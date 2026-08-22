@@ -1,0 +1,1 @@
+ALTER TABLE `culto_lancamentos` ADD `visitas_lares` integer DEFAULT 0 NOT NULL;

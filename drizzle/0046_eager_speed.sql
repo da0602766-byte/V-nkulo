@@ -1,0 +1,2 @@
+ALTER TABLE `visitante_categorias` ADD `ministerio_id` integer;--> statement-breakpoint
+CREATE INDEX `visitante_categorias_comunidade_ministerio_idx` ON `visitante_categorias` (`comunidade_id`,`ministerio_id`,`ativa`);

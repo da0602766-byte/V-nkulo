@@ -1,0 +1,1 @@
+ALTER TABLE `notificacoes_sistema` ADD `usuario_id` integer REFERENCES usuarios(id);

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Símbolo ADOTE</title>
+  <defs>
+    <linearGradient id="gold" x1="10" y1="6" x2="52" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f7d78c"/>
+      <stop offset=".48" stop-color="#d59a33"/>
+      <stop offset="1" stop-color="#8d5b18"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#gold)" d="M27 4h10v17h14v10H37v29H27V31H13V21h14z"/>
+  <path fill="#fff" fill-opacity=".38" d="M30 7h3v50h-3z"/>
+</svg>

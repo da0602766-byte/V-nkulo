@@ -1,0 +1,156 @@
+import { getD1 } from "../../../../../db";
+import { parseFeedPostPayload } from "../../../../lib/feed-validation";
+import { recordTenantAudit } from "../../../../lib/tenant-audit";
+import { requireTenantPermission } from "../../../../lib/tenant";
+
+type Context = { params: Promise<{ id: string }> };
+
+export async function PATCH(request: Request, context: Context) {
+  const access = await requireTenantPermission("feed.view");
+  if ("error" in access) return access.error;
+  const id = Number((await context.params).id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return Response.json({ error: "Publicação inválida." }, { status: 400 });
+  }
+  const payload = (await request.json()) as Record<string, unknown>;
+  const db = getD1();
+  const existing = await db
+    .prepare(
+      `SELECT id, criado_por FROM publicacoes_piloto
+      WHERE id = ? AND comunidade_id = ? AND status <> 'ARQUIVADA'`,
+    )
+    .bind(id, access.context.comunidadeId)
+    .first<{ id: number; criado_por: number | null }>();
+  if (!existing) {
+    return Response.json(
+      { error: "Publicação não encontrada." },
+      { status: 404 },
+    );
+  }
+  const isOwner = existing.criado_por === access.user.id;
+  const canModerate = access.context.permissions.includes("feed.moderate");
+  if (String(payload.acao || "").toUpperCase() === "ARQUIVAR") {
+    if (!isOwner && !canModerate) {
+      return Response.json(
+        { error: "Somente o autor ou a gestão pode ocultar esta publicação." },
+        { status: 403 },
+      );
+    }
+    await db
+      .prepare(
+        `UPDATE publicacoes_piloto
+        SET status = 'ARQUIVADA', atualizado_em = CURRENT_TIMESTAMP
+        WHERE id = ? AND comunidade_id = ?`,
+      )
+      .bind(id, access.context.comunidadeId)
+      .run();
+    await recordTenantAudit(
+      db,
+      access.context,
+      access.user.id,
+      "PUBLICACAO_V45_ARQUIVADA",
+      "SUCESSO",
+      { publicacaoId: id },
+    );
+    return Response.json({ ok: true });
+  }
+  if (!isOwner) {
+    return Response.json(
+      { error: "Somente o autor pode editar esta publicação." },
+      { status: 403 },
+    );
+  }
+  if (!access.context.permissions.includes("feed.publish")) {
+    return Response.json(
+      { error: "Seu perfil atual não permite publicar conteúdo." },
+      { status: 403 },
+    );
+  }
+  const parsed = parseFeedPostPayload({ ...payload, visibilidade: "COMUNIDADE" });
+  if ("error" in parsed) {
+    return Response.json({ error: parsed.error }, { status: 400 });
+  }
+  await db
+    .prepare(
+      `UPDATE publicacoes_piloto SET
+        titulo = ?, resumo = ?, conteudo = ?, categoria = ?,
+        visibilidade = ?, status = ?, comentarios_habilitados = ?,
+        imagem_url = ?, imagem_thumbnail_url = ?, imagem_alt = ?,
+        imagem_width = ?, imagem_height = ?, links_json = ?,
+        atualizado_em = CURRENT_TIMESTAMP
+      WHERE id = ? AND comunidade_id = ?`,
+    )
+    .bind(
+      parsed.titulo,
+      parsed.resumo,
+      parsed.conteudo,
+      parsed.categoria,
+      "COMUNIDADE",
+      parsed.status,
+      parsed.comentariosHabilitados ? 1 : 0,
+      parsed.imagemUrl,
+      parsed.imagemThumbnailUrl,
+      parsed.imagemAlt,
+      parsed.imagemWidth,
+      parsed.imagemHeight,
+      parsed.linksJson,
+      id,
+      access.context.comunidadeId,
+    )
+    .run();
+  await recordTenantAudit(
+    db,
+    access.context,
+    access.user.id,
+    "PUBLICACAO_V45_ATUALIZADA",
+    "SUCESSO",
+    {
+      publicacaoId: id,
+      status: parsed.status,
+      visibilidade: "COMUNIDADE",
+    },
+  );
+  return Response.json({ ok: true });
+}
+
+export async function DELETE(_request: Request, context: Context) {
+  const access = await requireTenantPermission("feed.view");
+  if ("error" in access) return access.error;
+  if (access.user.system_owner !== true) {
+    return Response.json(
+      { error: "Somente o proprietário da plataforma pode excluir definitivamente." },
+      { status: 403 },
+    );
+  }
+  const id = Number((await context.params).id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return Response.json({ error: "Publicação inválida." }, { status: 400 });
+  }
+  const db = getD1();
+  const existing = await db
+    .prepare(
+      `SELECT id, titulo FROM publicacoes_piloto
+       WHERE id = ? AND comunidade_id = ?`,
+    )
+    .bind(id, access.context.comunidadeId)
+    .first<{ id: number; titulo: string }>();
+  if (!existing) {
+    return Response.json({ error: "Publicação não encontrada." }, { status: 404 });
+  }
+  await recordTenantAudit(
+    db,
+    access.context,
+    access.user.id,
+    "PUBLICACAO_V473_EXCLUIDA_PELO_PROPRIETARIO",
+    "SUCESSO",
+    { publicacaoId: id, titulo: existing.titulo },
+  );
+  await db
+    .prepare(
+      `DELETE FROM publicacoes_piloto
+       WHERE id = ? AND comunidade_id = ?`,
+    )
+    .bind(id, access.context.comunidadeId)
+    .run();
+  return Response.json({ ok: true });
+}
