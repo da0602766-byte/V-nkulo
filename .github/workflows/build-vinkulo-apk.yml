@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
     paths: ["Vinkulo-Android/**"]
+  pull_request:
+    branches: [main]
+    paths: ["Vinkulo-Android/**"]
 jobs:
   apk:
     runs-on: ubuntu-latest
