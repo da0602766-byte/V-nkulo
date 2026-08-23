@@ -59,7 +59,7 @@ public class MainActivity extends Activity {
             }
         });
         createNotificationChannel();
-        requestNotificationPermission();
+        requestStartupPermissions();
         if (state == null) webView.loadUrl(APP_URL); else webView.restoreState(state);
     }
 
@@ -100,13 +100,22 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void requestNotificationPermission() {
+    private void requestStartupPermissions() {
         if (Build.VERSION.SDK_INT >= 33 &&
                 checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(
                     new String[]{Manifest.permission.POST_NOTIFICATIONS},
                     NOTIFICATION_PERMISSION
             );
+        } else {
+            requestCameraPermission();
+        }
+    }
+
+    private void requestCameraPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+                checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION);
         }
     }
 
@@ -134,15 +143,18 @@ public class MainActivity extends Activity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         boolean granted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
 
-        if (requestCode == CAMERA_PERMISSION && pendingCameraRequest != null) {
-            if (granted) {
-                pendingCameraRequest.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
-            } else {
-                pendingCameraRequest.deny();
+        if (requestCode == CAMERA_PERMISSION) {
+            if (pendingCameraRequest != null) {
+                if (granted) {
+                    pendingCameraRequest.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+                } else {
+                    pendingCameraRequest.deny();
+                }
+                pendingCameraRequest = null;
             }
-            pendingCameraRequest = null;
-        } else if (requestCode == NOTIFICATION_PERMISSION && granted) {
-            showNotificationEnabledConfirmation();
+        } else if (requestCode == NOTIFICATION_PERMISSION) {
+            if (granted) showNotificationEnabledConfirmation();
+            requestCameraPermission();
         }
     }
 
