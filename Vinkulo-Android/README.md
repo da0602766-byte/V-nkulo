@@ -21,6 +21,8 @@ A identidade mostrada dentro do aplicativo vem da própria plataforma. O ícone 
 
 Abra o projeto no Android Studio e use **Build > Build APK(s)**. Também há um fluxo do GitHub Actions no repositório para gerar `app-debug.apk` automaticamente.
 
+Depois de uma compilação da branch principal, a versão mais recente também fica disponível em `downloads/VINKULO_ANDROID_LATEST.apk` no repositório.
+
 ## Endereço conectado
 
 `https://adote-gestao.da0602766.chatgpt.site`
