@@ -4,10 +4,10 @@ Aplicativo Android conectado à plataforma oficial do Vínkulo.
 
 ## Permissões
 
-- **Câmera:** solicitada quando o leitor de QR Code é aberto.
+- **Câmera:** solicitada na primeira abertura, logo depois das notificações, para evitar o bloqueio do WebView em alguns aparelhos Samsung.
 - **Notificações:** solicitada na primeira abertura em Android 13 ou superior.
 
-Versão atual: **1.1.0** (`versionCode 2`).
+Versão atual: **1.2.0** (`versionCode 3`).
 
 ## Identidade visual
 
