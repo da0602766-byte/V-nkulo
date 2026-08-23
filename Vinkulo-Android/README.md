@@ -7,7 +7,11 @@ Aplicativo Android conectado à plataforma oficial do Vínkulo.
 - **Câmera:** solicitada na primeira abertura, logo depois das notificações, para evitar o bloqueio do WebView em alguns aparelhos Samsung.
 - **Notificações:** solicitada na primeira abertura em Android 13 ou superior.
 
-Versão atual: **1.2.0** (`versionCode 3`).
+Versão atual: **1.3.0** (`versionCode 4`).
+
+## Compartilhamento no WhatsApp
+
+O botão do WhatsApp usa uma ponte nativa protegida pelo domínio oficial do Vínkulo. No aplicativo Android, ele abre diretamente a escolha de conversa ou grupo no WhatsApp (ou WhatsApp Business), sem depender da área de transferência.
 
 ## Identidade visual
 
@@ -15,7 +19,7 @@ A identidade mostrada dentro do aplicativo vem da própria plataforma. O ícone 
 
 ## Gerar o APK
 
-Abra o projeto no Android Studio e use **Build > Build APK(s)**. Também há um fluxo do GitHub Actions em `.github/workflows/build-apk.yml` para gerar `app-debug.apk` automaticamente.
+Abra o projeto no Android Studio e use **Build > Build APK(s)**. Também há um fluxo do GitHub Actions no repositório para gerar `app-debug.apk` automaticamente.
 
 ## Endereço conectado
 

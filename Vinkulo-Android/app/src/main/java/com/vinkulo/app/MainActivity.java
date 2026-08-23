@@ -5,21 +5,26 @@ import android.app.Activity;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.CookieManager;
 import android.webkit.ValueCallback;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.Toast;
 
 public class MainActivity extends Activity {
     private static final String APP_URL = "https://adote-gestao.da0602766.chatgpt.site";
+    private static final String APP_HOST = "adote-gestao.da0602766.chatgpt.site";
     private static final int FILE_PICKER = 401;
     private static final int CAMERA_PERMISSION = 402;
     private static final int NOTIFICATION_PERMISSION = 403;
@@ -41,7 +46,17 @@ public class MainActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(false);
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
-        webView.setWebViewClient(new WebViewClient());
+        webView.addJavascriptInterface(new VinkuloBridge(), "VinkuloAndroid");
+        webView.setWebViewClient(new WebViewClient() {
+            @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                return handleNavigation(request.getUrl());
+            }
+
+            @SuppressWarnings("deprecation")
+            @Override public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                return handleNavigation(Uri.parse(url));
+            }
+        });
         webView.setWebChromeClient(new WebChromeClient() {
             @Override public void onPermissionRequest(PermissionRequest request) {
                 runOnUiThread(() -> handleWebPermissionRequest(request));
@@ -61,6 +76,61 @@ public class MainActivity extends Activity {
         createNotificationChannel();
         requestStartupPermissions();
         if (state == null) webView.loadUrl(APP_URL); else webView.restoreState(state);
+    }
+
+    private final class VinkuloBridge {
+        @JavascriptInterface
+        public void shareToWhatsApp(String message) {
+            if (message == null || message.trim().isEmpty()) return;
+            runOnUiThread(() -> openWhatsAppShare(message));
+        }
+    }
+
+    private void openWhatsAppShare(String message) {
+        Intent share = new Intent(Intent.ACTION_SEND);
+        share.setType("text/plain");
+        share.putExtra(Intent.EXTRA_TEXT, message);
+
+        if (launchShareInPackage(share, "com.whatsapp")) return;
+        if (launchShareInPackage(share, "com.whatsapp.w4b")) return;
+
+        Toast.makeText(this, "Instale o WhatsApp para compartilhar.", Toast.LENGTH_LONG).show();
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=com.whatsapp")));
+        } catch (ActivityNotFoundException ignored) {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=com.whatsapp")));
+        }
+    }
+
+    private boolean launchShareInPackage(Intent baseIntent, String packageName) {
+        Intent targeted = new Intent(baseIntent);
+        targeted.setPackage(packageName);
+        try {
+            startActivity(targeted);
+            return true;
+        } catch (ActivityNotFoundException ignored) {
+            return false;
+        }
+    }
+
+    private boolean handleNavigation(Uri uri) {
+        if (uri == null) return false;
+        if ("https".equalsIgnoreCase(uri.getScheme()) && APP_HOST.equalsIgnoreCase(uri.getHost())) {
+            return false;
+        }
+
+        try {
+            Intent externalIntent;
+            if ("intent".equalsIgnoreCase(uri.getScheme())) {
+                externalIntent = Intent.parseUri(uri.toString(), Intent.URI_INTENT_SCHEME);
+            } else {
+                externalIntent = new Intent(Intent.ACTION_VIEW, uri);
+            }
+            startActivity(externalIntent);
+        } catch (Exception ignored) {
+            Toast.makeText(this, "Não foi possível abrir este aplicativo.", Toast.LENGTH_SHORT).show();
+        }
+        return true;
     }
 
     private void handleWebPermissionRequest(PermissionRequest request) {
