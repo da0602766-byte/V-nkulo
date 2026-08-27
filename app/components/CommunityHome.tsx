@@ -935,7 +935,7 @@ export default function CommunityHome({
                     )}
                   </footer>
                   {post.status === "PUBLICADA" && (
-                    <CommunityPostInteractions postId={post.id} initialCount={Number(post.total_comentarios || 0)} />
+                    <CommunityPostInteractions postId={post.id} initialCount={Number(post.total_comentarios || 0)} currentUserName={userName} />
                   )}
                 </article>
               ))}
