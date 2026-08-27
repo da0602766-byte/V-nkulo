@@ -60,6 +60,7 @@ export async function PATCH(request: Request, context: Context) {
       `UPDATE eventos_comunidade SET
         titulo = ?, descricao = ?, categoria = ?, inicia_em = ?,
         termina_em = ?, local = ?, publico = ?, status = ?, capacidade = ?,
+        escalas_abrem_em = ?, reservas_abrem_em = ?,
         atualizado_por = ?, atualizado_em = CURRENT_TIMESTAMP
       WHERE id = ? AND comunidade_id = ?`,
     )
@@ -73,6 +74,8 @@ export async function PATCH(request: Request, context: Context) {
       parsed.publico ? 1 : 0,
       parsed.status,
       parsed.capacidade,
+      parsed.escalasAbremEm,
+      parsed.reservasAbremEm,
       access.user.id,
       id,
       access.context.comunidadeId,

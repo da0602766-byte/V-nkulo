@@ -15,7 +15,6 @@ import CommunityLifecycleWorkspace from "./CommunityLifecycleWorkspace";
 import CommunityHome from "./CommunityHome";
 import AccountProfileWorkspace from "./AccountProfileWorkspace";
 import EventsWorkspace from "./EventsWorkspace";
-import FontScaleControl from "./FontScaleControl";
 import GlobalVisualEditor from "./GlobalVisualEditor";
 import SecretaryMinisterialWorkspace from "./SecretaryMinisterialWorkspace";
 import NetworkWorkspace from "./NetworkWorkspace";
@@ -30,6 +29,8 @@ import LeadershipWorkspace from "./LeadershipWorkspace";
 import WorkspaceErrorBoundary from "./WorkspaceErrorBoundary";
 import VerifiedOwnerName from "./VerifiedOwnerName";
 import TemporaryAccessWatcher from "./TemporaryAccessWatcher";
+import CloseDetailsOnOutside from "./CloseDetailsOnOutside";
+import EditorialSidebarSchedule from "./EditorialSidebarSchedule";
 
 type FeedItem = {
   id: number;
@@ -124,6 +125,7 @@ export default function PilotDashboard({
   userName,
   userEmail,
   userPhotoUrl,
+  systemOwner,
   initialView,
   communityTheme,
 }: {
@@ -135,6 +137,7 @@ export default function PilotDashboard({
   userName: string;
   userEmail: string;
   userPhotoUrl: string;
+  systemOwner: boolean;
   initialView: string;
   communityTheme: CommunityTheme;
 }) {
@@ -147,16 +150,11 @@ export default function PilotDashboard({
   const [communitySearch, setCommunitySearch] = useState("");
   const [switching, setSwitching] = useState(false);
   const [viewLoading, setViewLoading] = useState(false);
+  const [fontScale, setFontScale] = useState(1);
+  const [fontScaleHydrated, setFontScaleHydrated] = useState(false);
   const [inviteMessage, setInviteMessage] = useState("");
   const [inviteLink, setInviteLink] = useState("");
   const [inviteLoading, setInviteLoading] = useState(false);
-  const [registrationLinkMessage, setRegistrationLinkMessage] = useState("");
-  const [registrationLinkUrl, setRegistrationLinkUrl] = useState("");
-  const [registrationLinkLoading, setRegistrationLinkLoading] = useState(false);
-  const [registrationLinks, setRegistrationLinks] = useState<
-    { tokenHash: string; status: string; countdown: string }[]
-  >([]);
-  const [cancellingLink, setCancellingLink] = useState("");
   const [communityInfoOpen, setCommunityInfoOpen] = useState(false);
   const [communityProfile, setCommunityProfile] =
     useState<CommunityProfile | null>(null);
@@ -172,6 +170,43 @@ export default function PilotDashboard({
       // O menu continua expandido quando o armazenamento do navegador não está disponível.
     }
   }, []);
+
+  useEffect(() => {
+    try {
+      const individualKey = `vinkulo:font-scale:${userEmail.trim().toLowerCase()}`;
+      const saved = Number(
+        window.localStorage.getItem(individualKey) ??
+        window.localStorage.getItem("vinkulo:font-scale"),
+      );
+      if (Number.isFinite(saved)) {
+        setFontScale(Math.min(1.15, Math.max(0.9, Math.round(saved * 100) / 100)));
+      }
+    } catch {
+      // Mantém o tamanho padrão quando a preferência local não está disponível.
+    } finally {
+      setFontScaleHydrated(true);
+    }
+  }, [userEmail]);
+
+  useEffect(() => {
+    if (!fontScaleHydrated) return;
+    document.documentElement.style.zoom = String(fontScale);
+    try {
+      window.localStorage.setItem(
+        `vinkulo:font-scale:${userEmail.trim().toLowerCase()}`,
+        String(fontScale),
+      );
+    } catch {
+      // A preferência continua ativa na sessão atual.
+    }
+    return () => {
+      document.documentElement.style.zoom = "";
+    };
+  }, [fontScale, fontScaleHydrated, userEmail]);
+
+  function changeFontScale(delta: number) {
+    setFontScale((current) => Math.min(1.15, Math.max(0.9, Math.round((current + delta) * 100) / 100)));
+  }
 
   function toggleSidebar() {
     setSidebarCollapsed((current) => {
@@ -189,6 +224,7 @@ export default function PilotDashboard({
       MENU.filter(
         (item) =>
           (active.permissions.includes(item.permission) ||
+            (item.id === "estacionamento" && active.permissions.includes("parking.reserve")) ||
             (active.isOwner && item.id === "pessoas")) &&
           (!VIEW_MODULE[item.id] ||
             active.modules.includes(VIEW_MODULE[item.id]!)) &&
@@ -523,66 +559,6 @@ export default function PilotDashboard({
     }
   }
 
-  async function createRegistrationLink(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const formElement = event.currentTarget;
-    setRegistrationLinkLoading(true);
-    setRegistrationLinkMessage("");
-    setRegistrationLinkUrl("");
-    const days = Number(new FormData(formElement).get("validadeDias") || 1);
-    const expiresAt = new Date(Date.now() + days * 86_400_000).toISOString();
-    try {
-      const response = await fetch("/api/pilot/links-cadastro-membro", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ expiresAt }),
-      });
-      const result = (await response.json()) as { error?: string; url?: string };
-      if (!response.ok) throw new Error(result.error || "Não foi possível criar o link.");
-      setRegistrationLinkMessage("Link de cadastro criado. Copie e compartilhe.");
-      setRegistrationLinkUrl(new URL(result.url || "", window.location.origin).toString());
-      void loadRegistrationLinks();
-    } catch (error) {
-      setRegistrationLinkMessage((error as Error).message);
-    } finally {
-      setRegistrationLinkLoading(false);
-    }
-  }
-
-  async function loadRegistrationLinks() {
-    try {
-      const response = await fetch("/api/pilot/links-cadastro-membro", { cache: "no-store" });
-      if (!response.ok) return;
-      const result = (await response.json()) as {
-        links?: { tokenHash: string; status: string; countdown: string }[];
-      };
-      setRegistrationLinks(result.links || []);
-    } catch {
-      // silencioso: a listagem é um extra de conveniência, não bloqueia a criação
-    }
-  }
-
-  async function cancelRegistrationLink(tokenHash: string) {
-    setCancellingLink(tokenHash);
-    try {
-      const response = await fetch("/api/pilot/links-cadastro-membro", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tokenHash }),
-      });
-      if (response.ok) await loadRegistrationLinks();
-    } finally {
-      setCancellingLink("");
-    }
-  }
-
-  useEffect(() => {
-    if (visibleView === "comunidade" && active.permissions.includes("community.membership-links.manage")) {
-      void loadRegistrationLinks();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visibleView]);
-
   return (
     <main
       className="pilot-dashboard"
@@ -619,6 +595,7 @@ export default function PilotDashboard({
           : {}),
       } as CSSProperties}
     >
+      <CloseDetailsOnOutside />
       <header className="pilot-topbar" data-editor-key="cabecalho" data-smart-scroll-header>
         <button
           className="vinkulo-brand community-brand-trigger"
@@ -717,7 +694,7 @@ export default function PilotDashboard({
               <i aria-hidden="true">⌄</i>
             </summary>
             <div className="pilot-user-popover">
-              <header className="pilot-user-popover-head">
+              <header className="pilot-user-popover-head-v3">
                 <span>{userPhotoUrl ? <img src={userPhotoUrl} alt="" /> : userInitials}</span>
                 <div className="pilot-user-popover-identity"><VerifiedOwnerName name={userName} verified={active.isOwner} /><small>{userEmail}</small><em>{active.isOwner ? "Proprietário" : ROLE_LABELS[active.papel] || active.papel}</em></div>
                 <ThemeControl compact />
@@ -744,7 +721,12 @@ export default function PilotDashboard({
                   </nav>
                 </details>
               )}
-              <FontScaleControl userEmail={userEmail} />
+              <div className="pilot-user-font-scale-v3" role="group" aria-label="Tamanho do texto">
+                <span className="pilot-user-font-scale-label-v3">Tamanho do texto</span>
+                <button type="button" onClick={() => changeFontScale(-0.05)} disabled={fontScale <= 0.9} aria-label="Diminuir textos">A−</button>
+                <button type="button" className={fontScale === 1 ? "active" : ""} onClick={() => setFontScale(1)} aria-label="Restaurar tamanho padrão">{Math.round(fontScale * 100)}%</button>
+                <button type="button" onClick={() => changeFontScale(0.05)} disabled={fontScale >= 1.15} aria-label="Aumentar textos">A+</button>
+              </div>
               <button type="button" onClick={() => openView("conta")}>Minha conta</button>
               {active.isOwner && <Link href="/proprietario">Área do proprietário</Link>}
               <Link href={`/comunidades/${active.comunidadeSlug}`}>Página pública</Link>
@@ -753,6 +735,12 @@ export default function PilotDashboard({
           </details>
         </div>
       </header>
+      {switching && (
+        <div className="pilot-community-switching-v3" role="status" aria-live="polite">
+          <span className="pilot-loading-spinner" aria-hidden="true" />
+          <div><strong>Entrando na comunidade</strong><small>Preparando informações, permissões e módulos…</small></div>
+        </div>
+      )}
       {active.temporaryAccess && (
         <TemporaryAccessWatcher
           resourceLabel={active.temporaryAccess.resource === "ESTACIONAMENTO" ? "Estacionamento" : "Escala em modo leitura"}
@@ -910,6 +898,9 @@ export default function PilotDashboard({
               <span className="pilot-sidebar-label">Explorar comunidades</span>
             </Link>
           </nav>
+          {(systemOwner || active.papel === "SUPERADMIN") && (
+            <EditorialSidebarSchedule onOpen={() => window.location.assign("/proprietario?tab=editorial")} />
+          )}
           <div className="pilot-sidebar-note"><strong>Ambiente controlado</strong><p>Nenhum menu substitui as verificações do backend.</p></div>
         </aside>
         <section
@@ -986,7 +977,7 @@ export default function PilotDashboard({
             />
           )}
           {visibleView === "estacionamento" && (
-            <ParkingWorkspace communityName={active.comunidadeNome} />
+            <ParkingWorkspace communityName={active.comunidadeNome} memberMode={!active.permissions.includes("parking.view")} />
           )}
           {visibleView === "redes" && features.networkModuleEnabled && (
             <NetworkWorkspace />
@@ -1022,69 +1013,6 @@ export default function PilotDashboard({
                   <div className="sensitive-action-note"><strong>Perfis privilegiados bloqueados</strong><p>Convites para líderes, pastores ou administradores exigirão MFA, reautenticação e revisão.</p></div>
                 </>
               )}
-              {active.permissions.includes("community.membership-links.manage") && (
-                <>
-                  <form className="pilot-form invite-generator" onSubmit={createRegistrationLink}>
-                    <label>
-                      Link de cadastro para novos membros
-                      <select name="validadeDias" defaultValue="7">
-                        <option value="1">Válido por 1 dia</option>
-                        <option value="3">Válido por 3 dias</option>
-                        <option value="7">Válido por 7 dias</option>
-                        <option value="15">Válido por 15 dias</option>
-                        <option value="30">Válido por 30 dias</option>
-                      </select>
-                    </label>
-                    <button disabled={registrationLinkLoading}>
-                      {registrationLinkLoading ? "Gerando…" : "Gerar link"}
-                    </button>
-                  </form>
-                  {registrationLinkMessage && (
-                    <p className="pilot-form-message" role="status">{registrationLinkMessage}</p>
-                  )}
-                  {registrationLinkUrl && (
-                    <div className="invite-result">
-                      <label>
-                        Link compartilhável
-                        <input
-                          readOnly
-                          value={registrationLinkUrl}
-                          onFocus={(event) => event.currentTarget.select()}
-                        />
-                      </label>
-                      <button onClick={() => navigator.clipboard.writeText(registrationLinkUrl)}>
-                        Copiar link
-                      </button>
-                    </div>
-                  )}
-                  <div className="sensitive-action-note">
-                    <strong>Qualquer pessoa com o link pode se candidatar</strong>
-                    <p>
-                      Quem preencher fica pendente de aprovação em Solicitações — nenhum vínculo é
-                      criado automaticamente.
-                    </p>
-                  </div>
-                  {registrationLinks.length > 0 && (
-                    <ul className="registration-link-list">
-                      {registrationLinks.map((link) => (
-                        <li key={link.tokenHash}>
-                          <span>{link.status === "ATIVO" ? link.countdown : "Cancelado"}</span>
-                          {link.status === "ATIVO" && (
-                            <button
-                              type="button"
-                              className="secondary"
-                              disabled={cancellingLink === link.tokenHash}
-                              onClick={() => void cancelRegistrationLink(link.tokenHash)}
-                            >
-                              {cancellingLink === link.tokenHash ? "Cancelando…" : "Cancelar"}
-                            </button>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </>
-              )}
               <CommunityAdminWorkspace
                 managementItems={communityManagementItems}
                 onOpenManagementView={(nextView) => openView(nextView)}
@@ -1097,6 +1025,7 @@ export default function PilotDashboard({
                 canConfigureParking={active.permissions.includes(
                   "parking.configure",
                 )}
+                canManageRegistrationLinks={active.isCommunityOwner}
               />
             </section>
           )}
@@ -1113,18 +1042,20 @@ export default function PilotDashboard({
           type="button"
           className={visibleView === "inicio" && !mobileMenu ? "active" : ""}
           onClick={() => openView("inicio")}
+          aria-label="Início"
         >
-          <span aria-hidden="true">⌂</span>
-          Início
+          <span className="pilot-mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5v8a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5z"/><path d="M9.5 20v-6h5v6"/></svg></span>
+          <small className="pilot-mobile-label">Início</small>
         </button>
         {eventViewAvailable && (
           <button
             type="button"
             className={visibleView === "eventos" && !mobileMenu ? "active" : ""}
             onClick={() => openView("eventos")}
+            aria-label="Eventos"
           >
-            <span aria-hidden="true">▣</span>
-            Eventos
+            <span className="pilot-mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="14" rx="2"/><path d="M8 3.5v4M16 3.5v4M4 10h16M8 14h3M14 14h2"/></svg></span>
+            <small className="pilot-mobile-label">Eventos</small>
           </button>
         )}
         {quickActions.length > 0 && (
@@ -1141,7 +1072,7 @@ export default function PilotDashboard({
           aria-label="Abrir ações rápidas"
         >
           <span aria-hidden="true">+</span>
-          Adicionar
+          <small className="pilot-mobile-label">Adicionar</small>
         </button>
         )}
         <button
@@ -1159,7 +1090,7 @@ export default function PilotDashboard({
             <i />
             <i />
           </span>
-          Menu
+          <small className="pilot-mobile-label">Menu</small>
         </button>
         <button
           type="button"
@@ -1167,9 +1098,10 @@ export default function PilotDashboard({
           onClick={() => setMobileMenu((current) => current === "perfil" ? null : "perfil")}
           aria-expanded={mobileMenu === "perfil"}
           aria-controls="pilot-mobile-sheet"
+          aria-label="Perfil"
         >
           <span className="mobile-profile-initials" aria-hidden="true">{userPhotoUrl ? <img src={userPhotoUrl} alt="" /> : userInitials}</span>
-          Perfil
+          <small className="pilot-mobile-label">Perfil</small>
         </button>
       </nav>
       {mobileMenu && (
@@ -1209,53 +1141,6 @@ export default function PilotDashboard({
             </header>
             {mobileMenu === "menu" ? (
               <div className="pilot-mobile-menu-content">
-                <section className="pilot-mobile-community-switcher">
-                  <div>
-                    <p className="pilot-kicker">COMUNIDADE</p>
-                    <strong>{active.comunidadeNome}</strong>
-                    <small>Troque apenas entre comunidades vinculadas à sua conta.</small>
-                  </div>
-                  <label>
-                    <span className="sr-only">Pesquisar comunidade</span>
-                    <input
-                      type="search"
-                      value={communitySearch}
-                      onChange={(event) => setCommunitySearch(event.target.value)}
-                      placeholder="Pesquisar comunidade"
-                    />
-                  </label>
-                  <div className="pilot-mobile-community-list">
-                    {filteredMemberships.map((membership) => (
-                      <button
-                        key={membership.comunidadeId}
-                        type="button"
-                        className={
-                          membership.comunidadeId === active.comunidadeId
-                            ? "active"
-                            : ""
-                        }
-                        disabled={
-                          switching ||
-                          membership.comunidadeId === active.comunidadeId
-                        }
-                        onClick={() => switchCommunity(membership.comunidadeId)}
-                      >
-                        <span>{getInitials(membership.comunidadeNome)}</span>
-                        <div>
-                          <strong>{membership.comunidadeNome}</strong>
-                          <small>
-                            {membership.comunidadeId === active.comunidadeId
-                              ? "Ativa agora"
-                              : "Trocar contexto"}
-                          </small>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                  <Link href="/comunidades" onClick={() => setMobileMenu(null)}>
-                    Explorar comunidades públicas
-                  </Link>
-                </section>
                 <div className="pilot-mobile-menu-grid">
                   {primaryMenu.map((item) => (
                     <button

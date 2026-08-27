@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import CommunityThemeEditor from "./CommunityThemeEditor";
+import MemberRegistrationLinkManager from "./MemberRegistrationLinkManager";
 
 type JoinRequest = {
   id: number;
@@ -31,12 +32,14 @@ export default function CommunityAdminWorkspace({
   canManageCommunity = false,
   canManageRequests = false,
   canConfigureParking = false,
+  canManageRegistrationLinks = false,
 }: {
   managementItems: ManagementItem[];
   onOpenManagementView: (view: CommunityManagementView) => void;
   canManageCommunity?: boolean;
   canManageRequests?: boolean;
   canConfigureParking?: boolean;
+  canManageRegistrationLinks?: boolean;
 }) {
   const [requests, setRequests] = useState<JoinRequest[]>([]);
   const [parkingActive, setParkingActive] = useState(false);
@@ -208,6 +211,8 @@ export default function CommunityAdminWorkspace({
         </>
       )}
 
+      {canManageRegistrationLinks && <MemberRegistrationLinkManager />}
+
       {canConfigureParking && (
         <section className="community-privacy-control parking-module-control">
           <div>
@@ -242,7 +247,7 @@ export default function CommunityAdminWorkspace({
             <p className="pilot-kicker">SOLICITAÇÕES DE ENTRADA</p>
             <h2>Análise pela comunidade</h2>
             <p className="join-request-retention">
-              Pedidos analisados permanecem visíveis por 7 dias antes da limpeza automática.
+              Pedidos analisados permanecem visíveis por 24 horas antes da limpeza automática.
             </p>
           </div>
           <span>{loading ? "Carregando…" : `${requests.length} registros`}</span>

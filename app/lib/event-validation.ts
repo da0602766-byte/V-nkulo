@@ -24,6 +24,12 @@ export function parseEventPayload(payload: unknown) {
     Number.isInteger(capacidadeRaw) && capacidadeRaw > 0
       ? capacidadeRaw
       : null;
+  const escalasAbremEm = body.escalasAbremEm
+    ? normalizeDateTime(body.escalasAbremEm)
+    : null;
+  const reservasAbremEm = body.reservasAbremEm
+    ? normalizeDateTime(body.reservasAbremEm)
+    : null;
   const publico = body.publico === true || body.publico === 1;
   const enquete = parsePoll(body.enquete);
 
@@ -36,6 +42,14 @@ export function parseEventPayload(payload: unknown) {
   if (terminaEm && Date.parse(terminaEm) < Date.parse(iniciaEm)) {
     return {
       error: "A data de término não pode ser anterior ao início.",
+    } as const;
+  }
+  if (
+    (escalasAbremEm && Date.parse(escalasAbremEm) >= Date.parse(iniciaEm)) ||
+    (reservasAbremEm && Date.parse(reservasAbremEm) >= Date.parse(iniciaEm))
+  ) {
+    return {
+      error: "A abertura das escalas e reservas precisa acontecer antes do evento.",
     } as const;
   }
   if (
@@ -56,6 +70,8 @@ export function parseEventPayload(payload: unknown) {
     publico,
     status,
     capacidade,
+    escalasAbremEm,
+    reservasAbremEm,
     enquete,
   } as const;
 }

@@ -294,6 +294,14 @@ export async function POST(request: Request) {
         parsed.responsavelUsuarioId,
       )
       .run();
+    if (parsed.categoria === "ESTACIONAMENTO") {
+      const rules = JSON.stringify({ responsavelUsuarioId: parsed.responsavelUsuarioId, instrucoes: "Operação vinculada ao ministério de Estacionamento." });
+      await db.prepare(`INSERT INTO estacionamento_configuracoes
+        (comunidade_id,ativo,nome_modulo,cor_destaque,regras,atualizado_por,atualizado_em)
+        VALUES (?,1,'Estacionamento','#d99a32',?,?,CURRENT_TIMESTAMP)
+        ON CONFLICT(comunidade_id) DO UPDATE SET ativo=1,regras=excluded.regras,atualizado_por=excluded.atualizado_por,atualizado_em=CURRENT_TIMESTAMP`)
+        .bind(access.context.comunidadeId,rules,access.user.id).run();
+    }
     await recordTenantAudit(
       db,
       access.context,

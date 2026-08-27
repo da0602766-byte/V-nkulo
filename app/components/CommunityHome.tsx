@@ -626,14 +626,6 @@ export default function CommunityHome({
                 purpose="post-image"
                 onChange={setComposerImageUrl}
               />
-              <label>
-                Descrição da imagem
-                <input
-                  name="imagemAlt"
-                  maxLength={180}
-                  placeholder="Descreva a imagem para acessibilidade"
-                />
-              </label>
             </div>
             <label className="composer-wide">
               Links para divulgação (opcional)

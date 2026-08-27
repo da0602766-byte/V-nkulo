@@ -59,17 +59,37 @@ export async function GET() {
        ORDER BY criado_em DESC LIMIT 250`,
     ).bind(access.context.comunidadeId).all(),
     db.prepare(
-      `SELECT u.id, u.nome, uc.papel FROM usuario_comunidades uc
+      `SELECT u.id, u.nome, u.email, u.telefone, u.foto_perfil, uc.papel FROM usuario_comunidades uc
        JOIN usuarios u ON u.id = uc.usuario_id
        WHERE uc.comunidade_id = ? AND uc.status = 'ATIVO' AND u.ativo = 1
        ORDER BY u.nome ASC LIMIT 250`,
-    ).bind(access.context.comunidadeId).all<{ id: number; nome: string; papel: string }>(),
+    ).bind(access.context.comunidadeId).all<{
+      id: number;
+      nome: string;
+      email: string;
+      telefone: string | null;
+      foto_perfil: string | null;
+      papel: string;
+    }>(),
   ]);
+  const usersById = new Map(users.results.map((user) => [Number(user.id), user]));
   const cells = result.results.map((cell) => {
     const canOperate = canManage || Number(cell.lider_usuario_id) === access.user.id || Number(cell.vice_lider_usuario_id) === access.user.id;
+    const members = parseArray(cell.membros);
     return {
       ...cell,
-      membros: parseArray(cell.membros),
+      membros_total: members.filter((member) => String((member as Record<string, unknown>).kind) === "COMMUNITY").length,
+      membros: canOperate ? members.map((member) => {
+        const source = member as Record<string, unknown>;
+        const profile = usersById.get(Number(source.userId));
+        return profile ? {
+          ...source,
+          email: profile.email,
+          telefone: profile.telefone,
+          fotoPerfil: profile.foto_perfil,
+          papelComunidade: profile.papel,
+        } : source;
+      }) : [],
       dias_reuniao: parseArray(cell.dias_reuniao),
       can_operate: canOperate,
       agenda: agenda.results.filter((item) => Number(item.celula_id) === Number(cell.id) && (canOperate || item.visibilidade === "PUBLICO")),
@@ -77,7 +97,11 @@ export async function GET() {
       solicitacoes: canOperate ? requests.results.filter((item) => Number(item.celula_id) === Number(cell.id) && item.status === "PENDENTE") : [],
     };
   });
-  return Response.json({ celulas: cells, availableUsers: users.results, canManage }, { headers: { "Cache-Control": "no-store" } });
+  return Response.json({
+    celulas: cells,
+    availableUsers: canManage ? users.results.map((user) => ({ id: user.id, nome: user.nome, papel: user.papel })) : [],
+    canManage,
+  }, { headers: { "Cache-Control": "no-store" } });
 }
 
 function parseArray(value: unknown) {

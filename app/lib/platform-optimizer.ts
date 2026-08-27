@@ -152,7 +152,7 @@ export async function getPlatformOptimizerStatus(db: D1Database) {
         (SELECT COUNT(*) FROM solicitacoes_entrada_comunidade
           WHERE status IN ('APROVADA', 'RECUSADA')
             AND analisado_em IS NOT NULL
-            AND datetime(analisado_em) <= datetime('now', '-7 days')) AS resolvedJoinRequests,
+            AND datetime(analisado_em) <= datetime('now', '-1 day')) AS resolvedJoinRequests,
         (SELECT COUNT(*) FROM auditoria_piloto
           WHERE datetime(criado_em) < datetime('now', '-14 days')) AS oldAuditRecords,
         (SELECT COUNT(*) FROM convites_comunidade
@@ -252,7 +252,7 @@ export async function runPlatformOptimization(
         `DELETE FROM solicitacoes_entrada_comunidade
          WHERE status IN ('APROVADA', 'RECUSADA')
            AND analisado_em IS NOT NULL
-           AND datetime(analisado_em) <= datetime('now', '-7 days')`,
+           AND datetime(analisado_em) <= datetime('now', '-1 day')`,
       ),
       db.prepare(
         "DELETE FROM auditoria_piloto WHERE datetime(criado_em) < datetime('now', '-14 days')",

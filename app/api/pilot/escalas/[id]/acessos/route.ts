@@ -150,17 +150,12 @@ export async function POST(request: Request, context: Context) {
       { status: 409 },
     );
   }
-  const scheduleStartsAt = Date.parse(schedule.inicia_em);
-  const scheduleEndsAt = Date.parse(schedule.termina_em);
-  if (
-    startsAt < scheduleStartsAt ||
-    endsAt > scheduleEndsAt ||
-    endsAt - startsAt > 31 * 24 * 60 * 60 * 1000
-  ) {
+  if (endsAt <= Date.now() || endsAt - startsAt > 31 * 24 * 60 * 60 * 1000) {
     return Response.json(
       {
-        error:
-          "O acesso precisa permanecer dentro do horário publicado da escala.",
+        error: endsAt <= Date.now()
+          ? "O término da liberação precisa estar no futuro."
+          : "A liberação pode durar no máximo 31 dias.",
       },
       { status: 400 },
     );

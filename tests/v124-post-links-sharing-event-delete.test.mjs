@@ -31,7 +31,8 @@ test("publicações persistem até cinco links seguros e exibem compartilhamento
   assert.match(share, /payload\.files = files/);
   assert.match(share, /\/compartilhar\/publicacao\/\$\{postId\}/);
   assert.doesNotMatch(share, /Imagem da publicação:/);
-  assert.match(share, /https:\/\/wa\.me/);
+  assert.match(share, /shareToWhatsAppApp\(shareData\.message\)/);
+  assert.doesNotMatch(share, /https:\/\/wa\.me/);
   assert.match(share, /facebook\.com\/sharer/);
   assert.match(styles, /\.community-post-share-grid/);
   assert.match(styles, /\.community-post-actions-overlay/);

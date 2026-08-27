@@ -1,8 +1,8 @@
 import { getD1 } from "../../../../db";
-import { attachSessionCookie, createSession, normalizeEmail, verifyPassword } from "../../../lib/local-auth";
+import { attachSessionCookie, createFirstAccessToken, createSession, normalizeEmail, verifyPassword } from "../../../lib/local-auth";
 import { safeRelativeReturnPath } from "../../../lib/safe-return-path";
 
-type LoginRow = { id: number; perfil: string; senha_hash: string | null; senha_salt: string | null; tentativas_login: number; bloqueado_ate: string | null; ativo: number };
+type LoginRow = { id: number; perfil: string; senha_hash: string | null; senha_salt: string | null; tentativas_login: number; bloqueado_ate: string | null; ativo: number; primeiro_acesso_pendente: number };
 
 export async function POST(request: Request) {
   const contentType = request.headers.get("content-type") || "";
@@ -21,30 +21,42 @@ export async function POST(request: Request) {
   };
   const cleanEmail = normalizeEmail(email);
   const db = getD1();
-  const user = await db.prepare("SELECT id, perfil, senha_hash, senha_salt, tentativas_login, bloqueado_ate, ativo FROM usuarios WHERE email = ? LIMIT 1").bind(cleanEmail).first<LoginRow>();
+  const user = await db.prepare(
+    `SELECT u.id, u.perfil, u.senha_hash, u.senha_salt, u.tentativas_login,
+      u.bloqueado_ate, u.ativo,
+      EXISTS(
+        SELECT 1 FROM redefinicoes_senha r
+        WHERE r.usuario_id = u.id AND r.usado = 0 AND r.token_hash LIKE 'first:%'
+      ) AS primeiro_acesso_pendente
+     FROM usuarios u WHERE u.email = ? LIMIT 1`,
+  ).bind(cleanEmail).first<LoginRow>();
   if (!user?.senha_hash || !user.senha_salt) return fail("E-mail ou senha inválidos. Se for seu primeiro acesso, use seu convite individual ou fale com o administrador.", 401);
   if (user.bloqueado_ate && new Date(user.bloqueado_ate).getTime() > Date.now()) return fail("Acesso temporariamente bloqueado após 3 tentativas. Use Esqueci minha senha ou aguarde 15 minutos.", 429);
   const valid = await verifyPassword(String(senha || ""), user.senha_salt, user.senha_hash);
   if (!valid) {
-    // Incremento atômico no próprio SQL: duas tentativas simultâneas não podem
-    // ler o mesmo contador antigo e "perder" um incremento (o que permitiria
-    // mais de 3 tentativas em paralelo antes do bloqueio).
-    const counter = await db
-      .prepare("UPDATE usuarios SET tentativas_login = tentativas_login + 1 WHERE id = ? RETURNING tentativas_login")
-      .bind(user.id)
-      .first<{ tentativas_login: number }>();
-    const attempts = Number(counter?.tentativas_login || 1);
-    if (attempts >= 3) {
-      const blockedUntil = new Date(Date.now() + 15 * 60000).toISOString();
-      await db.prepare("UPDATE usuarios SET tentativas_login = 0, bloqueado_ate = ? WHERE id = ?").bind(blockedUntil, user.id).run();
-      return fail("Você errou a senha 3 vezes. Use Esqueci minha senha ou aguarde 15 minutos.", 401);
-    }
-    return fail(`E-mail ou senha inválidos. Restam ${3 - attempts} tentativa(s).`, 401);
+    const attempts = Number(user.tentativas_login || 0) + 1;
+    const blockedUntil = attempts >= 3 ? new Date(Date.now() + 15 * 60000).toISOString() : null;
+    await db.prepare("UPDATE usuarios SET tentativas_login = ?, bloqueado_ate = ? WHERE id = ?").bind(attempts >= 3 ? 0 : attempts, blockedUntil, user.id).run();
+    return fail(attempts >= 3 ? "Você errou a senha 3 vezes. Use Esqueci minha senha ou aguarde 15 minutos." : `E-mail ou senha inválidos. Restam ${3 - attempts} tentativa(s).`, 401);
   }
   if (!user.ativo) {
     return fail("Este cadastro está inativo. Solicite revisão ao suporte.", 403);
   }
   await db.prepare("UPDATE usuarios SET tentativas_login = 0, bloqueado_ate = NULL, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?").bind(user.id).run();
+  if (user.primeiro_acesso_pendente) {
+    const firstAccess = await createFirstAccessToken(user.id);
+    const firstAccessPath = `/primeiro-acesso?token=${encodeURIComponent(firstAccess.token)}&login=${encodeURIComponent(cleanEmail)}`;
+    if (isBrowserForm) {
+      return new Response(null, {
+        status: 303,
+        headers: { Location: new URL(firstAccessPath, request.url).toString(), "Cache-Control": "no-store" },
+      });
+    }
+    return Response.json(
+      { ok: true, firstAccessRequired: true, redirect: firstAccessPath },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  }
   const membership = await db
     .prepare(
       `SELECT uc.id FROM usuario_comunidades uc

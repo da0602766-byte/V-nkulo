@@ -10,11 +10,13 @@ type QueueItem = {
   publicar_em: string;
   status: string;
 };
+type SidebarNotification = { id:number; title:string; message:string; destination:string; read:boolean; category:string };
 
 const STORAGE_KEY = "adote:editorial-sidebar-visible";
 
 export default function EditorialSidebarSchedule({ onOpen }: { onOpen: () => void }) {
   const [queue, setQueue] = useState<QueueItem[]>([]);
+  const [notifications, setNotifications] = useState<SidebarNotification[]>([]);
   const [visible, setVisible] = useState(true);
   const [now, setNow] = useState(0);
 
@@ -30,10 +32,18 @@ export default function EditorialSidebarSchedule({ onOpen }: { onOpen: () => voi
     let active = true;
     async function load() {
       try {
-        const response = await fetch("/api/pilot/editorial/programacoes", { cache: "no-store" });
-        if (!response.ok) return;
-        const result = (await response.json()) as { queue?: QueueItem[] };
-        if (active) setQueue(result.queue || []);
+        const [scheduleResponse, notificationResponse] = await Promise.all([
+          fetch("/api/pilot/editorial/programacoes", { cache: "no-store" }),
+          fetch("/api/pilot/notificacoes", { cache: "no-store" }),
+        ]);
+        if (scheduleResponse.ok) {
+          const result = (await scheduleResponse.json()) as { queue?: QueueItem[] };
+          if (active) setQueue(result.queue || []);
+        }
+        if (notificationResponse.ok) {
+          const result = (await notificationResponse.json()) as { notifications?: SidebarNotification[] };
+          if (active) setNotifications(result.notifications || []);
+        }
       } catch {
         // O painel é informativo; uma falha de rede não interrompe a navegação.
       }
@@ -55,6 +65,7 @@ export default function EditorialSidebarSchedule({ onOpen }: { onOpen: () => voi
   }
 
   const next = queue.find((item) => item.status === "AGENDADA");
+  const latest = notifications.find((item) => !item.read) || notifications[0];
   if (!visible) {
     return (
       <button className="editorial-sidebar-restore" type="button" onClick={() => changeVisibility(true)}>
@@ -64,11 +75,22 @@ export default function EditorialSidebarSchedule({ onOpen }: { onOpen: () => voi
   }
 
   return (
-    <section className="editorial-sidebar-card" aria-label="Próxima publicação programada">
+    <section className="editorial-sidebar-card" aria-label="Assistente e avisos da comunidade">
       <header>
-        <div><span>◷</span><strong>Agenda editorial</strong></div>
+        <div><span>✦</span><strong>Assistente e avisos</strong></div>
         <button type="button" onClick={() => changeVisibility(false)} aria-label="Ocultar agenda editorial">−</button>
       </header>
+      {latest && (
+        <button
+          className="editorial-sidebar-alert"
+          type="button"
+          onClick={() => window.location.assign(latest.destination || "/painel?view=inicio")}
+        >
+          <span>{latest.read ? "Aviso recente" : "Novo aviso"}</span>
+          <strong>{latest.title}</strong>
+          <small>{latest.message}</small>
+        </button>
+      )}
       {next ? (
         <button className="editorial-sidebar-next" type="button" onClick={onOpen}>
           <small>Próxima publicação</small>
@@ -78,8 +100,8 @@ export default function EditorialSidebarSchedule({ onOpen }: { onOpen: () => voi
         </button>
       ) : (
         <button className="editorial-sidebar-empty" type="button" onClick={onOpen}>
-          <span>Nenhuma publicação autorizada.</span>
-          <strong>Configurar agenda →</strong>
+          <span>Nenhuma mensagem automática programada.</span>
+          <strong>Configurar IA editorial →</strong>
         </button>
       )}
     </section>

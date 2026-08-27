@@ -4,6 +4,7 @@ import GlobalVisualEditor from "./GlobalVisualEditor";
 import ThemeControl from "./ThemeControl";
 import { getPlatformBranding } from "../lib/platform-branding";
 import PublicIcon from "./PublicIcon";
+import CloseDetailsOnOutside from "./CloseDetailsOnOutside";
 
 export default async function PublicHeader({
   editorScreen = "public:geral",
@@ -15,6 +16,7 @@ export default async function PublicHeader({
   const canEdit = Boolean(user?.system_owner);
   return (
     <>
+      <CloseDetailsOnOutside />
       <header
         className="vinkulo-header social-public-header reception-header"
         data-editor-key="cabecalho-publico"
@@ -61,7 +63,7 @@ export default async function PublicHeader({
               <button type="submit">Buscar</button>
             </form>
           </details>
-          <ThemeControl compact />
+          <ThemeControl compact cycle />
           {canEdit && (
             <span
               id="global-editor-toolbar-slot"

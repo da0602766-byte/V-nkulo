@@ -94,7 +94,7 @@ export default function PrivateChatWorkspace() {
     const initial = window.setTimeout(() => void load(initialConversation), 0);
     const timer = window.setInterval(() => {
       if (activeId > 0 && document.visibilityState === "visible") void load(activeId, true);
-    }, 8_000);
+    }, 4_000);
     return () => {
       window.clearTimeout(initial);
       window.clearInterval(timer);

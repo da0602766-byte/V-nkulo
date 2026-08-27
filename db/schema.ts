@@ -1311,6 +1311,8 @@ export const eventosComunidade = sqliteTable(
     publico: integer("publico", { mode: "boolean" }).notNull().default(false),
     status: text("status").notNull().default("RASCUNHO"),
     capacidade: integer("capacidade"),
+    escalasAbremEm: text("escalas_abrem_em"),
+    reservasAbremEm: text("reservas_abrem_em"),
     criadoPor: integer("criado_por").references(() => usuarios.id, {
       onDelete: "set null",
     }),
@@ -1637,6 +1639,88 @@ export const ministerioLinksReutilizaveis = sqliteTable(
   ],
 );
 
+export const linksCadastroMembros = sqliteTable(
+  "links_cadastro_membros",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    comunidadeOrigemId: integer("comunidade_origem_id")
+      .notNull()
+      .references(() => comunidades.id, { onDelete: "cascade" }),
+    criadoPor: integer("criado_por")
+      .notNull()
+      .references(() => usuarios.id, { onDelete: "cascade" }),
+    token: text("token").notNull().unique(),
+    titulo: text("titulo").notNull().default("Cadastro de membros"),
+    abreEm: text("abre_em").notNull(),
+    fechaEm: text("fecha_em").notNull(),
+    status: text("status").notNull().default("ATIVO"),
+    autoExcluir: integer("auto_excluir", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+    atualizadoEm: text("atualizado_em")
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("links_cadastro_membros_criador_idx").on(
+      table.criadoPor,
+      table.status,
+      table.fechaEm,
+    ),
+    index("links_cadastro_membros_comunidade_idx").on(
+      table.comunidadeOrigemId,
+      table.status,
+      table.id,
+    ),
+  ],
+);
+
+export const cadastrosMembrosTemporarios = sqliteTable(
+  "cadastros_membros_temporarios",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    linkId: integer("link_id")
+      .notNull()
+      .references(() => linksCadastroMembros.id, { onDelete: "cascade" }),
+    comunidadeId: integer("comunidade_id")
+      .notNull()
+      .references(() => comunidades.id, { onDelete: "cascade" }),
+    ministerioId: integer("ministerio_id")
+      .notNull()
+      .references(() => ministeriosComunidade.id, { onDelete: "restrict" }),
+    nomeCompleto: text("nome_completo").notNull(),
+    email: text("email").notNull(),
+    cpf: text("cpf").notNull().default(""),
+    cep: text("cep").notNull(),
+    dataNascimento: text("data_nascimento").notNull(),
+    uncao: text("uncao").notNull(),
+    fotoUrl: text("foto_url").notNull().default(""),
+    ministerioDados: text("ministerio_dados").notNull().default("{}"),
+    status: text("status").notNull().default("PENDENTE"),
+    enviadoEm: text("enviado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+    atualizadoEm: text("atualizado_em")
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("cadastros_membros_link_email_unique").on(
+      table.linkId,
+      table.email,
+    ),
+    index("cadastros_membros_comunidade_status_idx").on(
+      table.comunidadeId,
+      table.status,
+      table.enviadoEm,
+    ),
+    index("cadastros_membros_ministerio_idx").on(
+      table.comunidadeId,
+      table.ministerioId,
+      table.enviadoEm,
+    ),
+  ],
+);
+
 export const escalasMinisterio = sqliteTable(
   "escalas_ministerio",
   {
@@ -1664,6 +1748,7 @@ export const escalasMinisterio = sqliteTable(
     ),
     shareToken: text("share_token"),
     compartilhadoEm: text("compartilhado_em"),
+    publicarEm: text("publicar_em"),
     modeloSnapshot: text("modelo_snapshot").notNull().default("{}"),
     camposRespostas: text("campos_respostas").notNull().default("{}"),
     criadoPor: integer("criado_por").references(() => usuarios.id, {
@@ -1690,6 +1775,11 @@ export const escalasMinisterio = sqliteTable(
       table.comunidadeId,
       table.ministerioId,
       table.iniciaEm,
+    ),
+    index("escalas_ministerio_publicacao_idx").on(
+      table.comunidadeId,
+      table.status,
+      table.publicarEm,
     ),
     uniqueIndex("escalas_ministerio_share_token_unique").on(table.shareToken),
   ],
@@ -2223,8 +2313,10 @@ export const estacionamentoVagas = sqliteTable(
       .references(() => estacionamentoSetores.id, { onDelete: "cascade" }),
     codigo: text("codigo").notNull(),
     tipo: text("tipo").notNull().default("COMUM"),
-    status: text("status").notNull().default("LIVRE"),
-    ativo: integer("ativo", { mode: "boolean" }).notNull().default(true),
+      status: text("status").notNull().default("LIVRE"),
+      posicaoX: integer("posicao_x").notNull().default(0),
+      posicaoY: integer("posicao_y").notNull().default(0),
+      ativo: integer("ativo", { mode: "boolean" }).notNull().default(true),
     criadoEm: text("criado_em")
       .notNull()
       .default(sql`CURRENT_TIMESTAMP`),
@@ -2326,6 +2418,64 @@ export const estacionamentoOcorrencias = sqliteTable(
       table.status,
       table.criadoEm,
     ),
+  ],
+);
+
+export const estacionamentoReservas = sqliteTable(
+  "estacionamento_reservas",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    comunidadeId: integer("comunidade_id").notNull().references(() => comunidades.id, { onDelete: "cascade" }),
+    vagaId: integer("vaga_id").notNull().references(() => estacionamentoVagas.id, { onDelete: "restrict" }),
+    usuarioId: integer("usuario_id").notNull().references(() => usuarios.id, { onDelete: "cascade" }),
+    eventoId: integer("evento_id").references(() => eventosComunidade.id, { onDelete: "set null" }),
+    eventoTitulo: text("evento_titulo").notNull().default(""),
+    nomeCompleto: text("nome_completo").notNull(),
+    email: text("email").notNull(),
+    telefone: text("telefone").notNull().default(""),
+    placaVeiculo: text("placa_veiculo").notNull().default(""),
+    tipoVeiculo: text("tipo_veiculo").notNull().default("CARRO"),
+    modeloVeiculo: text("modelo_veiculo").notNull().default(""),
+    corVeiculo: text("cor_veiculo").notNull().default(""),
+    documentoHash: text("documento_hash").notNull(),
+    documentoMascarado: text("documento_mascarado").notNull(),
+    inicioEm: text("inicio_em").notNull(),
+    fimEm: text("fim_em").notNull(),
+    codigo: text("codigo").notNull(),
+    status: text("status").notNull().default("PENDENTE"),
+    confirmadoPor: integer("confirmado_por").references(() => usuarios.id, { onDelete: "set null" }),
+    checkinEm: text("checkin_em"),
+    criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+    atualizadoEm: text("atualizado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("estacionamento_reserva_codigo_unique").on(table.codigo),
+    index("estacionamento_reserva_comunidade_status_idx").on(table.comunidadeId, table.status, table.inicioEm),
+    index("estacionamento_reserva_usuario_idx").on(table.comunidadeId, table.usuarioId, table.inicioEm),
+    index("estacionamento_reserva_evento_idx").on(table.comunidadeId, table.eventoId, table.inicioEm),
+  ],
+);
+
+export const estacionamentoRelatoriosEscala = sqliteTable(
+  "estacionamento_relatorios_escala",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    comunidadeId: integer("comunidade_id").notNull().references(() => comunidades.id, { onDelete: "cascade" }),
+    escalaId: integer("escala_id").notNull().references(() => escalasMinisterio.id, { onDelete: "cascade" }),
+    usuarioId: integer("usuario_id").notNull().references(() => usuarios.id, { onDelete: "cascade" }),
+    resumo: text("resumo").notNull().default(""),
+    entradas: integer("entradas").notNull().default(0),
+    saidas: integer("saidas").notNull().default(0),
+    ocorrencias: integer("ocorrencias").notNull().default(0),
+    status: text("status").notNull().default("AGUARDANDO_MEMBRO"),
+    revisadoPor: integer("revisado_por").references(() => usuarios.id, { onDelete: "set null" }),
+    enviadoPastorEm: text("enviado_pastor_em"),
+    criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+    atualizadoEm: text("atualizado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("estacionamento_relatorio_escala_usuario_unique").on(table.escalaId, table.usuarioId),
+    index("estacionamento_relatorio_comunidade_status_idx").on(table.comunidadeId, table.status, table.atualizadoEm),
   ],
 );
 

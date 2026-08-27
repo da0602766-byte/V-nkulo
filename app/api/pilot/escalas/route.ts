@@ -22,6 +22,7 @@ export async function GET() {
   const access = await requireTenantPermission("schedules.view");
   if ("error" in access) return access.error;
   const db = getD1();
+  await publishDueSchedules(db, access.context.comunidadeId);
   const globalManager = hasGlobalMinistryManagement(access.context);
   const visibilitySql = `(
     ? = 1
@@ -56,7 +57,7 @@ export async function GET() {
       `SELECT s.id, s.ministerio_id, m.nome AS ministerio_nome,
         m.categoria AS ministerio_categoria,
         s.equipe_id, equipe.nome AS equipe_nome,
-        s.titulo, s.inicia_em, s.termina_em, s.local, s.status,
+        s.titulo, s.inicia_em, s.termina_em, s.local, s.status, s.publicar_em,
         s.observacoes, s.modelo_snapshot, s.campos_respostas,
         s.repertorio, s.links_recursos, s.responsavel_usuario_id,
         responsavel.nome AS responsavel_nome, s.share_token,
@@ -392,7 +393,7 @@ async function createSchedule(request: Request) {
          JOIN escalas_ministerio s
            ON s.id = d.escala_id AND s.comunidade_id = d.comunidade_id
          WHERE d.voluntario_id = ? AND d.comunidade_id = ? AND d.ativo = 1
-           AND s.status IN ('PUBLICADA', 'AGUARDANDO_CHECKLIST')
+           AND s.status IN ('AGENDADA', 'PUBLICADA', 'AGUARDANDO_CHECKLIST')
            AND datetime(s.termina_em) >= datetime('now')`,
       )
       .bind(volunteer.id, access.context.comunidadeId)
@@ -473,9 +474,9 @@ async function createSchedule(request: Request) {
       `INSERT INTO escalas_ministerio
       (comunidade_id, ministerio_id, equipe_id, titulo, inicia_em, termina_em,
        local, status, observacoes, repertorio, links_recursos,
-       responsavel_usuario_id, modelo_snapshot, campos_respostas,
+       responsavel_usuario_id, publicar_em, modelo_snapshot, campos_respostas,
        criado_por, atualizado_por)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       access.context.comunidadeId,
@@ -490,6 +491,7 @@ async function createSchedule(request: Request) {
       JSON.stringify(parsed.repertorio),
       JSON.stringify(parsed.links),
       parsed.responsavelUsuarioId,
+      parsed.publicarEm,
       JSON.stringify(modelSnapshot),
       JSON.stringify(customAnswers),
       access.user.id,
@@ -570,6 +572,34 @@ async function createSchedule(request: Request) {
     },
   );
   return Response.json({ id: scheduleId }, { status: 201 });
+}
+
+async function publishDueSchedules(db: D1Database, communityId: number) {
+  const due = await db.prepare(
+    `SELECT id,titulo FROM escalas_ministerio
+     WHERE comunidade_id=? AND status='AGENDADA' AND publicar_em IS NOT NULL
+       AND datetime(publicar_em)<=datetime('now') LIMIT 40`,
+  ).bind(communityId).all<{ id: number; titulo: string }>();
+  for (const schedule of due.results) {
+    const updated = await db.prepare(
+      `UPDATE escalas_ministerio SET status='PUBLICADA',atualizado_em=CURRENT_TIMESTAMP
+       WHERE id=? AND comunidade_id=? AND status='AGENDADA'`,
+    ).bind(schedule.id,communityId).run();
+    if (!Number((updated.meta as { changes?: number }).changes || 0)) continue;
+    const recipients = await db.prepare(
+      `SELECT DISTINCT usuario_id FROM escala_designacoes
+       WHERE escala_id=? AND comunidade_id=? AND ativo=1`,
+    ).bind(schedule.id,communityId).all<{ usuario_id: number }>();
+    await Promise.all(recipients.results.map((recipient) => notifyUser(db, {
+      userId: Number(recipient.usuario_id),
+      title: "Nova escala ministerial",
+      message: `Você foi escalado para “${schedule.titulo}”.`,
+      entityId: Number(schedule.id),
+      area: "ESCALAS",
+      destination: "/painel?view=ministerios",
+      createdBy: "publicacao-agendada",
+    })));
+  }
 }
 
 function parseDays(value: unknown) {

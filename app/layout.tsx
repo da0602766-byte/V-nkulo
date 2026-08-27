@@ -1,8 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "./secretary.css";
 import SmartScrollHeader from "./components/SmartScrollHeader";
+import MobileAppInstall from "./components/MobileAppInstall";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,7 +29,27 @@ export const metadata: Metadata = {
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
+    apple: "/vinkulo-app-icon-192.png",
   },
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "Vínkulo",
+    statusBarStyle: "black-translucent",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f7fafc" },
+    { media: "(prefers-color-scheme: dark)", color: "#0c1722" },
+  ],
 };
 
 export default function RootLayout({
@@ -51,6 +72,7 @@ export default function RootLayout({
       >
         <SmartScrollHeader />
         {children}
+        <MobileAppInstall />
       </body>
     </html>
   );

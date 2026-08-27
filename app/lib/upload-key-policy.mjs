@@ -7,6 +7,7 @@ export const UPLOAD_PURPOSES = new Set([
   "visual-editor-image",
   "post-image",
   "profile-photo",
+  "member-registration-photo",
   "platform-logo",
   "platform-feed-banner",
 ]);

@@ -40,13 +40,13 @@ export async function GET() {
       .first<Record<string, number>>(),
     db
       .prepare(
-        `SELECT v.id, v.codigo, v.tipo, v.status, s.id AS setor_id,
+        `SELECT v.id, v.codigo, v.tipo, v.status, v.posicao_x, v.posicao_y, s.id AS setor_id,
           s.nome AS setor_nome, s.cor AS setor_cor, s.ordem
          FROM estacionamento_vagas v
          JOIN estacionamento_setores s
            ON s.id = v.setor_id AND s.comunidade_id = v.comunidade_id
          WHERE v.comunidade_id = ? AND v.ativo = 1 AND s.ativo = 1
-         ORDER BY s.ordem, s.nome, v.codigo`,
+         ORDER BY s.ordem, s.nome, v.posicao_y, v.posicao_x, v.codigo`,
       )
       .bind(access.context.comunidadeId)
       .all<Record<string, unknown>>(),
@@ -118,8 +118,8 @@ export async function GET() {
         especiais: Number(stats?.especiais || 0),
       },
       vagas: spaces.results,
-      movimentacoes: movements.results,
-      ocorrencias: occurrences.results,
+      movimentacoes: access.context.permissions.some((item) => ["parking.entry","parking.exit","parking.edit"].includes(item)) ? movements.results : [],
+      ocorrencias: access.context.permissions.includes("parking.edit") ? occurrences.results : [],
       availableUsers: access.context.permissions.includes("parking.helpers.manage") ||
         access.context.permissions.includes("parking.configure")
         ? users.results
@@ -127,6 +127,7 @@ export async function GET() {
       operator: {
         id: access.user.id,
         nome: access.user.nome,
+        email: access.user.email,
         papel: access.context.papel,
         origemAcesso: assignment ? "ESCALA_ATIVA" : "PERFIL_GESTOR",
         escala: assignment,
@@ -234,4 +235,24 @@ export async function POST(request: Request) {
     { movimentacaoId: movementId, vagaId: parsed.vagaId },
   );
   return Response.json({ id: movementId }, { status: 201 });
+}
+
+export async function DELETE() {
+  const access = await requireTenantPermission("parking.edit");
+  if ("error" in access) return access.error;
+  const db = getD1();
+  const result = await db.prepare(
+    `DELETE FROM estacionamento_movimentacoes
+     WHERE comunidade_id = ? AND status = 'ENCERRADA'`,
+  ).bind(access.context.comunidadeId).run();
+  const removed = Number((result.meta as { changes?: number }).changes || 0);
+  await recordTenantAudit(
+    db,
+    access.context,
+    access.user.id,
+    "ESTACIONAMENTO_MOVIMENTACOES_LIMPAS",
+    "SUCESSO",
+    { removidos: removed },
+  );
+  return Response.json({ ok: true, removidos: removed });
 }

@@ -33,6 +33,7 @@ export default function SharedScheduleAccessGate({
         <button type="button" onClick={() => setAuthorized(true)}>
           Acessar esta escala
         </button>
+        <a className="shared-secretary-signup" href="/login?modo=cadastro">Criar uma conta no Vínkulo</a>
         <small>Nenhum dado de contato será exibido.</small>
       </section>
     </main>

@@ -29,7 +29,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
-.dev.vars*
+.dev.vars
 
 # vercel
 .vercel
@@ -42,8 +42,15 @@ Vinkulo-Android/local.properties
 
 # typescript
 next-env.d.ts
+*.tsbuildinfo
 /dist/
 /.wrangler/
 /.sites-runtime/
+/.site-stage-*/
+/.site-tools/
+/.xlsx-install/
+/site-v*.tgz
+/test-output-*.txt
 /outputs/
 /work/
+/.task-tools/

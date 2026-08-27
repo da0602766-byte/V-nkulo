@@ -17,7 +17,23 @@ export async function GET() {
     .prepare(
       `SELECT u.id, u.nome, u.email, u.telefone, u.data_nascimento,
         u.criado_em AS owner_criado_em,
-        u.endereco, u.ministerio, u.foto_perfil,
+        u.endereco,
+        COALESCE((
+          SELECT group_concat(ministerio_nome, ', ')
+          FROM (
+            SELECT DISTINCT m.nome AS ministerio_nome
+            FROM ministerio_voluntarios mv
+            JOIN ministerios_comunidade m
+              ON m.id = mv.ministerio_id
+             AND m.comunidade_id = mv.comunidade_id
+            WHERE mv.comunidade_id = ?
+              AND mv.usuario_id = u.id
+              AND mv.ativo = 1
+              AND m.status = 'ATIVO'
+            ORDER BY m.nome
+          )
+        ), u.ministerio, '') AS ministerio,
+        u.foto_perfil,
         COALESCE((
           SELECT group_concat(c.nome, ', ')
           FROM celulas c, json_each(c.membros) membro
@@ -43,6 +59,7 @@ export async function GET() {
        LIMIT 1`,
     )
     .bind(
+      access.context.comunidadeId,
       access.context.comunidadeId,
       access.context.membershipId,
       access.context.papel,

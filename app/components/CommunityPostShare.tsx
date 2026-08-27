@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import { shareToWhatsAppApp } from "../lib/androidNativeBridge";
 
 export default function CommunityPostShare({
   postId,
@@ -16,6 +18,7 @@ export default function CommunityPostShare({
   links: string[];
 }) {
   const [feedback, setFeedback] = useState("");
+  const [openPanel, setOpenPanel] = useState(false);
   const shareData = useMemo(() => {
     if (typeof window === "undefined") return { pageUrl: "", image: "", message: "" };
     const pageUrl = `${window.location.origin}/compartilhar/publicacao/${postId}`;
@@ -53,6 +56,15 @@ export default function CommunityPostShare({
     }
   }
 
+  async function shareOnWhatsApp() {
+    setFeedback("");
+    if (shareToWhatsAppApp(shareData.message)) {
+      setFeedback("WhatsApp aberto. Escolha a conversa ou o grupo.");
+      return;
+    }
+    await nativeShare();
+  }
+
   async function copyMessage() {
     try {
       await navigator.clipboard.writeText(shareData.message);
@@ -66,23 +78,41 @@ export default function CommunityPostShare({
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
+  useEffect(() => {
+    if (!openPanel) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpenPanel(false);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [openPanel]);
+
   return (
-    <details className="community-post-share">
-      <summary aria-label="Compartilhar publicação" title="Compartilhar publicação">
+    <div className="community-post-share">
+      <button type="button" className="community-post-share-trigger" aria-label="Compartilhar publicação" title="Compartilhar publicação" onClick={() => setOpenPanel(true)}>
         <PaperPlaneIcon />
-      </summary>
-      <div>
-        <header><PaperPlaneIcon /><div><strong>Compartilhar publicação</strong><p>Escolha onde enviar ou copie a mensagem pronta.</p></div></header>
-        <div className="community-post-share-grid">
-          <button type="button" onClick={() => void nativeShare()}><span aria-hidden="true">✦</span>Mais aplicativos</button>
-          <button type="button" onClick={() => open(`https://wa.me/?text=${encodeURIComponent(shareData.message)}`)}><span aria-hidden="true">◉</span>WhatsApp</button>
-          <button type="button" onClick={() => open(`https://t.me/share/url?url=${encodeURIComponent(shareData.pageUrl)}&text=${encodeURIComponent(shareData.message)}`)}><span aria-hidden="true">➤</span>Telegram</button>
-          <button type="button" onClick={() => open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareData.pageUrl)}`)}><span aria-hidden="true">f</span>Facebook</button>
-          <button type="button" className="copy" onClick={() => void copyMessage()}><span aria-hidden="true">⧉</span>Copiar mensagem</button>
-        </div>
-        {feedback && <small role="status">{feedback}</small>}
-      </div>
-    </details>
+      </button>
+      {openPanel && typeof document !== "undefined" && createPortal(
+        <div className="community-share-backdrop" role="presentation" onClick={() => setOpenPanel(false)}>
+          <section className="community-share-dialog" role="dialog" aria-modal="true" aria-label="Compartilhar publicação" onClick={(event) => event.stopPropagation()}>
+            <header>
+              <span><PaperPlaneIcon /></span>
+              <div><strong>Compartilhar publicação</strong><p>Escolha onde enviar ou copie a mensagem pronta.</p></div>
+              <button type="button" aria-label="Fechar compartilhamento" onClick={() => setOpenPanel(false)}>×</button>
+            </header>
+            <div className="community-post-share-grid">
+              <button type="button" onClick={() => void nativeShare()}><span aria-hidden="true">✦</span>Mais aplicativos</button>
+              <button type="button" onClick={() => void shareOnWhatsApp()}><span aria-hidden="true">◉</span>WhatsApp</button>
+              <button type="button" onClick={() => open(`https://t.me/share/url?url=${encodeURIComponent(shareData.pageUrl)}&text=${encodeURIComponent(shareData.message)}`)}><span aria-hidden="true">➤</span>Telegram</button>
+              <button type="button" onClick={() => open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareData.pageUrl)}`)}><span aria-hidden="true">f</span>Facebook</button>
+              <button type="button" className="copy" onClick={() => void copyMessage()}><span aria-hidden="true">⧉</span>Copiar mensagem</button>
+            </div>
+            {feedback && <small role="status">{feedback}</small>}
+          </section>
+        </div>,
+        document.body,
+      )}
+    </div>
   );
 }
 

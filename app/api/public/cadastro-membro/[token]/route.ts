@@ -1,291 +1,256 @@
 import { getD1 } from "../../../../../db";
-import { normalizeEmail } from "../../../../lib/local-auth";
-import { notifyCommunityManagers } from "../../../../lib/pilot-notifications";
-import {
-  getMemberRegistrationLinkByToken,
-  isMemberRegistrationLinkOpen,
-} from "../../../../lib/member-registration-links";
+import { getRuntimeEnv } from "../../../../../db/runtime-env";
+import { getMemberRegistrationForm } from "../../../../lib/member-registration";
+import { createFirstAccessToken, generateTemporaryPassword, hashPassword } from "../../../../lib/local-auth";
 
 type Context = { params: Promise<{ token: string }> };
-
-const VALID_DAYS = new Set(["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"]);
-const VALID_PERIODS = new Set(["MANHA", "TARDE", "NOITE", "FLEXIVEL"]);
+const IMAGE_TYPES = new Map([
+  ["image/jpeg", "jpg"],
+  ["image/png", "png"],
+  ["image/webp", "webp"],
+]);
+const DAY_VALUES = new Set(["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"]);
+const PERIOD_VALUES = new Set(["MANHA", "TARDE", "NOITE", "FLEXIVEL"]);
 
 export async function GET(_request: Request, context: Context) {
   const token = (await context.params).token;
-  const db = getD1();
-  const link = await getMemberRegistrationLinkByToken(db, token);
-  if (!link || !isMemberRegistrationLinkOpen(link)) {
-    return Response.json({ error: "Este link é inválido, foi cancelado ou expirou." }, { status: 404 });
+  const form = await getMemberRegistrationForm(getD1(), token);
+  if (!form) {
+    return Response.json({ error: "Link de cadastro inválido." }, { status: 404 });
   }
-  const communities = await db
-    .prepare(
-      `SELECT id, nome FROM comunidades
-       WHERE proprietario_usuario_id = ? AND status = 'ATIVA'
-       ORDER BY nome`,
-    )
-    .bind(link.ownerId)
-    .all<{ id: number; nome: string }>();
-  const communityIds = communities.results.map((community) => community.id);
-  const ministriesByComunidade: Record<number, { id: number; nome: string }[]> = {};
-  for (const id of communityIds) ministriesByComunidade[id] = [];
-  if (communityIds.length) {
-    const placeholders = communityIds.map(() => "?").join(", ");
-    const ministries = await db
-      .prepare(
-        `SELECT id, comunidade_id, nome FROM ministerios_comunidade
-         WHERE comunidade_id IN (${placeholders}) AND status = 'ATIVO'
-         ORDER BY nome`,
-      )
-      .bind(...communityIds)
-      .all<{ id: number; comunidade_id: number; nome: string }>();
-    for (const ministry of ministries.results) {
-      (ministriesByComunidade[ministry.comunidade_id] ||= []).push({
-        id: ministry.id,
-        nome: ministry.nome,
-      });
-    }
-  }
-  return Response.json(
-    {
-      expiresAt: link.expiresAt,
-      communities: communities.results.map((community) => ({
-        id: community.id,
-        nome: community.nome,
-        ministerios: ministriesByComunidade[community.id] || [],
-      })),
-    },
-    { headers: { "Cache-Control": "no-store" } },
-  );
+  return Response.json(form, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request, context: Context) {
   const token = (await context.params).token;
   const db = getD1();
-  const link = await getMemberRegistrationLinkByToken(db, token);
-  if (!link || !isMemberRegistrationLinkOpen(link)) {
-    return Response.json({ error: "Este link é inválido, foi cancelado ou expirou." }, { status: 404 });
+  const registration = await getMemberRegistrationForm(db, token);
+  if (!registration) {
+    return Response.json({ error: "Link de cadastro inválido." }, { status: 404 });
   }
-  const payload = await safeJson(request);
-  if (!payload) return Response.json({ error: "Dados inválidos." }, { status: 400 });
-
-  const nome = clean(payload.nome, 120);
-  const email = normalizeEmail(payload.email);
-  const cpf = clean(payload.cpf, 20);
-  const cep = clean(payload.cep, 12);
-  const dataNascimento = clean(payload.dataNascimento, 10);
-  const telefone = clean(payload.telefone, 30);
-  const comunidadeId = Number(payload.comunidadeId || 0);
-  const ministerioId = payload.ministerioId ? Number(payload.ministerioId) : null;
-  const periodoPreferido = clean(payload.periodoPreferido, 20).toUpperCase() || "FLEXIVEL";
-  const diasDisponiveis = Array.isArray(payload.diasDisponiveis)
-    ? [...new Set(payload.diasDisponiveis.map((day) => String(day).toUpperCase()))].filter((day) =>
-        VALID_DAYS.has(day),
-      )
-    : [];
-  const funcaoDesejada = clean(payload.funcaoDesejada, 60);
-
-  if (nome.length < 3) {
-    return Response.json({ error: "Informe o nome completo." }, { status: 400 });
-  }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 180) {
-    return Response.json({ error: "Informe um e-mail válido." }, { status: 400 });
-  }
-  if (!cep) {
-    return Response.json({ error: "Informe o CEP." }, { status: 400 });
-  }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dataNascimento) || Number.isNaN(Date.parse(dataNascimento))) {
-    return Response.json({ error: "Informe uma data de nascimento válida." }, { status: 400 });
-  }
-  if (!VALID_PERIODS.has(periodoPreferido)) {
-    return Response.json({ error: "Período preferido inválido." }, { status: 400 });
-  }
-
-  const community = await db
-    .prepare(
-      `SELECT id, nome FROM comunidades
-       WHERE id = ? AND proprietario_usuario_id = ? AND status = 'ATIVA' LIMIT 1`,
-    )
-    .bind(comunidadeId, link.ownerId)
-    .first<{ id: number; nome: string }>();
-  if (!community) {
-    return Response.json({ error: "Selecione uma comunidade válida deste link." }, { status: 400 });
-  }
-
-  let ministry: { id: number; nome: string } | null = null;
-  if (ministerioId) {
-    ministry = await db
-      .prepare(
-        `SELECT id, nome FROM ministerios_comunidade
-         WHERE id = ? AND comunidade_id = ? AND status = 'ATIVO' LIMIT 1`,
-      )
-      .bind(ministerioId, comunidadeId)
-      .first<{ id: number; nome: string }>();
-    if (!ministry) {
-      return Response.json({ error: "Selecione um ministério válido desta comunidade." }, { status: 400 });
-    }
-  }
-
-  const existing = await db
-    .prepare("SELECT id, senha_hash FROM usuarios WHERE email = ? LIMIT 1")
-    .bind(email)
-    .first<{ id: number; senha_hash: string | null }>();
-  if (existing?.senha_hash) {
+  if (registration.state !== "ABERTO") {
     return Response.json(
       {
-        error:
-          "Já existe uma conta com este e-mail. Entre e solicite acesso pela lista de comunidades.",
+        error: registration.state === "AGUARDANDO"
+          ? "O período de cadastro ainda não começou."
+          : registration.state === "ENCERRADO"
+            ? "O período de cadastro já terminou."
+            : "Este link de cadastro foi cancelado.",
+        state: registration.state,
       },
       { status: 409 },
     );
   }
 
-  const cadastroDados = JSON.stringify({
-    cpf: cpf ? { label: "CPF", value: cpf } : undefined,
-    cep: { label: "CEP", value: cep },
-  });
-
-  let userId: number;
-  if (existing) {
-    userId = existing.id;
-    await db
-      .prepare(
-        `UPDATE usuarios SET nome = ?, telefone = ?, data_nascimento = ?, cadastro_dados = ?,
-           atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`,
-      )
-      .bind(nome, telefone || null, dataNascimento, cadastroDados, userId)
-      .run();
-  } else {
-    const result = await db
-      .prepare(
-        `INSERT INTO usuarios (nome, email, perfil, permissoes, telefone, data_nascimento, cadastro_dados, ativo)
-         VALUES (?, ?, 'LEITURA', '', ?, ?, ?, 1)`,
-      )
-      .bind(nome, email, telefone || null, dataNascimento, cadastroDados)
-      .run();
-    userId = Number(result.meta.last_row_id);
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    return Response.json({ error: "Não foi possível ler o formulário." }, { status: 400 });
   }
-
-  const activeMembership = await db
-    .prepare(
-      `SELECT id FROM usuario_comunidades WHERE usuario_id = ? AND comunidade_id = ? AND status = 'ATIVO' LIMIT 1`,
-    )
-    .bind(userId, comunidadeId)
-    .first<{ id: number }>();
-  if (activeMembership) {
+  const fullName = clean(form.get("fullName"), 120);
+  const email = clean(form.get("email"), 180).toLocaleLowerCase("pt-BR");
+  const cpf = digits(form.get("cpf")).slice(0, 11);
+  const cep = digits(form.get("cep")).slice(0, 8);
+  const birthDate = clean(form.get("birthDate"), 10);
+  const communityId = positiveInteger(form.get("communityId"));
+  const anointing = clean(form.get("anointing"), 40).toUpperCase();
+  const ministryId = positiveInteger(form.get("ministryId"));
+  const functionId = positiveInteger(form.get("functionId"));
+  const period = clean(form.get("period"), 20).toUpperCase();
+  const acceptedTerms = String(form.get("acceptedTerms")) === "true";
+  const days = form.getAll("availableDays").map(String).filter((day) => DAY_VALUES.has(day));
+  const community = registration.communities.find((item) => item.id === communityId);
+  const ministry = community?.ministries.find((item) => item.id === ministryId);
+  const ministryFunction = functionId
+    ? ministry?.functions.find((item) => item.id === functionId)
+    : undefined;
+  if (
+    fullName.length < 5 ||
+    !/^\S+@\S+\.\S+$/.test(email) ||
+    cep.length !== 8 ||
+    !validBirthDate(birthDate) ||
+    !community ||
+    !community.anointings.some((item) => item.id === anointing) ||
+    !ministry
+  ) {
     return Response.json(
-      { error: "Você já participa desta comunidade." },
+      { error: "Revise nome, e-mail, CEP, nascimento, comunidade, unção e ministério." },
+      { status: 400 },
+    );
+  }
+  if (cpf && !validCpf(cpf)) {
+    return Response.json({ error: "O CPF informado é inválido." }, { status: 400 });
+  }
+  if (functionId && !ministryFunction) {
+    return Response.json({ error: "A função escolhida não pertence a este ministério." }, { status: 400 });
+  }
+  if (period && !PERIOD_VALUES.has(period)) {
+    return Response.json({ error: "Período disponível inválido." }, { status: 400 });
+  }
+  if (!acceptedTerms) return Response.json({ error: "Aceite os Termos de Uso e a Política de Privacidade." }, { status: 400 });
+
+  const existingUser = await db.prepare("SELECT id FROM usuarios WHERE email = ? LIMIT 1").bind(email).first<{ id: number }>();
+  if (existingUser) return Response.json({ error: "Já existe uma conta com este e-mail. Entre com sua conta ou use outro e-mail." }, { status: 409 });
+
+  const duplicate = await db
+    .prepare("SELECT id FROM cadastros_membros_temporarios WHERE link_id = ? AND email = ? LIMIT 1")
+    .bind(registration.id, email)
+    .first<{ id: number }>();
+  if (duplicate) {
+    return Response.json(
+      { error: "Este e-mail já enviou um cadastro por este link." },
       { status: 409 },
     );
   }
 
-  const previousRequest = await db
-    .prepare(
-      `SELECT status FROM solicitacoes_entrada_comunidade WHERE usuario_id = ? AND comunidade_id = ? LIMIT 1`,
-    )
-    .bind(userId, comunidadeId)
-    .first<{ status: string }>();
-  if (previousRequest?.status === "PENDENTE") {
-    return Response.json(
-      { error: "Sua solicitação para esta comunidade já está aguardando análise." },
-      { status: 409 },
-    );
+  const customAnswers: Record<string, string> = {};
+  for (const field of ministry.extraFields) {
+    const value = clean(form.get(`extra:${field.id}`), 500);
+    if (field.required && !value) {
+      return Response.json({ error: `Preencha “${field.label}”.` }, { status: 400 });
+    }
+    if (value) customAnswers[field.id] = value;
   }
 
-  const mensagem = composeRequestMessage({
-    ministryName: ministry?.nome || "",
-    funcaoDesejada,
-    periodoPreferido,
-    diasDisponiveis,
-  });
-
-  await db.batch([
-    db
-      .prepare(
-        `INSERT INTO solicitacoes_entrada_comunidade
-         (comunidade_id, usuario_id, mensagem, status)
-         VALUES (?, ?, ?, 'PENDENTE')
-         ON CONFLICT(usuario_id, comunidade_id) DO UPDATE SET
-           mensagem = excluded.mensagem,
-           status = 'PENDENTE',
-           analisado_por = NULL,
-           analisado_em = NULL,
-           solicitado_em = CURRENT_TIMESTAMP,
-           atualizado_em = CURRENT_TIMESTAMP`,
-      )
-      .bind(comunidadeId, userId, mensagem),
-    db
-      .prepare(
-        `INSERT INTO auditoria_piloto
-         (comunidade_id, usuario_id, evento, resultado, metadados)
-         VALUES (?, ?, 'CADASTRO_MEMBRO_LINK_ENVIADO', 'SUCESSO', ?)`,
-      )
-      .bind(
-        comunidadeId,
-        userId,
-        JSON.stringify({ ministerioId: ministry?.id || null, periodoPreferido, diasDisponiveis }),
-      ),
-  ]);
-
-  const requestRow = await db
-    .prepare(
-      `SELECT id FROM solicitacoes_entrada_comunidade WHERE usuario_id = ? AND comunidade_id = ? LIMIT 1`,
-    )
-    .bind(userId, comunidadeId)
-    .first<{ id: number }>();
-  if (requestRow) {
-    await notifyCommunityManagers(db, {
-      communityId: comunidadeId,
-      communityName: community.nome,
-      applicantName: nome,
-      requestId: Number(requestRow.id),
-      createdBy: "link-cadastro-membro",
+  const photo = form.get("photo");
+  let photoUrl = "";
+  if (photo instanceof File && photo.size > 0) {
+    const extension = IMAGE_TYPES.get(photo.type);
+    if (!extension || photo.size > 8 * 1024 * 1024) {
+      return Response.json(
+        { error: "A foto deve ser JPG, PNG ou WebP e ter no máximo 8 MB." },
+        { status: 415 },
+      );
+    }
+    const bytes = new Uint8Array(await photo.arrayBuffer());
+    if (!hasValidImageSignature(bytes, photo.type)) {
+      return Response.json({ error: "O arquivo enviado não é uma foto válida." }, { status: 415 });
+    }
+    const bucket = getRuntimeEnv().BUCKET;
+    if (!bucket) {
+      return Response.json({ error: "O envio de foto está temporariamente indisponível." }, { status: 503 });
+    }
+    const key = `images/member-registration-photo/${community.id}/${crypto.randomUUID()}.${extension}`;
+    await bucket.put(key, bytes.buffer, {
+      httpMetadata: { contentType: photo.type, cacheControl: "private, max-age=3600" },
+      customMetadata: {
+        communityId: String(community.id),
+        registrationLinkId: String(registration.id),
+        purpose: "member-registration-photo",
+      },
     });
+    photoUrl = `/api/pilot/uploads/${key}`;
   }
 
+  const temporaryPassword = generateTemporaryPassword();
+  const passwordData = await hashPassword(temporaryPassword);
+  const account = await db.prepare(
+    `INSERT INTO usuarios
+     (nome, email, perfil, permissoes, senha_hash, senha_salt, titulo_eclesiastico, ativo, cadastro_dados)
+     VALUES (?, ?, 'LEITURA', '', ?, ?, 'MEMBRO', 1, ?)`,
+  ).bind(fullName, email, passwordData.hash, passwordData.salt, JSON.stringify({ origem: "LINK_CADASTRO_MEMBROS" })).run();
+  const userId = Number(account.meta.last_row_id);
+  await db.prepare(
+    `INSERT INTO usuario_comunidades (usuario_id, comunidade_id, papel, status)
+     VALUES (?, ?, 'MEMBRO', 'ATIVO')
+     ON CONFLICT(usuario_id, comunidade_id) DO UPDATE SET status = 'ATIVO', papel = 'MEMBRO'`,
+  ).bind(userId, community.id).run();
+
+  let firstAccess: Awaited<ReturnType<typeof createFirstAccessToken>>;
+  try {
+    firstAccess = await createFirstAccessToken(userId);
+  } catch {
+    await db.prepare("DELETE FROM usuarios WHERE id = ?").bind(userId).run();
+    return Response.json(
+      { error: "Não foi possível preparar o primeiro acesso. Tente novamente." },
+      { status: 503 },
+    );
+  }
+
+  const result = await db
+    .prepare(
+      `INSERT INTO cadastros_membros_temporarios
+       (link_id, comunidade_id, ministerio_id, nome_completo, email, cpf, cep,
+        data_nascimento, uncao, foto_url, ministerio_dados, status)
+       SELECT ?, c.id, m.id, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDENTE'
+       FROM comunidades c
+       JOIN ministerios_comunidade m
+         ON m.id = ? AND m.comunidade_id = c.id AND m.status = 'ATIVO'
+       WHERE c.id = ? AND c.proprietario_usuario_id = ? AND c.status = 'ATIVA'`,
+    )
+    .bind(
+      registration.id,
+      fullName,
+      email,
+      cpf,
+      cep,
+      birthDate,
+      anointing,
+      photoUrl,
+      JSON.stringify({
+        functionId: ministryFunction?.id || null,
+        functionName: ministryFunction?.name || "",
+        availableDays: [...new Set(days)],
+        preferredPeriod: period || "FLEXIVEL",
+        customAnswers,
+      }),
+      ministry.id,
+      community.id,
+      registration.creatorId,
+    )
+    .run();
+  if (!Number(result.meta.changes)) {
+    await db.prepare("DELETE FROM usuarios WHERE id = ?").bind(userId).run();
+    return Response.json(
+      { error: "A comunidade ou o ministério não está mais disponível neste formulário." },
+      { status: 409 },
+    );
+  }
   return Response.json(
     {
-      ok: true,
-      message:
-        "Cadastro enviado! Assim que o responsável aprovar, você recebe um link para definir sua senha e acessar.",
+      submitted: true,
+      accountCreated: true,
+      membershipCreated: true,
+      registrationId: Number(result.meta.last_row_id),
+      firstAccess: {
+        path: `/primeiro-acesso?token=${encodeURIComponent(firstAccess.token)}&login=${encodeURIComponent(email)}`,
+        login: email,
+        temporaryPassword,
+        expiresAt: firstAccess.expiresAt,
+      },
     },
-    { status: 201 },
+    { status: 201, headers: { "Cache-Control": "no-store" } },
   );
 }
 
-function composeRequestMessage(options: {
-  ministryName: string;
-  funcaoDesejada: string;
-  periodoPreferido: string;
-  diasDisponiveis: string[];
-}) {
-  const parts = ["Cadastro via link temporário de novos membros."];
-  if (options.ministryName) {
-    parts.push(
-      `Interesse em servir: ${options.ministryName}${options.funcaoDesejada ? ` (${options.funcaoDesejada})` : ""}.`,
-    );
-    parts.push(`Período preferido: ${periodLabel(options.periodoPreferido)}.`);
-    if (options.diasDisponiveis.length) {
-      parts.push(`Dias disponíveis: ${options.diasDisponiveis.join(", ")}.`);
-    }
+function clean(value: unknown, maximum: number) {
+  return String(value ?? "").trim().slice(0, maximum);
+}
+function digits(value: unknown) {
+  return String(value ?? "").replace(/\D/g, "");
+}
+function positiveInteger(value: unknown) {
+  const parsed = Number(value || 0);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
+}
+function validBirthDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T12:00:00Z`);
+  return Number.isFinite(date.getTime()) && date.getTime() <= Date.now();
+}
+function validCpf(cpf: string) {
+  if (!/^\d{11}$/.test(cpf) || /^(\d)\1{10}$/.test(cpf)) return false;
+  const numbers = cpf.split("").map(Number);
+  for (let position = 9; position <= 10; position += 1) {
+    const sum = numbers.slice(0, position).reduce((total, digit, index) => total + digit * (position + 1 - index), 0);
+    const check = (sum * 10) % 11 % 10;
+    if (check !== numbers[position]) return false;
   }
-  return parts.join(" ").slice(0, 500);
+  return true;
 }
-
-function periodLabel(value: string) {
-  return (
-    { MANHA: "Manhã", TARDE: "Tarde", NOITE: "Noite", FLEXIVEL: "Flexível" }[value] || "Flexível"
-  );
-}
-
-function clean(value: unknown, length: number) {
-  return String(value ?? "").trim().slice(0, length);
-}
-
-async function safeJson(request: Request) {
-  try {
-    return (await request.json()) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
+function hasValidImageSignature(bytes: Uint8Array, type: string) {
+  if (type === "image/jpeg") return bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  if (type === "image/png") return bytes.length > 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47 && bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a;
+  return type === "image/webp" && bytes.length > 12 && String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" && String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";
 }

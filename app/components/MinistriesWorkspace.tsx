@@ -131,7 +131,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   ESTACIONAMENTO: "Estacionamento",
   OUTRO: "Outro",
 };
-export const DAY_LABELS: Record<string, string> = {
+const DAY_LABELS: Record<string, string> = {
   DOM: "Dom",
   SEG: "Seg",
   TER: "Ter",
@@ -140,7 +140,7 @@ export const DAY_LABELS: Record<string, string> = {
   SEX: "Sex",
   SAB: "Sáb",
 };
-export const PERIOD_LABELS: Record<string, string> = {
+const PERIOD_LABELS: Record<string, string> = {
   MANHA: "Manhã",
   TARDE: "Tarde",
   NOITE: "Noite",
@@ -2389,7 +2389,7 @@ function MinistryCard({
   );
 }
 
-export function DaySelector({ selected }: { selected: string[] }) {
+function DaySelector({ selected }: { selected: string[] }) {
   return (
     <fieldset className="day-selector">
       <legend>Dias disponíveis</legend>

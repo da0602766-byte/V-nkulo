@@ -2,7 +2,7 @@ import { getD1 } from "../../db";
 
 type D1Database = ReturnType<typeof getD1>;
 
-export const JOIN_REQUEST_RETENTION_DAYS = 7;
+export const JOIN_REQUEST_RETENTION_DAYS = 1;
 
 /**
  * Remove somente decisões já concluídas. Solicitações pendentes continuam
@@ -18,7 +18,7 @@ export async function cleanupResolvedJoinRequests(
       WHERE comunidade_id = ?
         AND status IN ('APROVADA', 'RECUSADA')
         AND analisado_em IS NOT NULL
-        AND datetime(analisado_em) <= datetime('now', '-7 days')`,
+        AND datetime(analisado_em) <= datetime('now', '-1 day')`,
     )
     .bind(communityId)
     .run();

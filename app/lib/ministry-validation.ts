@@ -13,7 +13,7 @@ const MINISTRY_STATUSES = new Set(["ATIVO", "INATIVO"]);
 const VOLUNTEER_ROLES = new Set(["VOLUNTARIO", "LIDER"]);
 const WEEK_DAYS = new Set(["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"]);
 const PERIODS = new Set(["MANHA", "TARDE", "NOITE", "FLEXIVEL"]);
-const SCHEDULE_STATUSES = new Set(["RASCUNHO", "PUBLICADA"]);
+const SCHEDULE_STATUSES = new Set(["RASCUNHO", "AGENDADA", "PUBLICADA"]);
 const CUSTOM_FIELD_TYPES = new Set([
   "TEXTO",
   "NUMERO",
@@ -79,6 +79,7 @@ export function parseMinistryPayload(payload: unknown) {
   const spotifyUrl = parseOptionalMediaUrl(body.spotifyUrl, "SPOTIFY");
   const bannerUrl = parseMinistryAssetUrl(body.bannerUrl);
   const responsavelUsuarioId = positiveInteger(body.responsavelUsuarioId);
+  const publicarEm = body.publicarEm ? normalizeDateTime(body.publicarEm) : null;
   if (!nome) return { error: "O nome do ministério é obrigatório." } as const;
   if (!MINISTRY_CATEGORIES.has(categoria) || !MINISTRY_STATUSES.has(status)) {
     return { error: "Categoria ou status do ministério inválido." } as const;
@@ -238,6 +239,7 @@ export function parseSchedulePayload(payload: unknown) {
   const local = cleanText(body.local, 180);
   const status =
     cleanText(body.status, 20).toUpperCase() || "RASCUNHO";
+  const publicarEm = normalizeDateTime(body.publicarEm);
   const observacoes = cleanText(body.observacoes, 1200);
   const responsavelUsuarioId = positiveInteger(body.responsavelUsuarioId);
   const repertorio = Array.isArray(body.repertorio)
@@ -266,6 +268,9 @@ export function parseSchedulePayload(payload: unknown) {
   if (!SCHEDULE_STATUSES.has(status)) {
     return { error: "Status da escala inválido." } as const;
   }
+  if (status === "AGENDADA" && (!publicarEm || Date.parse(publicarEm) <= Date.now())) {
+    return { error: "Escolha um horário futuro para publicar a escala." } as const;
+  }
   return {
     ministerioId,
     equipeId,
@@ -276,6 +281,7 @@ export function parseSchedulePayload(payload: unknown) {
     status,
     observacoes,
     responsavelUsuarioId,
+    publicarEm: status === "AGENDADA" ? publicarEm : null,
     repertorio,
     links: links.value,
     designacoes: designacoes.value,

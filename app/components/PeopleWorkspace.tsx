@@ -561,7 +561,7 @@ function SelfProfile({
       </header>
       <div className="self-profile-card">
         <aside>
-          <span>{getInitials(me.nome)}</span>
+          <span className="self-profile-avatar" aria-hidden="true">{getInitials(me.nome)}</span>
           <VerifiedOwnerName name={me.nome} verified={Boolean(me.owner_verified)} />
           <small>{me.email}</small>
           <em>{me.oficial ? me.titulo_oficial || "Oficial" : "Membro"}</em>
@@ -601,11 +601,11 @@ function SelfProfile({
           </label>
           <label>
             Ministério
-            <input
-              name="ministerio"
-              maxLength={100}
-              defaultValue={me.ministerio || ""}
-            />
+            <span className="self-profile-readonly">
+              {me.ministerio || "Você ainda não está vinculado a um ministério."}
+            </span>
+            <input type="hidden" name="ministerio" value={me.ministerio || ""} />
+            <small>Preenchido automaticamente conforme seus vínculos ativos.</small>
           </label>
           <button disabled={saving}>
             {saving ? "Salvando…" : "Salvar meus dados"}

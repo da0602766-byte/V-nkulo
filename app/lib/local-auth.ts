@@ -4,6 +4,7 @@ import { getRuntimeEnv } from "../../db/runtime-env";
 import type { AppUser } from "./access";
 
 const SESSION_COOKIE = "__Host-adote_session";
+const PREVIEW_SESSION_COOKIE = "adote_preview_session";
 const LEGACY_SESSION_COOKIE = "adote_session";
 const SESSION_DAYS = 14;
 const PASSWORD_ITERATIONS = 100_000;
@@ -116,9 +117,21 @@ export function attachSessionCookie(
   return response;
 }
 
+export function attachPreviewSessionCookie(
+  response: Response,
+  session: { token: string; expires: Date },
+) {
+  response.headers.append(
+    "Set-Cookie",
+    `${PREVIEW_SESSION_COOKIE}=${session.token}; Path=/; Max-Age=${SESSION_DAYS * 86400}; Expires=${session.expires.toUTCString()}; HttpOnly; SameSite=Strict`,
+  );
+  return response;
+}
+
 export async function destroySession() {
   const jar = await cookies();
-  const cookieValue = jar.get(SESSION_COOKIE)?.value;
+  const cookieValue =
+    jar.get(SESSION_COOKIE)?.value || jar.get(PREVIEW_SESSION_COOKIE)?.value;
   const legacyToken = jar.get(LEGACY_SESSION_COOKIE)?.value;
   const signed = cookieValue ? await decodeSignedSession(cookieValue) : null;
   const token = signed?.n || legacyToken;
@@ -141,6 +154,12 @@ export async function destroySession() {
     path: "/",
     maxAge: 0,
   });
+  jar.set(PREVIEW_SESSION_COOKIE, "", {
+    httpOnly: true,
+    sameSite: "strict",
+    path: "/",
+    maxAge: 0,
+  });
 }
 
 export type SessionState = {
@@ -155,7 +174,8 @@ export type SessionState = {
 
 export async function getSessionState(): Promise<SessionState> {
   const jar = await cookies();
-  const cookieValue = jar.get(SESSION_COOKIE)?.value;
+  const cookieValue =
+    jar.get(SESSION_COOKIE)?.value || jar.get(PREVIEW_SESSION_COOKIE)?.value;
   const legacyToken = jar.get(LEGACY_SESSION_COOKIE)?.value;
   if (!cookieValue && !legacyToken)
     return { user: null, reason: "cookie_ausente" };
@@ -266,7 +286,7 @@ export async function createResetToken(userId: number) {
   const db = getD1();
   await db
     .prepare(
-      "UPDATE redefinicoes_senha SET usado = 1 WHERE usuario_id = ? AND usado = 0",
+      "UPDATE redefinicoes_senha SET usado = 1 WHERE usuario_id = ? AND usado = 0 AND (token_hash IS NULL OR token_hash NOT LIKE 'first:%')",
     )
     .bind(userId)
     .run();
@@ -279,19 +299,107 @@ export async function createResetToken(userId: number) {
   return token;
 }
 
+export function generateTemporaryPassword() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  const bytes = crypto.getRandomValues(new Uint8Array(10));
+  let suffix = "";
+  for (const byte of bytes) suffix += alphabet[byte % alphabet.length];
+  return `V7${suffix}`;
+}
+
+export async function createFirstAccessToken(userId: number) {
+  const token = `fa_${randomHex(32)}`;
+  const expiresAt = new Date(Date.now() + 7 * 86400000).toISOString();
+  const db = getD1();
+  await db
+    .prepare(
+      "UPDATE redefinicoes_senha SET usado = 1 WHERE usuario_id = ? AND usado = 0 AND token_hash LIKE 'first:%'",
+    )
+    .bind(userId)
+    .run();
+  await db
+    .prepare(
+      "INSERT INTO redefinicoes_senha (usuario_id, token_hash, expira_em, usado) VALUES (?, ?, ?, 0)",
+    )
+    .bind(userId, `first:${await sha256(token)}`, expiresAt)
+    .run();
+  return { token, expiresAt };
+}
+
+export async function consumeFirstAccessToken(input: {
+  token: string;
+  email: string;
+  temporaryPassword: string;
+  newPassword: string;
+}) {
+  const db = getD1();
+  const email = normalizeEmail(input.email);
+  const row = await db
+    .prepare(
+      `SELECT r.id, r.usuario_id, u.senha_hash, u.senha_salt
+       FROM redefinicoes_senha r
+       JOIN usuarios u ON u.id = r.usuario_id
+       WHERE r.token_hash = ? AND r.usado = 0
+         AND datetime(r.expira_em) > CURRENT_TIMESTAMP
+         AND lower(u.email) = ? AND u.ativo = 1
+       LIMIT 1`,
+    )
+    .bind(`first:${await sha256(input.token)}`, email)
+    .first<{
+      id: number;
+      usuario_id: number;
+      senha_hash: string | null;
+      senha_salt: string | null;
+    }>();
+  if (!row?.senha_hash || !row.senha_salt) {
+    return { ok: false, reason: "INVALID" } as const;
+  }
+  if (!(await verifyPassword(input.temporaryPassword, row.senha_salt, row.senha_hash))) {
+    return { ok: false, reason: "INVALID" } as const;
+  }
+  if (input.temporaryPassword === input.newPassword) {
+    return { ok: false, reason: "SAME_PASSWORD" } as const;
+  }
+  const claim = await db
+    .prepare("UPDATE redefinicoes_senha SET usado = 1 WHERE id = ? AND usado = 0")
+    .bind(row.id)
+    .run();
+  if (!Number((claim.meta as { changes?: number }).changes || 0)) {
+    return { ok: false, reason: "INVALID" } as const;
+  }
+  try {
+    await setUserPassword(row.usuario_id, input.newPassword);
+  } catch (error) {
+    await db
+      .prepare("UPDATE redefinicoes_senha SET usado = 0 WHERE id = ?")
+      .bind(row.id)
+      .run();
+    throw error;
+  }
+  await db
+    .prepare("UPDATE redefinicoes_senha SET usado = 1 WHERE usuario_id = ? AND usado = 0")
+    .bind(row.usuario_id)
+    .run();
+  await db
+    .prepare("DELETE FROM sessoes WHERE usuario_id = ?")
+    .bind(row.usuario_id)
+    .run();
+  return { ok: true, userId: row.usuario_id } as const;
+}
+
 export async function consumeResetToken(token: string, password: string) {
   const db = getD1();
   const row = await db
     .prepare(
-      "SELECT id, usuario_id FROM redefinicoes_senha WHERE token_hash = ? AND usado = 0 AND datetime(expira_em) > CURRENT_TIMESTAMP LIMIT 1",
+      "SELECT usuario_id FROM redefinicoes_senha WHERE token_hash = ? AND usado = 0 AND datetime(expira_em) > CURRENT_TIMESTAMP LIMIT 1",
     )
     .bind(await sha256(token))
-    .first<{ id: number; usuario_id: number }>();
+    .first<{ usuario_id: number }>();
   if (!row) return false;
   await setUserPassword(row.usuario_id, password);
   await db
-    .prepare("UPDATE redefinicoes_senha SET usado = 1 WHERE id = ?")
-    .bind(row.id)
+    .prepare("UPDATE redefinicoes_senha SET usado = 1 WHERE usuario_id = ? AND usado = 0")
+    .bind(row.usuario_id)
     .run();
   await db
     .prepare("DELETE FROM sessoes WHERE usuario_id = ?")

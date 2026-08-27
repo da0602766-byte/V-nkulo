@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import LoginPortal from "../components/LoginPortal";
 import { getSessionUser } from "../lib/local-auth";
 import { getPilotLoginConfig } from "../lib/pilot-login-config";
@@ -10,7 +11,12 @@ export const dynamic = "force-dynamic";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ erro?: string; motivo?: string; returnTo?: string }>;
+  searchParams: Promise<{
+    erro?: string;
+    motivo?: string;
+    returnTo?: string;
+    auto?: string;
+  }>;
 }) {
   const params = await searchParams;
   const returnTo = safeRelativeReturnPath(params.returnTo, "");
@@ -19,6 +25,16 @@ export default async function LoginPage({
     if (returnTo) redirect(returnTo);
     const memberships = await listTenantMemberships(user);
     redirect(memberships.length ? "/painel" : "/comunidades?conta=ativa");
+  }
+  const requestHeaders = await headers();
+  const hostname = String(requestHeaders.get("host") || "")
+    .split(":")[0]
+    .toLowerCase();
+  const isLocalPreview =
+    hostname === "127.0.0.1" || hostname === "localhost" || hostname === "[::1]";
+  if (isLocalPreview && params.auto !== "0") {
+    const query = returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : "";
+    redirect(`/api/auth/preview${query}`);
   }
   const config = await getPilotLoginConfig();
   const sessionMessages: Record<string, string> = {
@@ -39,6 +55,7 @@ export default async function LoginPage({
       maintenance={{ ativa: false, mensagem: "", terminaEm: null }}
       config={config}
       returnTo={returnTo}
+      initialMode={params.modo === "cadastro" && config.cadastroHabilitado !== false ? "cadastro" : "login"}
     />
   );
 }

@@ -40,7 +40,8 @@ test("compartilhamento e cartões do proprietário respeitam a largura do celula
   assert.match(workspace, /Selecionar várias pessoas para enviar em um grupo/);
   assert.match(workspace, /designacaoIds: selectedDesignationIds/);
   assert.match(workspace, /aria-pressed=\{selected\}/);
-  assert.match(workspace, /https:\/\/wa\.me\/\?text=/);
+  assert.match(workspace, /navigator\.share\(\{/);
+  assert.doesNotMatch(workspace, /https:\/\/wa\.me\/\?text=/);
   assert.match(workspace, /Cada pessoa deve abrir somente o link ao lado do próprio nome/);
   assert.doesNotMatch(workspace, /function ShareDialog\(/);
   assert.match(schedulesApi, /u\.nome, u\.telefone, u\.foto_perfil/);

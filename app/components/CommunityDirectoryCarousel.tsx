@@ -70,7 +70,6 @@ export default function CommunityDirectoryCarousel({
             <h2>{community.nome}</h2>
             <p className="directory-profile-description">{community.descricao}</p>
             <dl className="directory-profile-facts">
-              <div><dt>Publicações</dt><dd>{community.publicacoesPublicas}</dd></div>
               <div><dt>Próximos eventos</dt><dd>{community.eventosPublicos}</dd></div>
               <div><dt>Acesso</dt><dd>Protegido</dd></div>
             </dl>

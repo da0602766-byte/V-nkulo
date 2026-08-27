@@ -4,7 +4,13 @@ import { useEffect, useState } from "react";
 
 type Theme = "CLARO" | "ESCURO" | "AUTO";
 
-export default function ThemeControl({ compact = false }: { compact?: boolean }) {
+export default function ThemeControl({
+  compact = false,
+  cycle = false,
+}: {
+  compact?: boolean;
+  cycle?: boolean;
+}) {
   const [theme, setTheme] = useState<Theme>("AUTO");
 
   useEffect(() => {
@@ -20,6 +26,26 @@ export default function ThemeControl({ compact = false }: { compact?: boolean })
     setTheme(next);
     window.localStorage.setItem("vinkulo-theme", next);
     applyTheme(next);
+  }
+
+  const activeTheme = THEMES.find((item) => item.value === theme) || THEMES[2];
+
+  if (cycle) {
+    const nextTheme = THEMES[(THEMES.findIndex((item) => item.value === theme) + 1) % THEMES.length];
+    return (
+      <div className={`theme-control theme-control-cycle ${compact ? "compact" : ""}`}>
+        <button
+          type="button"
+          className="active"
+          aria-label={`${activeTheme.label}. Mudar para ${nextTheme.label}`}
+          title={`${activeTheme.label} · mudar para ${nextTheme.label}`}
+          onClick={() => update(nextTheme.value)}
+        >
+          <span aria-hidden="true">{activeTheme.icon}</span>
+          <small>{activeTheme.label}</small>
+        </button>
+      </div>
+    );
   }
 
   return (

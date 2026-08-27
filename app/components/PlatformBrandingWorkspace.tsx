@@ -69,11 +69,11 @@ export default function PlatformBrandingWorkspace() {
     <section className="platform-branding-workspace">
       <header>
         <div>
-          <p className="pilot-kicker">IDENTIDADE DA PÁGINA PRINCIPAL</p>
-          <h2>Tema público da plataforma</h2>
+          <p className="pilot-kicker">IDENTIDADE PÚBLICA</p>
+          <h2>Logo, ícone e tema do VÍNKULO</h2>
           <p>
-            Defina nome, logo, paleta e banner da plataforma. A leitura é
-            preservada nos modos claro, escuro e automático.
+            O logo escolhido aqui substitui o ícone do VÍNKULO no cabeçalho de
+            todas as páginas públicas. Defina também nome, paleta e banner.
           </p>
         </div>
       </header>
@@ -89,7 +89,7 @@ export default function PlatformBrandingWorkspace() {
             />
           </label>
           <NativeImageUpload
-            label="Logo global da plataforma"
+            label="Logo global da plataforma · ícone das páginas públicas"
             value={logoUrl}
             purpose="platform-logo"
             onChange={setLogoUrl}

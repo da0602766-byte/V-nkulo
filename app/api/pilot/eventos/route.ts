@@ -16,6 +16,7 @@ export async function GET() {
     .prepare(
       `SELECT e.id, e.titulo, e.descricao, e.categoria, e.inicia_em,
         e.termina_em, e.local, e.publico, e.status, e.capacidade,
+        e.escalas_abrem_em, e.reservas_abrem_em,
         e.criado_por, e.criado_em, e.atualizado_em,
         SUM(CASE WHEN ce.status = 'CONFIRMADO' THEN 1 ELSE 0 END) AS confirmacoes,
         MAX(CASE WHEN ce.usuario_id = ? THEN ce.status ELSE NULL END) AS minha_confirmacao,
@@ -128,8 +129,9 @@ export async function POST(request: Request) {
     .prepare(
       `INSERT INTO eventos_comunidade
       (comunidade_id, titulo, descricao, categoria, inicia_em, termina_em,
-       local, publico, status, capacidade, criado_por, atualizado_por)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       local, publico, status, capacidade, escalas_abrem_em,
+       reservas_abrem_em, criado_por, atualizado_por)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       access.context.comunidadeId,
@@ -142,6 +144,8 @@ export async function POST(request: Request) {
       parsed.publico ? 1 : 0,
       parsed.status,
       parsed.capacidade,
+      parsed.escalasAbremEm,
+      parsed.reservasAbremEm,
       access.user.id,
       access.user.id,
     )

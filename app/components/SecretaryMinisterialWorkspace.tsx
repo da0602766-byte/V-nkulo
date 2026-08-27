@@ -12,6 +12,7 @@ import {
 import MinistriesWorkspace from "./MinistriesWorkspace";
 import NativeImageUpload from "./NativeImageUpload";
 import VerifiedOwnerName from "./VerifiedOwnerName";
+import { shareToWhatsAppApp } from "../lib/androidNativeBridge";
 
 type Volunteer = {
   id: number;
@@ -99,7 +100,8 @@ type Schedule = {
   inicia_em: string;
   termina_em: string;
   local: string;
-  status: "RASCUNHO" | "PUBLICADA" | "AGUARDANDO_CHECKLIST" | "ENCERRADA" | "CANCELADA";
+  status: "RASCUNHO" | "AGENDADA" | "PUBLICADA" | "AGUARDANDO_CHECKLIST" | "ENCERRADA" | "CANCELADA";
+  publicar_em: string | null;
   observacoes: string;
   responsavel_usuario_id: number | null;
   responsavel_nome: string | null;
@@ -201,10 +203,12 @@ export default function SecretaryMinisterialWorkspace({
   const [feedback, setFeedback] = useState("");
   const [selectedVolunteers, setSelectedVolunteers] = useState<number[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
+  const [expandedTeamId, setExpandedTeamId] = useState<number | null>(null);
   const [links, setLinks] = useState<SecretaryLink[]>([blankSecretaryLink()]);
   const [reusableLinks, setReusableLinks] = useState<ReusableSecretaryLink[]>([]);
   const [scheduleStartsAt, setScheduleStartsAt] = useState("");
   const [scheduleEndsAt, setScheduleEndsAt] = useState("");
+  const [scheduleCreatorOpen, setScheduleCreatorOpen] = useState(false);
   const [checklistDraft, setChecklistDraft] = useState<ChecklistDraft[]>([]);
   const [shareSchedule, setShareSchedule] = useState<Schedule | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -322,8 +326,8 @@ export default function SecretaryMinisterialWorkspace({
         null,
       );
       setTab("escalas");
+      setScheduleCreatorOpen(true);
       window.setTimeout(() => {
-        if (scheduleDetails.current) scheduleDetails.current.open = true;
         scheduleDetails.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 80);
     };
@@ -425,7 +429,9 @@ export default function SecretaryMinisterialWorkspace({
       url,
     );
     setSelectedMinistryId(ministry.id);
+    setExpandedTeamId(null);
     setLinks([blankSecretaryLink()]);
+    setScheduleCreatorOpen(false);
     setTab(ministry.can_manage ? "painel" : "escalas");
     setError("");
     setFeedback("");
@@ -443,6 +449,8 @@ export default function SecretaryMinisterialWorkspace({
     setLinks([blankSecretaryLink()]);
     setTeams([]);
     setSelectedTeamId(null);
+    setExpandedTeamId(null);
+    setScheduleCreatorOpen(false);
     setTab("painel");
     setError("");
     setFeedback("");
@@ -536,7 +544,7 @@ export default function SecretaryMinisterialWorkspace({
     const title = String(body.titulo || "").trim();
     const startsAt = String(body.iniciaEm || "");
     const endsAt = String(body.terminaEm || "");
-    const publishing = body.status === "PUBLICADA";
+    const publishing = body.status === "PUBLICADA" || body.status === "AGENDADA";
     if (!title) {
       setError("Etapa 1 — informe o título da escala.");
       return;
@@ -565,6 +573,10 @@ export default function SecretaryMinisterialWorkspace({
       setError("Etapa 1 — escolha um responsável antes de publicar.");
       return;
     }
+    if (body.status === "AGENDADA" && (!body.publicarEm || Date.parse(String(body.publicarEm)) <= Date.now())) {
+      setError("Etapa 5 — escolha um horário futuro para publicar a escala.");
+      return;
+    }
     const repertorio = String(body.repertorio || "")
       .split("\n")
       .map((item) => item.trim())
@@ -589,7 +601,9 @@ export default function SecretaryMinisterialWorkspace({
       },
       body.status === "PUBLICADA"
         ? "Escala publicada e integrantes notificados."
-        : "Rascunho da escala salvo.",
+        : body.status === "AGENDADA"
+          ? "Escala agendada. O cronômetro já está ativo."
+          : "Rascunho da escala salvo.",
       event.currentTarget,
     );
     if (created) {
@@ -599,7 +613,7 @@ export default function SecretaryMinisterialWorkspace({
       setChecklistDraft([]);
       setScheduleStartsAt("");
       setScheduleEndsAt("");
-      if (scheduleDetails.current) scheduleDetails.current.open = false;
+      setScheduleCreatorOpen(false);
     }
   }
 
@@ -655,13 +669,25 @@ export default function SecretaryMinisterialWorkspace({
   }
 
   async function updateChecklist(item: ChecklistItem, status: "FEITO" | "NAO_FEITO" | "PENDENTE") {
-    await submit(
-      `checklist-${item.id}`,
-      "/api/pilot/ministerios/recursos",
-      "PATCH",
-      { acao: "ATUALIZAR_CHECKLIST", itemId: item.id, status, observacao: item.observacao || "" },
-      status === "FEITO" ? "Responsabilidade concluída." : "Status do checklist atualizado.",
-    );
+    const previous = item.status;
+    setChecklist((current) => current.map((entry) => entry.id === item.id ? { ...entry, status } : entry));
+    setBusy(`checklist-${item.id}`);
+    setError("");
+    try {
+      const response = await fetch("/api/pilot/ministerios/recursos", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acao: "ATUALIZAR_CHECKLIST", itemId: item.id, status, observacao: item.observacao || "" }),
+      });
+      const result = await readJson<{ error?: string }>(response);
+      if (!response.ok) throw new Error(result.error || "Não foi possível atualizar o checklist.");
+      setFeedback(status === "FEITO" ? "Responsabilidade concluída." : "Status do checklist atualizado.");
+    } catch (cause) {
+      setChecklist((current) => current.map((entry) => entry.id === item.id ? { ...entry, status: previous } : entry));
+      setError((cause as Error).message);
+    } finally {
+      setBusy("");
+    }
   }
 
   async function respondToSchedule(
@@ -1224,7 +1250,7 @@ export default function SecretaryMinisterialWorkspace({
                 <div className="ministry-team-grid">
                   {teams.map((team) => (
                     <form
-                      className="ministry-team-card"
+                      className={`ministry-team-card${expandedTeamId === team.id ? " expanded" : " collapsed"}`}
                       key={`${team.id}-${team.membros.map((member) => member.voluntario_id).join("-")}`}
                       style={{ "--team-color": team.cor } as CSSProperties}
                       onSubmit={(event) => {
@@ -1236,11 +1262,17 @@ export default function SecretaryMinisterialWorkspace({
                         void saveTeamMembers(team, volunteerIds);
                       }}
                     >
-                      <header>
+                      <button
+                        type="button"
+                        className="ministry-team-collapse-trigger"
+                        aria-expanded={expandedTeamId === team.id}
+                        onClick={() => setExpandedTeamId((current) => current === team.id ? null : team.id)}
+                      >
                         <span aria-hidden="true" />
-                        <div><strong>{team.nome}</strong><small>{team.descricao || "Equipe deste ministério"}</small></div>
-                        <b>{team.membros.length}</b>
-                      </header>
+                        <strong>{team.nome}</strong>
+                        <i aria-hidden="true">⌄</i>
+                      </button>
+                      {expandedTeamId === team.id && <>
                       <div className="ministry-team-members">
                         {selectedMinistry.voluntarios.map((volunteer) => (
                           <label key={volunteer.id}>
@@ -1273,6 +1305,7 @@ export default function SecretaryMinisterialWorkspace({
                           </button>
                         </footer>
                       )}
+                      </>}
                     </form>
                   ))}
                   {!teams.length && (
@@ -1347,7 +1380,17 @@ export default function SecretaryMinisterialWorkspace({
           {tab === "escalas" && selectedMinistry && (
             <div className="secretary-schedules">
               {canManage && (
-                <details className="secretary-create-schedule" ref={scheduleDetails}>
+                <details
+                  className="secretary-create-schedule"
+                  ref={scheduleDetails}
+                  data-keep-open-on-outside
+                  open={scheduleCreatorOpen}
+                  onToggle={(event) => {
+                    if (event.currentTarget.open !== scheduleCreatorOpen) {
+                      setScheduleCreatorOpen(event.currentTarget.open);
+                    }
+                  }}
+                >
                   <summary><span>+</span><div><strong>Criar nova escala</strong><small>Equipe, repertório, links e checklist em um único fluxo</small></div></summary>
                   <form onSubmit={createSchedule}>
                     <details className="secretary-fold-section" open>
@@ -1408,7 +1451,8 @@ export default function SecretaryMinisterialWorkspace({
                     <details className="secretary-fold-section">
                       <summary><span>5</span><div><h3>Publicação</h3><p>Rascunhos não notificam a equipe.</p></div><i aria-hidden="true">⌄</i></summary>
                       <div className="secretary-fold-content secretary-form-grid">
-                        <label>Status<select name="status" defaultValue="RASCUNHO"><option value="RASCUNHO">Salvar como rascunho</option><option value="PUBLICADA">Publicar e notificar</option></select></label>
+                        <label>Status<select name="status" defaultValue="RASCUNHO"><option value="RASCUNHO">Salvar como rascunho</option><option value="AGENDADA">Agendar publicação</option><option value="PUBLICADA">Publicar e notificar agora</option></select></label>
+                        <label>Publicar em<input name="publicarEm" type="datetime-local" /><small>Obrigatório apenas para publicação agendada.</small></label>
                         <label className="span-2">Observações<textarea name="observacoes" rows={4} maxLength={1200} /></label>
                       </div>
                     </details>
@@ -1421,7 +1465,7 @@ export default function SecretaryMinisterialWorkspace({
                   <article className="secretary-schedule-card" key={schedule.id}>
                     <header>
                       <time dateTime={schedule.inicia_em}><strong>{formatDay(schedule.inicia_em)}</strong><span>{formatMonth(schedule.inicia_em)}</span></time>
-                      <div><span className={`secretary-status ${schedule.status.toLowerCase()}`}>{schedule.status.replaceAll("_", " ")}</span><h2>{schedule.titulo}</h2><p>{formatDate(schedule.inicia_em)} · {schedule.local || "Local não informado"}</p></div>
+                      <div><span className={`secretary-status ${schedule.status.toLowerCase()}`}>{schedule.status.replaceAll("_", " ")}</span><h2>{schedule.titulo}</h2><p>{formatDate(schedule.inicia_em)} · {schedule.local || "Local não informado"}</p>{schedule.status === "AGENDADA" && schedule.publicar_em && <SchedulePublicationCountdown opensAt={schedule.publicar_em} />}</div>
                     </header>
                     <div className="secretary-schedule-body">
                       <div><small>Responsável</small><strong>{schedule.responsavel_nome || "Não definido"}</strong></div>
@@ -1431,7 +1475,7 @@ export default function SecretaryMinisterialWorkspace({
                     </div>
                     <div className="secretary-assignment-status-list">
                       {schedule.designacoes.map((assignment) => (
-                        <article key={assignment.id}>
+                        <article key={assignment.id} data-status={assignment.status.toLowerCase()}>
                           <span className="secretary-avatar">{initials(assignment.nome)}</span>
                           <div>
                             <VerifiedOwnerName name={assignment.nome} verified={Boolean(assignment.owner_verified)} />
@@ -1839,7 +1883,7 @@ function ScheduleCompact({
   return (
     <div className="secretary-next-schedule">
       <time><strong>{formatDay(schedule.inicia_em)}</strong><span>{formatMonth(schedule.inicia_em)}</span></time>
-      <div><strong>{schedule.titulo}</strong><span>{formatDate(schedule.inicia_em)} · {schedule.local || "Local não informado"}</span><small>{schedule.designacoes.length} integrantes · {schedule.repertorio.length} itens no repertório</small></div>
+      <div><strong>{schedule.titulo}</strong><span>{formatDate(schedule.inicia_em)} · {schedule.local || "Local não informado"}</span><small>{schedule.designacoes.length} integrantes · {schedule.repertorio.length} itens no repertório</small>{schedule.status === "AGENDADA" && schedule.publicar_em && <SchedulePublicationCountdown opensAt={schedule.publicar_em} />}</div>
       <div className="secretary-card-actions"><a href={`/api/pilot/escalas/${schedule.id}/pdf?download=1`}>PDF</a>{schedule.can_manage && schedule.status === "PUBLICADA" && <button type="button" onClick={() => onShare(schedule)} disabled={busy === `share-${schedule.id}`}>Compartilhar</button>}</div>
     </div>
   );
@@ -1915,6 +1959,7 @@ function MinistryAccessHistory({ schedules }: { schedules: Schedule[] }) {
     scheduleTitle: string;
   }>>([]);
   const [loading, setLoading] = useState(true);
+  const [workingEntryId, setWorkingEntryId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const load = useCallback(async () => {
     setLoading(true);
@@ -1949,8 +1994,10 @@ function MinistryAccessHistory({ schedules }: { schedules: Schedule[] }) {
 
   async function cancel(entry: (typeof entries)[number]) {
     if (!window.confirm(`Cancelar o acesso de ${entry.beneficiarioNome}?`)) return;
-    setLoading(true);
+    setWorkingEntryId(entry.id);
     setError("");
+    const previous = entries;
+    setEntries((current) => current.map((item) => item.id === entry.id ? { ...item, status: "CANCELADO" } : item));
     try {
       const response = await fetch(
         `/api/pilot/escalas/${entry.scheduleId}/acessos/${entry.id}`,
@@ -1962,10 +2009,11 @@ function MinistryAccessHistory({ schedules }: { schedules: Schedule[] }) {
       );
       const payload = await readJson<{ error?: string }>(response);
       if (!response.ok) throw new Error(payload.error || "Não foi possível cancelar o acesso.");
-      await load();
     } catch (cause) {
+      setEntries(previous);
       setError((cause as Error).message);
-      setLoading(false);
+    } finally {
+      setWorkingEntryId(null);
     }
   }
 
@@ -1975,8 +2023,10 @@ function MinistryAccessHistory({ schedules }: { schedules: Schedule[] }) {
       ? "Este acesso ainda está ativo e será revogado imediatamente."
       : "O registro deixará de aparecer no histórico do ministério.";
     if (!window.confirm(`Excluir o histórico de ${entry.beneficiarioNome}?\n\n${warning}`)) return;
-    setLoading(true);
+    setWorkingEntryId(entry.id);
     setError("");
+    const previous = entries;
+    setEntries((current) => current.filter((item) => item.id !== entry.id));
     try {
       const response = await fetch(
         `/api/pilot/escalas/${entry.scheduleId}/acessos/${entry.id}`,
@@ -1984,11 +2034,11 @@ function MinistryAccessHistory({ schedules }: { schedules: Schedule[] }) {
       );
       const payload = await readJson<{ error?: string }>(response);
       if (!response.ok) throw new Error(payload.error || "Não foi possível excluir o histórico.");
-      setEntries((current) => current.filter((item) => item.id !== entry.id));
-      setLoading(false);
     } catch (cause) {
+      setEntries(previous);
       setError((cause as Error).message);
-      setLoading(false);
+    } finally {
+      setWorkingEntryId(null);
     }
   }
 
@@ -2006,8 +2056,8 @@ function MinistryAccessHistory({ schedules }: { schedules: Schedule[] }) {
             <p><strong>{entry.beneficiarioNome}</strong> recebeu acesso a <b>{entry.recursoLabel}</b> na escala “{entry.scheduleTitle}”, de {formatDate(entry.iniciaEm)} até {formatDate(entry.terminaEm)}.</p>
             <small data-status={entry.status.toLowerCase()}>{entry.status.replaceAll("_", " ")}</small>
             <div className="secretary-access-history-actions">
-              {["PENDENTE", "AGUARDANDO_HORARIO", "ATIVO"].includes(entry.status) && <button type="button" disabled={loading} onClick={() => void cancel(entry)}>Cancelar acesso</button>}
-              <button type="button" className="danger" disabled={loading} onClick={() => void removeHistory(entry)}>Excluir histórico</button>
+              {["PENDENTE", "AGUARDANDO_HORARIO", "ATIVO"].includes(entry.status) && <button type="button" disabled={workingEntryId === entry.id} onClick={() => void cancel(entry)}>Cancelar acesso</button>}
+              <button type="button" className="danger" disabled={workingEntryId === entry.id} onClick={() => void removeHistory(entry)}>{workingEntryId === entry.id ? "Processando…" : "Excluir histórico"}</button>
             </div>
           </article>
         ))}
@@ -2049,6 +2099,7 @@ function ShareDialogV2({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [copyStatus, setCopyStatus] = useState("Copiar mensagem");
+  const [shareStatus, setShareStatus] = useState("");
   const selectedAssignments = schedule.designacoes.filter((assignment) =>
     selectedDesignationIds.includes(assignment.id),
   );
@@ -2061,6 +2112,7 @@ function ShareDialogV2({
           url: `${window.location.origin}/acesso/${access.token}`,
         }));
   const safeMessage = message.trim().slice(0, 6000);
+  const accessWindowError = temporaryAccessWindowError(startsAt, endsAt);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -2073,6 +2125,10 @@ function ShareDialogV2({
   async function createAccess() {
     if (!selectedDesignationIds.length || !selectedAssignments.length || !startsAt || !endsAt) {
       setError("Selecione uma ou mais pessoas, o recurso e o período.");
+      return;
+    }
+    if (accessWindowError) {
+      setError(accessWindowError);
       return;
     }
     setLoading(true);
@@ -2134,6 +2190,45 @@ function ShareDialogV2({
       setCopyStatus("Selecione e copie a mensagem");
     }
     window.setTimeout(() => setCopyStatus("Copiar mensagem"), 2_000);
+  }
+
+  async function shareGeneratedMessage(recipientName?: string) {
+    if (!safeMessage) return;
+    setShareStatus("");
+    try {
+      if (shareToWhatsAppApp(safeMessage)) {
+        setShareStatus(
+          recipientName
+            ? `WhatsApp aberto para enviar a ${recipientName}.`
+            : "WhatsApp aberto. Escolha a conversa ou o grupo.",
+        );
+        return;
+      }
+      if (navigator.share) {
+        await navigator.share({
+          title: `Acesso temporário — ${schedule.titulo}`,
+          text: safeMessage,
+        });
+        setShareStatus(
+          recipientName
+            ? `Mensagem preparada para enviar a ${recipientName}.`
+            : "Escolha o WhatsApp e depois a conversa ou grupo.",
+        );
+        return;
+      }
+      await navigator.clipboard.writeText(safeMessage);
+      setShareStatus("Mensagem copiada. Abra o WhatsApp e cole na conversa desejada.");
+    } catch (cause) {
+      if ((cause as Error).name === "AbortError") return;
+      setShareStatus("Não foi possível abrir o compartilhamento. Use Copiar mensagem.");
+    }
+  }
+
+  function resetGeneratedAccess() {
+    setCreated([]);
+    setMessage("");
+    setShareStatus("");
+    setError("");
   }
 
   return (
@@ -2222,11 +2317,11 @@ function ShareDialogV2({
         <fieldset className="secretary-share-section">
           <legend>2. Aba ou recurso permitido</legend>
           <div className="secretary-share-resource-grid">
-            <button type="button" className={resource === "ESCALA_LEITURA" ? "active" : ""} onClick={() => setResource("ESCALA_LEITURA")} aria-pressed={resource === "ESCALA_LEITURA"}>
+            <button type="button" className={resource === "ESCALA_LEITURA" ? "active" : ""} onClick={() => { setResource("ESCALA_LEITURA"); resetGeneratedAccess(); }} aria-pressed={resource === "ESCALA_LEITURA"}>
               <strong>Escala em leitura</strong><small>Somente os dados operacionais desta escala.</small>
             </button>
             {parkingMinistry && (
-              <button type="button" className={resource === "ESTACIONAMENTO" ? "active" : ""} onClick={() => setResource("ESTACIONAMENTO")} aria-pressed={resource === "ESTACIONAMENTO"}>
+              <button type="button" className={resource === "ESTACIONAMENTO" ? "active" : ""} onClick={() => { setResource("ESTACIONAMENTO"); resetGeneratedAccess(); }} aria-pressed={resource === "ESTACIONAMENTO"}>
                 <strong>Estacionamento</strong><small>Apenas a aba operacional protegida.</small>
               </button>
             )}
@@ -2235,10 +2330,11 @@ function ShareDialogV2({
 
         <fieldset className="secretary-share-window">
           <legend>3. Horário autorizado</legend>
-          <label>Início<input type="datetime-local" value={startsAt} min={toLocalDateTimeInput(schedule.inicia_em)} max={toLocalDateTimeInput(schedule.termina_em)} onChange={(event) => setStartsAt(event.target.value)} /></label>
-          <label>Término<input type="datetime-local" value={endsAt} min={toLocalDateTimeInput(schedule.inicia_em)} max={toLocalDateTimeInput(schedule.termina_em)} onChange={(event) => setEndsAt(event.target.value)} /></label>
-          <button type="button" disabled={loading || !selectedDesignationIds.length || !startsAt || !endsAt} onClick={() => void createAccess()}>{loading ? "Validando…" : selectedDesignationIds.length > 1 ? `Gerar ${selectedDesignationIds.length} acessos pessoais` : "Gerar acesso pessoal"}</button>
-          <small>O backend limita o período ao horário publicado da escala e cria um token diferente para cada pessoa.</small>
+          <label>Início<input type="datetime-local" value={startsAt} step={60} onChange={(event) => { setStartsAt(event.target.value); resetGeneratedAccess(); }} /></label>
+          <label>Término<input type="datetime-local" value={endsAt} step={60} onChange={(event) => { setEndsAt(event.target.value); resetGeneratedAccess(); }} /></label>
+          <button type="button" disabled={loading || !selectedDesignationIds.length || !startsAt || !endsAt || Boolean(accessWindowError)} onClick={() => void createAccess()}>{loading ? "Validando…" : selectedDesignationIds.length > 1 ? `Gerar ${selectedDesignationIds.length} acessos pessoais` : "Gerar acesso pessoal"}</button>
+          <small>Escolha livremente o início e o término. Por segurança, cada liberação pode durar no máximo 31 dias.</small>
+          {accessWindowError && <small className="secretary-share-window-error" role="alert">{accessWindowError}</small>}
         </fieldset>
 
         {error && <p className="secretary-share-error" role="alert">{error}</p>}
@@ -2264,13 +2360,14 @@ function ShareDialogV2({
             <label className="secretary-share-message">Mensagem para envio<textarea value={message} onChange={(event) => setMessage(event.target.value.slice(0, 6000))} rows={Math.min(12, 7 + created.length)} maxLength={6000} /></label>
             <div className="secretary-share-actions">
               <button type="button" onClick={() => void copyGeneratedMessage()}>{copyStatus}</button>
-              <a href={`https://wa.me/?text=${encodeURIComponent(safeMessage)}`} target="_blank" rel="noreferrer">Escolher conversa ou grupo</a>
-              {directRecipient?.telefone && <a href={`https://wa.me/${String(directRecipient.telefone).replace(/\D/g, "")}?text=${encodeURIComponent(safeMessage)}`} target="_blank" rel="noreferrer">Enviar direto</a>}
+              <button type="button" onClick={() => void shareGeneratedMessage()}>Escolher conversa ou grupo</button>
+              {directRecipient?.telefone && <button type="button" onClick={() => void shareGeneratedMessage(directRecipient.nome)}>Enviar para contato</button>}
               <a href={`https://t.me/share/url?url=${encodeURIComponent(generatedAccesses[0]?.url || "")}&text=${encodeURIComponent(safeMessage)}`} target="_blank" rel="noreferrer">Telegram</a>
               <a href={`mailto:?subject=${encodeURIComponent(`Acesso temporário — ${schedule.titulo}`)}&body=${encodeURIComponent(safeMessage)}`}>E-mail</a>
               <a href={`/api/pilot/escalas/${schedule.id}/pdf?download=1`}>Baixar PDF</a>
               <button type="button" onClick={() => downloadScheduleImage(schedule)}>Baixar imagem</button>
             </div>
+            {shareStatus && <p className="secretary-share-status" role="status">{shareStatus}</p>}
           </section>
         )}
 
@@ -2323,6 +2420,21 @@ function buildTemporaryAccessGroupMessage({
       access.url,
     ]),
   ].join("\n");
+}
+
+function temporaryAccessWindowError(startsAt: string, endsAt: string) {
+  if (!startsAt || !endsAt) return "";
+  const start = Date.parse(startsAt);
+  const end = Date.parse(endsAt);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) {
+    return "Informe datas e horários válidos.";
+  }
+  if (end <= start) return "O término precisa ser posterior ao início.";
+  if (end <= Date.now()) return "O término da liberação precisa estar no futuro.";
+  if (end - start > 31 * 24 * 60 * 60 * 1000) {
+    return "A liberação pode durar no máximo 31 dias.";
+  }
+  return "";
 }
 
 function downloadScheduleImage(schedule: Schedule) {
@@ -2397,6 +2509,24 @@ async function readJson<T>(response: Response) {
   } catch {
     return {} as T;
   }
+}
+
+function SchedulePublicationCountdown({ opensAt }: { opensAt: string }) {
+  const [remaining, setRemaining] = useState(() => Math.max(0, Date.parse(opensAt) - Date.now()));
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const next = Math.max(0, Date.parse(opensAt) - Date.now());
+      setRemaining(next);
+      if (!next) window.location.reload();
+    }, 1_000);
+    return () => window.clearInterval(timer);
+  }, [opensAt]);
+  const seconds = Math.ceil(remaining / 1_000);
+  const days = Math.floor(seconds / 86_400);
+  const hours = Math.floor((seconds % 86_400) / 3_600);
+  const minutes = Math.floor((seconds % 3_600) / 60);
+  const rest = seconds % 60;
+  return <small className="secretary-publication-countdown" aria-live="polite" title={`Liberação programada para ${formatDate(opensAt)}`}>Liberação automática em {days ? `${days}d ` : ""}{hours}h {minutes}min {rest}s</small>;
 }
 
 function initials(name: string) {

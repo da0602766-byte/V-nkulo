@@ -21,6 +21,8 @@ type CommunityEvent = {
   publico: boolean | number;
   status: "RASCUNHO" | "PUBLICADO" | "CANCELADO";
   capacidade: number | null;
+  escalas_abrem_em: string | null;
+  reservas_abrem_em: string | null;
   confirmacoes: number;
   minha_confirmacao: "CONFIRMADO" | "CANCELADO" | null;
   can_view_registrants: number;
@@ -75,12 +77,17 @@ export default function EventsWorkspace({
   const [pollOptions, setPollOptions] = useState(["", ""]);
   const [registrantSearchEventId, setRegistrantSearchEventId] = useState<number | null>(null);
   const [registrantSearch, setRegistrantSearch] = useState("");
+  const [actionMenuId, setActionMenuId] = useState<number | null>(null);
   const detailsRef = useRef<HTMLDetailsElement>(null);
   const canManage = permissions.includes("events.manage");
   const canRsvp = permissions.includes("events.rsvp");
   const registrantSearchEvent = useMemo(
     () => events.find((item) => item.id === registrantSearchEventId) || null,
     [events, registrantSearchEventId],
+  );
+  const actionMenuEvent = useMemo(
+    () => events.find((item) => item.id === actionMenuId) || null,
+    [actionMenuId, events],
   );
   const filteredRegistrants = useMemo(() => {
     if (!registrantSearchEvent) return [];
@@ -114,6 +121,20 @@ export default function EventsWorkspace({
     const timer = window.setTimeout(() => void loadEvents(), 0);
     return () => window.clearTimeout(timer);
   }, [loadEvents]);
+
+  useEffect(() => {
+    if (!actionMenuId) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setActionMenuId(null);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [actionMenuId]);
 
   useEffect(() => {
     if (!events.length || typeof window === "undefined") return;
@@ -167,6 +188,8 @@ export default function EventsWorkspace({
       terminaEm: localDateToIso(String(form.get("terminaEm") || "")),
       local: form.get("local"),
       capacidade: form.get("capacidade"),
+      escalasAbremEm: localDateToIso(String(form.get("escalasAbremEm") || "")),
+      reservasAbremEm: localDateToIso(String(form.get("reservasAbremEm") || "")),
       publico: form.get("publico") === "on",
       status: form.get("status"),
       enquete: pollEnabled
@@ -428,6 +451,24 @@ export default function EventsWorkspace({
               />
             </label>
             <label>
+              Escalas disponíveis em
+              <input
+                name="escalasAbremEm"
+                type="datetime-local"
+                defaultValue={toLocalInput(editing?.escalas_abrem_em)}
+              />
+              <small>Horário exibido para a equipe antes do evento.</small>
+            </label>
+            <label>
+              Reservas do estacionamento em
+              <input
+                name="reservasAbremEm"
+                type="datetime-local"
+                defaultValue={toLocalInput(editing?.reservas_abrem_em)}
+              />
+              <small>Somente pessoas confirmadas poderão reservar após este horário.</small>
+            </label>
+            <label>
               Status
               <select name="status" defaultValue={editing?.status || "RASCUNHO"}>
                 <option value="RASCUNHO">Rascunho</option>
@@ -450,12 +491,15 @@ export default function EventsWorkspace({
                 aria-expanded={pollEnabled}
                 onClick={() => setPollEnabled((enabled) => !enabled)}
               >
-                <span aria-hidden="true">▥</span>
-                <span>
+                <span className="event-poll-toggle-icon" aria-hidden="true"><i /><i /><i /></span>
+                <span className="event-poll-toggle-copy">
                   <strong>{pollEnabled ? "Votação adicionada" : "Adicionar votação"}</strong>
                   <small>{pollEnabled ? "Defina a pergunta e as respostas" : "Colete respostas junto com o evento"}</small>
                 </span>
-                <b aria-hidden="true">{pollEnabled ? "−" : "+"}</b>
+                <span className="event-poll-toggle-action" aria-hidden="true">
+                  <em>{pollEnabled ? "Remover" : "Adicionar"}</em>
+                  <b>{pollEnabled ? "−" : "+"}</b>
+                </span>
               </button>
               {pollEnabled && (
                 <div className="event-poll-builder">
@@ -586,41 +630,33 @@ export default function EventsWorkspace({
                       {item.publico ? <span className="event-public-label">Público</span> : null}
                     </div>
                     {canManage && (
-                      <details className="event-card-menu">
-                        <summary aria-label={`Abrir ações de ${item.titulo}`}>•••</summary>
-                        <div>
-                          {item.status !== "CANCELADO" && (
-                            <>
-                              <button type="button" onClick={() => startEditing(item)}>Editar evento</button>
-                              <button
-                                type="button"
-                                className="danger-link"
-                                disabled={workingId === item.id}
-                                onClick={() => void cancelEvent(item)}
-                              >Cancelar evento</button>
-                            </>
-                          )}
-                          <button
-                            type="button"
-                            className="danger-link"
-                            disabled={workingId === item.id}
-                            onClick={() => void deleteEvent(item)}
-                          >Excluir evento</button>
-                          {Boolean(item.can_view_registrants) && (
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.currentTarget.closest("details")?.removeAttribute("open");
-                                setRegistrantSearch("");
-                                setRegistrantSearchEventId(item.id);
-                              }}
-                            >Pesquisar inscritos</button>
-                          )}
-                        </div>
-                      </details>
+                      <div className="event-card-menu">
+                        <button
+                          type="button"
+                          className="event-card-menu-trigger"
+                          aria-label={`Abrir ações de ${item.titulo}`}
+                          aria-expanded={actionMenuId === item.id}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setActionMenuId(item.id);
+                          }}
+                        >•••</button>
+                      </div>
                     )}
                   </div>
                   <h2>{item.titulo}</h2>
+                  <details className="event-card-details">
+                    <summary>
+                      <span>
+                        {item.enquete && isPublished
+                          ? item.enquete.minha_opcao
+                            ? "Opinião registrada"
+                            : "Sua opinião é necessária"
+                          : "Ver informações do evento"}
+                      </span>
+                      <i aria-hidden="true">⌄</i>
+                    </summary>
+                    <div className="event-card-expanded">
                   <p>{item.descricao || "Sem descrição adicional."}</p>
                   <dl>
                     <div>
@@ -637,6 +673,14 @@ export default function EventsWorkspace({
                         {item.confirmacoes}
                         {item.capacidade ? ` de ${item.capacidade}` : ""}
                       </dd>
+                    </div>
+                    <div>
+                      <dt>Escalas disponíveis</dt>
+                      <dd>{item.escalas_abrem_em ? formatShortDate(item.escalas_abrem_em) : "Ao publicar"}</dd>
+                    </div>
+                    <div>
+                      <dt>Reservas disponíveis</dt>
+                      <dd>{item.reservas_abrem_em ? formatShortDate(item.reservas_abrem_em) : "Após confirmar presença"}</dd>
                     </div>
                   </dl>
                   <div className="event-actions">
@@ -718,6 +762,8 @@ export default function EventsWorkspace({
                       {item.inscritos.length > 5 && <small className="event-registrants-more">Mostrando 5 de {item.inscritos.length}. Use os três pontos para pesquisar.</small>}
                     </details>
                   )}
+                    </div>
+                  </details>
                 </div>
               </article>
             );
@@ -731,6 +777,31 @@ export default function EventsWorkspace({
             tenant.
           </p>
         </div>
+      )}
+      {actionMenuEvent && typeof document !== "undefined" && createPortal(
+        <div className="event-action-overlay" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setActionMenuId(null);
+        }}>
+          <section className="event-action-dialog" role="dialog" aria-modal="true" aria-labelledby="event-action-title">
+            <header>
+              <div><small>AÇÕES DO EVENTO</small><strong id="event-action-title">{actionMenuEvent.titulo}</strong></div>
+              <button type="button" onClick={() => setActionMenuId(null)} aria-label="Fechar ações">×</button>
+            </header>
+            <div role="menu">
+              {actionMenuEvent.status !== "CANCELADO" && <>
+                <button type="button" onClick={() => { setActionMenuId(null); startEditing(actionMenuEvent); }}>Editar evento</button>
+                <button type="button" className="danger-link" disabled={workingId === actionMenuEvent.id} onClick={() => { setActionMenuId(null); void cancelEvent(actionMenuEvent); }}>Cancelar evento</button>
+              </>}
+              <button type="button" className="danger-link" disabled={workingId === actionMenuEvent.id} onClick={() => { setActionMenuId(null); void deleteEvent(actionMenuEvent); }}>Excluir evento</button>
+              {Boolean(actionMenuEvent.can_view_registrants) && <button type="button" onClick={() => {
+                setActionMenuId(null);
+                setRegistrantSearch("");
+                setRegistrantSearchEventId(actionMenuEvent.id);
+              }}>Pesquisar inscritos</button>}
+            </div>
+          </section>
+        </div>,
+        document.body,
       )}
       {registrantSearchEvent && typeof document !== "undefined" && createPortal(
         <div className="event-registrant-search-overlay" role="presentation" onMouseDown={(event) => {

@@ -89,7 +89,7 @@ export default function CommunityPostInteractions({ postId, initialCount = 0 }: 
                 aria-label={sending ? "Enviando comentário" : "Enviar comentário"}
                 title={sending ? "Enviando comentário" : "Enviar comentário"}
               >
-                <span aria-hidden="true" className="community-comment-send-icon">➤</span>
+                <span aria-hidden="true" className="community-comment-send-icon">↑</span>
               </button>
             </form>
           ) : <p>Comentários desativados pelo autor.</p>}

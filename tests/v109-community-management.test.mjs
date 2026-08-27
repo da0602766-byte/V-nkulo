@@ -36,7 +36,7 @@ test("menu principal do computador fica recolhido e mantém nomes acessíveis", 
   assert.match(styles, /\.pilot-sidebar-label/);
 });
 
-test("backend aplica retenção de sete dias somente a solicitações concluídas", async () => {
+test("backend aplica retenção de 24 horas somente a solicitações concluídas", async () => {
   const [route, retention] = await Promise.all([
     source("app/api/pilot/solicitacoes-entrada/route.ts"),
     source("app/lib/join-request-retention.ts"),
@@ -44,7 +44,7 @@ test("backend aplica retenção de sete dias somente a solicitações concluída
 
   assert.match(route, /cleanupResolvedJoinRequests/);
   assert.match(route, /JOIN_REQUEST_RETENTION_DAYS/);
-  assert.match(retention, /JOIN_REQUEST_RETENTION_DAYS = 7/);
+  assert.match(retention, /JOIN_REQUEST_RETENTION_DAYS = 1/);
   assert.match(retention, /status IN \('APROVADA', 'RECUSADA'\)/);
   assert.match(retention, /comunidade_id = \?/);
   assert.doesNotMatch(retention, /status = 'PENDENTE'/);

@@ -15,6 +15,15 @@ const STATUS = new Set([
 ]);
 const PAGE_SIZE = 10;
 
+const VISIONS = new Set([
+  "visitantes",
+  "acompanhamentos",
+  "pendencias",
+  "encaminhamentos",
+  "historico",
+  "arquivados",
+]);
+
 export async function GET(request: Request) {
   const access = await requireTenantPermission("visitors.view");
   if ("error" in access) return access.error;
@@ -22,6 +31,8 @@ export async function GET(request: Request) {
   const search = String(params.get("busca") || "").trim().slice(0, 80);
   const cursor = Math.max(0, Number(params.get("cursor") || 0) || 0);
   const categoryParam = String(params.get("categoria") || "").trim();
+  const requestedVision = String(params.get("visao") || "visitantes").trim();
+  const vision = VISIONS.has(requestedVision) ? requestedVision : "visitantes";
   const categoryMode = categoryParam === "sem-categoria"
     ? -1
     : Math.max(0, Number(categoryParam) || 0);
@@ -56,8 +67,23 @@ export async function GET(request: Request) {
         v.batizado, v.status, v.endereco, v.acompanhante, v.parente,
         v.encontro_com_deus, v.curso_membros, v.ministerio,
         v.data_entrada, v.observacoes, v.celula_id, v.categoria_id, v.criado_por,
+        v.ativo, v.criado_em, v.atualizado_em,
         c.nome AS celula_nome, vc.nome AS categoria_nome, vc.icone AS categoria_icone,
-        vc.cor AS categoria_cor, v.criado_em, v.atualizado_em
+        vc.cor AS categoria_cor,
+        (SELECT MAX(a.criado_em) FROM acompanhamentos a
+          WHERE a.visitante_id = v.id AND a.comunidade_id = v.comunidade_id
+            AND a.escopo_confirmado = 1) AS ultimo_contato,
+        (SELECT a.proximo_contato FROM acompanhamentos a
+          WHERE a.visitante_id = v.id AND a.comunidade_id = v.comunidade_id
+            AND a.escopo_confirmado = 1
+          ORDER BY a.id DESC LIMIT 1) AS proximo_contato,
+        (SELECT a.responsavel_email FROM acompanhamentos a
+          WHERE a.visitante_id = v.id AND a.comunidade_id = v.comunidade_id
+            AND a.escopo_confirmado = 1
+          ORDER BY a.id DESC LIMIT 1) AS responsavel_email,
+        (SELECT COUNT(*) FROM acompanhamentos a
+          WHERE a.visitante_id = v.id AND a.comunidade_id = v.comunidade_id
+            AND a.escopo_confirmado = 1) AS acompanhamentos_total
       FROM visitantes v
       LEFT JOIN celulas c
         ON c.id = v.celula_id
@@ -68,8 +94,27 @@ export async function GET(request: Request) {
        AND vc.comunidade_id = v.comunidade_id
        AND vc.ativa = 1
       WHERE v.comunidade_id = ?
-        AND v.ativo = 1
         AND v.escopo_confirmado = 1
+        AND (
+          (? = 'arquivados' AND v.ativo = 0)
+          OR (? <> 'arquivados' AND v.ativo = 1)
+        )
+        AND (
+          ? = 'visitantes'
+          OR ? = 'arquivados'
+          OR (? IN ('acompanhamentos', 'historico') AND EXISTS (
+            SELECT 1 FROM acompanhamentos ax
+            WHERE ax.visitante_id = v.id AND ax.comunidade_id = v.comunidade_id
+              AND ax.escopo_confirmado = 1
+          ))
+          OR (? = 'pendencias' AND EXISTS (
+            SELECT 1 FROM acompanhamentos ax
+            WHERE ax.visitante_id = v.id AND ax.comunidade_id = v.comunidade_id
+              AND ax.escopo_confirmado = 1 AND ax.proximo_contato IS NOT NULL
+              AND ax.proximo_contato <= date('now')
+          ))
+          OR (? = 'encaminhamentos' AND v.status IN ('EM_CONTATO', 'EM_ACOMPANHAMENTO'))
+        )
         AND (? = 0 OR v.id < ?)
         AND (? = 0 OR (? = -1 AND v.categoria_id IS NULL) OR v.categoria_id = ?)
         AND (? = '' OR v.nome_completo LIKE ? OR COALESCE(v.telefone, '') LIKE ? OR COALESCE(v.email, '') LIKE ?)
@@ -78,6 +123,13 @@ export async function GET(request: Request) {
     )
     .bind(
       access.context.comunidadeId,
+      vision,
+      vision,
+      vision,
+      vision,
+      vision,
+      vision,
+      vision,
       cursor,
       cursor,
       categoryMode,
@@ -105,11 +157,42 @@ export async function GET(request: Request) {
     )
     .bind(access.context.comunidadeId, month)
     .all<Record<string, unknown>>();
+  const counts = await db
+    .prepare(
+      `SELECT
+        SUM(CASE WHEN v.ativo = 1 THEN 1 ELSE 0 END) AS visitantes,
+        SUM(CASE WHEN v.ativo = 0 THEN 1 ELSE 0 END) AS arquivados,
+        SUM(CASE WHEN v.ativo = 1 AND EXISTS (
+          SELECT 1 FROM acompanhamentos a
+          WHERE a.visitante_id = v.id AND a.comunidade_id = v.comunidade_id
+            AND a.escopo_confirmado = 1
+        ) THEN 1 ELSE 0 END) AS acompanhamentos,
+        SUM(CASE WHEN v.ativo = 1 AND EXISTS (
+          SELECT 1 FROM acompanhamentos a
+          WHERE a.visitante_id = v.id AND a.comunidade_id = v.comunidade_id
+            AND a.escopo_confirmado = 1 AND a.proximo_contato IS NOT NULL
+            AND a.proximo_contato <= date('now')
+        ) THEN 1 ELSE 0 END) AS pendencias,
+        SUM(CASE WHEN v.ativo = 1 AND v.status IN ('EM_CONTATO', 'EM_ACOMPANHAMENTO')
+          THEN 1 ELSE 0 END) AS encaminhamentos
+      FROM visitantes v
+      WHERE v.comunidade_id = ? AND v.escopo_confirmado = 1`,
+    )
+    .bind(access.context.comunidadeId)
+    .first<Record<string, number | null>>();
   return Response.json(
     {
       visitantes: visitors,
       nextCursor: hasMore ? Number(visitors.at(-1)?.id || 0) : null,
       aniversariantes: birthdays.results,
+      contagens: {
+        visitantes: Number(counts?.visitantes || 0),
+        acompanhamentos: Number(counts?.acompanhamentos || 0),
+        pendencias: Number(counts?.pendencias || 0),
+        encaminhamentos: Number(counts?.encaminhamentos || 0),
+        historico: Number(counts?.acompanhamentos || 0),
+        arquivados: Number(counts?.arquivados || 0),
+      },
     },
     { headers: { "Cache-Control": "no-store" } },
   );
@@ -139,6 +222,10 @@ export async function POST(request: Request) {
   const observacoes = cleanText(payload.observacoes, 1000);
   const celulaId = Number(payload.celulaId || 0) || null;
   const categoriaId = Number(payload.categoriaId || 0) || null;
+  const rawCategoriaNome = cleanText(payload.categoriaNome, 80);
+  const categoriaNome = /^(sem\s+categoria|[-—])$/i.test(rawCategoriaNome)
+    ? ""
+    : rawCategoriaNome;
 
   if (!nome) {
     return Response.json(
@@ -193,7 +280,7 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  const category = categoriaId
+  let category = categoriaId
     ? await db
         .prepare(
           `SELECT id FROM visitante_categorias
@@ -202,18 +289,63 @@ export async function POST(request: Request) {
         .bind(categoriaId, access.context.comunidadeId)
         .first<{ id: number }>()
     : null;
-  if (categoriaId && !category) {
+  if (!category && categoriaNome) {
+    category = await db
+      .prepare(
+        `SELECT id FROM visitante_categorias
+         WHERE comunidade_id = ? AND lower(trim(nome)) = lower(trim(?))`,
+      )
+      .bind(access.context.comunidadeId, categoriaNome)
+      .first<{ id: number }>();
+    if (category) {
+      await db
+        .prepare(
+          `UPDATE visitante_categorias
+           SET ativa = 1, atualizado_em = CURRENT_TIMESTAMP
+           WHERE id = ? AND comunidade_id = ?`,
+        )
+        .bind(category.id, access.context.comunidadeId)
+        .run();
+    }
+  }
+  if (categoriaId && !category && !categoriaNome) {
     return Response.json(
       { error: "A categoria não pertence à comunidade ativa." },
       { status: 400 },
     );
+  }
+  if (!category && categoriaNome) {
+    const nextOrder = await db
+      .prepare(
+        `SELECT COALESCE(MAX(ordem), 0) + 10 AS ordem
+         FROM visitante_categorias WHERE comunidade_id = ?`,
+      )
+      .bind(access.context.comunidadeId)
+      .first<{ ordem: number }>();
+    const created = await db
+      .prepare(
+        `INSERT INTO visitante_categorias
+         (comunidade_id, nome, descricao, icone, cor, ordem, ativa, criado_por)
+         VALUES (?, ?, '', '◎', '#7357e8', ?, 1, ?)`,
+      )
+      .bind(
+        access.context.comunidadeId,
+        categoriaNome,
+        Number(nextOrder?.ordem || 10),
+        access.user.id,
+      )
+      .run();
+    category = { id: Number(created.meta.last_row_id) };
   }
   const automaticCategory = await resolveAutomaticVisitorCategory(
     db,
     access.context.comunidadeId,
     dataNascimento || null,
   );
-  const effectiveCategoryId = automaticCategory?.id || category?.id || null;
+  // Uma categoria declarada na planilha ou no formulário representa a intenção
+  // explícita de quem está cadastrando; a classificação por idade fica como
+  // sugestão apenas quando ela não foi informada.
+  const effectiveCategoryId = category?.id || automaticCategory?.id || null;
 
   const result = await db
     .prepare(

@@ -3500,7 +3500,7 @@ test("feed interno, solicitação de entrada, retenção e estatísticas usam re
   database
     .prepare(
       `UPDATE solicitacoes_entrada_comunidade
-      SET analisado_em = datetime('now', '-8 days')
+      SET analisado_em = datetime('now', '-2 days')
       WHERE id = ?`,
     )
     .run(requestId);
@@ -3513,7 +3513,7 @@ test("feed interno, solicitação de entrada, retenção e estatísticas usam re
   );
   assert.equal(retentionResponse.status, 200);
   const retentionBody = await retentionResponse.json();
-  assert.equal(retentionBody.retention.days, 7);
+  assert.equal(retentionBody.retention.days, 1);
   assert.deepEqual(retentionBody.retention.appliesTo, ["APROVADA", "RECUSADA"]);
   assert.equal(
     database

@@ -1,32 +1,18 @@
 import { notFound } from "next/navigation";
 import { getD1 } from "../../../db";
 import MemberRegistrationForm from "../../components/MemberRegistrationForm";
-import {
-  getMemberRegistrationLinkByToken,
-  isMemberRegistrationLinkOpen,
-} from "../../lib/member-registration-links";
+import { getMemberRegistrationForm } from "../../lib/member-registration";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function MemberRegistrationLinkPage({
+export default async function MemberRegistrationPage({
   params,
 }: {
   params: Promise<{ token: string }>;
 }) {
-  const { token } = await params;
-  const db = getD1();
-  const link = await getMemberRegistrationLinkByToken(db, token);
-  if (!link || !isMemberRegistrationLinkOpen(link)) notFound();
-
-  const communityCount = await db
-    .prepare(
-      `SELECT COUNT(*) AS total FROM comunidades
-       WHERE proprietario_usuario_id = ? AND status = 'ATIVA'`,
-    )
-    .bind(link.ownerId)
-    .first<{ total: number }>();
-  if (!Number(communityCount?.total || 0)) notFound();
-
-  return <MemberRegistrationForm token={token} expiresAt={link.expiresAt} />;
+  const token = (await params).token;
+  const form = await getMemberRegistrationForm(getD1(), token);
+  if (!form) notFound();
+  return <MemberRegistrationForm token={token} registration={form} />;
 }

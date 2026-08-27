@@ -91,6 +91,7 @@ export default function LoginPortal({
   maintenance,
   initialMessage = "",
   returnTo = "",
+  initialMode = "login",
 }: {
   config: LoginConfig;
   siteName: string;
@@ -98,8 +99,9 @@ export default function LoginPortal({
   maintenance: Maintenance;
   initialMessage?: string;
   returnTo?: string;
+  initialMode?: Mode;
 }) {
-  const [mode, setMode] = useState<Mode>("login");
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [message, setMessage] = useState(initialMessage);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);

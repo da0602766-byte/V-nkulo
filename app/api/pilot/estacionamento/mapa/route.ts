@@ -116,7 +116,33 @@ export async function PATCH(request: Request) {
   const access = await requireTenantPermission("parking.configure");
   if ("error" in access) return access.error;
   const payload = (await request.json()) as Record<string, unknown>;
-  if (String(payload.action || "").toUpperCase() !== "ATUALIZAR_SETOR") {
+  const action = String(payload.action || "").toUpperCase();
+  const db = getD1();
+  if (action === "ATUALIZAR_POSICOES") {
+    const source = Array.isArray(payload.positions) ? payload.positions : [];
+    const positions = source.slice(0, 500).map((item) => {
+      const row = item as Record<string, unknown>;
+      return {
+        vagaId: Number(row.vagaId),
+        x: Math.max(0, Math.round(Number(row.posicaoX) || 0)),
+        y: Math.max(0, Math.round(Number(row.posicaoY) || 0)),
+      };
+    }).filter((item) => Number.isInteger(item.vagaId) && item.vagaId > 0);
+    if (!positions.length) return Response.json({ error: "Nenhuma posição válida foi enviada." }, { status: 400 });
+    await db.batch(positions.map((item) => db.prepare(`UPDATE estacionamento_vagas SET posicao_x=?,posicao_y=?,atualizado_em=CURRENT_TIMESTAMP WHERE id=? AND comunidade_id=? AND ativo=1`).bind(item.x,item.y,item.vagaId,access.context.comunidadeId)));
+    await recordTenantAudit(db,access.context,access.user.id,"ESTACIONAMENTO_LAYOUT_REORGANIZADO","SUCESSO",{quantidade:positions.length});
+    return Response.json({ ok: true, quantidade: positions.length });
+  }
+  if (action === "ATUALIZAR_POSICAO") {
+    const vagaId = Number(payload.vagaId);
+    const x = Math.max(0, Math.round(Number(payload.posicaoX) || 0));
+    const y = Math.max(0, Math.round(Number(payload.posicaoY) || 0));
+    const result = await db.prepare(`UPDATE estacionamento_vagas SET posicao_x=?,posicao_y=?,atualizado_em=CURRENT_TIMESTAMP WHERE id=? AND comunidade_id=? AND ativo=1`).bind(x,y,vagaId,access.context.comunidadeId).run();
+    if (!result.meta.changes) return Response.json({ error: "Vaga não encontrada." }, { status: 404 });
+    await recordTenantAudit(db,access.context,access.user.id,"ESTACIONAMENTO_VAGA_REPOSICIONADA","SUCESSO",{vagaId,posicaoX:x,posicaoY:y});
+    return Response.json({ ok: true });
+  }
+  if (action !== "ATUALIZAR_SETOR") {
     return Response.json({ error: "Ação inválida." }, { status: 400 });
   }
   const setorId = Number(payload.setorId);
@@ -127,7 +153,6 @@ export async function PATCH(request: Request) {
       { status: 400 },
     );
   }
-  const db = getD1();
   const sector = await db
     .prepare(
       `SELECT id FROM estacionamento_setores

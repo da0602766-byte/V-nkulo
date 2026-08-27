@@ -58,6 +58,7 @@ export default async function PilotPanelPage({
       userName={session.user.nome}
       userEmail={session.user.email}
       userPhotoUrl={session.user.foto_perfil || ""}
+      systemOwner={Boolean(session.user.system_owner)}
       initialView={initialView}
       communityTheme={communityTheme}
     />

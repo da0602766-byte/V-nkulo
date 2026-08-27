@@ -6,16 +6,18 @@ import { getSessionUser } from "./lib/local-auth";
 import { getPublicCommunities } from "./lib/pilot-data";
 import { getPlatformBranding } from "./lib/platform-branding";
 import PublicIcon from "./components/PublicIcon";
+import LandingFeatureCards, { type LandingFeature } from "./components/LandingFeatureCards";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 const FEATURES = [
-  ["users", "Pessoas e vínculos", "Membros, visitantes, perfis e permissões com contexto por comunidade."],
-  ["layers", "Ministérios e escalas", "Equipes, funções, checklists e confirmações organizadas por ministério."],
-  ["calendar", "Eventos organizados", "Agenda, inscrições, comunicação e acompanhamento de participação."],
-  ["message", "Comunicação que aproxima", "Feed, avisos e notificações para manter todos no mesmo ritmo."],
-  ["sparkles", "IA com revisão", "Rascunhos e sugestões com aprovação humana antes de qualquer publicação."],
-] as const;
+  ["users", "Pessoas e vínculos", "Membros, visitantes, perfis e permissões com contexto por comunidade.", "pessoas", "Centralize cadastros sem misturar responsabilidades. Cada pessoa vê apenas o que precisa e a liderança acompanha vínculos, visitantes e permissões em um diretório claro."],
+  ["layers", "Ministérios e escalas", "Equipes, funções, checklists e confirmações organizadas por ministério.", "ministerios", "Organize equipes, responsáveis, horários e checklists no mesmo fluxo. As confirmações chegam à pessoa certa e os relatórios permanecem ligados ao ministério."],
+  ["calendar", "Eventos organizados", "Agenda, inscrições, comunicação e acompanhamento de participação.", "eventos", "Crie eventos públicos ou internos, compartilhe um link próprio e acompanhe confirmações, votação e inscrições sem planilhas paralelas."],
+  ["message", "Comunicação que aproxima", "Feed, avisos e notificações para manter todos no mesmo ritmo.", "comunicacao", "Use feed, mensagens privadas e notificações configuráveis para comunicar com contexto, sem transformar cada rotina da comunidade em um novo grupo de conversa."],
+  ["sparkles", "IA com revisão", "Rascunhos e sugestões com aprovação humana antes de qualquer publicação.", "ia", "A IA ajuda a preparar textos e organizar informações, mas nenhuma publicação acontece sem revisão e aprovação humana."],
+] as const satisfies readonly LandingFeature[];
 
 export default async function Home() {
   const [user, communities, branding] = await Promise.all([
@@ -23,6 +25,9 @@ export default async function Home() {
     getPublicCommunities(),
     getPlatformBranding(),
   ]);
+  if (user && !user.system_owner) {
+    redirect("/comunidades");
+  }
   return (
     <main
       className="vinkulo-site commercial-landing"
@@ -108,16 +113,7 @@ export default async function Home() {
           <div><p className="landing-eyebrow">RECURSOS ESSENCIAIS</p><h2>Menos telas soltas. Mais clareza para servir.</h2></div>
           <p>O VÍNKULO reúne as rotinas da comunidade sem perder simplicidade para quem só precisa participar.</p>
         </header>
-        <div>
-          {FEATURES.map(([icon, title, description]) => (
-            <article key={title}>
-              <span><PublicIcon name={icon} size={21} /></span>
-              <h3>{title}</h3>
-              <p>{description}</p>
-              <i aria-hidden="true"><PublicIcon name="arrow" size={17} /></i>
-            </article>
-          ))}
-        </div>
+        <LandingFeatureCards features={FEATURES} />
       </section>
 
       <section id="seguranca" className="landing-governance" data-editor-key="landing-governanca">

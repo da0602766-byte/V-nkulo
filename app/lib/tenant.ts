@@ -167,7 +167,6 @@ export async function getActiveTenantContext(
   const continuityPermissions = new Set([
     "community.lifecycle.request",
     "community.lifecycle.review",
-    "community.membership-links.manage",
   ]);
   permissions = permissions.filter(
     (permission) => !continuityPermissions.has(permission),
@@ -261,7 +260,6 @@ export async function getActiveTenantContext(
   );
   if (isCommunityOwner || user.system_owner) {
     permissions.push("community.lifecycle.request");
-    permissions.push("community.membership-links.manage");
     if (!permissions.includes("community.theme.manage")) {
       permissions.push("community.theme.manage");
     }
