@@ -33,6 +33,12 @@ yarn-error.log*
 # vercel
 .vercel
 
+# android build artifacts
+Vinkulo-Android/.gradle/
+Vinkulo-Android/build/
+Vinkulo-Android/app/build/
+Vinkulo-Android/local.properties
+
 # typescript
 next-env.d.ts
 /dist/

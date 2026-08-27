@@ -26,10 +26,20 @@ export async function POST(request: Request) {
   if (user.bloqueado_ate && new Date(user.bloqueado_ate).getTime() > Date.now()) return fail("Acesso temporariamente bloqueado após 3 tentativas. Use Esqueci minha senha ou aguarde 15 minutos.", 429);
   const valid = await verifyPassword(String(senha || ""), user.senha_salt, user.senha_hash);
   if (!valid) {
-    const attempts = Number(user.tentativas_login || 0) + 1;
-    const blockedUntil = attempts >= 3 ? new Date(Date.now() + 15 * 60000).toISOString() : null;
-    await db.prepare("UPDATE usuarios SET tentativas_login = ?, bloqueado_ate = ? WHERE id = ?").bind(attempts >= 3 ? 0 : attempts, blockedUntil, user.id).run();
-    return fail(attempts >= 3 ? "Você errou a senha 3 vezes. Use Esqueci minha senha ou aguarde 15 minutos." : `E-mail ou senha inválidos. Restam ${3 - attempts} tentativa(s).`, 401);
+    // Incremento atômico no próprio SQL: duas tentativas simultâneas não podem
+    // ler o mesmo contador antigo e "perder" um incremento (o que permitiria
+    // mais de 3 tentativas em paralelo antes do bloqueio).
+    const counter = await db
+      .prepare("UPDATE usuarios SET tentativas_login = tentativas_login + 1 WHERE id = ? RETURNING tentativas_login")
+      .bind(user.id)
+      .first<{ tentativas_login: number }>();
+    const attempts = Number(counter?.tentativas_login || 1);
+    if (attempts >= 3) {
+      const blockedUntil = new Date(Date.now() + 15 * 60000).toISOString();
+      await db.prepare("UPDATE usuarios SET tentativas_login = 0, bloqueado_ate = ? WHERE id = ?").bind(blockedUntil, user.id).run();
+      return fail("Você errou a senha 3 vezes. Use Esqueci minha senha ou aguarde 15 minutos.", 401);
+    }
+    return fail(`E-mail ou senha inválidos. Restam ${3 - attempts} tentativa(s).`, 401);
   }
   if (!user.ativo) {
     return fail("Este cadastro está inativo. Solicite revisão ao suporte.", 403);

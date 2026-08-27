@@ -22,16 +22,21 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 public class MainActivity extends Activity {
     private static final String APP_URL = "https://adote-gestao.da0602766.chatgpt.site";
-    private static final String APP_HOST = "adote-gestao.da0602766.chatgpt.site";
     private static final int FILE_PICKER = 401;
     private static final int CAMERA_PERMISSION = 402;
     private static final int NOTIFICATION_PERMISSION = 403;
     private static final String NOTIFICATION_CHANNEL = "vinkulo_alertas";
     private WebView webView;
     private ValueCallback<Uri[]> fileCallback;
-    private PermissionRequest pendingCameraRequest;
+    private final ArrayDeque<PermissionRequest> pendingMediaRequests = new ArrayDeque<>();
+    private boolean awaitingMediaPermissionResult;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -49,6 +54,7 @@ public class MainActivity extends Activity {
         webView.addJavascriptInterface(new VinkuloBridge(), "VinkuloAndroid");
         webView.setWebViewClient(new WebViewClient() {
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                if (!request.isForMainFrame()) return false;
                 return handleNavigation(request.getUrl());
             }
 
@@ -63,7 +69,7 @@ public class MainActivity extends Activity {
             }
 
             @Override public void onPermissionRequestCanceled(PermissionRequest request) {
-                if (pendingCameraRequest == request) pendingCameraRequest = null;
+                pendingMediaRequests.remove(request);
             }
 
             @Override public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
@@ -115,7 +121,12 @@ public class MainActivity extends Activity {
 
     private boolean handleNavigation(Uri uri) {
         if (uri == null) return false;
-        if ("https".equalsIgnoreCase(uri.getScheme()) && APP_HOST.equalsIgnoreCase(uri.getHost())) {
+        String scheme = uri.getScheme();
+        // O próprio domínio do app, e qualquer outro destino http(s) (login externo,
+        // checkout, redirecionamento de OAuth etc.), continuam carregando dentro da
+        // WebView. Só é enviado para fora do app o que a WebView não consegue exibir
+        // (tel:, mailto:, whatsapp:, intents nativos, lojas de aplicativo...).
+        if ("https".equalsIgnoreCase(scheme) || "http".equalsIgnoreCase(scheme)) {
             return false;
         }
 
@@ -134,27 +145,43 @@ public class MainActivity extends Activity {
     }
 
     private void handleWebPermissionRequest(PermissionRequest request) {
-        boolean asksForCamera = false;
-        for (String resource : request.getResources()) {
-            if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource)) {
-                asksForCamera = true;
-                break;
-            }
-        }
-
-        if (!asksForCamera) {
+        List<String> resources = Arrays.asList(request.getResources());
+        boolean wantsVideo = resources.contains(PermissionRequest.RESOURCE_VIDEO_CAPTURE);
+        boolean wantsAudio = resources.contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE);
+        if (!wantsVideo && !wantsAudio) {
             request.deny();
             return;
         }
 
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
-                checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-            request.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+        List<String> missing = new ArrayList<>();
+        if (wantsVideo && !hasRuntimePermission(Manifest.permission.CAMERA)) missing.add(Manifest.permission.CAMERA);
+        if (wantsAudio && !hasRuntimePermission(Manifest.permission.RECORD_AUDIO)) missing.add(Manifest.permission.RECORD_AUDIO);
+
+        if (missing.isEmpty()) {
+            grantMediaRequest(request, wantsVideo, wantsAudio);
             return;
         }
 
-        pendingCameraRequest = request;
-        requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION);
+        // Cada solicitação pendente fica na fila com os recursos que ela pediu;
+        // nenhuma delas é descartada se outra chegar antes do usuário responder
+        // ao diálogo de permissão do sistema.
+        pendingMediaRequests.add(request);
+        if (!awaitingMediaPermissionResult) {
+            awaitingMediaPermissionResult = true;
+            requestPermissions(missing.toArray(new String[0]), CAMERA_PERMISSION);
+        }
+    }
+
+    private boolean hasRuntimePermission(String permission) {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
+                checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void grantMediaRequest(PermissionRequest request, boolean wantsVideo, boolean wantsAudio) {
+        List<String> granted = new ArrayList<>();
+        if (wantsVideo && hasRuntimePermission(Manifest.permission.CAMERA)) granted.add(PermissionRequest.RESOURCE_VIDEO_CAPTURE);
+        if (wantsAudio && hasRuntimePermission(Manifest.permission.RECORD_AUDIO)) granted.add(PermissionRequest.RESOURCE_AUDIO_CAPTURE);
+        if (granted.isEmpty()) request.deny(); else request.grant(granted.toArray(new String[0]));
     }
 
     private void createNotificationChannel() {
@@ -214,13 +241,14 @@ public class MainActivity extends Activity {
         boolean granted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
 
         if (requestCode == CAMERA_PERMISSION) {
-            if (pendingCameraRequest != null) {
-                if (granted) {
-                    pendingCameraRequest.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
-                } else {
-                    pendingCameraRequest.deny();
-                }
-                pendingCameraRequest = null;
+            awaitingMediaPermissionResult = false;
+            while (!pendingMediaRequests.isEmpty()) {
+                PermissionRequest pending = pendingMediaRequests.poll();
+                List<String> resources = Arrays.asList(pending.getResources());
+                grantMediaRequest(
+                        pending,
+                        resources.contains(PermissionRequest.RESOURCE_VIDEO_CAPTURE),
+                        resources.contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE));
             }
         } else if (requestCode == NOTIFICATION_PERMISSION) {
             if (granted) showNotificationEnabledConfirmation();

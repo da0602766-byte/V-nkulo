@@ -17,6 +17,7 @@ jobs:
         working-directory: Vinkulo-Android
     steps:
       - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: "17" }
       - uses: gradle/actions/setup-gradle@v4
@@ -37,4 +38,14 @@ jobs:
           git add downloads/VINKULO_ANDROID_LATEST.apk
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "build: atualizar APK Android [skip ci]"
-          git push
+          # Dois builds em sequência podem terminar quase juntos; se o push for
+          # rejeitado por não ser fast-forward, refaz o rebase sobre o main mais
+          # recente e tenta de novo em vez de deixar o job falhar.
+          for attempt in 1 2 3 4 5; do
+            if git push; then exit 0; fi
+            echo "Push rejeitado (tentativa $attempt); atualizando e tentando novamente..."
+            git fetch origin main
+            git rebase origin/main
+          done
+          echo "Não foi possível enviar o APK atualizado após várias tentativas." >&2
+          exit 1
