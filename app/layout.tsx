@@ -63,7 +63,7 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "try{const t=localStorage.getItem('vinkulo-theme');if(t==='CLARO'||t==='ESCURO'){document.documentElement.dataset.pilotTheme=t.toLowerCase();document.documentElement.style.colorScheme=t==='ESCURO'?'dark':'light'}else{document.documentElement.style.colorScheme='light dark'}const z=Number(localStorage.getItem('vinkulo:font-scale'));if(Number.isFinite(z)&&z>=.85&&z<=1.25){document.documentElement.style.zoom=String(z)}}catch{}",
+              "try{const r=document.documentElement,t=localStorage.getItem('vinkulo-theme');if(t==='CLARO'||t==='ESCURO'){r.dataset.pilotTheme=t.toLowerCase();r.style.colorScheme=t==='ESCURO'?'dark':'light'}else{r.style.colorScheme='light dark'}const z=Number(localStorage.getItem('vinkulo:font-scale'));if(Number.isFinite(z)&&z>=.85&&z<=1.25){r.style.zoom=String(z);r.style.setProperty('--vinkulo-ui-scale',String(z));r.style.setProperty('--vinkulo-ui-scale-inverse',String(1/z));r.dataset.vinkuloScale=z>1?'ampliado':z<1?'reduzido':'normal'}}catch{}",
           }}
         />
       </head>
