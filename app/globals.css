@@ -19698,7 +19698,9 @@ html[data-pilot-theme="escuro"] .owner-grid-toolbar button { border-color: #3140
 .pilot-user-popover > header { min-width: 0; display: grid; grid-template-columns: 42px minmax(0,1fr); gap: 10px; align-items: center; margin-bottom: 5px; border-bottom: 1px solid var(--pilot-line); padding: 5px 5px 12px; }
 .pilot-user-popover > header > span { width: 42px; height: 42px; display: grid; place-items: center; overflow: hidden; border-radius: 13px; background: var(--pilot-gradient); color: #fff; font-size: 9px; font-weight: 900; }
 .pilot-user-popover img { width: 100%; height: 100%; object-fit: cover; }
-.pilot-user-popover > header > div { min-width: 0; display: grid; gap: 3px; }
+/* Restrito ao bloco de identidade: o cabeçalho também recebe o .theme-control,
+   que precisa manter o próprio display:flex em linha. */
+.pilot-user-popover > header > .pilot-user-popover-identity { min-width: 0; display: grid; gap: 3px; }
 .pilot-user-popover > header small { overflow: hidden; color: var(--pilot-muted); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
 .pilot-user-popover > :is(a,button) { min-height: 42px; display: flex; align-items: center; border: 0; border-radius: 11px; background: transparent; color: var(--pilot-text); padding: 0 12px; font: inherit; font-size: 10px; font-weight: 800; text-align: left; text-decoration: none; cursor: pointer; }
 .pilot-user-popover > :is(a,button):hover { background: var(--pilot-surface-2); }
@@ -20462,8 +20464,20 @@ html[data-pilot-theme="claro"] .social-public-community .community-public-avatar
 .pilot-user-community-switcher nav button strong { overflow: hidden; font-size: .58rem; text-overflow: ellipsis; white-space: nowrap; }
 .pilot-user-community-switcher nav button.active { border-color: var(--pilot-purple); }
 .pilot-user-community-switcher nav button:disabled { cursor: default; opacity: .68; }
-.pilot-user-theme { min-height: 42px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid var(--pilot-line); border-radius: 11px; padding: 5px 9px 5px 11px; }
-.pilot-user-theme > span { color: var(--pilot-muted); font-size: .6rem; font-weight: 800; }
+/* O seletor precisa do elemento + classe para vencer `.pilot-user-popover > header`. */
+.pilot-user-popover > header.pilot-user-popover-head { grid-template-columns: 42px minmax(0,1fr); }
+/* Em 310px de popover não sobra largura para uma terceira coluna sem espremer o
+   e-mail, então o seletor de tema ocupa uma faixa própria abaixo da identidade. */
+.pilot-user-popover-head > .theme-control { grid-column: 1/-1; justify-self: stretch; justify-content: center; }
+
+/* Rótulo + três botões: quatro colunas, senão o "A+" cai para a linha de baixo. */
+.pilot-user-font-scale { display: grid; grid-template-columns: minmax(0,1fr) repeat(3,38px); align-items: center; gap: 5px; border: 1px solid var(--pilot-line); border-radius: 11px; padding: 8px 10px; }
+.pilot-user-font-scale > span { color: var(--pilot-muted); font-size: .58rem; font-weight: 800; }
+.pilot-user-font-scale button { min-height: 32px; border: 1px solid var(--pilot-line); border-radius: 8px; background: transparent; color: var(--pilot-text); font: inherit; font-size: .58rem; font-weight: 850; cursor: pointer; }
+.pilot-user-font-scale button:nth-of-type(2) { font-variant-numeric: tabular-nums; }
+.pilot-user-font-scale button:hover:not(:disabled) { background: var(--pilot-surface-2); }
+.pilot-user-font-scale button.active { border-color: var(--pilot-purple); background: color-mix(in srgb,var(--pilot-purple) 14%,transparent); color: var(--pilot-purple); }
+.pilot-user-font-scale button:disabled { opacity: .38; cursor: not-allowed; }
 .pilot-mobile-nav .mobile-profile-initials { overflow: hidden; }
 .pilot-mobile-nav .mobile-profile-initials img { width: 100%; height: 100%; display: block; object-fit: cover; }
 .pilot-access-denied-inline { min-height: min(560px,65dvh); display: grid; grid-template-columns: 64px minmax(0,620px); align-content: center; justify-content: center; gap: 18px; }

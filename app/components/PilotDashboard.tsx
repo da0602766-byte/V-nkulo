@@ -15,6 +15,7 @@ import CommunityLifecycleWorkspace from "./CommunityLifecycleWorkspace";
 import CommunityHome from "./CommunityHome";
 import AccountProfileWorkspace from "./AccountProfileWorkspace";
 import EventsWorkspace from "./EventsWorkspace";
+import FontScaleControl from "./FontScaleControl";
 import GlobalVisualEditor from "./GlobalVisualEditor";
 import SecretaryMinisterialWorkspace from "./SecretaryMinisterialWorkspace";
 import NetworkWorkspace from "./NetworkWorkspace";
@@ -716,9 +717,10 @@ export default function PilotDashboard({
               <i aria-hidden="true">⌄</i>
             </summary>
             <div className="pilot-user-popover">
-              <header>
+              <header className="pilot-user-popover-head">
                 <span>{userPhotoUrl ? <img src={userPhotoUrl} alt="" /> : userInitials}</span>
-                <div><VerifiedOwnerName name={userName} verified={active.isOwner} /><small>{userEmail}</small><em>{active.isOwner ? "Proprietário" : ROLE_LABELS[active.papel] || active.papel}</em></div>
+                <div className="pilot-user-popover-identity"><VerifiedOwnerName name={userName} verified={active.isOwner} /><small>{userEmail}</small><em>{active.isOwner ? "Proprietário" : ROLE_LABELS[active.papel] || active.papel}</em></div>
+                <ThemeControl compact />
               </header>
               <dl>
                 <div><dt>Comunidade ativa</dt><dd>{active.comunidadeNome}</dd></div>
@@ -742,7 +744,7 @@ export default function PilotDashboard({
                   </nav>
                 </details>
               )}
-              <div className="pilot-user-theme"><span>Tema</span><ThemeControl compact /></div>
+              <FontScaleControl userEmail={userEmail} />
               <button type="button" onClick={() => openView("conta")}>Minha conta</button>
               {active.isOwner && <Link href="/proprietario">Área do proprietário</Link>}
               <Link href={`/comunidades/${active.comunidadeSlug}`}>Página pública</Link>
