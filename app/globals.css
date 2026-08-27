@@ -26150,6 +26150,175 @@ textarea { resize:none!important; }
   .visitor-registration-dialog .visitor-registration-actions { position:static!important; margin:16px 0 0!important; padding:12px 0 0!important; }
 }
 
+/* V176 — atendimento operacional de orações, visitas e testemunhos. */
+.request-create-collapsible>summary{
+  min-height:56px!important;
+  display:flex!important;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  color:var(--pilot-primary)!important;
+  text-align:center!important;
+  font-weight:900;
+}
+.request-create-collapsible>summary>span{font-size:18px;line-height:1}
+.request-repository-routing{
+  display:grid;
+  grid-template-columns:42px minmax(0,1fr);
+  align-items:center;
+  gap:10px;
+  border:1px solid color-mix(in srgb,var(--pilot-primary) 28%,var(--pilot-line));
+  border-radius:13px;
+  background:color-mix(in srgb,var(--pilot-primary) 7%,var(--pilot-surface));
+  padding:11px 13px;
+}
+.request-repository-routing>span{width:42px;height:42px;display:grid;place-items:center;border-radius:12px;background:color-mix(in srgb,var(--pilot-primary) 13%,var(--pilot-surface));color:var(--pilot-primary);font-size:20px;font-weight:900}
+.request-repository-routing>div{min-width:0;display:grid;gap:3px}
+.request-repository-routing small{color:var(--pilot-muted);line-height:1.4}
+.request-repository-items>button{
+  width:100%;
+  min-width:0;
+  display:grid;
+  grid-template-columns:36px minmax(0,1fr) auto;
+  align-items:center;
+  gap:10px;
+  border:0;
+  border-bottom:1px solid var(--pilot-line);
+  background:transparent;
+  color:var(--pilot-text);
+  padding:11px 13px;
+  text-align:left;
+  cursor:pointer;
+}
+.request-repository-items>button:last-child{border-bottom:0}
+.request-repository-item-mark{width:36px;height:36px;display:grid;place-items:center;border-radius:11px;background:color-mix(in srgb,var(--pilot-purple) 12%,var(--pilot-surface));color:var(--pilot-purple);font-size:18px;font-weight:900}
+.request-repository-item-mark.type-visita{background:color-mix(in srgb,var(--pilot-blue) 12%,var(--pilot-surface));color:var(--pilot-blue)}
+.request-repository-items>button>span:nth-child(2){min-width:0;display:grid;gap:3px}
+.request-repository-items>button strong,.request-repository-items>button small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.request-repository-items>button small{color:var(--pilot-muted)}
+.request-repository-items>button em{border-radius:999px;background:var(--pilot-surface);color:var(--pilot-primary);padding:6px 9px;font-size:8px;font-style:normal;font-weight:900}
+
+.request-workflow-backdrop{position:fixed;z-index:1600;inset:0;display:grid;place-items:center;padding:20px;background:rgba(3,9,20,.7);backdrop-filter:blur(10px)}
+.request-workflow-dialog{width:min(640px,100%);max-height:calc(100dvh - 40px);display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;overflow:hidden;border:1px solid var(--pilot-line);border-radius:22px;background:var(--pilot-surface);color:var(--pilot-text);box-shadow:0 28px 90px rgba(0,0,0,.38)}
+.request-workflow-dialog>header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:18px 20px;border-bottom:1px solid var(--pilot-line)}
+.request-workflow-dialog>header h2{margin:4px 0 0;font-size:20px}
+.request-workflow-dialog>header>button{width:36px;height:36px;flex:none;border:1px solid var(--pilot-line);border-radius:10px;background:var(--pilot-surface-2);color:var(--pilot-text);font-size:20px;cursor:pointer}
+.request-workflow-request{display:grid;gap:5px;padding:13px 20px;border-bottom:1px solid var(--pilot-line);background:var(--pilot-surface-2)}
+.request-workflow-request p{margin:0;color:var(--pilot-muted);line-height:1.5}
+.request-workflow-dialog>form{min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:12px;overflow-y:auto;padding:16px 20px}
+.request-workflow-dialog label{display:grid;gap:6px;color:var(--pilot-muted);font-size:10px;font-weight:800}
+.request-workflow-dialog :is(input,select,textarea){width:100%;border:1px solid var(--pilot-line);border-radius:11px;background:var(--pilot-surface-2);color:var(--pilot-text);padding:10px 11px;font:inherit}
+.request-workflow-dialog :is(input,select){min-height:44px}
+.request-workflow-dialog input[readonly]{color:var(--pilot-primary);font-weight:850}
+.request-workflow-wide{grid-column:1/-1}
+.request-testimony-consent{display:grid;gap:9px;margin:0;border:1px solid var(--pilot-line);border-radius:13px;padding:12px}
+.request-testimony-consent legend{padding:0 6px;color:var(--pilot-text);font-weight:900}
+.request-testimony-consent>div{display:flex;align-items:center;flex-wrap:wrap;gap:9px 14px}
+.request-testimony-consent>div>strong{width:100%;font-size:10px}
+.request-testimony-consent>div label{display:flex;grid-template-columns:auto 1fr;align-items:center;gap:6px;color:var(--pilot-text)}
+.request-testimony-consent input[type="radio"]{width:18px;min-height:18px;margin:0;padding:0;accent-color:var(--pilot-primary)}
+.request-workflow-dialog footer{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px;padding-top:2px}
+.request-workflow-dialog footer button{min-height:42px;border:1px solid var(--pilot-line);border-radius:11px;background:var(--pilot-surface-2);color:var(--pilot-text);padding:0 13px;font-weight:850;cursor:pointer}
+.request-workflow-dialog footer button:last-child{border-color:transparent;background:var(--pilot-primary);color:#fff}
+.request-workflow-dialog footer .request-testimony-share{border-color:color-mix(in srgb,#199768 38%,var(--pilot-line));background:color-mix(in srgb,#199768 10%,var(--pilot-surface));color:#168158}
+.request-retention-note{display:block;border-top:1px solid var(--pilot-line);color:var(--pilot-muted);padding:10px 20px;text-align:center}
+
+@media(max-width:680px){
+  .request-workflow-backdrop{place-items:end center;padding:max(8px,env(safe-area-inset-top)) 8px calc(80px + env(safe-area-inset-bottom))}
+  .request-workflow-dialog{width:100%;max-height:calc(100dvh - 96px - env(safe-area-inset-bottom));border-radius:20px 20px 13px 13px}
+  .request-workflow-dialog>header{padding:15px}
+  .request-workflow-request{padding:11px 15px}
+  .request-workflow-dialog>form{grid-template-columns:1fr;padding:13px 15px}
+  .request-workflow-wide{grid-column:1}
+  .request-workflow-dialog footer{display:grid;grid-template-columns:1fr 1fr}
+  .request-workflow-dialog footer button:last-child{grid-column:1/-1}
+  .request-retention-note{padding:9px 15px}
+}
+
+/* V175 — painéis fixos permanecem dentro da área útil quando a lupa está ampliada. */
+:root {
+  --vinkulo-ui-scale:1;
+  --vinkulo-ui-scale-inverse:1;
+}
+
+@media (max-width:760px) {
+  html[data-vinkulo-scale="ampliado"] :is(.community-composer-overlay,.pilot-notification-backdrop) {
+    inset:auto!important;
+    top:0!important;
+    left:0!important;
+    width:calc(100vw * var(--vinkulo-ui-scale-inverse))!important;
+    height:calc(100dvh * var(--vinkulo-ui-scale-inverse))!important;
+  }
+  html[data-vinkulo-scale="ampliado"] .community-composer-overlay {
+    align-items:end!important;
+    padding:calc(8px * var(--vinkulo-ui-scale-inverse)) calc(8px * var(--vinkulo-ui-scale-inverse)) calc((84px + env(safe-area-inset-bottom)) * var(--vinkulo-ui-scale-inverse))!important;
+    overflow:hidden!important;
+  }
+  html[data-vinkulo-scale="ampliado"] .community-composer-dialog {
+    width:100%!important;
+    max-height:100%!important;
+    overflow-x:hidden!important;
+    overflow-y:auto!important;
+  }
+  html[data-vinkulo-scale="ampliado"] .pilot-notification-panel {
+    inset:auto!important;
+    left:calc(8px * var(--vinkulo-ui-scale-inverse))!important;
+    bottom:calc(8px * var(--vinkulo-ui-scale-inverse))!important;
+    width:calc((100vw - 16px) * var(--vinkulo-ui-scale-inverse))!important;
+    max-height:calc((100dvh - 16px) * var(--vinkulo-ui-scale-inverse))!important;
+  }
+  html[data-vinkulo-scale="ampliado"] .global-editor-panel:not(.is-minimized) {
+    left:calc(8px * var(--vinkulo-ui-scale-inverse))!important;
+    top:calc((72px + env(safe-area-inset-top)) * var(--vinkulo-ui-scale-inverse))!important;
+    width:calc((100vw - 16px) * var(--vinkulo-ui-scale-inverse))!important;
+    height:calc((100dvh - 88px - env(safe-area-inset-top)) * var(--vinkulo-ui-scale-inverse))!important;
+    max-height:none!important;
+  }
+  html[data-vinkulo-scale="ampliado"] .global-editor-panel>footer {
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom))!important;
+  }
+
+  .pilot-dashboard[data-ui-version="v2"] .cell-detail-v4 .cell-tabs-v2 {
+    display:flex!important;
+    flex-direction:row!important;
+    flex-wrap:nowrap!important;
+    gap:5px!important;
+    padding:8px 10px!important;
+    overflow-x:auto!important;
+    overflow-y:hidden!important;
+    scrollbar-width:none;
+  }
+  .pilot-dashboard[data-ui-version="v2"] .cell-detail-v4 .cell-tabs-v2::-webkit-scrollbar{display:none}
+  .pilot-dashboard[data-ui-version="v2"] .cell-detail-v4 .cell-tabs-v2 button{
+    flex:0 0 auto!important;
+    width:auto!important;
+    min-width:max-content!important;
+    padding:8px 10px!important;
+    white-space:nowrap!important;
+  }
+  .pilot-dashboard[data-ui-version="v2"] .cell-detail-v4 .cell-detail-content-v4{
+    flex:1 1 auto!important;
+    min-height:0!important;
+    overflow-y:auto!important;
+    overscroll-behavior:contain;
+    padding-bottom:calc(18px + env(safe-area-inset-bottom))!important;
+  }
+
+  html[data-vinkulo-scale="ampliado"] .pilot-dashboard[data-ui-version="v2"] .cell-detail-overlay-v2:has(.cell-detail-v4) {
+    inset:auto!important;
+    top:calc((64px + env(safe-area-inset-top)) * var(--vinkulo-ui-scale-inverse))!important;
+    left:0!important;
+    width:calc(100vw * var(--vinkulo-ui-scale-inverse))!important;
+    height:calc((100dvh - 136px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * var(--vinkulo-ui-scale-inverse))!important;
+    padding:0!important;
+  }
+  html[data-vinkulo-scale="ampliado"] .pilot-dashboard[data-ui-version="v2"] .cell-detail-overlay-v2 .cell-detail-v2.cell-detail-v4{
+    width:100%!important;
+    height:100%!important;
+    max-height:100%!important;
+  }
+}
+
 /* Última cascata do menu da conta: mantém os três temas junto ao perfil. */
 .pilot-user-popover .pilot-user-popover-head-v3 {
   display:grid!important;
