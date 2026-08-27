@@ -234,7 +234,11 @@ export default function PilotDashboard({
 
   useEffect(() => {
     if (!fontScaleHydrated) return;
-    document.documentElement.style.zoom = String(fontScale);
+    const root = document.documentElement;
+    root.style.zoom = String(fontScale);
+    root.style.setProperty("--vinkulo-ui-scale", String(fontScale));
+    root.style.setProperty("--vinkulo-ui-scale-inverse", String(1 / fontScale));
+    root.dataset.vinkuloScale = fontScale > 1 ? "ampliado" : fontScale < 1 ? "reduzido" : "normal";
     try {
       window.localStorage.setItem(
         `vinkulo:font-scale:${userEmail.trim().toLowerCase()}`,
