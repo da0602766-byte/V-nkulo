@@ -8313,6 +8313,32 @@ html[data-pilot-theme="escuro"] .pilot-dashboard[data-community-palette] {
 .pilot-invite-summary { display:grid; gap:4px; padding:17px; border-radius:14px; background:var(--pilot-surface-2); }
 .pilot-invite-card>small { display:block; margin-top:20px; color:var(--pilot-muted); line-height:1.55; }
 .pilot-invite-card a { color:var(--pilot-blue); }
+.member-registration-card { display:grid; gap:10px; }
+.member-registration-title { margin:0; font-size:clamp(24px,4vw,32px); letter-spacing:-.03em; }
+.member-registration-countdown { margin:0 0 8px; font-size:13px; font-weight:750; color:var(--pilot-purple); }
+.member-registration-form { gap:26px; }
+.member-registration-step { display:grid; gap:13px; padding-top:6px; border-top:1px solid var(--pilot-line); }
+.member-registration-step:first-child { border-top:0; padding-top:0; }
+.member-registration-step h2 { margin:0; display:flex; align-items:center; gap:10px; font-size:16px; }
+.member-registration-step h2>span { width:26px; height:26px; flex:none; display:grid; place-items:center; border-radius:50%; background:var(--pilot-gradient); color:#fff; font-size:12px; font-weight:900; }
+.member-registration-step>p { margin:-6px 0 0; color:var(--pilot-muted); font-size:12px; }
+.member-registration-step label small { font-weight:600; text-transform:none; color:var(--pilot-muted); }
+.member-registration-review { display:grid; gap:16px; }
+.member-registration-review h2 { margin:0; font-size:18px; }
+.member-registration-review dl { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:0; }
+.member-registration-review dl>div { min-width:0; display:grid; gap:4px; border:1px solid var(--pilot-line); border-radius:13px; background:var(--pilot-surface-2); padding:12px; }
+.member-registration-review dt { color:var(--pilot-muted); font-size:11px; }
+.member-registration-review dd { margin:0; font-weight:750; overflow-wrap:break-word; }
+.member-registration-review-actions { display:flex; flex-wrap:wrap; gap:10px; }
+.member-registration-review-actions button { min-height:48px; padding:0 19px; border:0; border-radius:12px; background:var(--pilot-gradient); color:#fff; font-weight:850; cursor:pointer; }
+.member-registration-review-actions button.secondary { background:var(--pilot-surface-2); color:var(--pilot-text); border:1px solid var(--pilot-line); }
+.member-registration-done { padding:16px; border-radius:14px; background:var(--pilot-surface-2); font-weight:750; line-height:1.6; }
+.registration-link-list { display:grid; gap:8px; max-width:720px; margin:14px 0 0; padding:0; list-style:none; }
+.registration-link-list li { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:11px 15px; border:1px solid var(--pilot-line); border-radius:12px; background:var(--pilot-surface-2); font-size:13px; font-weight:750; }
+.registration-link-list button { min-height:34px; padding:0 14px; border:1px solid var(--pilot-line); border-radius:10px; background:var(--pilot-surface); color:var(--pilot-text); font-weight:750; cursor:pointer; }
+@media (max-width:640px) {
+  .member-registration-review dl { grid-template-columns:1fr; }
+}
 .operations-notice {
   display:flex;
   align-items:center;

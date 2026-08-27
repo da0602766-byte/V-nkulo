@@ -149,6 +149,13 @@ export default function PilotDashboard({
   const [inviteMessage, setInviteMessage] = useState("");
   const [inviteLink, setInviteLink] = useState("");
   const [inviteLoading, setInviteLoading] = useState(false);
+  const [registrationLinkMessage, setRegistrationLinkMessage] = useState("");
+  const [registrationLinkUrl, setRegistrationLinkUrl] = useState("");
+  const [registrationLinkLoading, setRegistrationLinkLoading] = useState(false);
+  const [registrationLinks, setRegistrationLinks] = useState<
+    { tokenHash: string; status: string; countdown: string }[]
+  >([]);
+  const [cancellingLink, setCancellingLink] = useState("");
   const [communityInfoOpen, setCommunityInfoOpen] = useState(false);
   const [communityProfile, setCommunityProfile] =
     useState<CommunityProfile | null>(null);
@@ -514,6 +521,66 @@ export default function PilotDashboard({
       setInviteLoading(false);
     }
   }
+
+  async function createRegistrationLink(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    setRegistrationLinkLoading(true);
+    setRegistrationLinkMessage("");
+    setRegistrationLinkUrl("");
+    const days = Number(new FormData(formElement).get("validadeDias") || 1);
+    const expiresAt = new Date(Date.now() + days * 86_400_000).toISOString();
+    try {
+      const response = await fetch("/api/pilot/links-cadastro-membro", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ expiresAt }),
+      });
+      const result = (await response.json()) as { error?: string; url?: string };
+      if (!response.ok) throw new Error(result.error || "Não foi possível criar o link.");
+      setRegistrationLinkMessage("Link de cadastro criado. Copie e compartilhe.");
+      setRegistrationLinkUrl(new URL(result.url || "", window.location.origin).toString());
+      void loadRegistrationLinks();
+    } catch (error) {
+      setRegistrationLinkMessage((error as Error).message);
+    } finally {
+      setRegistrationLinkLoading(false);
+    }
+  }
+
+  async function loadRegistrationLinks() {
+    try {
+      const response = await fetch("/api/pilot/links-cadastro-membro", { cache: "no-store" });
+      if (!response.ok) return;
+      const result = (await response.json()) as {
+        links?: { tokenHash: string; status: string; countdown: string }[];
+      };
+      setRegistrationLinks(result.links || []);
+    } catch {
+      // silencioso: a listagem é um extra de conveniência, não bloqueia a criação
+    }
+  }
+
+  async function cancelRegistrationLink(tokenHash: string) {
+    setCancellingLink(tokenHash);
+    try {
+      const response = await fetch("/api/pilot/links-cadastro-membro", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tokenHash }),
+      });
+      if (response.ok) await loadRegistrationLinks();
+    } finally {
+      setCancellingLink("");
+    }
+  }
+
+  useEffect(() => {
+    if (visibleView === "comunidade" && active.permissions.includes("community.membership-links.manage")) {
+      void loadRegistrationLinks();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleView]);
 
   return (
     <main
@@ -951,6 +1018,69 @@ export default function PilotDashboard({
                   {inviteMessage && <p className="pilot-form-message" role="status">{inviteMessage}</p>}
                   {inviteLink && <div className="invite-result"><label>Link individual<input readOnly value={inviteLink} onFocus={(event) => event.currentTarget.select()} /></label><button onClick={() => navigator.clipboard.writeText(inviteLink)}>Copiar link</button></div>}
                   <div className="sensitive-action-note"><strong>Perfis privilegiados bloqueados</strong><p>Convites para líderes, pastores ou administradores exigirão MFA, reautenticação e revisão.</p></div>
+                </>
+              )}
+              {active.permissions.includes("community.membership-links.manage") && (
+                <>
+                  <form className="pilot-form invite-generator" onSubmit={createRegistrationLink}>
+                    <label>
+                      Link de cadastro para novos membros
+                      <select name="validadeDias" defaultValue="7">
+                        <option value="1">Válido por 1 dia</option>
+                        <option value="3">Válido por 3 dias</option>
+                        <option value="7">Válido por 7 dias</option>
+                        <option value="15">Válido por 15 dias</option>
+                        <option value="30">Válido por 30 dias</option>
+                      </select>
+                    </label>
+                    <button disabled={registrationLinkLoading}>
+                      {registrationLinkLoading ? "Gerando…" : "Gerar link"}
+                    </button>
+                  </form>
+                  {registrationLinkMessage && (
+                    <p className="pilot-form-message" role="status">{registrationLinkMessage}</p>
+                  )}
+                  {registrationLinkUrl && (
+                    <div className="invite-result">
+                      <label>
+                        Link compartilhável
+                        <input
+                          readOnly
+                          value={registrationLinkUrl}
+                          onFocus={(event) => event.currentTarget.select()}
+                        />
+                      </label>
+                      <button onClick={() => navigator.clipboard.writeText(registrationLinkUrl)}>
+                        Copiar link
+                      </button>
+                    </div>
+                  )}
+                  <div className="sensitive-action-note">
+                    <strong>Qualquer pessoa com o link pode se candidatar</strong>
+                    <p>
+                      Quem preencher fica pendente de aprovação em Solicitações — nenhum vínculo é
+                      criado automaticamente.
+                    </p>
+                  </div>
+                  {registrationLinks.length > 0 && (
+                    <ul className="registration-link-list">
+                      {registrationLinks.map((link) => (
+                        <li key={link.tokenHash}>
+                          <span>{link.status === "ATIVO" ? link.countdown : "Cancelado"}</span>
+                          {link.status === "ATIVO" && (
+                            <button
+                              type="button"
+                              className="secondary"
+                              disabled={cancellingLink === link.tokenHash}
+                              onClick={() => void cancelRegistrationLink(link.tokenHash)}
+                            >
+                              {cancellingLink === link.tokenHash ? "Cancelando…" : "Cancelar"}
+                            </button>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </>
               )}
               <CommunityAdminWorkspace
