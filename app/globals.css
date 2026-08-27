@@ -27851,6 +27851,82 @@ textarea { resize:none!important; }
   .parking-map section>div.parking-free-position-canvas { height:220px; overflow:auto; }
 }
 
+/* Preferências individuais: tema compacto e lupa lado a lado no menu da conta. */
+.pilot-user-popover .pilot-user-popover-head-v3 {
+  grid-template-columns:42px minmax(0,1fr)!important;
+  grid-template-areas:"avatar identity"!important;
+}
+.account-personalization-v4 {
+  min-width:0;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto auto;
+  align-items:center;
+  gap:7px;
+  padding:7px 8px 7px 11px;
+  border:1px solid var(--pilot-line);
+  border-radius:12px;
+  background:var(--pilot-surface);
+}
+.account-personalization-v4>span {
+  min-width:0;
+  overflow:hidden;
+  color:var(--pilot-muted);
+  font-size:10px;
+  font-weight:850;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.account-personalization-v4 .theme-control-cycle {
+  width:36px;
+  min-width:36px;
+  padding:2px;
+  border-radius:10px;
+}
+.account-personalization-v4 .theme-control-cycle button {
+  width:30px;
+  min-width:30px;
+  height:30px;
+  border-radius:8px;
+}
+.account-font-zoom-v4 {
+  display:flex;
+  align-items:center;
+  gap:2px;
+  padding:2px;
+  border:1px solid var(--pilot-line);
+  border-radius:10px;
+  background:var(--pilot-surface-2);
+}
+.account-font-zoom-v4 button {
+  min-width:32px;
+  height:30px;
+  display:grid;
+  place-items:center;
+  border:0;
+  border-radius:8px;
+  background:transparent;
+  color:var(--pilot-muted);
+  padding:0 6px;
+  font:inherit;
+  font-size:9px;
+  font-weight:900;
+  cursor:pointer;
+}
+.account-font-zoom-v4 button:nth-child(2) { min-width:43px; font-variant-numeric:tabular-nums; }
+.account-font-zoom-v4 button.active { background:var(--pilot-surface); color:var(--pilot-primary); box-shadow:0 3px 10px #08111f18; }
+.account-font-zoom-v4 button:disabled { opacity:.34; cursor:not-allowed; }
+.account-font-zoom-v4 button:focus-visible { outline:2px solid var(--pilot-primary); outline-offset:1px; }
+.account-font-zoom-v4 svg { width:17px; height:17px; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; }
+
+@media (max-width:680px) {
+  .pilot-mobile-profile .account-personalization-v4 { min-height:58px; padding:9px 10px 9px 13px; border-radius:14px; background:var(--pilot-surface); }
+  .pilot-mobile-profile .account-personalization-v4>span { font-size:10px; }
+  .pilot-mobile-profile .account-font-zoom-v4 button { min-width:35px; height:34px; }
+  .pilot-mobile-profile .account-font-zoom-v4 button:nth-child(2) { min-width:46px; }
+  .pilot-mobile-profile .account-personalization-v4 .theme-control-cycle { width:40px; min-width:40px; }
+  .pilot-mobile-profile .account-personalization-v4 .theme-control-cycle button { width:34px; min-width:34px; height:34px; }
+}
+
 /* Final mobile cascade: keep phone chrome, reservation CTA and dark theme stable. */
 @media (max-width:680px) {
   .pilot-dashboard[data-ui-version="v2"] .pilot-topbar {

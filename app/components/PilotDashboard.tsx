@@ -115,6 +115,50 @@ const ROLE_LABELS: Record<string, string> = {
   SUPERADMIN: "Superadministrador",
   PROPRIETARIO_VISUALIZADOR: "Proprietário · somente feed",
 };
+const MIN_FONT_SCALE = 0.85;
+const MAX_FONT_SCALE = 1.25;
+
+function MagnifierIcon({ operation }: { operation: "minus" | "plus" }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
+      <circle cx="10.5" cy="10.5" r="6.5" />
+      <path d="m15.4 15.4 4.1 4.1M7.8 10.5h5.4" />
+      {operation === "plus" && <path d="M10.5 7.8v5.4" />}
+    </svg>
+  );
+}
+
+function PersonalizationControls({
+  userEmail,
+  fontScale,
+  onDecrease,
+  onReset,
+  onIncrease,
+}: {
+  userEmail: string;
+  fontScale: number;
+  onDecrease: () => void;
+  onReset: () => void;
+  onIncrease: () => void;
+}) {
+  return (
+    <div className="account-personalization-v4" role="group" aria-label="Aparência individual">
+      <span>Aparência</span>
+      <ThemeControl compact cycle storageId={userEmail} />
+      <div className="account-font-zoom-v4" role="group" aria-label="Tamanho de todo o sistema">
+        <button type="button" onClick={onDecrease} disabled={fontScale <= MIN_FONT_SCALE} aria-label="Diminuir todo o sistema" title="Diminuir">
+          <MagnifierIcon operation="minus" />
+        </button>
+        <button type="button" className={fontScale === 1 ? "active" : ""} onClick={onReset} aria-label="Restaurar tamanho padrão" title="Restaurar tamanho padrão">
+          {Math.round(fontScale * 100)}%
+        </button>
+        <button type="button" onClick={onIncrease} disabled={fontScale >= MAX_FONT_SCALE} aria-label="Aumentar todo o sistema" title="Aumentar">
+          <MagnifierIcon operation="plus" />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function PilotDashboard({
   active,
@@ -179,7 +223,7 @@ export default function PilotDashboard({
         window.localStorage.getItem("vinkulo:font-scale"),
       );
       if (Number.isFinite(saved)) {
-        setFontScale(Math.min(1.15, Math.max(0.9, Math.round(saved * 100) / 100)));
+        setFontScale(Math.min(MAX_FONT_SCALE, Math.max(MIN_FONT_SCALE, Math.round(saved * 100) / 100)));
       }
     } catch {
       // Mantém o tamanho padrão quando a preferência local não está disponível.
@@ -196,16 +240,14 @@ export default function PilotDashboard({
         `vinkulo:font-scale:${userEmail.trim().toLowerCase()}`,
         String(fontScale),
       );
+      window.localStorage.setItem("vinkulo:font-scale", String(fontScale));
     } catch {
       // A preferência continua ativa na sessão atual.
     }
-    return () => {
-      document.documentElement.style.zoom = "";
-    };
   }, [fontScale, fontScaleHydrated, userEmail]);
 
   function changeFontScale(delta: number) {
-    setFontScale((current) => Math.min(1.15, Math.max(0.9, Math.round((current + delta) * 100) / 100)));
+    setFontScale((current) => Math.min(MAX_FONT_SCALE, Math.max(MIN_FONT_SCALE, Math.round((current + delta) * 100) / 100)));
   }
 
   function toggleSidebar() {
@@ -697,7 +739,6 @@ export default function PilotDashboard({
               <header className="pilot-user-popover-head-v3">
                 <span>{userPhotoUrl ? <img src={userPhotoUrl} alt="" /> : userInitials}</span>
                 <div className="pilot-user-popover-identity"><VerifiedOwnerName name={userName} verified={active.isOwner} /><small>{userEmail}</small><em>{active.isOwner ? "Proprietário" : ROLE_LABELS[active.papel] || active.papel}</em></div>
-                <ThemeControl compact />
               </header>
               <dl>
                 <div><dt>Comunidade ativa</dt><dd>{active.comunidadeNome}</dd></div>
@@ -721,12 +762,7 @@ export default function PilotDashboard({
                   </nav>
                 </details>
               )}
-              <div className="pilot-user-font-scale-v3" role="group" aria-label="Tamanho do texto">
-                <span className="pilot-user-font-scale-label-v3">Tamanho do texto</span>
-                <button type="button" onClick={() => changeFontScale(-0.05)} disabled={fontScale <= 0.9} aria-label="Diminuir textos">A−</button>
-                <button type="button" className={fontScale === 1 ? "active" : ""} onClick={() => setFontScale(1)} aria-label="Restaurar tamanho padrão">{Math.round(fontScale * 100)}%</button>
-                <button type="button" onClick={() => changeFontScale(0.05)} disabled={fontScale >= 1.15} aria-label="Aumentar textos">A+</button>
-              </div>
+              <PersonalizationControls userEmail={userEmail} fontScale={fontScale} onDecrease={() => changeFontScale(-0.05)} onReset={() => setFontScale(1)} onIncrease={() => changeFontScale(0.05)} />
               <button type="button" onClick={() => openView("conta")}>Minha conta</button>
               {active.isOwner && <Link href="/proprietario">Área do proprietário</Link>}
               <Link href={`/comunidades/${active.comunidadeSlug}`}>Página pública</Link>
@@ -1237,10 +1273,7 @@ export default function PilotDashboard({
                     Abrir seletor de ministérios
                   </button>
                 </details>
-                <div className="pilot-mobile-theme-row">
-                  <span>Tema</span>
-                  <ThemeControl compact />
-                </div>
+                <PersonalizationControls userEmail={userEmail} fontScale={fontScale} onDecrease={() => changeFontScale(-0.05)} onReset={() => setFontScale(1)} onIncrease={() => changeFontScale(0.05)} />
                 <button
                   type="button"
                   className="pilot-profile-manage"

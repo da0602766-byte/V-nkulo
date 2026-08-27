@@ -7,24 +7,31 @@ type Theme = "CLARO" | "ESCURO" | "AUTO";
 export default function ThemeControl({
   compact = false,
   cycle = false,
+  storageId = "",
 }: {
   compact?: boolean;
   cycle?: boolean;
+  storageId?: string;
 }) {
   const [theme, setTheme] = useState<Theme>("AUTO");
+  const individualKey = themeStorageKey(storageId);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      const saved = normalizeTheme(window.localStorage.getItem("vinkulo-theme"));
+      const saved = normalizeTheme(
+        (individualKey && window.localStorage.getItem(individualKey)) ||
+        window.localStorage.getItem("vinkulo-theme"),
+      );
       setTheme(saved);
       applyTheme(saved);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [individualKey]);
 
   function update(next: Theme) {
     setTheme(next);
     window.localStorage.setItem("vinkulo-theme", next);
+    if (individualKey) window.localStorage.setItem(individualKey, next);
     applyTheme(next);
   }
 
@@ -80,6 +87,11 @@ const THEMES: { value: Theme; label: string; icon: string }[] = [
 
 function normalizeTheme(value: string | null): Theme {
   return value === "CLARO" || value === "ESCURO" ? value : "AUTO";
+}
+
+function themeStorageKey(storageId: string) {
+  const normalized = storageId.trim().toLowerCase();
+  return normalized ? `vinkulo:theme:${normalized}` : "";
 }
 
 function applyTheme(theme: Theme) {

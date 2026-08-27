@@ -63,7 +63,7 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "try{const t=localStorage.getItem('vinkulo-theme');if(t==='CLARO'||t==='ESCURO'){document.documentElement.dataset.pilotTheme=t.toLowerCase();document.documentElement.style.colorScheme=t==='ESCURO'?'dark':'light'}else{document.documentElement.style.colorScheme='light dark'}}catch{}",
+              "try{const t=localStorage.getItem('vinkulo-theme');if(t==='CLARO'||t==='ESCURO'){document.documentElement.dataset.pilotTheme=t.toLowerCase();document.documentElement.style.colorScheme=t==='ESCURO'?'dark':'light'}else{document.documentElement.style.colorScheme='light dark'}const z=Number(localStorage.getItem('vinkulo:font-scale'));if(Number.isFinite(z)&&z>=.85&&z<=1.25){document.documentElement.style.zoom=String(z)}}catch{}",
           }}
         />
       </head>
