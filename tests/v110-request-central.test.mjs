@@ -173,7 +173,8 @@ test("Central V110 isola comunidades, exige opt-in e restringe repositórios no 
 
   const updateItem = await api(worker, env, leaderCookie, "/api/pilot/solicitacoes/central", {
     action: "ATUALIZAR_ITEM", itemId: leaderCentral.data.repositories[0].items[0].id,
-    status: "EM_ACOMPANHAMENTO",
+    status: "EM_ORACAO",
+    mensagemAtendimento: "Seguimos em oração e entregamos uma mensagem de cuidado.",
   });
   assert.equal(updateItem.response.status, 200);
   const crossTenantForward = await api(worker, env, southCookie, "/api/pilot/solicitacoes/central", {
