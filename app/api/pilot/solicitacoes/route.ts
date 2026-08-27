@@ -2,6 +2,7 @@ import { getD1 } from "../../../../db";
 import { notifyUser } from "../../../lib/pilot-notifications";
 import { recordTenantAudit } from "../../../lib/tenant-audit";
 import { requireTenantPermission } from "../../../lib/tenant";
+import { routeRequestToRepository } from "../../../lib/request-repositories";
 
 const TYPES = new Set([
   "ORACAO",
@@ -29,6 +30,7 @@ export async function GET() {
     ),
   );
   const db = getD1();
+  await cleanupCompletedRequests(db, access.context.comunidadeId);
   const result = await db
     .prepare(
       `SELECT s.id, s.tipo, s.titulo, s.descricao, s.visibilidade, s.status,
@@ -182,6 +184,14 @@ export async function POST(request: Request) {
     )
     .run();
   const id = Number(result.meta.last_row_id);
+  if (tipo === "ORACAO" || tipo === "VISITA") {
+    await routeRequestToRepository(db, {
+      communityId: access.context.comunidadeId,
+      requestId: id,
+      requestType: tipo,
+      forwardedBy: access.user.id,
+    });
+  }
   for (const target of audience.value) {
     await db
       .prepare(
@@ -305,6 +315,14 @@ export async function PATCH(request: Request) {
 
 function clean(value: unknown, length: number) {
   return String(value ?? "").trim().slice(0, length);
+}
+
+async function cleanupCompletedRequests(db: ReturnType<typeof getD1>, communityId: number) {
+  await db.prepare(
+    `DELETE FROM solicitacoes_comunidade
+     WHERE comunidade_id = ? AND status = 'CONCLUIDA'
+       AND atualizado_em <= datetime('now', '-30 days')`,
+  ).bind(communityId).run();
 }
 
 type AudienceTarget = {
