@@ -16,9 +16,12 @@ type AudienceOptions = {
 };
 type RepositoryItem = {
   id: number; solicitacao_id: number;
-  item_status: "ABERTO" | "EM_ACOMPANHAMENTO" | "CONCLUIDO";
+  item_status: "ABERTO" | "EM_ORACAO" | "FINALIZADO" | "ORACAO_ATENDIDA" | "EM_PROCESSO" | "VISITA_CONCLUIDA" | "NOVA_VISITA";
   titulo: string; descricao: string; solicitante_nome: string;
   solicitante_telefone: string; criado_em: string;
+  responsavel_usuario_id: number | null; responsavel_nome: string;
+  mensagem_atendimento: string; testemunho: string;
+  testemunho_compartilhavel: number; testemunho_publicado_em: string | null;
 };
 type Repository = {
   id: number; tipo: "ORACAO" | "VISITA"; nome: string;
@@ -28,6 +31,7 @@ type Repository = {
 type PastorContact = { id: number; nome: string; foto: string; whatsappUrl: string };
 type CentralData = {
   canManageRepositories: boolean;
+  currentActor: { id: number; nome: string };
   whatsappPreference: { canConfigure: boolean; enabled: boolean; hasPhone: boolean };
   pastoresContato: PastorContact[];
   ministries: Array<{ id: number; nome: string }>;
@@ -44,6 +48,7 @@ const CATEGORIES: Array<{ value: Exclude<RequestType, "INFORMACAO">; label: stri
 ];
 const EMPTY_CENTRAL: CentralData = {
   canManageRepositories: false,
+  currentActor: { id: 0, nome: "" },
   whatsappPreference: { canConfigure: false, enabled: false, hasPhone: false },
   pastoresContato: [], ministries: [], repositories: [],
 };
@@ -58,6 +63,12 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<"TODAS" | Exclude<RequestType, "INFORMACAO">>("TODAS");
   const [pendingPastor, setPendingPastor] = useState<PastorContact | null>(null);
+  const [selectedRepositoryItem, setSelectedRepositoryItem] = useState<(RepositoryItem & { repositoryType: Repository["tipo"] }) | null>(null);
+  const [workflowStatus, setWorkflowStatus] = useState<RepositoryItem["item_status"]>("ABERTO");
+  const [workflowMessage, setWorkflowMessage] = useState("");
+  const [workflowTestimony, setWorkflowTestimony] = useState("");
+  const [testimonyPermission, setTestimonyPermission] = useState<"" | "PERMITIR" | "NAO_PERMITIR">("");
+  const [requestCategory, setRequestCategory] = useState<Exclude<RequestType, "INFORMACAO">>("ORACAO");
   const [repositoryMinistries, setRepositoryMinistries] = useState<Record<number, string>>({});
   const [audienceOptions, setAudienceOptions] = useState<AudienceOptions>({
     usuarios: [], ministerios: [], papeis: [], allowAllMembers: false,
@@ -123,17 +134,20 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
     concluidas: items.filter((item) => item.status === "CONCLUIDA").length,
     repositorios: central.repositories.filter((item) => item.status === "ATIVO").length,
   }), [central.repositories, items]);
-  const filteredItems = useMemo(() => items.filter((item) => {
+  const generalItems = useMemo(() => items.filter((item) => item.tipo !== "ORACAO" && item.tipo !== "VISITA"), [items]);
+  const filteredItems = useMemo(() => generalItems.filter((item) => {
     if (filter === "TODAS") return true;
     if (filter === "OUTRO" && item.tipo === "INFORMACAO") return true;
     return item.tipo === filter;
-  }), [filter, items]);
+  }), [filter, generalItems]);
 
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     const data = new FormData(form);
-    if (!selectedAudience.length) {
+    const category = String(data.get("tipo") || "") as RequestType;
+    const goesToRepository = category === "ORACAO" || category === "VISITA";
+    if (!goesToRepository && !selectedAudience.length) {
       setError("Selecione pelo menos uma pessoa, ministério ou função autorizada.");
       return;
     }
@@ -143,14 +157,16 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...Object.fromEntries(data.entries()), visibilidade: "PRIVADA",
-          audience: selectedAudience.map(parseAudienceKey),
+          audience: goesToRepository ? undefined : selectedAudience.map(parseAudienceKey),
         }),
       });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "Não foi possível enviar.");
       form.reset(); setSelectedAudience([]);
       if (formRef.current) formRef.current.open = false;
-      setFeedback("Pedido registrado e público autorizado notificado.");
+      setFeedback(goesToRepository
+        ? `Pedido enviado diretamente ao repositório de ${category === "ORACAO" ? "orações" : "visitas"}.`
+        : "Pedido registrado e público autorizado notificado.");
       await load(true);
     } catch (caught) { setError((caught as Error).message); }
     finally { setBusy(""); }
@@ -181,8 +197,51 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
       if (!response.ok) throw new Error(responsePayload.error || "Não foi possível concluir a ação.");
       setFeedback(successMessage);
       await load(true);
+      return true;
     } catch (caught) { setError((caught as Error).message); }
     finally { setBusy(""); }
+    return false;
+  }
+
+  function openRepositoryWorkflow(item: RepositoryItem, repositoryType: Repository["tipo"]) {
+    setSelectedRepositoryItem({ ...item, repositoryType });
+    setWorkflowStatus(item.item_status);
+    setWorkflowMessage(item.mensagem_atendimento || "");
+    setWorkflowTestimony(item.testemunho || "");
+    setTestimonyPermission(item.testemunho_compartilhavel === 1 ? "PERMITIR" : item.testemunho_compartilhavel === 0 ? "NAO_PERMITIR" : "");
+    clearMessages();
+  }
+
+  async function saveRepositoryWorkflow(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedRepositoryItem) return;
+    if (workflowTestimony.trim() && !testimonyPermission) {
+      setError("Escolha se o testemunho pode ou não ser compartilhado.");
+      return;
+    }
+    const ok = await centralAction(
+      `workflow-${selectedRepositoryItem.id}`,
+      {
+        action: "ATUALIZAR_ITEM",
+        itemId: selectedRepositoryItem.id,
+        status: workflowStatus,
+        mensagemAtendimento: workflowMessage,
+        testemunho: workflowTestimony,
+        testemunhoPermissao: workflowTestimony.trim() ? testimonyPermission : "NAO_INFORMADO",
+      },
+      "Atendimento atualizado e solicitante notificado.",
+    );
+    if (ok) setSelectedRepositoryItem(null);
+  }
+
+  async function shareTestimony() {
+    if (!selectedRepositoryItem) return;
+    const ok = await centralAction(
+      `testimony-${selectedRepositoryItem.id}`,
+      { action: "PUBLICAR_TESTEMUNHO", itemId: selectedRepositoryItem.id },
+      "Testemunho compartilhado no feed da comunidade.",
+    );
+    if (ok) setSelectedRepositoryItem(null);
   }
 
   function forwardToRepository(item: CommunityRequest) {
@@ -303,19 +362,11 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
                 </summary>
                 <div className="request-repository-items">
                   {repository.items.length ? repository.items.map((item) => (
-                    <article key={item.id}>
-                      <div><strong>{item.titulo}</strong><p>{item.descricao}</p><small>
-                        {item.solicitante_nome}{item.solicitante_telefone ? ` · ${item.solicitante_telefone}` : " · sem telefone cadastrado"}
-                      </small></div>
-                      <label><span>Situação</span><select
-                        value={item.item_status} disabled={busy === `repository-item-${item.id}`}
-                        onChange={(event) => void centralAction(
-                          `repository-item-${item.id}`,
-                          { action: "ATUALIZAR_ITEM", itemId: item.id, status: event.target.value },
-                          "Acompanhamento atualizado e solicitante notificado.",
-                        )}
-                      ><option value="ABERTO">Aberto</option><option value="EM_ACOMPANHAMENTO">Em acompanhamento</option><option value="CONCLUIDO">Concluído</option></select></label>
-                    </article>
+                    <button type="button" key={item.id} onClick={() => openRepositoryWorkflow(item, repository.tipo)}>
+                      <span className={`request-repository-item-mark type-${repository.tipo.toLowerCase()}`} aria-hidden="true">{repository.tipo === "ORACAO" ? "♡" : "⌂"}</span>
+                      <span><strong>{item.titulo}</strong><small>{item.solicitante_nome} · {repositoryStatusLabel(repository.tipo, item.item_status)}</small></span>
+                      <em>Atender</em>
+                    </button>
                   )) : <p className="request-repository-empty">Nenhum pedido encaminhado.</p>}
                 </div>
               </details>
@@ -325,13 +376,18 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
       )}
 
       <details className="operations-form-card request-form-card request-create-collapsible" ref={formRef}>
-        <summary>+ Criar pedido</summary>
+        <summary><span aria-hidden="true">＋</span>Criar pedido</summary>
         <form className="pilot-form request-form" onSubmit={create}>
-          <label>Categoria<select name="tipo" defaultValue="ORACAO">
+          <label>Categoria<select name="tipo" value={requestCategory} onChange={(event) => setRequestCategory(event.target.value as Exclude<RequestType, "INFORMACAO">)}>
             {CATEGORIES.map((category) => <option value={category.value} key={category.value}>{category.label}</option>)}
           </select></label>
           <label>Privacidade<span className="request-privacy-readonly">Somente o público selecionado</span></label>
-          <fieldset className="request-audience request-wide-field">
+          {(requestCategory === "ORACAO" || requestCategory === "VISITA") ? (
+            <div className="request-repository-routing request-wide-field" role="status">
+              <span aria-hidden="true">{requestCategory === "ORACAO" ? "♡" : "⌂"}</span>
+              <div><strong>Envio direto ao repositório de {requestCategory === "ORACAO" ? "orações" : "visitas"}</strong><small>A equipe responsável receberá o pedido para iniciar o acompanhamento.</small></div>
+            </div>
+          ) : <fieldset className="request-audience request-wide-field">
             <legend>Quem pode ler e receber notificação?*</legend>
             <p>A mesma seleção controla acesso e notificações no servidor.</p>
             <label className="request-person-search"><span>Pesquisar pessoa</span><input
@@ -351,7 +407,7 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
               {audienceOptions.allowAllMembers && <AudienceGroup title="Comunidade" items={[{ key: "TODOS_MEMBROS:TODOS", label: "Todos os membros ativos" }]} selected={selectedAudience} onChange={setSelectedAudience} />}
             </div>
             <div className="request-audience-preview" aria-live="polite">{selectedAudience.length ? `${selectedAudience.length} público(s) selecionado(s)` : "Nenhum público selecionado"}</div>
-          </fieldset>
+          </fieldset>}
           <label className="request-wide-field">Título*<input name="titulo" required minLength={3} maxLength={120} /></label>
           <label className="request-wide-field">Descrição*<textarea name="descricao" required minLength={10} maxLength={2000} rows={4} /></label>
           <button disabled={busy === "create"}>{busy === "create" ? "Enviando…" : "Enviar pedido"}</button>
@@ -363,8 +419,8 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
       {canManage && (
         <>
           <nav className="request-category-tabs" aria-label="Filtrar solicitações por categoria">
-            <button type="button" className={filter === "TODAS" ? "active" : ""} onClick={() => setFilter("TODAS")}>Todas <span>{items.length}</span></button>
-            {CATEGORIES.map((category) => <button
+            <button type="button" className={filter === "TODAS" ? "active" : ""} onClick={() => setFilter("TODAS")}>Todas <span>{generalItems.length}</span></button>
+            {CATEGORIES.filter((category) => category.value !== "ORACAO" && category.value !== "VISITA").map((category) => <button
               type="button" key={category.value} className={filter === category.value ? "active" : ""}
               onClick={() => setFilter(category.value)}
             >{category.label}<span>{items.filter((item) => item.tipo === category.value || (category.value === "OUTRO" && item.tipo === "INFORMACAO")).length}</span></button>)}
@@ -407,6 +463,34 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
           }}>Continuar para o WhatsApp</button></div>
         </section>
       </div>}
+
+      {selectedRepositoryItem && <div className="request-workflow-backdrop" role="presentation" onMouseDown={() => setSelectedRepositoryItem(null)}>
+        <section className="request-workflow-dialog" role="dialog" aria-modal="true" aria-labelledby="request-workflow-title" onMouseDown={(event) => event.stopPropagation()}>
+          <header>
+            <div><p className="pilot-kicker">{selectedRepositoryItem.repositoryType === "ORACAO" ? "ATENDIMENTO DE ORAÇÃO" : "ATENDIMENTO DE VISITA"}</p><h2 id="request-workflow-title">{selectedRepositoryItem.titulo}</h2></div>
+            <button type="button" aria-label="Fechar" onClick={() => setSelectedRepositoryItem(null)}>×</button>
+          </header>
+          <div className="request-workflow-request"><strong>{selectedRepositoryItem.solicitante_nome}</strong><p>{selectedRepositoryItem.descricao}</p></div>
+          <form onSubmit={saveRepositoryWorkflow}>
+            <label>Responsável pelo atendimento<input readOnly value={selectedRepositoryItem.responsavel_nome || central.currentActor.nome} /></label>
+            <label>Situação<select value={workflowStatus} onChange={(event) => setWorkflowStatus(event.target.value as RepositoryItem["item_status"])}>
+              {repositoryStatusOptions(selectedRepositoryItem.repositoryType).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select></label>
+            <label className="request-workflow-wide">Mensagem entregue<textarea required minLength={3} maxLength={2000} rows={5} value={workflowMessage} onChange={(event) => setWorkflowMessage(event.target.value)} placeholder={selectedRepositoryItem.repositoryType === "ORACAO" ? "Registre a mensagem, orientação ou retorno entregue à pessoa." : "Registre o andamento, a visita realizada e as orientações entregues."} /></label>
+            <fieldset className="request-testimony-consent request-workflow-wide">
+              <legend>Testemunho (opcional)</legend>
+              <textarea maxLength={2000} rows={4} value={workflowTestimony} onChange={(event) => setWorkflowTestimony(event.target.value)} placeholder="Conte o testemunho quando houver." />
+              {workflowTestimony.trim() && <div><strong>Consentimento da pessoa atendida para compartilhar o testemunho</strong><label><input type="radio" name="testimonyPermission" checked={testimonyPermission === "PERMITIR"} onChange={() => setTestimonyPermission("PERMITIR")} />Permitir</label><label><input type="radio" name="testimonyPermission" checked={testimonyPermission === "NAO_PERMITIR"} onChange={() => setTestimonyPermission("NAO_PERMITIR")} />Não permitir</label></div>}
+            </fieldset>
+            <footer className="request-workflow-wide">
+              <button type="button" onClick={() => setSelectedRepositoryItem(null)}>Cancelar</button>
+              {selectedRepositoryItem.testemunho && selectedRepositoryItem.testemunho_compartilhavel === 1 && !selectedRepositoryItem.testemunho_publicado_em && selectedRepositoryItem.responsavel_usuario_id === central.currentActor.id && <button type="button" className="request-testimony-share" disabled={busy === `testimony-${selectedRepositoryItem.id}`} onClick={() => void shareTestimony()}>Compartilhar testemunho</button>}
+              <button disabled={busy === `workflow-${selectedRepositoryItem.id}`}>{busy === `workflow-${selectedRepositoryItem.id}` ? "Salvando…" : "Salvar atendimento"}</button>
+            </footer>
+          </form>
+          <small className="request-retention-note">Atendimentos finalizados são removidos automaticamente após 30 dias.</small>
+        </section>
+      </div>}
     </section>
   );
 }
@@ -446,4 +530,24 @@ function visibilityLabel(value: CommunityRequest["visibilidade"]) {
 }
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
+}
+
+function repositoryStatusOptions(type: Repository["tipo"]) {
+  return type === "ORACAO"
+    ? [
+        { value: "ABERTO", label: "Aguardando atendimento" },
+        { value: "EM_ORACAO", label: "Em oração" },
+        { value: "FINALIZADO", label: "Finalizado" },
+        { value: "ORACAO_ATENDIDA", label: "Oração atendida" },
+      ]
+    : [
+        { value: "ABERTO", label: "Aguardando atendimento" },
+        { value: "EM_PROCESSO", label: "Em processo" },
+        { value: "VISITA_CONCLUIDA", label: "Visita concluída" },
+        { value: "NOVA_VISITA", label: "Solicita nova visita" },
+      ];
+}
+
+function repositoryStatusLabel(type: Repository["tipo"], status: RepositoryItem["item_status"]) {
+  return repositoryStatusOptions(type).find((option) => option.value === status)?.label || "Aguardando atendimento";
 }
