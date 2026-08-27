@@ -2197,6 +2197,14 @@ export const solicitacaoRepositorioItens = sqliteTable(
     encaminhadoPor: integer("encaminhado_por").references(() => usuarios.id, {
       onDelete: "set null",
     }),
+    responsavelUsuarioId: integer("responsavel_usuario_id").references(() => usuarios.id, {
+      onDelete: "set null",
+    }),
+    mensagemAtendimento: text("mensagem_atendimento").notNull().default(""),
+    testemunho: text("testemunho").notNull().default(""),
+    testemunhoCompartilhavel: integer("testemunho_compartilhavel").notNull().default(-1),
+    testemunhoPublicadoEm: text("testemunho_publicado_em"),
+    finalizadoEm: text("finalizado_em"),
     criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
     atualizadoEm: text("atualizado_em")
       .notNull()
@@ -2211,6 +2219,10 @@ export const solicitacaoRepositorioItens = sqliteTable(
       table.comunidadeId,
       table.repositorioId,
       table.status,
+    ),
+    index("solicitacao_repositorio_itens_finalizado_idx").on(
+      table.comunidadeId,
+      table.finalizadoEm,
     ),
   ],
 );
