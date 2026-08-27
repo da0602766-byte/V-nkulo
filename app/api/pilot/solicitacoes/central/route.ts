@@ -8,7 +8,9 @@ import { recordTenantAudit } from "../../../../lib/tenant-audit";
 import { requireTenantPermission } from "../../../../lib/tenant";
 
 const REPOSITORY_TYPES = new Set(["ORACAO", "VISITA"]);
-const ITEM_STATUSES = new Set(["ABERTO", "EM_ACOMPANHAMENTO", "CONCLUIDO"]);
+const PRAYER_STATUSES = new Set(["ABERTO", "EM_ORACAO", "FINALIZADO", "ORACAO_ATENDIDA"]);
+const VISIT_STATUSES = new Set(["ABERTO", "EM_PROCESSO", "VISITA_CONCLUIDA", "NOVA_VISITA"]);
+const FINAL_STATUSES = new Set(["FINALIZADO", "ORACAO_ATENDIDA", "VISITA_CONCLUIDA"]);
 
 export async function GET() {
   const access = await requireTenantPermission("dashboard.view");
@@ -23,6 +25,7 @@ export async function GET() {
   const canManageRepositories = hasGlobalRepositoryAccess(access.context.permissions);
   const canConfigureWhatsapp = access.context.papel === "PASTOR";
 
+  await cleanupFinishedRepositoryRequests(db, communityId);
   await ensureRequestRepositorySuggestions(db, communityId);
 
   const [repositories, items, ministries, contacts, preference, currentUser] = await Promise.all([
@@ -44,19 +47,23 @@ export async function GET() {
       `SELECT ri.id, ri.repositorio_id, ri.status AS item_status,
         s.id AS solicitacao_id, s.tipo, s.titulo, s.descricao,
         s.status AS solicitacao_status, s.criado_em,
-        u.nome AS solicitante_nome, COALESCE(u.telefone, '') AS solicitante_telefone
+        u.nome AS solicitante_nome, COALESCE(u.telefone, '') AS solicitante_telefone,
+        ri.responsavel_usuario_id, COALESCE(responsavel.nome, '') AS responsavel_nome,
+        ri.mensagem_atendimento, ri.testemunho, ri.testemunho_compartilhavel,
+        ri.testemunho_publicado_em, ri.finalizado_em
        FROM solicitacao_repositorio_itens ri
        JOIN solicitacao_repositorios r
          ON r.id = ri.repositorio_id AND r.comunidade_id = ri.comunidade_id
        JOIN solicitacoes_comunidade s
          ON s.id = ri.solicitacao_id AND s.comunidade_id = ri.comunidade_id
        JOIN usuarios u ON u.id = s.solicitante_id
+       LEFT JOIN usuarios responsavel ON responsavel.id = ri.responsavel_usuario_id
        LEFT JOIN ministerios_comunidade m
          ON m.id = r.ministerio_id AND m.comunidade_id = r.comunidade_id
        WHERE ri.comunidade_id = ?
          AND r.status = 'ATIVO'
          AND (? = 1 OR m.responsavel_usuario_id = ?)
-       ORDER BY CASE ri.status WHEN 'ABERTO' THEN 0 WHEN 'EM_ACOMPANHAMENTO' THEN 1 ELSE 2 END,
+       ORDER BY CASE WHEN ri.finalizado_em IS NULL THEN 0 ELSE 1 END,
          ri.id DESC
        LIMIT 200`,
     ).bind(communityId, canManageRepositories ? 1 : 0, userId).all<Record<string, unknown>>(),
@@ -102,6 +109,7 @@ export async function GET() {
   return Response.json(
     {
       canManageRepositories,
+      currentActor: { id: userId, nome: access.user.nome },
       whatsappPreference: {
         canConfigure: canConfigureWhatsapp,
         enabled: Boolean(preference?.disponivel),
@@ -261,37 +269,51 @@ export async function PATCH(request: Request) {
   if (action === "ATUALIZAR_ITEM") {
     const itemId = positiveInteger(body.itemId);
     const status = clean(body.status, 30).toUpperCase();
-    if (!itemId || !ITEM_STATUSES.has(status)) {
+    const message = clean(body.mensagemAtendimento, 2000);
+    const testimony = clean(body.testemunho, 2000);
+    const testimonyPermission = clean(body.testemunhoPermissao, 30).toUpperCase();
+    if (!itemId || message.length < 3 || (testimony && !["PERMITIR", "NAO_PERMITIR"].includes(testimonyPermission))) {
       return Response.json({ error: "Atualização inválida." }, { status: 400 });
     }
     const item = await db.prepare(
-      `SELECT ri.id, ri.repositorio_id, ri.solicitacao_id, s.solicitante_id
+      `SELECT ri.id, ri.repositorio_id, ri.solicitacao_id, ri.responsavel_usuario_id,
+        s.solicitante_id, r.tipo
        FROM solicitacao_repositorio_itens ri
+       JOIN solicitacao_repositorios r
+         ON r.id = ri.repositorio_id AND r.comunidade_id = ri.comunidade_id
        JOIN solicitacoes_comunidade s
          ON s.id = ri.solicitacao_id AND s.comunidade_id = ri.comunidade_id
        WHERE ri.id = ? AND ri.comunidade_id = ? LIMIT 1`,
     ).bind(itemId, communityId).first<{
       id: number; repositorio_id: number; solicitacao_id: number; solicitante_id: number;
+      responsavel_usuario_id: number | null; tipo: string;
     }>();
     if (!item) return Response.json({ error: "Item não encontrado." }, { status: 404 });
     const repository = await getAuthorizedRepository(db, {
       repositoryId: item.repositorio_id, communityId, userId, globalAccess,
     });
     if (!repository) return Response.json({ error: "Repositório não autorizado." }, { status: 403 });
+    const allowedStatuses = item.tipo === "ORACAO" ? PRAYER_STATUSES : VISIT_STATUSES;
+    if (!allowedStatuses.has(status)) return Response.json({ error: "Situação inválida para este repositório." }, { status: 400 });
+    const isFinal = FINAL_STATUSES.has(status);
     await db.prepare(
       `UPDATE solicitacao_repositorio_itens
-       SET status = ?, atualizado_em = CURRENT_TIMESTAMP
+       SET status = ?, responsavel_usuario_id = COALESCE(responsavel_usuario_id, ?),
+         mensagem_atendimento = ?, testemunho = ?,
+         testemunho_compartilhavel = ?,
+         finalizado_em = CASE WHEN ? = 1 THEN COALESCE(finalizado_em, CURRENT_TIMESTAMP) ELSE NULL END,
+         atualizado_em = CURRENT_TIMESTAMP
        WHERE id = ? AND comunidade_id = ?`,
-    ).bind(status, itemId, communityId).run();
+    ).bind(status, userId, message, testimony, testimony ? (testimonyPermission === "PERMITIR" ? 1 : 0) : -1, isFinal ? 1 : 0, itemId, communityId).run();
     await db.prepare(
       `UPDATE solicitacoes_comunidade
        SET status = ?, atualizado_em = CURRENT_TIMESTAMP
        WHERE id = ? AND comunidade_id = ?`,
-    ).bind(status === "CONCLUIDO" ? "CONCLUIDA" : "EM_ANALISE", item.solicitacao_id, communityId).run();
+    ).bind(isFinal ? "CONCLUIDA" : "EM_ANALISE", item.solicitacao_id, communityId).run();
     await notifyUser(db, {
       userId: Number(item.solicitante_id),
       title: "Acompanhamento atualizado",
-      message: status === "CONCLUIDO" ? "Seu pedido foi concluído." : "Seu pedido está em acompanhamento.",
+      message: isFinal ? "Seu pedido foi concluído." : "Seu pedido está em acompanhamento.",
       entityId: item.solicitacao_id,
       area: "SOLICITACOES",
       destination: "/painel?view=solicitacoes",
@@ -301,6 +323,41 @@ export async function PATCH(request: Request) {
       itemId, status,
     });
     return Response.json({ ok: true });
+  }
+
+  if (action === "PUBLICAR_TESTEMUNHO") {
+    const itemId = positiveInteger(body.itemId);
+    if (!itemId) return Response.json({ error: "Testemunho inválido." }, { status: 400 });
+    const item = await db.prepare(
+      `SELECT ri.id, ri.repositorio_id, ri.responsavel_usuario_id, ri.testemunho,
+        ri.testemunho_compartilhavel, ri.testemunho_publicado_em,
+        s.titulo, s.solicitante_id, u.nome AS solicitante_nome
+       FROM solicitacao_repositorio_itens ri
+       JOIN solicitacoes_comunidade s ON s.id = ri.solicitacao_id AND s.comunidade_id = ri.comunidade_id
+       JOIN usuarios u ON u.id = s.solicitante_id
+       WHERE ri.id = ? AND ri.comunidade_id = ? LIMIT 1`,
+    ).bind(itemId, communityId).first<{
+      id: number; repositorio_id: number; responsavel_usuario_id: number | null;
+      testemunho: string; testemunho_compartilhavel: number; testemunho_publicado_em: string | null;
+      titulo: string; solicitante_id: number; solicitante_nome: string;
+    }>();
+    if (!item) return Response.json({ error: "Atendimento não encontrado." }, { status: 404 });
+    const repository = await getAuthorizedRepository(db, { repositoryId: item.repositorio_id, communityId, userId, globalAccess });
+    if (!repository || item.responsavel_usuario_id !== userId) return Response.json({ error: "Somente quem realizou o atendimento pode publicar o testemunho." }, { status: 403 });
+    if (!item.testemunho || item.testemunho_compartilhavel !== 1) return Response.json({ error: "O compartilhamento deste testemunho não foi autorizado." }, { status: 403 });
+    if (item.testemunho_publicado_em) return Response.json({ error: "Este testemunho já foi compartilhado." }, { status: 409 });
+    const result = await db.prepare(
+      `INSERT INTO publicacoes_piloto
+       (comunidade_id, titulo, resumo, conteudo, categoria, visibilidade, status,
+        origem, comentarios_habilitados, criado_por, atualizado_em)
+       VALUES (?, ?, ?, ?, 'TESTEMUNHO', 'COMUNIDADE', 'PUBLICADA', 'COMUNIDADE', 1, ?, CURRENT_TIMESTAMP)`,
+    ).bind(communityId, `Testemunho · ${item.titulo}`.slice(0, 120), item.testemunho.slice(0, 320), item.testemunho, userId).run();
+    await db.prepare(
+      `UPDATE solicitacao_repositorio_itens SET testemunho_publicado_em = CURRENT_TIMESTAMP,
+       atualizado_em = CURRENT_TIMESTAMP WHERE id = ? AND comunidade_id = ?`,
+    ).bind(itemId, communityId).run();
+    await recordTenantAudit(db, access.context, userId, "TESTEMUNHO_PEDIDO_PUBLICADO", "SUCESSO", { itemId, publicacaoId: Number(result.meta.last_row_id) });
+    return Response.json({ ok: true, publicacaoId: Number(result.meta.last_row_id) });
   }
 
   return Response.json({ error: "Ação inválida." }, { status: 400 });
@@ -352,4 +409,15 @@ function clean(value: unknown, length: number) {
 function positiveInteger(value: unknown) {
   const number = Number(value);
   return Number.isInteger(number) && number > 0 ? number : 0;
+}
+
+async function cleanupFinishedRepositoryRequests(db: ReturnType<typeof getD1>, communityId: number) {
+  await db.prepare(
+    `DELETE FROM solicitacoes_comunidade
+     WHERE comunidade_id = ? AND id IN (
+       SELECT solicitacao_id FROM solicitacao_repositorio_itens
+       WHERE comunidade_id = ? AND finalizado_em IS NOT NULL
+         AND finalizado_em <= datetime('now', '-30 days')
+     )`,
+  ).bind(communityId, communityId).run();
 }
