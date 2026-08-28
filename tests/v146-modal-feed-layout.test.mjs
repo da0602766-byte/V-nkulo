@@ -20,11 +20,14 @@ test("a ficha do visitante tem fechamento e semântica de diálogo", () => {
   assert.match(source, /role="dialog" aria-modal="true"/);
 });
 
-test("o comentário usa campo de uma linha e envio compacto", () => {
+// V147 trocou o campo de uma linha por um textarea que cresce com o texto:
+// Enter envia e Shift+Enter quebra linha. O envio compacto permanece.
+test("o comentário usa campo que cresce com o texto e envio compacto", () => {
   const source = read("app/components/CommunityPostInteractions.tsx");
-  assert.match(source, /<input name="texto"/);
+  assert.match(source, /<textarea/);
+  assert.match(source, /name="texto"/);
   assert.match(source, /community-comment-send-icon/);
-  assert.doesNotMatch(source, /<textarea name="texto"/);
+  assert.doesNotMatch(source, /<input name="texto"/);
 });
 
 test("os estilos preservam modal, feed compacto e largura estável", () => {

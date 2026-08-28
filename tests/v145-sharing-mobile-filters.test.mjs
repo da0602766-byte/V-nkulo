@@ -65,6 +65,8 @@ test("ações móveis, comentários e inscritos usam painéis fora dos cartões"
   assert.match(events, /item\.inscritos\.slice\(0, 5\)/);
   assert.match(events, /Pesquisar inscritos/);
   assert.match(events, /event-registrant-search-overlay/);
-  assert.match(styles, /\.community-comments-panel>form:focus-within/);
+  // V147 moveu o anel de foco do form para o label que envolve o campo,
+  // porque o form passou a ter uma coluna a mais para o avatar do autor.
+  assert.match(styles, /\.community-comment-form > label:focus-within/);
   assert.match(styles, /\.event-registrant-search-dialog/);
 });
