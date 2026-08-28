@@ -27925,6 +27925,92 @@ html[data-pilot-theme="escuro"] .owner-feedback-detail>aside { border-color:#4f4
 .notification-bulk-actions .notification-clear-read { margin-left:auto; color:#d95d70; }
 .pilot-notification-list .notification-clear-one { color:#d95d70; }
 
+/* Reforma do estacionamento: posições reais, toque móvel e consulta por setor. */
+.parking-map section.parking-positioned-sector { overflow:auto; }
+.parking-map section>div.parking-position-canvas {
+  position:relative;
+  display:block!important;
+  min-width:360px;
+  max-width:none;
+  overflow:hidden;
+  border:1px dashed color-mix(in srgb,var(--sector-color) 55%,var(--pilot-line));
+  border-radius:9px;
+  background-image:linear-gradient(var(--pilot-line) 1px,transparent 1px),linear-gradient(90deg,var(--pilot-line) 1px,transparent 1px);
+  background-size:20px 20px;
+}
+.parking-map section>div.parking-position-canvas button.parking-space {
+  position:absolute;
+  width:52px;
+  min-height:34px;
+  touch-action:none;
+  user-select:none;
+  -webkit-user-select:none;
+}
+
+.people-remove-name { display:block; margin-top:8px; color:var(--ink); font-size:15px; overflow-wrap:anywhere; }
+.people-role-form>label { display:grid; gap:7px; color:var(--muted); font-size:12px; font-weight:800; }
+.people-role-form>label>small { color:var(--muted); font-size:11px; font-weight:600; line-height:1.45; }
+.people-role-form>label :is(input,select) { width:100%; min-height:46px; border:1px solid var(--line); border-radius:11px; background:var(--canvas); color:var(--ink); padding:9px 11px; font:inherit; }
+.people-role-form>label :is(input,select):focus { outline:3px solid color-mix(in srgb,var(--teal) 20%,transparent); border-color:var(--teal); }
+.people-modal-actions { display:flex; justify-content:flex-end; gap:10px; }
+.people-modal-actions button { min-height:46px; border:1px solid var(--line); border-radius:11px; padding:9px 16px; font-weight:850; cursor:pointer; }
+.people-modal-actions button.secondary { background:transparent; color:var(--ink); }
+.people-modal-actions button.danger { border-color:#c8425a; background:#c8425a; color:#fff; }
+.people-modal-actions button:disabled { opacity:.48; cursor:not-allowed; }
+
+@media (max-width:680px) {
+  .parking-mobile-gate-notice { display:flex; gap:10px; margin:0 0 18px; padding:12px; border:1px solid color-mix(in srgb,#d5f247 45%,var(--pm-line)); border-radius:14px; background:color-mix(in srgb,#d5f247 10%,var(--pm-card)); color:var(--pm-ink); }
+  .parking-mobile-gate-notice>span { flex:0 0 34px; width:34px; height:34px; display:grid; place-items:center; border-radius:10px; background:#dced83; font-size:16px; }
+  .parking-mobile-gate-notice>div { min-width:0; display:grid; gap:3px; }
+  .parking-mobile-gate-notice strong { font-size:11px; }
+  .parking-mobile-gate-notice p { margin:0; color:var(--pm-muted); font-size:9px; line-height:1.45; }
+  .parking-mobile-load-error { min-height:70dvh; display:grid; place-content:center; justify-items:center; gap:8px; padding:28px; text-align:center; }
+  .parking-mobile-load-error strong { font-size:16px; }
+  .parking-mobile-load-error p { max-width:280px; margin:0; color:var(--pm-muted,#68736a); font-size:12px; line-height:1.5; }
+  .parking-mobile-load-error button { min-height:44px; margin-top:7px; border:0; border-radius:12px; background:#18261f; color:#fff; padding:0 18px; font-weight:800; }
+  .parking-mobile-sector-option { display:grid; gap:0; border-radius:18px; }
+  .parking-mobile-sector-option>button { width:100%; display:flex; align-items:center; gap:12px; padding:13px; border:1px solid var(--pm-line); border-radius:17px; background:var(--pm-card); color:var(--pm-ink); text-align:left; transition:.16s ease; }
+  .parking-mobile-sector-option>button.chosen { position:relative; z-index:2; border-color:#2e4b3d; border-radius:17px 17px 10px 10px; box-shadow:0 5px 0 #d5f247; transform:translateY(-2px); }
+  .parking-mobile-sector-option>button>span:nth-child(2) { min-width:0; flex:1; display:grid; gap:3px; }
+  .parking-mobile-sector-option>button>i { width:19px; height:19px; display:grid; place-items:center; border:1px solid #bfc7bc; border-radius:50%; }
+  .parking-mobile-sector-option>button.chosen>i { border-color:#15211c; }
+  .parking-mobile-sector-option>button.chosen>i>b { width:9px; height:9px; border-radius:50%; background:#17251f; }
+  .parking-mobile-sector-preview { display:grid; gap:10px; margin-top:-1px; padding:18px 10px 10px; border:1px solid var(--pm-line); border-top:0; border-radius:0 0 17px 17px; background:color-mix(in srgb,var(--pm-card) 88%,var(--pm-surface)); animation:parking-sector-preview-in .18s ease-out; }
+  .parking-mobile-sector-preview>header { display:flex; justify-content:space-between; gap:10px; padding:0 3px; }
+  .parking-mobile-sector-preview>header strong { font-size:10px; }
+  .parking-mobile-sector-preview>header span { color:var(--pm-muted); font-size:8px; text-align:right; }
+  .parking-mobile-position-map { overflow:hidden; }
+  .parking-mobile-position-map.compact { padding:9px 10px; border-radius:14px; }
+  .parking-mobile-position-map.compact .parking-mobile-entrance,
+  .parking-mobile-position-map.compact .parking-mobile-exit { font-size:7px; }
+  .parking-mobile-layout-canvas { width:100%; }
+  .parking-mobile-layout-canvas.positioned { position:relative; width:100%; min-height:190px; aspect-ratio:var(--parking-layout-ratio); max-height:330px; overflow:hidden; border:1px solid var(--pm-line); border-radius:11px; background-color:var(--pm-surface); background-image:linear-gradient(var(--pm-line) 1px,transparent 1px),linear-gradient(90deg,var(--pm-line) 1px,transparent 1px); background-size:18px 18px; }
+  .parking-mobile-layout-canvas.fallback-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:7px; }
+  .parking-mobile-layout-canvas>button { min-width:0; min-height:34px; display:grid; place-items:center; gap:1px; padding:2px; border:1px solid var(--pm-line); border-radius:7px; background:var(--pm-card); color:var(--pm-muted); }
+  .parking-mobile-layout-canvas.positioned>button { position:absolute; width:clamp(34px,13%,50px); min-height:34px; transform:none; }
+  .parking-mobile-layout-canvas>button>span { font-size:13px; }
+  .parking-mobile-layout-canvas>button small { font:500 7px monospace; }
+  .parking-mobile-layout-canvas>button.busy,
+  .parking-mobile-layout-canvas>button.reserved { border-color:#d5d9d3; background:#d7dad3; color:#909890; }
+  .parking-mobile-layout-canvas>button.selected { z-index:2; border-color:#6f8912; background:#d5f247; color:#26351f; box-shadow:0 2px 0 #738c17; }
+  .parking-mobile-position-map.compact .parking-mobile-layout-canvas.positioned { min-height:150px; max-height:210px; }
+  .parking-mobile-position-map.compact .parking-mobile-layout-canvas>button { min-height:29px; }
+  .parking-mobile-empty-sectors { padding:18px; border:1px dashed #cbd2c8; border-radius:15px; text-align:center; }
+  .parking-mobile-empty-sectors strong { font-size:12px; }
+  .parking-mobile-empty-sectors p { margin:5px 0 0; color:var(--pm-muted); font-size:10px; line-height:1.45; }
+  .parking-mobile-action { padding-bottom:calc(18px + env(safe-area-inset-bottom)); }
+  @keyframes parking-sector-preview-in { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:none; } }
+
+  .people-modal-backdrop { z-index:2147483000; background:rgba(3,10,18,.82); backdrop-filter:blur(4px); }
+  .people-modal { max-height:calc(94dvh - env(safe-area-inset-top)); padding-bottom:env(safe-area-inset-bottom); }
+  .people-modal>header { position:sticky; z-index:2; top:0; padding:18px; background:var(--white); }
+  .people-modal>header>div { min-width:0; }
+  .people-modal h2 { font-size:20px; line-height:1.2; }
+  .people-modal>header p { font-size:12px; line-height:1.5; }
+  .people-role-form { gap:16px; padding:18px; }
+  .people-modal-actions { flex-direction:column-reverse; }
+  .people-modal-actions button { width:100%; }
+}
 
 .pilot-dashboard[data-ui-version="v2"] .pilot-sidebar>.editorial-sidebar-card,
 .pilot-dashboard[data-ui-version="v2"] .pilot-sidebar>.editorial-sidebar-restore { margin-top:10px; border-radius:10px; background:var(--v2-surface-subtle); }

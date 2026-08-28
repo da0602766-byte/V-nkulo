@@ -21,6 +21,7 @@ Antes de alterar o código, leia este documento e atualize a seção **Trabalho 
 
 | Responsável | Tarefa | Arquivos reservados | Início | Estado | Observações |
 | --- | --- | --- | --- | --- | --- |
+| Codex | Carregamento na navegação pública, Ajuda oculta durante carregamentos e saneamento do lint para publicação | `app/components/StableLink.tsx`, `PublicHeader.tsx`, `PublicMobileNav.tsx`, `MemberRegistrationForm.tsx`, `MemberRegistrationLinkManager.tsx`, `MobileAppInstall.tsx`, `ParkingReservationQr.tsx`, `ParkingWorkspace.tsx`, `PilotDashboard.tsx`, `PilotNotificationCenter.tsx`, `SecretaryMinisterialWorkspace.tsx`, `TenantOperations.tsx`, `app/globals.css`, testes relacionados, `COORDENACAO_IA.md` | 2026-08-28 | concluído e pronto para publicação | Implementação em `53d1f2e`, além do redesenho de comentários em `7f970b4` e `b3786b4`, integrados sobre `9e4be77`. Validação: build e artefato aprovados; lint com 0 erros e 49 avisos; suíte no candidato e no commit anterior com as mesmas 11 falhas históricas, sem regressão nova. |
 | Codex | Correção do popover da conta: escala de fonte e controles de tema | `app/globals.css` | 2026-08-27 | concluído e sincronizado | Commit `15e22c2`; sincronizado com o repositório do Sites em 2026-08-27. |
 | Claude | _A preencher antes de editar_ | _A preencher_ |  | pendente |  |
 

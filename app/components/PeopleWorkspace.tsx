@@ -99,6 +99,7 @@ export default function PeopleWorkspace({
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Person | null>(null);
   const [removing, setRemoving] = useState<Person | null>(null);
+  const [removeConfirmation, setRemoveConfirmation] = useState("");
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -216,9 +217,14 @@ export default function PeopleWorkspace({
       });
       const result = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(result.error || "Não foi possível concluir.");
+      const removedMembershipId = removing.membership_id;
       setRemoving(null);
+      setRemoveConfirmation("");
+      setData((current) => ({
+        ...current,
+        people: current.people.filter((person) => person.membership_id !== removedMembershipId),
+      }));
       setMessage("A ação foi concluída e registrada na auditoria.");
-      await load(true);
     } catch (removeError) {
       setError((removeError as Error).message);
     } finally {
@@ -368,7 +374,7 @@ export default function PeopleWorkspace({
                 <button
                   type="button"
                   className="danger"
-                  onClick={() => setRemoving(person)}
+                  onClick={() => { setRemoveConfirmation(""); setRemoving(person); }}
                 >
                   Remover pessoa
                 </button>
@@ -480,7 +486,7 @@ export default function PeopleWorkspace({
         </div>
       )}
       {removing && (
-        <div className="people-modal-backdrop" onMouseDown={() => setRemoving(null)}>
+        <div className="people-modal-backdrop" onMouseDown={() => { setRemoving(null); setRemoveConfirmation(""); }}>
           <section
             className="people-modal"
             role="dialog"
@@ -491,10 +497,11 @@ export default function PeopleWorkspace({
             <header>
               <div>
                 <p className="pilot-kicker">AÇÃO PROTEGIDA E AUDITADA</p>
-                <h2>Remover {removing.nome}</h2>
-                <p>Históricos e registros protegidos nunca são apagados silenciosamente.</p>
+                <h2>Remover da comunidade</h2>
+                <strong className="people-remove-name">{removing.nome}</strong>
+                <p>O vínculo será removido, mas históricos e registros protegidos continuarão preservados.</p>
               </div>
-              <button type="button" onClick={() => setRemoving(null)} aria-label="Fechar">×</button>
+              <button type="button" onClick={() => { setRemoving(null); setRemoveConfirmation(""); }} aria-label="Fechar">×</button>
             </header>
             <form className="people-role-form" onSubmit={removePerson}>
               <label>
@@ -506,20 +513,25 @@ export default function PeopleWorkspace({
                 </select>
               </label>
               <label>
-                Confirmação
+                <span>Confirmação</span>
+                <small>Digite <strong>REMOVER</strong> para liberar a ação.</small>
                 <input
+                  name="confirmation"
                   required
                   pattern="REMOVER"
                   placeholder="Digite REMOVER"
                   title="Digite REMOVER para confirmar"
+                  autoComplete="off"
+                  value={removeConfirmation}
+                  onChange={(event) => setRemoveConfirmation(event.target.value.toUpperCase())}
                 />
               </label>
               <div className="people-modal-actions">
-                <button type="button" className="secondary" onClick={() => setRemoving(null)}>
+                <button type="button" className="secondary" onClick={() => { setRemoving(null); setRemoveConfirmation(""); }}>
                   Cancelar
                 </button>
-                <button type="submit" className="danger" disabled={saving}>
-                  {saving ? "Processando…" : "Confirmar ação"}
+                <button type="submit" className="danger" disabled={saving || removeConfirmation !== "REMOVER"}>
+                  {saving ? "Processando…" : "Remover da comunidade"}
                 </button>
               </div>
             </form>

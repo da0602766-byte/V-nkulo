@@ -124,6 +124,13 @@ export default function ParkingWorkspace({
   const exitRef = useRef<HTMLDetailsElement>(null);
   const occurrenceRef = useRef<HTMLDetailsElement>(null);
   const operatorRef = useRef<HTMLElement>(null);
+  const pointerDragRef = useRef<{
+    spaceId: number;
+    offsetX: number;
+    offsetY: number;
+    x: number;
+    y: number;
+  } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -410,7 +417,30 @@ export default function ParkingWorkspace({
   async function moveSpace(sourceId:number,posicaoX:number,posicaoY:number) {
     if(!mapEditing) return;
     setDraggedSpace(null);
-    await submitJson("/api/pilot/estacionamento/mapa",{action:"ATUALIZAR_POSICAO",vagaId:sourceId,posicaoX,posicaoY},"Posição da vaga salva.","PATCH");
+    setData((current) => current ? {
+      ...current,
+      vagas: current.vagas.map((space) => space.id === sourceId
+        ? { ...space, posicao_x: posicaoX, posicao_y: posicaoY }
+        : space),
+    } : current);
+    setWorking(true);
+    setFeedback("");
+    setError("");
+    try {
+      const response = await fetch("/api/pilot/estacionamento/mapa", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action:"ATUALIZAR_POSICAO", vagaId:sourceId, posicaoX, posicaoY }),
+      });
+      const result = await readJson<{ error?: string }>(response);
+      if (!response.ok) throw new Error(result.error || "Não foi possível salvar a posição da vaga.");
+      setFeedback("Posição da vaga salva.");
+    } catch (cause) {
+      setError((cause as Error).message);
+      await load();
+    } finally {
+      setWorking(false);
+    }
   }
 
   function dropSpace(event: DragEvent<HTMLDivElement>) {
@@ -422,7 +452,51 @@ export default function ParkingWorkspace({
     void moveSpace(draggedSpace, x, y);
   }
 
-  async function applyLayoutSuggestion(preset: "GRADE" | "CORREDOR" | "FILEIRAS") {
+  function startPointerMove(event: React.PointerEvent<HTMLButtonElement>, spaceId: number) {
+    if (!mapEditing) return;
+    const canvas = event.currentTarget.parentElement;
+    if (!canvas) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const buttonRect = event.currentTarget.getBoundingClientRect();
+    pointerDragRef.current = {
+      spaceId,
+      offsetX: event.clientX - buttonRect.left,
+      offsetY: event.clientY - buttonRect.top,
+      x: Number(event.currentTarget.style.left.replace("px", "")) || 0,
+      y: Number(event.currentTarget.style.top.replace("px", "")) || 0,
+    };
+    setDraggedSpace(spaceId);
+  }
+
+  function continuePointerMove(event: React.PointerEvent<HTMLButtonElement>) {
+    const drag = pointerDragRef.current;
+    const canvas = event.currentTarget.parentElement;
+    if (!mapEditing || !drag || drag.spaceId !== Number(event.currentTarget.dataset.spaceId) || !canvas) return;
+    event.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.max(0, Math.min(canvas.scrollWidth - 54, Math.round(event.clientX - rect.left + canvas.scrollLeft - drag.offsetX)));
+    const y = Math.max(0, Math.min(canvas.scrollHeight - 36, Math.round(event.clientY - rect.top + canvas.scrollTop - drag.offsetY)));
+    pointerDragRef.current = { ...drag, x, y };
+    setData((current) => current ? {
+      ...current,
+      vagas: current.vagas.map((space) => space.id === drag.spaceId
+        ? { ...space, posicao_x: x, posicao_y: y }
+        : space),
+    } : current);
+  }
+
+  function finishPointerMove(event: React.PointerEvent<HTMLButtonElement>) {
+    const drag = pointerDragRef.current;
+    if (!drag || drag.spaceId !== Number(event.currentTarget.dataset.spaceId)) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    pointerDragRef.current = null;
+    void moveSpace(drag.spaceId, drag.x, drag.y);
+  }
+
+  async function applyLayoutSuggestion(preset: "GRADE" | "CORREDOR" | "FILEIRAS" | "DIAGONAL" | "PERIMETRO") {
     if (!mapEditing || !data) return;
     const positions = sectors.flatMap((sector) => sector.spaces.map((space, index) => {
       const row = Math.floor(index / 8);
@@ -433,27 +507,53 @@ export default function ParkingWorkspace({
       if (preset === "FILEIRAS") {
         return { vagaId: space.id, posicaoX: column * 78 + (row % 2 ? 32 : 0), posicaoY: row * 62 + 12 };
       }
+      if (preset === "DIAGONAL") {
+        return { vagaId: space.id, posicaoX: column * 82 + row * 24 + 10, posicaoY: row * 62 + 12 };
+      }
+      if (preset === "PERIMETRO") {
+        const topCount = Math.ceil(sector.spaces.length / 2);
+        const onTop = index < topCount;
+        const perimeterColumn = onTop ? index : index - topCount;
+        return { vagaId: space.id, posicaoX: perimeterColumn * 82 + 10, posicaoY: onTop ? 12 : 176 };
+      }
       return { vagaId: space.id, posicaoX: column * 78 + 10, posicaoY: row * 58 + 10 };
     }));
-    await submitJson(
-      "/api/pilot/estacionamento/mapa",
-      { action: "ATUALIZAR_POSICOES", positions },
-      "Sugestão aplicada. Você ainda pode ajustar cada vaga livremente.",
-      "PATCH",
-    );
+    const nextPositions = new Map(positions.map((position) => [position.vagaId, position]));
+    setData((current) => current ? {
+      ...current,
+      vagas: current.vagas.map((space) => {
+        const position = nextPositions.get(space.id);
+        return position ? { ...space, posicao_x: position.posicaoX, posicao_y: position.posicaoY } : space;
+      }),
+    } : current);
+    setWorking(true);
+    setFeedback("");
+    setError("");
+    try {
+      const response = await fetch("/api/pilot/estacionamento/mapa", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "ATUALIZAR_POSICOES", positions }),
+      });
+      const result = await readJson<{ error?: string }>(response);
+      if (!response.ok) throw new Error(result.error || "Não foi possível aplicar a sugestão.");
+      setFeedback("Sugestão aplicada. Você ainda pode ajustar cada vaga livremente.");
+    } catch (cause) {
+      setError((cause as Error).message);
+      await load();
+    } finally {
+      setWorking(false);
+    }
   }
 
   if (memberMode) {
-    if (data?.reservationGate && !data.reservationGate.unlocked) {
-      return <ParkingReservationGate communityName={communityName} gate={data.reservationGate} />;
-    }
     const selectedSpace = data?.vagas.find((space) => space.id === selectedSpaceId) || null;
     const reservationStartsAt = data?.reservationGate?.eventStartsAt ? new Date(data.reservationGate.eventStartsAt) : null;
     const reservationEndsAt = data?.reservationGate?.eventEndsAt ? new Date(data.reservationGate.eventEndsAt) : null;
     const suggestedStart = reservationStartsAt && !Number.isNaN(reservationStartsAt.getTime()) ? toLocalDateTimeInput(new Date(reservationStartsAt.getTime() - 90 * 60 * 1000)) : "";
     const suggestedEnd = reservationEndsAt && !Number.isNaN(reservationEndsAt.getTime()) ? toLocalDateTimeInput(new Date(reservationEndsAt.getTime() + 2 * 60 * 60 * 1000)) : "";
     return (<>
-      <ParkingMobileExperience communityName={communityName} data={data} sectors={sectors} reservations={reservations} eventOptions={eventOptions} loading={loading} working={working} feedback={feedback} error={error} onReserve={createReservation} />
+      <ParkingMobileExperience communityName={communityName} data={data} sectors={sectors} reservations={reservations} eventOptions={eventOptions} loading={loading} working={working} feedback={feedback} error={error} onRetry={load} onReserve={createReservation} />
       <section className="parking-workspace parking-member-workspace parking-desktop-shell" style={{ "--parking-accent": data?.config.cor_destaque || "#d99a32" } as React.CSSProperties}>
         <header className="parking-member-heading">
           <div><p className="pilot-kicker">ESTACIONAMENTO · {communityName}</p><h1>Escolha sua vaga</h1><p>Toque em uma vaga livre para iniciar a reserva.</p></div>
@@ -511,7 +611,7 @@ export default function ParkingWorkspace({
   }
 
   return (<>
-    {!mobileManagerView && <ParkingMobileExperience communityName={communityName} data={data} sectors={sectors} reservations={reservations} eventOptions={eventOptions} loading={loading} working={working} feedback={feedback} error={error} canManage={Boolean(canManageReservations && (canEntry || canExit || canEdit || canConfigure))} onManage={() => setMobileManagerView(true)} onReserve={createReservation} />}
+    {!mobileManagerView && <ParkingMobileExperience communityName={communityName} data={data} sectors={sectors} reservations={reservations} eventOptions={eventOptions} loading={loading} working={working} feedback={feedback} error={error} onRetry={load} canManage={Boolean(canManageReservations && (canEntry || canExit || canEdit || canConfigure))} onManage={() => setMobileManagerView(true)} onReserve={createReservation} />}
     <section
       className={`parking-workspace parking-desktop-shell${mobileManagerView ? " mobile-manager-active" : ""}`}
       style={
@@ -739,11 +839,16 @@ export default function ParkingWorkspace({
                   <button type="button" disabled={working} onClick={() => void applyLayoutSuggestion("GRADE")}>Grade compacta</button>
                   <button type="button" disabled={working} onClick={() => void applyLayoutSuggestion("CORREDOR")}>Corredor central</button>
                   <button type="button" disabled={working} onClick={() => void applyLayoutSuggestion("FILEIRAS")}>Fileiras alternadas</button>
+                  <button type="button" disabled={working} onClick={() => void applyLayoutSuggestion("DIAGONAL")}>Vagas diagonais</button>
+                  <button type="button" disabled={working} onClick={() => void applyLayoutSuggestion("PERIMETRO")}>Ao redor do setor</button>
                 </div>
               </>}
               <div className="parking-map">
-                {sectors.map((sector) => (
-                  <section key={sector.id} style={{ "--sector-color": sector.color } as React.CSSProperties}>
+                {sectors.map((sector) => {
+                  const positioned = hasCustomParkingLayout(sector.spaces);
+                  const positionCanvas = mapEditing || positioned;
+                  return (
+                  <section key={sector.id} className={positionCanvas ? "parking-positioned-sector" : ""} style={{ "--sector-color": sector.color } as React.CSSProperties}>
                     <header>
                       <strong>{sector.name}</strong>
                       {canConfigure && (
@@ -785,9 +890,13 @@ export default function ParkingWorkspace({
                       )}
                     </header>
                     <div
-                      className={mapEditing ? "parking-free-position-canvas" : ""}
+                      className={mapEditing ? "parking-position-canvas parking-free-position-canvas" : positioned ? "parking-position-canvas" : ""}
                       onDragOver={(event) => { if (mapEditing) event.preventDefault(); }}
                       onDrop={dropSpace}
+                      style={positionCanvas ? {
+                        width: `${getParkingCanvasWidth(sector.spaces)}px`,
+                        height: `${getParkingCanvasHeight(sector.spaces)}px`,
+                      } : undefined}
                     >{sector.spaces.map((space) => <button
                       type="button"
                       key={space.id}
@@ -795,12 +904,16 @@ export default function ParkingWorkspace({
                       data-space-id={space.id}
                       onDragStart={() => setDraggedSpace(space.id)}
                       onDragEnd={() => setDraggedSpace(null)}
-                      style={mapEditing ? { left: `${space.posicao_x}px`, top: `${space.posicao_y}px` } : undefined}
+                      onPointerDown={(event) => startPointerMove(event, space.id)}
+                      onPointerMove={continuePointerMove}
+                      onPointerUp={finishPointerMove}
+                      onPointerCancel={finishPointerMove}
+                      style={positionCanvas ? { left: `${space.posicao_x}px`, top: `${space.posicao_y}px` } : undefined}
                       className={`parking-space space-${space.status.toLowerCase()} type-${space.tipo.toLowerCase()}${mapEditing ? " editing" : ""}`}
                       title={`${space.codigo} · ${space.tipo} · ${space.status}`}
                     >{space.codigo}</button>)}</div>
                   </section>
-                ))}
+                )})}
                 <p>ENTRADA / SAÍDA</p>
               </div>
               <div className="parking-legend"><span><i className="free" />Livre</span><span><i className="busy" />Ocupada</span><span><i className="special" />Especial</span></div>
@@ -1034,6 +1147,7 @@ function ParkingMobileExperience({
   working,
   feedback,
   error,
+  onRetry,
   canManage = false,
   onManage,
   onReserve,
@@ -1047,6 +1161,7 @@ function ParkingMobileExperience({
   working: boolean;
   feedback: string;
   error: string;
+  onRetry: () => Promise<void>;
   canManage?: boolean;
   onManage?: () => void;
   onReserve: (values: Record<string, FormDataEntryValue>) => Promise<{ codigo?:string; id?:number; status?:string } | null>;
@@ -1063,8 +1178,9 @@ function ParkingMobileExperience({
   const [recommendedEnd, setRecommendedEnd] = useState(() => toLocalDateTimeInput(new Date(Date.now() + 3 * 60 * 60 * 1000)));
   const [profile, setProfile] = useState({ nomeCompleto:"", email:"", telefone:"", placaVeiculo:"", tipoVeiculo:"CARRO", modeloVeiculo:"", corVeiculo:"" });
   const profileLoaded = useRef(false);
-  const selectedSector = sectors.find((sector) => sector.id === sectorId) || sectors[0] || null;
+  const selectedSector = sectors.find((sector) => sector.id === sectorId) || null;
   const selectedSpace = selectedSector?.spaces.find((space) => space.id === spaceId) || null;
+  const reservationLocked = Boolean(data?.reservationGate && !data.reservationGate.unlocked);
   const activeReservation = useMemo(() => reservations.find((reservation) => ["PENDENTE","CONFIRMADA","CHECKIN"].includes(reservation.status) && reservation.codigo !== dismissedCode) || null, [reservations, dismissedCode]);
   const ticketReservation = activeReservation || reservations.find((reservation) => reservation.codigo === createdCode) || null;
   const ticketCode = ticketReservation?.codigo || createdCode;
@@ -1141,7 +1257,7 @@ function ParkingMobileExperience({
   }
 
   if (loading && !data) return <section className="parking-mobile-app"><div className="parking-mobile-loading"><span className="pilot-loader"/><p>Preparando as vagas…</p></div></section>;
-  if (!data) return <section className="parking-mobile-app"><p className="operations-feedback error">{error || "Não foi possível carregar o estacionamento."}</p></section>;
+  if (!data) return <section className="parking-mobile-app"><div className="parking-mobile-load-error" role="alert"><strong>Não foi possível abrir as vagas.</strong><p>{error || "Confira sua conexão e tente novamente."}</p><button type="button" onClick={() => void onRetry()}>Tentar novamente</button></div></section>;
 
   return <section className={`parking-mobile-app parking-mobile-step-${step}`} style={{"--parking-mobile-accent":"#d5f247"} as React.CSSProperties}>
     <header className="parking-mobile-header">
@@ -1153,6 +1269,12 @@ function ParkingMobileExperience({
     <main className="parking-mobile-main">
       {canManage && <div className="parking-mobile-role"><span>ÁREA INTERNA</span><button type="button" onClick={onManage}>Abrir gestão</button></div>}
       {(feedback || error) && step !== "success" && <p className={`parking-mobile-feedback${error ? " error" : ""}`} role="status">{error || feedback}</p>}
+      {reservationLocked && step !== "success" && data.reservationGate && (
+        <section className="parking-mobile-gate-notice" role="status">
+          <span aria-hidden="true">◷</span>
+          <div><strong>{data.reservationGate.reason === "WAIT_OPENING" ? "Escolha sua vaga antecipadamente" : "Mapa disponível para consulta"}</strong><p>{data.reservationGate.reason === "WAIT_OPENING" ? `Você pode consultar setores e vagas agora. A confirmação será liberada no horário programado para “${data.reservationGate.eventTitle}”.` : "Você pode consultar os setores e o posicionamento das vagas. A reserva será liberada quando houver um evento publicado."}</p></div>
+        </section>
+      )}
 
       {step === "local" && <>
         <p className="parking-mobile-step-label">01 / LOCAL</p>
@@ -1161,13 +1283,20 @@ function ParkingMobileExperience({
         <div className="parking-mobile-sector-list">
           {sectors.map((sector,index) => {
             const free = sector.spaces.filter(isSpaceAvailable).length;
-            const chosen = (sectorId || sectors[0]?.id) === sector.id;
-            return <button key={sector.id} type="button" className={chosen ? "chosen" : ""} onClick={() => setSectorId(sector.id)}>
-              <span className={`parking-mobile-sector-symbol tone-${index%3}`} aria-hidden="true">P</span>
-              <span><strong>{sector.name}</strong><small>{communityName}</small><em>{free} vagas disponíveis</em></span>
-              <i aria-hidden="true"><b/></i>
-            </button>;
+            const chosen = sectorId === sector.id;
+            return <div key={sector.id} className={`parking-mobile-sector-option${chosen ? " chosen" : ""}`}>
+              <button type="button" className={chosen ? "chosen" : ""} onClick={() => { setSectorId(sector.id); setSpaceId(null); }} aria-expanded={chosen}>
+                <span className={`parking-mobile-sector-symbol tone-${index%3}`} aria-hidden="true">P</span>
+                <span><strong>{sector.name}</strong><small>{communityName}</small><em>{free} vagas disponíveis</em></span>
+                <i aria-hidden="true"><b/></i>
+              </button>
+              {chosen && <div className="parking-mobile-sector-preview">
+                <header><strong>Posicionamento das vagas</strong><span>Toque em “Ver vagas” para escolher</span></header>
+                <ParkingMobilePositionMap sector={sector} selectedSpaceId={null} compact />
+              </div>}
+            </div>;
           })}
+          {!sectors.length && <div className="parking-mobile-empty-sectors"><strong>Nenhum setor disponível</strong><p>O responsável ainda não cadastrou vagas neste estacionamento.</p></div>}
         </div>
       </>}
 
@@ -1176,16 +1305,7 @@ function ParkingMobileExperience({
         <h1>Escolha o seu<br/><em>lugar.</em></h1>
         <p className="parking-mobile-location">⌖ {selectedSector.name} · {communityName}</p>
         <div className="parking-mobile-legend"><span><i className="free"/>Livre</span><span><i className="reserved"/>Reservada</span><span><i className="busy"/>Ocupada</span><span><i className="selected"/>Sua escolha</span></div>
-        <section className="parking-mobile-map" aria-label={`Vagas do ${selectedSector.name}`}>
-          <div className="parking-mobile-entrance">ENTRADA <span>↓</span></div>
-          <div className="parking-mobile-lane">ACESSO</div>
-          <div className="parking-mobile-spots">{selectedSector.spaces.map((space) => {
-            const free = isSpaceAvailable(space);
-            const reserved = Boolean(space.reservada);
-            return <button key={space.id} type="button" disabled={!free} className={`${free ? "free" : reserved ? "reserved" : "busy"}${spaceId === space.id ? " selected" : ""}`} title={`${space.codigo} · ${free ? "Livre" : reserved ? "Reservada" : "Ocupada"}`} onClick={() => setSpaceId(space.id)} aria-pressed={spaceId === space.id}><span aria-hidden="true">▰</span><small>{space.codigo}</small>{reserved && <b>R</b>}</button>;
-          })}</div>
-          <div className="parking-mobile-exit">SAÍDA <span>↑</span></div>
-        </section>
+        <ParkingMobilePositionMap sector={selectedSector} selectedSpaceId={spaceId} onSelect={setSpaceId} />
         {selectedSpace && <div className="parking-mobile-selection"><span>▦</span><div><small>VAGA SELECIONADA</small><strong>{selectedSpace.codigo}</strong></div><b>{selectedSector.name}</b></div>}
       </>}
 
@@ -1238,55 +1358,51 @@ function ParkingMobileExperience({
       </>}
     </main>
 
-    {step === "local" && <footer className="parking-mobile-action"><button type="button" className="parking-mobile-primary" disabled={!selectedSector} onClick={() => setStep("space")}>Escolher vaga <span>›</span></button></footer>}
-    {step === "space" && <footer className="parking-mobile-action"><button type="button" className="parking-mobile-primary" disabled={!selectedSpace} onClick={() => setStep("details")}>Continuar <span>›</span></button></footer>}
+    {step === "local" && <footer className="parking-mobile-action"><button type="button" className="parking-mobile-primary" disabled={!selectedSector} onClick={() => setStep("space")}>{selectedSector ? "Ver vagas do setor" : "Selecione um setor"} <span>›</span></button></footer>}
+    {step === "space" && <footer className="parking-mobile-action"><button type="button" className="parking-mobile-primary" disabled={!selectedSpace || reservationLocked} onClick={() => setStep("details")}>{reservationLocked ? "Reserva ainda não liberada" : "Continuar"} <span>›</span></button></footer>}
   </section>;
 }
 
-function ParkingReservationGate({
-  communityName,
-  gate,
+function ParkingMobilePositionMap({
+  sector,
+  selectedSpaceId,
+  onSelect,
+  compact = false,
 }: {
-  communityName: string;
-  gate: NonNullable<ParkingData["reservationGate"]>;
+  sector: ParkingSector;
+  selectedSpaceId: number | null;
+  onSelect?: (spaceId: number) => void;
+  compact?: boolean;
 }) {
-  const waiting = gate.reason === "WAIT_OPENING";
-  return (
-    <section className="parking-reservation-gate">
-      <span className="parking-mobile-logo" aria-hidden="true">V</span>
-      <p className="pilot-kicker">ESTACIONAMENTO · {communityName}</p>
-      <h1>{waiting ? "Reserva programada" : "Aguardando próximo evento"}</h1>
-      <p>
-        {waiting
-          ? `As reservas para “${gate.eventTitle}” serão liberadas automaticamente no horário informado.`
-          : "A reserva será liberada quando houver um evento publicado."}
-      </p>
-      <dl>
-        <div><dt>Evento</dt><dd>{gate.eventStartsAt ? formatTime(gate.eventStartsAt) : "A definir"}</dd></div>
-        <div><dt>Escalas abrem</dt><dd>{gate.schedulesOpenAt ? formatTime(gate.schedulesOpenAt) : "Ao publicar"}</dd></div>
-        <div><dt>Reservas abrem</dt><dd>{gate.reservationsOpenAt ? formatTime(gate.reservationsOpenAt) : "Ao publicar"}</dd></div>
-      </dl>
-      {!gate.eventAvailable && <a href="/painel?view=eventos">Ver Eventos</a>}
-      {waiting && gate.reservationsOpenAt && <ParkingOpeningCountdown opensAt={gate.reservationsOpenAt} />}
-    </section>
-  );
-}
-
-function ParkingOpeningCountdown({ opensAt }: { opensAt: string }) {
-  const [remaining, setRemaining] = useState(() => Math.max(0, Date.parse(opensAt) - Date.now()));
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      const next = Math.max(0, Date.parse(opensAt) - Date.now());
-      setRemaining(next);
-      if (!next) window.location.reload();
-    }, 1_000);
-    return () => window.clearInterval(timer);
-  }, [opensAt]);
-  const total = Math.ceil(remaining / 1_000);
-  const hours = Math.floor(total / 3_600);
-  const minutes = Math.floor((total % 3_600) / 60);
-  const seconds = total % 60;
-  return <strong className="parking-opening-countdown" aria-live="polite">{hours}h {minutes}min {seconds}s</strong>;
+  const positioned = hasCustomParkingLayout(sector.spaces);
+  const width = getParkingCanvasWidth(sector.spaces);
+  const height = getParkingCanvasHeight(sector.spaces);
+  return <section className={`parking-mobile-map parking-mobile-position-map${compact ? " compact" : ""}`} aria-label={`Posicionamento das vagas do ${sector.name}`}>
+    <div className="parking-mobile-entrance">ENTRADA <span>↓</span></div>
+    <div className="parking-mobile-lane">ACESSO</div>
+    <div
+      className={`parking-mobile-layout-canvas${positioned ? " positioned" : " fallback-grid"}`}
+      style={positioned ? { "--parking-layout-ratio": String(width / height) } as React.CSSProperties : undefined}
+    >{sector.spaces.map((space) => {
+      const free = isSpaceAvailable(space);
+      const reserved = Boolean(space.reservada);
+      const style = positioned ? {
+        left: `${(space.posicao_x / width) * 100}%`,
+        top: `${(space.posicao_y / height) * 100}%`,
+      } : undefined;
+      return <button
+        key={space.id}
+        type="button"
+        disabled={!free || !onSelect}
+        className={`${free ? "free" : reserved ? "reserved" : "busy"}${selectedSpaceId === space.id ? " selected" : ""}`}
+        title={`${space.codigo} · ${free ? "Livre" : reserved ? "Reservada" : "Ocupada"}`}
+        onClick={() => free && onSelect?.(space.id)}
+        aria-pressed={onSelect ? selectedSpaceId === space.id : undefined}
+        style={style}
+      ><span aria-hidden="true">▰</span><small>{space.codigo}</small>{reserved && <b>R</b>}</button>;
+    })}</div>
+    <div className="parking-mobile-exit">SAÍDA <span>↑</span></div>
+  </section>;
 }
 
 async function readJson<T>(response: Response) {
@@ -1352,4 +1468,20 @@ function formatTime(value: string) {
 
 function isSpaceAvailable(space: Space) {
   return space.status === "LIVRE" && !Boolean(space.reservada);
+}
+
+function hasCustomParkingLayout(spaces: Space[]) {
+  if (!spaces.length) return false;
+  const positions = new Set(spaces.map((space) => `${space.posicao_x}:${space.posicao_y}`));
+  return positions.size > 1 || spaces.some((space) => space.posicao_x > 0 || space.posicao_y > 0);
+}
+
+function getParkingCanvasWidth(spaces: Space[]) {
+  const furthest = Math.max(0, ...spaces.map((space) => Number(space.posicao_x) || 0));
+  return Math.max(360, Math.min(1200, furthest + 76));
+}
+
+function getParkingCanvasHeight(spaces: Space[]) {
+  const furthest = Math.max(0, ...spaces.map((space) => Number(space.posicao_y) || 0));
+  return Math.max(220, Math.min(720, furthest + 58));
 }

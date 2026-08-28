@@ -19,12 +19,16 @@ export async function GET() {
   const reservationsOpenAt = gateEvent?.reservas_abrem_em ? String(gateEvent.reservas_abrem_em) : null;
   const eventAvailable = Boolean(gateEvent);
   const unlocked = eventAvailable && (!reservationsOpenAt || Date.parse(reservationsOpenAt) <= Date.now());
-  const eventStartsAt = Date.parse(String(gateEvent?.inicia_em || ""));
-  const eventEndsAt = Date.parse(String(gateEvent?.termina_em || gateEvent?.inicia_em || ""));
-  const reservationWindowStart = unlocked ? new Date(eventStartsAt - (4 * 60 * 60 * 1000)).toISOString() : "1970-01-01T00:00:00.000Z";
-  const reservationWindowEnd = unlocked ? new Date(eventEndsAt + (4 * 60 * 60 * 1000)).toISOString() : "1970-01-01T00:00:00.000Z";
-  const spaces = unlocked
-    ? await db.prepare(`SELECT v.id,v.codigo,v.tipo,v.status,v.posicao_x,v.posicao_y,
+  const parsedEventStart = Date.parse(String(gateEvent?.inicia_em || ""));
+  const parsedEventEnd = Date.parse(String(gateEvent?.termina_em || gateEvent?.inicia_em || ""));
+  const now = Date.now();
+  const eventStartsAt = Number.isFinite(parsedEventStart) ? parsedEventStart : now;
+  const eventEndsAt = Number.isFinite(parsedEventEnd) ? parsedEventEnd : eventStartsAt + (2 * 60 * 60 * 1000);
+  const reservationWindowStart = new Date((eventAvailable ? eventStartsAt : now) - (4 * 60 * 60 * 1000)).toISOString();
+  const reservationWindowEnd = new Date((eventAvailable ? eventEndsAt : now) + (4 * 60 * 60 * 1000)).toISOString();
+  // O mapa permanece consultável mesmo antes da abertura das reservas. A
+  // trava continua sendo informada por reservationGate e aplicada na UI.
+  const spaces = await db.prepare(`SELECT v.id,v.codigo,v.tipo,v.status,v.posicao_x,v.posicao_y,
         s.id AS setor_id,s.nome AS setor_nome,s.cor AS setor_cor,s.ordem,
         EXISTS(SELECT 1 FROM estacionamento_reservas r
           WHERE r.comunidade_id=v.comunidade_id AND r.vaga_id=v.id
@@ -34,13 +38,12 @@ export async function GET() {
         JOIN estacionamento_setores s ON s.id=v.setor_id AND s.comunidade_id=v.comunidade_id
         WHERE v.comunidade_id=? AND v.ativo=1 AND s.ativo=1
         ORDER BY s.ordem,s.nome,v.posicao_y,v.posicao_x,v.codigo`)
-      .bind(reservationWindowEnd,reservationWindowStart,access.context.comunidadeId).all<Record<string,unknown>>()
-    : { results: [] as Record<string,unknown>[] };
+      .bind(reservationWindowEnd,reservationWindowStart,access.context.comunidadeId).all<Record<string,unknown>>();
   const availableSpaces = spaces.results.filter((space) => String(space.status) === "LIVRE" && !Boolean(space.reservada)).length;
   return Response.json({
     config:{ ...config, ...rules, responsavel:null, atualizado_por_nome:null },
     stats:{ total:Number(stats?.total||0), ocupadas:Number(stats?.ocupadas||0), livres:availableSpaces, especiais:Number(stats?.especiais||0) },
-    vagas:unlocked ? spaces.results : [],
+    vagas:spaces.results,
     movimentacoes:[], ocorrencias:[], availableUsers:[],
     operator:{ id:access.user.id,nome:access.user.nome,email:access.user.email,papel:access.context.papel,origemAcesso:"MEMBRO",escala:null },
     permissions:access.context.permissions,

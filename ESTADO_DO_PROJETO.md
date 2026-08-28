@@ -3,7 +3,7 @@
 ## Identificação
 
 - **Versão-base:** V4.7.3, com a Reforma Oficial do VÍNKULO, os ajustes operacionais V4.7.4 e a otimização global segura autorizada em 13/08/2026.
-- **Data da última análise:** 13/08/2026.
+- **Data da última análise:** 28/08/2026.
 - **Estado deste documento:** vigente. Decisões históricas incompatíveis foram removidas deste arquivo.
 - **Publicação automática do Site:** autorizada pelo proprietário para grupos completos que tenham build, testes e evidências aprovados; uma etapa com falha não pode ser publicada.
 - **Regra global:** toda evolução funcional vale para comunidades existentes e futuras, exceto quando o proprietário solicitar explicitamente uma exceção.
@@ -158,6 +158,12 @@
 
 ## Último bloco concluído
 
+- Reforma móvel do estacionamento de 28/08/2026: a seleção de um setor passou a revelar imediatamente o posicionamento persistido das vagas; o mesmo mapa real é reutilizado na escolha da vaga, com estados livre, reservada, ocupada e selecionada.
+- A tela “Onde você quer parar?” permanece consultável mesmo antes da abertura da reserva ou na ausência de evento publicado. A confirmação continua bloqueada até a janela autorizada, e falhas de carregamento oferecem nova tentativa sem deixar a superfície inacessível.
+- O editor do mapa passou de arraste dependente de mouse para Pointer Events com captura de toque, atualização visual imediata e persistência sem recarregar todo o módulo após cada movimento. Foram acrescentadas sugestões de vagas diagonais e ao redor do setor.
+- A remoção de pessoas recebeu folha móvel legível, confirmação controlada por `REMOVER`, botão destrutivo explícito, prioridade visual acima da Ajuda e atualização local da lista após sucesso, preservando auditoria e históricos.
+- Validação estrutural deste bloco: lint dos arquivos alterados sem erros, `git diff --check` aprovado e **11/11 regressões direcionadas aprovadas**, incluindo estacionamento móvel, posições por toque, acesso à seleção e remoção protegida.
+
 - Auditoria-base de 13/08/2026: build e artefato aprovados, 100 testes automatizados sem falhas e lint sem erros. Foi identificada como divergência crítica a permissão de Continuidade herdada por Pastor e Administrador, além de ferramentas globais ainda acessíveis por endereço do painel comunitário.
 - A política de Continuidade passou a derivar do vínculo real `comunidades.proprietario_usuario_id`, preservando supervisão do proprietário global e removendo a autorização automática por cargo.
 - IA Editorial e Estatísticas foram transferidas integralmente para a Área do Proprietário; os endereços antigos do painel comunitário deixam de ser destinos válidos.
@@ -239,6 +245,7 @@
 - `app/components/VerifiedOwnerName.tsx`, `CommunityHome.tsx`, `PilotDashboard.tsx`, `CommunityPresencePanel.tsx`, `PeopleWorkspace.tsx` e `OwnerWorkspace.tsx`.
 - APIs de publicações, comentários, pessoas, presença e escalas, com identificação retrocompatível do proprietário.
 - `app/components/ParkingWorkspace.tsx` e `app/api/pilot/estacionamento/mapa/route.ts`.
+- `app/api/pilot/estacionamento/disponibilidade/route.ts` e `tests/v179-parking-touch-and-removal.test.mjs`.
 - `app/components/PeopleWorkspace.tsx`, `EventsWorkspace.tsx`, `RequestsWorkspace.tsx` e `PilotNotificationCenter.tsx`.
 - `app/api/pilot/escalas/route.ts` (telefone disponível exclusivamente para gestores da escala).
 - `app/api/pilot/escalas/route.ts` (validação de equipe alinhada à coluna persistida `ativa`).
