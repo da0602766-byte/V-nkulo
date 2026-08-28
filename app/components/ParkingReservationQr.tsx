@@ -45,10 +45,13 @@ export function ParkingReservationQr({
   }, [code]);
 
   useEffect(() => {
-    setRemaining(remainingMs(expiresAt));
-    if (!expiresAt) return;
+    const initial = window.setTimeout(() => setRemaining(remainingMs(expiresAt)), 0);
+    if (!expiresAt) return () => window.clearTimeout(initial);
     const timer = window.setInterval(() => setRemaining(remainingMs(expiresAt)), 1_000);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearTimeout(initial);
+      window.clearInterval(timer);
+    };
   }, [expiresAt]);
 
   return (
@@ -114,6 +117,8 @@ export function ParkingQrCheckin({
   const frameRef = useRef<number | null>(null);
   const foundRef = useRef(false);
   const decoderRef = useRef<typeof import("jsqr").default | null>(null);
+  const startCameraRef = useRef<(preserveMessage?: boolean) => Promise<void>>(async () => undefined);
+  const readFrameRef = useRef<() => void>(() => undefined);
 
   const stopCamera = useCallback(() => {
     if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
@@ -129,12 +134,12 @@ export function ParkingQrCheckin({
   useEffect(() => {
     if (!open) return;
     if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraPermission("unsupported");
-      return;
+      const timer = window.setTimeout(() => setCameraPermission("unsupported"), 0);
+      return () => window.clearTimeout(timer);
     }
     if (!("permissions" in navigator)) {
-      setCameraPermission("prompt");
-      return;
+      const timer = window.setTimeout(() => setCameraPermission("prompt"), 0);
+      return () => window.clearTimeout(timer);
     }
     let active = true;
     let removeListener: () => void = () => undefined;
@@ -170,11 +175,11 @@ export function ParkingQrCheckin({
       }
       if (accepted === false) {
         setMessage("Não foi possível liberar esta reserva. Confira o motivo informado e tente o próximo QR Code.");
-        window.setTimeout(() => void startCamera(true), 1700);
+        window.setTimeout(() => void startCameraRef.current(true), 1700);
         return;
       }
       setMessage("QR Code autenticado. Entrada liberada — o leitor continuará aberto para a próxima reserva.");
-      window.setTimeout(() => void startCamera(true), 1300);
+      window.setTimeout(() => void startCameraRef.current(true), 1300);
     } finally {
       setProcessing(false);
       foundRef.current = false;
@@ -185,13 +190,13 @@ export function ParkingQrCheckin({
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas || foundRef.current || video.readyState < 2) {
-      frameRef.current = window.requestAnimationFrame(readFrame);
+      frameRef.current = window.requestAnimationFrame(readFrameRef.current);
       return;
     }
     const width = video.videoWidth;
     const height = video.videoHeight;
     if (!width || !height) {
-      frameRef.current = window.requestAnimationFrame(readFrame);
+      frameRef.current = window.requestAnimationFrame(readFrameRef.current);
       return;
     }
     canvas.width = width;
@@ -206,8 +211,12 @@ export function ParkingQrCheckin({
         return;
       }
     }
-    frameRef.current = window.requestAnimationFrame(readFrame);
+    frameRef.current = window.requestAnimationFrame(readFrameRef.current);
   }, [submitCode]);
+
+  useEffect(() => {
+    readFrameRef.current = readFrame;
+  }, [readFrame]);
 
   async function startCamera(preserveMessage = false) {
     if (!preserveMessage) setMessage("");
@@ -254,6 +263,10 @@ export function ParkingQrCheckin({
         : "Não foi possível abrir a câmera. Você ainda pode digitar o código da reserva.");
     }
   }
+
+  useEffect(() => {
+    startCameraRef.current = startCamera;
+  });
 
   function openScanner() {
     setOpen(true);

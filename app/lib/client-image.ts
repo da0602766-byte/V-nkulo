@@ -10,7 +10,8 @@ type ImagePurpose =
   | "post-image"
   | "profile-photo"
   | "platform-logo"
-  | "platform-feed-banner";
+  | "platform-feed-banner"
+  | "feedback-evidence";
 
 const LARGE_BACKGROUNDS = new Set<ImagePurpose>([
   "community-banner",

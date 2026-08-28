@@ -945,11 +945,12 @@ export function VisitorsWorkspace({
     return sortDirection === "asc" ? comparison : -comparison;
   });
 
-  useEffect(() => {
+  function changeVision(vision: VisitorVision) {
+    setActiveVision(vision);
     setSelectedRows([]);
     setSelectedId(null);
     setFollowups([]);
-  }, [activeVision]);
+  }
 
   return (
     <section className="visitor-workspace-redesign">
@@ -1237,7 +1238,7 @@ export function VisitorsWorkspace({
               key={vision}
               className={activeVision === vision ? "active" : ""}
               aria-current={activeVision === vision ? "page" : undefined}
-              onClick={() => setActiveVision(vision)}
+              onClick={() => changeVision(vision)}
             >
               <span>{label}</span><b>{counts[vision]}</b>
             </button>

@@ -1,4 +1,5 @@
 import { getD1 } from "../../../db";
+import { getRuntimeEnv } from "../../../db/runtime-env";
 import { DEFAULT_COMMUNITY_THEME } from "../../lib/community-theme";
 import { getSessionUser, isSystemOwnerAccount } from "../../lib/local-auth";
 import { createSystemNotification } from "../../lib/system-notifications";
@@ -56,7 +57,7 @@ export async function GET() {
   if ("error" in access) return access.error;
   const db = getD1();
   await purgeExpiredAudit(db);
-  const [metrics, requests, communities, users, audit, ownerLayout] = await Promise.all([
+  const [metrics, requests, communities, users, audit, feedback, ownerLayout] = await Promise.all([
     db
       .prepare(
         `SELECT
@@ -65,6 +66,8 @@ export async function GET() {
           (SELECT COUNT(*) FROM ministerios_comunidade WHERE status = 'ATIVO') AS ministerios_ativos,
           (SELECT COUNT(*) FROM solicitacoes_criacao_comunidade
             WHERE status IN ('PENDENTE', 'EM_ANALISE')) AS solicitacoes_pendentes,
+          (SELECT COUNT(*) FROM feedback_plataforma
+            WHERE status = 'PENDENTE') AS feedback_pendentes,
           (SELECT COUNT(*) FROM eventos_comunidade
             WHERE status = 'PUBLICADO' AND datetime(inicia_em) >= datetime('now')) AS eventos_futuros,
           (SELECT COUNT(*) FROM conversas_privadas
@@ -124,6 +127,26 @@ export async function GET() {
       )
       .all<Record<string, unknown>>(),
     db
+      .prepare(
+        `SELECT f.id, f.usuario_id, f.comunidade_id, f.tipo, f.categoria,
+          f.mensagem, f.pagina, f.entidade_tipo, f.entidade_id,
+          f.imagem_chave, f.imagem_nome, f.status, f.resposta_proprietario,
+          f.respondido_por, f.respondido_em, f.arquivado_em,
+          f.criado_em, f.atualizado_em,
+          u.nome AS usuario_nome, u.email AS usuario_email,
+          c.nome AS comunidade_nome, r.nome AS respondido_por_nome
+         FROM feedback_plataforma f
+         JOIN usuarios u ON u.id = f.usuario_id
+         LEFT JOIN comunidades c ON c.id = f.comunidade_id
+         LEFT JOIN usuarios r ON r.id = f.respondido_por
+         ORDER BY CASE f.status
+           WHEN 'PENDENTE' THEN 0 WHEN 'EM_ANALISE' THEN 1
+           WHEN 'RESPONDIDO' THEN 2 ELSE 3 END,
+           f.criado_em DESC, f.id DESC
+         LIMIT 500`,
+      )
+      .all<Record<string, unknown>>(),
+    db
       .prepare("SELECT valor FROM configuracoes WHERE chave = 'owner_dashboard_layout' LIMIT 1")
       .first<{ valor: string }>(),
   ]);
@@ -135,6 +158,7 @@ export async function GET() {
       communities: communities.results,
       users: users.results,
       audit: audit.results,
+      feedback: feedback.results,
       auditRetention: {
         days: AUDIT_RETENTION_DAYS,
         visibleLimit: OWNER_AUDIT_VISIBLE_LIMIT,
@@ -156,6 +180,92 @@ export async function PATCH(request: Request) {
   }
   const action = String(payload.action || "").toUpperCase();
   const db = getD1();
+
+  if (["FEEDBACK_EM_ANALISE", "FEEDBACK_RESPONDER", "FEEDBACK_ARQUIVAR", "FEEDBACK_REABRIR", "FEEDBACK_EXCLUIR"].includes(action)) {
+    const feedbackId = Number(payload.feedbackId || 0);
+    if (!Number.isInteger(feedbackId) || feedbackId <= 0) {
+      return Response.json({ error: "Mensagem inválida." }, { status: 400 });
+    }
+    const item = await db.prepare(
+      `SELECT id, usuario_id, comunidade_id, tipo, categoria, mensagem,
+        imagem_chave, status
+       FROM feedback_plataforma WHERE id = ? LIMIT 1`,
+    ).bind(feedbackId).first<{
+      id: number;
+      usuario_id: number;
+      comunidade_id: number | null;
+      tipo: string;
+      categoria: string;
+      mensagem: string;
+      imagem_chave: string;
+      status: string;
+    }>();
+    if (!item) return Response.json({ error: "Mensagem não encontrada." }, { status: 404 });
+
+    if (action === "FEEDBACK_EXCLUIR") {
+      if (item.imagem_chave) {
+        const bucket = getRuntimeEnv().BUCKET;
+        if (!bucket) return Response.json({ error: "O armazenamento da foto está indisponível." }, { status: 503 });
+        await bucket.delete(item.imagem_chave);
+      }
+      await db.batch([
+        db.prepare("DELETE FROM feedback_plataforma WHERE id = ?").bind(feedbackId),
+        db.prepare(
+          `INSERT INTO auditoria_piloto
+           (comunidade_id, usuario_id, evento, resultado, metadados)
+           VALUES (?, ?, 'FEEDBACK_PLATAFORMA_EXCLUIDO', 'SUCESSO', ?)`,
+        ).bind(item.comunidade_id, access.user.id, JSON.stringify({ feedbackId, tipo: item.tipo, categoria: item.categoria })),
+      ]);
+      return Response.json({ ok: true, deleted: true });
+    }
+
+    if (action === "FEEDBACK_RESPONDER") {
+      const resposta = clean(payload.resposta, 2000);
+      if (resposta.length < 2) return Response.json({ error: "Escreva uma resposta." }, { status: 400 });
+      await db.batch([
+        db.prepare(
+          `UPDATE feedback_plataforma
+           SET status = 'RESPONDIDO', resposta_proprietario = ?, respondido_por = ?,
+             respondido_em = CURRENT_TIMESTAMP, arquivado_em = NULL,
+             atualizado_em = CURRENT_TIMESTAMP
+           WHERE id = ?`,
+        ).bind(resposta, access.user.id, feedbackId),
+        db.prepare(
+          `INSERT INTO auditoria_piloto
+           (comunidade_id, usuario_id, evento, resultado, metadados)
+           VALUES (?, ?, 'FEEDBACK_PLATAFORMA_RESPONDIDO', 'SUCESSO', ?)`,
+        ).bind(item.comunidade_id, access.user.id, JSON.stringify({ feedbackId, tipo: item.tipo })),
+      ]);
+      await createSystemNotification(db, {
+        tipo: "NOVO",
+        titulo: "Resposta do Proprietário",
+        mensagem: resposta,
+        area: "MENU",
+        entidadeId: feedbackId,
+        usuarioId: item.usuario_id,
+        comunidadeId: item.comunidade_id,
+        remetenteUsuarioId: access.user.id,
+        destinoRota: "/painel",
+        criadoPor: access.user.email,
+      });
+      return Response.json({ ok: true, status: "RESPONDIDO" });
+    }
+
+    const status = action === "FEEDBACK_EM_ANALISE" ? "EM_ANALISE" : action === "FEEDBACK_ARQUIVAR" ? "ARQUIVADO" : "PENDENTE";
+    await db.batch([
+      db.prepare(
+        `UPDATE feedback_plataforma
+         SET status = ?, arquivado_em = CASE WHEN ? = 'ARQUIVADO' THEN CURRENT_TIMESTAMP ELSE NULL END,
+           atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`,
+      ).bind(status, status, feedbackId),
+      db.prepare(
+        `INSERT INTO auditoria_piloto
+         (comunidade_id, usuario_id, evento, resultado, metadados)
+         VALUES (?, ?, ?, 'SUCESSO', ?)`,
+      ).bind(item.comunidade_id, access.user.id, `FEEDBACK_PLATAFORMA_${status}`, JSON.stringify({ feedbackId, status })),
+    ]);
+    return Response.json({ ok: true, status });
+  }
 
   if (action === "ATUALIZAR_LAYOUT_PROPRIETARIO") {
     const gridPreset = String(payload.gridPreset || "");

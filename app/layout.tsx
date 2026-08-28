@@ -4,6 +4,7 @@ import "./globals.css";
 import "./secretary.css";
 import SmartScrollHeader from "./components/SmartScrollHeader";
 import MobileAppInstall from "./components/MobileAppInstall";
+import GlobalFeedbackLauncher from "./components/GlobalFeedbackLauncher";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -72,6 +73,7 @@ export default function RootLayout({
       >
         <SmartScrollHeader />
         {children}
+        <GlobalFeedbackLauncher />
         <MobileAppInstall />
       </body>
     </html>

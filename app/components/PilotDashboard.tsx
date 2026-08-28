@@ -208,28 +208,34 @@ export default function PilotDashboard({
   const [unreadMessages, setUnreadMessages] = useState(0);
 
   useEffect(() => {
-    try {
-      setSidebarCollapsed(window.localStorage.getItem("vinkulo:sidebar-collapsed") === "true");
-    } catch {
-      // O menu continua expandido quando o armazenamento do navegador não está disponível.
-    }
+    const initial = window.setTimeout(() => {
+      try {
+        setSidebarCollapsed(window.localStorage.getItem("vinkulo:sidebar-collapsed") === "true");
+      } catch {
+        // O menu continua expandido quando o armazenamento do navegador não está disponível.
+      }
+    }, 0);
+    return () => window.clearTimeout(initial);
   }, []);
 
   useEffect(() => {
-    try {
-      const individualKey = `vinkulo:font-scale:${userEmail.trim().toLowerCase()}`;
-      const saved = Number(
-        window.localStorage.getItem(individualKey) ??
-        window.localStorage.getItem("vinkulo:font-scale"),
-      );
-      if (Number.isFinite(saved)) {
-        setFontScale(Math.min(MAX_FONT_SCALE, Math.max(MIN_FONT_SCALE, Math.round(saved * 100) / 100)));
+    const initial = window.setTimeout(() => {
+      try {
+        const individualKey = `vinkulo:font-scale:${userEmail.trim().toLowerCase()}`;
+        const saved = Number(
+          window.localStorage.getItem(individualKey) ??
+          window.localStorage.getItem("vinkulo:font-scale"),
+        );
+        if (Number.isFinite(saved)) {
+          setFontScale(Math.min(MAX_FONT_SCALE, Math.max(MIN_FONT_SCALE, Math.round(saved * 100) / 100)));
+        }
+      } catch {
+        // Mantém o tamanho padrão quando a preferência local não está disponível.
+      } finally {
+        setFontScaleHydrated(true);
       }
-    } catch {
-      // Mantém o tamanho padrão quando a preferência local não está disponível.
-    } finally {
-      setFontScaleHydrated(true);
-    }
+    }, 0);
+    return () => window.clearTimeout(initial);
   }, [userEmail]);
 
   useEffect(() => {

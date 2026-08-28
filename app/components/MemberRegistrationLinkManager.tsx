@@ -55,7 +55,10 @@ export default function MemberRegistrationLinkManager() {
       setLoading(false);
     }
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const initial = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(initial);
+  }, [load]);
 
   async function createLink(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

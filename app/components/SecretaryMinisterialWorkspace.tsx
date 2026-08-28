@@ -573,7 +573,8 @@ export default function SecretaryMinisterialWorkspace({
       setError("Etapa 1 — escolha um responsável antes de publicar.");
       return;
     }
-    if (body.status === "AGENDADA" && (!body.publicarEm || Date.parse(String(body.publicarEm)) <= Date.now())) {
+    const submittedAt = performance.timeOrigin + event.timeStamp;
+    if (body.status === "AGENDADA" && (!body.publicarEm || Date.parse(String(body.publicarEm)) <= submittedAt)) {
       setError("Etapa 5 — escolha um horário futuro para publicar a escala.");
       return;
     }

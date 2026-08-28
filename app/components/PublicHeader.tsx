@@ -93,11 +93,15 @@ export default async function PublicHeader({
                     <small>{user.email}</small>
                   </div>
                 </header>
-                <Link href={user.system_owner ? "/proprietario" : "/painel"}>
+                <Link
+                  href={user.system_owner ? "/proprietario" : "/painel"}
+                  showLoading
+                  loadingLabel={user.system_owner ? "Abrindo a Área do proprietário…" : "Abrindo seu painel…"}
+                >
                   <PublicIcon name="home" size={18} />
                   {user.system_owner ? "Área do proprietário" : "Abrir meu painel"}
                 </Link>
-                <Link href="/painel">
+                <Link href="/painel" showLoading loadingLabel="Abrindo sua comunidade…">
                   <PublicIcon name="community" size={18} />
                   Minha comunidade
                 </Link>

@@ -1084,11 +1084,14 @@ function ParkingMobileExperience({
 
   useEffect(() => {
     if (!activeReservation || step !== "local") return;
-    const sector = sectors.find((item) => item.spaces.some((space) => space.id === activeReservation.vaga_id));
-    if (sector) setSectorId(sector.id);
-    setSpaceId(activeReservation.vaga_id);
-    setCreatedCode(activeReservation.codigo || "");
-    setStep("success");
+    const timer = window.setTimeout(() => {
+      const sector = sectors.find((item) => item.spaces.some((space) => space.id === activeReservation.vaga_id));
+      if (sector) setSectorId(sector.id);
+      setSpaceId(activeReservation.vaga_id);
+      setCreatedCode(activeReservation.codigo || "");
+      setStep("success");
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [activeReservation, sectors, step]);
 
   useEffect(() => {

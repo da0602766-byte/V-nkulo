@@ -99,13 +99,16 @@ export default function PilotNotificationCenter() {
   }, [showUnreadOnDevice]);
 
   useEffect(() => {
-    if (!("Notification" in window) || !("serviceWorker" in navigator)) {
-      permissionRef.current = "unsupported";
-      setDevicePermission("unsupported");
-      return;
-    }
-    permissionRef.current = Notification.permission;
-    setDevicePermission(Notification.permission);
+    const initial = window.setTimeout(() => {
+      if (!("Notification" in window) || !("serviceWorker" in navigator)) {
+        permissionRef.current = "unsupported";
+        setDevicePermission("unsupported");
+        return;
+      }
+      permissionRef.current = Notification.permission;
+      setDevicePermission(Notification.permission);
+    }, 0);
+    return () => window.clearTimeout(initial);
   }, []);
 
   useEffect(() => {

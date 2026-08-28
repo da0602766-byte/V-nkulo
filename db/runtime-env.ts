@@ -13,6 +13,7 @@ export type R2BucketBinding = {
     body: ReadableStream;
     httpMetadata?: { contentType?: string };
   } | null>;
+  delete(key: string): Promise<unknown>;
 };
 
 type RuntimeBindings = {

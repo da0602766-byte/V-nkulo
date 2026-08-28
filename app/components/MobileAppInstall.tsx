@@ -41,18 +41,20 @@ export default function MobileAppInstall() {
       return true;
     };
 
-    if (!refreshVisibility()) return;
-    const android = isAndroidMobile();
-    setAndroidDevice(android);
-    if (android) setVisible(true);
+    const initial = window.setTimeout(() => {
+      if (!refreshVisibility()) return;
+      const android = isAndroidMobile();
+      setAndroidDevice(android);
+      if (android) setVisible(true);
+      if (isAppleMobile()) setVisible(true);
+    }, 0);
 
-    const onBeforeInstall = (event: Event) => {
+    window.addEventListener("beforeinstallprompt", onBeforeInstall);
+    function onBeforeInstall(event: Event) {
       event.preventDefault();
       setInstallEvent(event as InstallPromptEvent);
       setVisible(true);
-    };
-
-    window.addEventListener("beforeinstallprompt", onBeforeInstall);
+    }
     const onInstalled = () => {
       window.localStorage.setItem("vinkulo-app-installed", "1");
       setVisible(false);
@@ -63,13 +65,12 @@ export default function MobileAppInstall() {
     // confirma que a página pode ser instalada. Isso evita exibi-lo dentro do
     // aplicativo já instalado. No iOS, onde esse evento não existe, mostramos
     // as instruções apenas no Safari móvel e fora do modo standalone.
-    if (isAppleMobile()) setVisible(true);
-
     if ("serviceWorker" in navigator) {
       void navigator.serviceWorker.register("/sw.js", { scope: "/" });
     }
 
     return () => {
+      window.clearTimeout(initial);
       window.removeEventListener("beforeinstallprompt", onBeforeInstall);
       window.removeEventListener("appinstalled", onInstalled);
       window.removeEventListener("pageshow", refreshVisibility);

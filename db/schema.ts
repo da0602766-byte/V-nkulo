@@ -2661,3 +2661,38 @@ export const layoutsInterfaceHistorico = sqliteTable(
     ),
   ],
 );
+
+export const feedbackPlataforma = sqliteTable(
+  "feedback_plataforma",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    usuarioId: integer("usuario_id")
+      .notNull()
+      .references(() => usuarios.id, { onDelete: "restrict" }),
+    comunidadeId: integer("comunidade_id").references(() => comunidades.id, {
+      onDelete: "set null",
+    }),
+    tipo: text("tipo").notNull(),
+    categoria: text("categoria").notNull(),
+    mensagem: text("mensagem").notNull(),
+    pagina: text("pagina").notNull().default(""),
+    entidadeTipo: text("entidade_tipo").notNull().default(""),
+    entidadeId: integer("entidade_id"),
+    imagemChave: text("imagem_chave").notNull().default(""),
+    imagemNome: text("imagem_nome").notNull().default(""),
+    status: text("status").notNull().default("PENDENTE"),
+    respostaProprietario: text("resposta_proprietario").notNull().default(""),
+    respondidoPor: integer("respondido_por").references(() => usuarios.id, {
+      onDelete: "set null",
+    }),
+    respondidoEm: text("respondido_em"),
+    arquivadoEm: text("arquivado_em"),
+    criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+    atualizadoEm: text("atualizado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("feedback_plataforma_status_idx").on(table.status, table.criadoEm),
+    index("feedback_plataforma_usuario_idx").on(table.usuarioId, table.criadoEm),
+    index("feedback_plataforma_tipo_idx").on(table.tipo, table.categoria, table.criadoEm),
+  ],
+);

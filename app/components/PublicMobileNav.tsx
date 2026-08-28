@@ -25,6 +25,8 @@ export default async function PublicMobileNav({
       <Link
         className="public-mobile-profile-link"
         href={user?.system_owner ? "/proprietario" : user ? "/painel" : "/login"}
+        showLoading={Boolean(user)}
+        loadingLabel={user?.system_owner ? "Abrindo a Área do proprietário…" : "Abrindo seu painel…"}
       >
         <span className="public-mobile-profile-avatar" aria-hidden="true">
           {user?.foto_perfil ? <img src={user.foto_perfil} alt="" /> : user ? initials : <PublicIcon name="user" size={18} />}

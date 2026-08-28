@@ -26,6 +26,7 @@ type OwnerData = {
   communities: Record<string, unknown>[];
   users: Record<string, unknown>[];
   audit: Record<string, unknown>[];
+  feedback: Record<string, unknown>[];
   auditRetention?: { days: number; visibleLimit: number };
   ownerLayout?: { gridPreset?: OwnerGridPreset; metricOrder?: OwnerMetricKey[] };
 };
@@ -36,6 +37,7 @@ type OwnerTab =
   | "communities"
   | "users"
   | "audit"
+  | "feedback"
   | "editorial"
   | "statistics"
   | "optimization"
@@ -55,6 +57,7 @@ const TABS: { id: OwnerTab; label: string; icon: string }[] = [
   { id: "communities", label: "Comunidades", icon: "◇" },
   { id: "users", label: "Pessoas", icon: "◎" },
   { id: "audit", label: "Segurança e auditoria", icon: "✓" },
+  { id: "feedback", label: "Feedback e denúncias", icon: "!" },
   { id: "editorial", label: "IA Editorial", icon: "✦" },
   { id: "statistics", label: "Estatísticas", icon: "▥" },
   { id: "optimization", label: "Otimização", icon: "↻" },
@@ -135,6 +138,10 @@ export default function OwnerWorkspace({
   const pending = useMemo(
     () => (data?.requests || []).filter((item) => ["PENDENTE", "EM_ANALISE"].includes(String(item.status))),
     [data?.requests],
+  );
+  const pendingFeedback = useMemo(
+    () => (data?.feedback || []).filter((item) => String(item.status) === "PENDENTE"),
+    [data?.feedback],
   );
   const filteredCommunities = useMemo(() => filterRows(data?.communities || [], search, ["nome", "cidade_publica", "proprietario_nome", "status"]), [data?.communities, search]);
   const filteredUsers = useMemo(() => filterRows(data?.users || [], search, ["nome", "email", "telefone", "perfil", "titulo_eclesiastico", "comunidades_nomes"]), [data?.users, search]);
@@ -308,6 +315,31 @@ export default function OwnerWorkspace({
     }
   }
 
+  async function feedbackAction(
+    feedbackId: number,
+    action: "FEEDBACK_EM_ANALISE" | "FEEDBACK_RESPONDER" | "FEEDBACK_ARQUIVAR" | "FEEDBACK_REABRIR" | "FEEDBACK_EXCLUIR",
+    resposta = "",
+  ) {
+    if (action === "FEEDBACK_EXCLUIR" && !window.confirm("Excluir definitivamente esta mensagem e a foto anexada?")) return;
+    setWorking(feedbackId);
+    setMessage("");
+    try {
+      const response = await fetch("/api/proprietario", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, feedbackId, resposta }),
+      });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error || "Não foi possível atualizar a mensagem.");
+      await load();
+      setMessage(action === "FEEDBACK_RESPONDER" ? "Resposta enviada ao usuário." : action === "FEEDBACK_EXCLUIR" ? "Mensagem excluída." : "Mensagem atualizada.");
+    } catch (error) {
+      setMessage((error as Error).message);
+    } finally {
+      setWorking(null);
+    }
+  }
+
   function reorderMetric(target: OwnerMetricKey) {
     if (!draggingMetric || draggingMetric === target) return;
     const next = [...metricOrder];
@@ -355,7 +387,7 @@ export default function OwnerWorkspace({
         <aside className="owner-sidebar">
           <div className="owner-identity-card"><span>DA</span><div><small>ACESSO INTEGRAL</small><VerifiedOwnerName name={ownerName} verified /><p>Todas as comunidades, usuários, módulos e configurações.</p></div></div>
           <nav aria-label="Menu do proprietário">
-            {TABS.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => { setTab(item.id); setDirectoryPage(0); }}><span>{item.icon}</span>{item.label}{item.id === "requests" && pending.length > 0 ? <b>{pending.length}</b> : null}</button>)}
+            {TABS.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => { setTab(item.id); setDirectoryPage(0); }}><span>{item.icon}</span>{item.label}{item.id === "requests" && pending.length > 0 ? <b>{pending.length}</b> : item.id === "feedback" && pendingFeedback.length > 0 ? <b>{pendingFeedback.length}</b> : null}</button>)}
           </nav>
           <Link href="/painel">Abrir painel de comunidade →</Link>
           <Link href="/comunidades">Ver diretório público →</Link>
@@ -366,6 +398,7 @@ export default function OwnerWorkspace({
             <div><p className="pilot-kicker">CENTRAL DO PROPRIETÁRIO</p><h1>{tabLabel(tab)}</h1><p>{tabDescription(tab)}</p></div>
             <div className="owner-page-quick-actions">
               <button type="button" onClick={() => setTab("requests")}><span>◫</span> Revisar solicitações {pending.length > 0 && <b>{pending.length}</b>}</button>
+              <button type="button" onClick={() => setTab("feedback")}><span>!</span> Feedback {pendingFeedback.length > 0 && <b>{pendingFeedback.length}</b>}</button>
               <button type="button" onClick={() => setTab("communities")}><span>◇</span> Abrir comunidades</button>
               <details className="owner-scope-note"><summary>Escopo global</summary><p>Esta área independe da comunidade ativa e valida cada ação no servidor.</p></details>
             </div>
@@ -497,6 +530,7 @@ export default function OwnerWorkspace({
           )}
 
           {tab === "audit" && data && <section className="owner-audit-panel"><header><div><h2>Trilha de auditoria</h2><p>Pesquise e abra um registro para conferir os detalhes preservados.</p></div><div className="owner-audit-filters"><input type="search" value={auditSearch} onChange={(event) => setAuditSearch(event.target.value)} placeholder="Pesquisar ação, pessoa ou comunidade" /><select value={auditResult} onChange={(event) => setAuditResult(event.target.value)} aria-label="Filtrar por resultado"><option value="TODOS">Todos os resultados</option><option value="SUCESSO">Sucesso</option><option value="NEGADO">Negado</option><option value="ERRO">Erro</option></select></div></header><p className="owner-audit-retention" role="note">Retenção automática: registros com mais de {data.auditRetention?.days || 14} dias são excluídos. Esta tela mostra somente as {data.auditRetention?.visibleLimit || 20} ações mais recentes.</p><div className="owner-audit-list">{filteredAudit.map((item) => <details key={Number(item.id)}><summary><span>{String(item.resultado) === "SUCESSO" ? "✓" : "!"}</span><div><strong>{humanize(String(item.evento))}</strong><p>{String(item.comunidade_nome || "Plataforma")} · {String(item.usuario_nome || "Sistema")}</p></div><time>{formatDate(String(item.criado_em))}</time></summary><div className="owner-audit-detail"><span><small>Resultado</small><strong>{String(item.resultado || "NÃO INFORMADO")}</strong></span><span><small>Registro</small><strong>#{Number(item.id)}</strong></span><span><small>Responsável</small><strong>{String(item.usuario_nome || "Sistema")}</strong></span><span><small>Contexto</small><strong>{String(item.comunidade_nome || "Plataforma")}</strong></span><AuditMetadata value={item.metadados} /></div></details>)}{!filteredAudit.length && <Empty title="Nenhum registro encontrado" text="Ajuste a pesquisa ou o filtro de resultado." />}</div></section>}
+          {tab === "feedback" && data && <FeedbackRepository items={data.feedback || []} working={working} onAction={feedbackAction} />}
           {tab === "editorial" && <EditorialAutomationWorkspace />}
           {tab === "statistics" && <StatisticsWorkspace />}
           {tab === "optimization" && <PlatformOptimizerWorkspace />}
@@ -598,6 +632,61 @@ function RequestCard({ item, working, onDecide }: { item: Record<string, unknown
   );
 }
 
+function FeedbackRepository({
+  items,
+  working,
+  onAction,
+}: {
+  items: Record<string, unknown>[];
+  working: number | null;
+  onAction: (
+    id: number,
+    action: "FEEDBACK_EM_ANALISE" | "FEEDBACK_RESPONDER" | "FEEDBACK_ARQUIVAR" | "FEEDBACK_REABRIR" | "FEEDBACK_EXCLUIR",
+    resposta?: string,
+  ) => Promise<void>;
+}) {
+  const [status, setStatus] = useState("ATIVOS");
+  const [type, setType] = useState("TODOS");
+  const [search, setSearch] = useState("");
+  const visible = useMemo(() => items.filter((item) => {
+    const currentStatus = String(item.status || "");
+    if (status === "ATIVOS" && currentStatus === "ARQUIVADO") return false;
+    if (status !== "ATIVOS" && status !== "TODOS" && currentStatus !== status) return false;
+    if (type !== "TODOS" && String(item.tipo) !== type) return false;
+    const term = search.trim().toLocaleLowerCase("pt-BR");
+    return !term || [item.usuario_nome, item.usuario_email, item.mensagem, item.categoria, item.comunidade_nome, item.pagina]
+      .some((value) => String(value || "").toLocaleLowerCase("pt-BR").includes(term));
+  }), [items, search, status, type]);
+  const pending = items.filter((item) => String(item.status) === "PENDENTE").length;
+
+  return <section className="owner-feedback-panel">
+    <header><div><p className="pilot-kicker">REPOSITÓRIO CENTRAL</p><h2>Feedback, melhorias e denúncias</h2><p>Mensagens identificadas pela conta, página e comunidade de origem.</p></div><span>{pending} pendente{pending === 1 ? "" : "s"}</span></header>
+    <div className="owner-feedback-filters">
+      <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Pesquisar pessoa, texto, categoria ou página" />
+      <select value={type} onChange={(event) => setType(event.target.value)} aria-label="Filtrar por tipo"><option value="TODOS">Todos os tipos</option><option value="PROBLEMA">Problemas</option><option value="SUGESTAO">Sugestões</option><option value="MELHORIA">Melhorias</option><option value="DENUNCIA">Denúncias</option></select>
+      <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Filtrar por situação"><option value="ATIVOS">Pendentes e ativos</option><option value="PENDENTE">Pendentes</option><option value="EM_ANALISE">Em análise</option><option value="RESPONDIDO">Respondidos</option><option value="ARQUIVADO">Arquivados</option><option value="TODOS">Todos</option></select>
+    </div>
+    <div className="owner-feedback-list">
+      {visible.map((item) => {
+        const id = Number(item.id);
+        const currentStatus = String(item.status || "PENDENTE");
+        const hasImage = Boolean(String(item.imagem_chave || ""));
+        return <details key={id} className={`owner-feedback-card status-${currentStatus.toLowerCase()}`}>
+          <summary><span className={`owner-feedback-type type-${String(item.tipo).toLowerCase()}`}>{String(item.tipo) === "PROBLEMA" ? "!" : String(item.tipo) === "SUGESTAO" ? "✦" : String(item.tipo) === "MELHORIA" ? "↗" : "⚑"}</span><div><small>{humanize(String(item.tipo))} · {humanize(String(item.categoria))}</small><strong>{String(item.usuario_nome || "Usuário")}</strong><p>{String(item.mensagem || "")}</p></div><b>{humanize(currentStatus)}</b><i aria-hidden="true">⌄</i></summary>
+          <div className="owner-feedback-detail">
+            <dl><div><dt>Usuário</dt><dd>{String(item.usuario_nome || "—")}<small>{String(item.usuario_email || "")}</small></dd></div><div><dt>Origem</dt><dd>{String(item.comunidade_nome || "Plataforma")}<small>{String(item.pagina || "/")}</small></dd></div><div><dt>Enviado</dt><dd>{formatDate(String(item.criado_em || ""))}</dd></div>{Number(item.entidade_id || 0) > 0 ? <div><dt>Publicação</dt><dd>#{Number(item.entidade_id)}</dd></div> : null}</dl>
+            <article><h3>Mensagem</h3><p>{String(item.mensagem || "")}</p>{hasImage && <a href={`/api/feedback/${id}/imagem`} target="_blank" rel="noreferrer"><img src={`/api/feedback/${id}/imagem`} alt={`Foto anexada por ${String(item.usuario_nome || "usuário")}`} /><span>Ampliar foto</span></a>}</article>
+            {Boolean(item.resposta_proprietario) && <aside><strong>Resposta enviada</strong><p>{String(item.resposta_proprietario)}</p><small>{String(item.respondido_por_nome || "Proprietário")} · {formatDate(String(item.respondido_em || item.atualizado_em || ""))}</small></aside>}
+            <form onSubmit={(event) => { event.preventDefault(); const resposta = String(new FormData(event.currentTarget).get("resposta") || ""); void onAction(id, "FEEDBACK_RESPONDER", resposta); }}><label>Responder ao usuário<textarea name="resposta" rows={3} maxLength={2000} required defaultValue={String(item.resposta_proprietario || "")} placeholder="Escreva a resposta que será enviada nas notificações" /></label><button disabled={working === id}>Responder</button></form>
+            <footer>{currentStatus === "PENDENTE" && <button type="button" disabled={working === id} onClick={() => void onAction(id, "FEEDBACK_EM_ANALISE")}>Marcar em análise</button>}{currentStatus === "ARQUIVADO" ? <button type="button" disabled={working === id} onClick={() => void onAction(id, "FEEDBACK_REABRIR")}>Reabrir</button> : <button type="button" disabled={working === id} onClick={() => void onAction(id, "FEEDBACK_ARQUIVAR")}>Arquivar</button>}<button type="button" className="danger" disabled={working === id} onClick={() => void onAction(id, "FEEDBACK_EXCLUIR")}>Excluir</button></footer>
+          </div>
+        </details>;
+      })}
+      {!visible.length && <Empty title="Nenhuma mensagem encontrada" text="Ajuste os filtros ou aguarde novos envios." />}
+    </div>
+  </section>;
+}
+
 function OwnerInsights({ metrics }: { metrics: Record<string, number> }) {
   const rows = OWNER_METRICS.map((metric) => ({
     ...metric,
@@ -687,6 +776,7 @@ function tabDescription(tab: OwnerTab) {
     communities: "Acompanhe status, responsáveis, membros e acesso integral.",
     users: "Consulte pessoas, vínculos e perfis globais.",
     audit: "Investigue ações, resultados e contexto de segurança.",
+    feedback: "Analise problemas, sugestões, melhorias e denúncias enviadas em todo o sistema.",
     editorial: "Revise e programe conteúdos da plataforma fora do contexto comunitário.",
     statistics: "Consulte indicadores globais sem expor ferramentas da plataforma nos menus comunitários.",
     optimization: "Diagnostique e execute retenções seguras sem remover dados ativos.",

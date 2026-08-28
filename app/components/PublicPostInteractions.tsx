@@ -97,6 +97,9 @@ export default function PublicPostInteractions({
 
   return (
     <section className="public-post-interactions">
+      <button type="button" className="post-report-button" onClick={() => window.dispatchEvent(new CustomEvent("vinkulo:open-feedback", { detail: { type: "DENUNCIA", entityType: "PUBLICACAO", entityId: postId } }))}>
+        Denunciar
+      </button>
       <button
         type="button"
         className="comments-toggle"

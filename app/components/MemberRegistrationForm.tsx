@@ -64,15 +64,9 @@ export default function MemberRegistrationForm({
     () => community?.ministries.find((item) => String(item.id) === values.ministryId),
     [community, values.ministryId],
   );
-  useEffect(() => {
-    if (!photo) {
-      setPhotoPreview("");
-      return;
-    }
-    const url = URL.createObjectURL(photo);
-    setPhotoPreview(url);
-    return () => URL.revokeObjectURL(url);
-  }, [photo]);
+  useEffect(() => () => {
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+  }, [photoPreview]);
   useEffect(() => {
     if (registration.state !== "AGUARDANDO" && registration.state !== "ABERTO") return;
     const timer = window.setInterval(() => {
@@ -86,6 +80,10 @@ export default function MemberRegistrationForm({
 
   function update<K extends keyof Values>(key: K, value: Values[K]) {
     setValues((current) => ({ ...current, [key]: value }));
+  }
+  function choosePhoto(file: File | null) {
+    setPhoto(file);
+    setPhotoPreview(file ? URL.createObjectURL(file) : "");
   }
   function chooseCommunity(id: string) {
     const next = registration.communities.find((item) => String(item.id) === id);
@@ -145,7 +143,7 @@ export default function MemberRegistrationForm({
       {!reviewing ? (
         <form className="member-registration-public-form" onSubmit={(event) => { event.preventDefault(); setError(""); setReviewing(true); }}>
           <section><header><b>01</b><div><h2>Seus dados e sua conta</h2><p>Preencha o cadastro e crie o acesso que você usará na comunidade.</p></div></header><div className="member-registration-fields">
-            <label className="member-registration-photo"><span>{photoPreview ? <img src={photoPreview} alt="Prévia da foto escolhida" /> : "+"}</span><strong>Foto <small>Opcional</small></strong><input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setPhoto(event.target.files?.[0] || null)} /></label>
+            <label className="member-registration-photo"><span>{photoPreview ? <img src={photoPreview} alt="Prévia da foto escolhida" /> : "+"}</span><strong>Foto <small>Opcional</small></strong><input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => choosePhoto(event.target.files?.[0] || null)} /></label>
             <label>Nome completo*<input required minLength={5} maxLength={120} value={values.fullName} onChange={(event) => update("fullName", event.target.value)} autoComplete="name" /></label>
             <label>E-mail*<input required type="email" maxLength={180} value={values.email} onChange={(event) => update("email", event.target.value)} autoComplete="email" /></label>
             <label>CPF <small>Opcional</small><input inputMode="numeric" maxLength={14} value={values.cpf} onChange={(event) => update("cpf", event.target.value)} /></label>
