@@ -157,7 +157,7 @@ export function filterPermissionsForCommunityModules(
   modules: CommunityModuleKey[],
 ) {
   const enabled = new Set(normalizeCommunityModules(modules, []));
-  const disabledPermissions = new Set(
+  const disabledPermissions = new Set<string>(
     COMMUNITY_MODULES.filter((module) => !enabled.has(module.key)).flatMap(
       (module) => [...module.permissions],
     ),

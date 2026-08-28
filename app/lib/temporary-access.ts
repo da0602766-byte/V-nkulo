@@ -338,7 +338,7 @@ export async function recordTemporaryAccessAudit(
   event: string,
   result: "SUCESSO" | "NEGADO" | "ERRO",
   actorId: number | null,
-  metadata: Record<string, string | number | boolean | null> = {},
+  metadata: Record<string, unknown> = {},
 ) {
   await db
     .prepare(

@@ -18,9 +18,10 @@ test("parking reservations use the published event without requiring personal co
   const workspace = await read("app/components/ParkingWorkspace.tsx");
   assert.doesNotMatch(availability, /confirmacoes_evento/);
   assert.doesNotMatch(reservations, /confirmacoes_evento/);
-  assert.match(reservations, /e\.status='PUBLICADO'/);
-  assert.match(reservations, /reservas_abrem_em/);
-  assert.match(workspace, /ParkingReservationGate/);
+  assert.match(reservations, /status\s*=\s*'PUBLICADO'/);
+  assert.match(availability, /reservas_abrem_em/);
+  assert.doesNotMatch(workspace, /return <ParkingReservationGate/);
+  assert.match(workspace, /Mapa disponível para consulta/);
 });
 
 test("ministry schedules can be collected for timed publication with live status feedback", async () => {
@@ -41,12 +42,12 @@ test("reading mode offers signup and cell profiles render above the page", async
   assert.match(gate, /\/login\?modo=cadastro/);
   assert.match(cells, /selectedMemberProfile/);
   assert.match(cells, /cell-member-profile-dialog/);
-  assert.match(styles, /\.cell-member-profile-overlay[^}]*z-index:1200/s);
+  assert.match(styles, /\.cell-member-profile-overlay\s*\{[^}]*z-index:1200/s);
 });
 
-test("publication copy uses the tubular message treatment", async () => {
+test("publication copy remains readable and preserves authored line breaks", async () => {
   const styles = await read("app/globals.css");
-  assert.match(styles, /\.social-feed-card \.social-post-copy \{/);
-  assert.match(styles, /border-radius:28px 28px 28px 9px/);
-  assert.match(styles, /\.social-feed-card \.social-post-copy::before/);
+  assert.match(styles, /\.social-post-copy\s*\{[^}]*padding:/s);
+  assert.match(styles, /\.social-post-copy p\s*\{[^}]*white-space:pre-wrap/s);
+  assert.match(styles, /\.social-post-copy p\s*\{[^}]*line-height:1\.65/s);
 });

@@ -190,10 +190,10 @@ export default function CommunityHome({
       const [feedResult, eventResult, ministryResult, cellResult, scheduleResult] =
         await Promise.all([
           readJson<Record<string, unknown>>(feedResponse),
-          eventResponse ? readJson<Record<string, unknown>>(eventResponse) : {},
-          ministryResponse ? readJson<Record<string, unknown>>(ministryResponse) : {},
-          cellResponse ? readJson<Record<string, unknown>>(cellResponse) : {},
-          scheduleResponse ? readJson<Record<string, unknown>>(scheduleResponse) : {},
+          eventResponse ? readJson<Record<string, unknown>>(eventResponse) : Promise.resolve({} as Record<string, unknown>),
+          ministryResponse ? readJson<Record<string, unknown>>(ministryResponse) : Promise.resolve({} as Record<string, unknown>),
+          cellResponse ? readJson<Record<string, unknown>>(cellResponse) : Promise.resolve({} as Record<string, unknown>),
+          scheduleResponse ? readJson<Record<string, unknown>>(scheduleResponse) : Promise.resolve({} as Record<string, unknown>),
         ]);
       if (!feedResponse.ok) {
         throw new Error(

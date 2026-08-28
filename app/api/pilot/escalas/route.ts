@@ -160,7 +160,7 @@ export async function GET() {
       continue;
     }
     const items = assignmentsBySchedule.get(scheduleId) || [];
-    const visibleAssignment = {
+    const visibleAssignment: AssignmentRow & { owner_verified: boolean } = {
       ...assignment,
       owner_verified: isSystemOwnerAccount({
         email: String(assignment.owner_email || ""),

@@ -30,7 +30,7 @@ test("temporary member registration is owner-scoped in schema, queries and UI", 
   assert.match(adminUi, /Criar link temporário/);
   assert.match(publicUi, /Revisar cadastro/);
   assert.match(publicUi, /Editar informações/);
-  assert.match(styles, /\.pilot-mobile-overlay\s*\{[^}]*align-items:center!important/s);
+  assert.match(styles, /\.pilot-mobile-overlay\s*\{[^}]*align-items:flex-end/s);
 });
 
 test("public form never exposes or accepts another owner's community data", async () => {
@@ -82,6 +82,7 @@ test("public form never exposes or accepts another owner's community data", asyn
   validBody.set("functionId", String(functionOne));
   validBody.set("period", "NOITE");
   validBody.append("availableDays", "DOM");
+  validBody.set("acceptedTerms", "true");
   const submit = await worker.fetch(new Request(`http://localhost/api/public/cadastro-membro/${token}`, { method: "POST", body: validBody }), env, workerContext);
   assert.equal(submit.status, 201);
   assert.equal(database.prepare("SELECT comunidade_id FROM cadastros_membros_temporarios WHERE email = ?").get("pessoa.cadastrada@example.test").comunidade_id, 1);

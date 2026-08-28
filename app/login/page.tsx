@@ -16,6 +16,7 @@ export default async function LoginPage({
     motivo?: string;
     returnTo?: string;
     auto?: string;
+    modo?: string;
   }>;
 }) {
   const params = await searchParams;

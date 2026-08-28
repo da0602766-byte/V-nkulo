@@ -49,7 +49,7 @@ export default function PilotNotificationCenter() {
 
     const registration = await navigator.serviceWorker.ready;
     for (const item of pending) {
-      await registration.showNotification(item.title || "Vínkulo", {
+      const options = {
         body: item.message,
         icon: "/vinkulo-app-icon-192.png",
         badge: "/vinkulo-app-icon-192.png",
@@ -59,7 +59,8 @@ export default function PilotNotificationCenter() {
           notificationId: item.id,
           url: isSafeInternalDestination(item.destination) ? item.destination : "/painel",
         },
-      });
+      } as NotificationOptions & { renotify: boolean };
+      await registration.showNotification(item.title || "Vínkulo", options);
       shownIds.add(item.id);
     }
     persistShownDeviceNotificationIds(shownIds);

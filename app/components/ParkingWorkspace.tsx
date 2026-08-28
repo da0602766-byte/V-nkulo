@@ -132,8 +132,8 @@ export default function ParkingWorkspace({
     y: number;
   } | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (quiet = false) => {
+    if (!quiet) setLoading(true);
     setError("");
     try {
       const response = await fetch(memberMode ? "/api/pilot/estacionamento/disponibilidade" : "/api/pilot/estacionamento", {
@@ -161,7 +161,7 @@ export default function ParkingWorkspace({
     } catch (loadError) {
       setError((loadError as Error).message);
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
   }, [memberMode]);
 
@@ -265,7 +265,7 @@ export default function ParkingWorkspace({
       if (!response.ok) throw new Error(result.error || "Entrada não registrada.");
       setFeedback("Entrada registrada e vaga ocupada.");
       formElement.reset();
-      await load();
+      await load(true);
     } catch (saveError) {
       setError((saveError as Error).message);
     } finally {
@@ -284,7 +284,7 @@ export default function ParkingWorkspace({
       const result = await readJson<{ error?: string }>(response);
       if (!response.ok) throw new Error(result.error || "Saída não registrada.");
       setFeedback("Saída registrada e vaga liberada.");
-      await load();
+      await load(true);
     } catch (saveError) {
       setError((saveError as Error).message);
     } finally {
@@ -311,7 +311,7 @@ export default function ParkingWorkspace({
       }
       setFeedback("Ocorrência registrada com auditoria.");
       formElement.reset();
-      await load();
+      await load(true);
     } catch (saveError) {
       setError((saveError as Error).message);
     } finally {
@@ -337,7 +337,7 @@ export default function ParkingWorkspace({
       const result = await readJson<{ error?: string }>(response);
       if (!response.ok) throw new Error(result.error || "Alteração não concluída.");
       setFeedback(success);
-      await load();
+      await load(true);
     } catch (saveError) {
       setError((saveError as Error).message);
     } finally {
@@ -360,7 +360,7 @@ export default function ParkingWorkspace({
               : `Não foi possível criar a reserva (erro ${response.status}). Tente novamente.`;
         throw new Error(result.error || result.message || fallback);
       }
-      setFeedback(`Reserva solicitada. Seu código é ${result.codigo}.`); setSelectedSpaceId(null); await load(); return result;
+      setFeedback(`Reserva solicitada. Seu código é ${result.codigo}.`); setSelectedSpaceId(null); await refreshReservations(); return result;
     }
     catch(cause){setError((cause as Error).message); return null;} finally{setWorking(false);}
   }
@@ -378,7 +378,8 @@ export default function ParkingWorkspace({
       const result=await readJson<{error?:string;reserva?:{nomeCompleto:string;documento:string;inicioEm:string;vaga:string;codigo:string}}>(response);
       if(!response.ok) throw new Error(result.error||"Reserva não atualizada.");
       setFeedback(result.reserva ? `Check-in confirmado: ${result.reserva.nomeCompleto} · vaga ${result.reserva.vaga} · ${result.reserva.documento} · ${formatTime(result.reserva.inicioEm)}.` : "Reserva atualizada.");
-      await load();
+      if (String(body.acao || "").toUpperCase() === "CHECKIN") await load(true);
+      else await refreshReservations();
       return true;
     } catch(cause){ const message=(cause as Error).message; setError(message); return message; } finally { setWorking(false); }
   }
@@ -405,7 +406,10 @@ export default function ParkingWorkspace({
       const result = await readJson<{ error?: string; removidos?: number }>(response);
       if (!response.ok) throw new Error(result.error || "Não foi possível limpar as movimentações.");
       setFeedback(`${result.removidos || 0} movimentação(ões) encerrada(s) removida(s).`);
-      await load();
+      setData((current) => current ? {
+        ...current,
+        movimentacoes: current.movimentacoes.filter((item) => item.status === "NO_LOCAL"),
+      } : current);
     } catch (cause) {
       setError((cause as Error).message);
     } finally {
@@ -437,7 +441,7 @@ export default function ParkingWorkspace({
       setFeedback("Posição da vaga salva.");
     } catch (cause) {
       setError((cause as Error).message);
-      await load();
+      await load(true);
     } finally {
       setWorking(false);
     }
@@ -540,7 +544,7 @@ export default function ParkingWorkspace({
       setFeedback("Sugestão aplicada. Você ainda pode ajustar cada vaga livremente.");
     } catch (cause) {
       setError((cause as Error).message);
-      await load();
+      await load(true);
     } finally {
       setWorking(false);
     }
@@ -663,7 +667,7 @@ export default function ParkingWorkspace({
                 : "Responsável ainda não definido"}
             </em>
           </section>}
-          {canEntry&&<section className="parking-checkin-hub parking-checkin-primary-v4"><div><p className="pilot-kicker">PORTARIA DIGITAL</p><h3>Ler acesso da reserva</h3><p>Aponte a câmera para o QR Code do usuário. O leitor permanece aberto para conferir várias reservas em sequência.</p></div><ParkingQrCheckin promptOnMount disabled={working} onDetected={(codigo)=>reservationAction({codigo,acao:"CHECKIN"})} /></section>}
+          {canEntry&&<section className="parking-checkin-hub parking-checkin-primary-v4"><div><p className="pilot-kicker">PORTARIA DIGITAL</p><h3>Ler acesso da reserva</h3><p>Aponte a câmera para o QR Code do usuário. O leitor permanece aberto para conferir várias reservas em sequência.</p></div><ParkingQrCheckin promptOnMount disabled={working} onDetected={async (codigo)=>{ await reservationAction({codigo,acao:"CHECKIN"}); }} /></section>}
           <div className="parking-metrics">
             <Metric icon="●" label="Vagas ocupadas" value={data.stats.ocupadas} tone="green" />
             <Metric icon="○" label="Vagas disponíveis" value={data.stats.livres} tone="cyan" />
@@ -1024,8 +1028,8 @@ export default function ParkingWorkspace({
                       "/api/pilot/estacionamento/configuracao",
                       {
                         ativo: true,
-                        nomeModulo: data.config.nome_modulo,
-                        corDestaque: data.config.cor_destaque,
+                        nomeModulo: data!.config.nome_modulo,
+                        corDestaque: data!.config.cor_destaque,
                         ...values,
                       },
                       "Responsável e instruções atualizados.",
@@ -1036,10 +1040,10 @@ export default function ParkingWorkspace({
                   <label>Responsável da diaconia
                     <select
                       name="responsavelUsuarioId"
-                      defaultValue={data.config.responsavelUsuarioId || ""}
+                      defaultValue={data!.config.responsavelUsuarioId || ""}
                     >
                       <option value="">Não definido</option>
-                      {data.availableUsers.map((item) => (
+                      {data!.availableUsers.map((item) => (
                         <option key={item.id} value={item.id}>{item.nome}</option>
                       ))}
                     </select>
@@ -1048,7 +1052,7 @@ export default function ParkingWorkspace({
                     <textarea
                       name="instrucoes"
                       rows={3}
-                      defaultValue={data.config.instrucoes}
+                      defaultValue={data!.config.instrucoes}
                       placeholder="Ex.: registrar ocorrências graves imediatamente."
                     />
                   </label>

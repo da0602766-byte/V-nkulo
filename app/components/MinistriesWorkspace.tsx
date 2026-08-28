@@ -415,9 +415,7 @@ export default function MinistriesWorkspace({
         status: data.get("status"),
         observacoes: data.get("observacoes"),
         camposRespostas,
-        camposRespostas,
         modeloId: data.get("modeloId"),
-        camposRespostas,
       },
       "Escala criada com validação de escopo.",
     );

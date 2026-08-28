@@ -32,10 +32,10 @@ test("the next ministry schedule displays its automatic publication countdown", 
 test("mobile cells and navigation use the final compact dock cascade", async () => {
   const dashboard = await read("app/components/PilotDashboard.tsx");
   const styles = await read("app/globals.css");
-  const finalCascade = styles.slice(styles.lastIndexOf("V168 last-rule guarantee"));
+  const finalCascade = styles.slice(styles.lastIndexOf("Final modal safeguards"));
 
   assert.match(dashboard, /className="pilot-mobile-nav-icon"/);
-  assert.match(finalCascade, /\.pilot-mobile-nav\s*\{[^}]*border-radius:21px!important/s);
-  assert.match(finalCascade, /\.cell-tabs-v2\s*\{[^}]*overflow-x:auto!important/s);
-  assert.match(finalCascade, /\.cell-detail-content-v4\s*\{[^}]*overflow-y:auto!important/s);
+  assert.match(styles, /\.pilot-mobile-nav\s*\{[^}]*border-radius:20px/s);
+  assert.match(finalCascade, /\.cell-detail-overlay-v2 \.cell-tabs-v2\s*\{[^}]*overflow-x:auto!important/s);
+  assert.match(finalCascade, /\.cell-detail-overlay-v2 \.cell-tabs-v2 ~ section\s*\{[^}]*overflow-y:auto!important/s);
 });

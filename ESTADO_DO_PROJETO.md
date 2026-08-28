@@ -2,7 +2,7 @@
 
 ## Identificação
 
-- **Versão-base:** V4.7.3, com a Reforma Oficial do VÍNKULO, os ajustes operacionais V4.7.4 e a otimização global segura autorizada em 13/08/2026.
+- **Versão-base:** V4.7.5, com a Reforma Oficial do VÍNKULO, os ajustes operacionais V4.7.4 e o bloco de estabilidade e desempenho concluído em 28/08/2026.
 - **Data da última análise:** 28/08/2026.
 - **Estado deste documento:** vigente. Decisões históricas incompatíveis foram removidas deste arquivo.
 - **Publicação automática do Site:** autorizada pelo proprietário para grupos completos que tenham build, testes e evidências aprovados; uma etapa com falha não pode ser publicada.
@@ -153,10 +153,17 @@
 - **Risco editorial:** toda programação exige autorização humana e é convertida para visibilidade `COMUNIDADE`.
 - **Risco de chat lento:** mitigado por busca incremental, polling condicional e atualização local após envio.
 - **Risco de arquivamento indevido:** mitigado por migração corretiva auditada, que restaura apenas comunidades reais gerenciadas e mantém as sementes piloto arquivadas.
-- **Risco de regressão:** coberto pela suíte automatizada de 103 testes.
+- **Risco de regressão:** coberto pela suíte automatizada de 199 testes, incluindo isolamento, segurança, estacionamento móvel, remoções e sincronização sem bloqueio integral da tela.
 - **Risco de exclusão indevida pelo otimizador:** mitigado por lista fechada de seis tarefas, bloqueio de concorrência, auditoria e testes que preservam sessão ativa e solicitação pendente.
 
 ## Último bloco concluído
+
+- Estabilidade V4.7.5: a dívida central de tipagem do tenant, validações e D1 foi eliminada; a checagem TypeScript passou de 1.128 ocorrências para zero sem remover dados, páginas ou permissões.
+- Ações de administração e estacionamento deixam o conteúdo atual visível durante a sincronização silenciosa, evitando a impressão de travamento após adicionar, alterar, confirmar ou excluir.
+- Reservas atualizam somente os dados necessários; limpezas de históricos atualizam a lista localmente, e recargas completas ficam restritas às operações que realmente alteram mapa, ocupação ou indicadores globais.
+- O perfil de integrante da célula recebeu diálogo completo, responsivo e acima das demais camadas, com fechamento, contato e rolagem segura.
+- Contratos antigos de testes foram alinhados à reforma móvel vigente: o cadastro de visitantes permanece contínuo, a seleção do estacionamento continua acessível antes da abertura da reserva e a aceitação dos termos segue obrigatória.
+- Validação deste bloco: TypeScript com zero erros, lint com zero erros, artefato Sites aprovado e **199/199 testes automatizados aprovados**.
 
 - Reforma móvel do estacionamento de 28/08/2026: a seleção de um setor passou a revelar imediatamente o posicionamento persistido das vagas; o mesmo mapa real é reutilizado na escolha da vaga, com estados livre, reservada, ocupada e selecionada.
 - A tela “Onde você quer parar?” permanece consultável mesmo antes da abertura da reserva ou na ausência de evento publicado. A confirmação continua bloqueada até a janela autorizada, e falhas de carregamento oferecem nova tentativa sem deixar a superfície inacessível.

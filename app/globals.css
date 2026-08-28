@@ -24370,6 +24370,40 @@ textarea { resize: none !important; }
 .visitor-category-dashboard-toggle strong { font-size:10px; }
 .visitor-category-dashboard-toggle small { color:var(--pilot-muted); font-size:8px; line-height:1.4; }
 .visitor-registration textarea,.visitor-edit-form textarea,.visitor-settings-panel textarea { resize:none!important; }
+.visitor-registration-form-section>fieldset { display:grid!important; }
+
+.cell-member-profile-overlay {
+  position:fixed;
+  inset:0;
+  z-index:1200;
+  display:grid;
+  place-items:center;
+  padding:16px;
+  background:rgb(3 7 16 / .72);
+  backdrop-filter:blur(7px);
+}
+.cell-member-profile-dialog {
+  width:min(520px,100%);
+  max-height:calc(100dvh - 32px);
+  overflow:auto;
+  border:1px solid var(--pilot-line);
+  border-radius:18px;
+  background:var(--pilot-surface);
+  color:var(--pilot-text);
+  padding:18px;
+  box-shadow:0 24px 72px rgb(0 0 0 / .38);
+}
+.cell-member-profile-dialog>header { display:grid; grid-template-columns:48px minmax(0,1fr) 36px; align-items:center; gap:11px; }
+.cell-member-profile-dialog>header>span { width:48px; height:48px; display:grid; place-items:center; overflow:hidden; border-radius:50%; background:var(--pilot-surface-2); font-weight:900; }
+.cell-member-profile-dialog>header img { width:100%; height:100%; object-fit:cover; }
+.cell-member-profile-dialog>header h2,.cell-member-profile-dialog>header p { margin:0; }
+.cell-member-profile-dialog>header small { color:var(--pilot-purple); font-size:.62rem; font-weight:900; }
+.cell-member-profile-dialog>header button { width:36px; height:36px; border:1px solid var(--pilot-line); border-radius:50%; background:var(--pilot-surface-2); color:var(--pilot-text); font-size:1.25rem; }
+.cell-member-profile-dialog dl { display:grid; gap:8px; margin:16px 0; }
+.cell-member-profile-dialog dl>div { display:grid; grid-template-columns:minmax(110px,.6fr) minmax(0,1fr); gap:10px; padding:10px; border-radius:10px; background:var(--pilot-surface-2); }
+.cell-member-profile-dialog dt { color:var(--pilot-muted); }
+.cell-member-profile-dialog dd { margin:0; overflow-wrap:anywhere; font-weight:800; }
+.cell-member-profile-dialog>a { display:flex; min-height:42px; align-items:center; justify-content:center; border-radius:10px; background:#15966f; color:#fff; font-weight:850; text-decoration:none; }
 
 @media (max-width:1120px) {
   .visitor-overview-grid { grid-template-columns:1fr; }

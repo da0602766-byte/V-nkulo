@@ -68,7 +68,53 @@ export type MinistryCustomField = {
   options: string[];
 };
 
-export function parseMinistryPayload(payload: unknown) {
+type ValidationResult<T extends object> =
+  | T
+  | { error: string };
+
+type MinistryPayload = {
+  nome: string;
+  descricao: string;
+  categoria: string;
+  status: string;
+  youtubeUrl: string;
+  spotifyUrl: string;
+  bannerUrl: string;
+  responsavelUsuarioId: number | null;
+};
+
+type ScheduleTemplatePayload = {
+  ministerioId: number;
+  nome: string;
+  titulo: string;
+  duracaoMinutos: number;
+  local: string;
+  observacoes: string;
+  checklist: string[];
+  camposPersonalizados: MinistryCustomField[];
+};
+
+type SchedulePayload = {
+  ministerioId: number;
+  equipeId: number | null;
+  titulo: string;
+  iniciaEm: string;
+  terminaEm: string;
+  local: string;
+  status: string;
+  observacoes: string;
+  responsavelUsuarioId: number | null;
+  publicarEm: string | null;
+  repertorio: string[];
+  links: SecretaryLink[];
+  designacoes: SecretaryAssignment[];
+  checklist: SecretaryChecklistItem[];
+  camposRespostas: Record<string, unknown>;
+};
+
+export function parseMinistryPayload(
+  payload: unknown,
+): ValidationResult<MinistryPayload> {
   const body = asRecord(payload);
   const nome = cleanText(body.nome, 120);
   const descricao = cleanText(body.descricao, 1200);
@@ -79,14 +125,13 @@ export function parseMinistryPayload(payload: unknown) {
   const spotifyUrl = parseOptionalMediaUrl(body.spotifyUrl, "SPOTIFY");
   const bannerUrl = parseMinistryAssetUrl(body.bannerUrl);
   const responsavelUsuarioId = positiveInteger(body.responsavelUsuarioId);
-  const publicarEm = body.publicarEm ? normalizeDateTime(body.publicarEm) : null;
   if (!nome) return { error: "O nome do ministério é obrigatório." } as const;
   if (!MINISTRY_CATEGORIES.has(categoria) || !MINISTRY_STATUSES.has(status)) {
     return { error: "Categoria ou status do ministério inválido." } as const;
   }
-  if ("error" in youtubeUrl) return youtubeUrl;
-  if ("error" in spotifyUrl) return spotifyUrl;
-  if ("error" in bannerUrl) return bannerUrl;
+  if ("error" in youtubeUrl) return { error: youtubeUrl.error };
+  if ("error" in spotifyUrl) return { error: spotifyUrl.error };
+  if ("error" in bannerUrl) return { error: bannerUrl.error };
   return {
     nome,
     descricao,
@@ -99,7 +144,9 @@ export function parseMinistryPayload(payload: unknown) {
   } as const;
 }
 
-export function parseMinistryAssetUrl(value: unknown) {
+export function parseMinistryAssetUrl(
+  value: unknown,
+): ValidationResult<{ value: string }> {
   const url = cleanText(value, 600);
   if (!url) return { value: "" } as const;
   if (
@@ -114,7 +161,9 @@ export function parseMinistryAssetUrl(value: unknown) {
   return { value: url } as const;
 }
 
-export function parseCustomFunctionPayload(payload: unknown) {
+export function parseCustomFunctionPayload(
+  payload: unknown,
+): ValidationResult<{ nome: string; descricao: string }> {
   const body = asRecord(payload);
   const nome = cleanText(body.nome, 100);
   const descricao = cleanText(body.descricao, 300);
@@ -124,7 +173,9 @@ export function parseCustomFunctionPayload(payload: unknown) {
   return { nome, descricao } as const;
 }
 
-export function parseScheduleTemplatePayload(payload: unknown) {
+export function parseScheduleTemplatePayload(
+  payload: unknown,
+): ValidationResult<ScheduleTemplatePayload> {
   const body = asRecord(payload);
   const ministerioId = positiveInteger(body.ministerioId);
   const nome = cleanText(body.nome, 100);
@@ -142,7 +193,7 @@ export function parseScheduleTemplatePayload(payload: unknown) {
       ].slice(0, 30)
     : [];
   const customFields = parseCustomFields(body.camposPersonalizados);
-  if ("error" in customFields) return customFields;
+  if ("error" in customFields) return { error: customFields.error };
   if (!ministerioId || !nome || !titulo) {
     return {
       error: "Ministério, nome do modelo e título são obrigatórios.",
@@ -169,7 +220,9 @@ export function parseScheduleTemplatePayload(payload: unknown) {
   } as const;
 }
 
-export function parseMinistryChecklistUpdate(payload: unknown) {
+export function parseMinistryChecklistUpdate(
+  payload: unknown,
+): ValidationResult<{ itemId: number; status: string; observacao: string }> {
   const body = asRecord(payload);
   const itemId = positiveInteger(body.itemId);
   const status = cleanText(body.status, 30).toUpperCase();
@@ -183,7 +236,13 @@ export function parseMinistryChecklistUpdate(payload: unknown) {
   return { itemId, status, observacao } as const;
 }
 
-export function parseVolunteerPayload(payload: unknown) {
+export function parseVolunteerPayload(payload: unknown): ValidationResult<{
+  usuarioId: number;
+  funcao: string;
+  papel: string;
+  periodoPreferido: string;
+  diasDisponiveis: string[];
+}> {
   const body = asRecord(payload);
   const usuarioId = positiveInteger(body.usuarioId);
   const funcao = cleanText(body.funcao, 100);
@@ -215,7 +274,10 @@ export function parseVolunteerPayload(payload: unknown) {
   } as const;
 }
 
-export function parseAvailabilityPayload(payload: unknown) {
+export function parseAvailabilityPayload(payload: unknown): ValidationResult<{
+  diasDisponiveis: string[];
+  periodoPreferido: string;
+}> {
   const parsed = parseVolunteerPayload({
     ...asRecord(payload),
     usuarioId: 1,
@@ -229,7 +291,9 @@ export function parseAvailabilityPayload(payload: unknown) {
   } as const;
 }
 
-export function parseSchedulePayload(payload: unknown) {
+export function parseSchedulePayload(
+  payload: unknown,
+): ValidationResult<SchedulePayload> {
   const body = asRecord(payload);
   const ministerioId = positiveInteger(body.ministerioId);
   const equipeId = positiveInteger(body.equipeId);
@@ -252,11 +316,11 @@ export function parseSchedulePayload(payload: unknown) {
       ].slice(0, 80)
     : [];
   const links = parseSecretaryLinks(body.links);
-  if ("error" in links) return links;
+  if ("error" in links) return { error: links.error };
   const designacoes = parseSecretaryAssignments(body.designacoes);
-  if ("error" in designacoes) return designacoes;
+  if ("error" in designacoes) return { error: designacoes.error };
   const checklist = parseSecretaryChecklist(body.checklist);
-  if ("error" in checklist) return checklist;
+  if ("error" in checklist) return { error: checklist.error };
   if (!ministerioId || !titulo || !iniciaEm || !terminaEm) {
     return {
       error: "Ministério, título, início e término são obrigatórios.",
@@ -293,7 +357,9 @@ export function parseSchedulePayload(payload: unknown) {
   } as const;
 }
 
-export function parseSecretaryLinks(value: unknown) {
+export function parseSecretaryLinks(
+  value: unknown,
+): ValidationResult<{ value: SecretaryLink[] }> {
   if (!Array.isArray(value)) return { value: [] as SecretaryLink[] } as const;
   if (value.length > 20) {
     return { error: "A escala aceita no máximo 20 links." } as const;
@@ -325,7 +391,9 @@ export function parseSecretaryLinks(value: unknown) {
   return { value: links } as const;
 }
 
-function parseSecretaryAssignments(value: unknown) {
+function parseSecretaryAssignments(
+  value: unknown,
+): ValidationResult<{ value: SecretaryAssignment[] }> {
   if (!Array.isArray(value)) {
     return { value: [] as SecretaryAssignment[] } as const;
   }
@@ -349,7 +417,9 @@ function parseSecretaryAssignments(value: unknown) {
   return { value: assignments } as const;
 }
 
-function parseSecretaryChecklist(value: unknown) {
+function parseSecretaryChecklist(
+  value: unknown,
+): ValidationResult<{ value: SecretaryChecklistItem[] }> {
   if (!Array.isArray(value)) {
     return { value: [] as SecretaryChecklistItem[] } as const;
   }
@@ -372,7 +442,7 @@ function parseSecretaryChecklist(value: unknown) {
 export function parseCustomFieldAnswers(
   answers: Record<string, unknown>,
   fields: MinistryCustomField[],
-) {
+): ValidationResult<{ value: Record<string, string | number | boolean> }> {
   const normalized: Record<string, string | number | boolean> = {};
   for (const field of fields) {
     const raw = answers[field.id];
@@ -414,7 +484,9 @@ export function parseCustomFieldAnswers(
   return { value: normalized } as const;
 }
 
-export function parseAssignmentPayload(payload: unknown) {
+export function parseAssignmentPayload(
+  payload: unknown,
+): ValidationResult<{ voluntarioId: number; funcao: string }> {
   const body = asRecord(payload);
   const voluntarioId = positiveInteger(body.voluntarioId);
   const funcao = cleanText(body.funcao, 100);
@@ -452,7 +524,10 @@ function normalizeDateTime(value: unknown) {
     : null;
 }
 
-function parseOptionalMediaUrl(value: unknown, provider: "YOUTUBE" | "SPOTIFY") {
+function parseOptionalMediaUrl(
+  value: unknown,
+  provider: "YOUTUBE" | "SPOTIFY",
+): ValidationResult<{ value: string }> {
   const text = cleanText(value, 500);
   if (!text) return { value: "" } as const;
   try {
@@ -484,7 +559,9 @@ function parseOptionalMediaUrl(value: unknown, provider: "YOUTUBE" | "SPOTIFY") 
   }
 }
 
-function parseCustomFields(value: unknown) {
+function parseCustomFields(
+  value: unknown,
+): ValidationResult<{ value: MinistryCustomField[] }> {
   if (!Array.isArray(value)) return { value: [] as MinistryCustomField[] } as const;
   if (value.length > 20) {
     return { error: "Cada modelo aceita no máximo 20 campos personalizados." } as const;

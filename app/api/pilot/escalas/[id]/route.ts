@@ -761,12 +761,12 @@ export async function PATCH(request: Request, context: Context) {
 
   async function audit(
     event: string,
-    metadata: Record<string, string | number | boolean | null>,
+    metadata: Record<string, unknown>,
   ) {
     return recordTenantAudit(
       db,
-      access.context,
-      access.user.id,
+      access.context!,
+      access.user!.id,
       event,
       "SUCESSO",
       metadata,
@@ -780,7 +780,7 @@ export async function PATCH(request: Request, context: Context) {
          WHERE comunidade_id = ? AND escala_id = ?
            AND status IN ('PENDENTE','AGUARDANDO_HORARIO','ATIVO')`,
       )
-      .bind(access.context.comunidadeId, id)
+      .bind(access.context!.comunidadeId, id)
       .all<{ id: number }>();
     if (!rows.results.length) return;
     await db
@@ -791,7 +791,7 @@ export async function PATCH(request: Request, context: Context) {
          WHERE comunidade_id = ? AND escala_id = ?
            AND status IN ('PENDENTE','AGUARDANDO_HORARIO','ATIVO')`,
       )
-      .bind(access.user.id, access.context.comunidadeId, id)
+      .bind(access.user!.id, access.context!.comunidadeId, id)
       .run();
     for (const row of rows.results) {
       const grant = await getTemporaryAccessById(db, Number(row.id), {
@@ -803,7 +803,7 @@ export async function PATCH(request: Request, context: Context) {
           grant,
           "ACESSO_TEMPORARIO_CANCELADO",
           "SUCESSO",
-          access.user.id,
+          access.user!.id,
           { motivo: reason },
         );
       }
@@ -820,7 +820,7 @@ export async function PATCH(request: Request, context: Context) {
          WHERE comunidade_id = ? AND escala_id = ? AND designacao_id = ?
            AND status IN ('PENDENTE','AGUARDANDO_HORARIO','ATIVO')`,
       )
-      .bind(access.context.comunidadeId, id, designationId)
+      .bind(access.context!.comunidadeId, id, designationId)
       .all<{ id: number }>();
     if (!rows.results.length) return;
     await db
@@ -832,8 +832,8 @@ export async function PATCH(request: Request, context: Context) {
            AND status IN ('PENDENTE','AGUARDANDO_HORARIO','ATIVO')`,
       )
       .bind(
-        access.user.id,
-        access.context.comunidadeId,
+        access.user!.id,
+        access.context!.comunidadeId,
         id,
         designationId,
       )
@@ -848,7 +848,7 @@ export async function PATCH(request: Request, context: Context) {
           grant,
           "ACESSO_TEMPORARIO_CANCELADO",
           "SUCESSO",
-          access.user.id,
+          access.user!.id,
           { motivo: reason },
         );
       }

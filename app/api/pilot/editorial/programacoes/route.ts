@@ -54,7 +54,7 @@ export async function POST(request: Request) {
   const payload = await safeJson(request);
   if (!payload) return badRequest("Os dados da programação são inválidos.");
   const parsed = parseSchedule(payload);
-  if ("error" in parsed) return badRequest(parsed.error);
+  if ("error" in parsed) return badRequest(parsed.error || "Dados inválidos.");
   const db = getD1();
   const community = await db
     .prepare("SELECT id FROM comunidades WHERE id = ? AND status = 'ATIVA' LIMIT 1")

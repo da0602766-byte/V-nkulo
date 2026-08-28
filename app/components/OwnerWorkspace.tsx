@@ -109,8 +109,8 @@ export default function OwnerWorkspace({
   );
   const [draggingMetric, setDraggingMetric] = useState<OwnerMetricKey | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (quiet = false) => {
+    if (!quiet) setLoading(true);
     try {
       const response = await fetch("/api/proprietario", { cache: "no-store" });
       const result = (await response.json()) as OwnerData & { error?: string };
@@ -122,11 +122,11 @@ export default function OwnerWorkspace({
       if (Array.isArray(result.ownerLayout?.metricOrder)) {
         setMetricOrder(normalizeMetricOrder(result.ownerLayout.metricOrder));
       }
-      setMessage("");
+      if (!quiet) setMessage("");
     } catch (error) {
       setMessage((error as Error).message);
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
   }, []);
 
@@ -183,7 +183,7 @@ export default function OwnerWorkspace({
             ? "Solicitação recusada e registrada na auditoria."
             : "Solicitação marcada como em análise.",
       );
-      await load();
+      await load(true);
     } catch (error) {
       setMessage((error as Error).message);
     } finally {
@@ -225,7 +225,7 @@ export default function OwnerWorkspace({
       const result = (await response.json()) as { error?: string; status?: string };
       if (!response.ok) throw new Error(result.error || "Não foi possível alterar a comunidade.");
       setMessage(status === "ATIVA" ? "Comunidade restaurada e ativada." : "Comunidade suspensa com registro na auditoria.");
-      await load();
+      await load(true);
     } catch (error) {
       setMessage((error as Error).message);
     } finally {
@@ -250,7 +250,7 @@ export default function OwnerWorkspace({
       const result = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(result.error || "Não foi possível alterar a conta.");
       setMessage(active ? "Conta reativada." : "Conta desativada e sessões encerradas.");
-      await load();
+      await load(true);
     } catch (error) {
       setMessage((error as Error).message);
     } finally {
@@ -277,7 +277,7 @@ export default function OwnerWorkspace({
       const result = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(result.error || "Não foi possível excluir a conta.");
       setMessage("Conta de teste excluída definitivamente.");
-      await load();
+      await load(true);
     } catch (error) {
       setMessage((error as Error).message);
     } finally {
@@ -331,7 +331,7 @@ export default function OwnerWorkspace({
       });
       const result = await response.json() as { error?: string };
       if (!response.ok) throw new Error(result.error || "Não foi possível atualizar a mensagem.");
-      await load();
+      await load(true);
       setMessage(action === "FEEDBACK_RESPONDER" ? "Resposta enviada ao usuário." : action === "FEEDBACK_EXCLUIR" ? "Mensagem excluída." : "Mensagem atualizada.");
     } catch (error) {
       setMessage((error as Error).message);

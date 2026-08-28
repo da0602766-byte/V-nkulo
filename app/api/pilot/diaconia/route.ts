@@ -525,12 +525,12 @@ export async function PATCH(request: Request) {
 
   async function audit(
     event: string,
-    metadata: Record<string, string | number | boolean | null>,
+    metadata: Record<string, unknown>,
   ) {
     return recordTenantAudit(
       db,
-      access.context,
-      access.user.id,
+      access.context!,
+      access.user!.id,
       event,
       "SUCESSO",
       metadata,

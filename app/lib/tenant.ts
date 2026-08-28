@@ -61,6 +61,23 @@ export type TenantContext = {
   } | null;
 };
 
+export type TenantPermissionSuccess = {
+  user: AppUser;
+  context: TenantContext;
+  memberships: TenantMembership[];
+};
+
+export type TenantPermissionFailure = {
+  error: Response;
+  user?: never;
+  context?: never;
+  memberships?: never;
+};
+
+export type TenantPermissionResult =
+  | TenantPermissionSuccess
+  | TenantPermissionFailure;
+
 type MembershipRow = {
   membership_id: number;
   comunidade_id: number;
@@ -338,7 +355,9 @@ async function getDiaconiaPermissions(
   return permissions;
 }
 
-export async function requireTenantPermission(permission: string) {
+export async function requireTenantPermission(
+  permission: string,
+): Promise<TenantPermissionResult> {
   const user = await getSessionUser();
   if (!user) {
     return {
@@ -370,7 +389,11 @@ export async function requireTenantPermission(permission: string) {
       ),
     } as const;
   }
-  return { user, ...tenant } as const;
+  return {
+    user,
+    context: tenant.context,
+    memberships: tenant.memberships,
+  };
 }
 
 export async function getActiveParkingAssignment(

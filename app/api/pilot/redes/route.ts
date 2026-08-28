@@ -9,7 +9,16 @@ import {
   parseNetworkUnitUpdate,
 } from "../../../lib/network-validation";
 import { recordTenantAudit } from "../../../lib/tenant-audit";
-import { requireTenantPermission } from "../../../lib/tenant";
+import {
+  requireTenantPermission,
+  type TenantPermissionSuccess,
+} from "../../../lib/tenant";
+
+type NetworkAccess =
+  | { error: Response }
+  | (TenantPermissionSuccess & {
+      flags: Awaited<ReturnType<typeof getPilotFeatureState>>;
+    });
 
 export async function GET() {
   const access = await requireNetworkAccess("networks.view");
@@ -172,6 +181,8 @@ export async function GET() {
 export async function POST(request: Request) {
   const access = await requireNetworkAccess("networks.manage");
   if ("error" in access) return access.error;
+  const accessContext = access.context;
+  const accessUser = access.user;
   const payload = (await request.json()) as Record<string, unknown>;
   const action = String(payload.action || "").toUpperCase();
   const db = getD1();
@@ -184,7 +195,7 @@ export async function POST(request: Request) {
       );
     }
     const parsed = parseNetwork(payload);
-    if ("error" in parsed) return badRequest(parsed.error);
+    if ("error" in parsed) return badRequest(parsed.error || "Dados inválidos.");
     const community = await activeCommunity(parsed.comunidadeMaeId);
     if (!community) return notFound("Igreja-mãe não encontrada.");
     try {
@@ -234,7 +245,7 @@ export async function POST(request: Request) {
 
   if (action === "VINCULAR_UNIDADE") {
     const parsed = parseNetworkUnit(payload);
-    if ("error" in parsed) return badRequest(parsed.error);
+    if ("error" in parsed) return badRequest(parsed.error || "Dados inválidos.");
     if (!(await canManageNetwork(parsed.redeId))) return forbidden();
     if (
       ["AFILIADA", "CONGREGACAO", "UNIDADE_REGIONAL"].includes(parsed.tipo) &&
@@ -310,7 +321,7 @@ export async function POST(request: Request) {
 
   if (action === "DEFINIR_RESPONSAVEL") {
     const parsed = parseNetworkUnitUpdate(payload);
-    if ("error" in parsed) return badRequest(parsed.error);
+    if ("error" in parsed) return badRequest(parsed.error || "Dados inválidos.");
     if (!(await canManageNetwork(parsed.redeId))) return forbidden();
     const unit = await db
       .prepare(
@@ -367,7 +378,7 @@ export async function POST(request: Request) {
 
   if (action === "ADICIONAR_GESTOR") {
     const parsed = parseNetworkManager(payload);
-    if ("error" in parsed) return badRequest(parsed.error);
+    if ("error" in parsed) return badRequest(parsed.error || "Dados inválidos.");
     if (!(await canManageNetwork(parsed.redeId))) return forbidden();
     const eligible = await db
       .prepare(
@@ -413,7 +424,7 @@ export async function POST(request: Request) {
   if (action === "ATUALIZAR_COMERCIAL") {
     if (!access.context.isSuperadmin) return forbidden();
     const parsed = parseNetworkCommercial(payload);
-    if ("error" in parsed) return badRequest(parsed.error);
+    if ("error" in parsed) return badRequest(parsed.error || "Dados inválidos.");
     await db
       .prepare(
         `UPDATE redes_igrejas
@@ -446,7 +457,7 @@ export async function POST(request: Request) {
   if (action === "SALVAR_PLANO") {
     if (!access.context.isSuperadmin) return forbidden();
     const parsed = parseNetworkPlan(payload);
-    if ("error" in parsed) return badRequest(parsed.error);
+    if ("error" in parsed) return badRequest(parsed.error || "Dados inválidos.");
     try {
       const result = await db
         .prepare(
@@ -484,7 +495,7 @@ export async function POST(request: Request) {
   return badRequest("Ação inválida.");
 
   async function canManageNetwork(redeId: number) {
-    if (access.context.isSuperadmin) return true;
+    if (accessContext.isSuperadmin) return true;
     const manager = await db
       .prepare(
         `SELECT id FROM rede_administradores
@@ -494,7 +505,7 @@ export async function POST(request: Request) {
            AND (termina_em IS NULL OR datetime(termina_em) > datetime('now'))
          LIMIT 1`,
       )
-      .bind(redeId, access.user.id)
+      .bind(redeId, accessUser.id)
       .first<{ id: number }>();
     return Boolean(manager);
   }
@@ -508,12 +519,12 @@ export async function POST(request: Request) {
 
   async function audit(
     event: string,
-    metadata: Record<string, string | number | boolean | null>,
+    metadata: Record<string, unknown>,
   ) {
     return recordTenantAudit(
       db,
-      access.context,
-      access.user.id,
+      accessContext,
+      accessUser.id,
       event,
       "SUCESSO",
       metadata,
@@ -521,7 +532,7 @@ export async function POST(request: Request) {
   }
 }
 
-async function requireNetworkAccess(permission: string) {
+async function requireNetworkAccess(permission: string): Promise<NetworkAccess> {
   const access = await requireTenantPermission("dashboard.view");
   if ("error" in access) return access;
   const flags = await getPilotFeatureState(access.context.comunidadeId);
@@ -544,7 +555,12 @@ async function requireNetworkAccess(permission: string) {
       ),
     } as const;
   }
-  return { ...access, flags } as const;
+  return {
+    user: access.user,
+    context: access.context,
+    memberships: access.memberships,
+    flags,
+  };
 }
 
 function emptyPayload(flags: Awaited<ReturnType<typeof getPilotFeatureState>>) {

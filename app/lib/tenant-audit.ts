@@ -21,7 +21,7 @@ export async function recordTenantAudit(
   userId: number,
   event: string,
   result: "SUCESSO" | "NEGADO" | "ERRO",
-  metadata: Record<string, string | number | boolean | null> = {},
+  metadata: Record<string, unknown> = {},
 ) {
   await db.batch([
     db

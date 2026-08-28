@@ -57,6 +57,7 @@ type View =
   | "visitantes"
   | "celulas"
   | "estacionamento"
+  | "diaconia"
   | "redes"
   | "membro"
   | "lider"

@@ -266,11 +266,14 @@ export async function POST(request: Request) {
   if (action === "CRIAR_FUNCAO") {
     const ministryId = positiveInteger(payload.ministerioId);
     const parsed = parseCustomFunctionPayload(payload);
-    if (!ministryId || "error" in parsed) {
+    if (!ministryId) {
       return Response.json(
-        { error: !ministryId ? "Ministério obrigatório." : parsed.error },
+        { error: "Ministério obrigatório." },
         { status: 400 },
       );
+    }
+    if ("error" in parsed) {
+      return Response.json({ error: parsed.error }, { status: 400 });
     }
     if (
       !(await canManageMinistry(
@@ -370,12 +373,12 @@ export async function POST(request: Request) {
 
   async function audit(
     event: string,
-    metadata: Record<string, string | number | boolean | null>,
+    metadata: Record<string, unknown>,
   ) {
     return recordTenantAudit(
       db,
-      access.context,
-      access.user.id,
+      access.context!,
+      access.user!.id,
       event,
       "SUCESSO",
       metadata,
@@ -454,11 +457,14 @@ export async function PATCH(request: Request) {
   if (action === "ATUALIZAR_FUNCAO") {
     const id = positiveInteger(payload.id);
     const parsed = parseCustomFunctionPayload(payload);
-    if (!id || "error" in parsed) {
+    if (!id) {
       return Response.json(
-        { error: !id ? "Função inválida." : parsed.error },
+        { error: "Função inválida." },
         { status: 400 },
       );
+    }
+    if ("error" in parsed) {
+      return Response.json({ error: parsed.error }, { status: 400 });
     }
     const row = await db
       .prepare(
@@ -515,11 +521,14 @@ export async function PATCH(request: Request) {
   if (action === "ATUALIZAR_MODELO") {
     const id = positiveInteger(payload.id);
     const parsed = parseScheduleTemplatePayload(payload);
-    if (!id || "error" in parsed) {
+    if (!id) {
       return Response.json(
-        { error: !id ? "Modelo inválido." : parsed.error },
+        { error: "Modelo inválido." },
         { status: 400 },
       );
+    }
+    if ("error" in parsed) {
+      return Response.json({ error: parsed.error }, { status: 400 });
     }
     const row = await db
       .prepare(

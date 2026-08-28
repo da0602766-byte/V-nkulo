@@ -10,15 +10,16 @@ test("cadastros recolhem informações sem remover dados ou ações", async () =
     source("app/globals.css"),
   ]);
 
-  assert.match(workspace, /<details className="visitor-registration-section" open>/);
-  assert.equal((workspace.match(/className="visitor-registration-section"/g) || []).length, 4);
+  assert.doesNotMatch(workspace, /<details className="visitor-registration-section"/);
+  assert.equal((workspace.match(/visitor-registration-form-section/g) || []).length, 4);
+  assert.match(workspace, /<form className="pilot-form visitor-registration"/);
   assert.match(workspace, /<details\s+className=\{selectedId === visitor\.id/);
   assert.match(workspace, /className="visitor-card-summary-meta"/);
   assert.match(workspace, /className="visitor-card-collapsible"/);
   assert.match(workspace, /visitor-card-action visitor-whatsapp-link/);
   assert.match(workspace, /visitor-card-action visitor-card-action-primary/);
   assert.match(workspace, /visitor-card-action visitor-card-action-danger/);
-  assert.match(styles, /\.visitor-registration-section\[open\]>summary>i/);
+  assert.match(styles, /\.visitor-registration-form-section>fieldset\s*\{[^}]*display:grid!important/s);
   assert.match(styles, /\.operations-list>details\[open\] \.visitor-card-chevron/);
 });
 
