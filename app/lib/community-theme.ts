@@ -82,17 +82,20 @@ export const COMMUNITY_PALETTES: CommunityPalette[] = [
       accent: "#159aa0",
       shadow: "0 22px 58px rgba(39, 48, 73, 0.11)",
     },
+    // O modo escuro troca o violeta por grafite neutro nas superfícies, mas
+    // mantém um acento vivo: a seriedade vem do fundo, não da falta de cor.
+    // A identidade violeta permanece no modo claro.
     dark: {
-      background: "#070a11",
-      surface: "#101521",
-      surface2: "#171e2c",
-      text: "#f4f2f8",
-      muted: "#a8afbd",
-      line: "#293143",
-      primary: "#8a5cf2",
-      secondary: "#528eea",
-      accent: "#38c2c8",
-      shadow: "0 24px 72px rgba(0, 0, 0, 0.42)",
+      background: "#0b0d10",
+      surface: "#15181d",
+      surface2: "#1e232a",
+      text: "#edf1f5",
+      muted: "#98a3b0",
+      line: "#2e353e",
+      primary: "#4d9fff",
+      secondary: "#3d84e0",
+      accent: "#3fc9b0",
+      shadow: "0 24px 72px rgba(0, 0, 0, 0.55)",
     },
   },
   {

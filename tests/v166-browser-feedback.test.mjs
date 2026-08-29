@@ -9,7 +9,7 @@ test("mobile navigation keeps compact captions and teams open as accordions", as
   const ministries = await read("app/components/SecretaryMinisterialWorkspace.tsx");
   const styles = await read("app/globals.css");
   assert.match(dashboard, /pilot-mobile-label/);
-  assert.match(styles, /\.pilot-mobile-nav>a,[\s\S]*font-size:7px/);
+  assert.match(styles, /\.pilot-mobile-nav>a,[\s\S]*font-size:var\(--fs-2xs\)/);
   assert.match(ministries, /expandedTeamId/);
   assert.match(ministries, /ministry-team-collapse-trigger/);
 });

@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import AgendaCalendar from "./AgendaCalendar";
 
 type CommunityEvent = {
   id: number;
@@ -374,6 +375,23 @@ export default function EventsWorkspace({
         </div>
         <span className="scope-badge">Escopo do servidor</span>
       </header>
+
+      {/* O calendário reúne, em camadas, o que já existe espalhado: eventos da
+          comunidade, as escalas desta pessoa e os compromissos que ela mesma
+          marcou. A lista de gestão de eventos continua abaixo. */}
+      <AgendaCalendar
+        podeVerEventos={permissions.includes("events.view")}
+        aoCriarEvento={
+          canManage
+            ? () => {
+                const alvo = detailsRef.current;
+                if (!alvo) return;
+                alvo.open = true;
+                alvo.scrollIntoView({ behavior: "smooth", block: "start" });
+              }
+            : undefined
+        }
+      />
 
       <div className="operations-notice">
         <strong>Dados separados por comunidade</strong>
