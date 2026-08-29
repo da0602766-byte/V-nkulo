@@ -15,11 +15,21 @@ test("menu móvel preserva dimensões visíveis para todos os ícones", () => {
 test("Mural usa símbolo diferente da página inicial", () => {
   const dashboard = read("app/components/PilotDashboard.tsx");
   const home = dashboard.match(/inicio: "([^"]+)"/)?.[1];
-  const wall = dashboard.match(/comunidade: "([^"]+)"/)?.[1];
+  const wall = dashboard.match(/mural: "([^"]+)"/)?.[1];
 
   assert.ok(home && wall);
   assert.notEqual(wall, home);
   assert.match(wall, /M4 5h16v14/);
+  assert.match(dashboard, /MenuIcon id=\{item\.key as MenuIconId\}/);
+});
+
+test("Escalas usa símbolo diferente de Ministérios", () => {
+  const dashboard = read("app/components/PilotDashboard.tsx");
+  const ministries = dashboard.match(/ministerios: "([^"]+)"/)?.[1];
+  const schedules = dashboard.match(/escalas: "([^"]+)"/)?.[1];
+
+  assert.ok(ministries && schedules);
+  assert.notEqual(schedules, ministries);
 });
 
 test("atalho visual é removido e Ajuda não cobre diálogos", () => {

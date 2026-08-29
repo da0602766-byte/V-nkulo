@@ -859,7 +859,7 @@ export default function PilotDashboard({
             <nav aria-label="Resultados da busca">
               {navigationSearchResults.map((item) => item && (
                 <button key={item.key} type="button" onClick={() => { setNavigationSearchOpen(false); setNavigationSearch(""); openView(item.id); }}>
-                  <span aria-hidden="true"><MenuIcon id={item.id} /></span>
+                  <span aria-hidden="true"><MenuIcon id={item.key as MenuIconId} /></span>
                   <strong>{item.label}</strong>
                 </button>
               ))}
@@ -1012,7 +1012,7 @@ export default function PilotDashboard({
                     aria-label={item.label}
                     title={item.label}
                   >
-                    <span className="pilot-sidebar-icon" aria-hidden="true"><MenuIcon id={item.id} /></span>
+                    <span className="pilot-sidebar-icon" aria-hidden="true"><MenuIcon id={item.key as MenuIconId} /></span>
                     <span className="pilot-sidebar-label">{item.label}</span>
                   </button>
                 ))}
@@ -1375,11 +1375,14 @@ function getInitials(name: string) {
     .join("") || "US";
 }
 
-function MenuIcon({ id }: { id: View }) {
-  const paths: Partial<Record<View, string>> = {
+type MenuIconId = View | "mural" | "escalas";
+
+function MenuIcon({ id }: { id: MenuIconId }) {
+  const paths: Partial<Record<MenuIconId, string>> = {
     inicio: "M3 11.5 12 4l9 7.5v8a1.5 1.5 0 0 1-1.5 1.5h-5v-6h-5v6h-5A1.5 1.5 0 0 1 3 19.5v-8Z",
     eventos: "M5 4h14a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm0 6h14M8 2v4m8-4v4",
     ministerios: "M12 3v18m-7-9h14M7 7h10v10H7z",
+    escalas: "M7 4h10v3H7V4Zm-2 2h14v15H5V6Zm3 6 2 2 4-4m-6 7h7",
     diaconia: "M6 20v-8a6 6 0 0 1 12 0v8M9 8a3 3 0 1 1 6 0",
     solicitacoes: "M12 21s-8-4.4-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 6.6-8 11-8 11Z",
     visitantes: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m7-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8m9-2v6m3-3h-6",
@@ -1388,7 +1391,8 @@ function MenuIcon({ id }: { id: View }) {
     membro: "M20 21a8 8 0 0 0-16 0m8-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8",
     lider: "M12 3 3 8l3 13h12l3-13-9-5Zm0 0v18",
     pessoas: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2m8-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8m8 1a4 4 0 0 1 4 4v2m-4-18a4 4 0 0 1 0 8",
-    comunidade: "M4 5h16v14H4V5Zm3 3h4v4H7V8Zm7 0h3m-3 3h3M7 15h10",
+    mural: "M4 5h16v14H4V5Zm3 3h4v4H7V8Zm7 0h3m-3 3h3M7 15h10",
+    comunidade: "M4 7h10m4 0h2M14 5v4M4 17h2m4 0h10M8 15v4M4 12h4m4 0h8M10 10v4",
     continuidade: "M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5",
     redes: "M12 8a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM5 22v-2a7 7 0 0 1 14 0v2",
     "visual-editor": "m4 20 4.5-1 10-10a2.8 2.8 0 0 0-4-4l-10 10L4 20Zm9-13 4 4",
