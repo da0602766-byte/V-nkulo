@@ -11,7 +11,6 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import ResponsiveFeedImage from "./ResponsiveFeedImage";
-import CommunityPresencePanel from "./CommunityPresencePanel";
 import NativeImageUpload from "./NativeImageUpload";
 import CommunityPostInteractions from "./CommunityPostInteractions";
 import CommunityPostShare from "./CommunityPostShare";
@@ -55,20 +54,6 @@ type EventItem = {
   status: string;
   criado_por?: number | null;
   categoria?: string;
-};
-
-type CellItem = {
-  id: number;
-  nome: string;
-  responsavel: string;
-  visitantes_ativos: number;
-};
-
-type MinistryItem = {
-  id: number;
-  nome: string;
-  categoria: string;
-  voluntarios?: unknown[];
 };
 
 type ScheduleAssignment = {
@@ -121,8 +106,6 @@ export default function CommunityHome({
 }) {
   const [posts, setPosts] = useState<FeedItem[]>(initialFeed);
   const [events, setEvents] = useState<EventItem[]>([]);
-  const [cells, setCells] = useState<CellItem[]>([]);
-  const [ministries, setMinistries] = useState<MinistryItem[]>([]);
   const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
@@ -149,7 +132,6 @@ export default function CommunityHome({
   const feedAbortRef = useRef<AbortController | null>(null);
   const feedRequestRef = useRef(0);
   const canPublish = permissions.includes("feed.publish");
-  const canViewCells = permissions.includes("cells.view");
   const canViewSchedules = permissions.includes("schedules.view");
   const scrollKey = `vinkulo-community-feed-scroll:${communitySlug}`;
 
@@ -175,24 +157,18 @@ export default function CommunityHome({
     setLoading(true);
     setError("");
     try {
-      const [feedResponse, eventResponse, ministryResponse, cellResponse, scheduleResponse] =
+      const [feedResponse, eventResponse, scheduleResponse] =
         await Promise.all([
           fetch("/api/pilot/publicacoes?limit=10", { cache: "no-store" }),
           readOnlyFeed ? null : fetch("/api/pilot/eventos", { cache: "no-store" }),
-          readOnlyFeed ? null : fetch("/api/pilot/ministerios", { cache: "no-store" }),
-          !readOnlyFeed && canViewCells
-            ? fetch("/api/pilot/celulas", { cache: "no-store" })
-            : null,
           !readOnlyFeed && canViewSchedules
             ? fetch("/api/pilot/escalas", { cache: "no-store" })
             : null,
         ]);
-      const [feedResult, eventResult, ministryResult, cellResult, scheduleResult] =
+      const [feedResult, eventResult, scheduleResult] =
         await Promise.all([
           readJson<Record<string, unknown>>(feedResponse),
           eventResponse ? readJson<Record<string, unknown>>(eventResponse) : Promise.resolve({} as Record<string, unknown>),
-          ministryResponse ? readJson<Record<string, unknown>>(ministryResponse) : Promise.resolve({} as Record<string, unknown>),
-          cellResponse ? readJson<Record<string, unknown>>(cellResponse) : Promise.resolve({} as Record<string, unknown>),
           scheduleResponse ? readJson<Record<string, unknown>>(scheduleResponse) : Promise.resolve({} as Record<string, unknown>),
         ]);
       if (!feedResponse.ok) {
@@ -204,15 +180,13 @@ export default function CommunityHome({
       setFeedCursor(String(feedResult.nextCursor || "") || null);
       setFeedHasMore(Boolean(feedResult.hasMore));
       if (eventResponse?.ok) setEvents((eventResult.eventos || []) as EventItem[]);
-      if (ministryResponse?.ok) setMinistries((ministryResult.ministerios || []) as MinistryItem[]);
-      if (cellResponse?.ok) setCells((cellResult.celulas || []) as CellItem[]);
       if (scheduleResponse?.ok) setSchedules((scheduleResult.escalas || []) as ScheduleItem[]);
     } catch (loadError) {
       setError((loadError as Error).message);
     } finally {
       setLoading(false);
     }
-  }, [canViewCells, canViewSchedules, readOnlyFeed]);
+  }, [canViewSchedules, readOnlyFeed]);
 
   const refreshFeed = useCallback(async () => {
     const response = await fetch("/api/pilot/publicacoes?limit=10", { cache: "no-store" });
@@ -338,6 +312,43 @@ export default function CommunityHome({
     ),
   ).length;
 
+  const dayThread = useMemo(() => {
+    const eventItems = upcomingEvents.map((item) => ({
+      id: `event-${item.id}`,
+      kind: "Evento",
+      title: item.titulo,
+      detail: item.local || "Local a confirmar",
+      date: item.inicia_em,
+      action: "Ver na agenda",
+      href: "/painel?view=eventos",
+    }));
+    const scheduleItems = myUpcomingSchedules.map((item) => ({
+      id: `schedule-${item.id}`,
+      kind: "Escala",
+      title: item.titulo,
+      detail: `${item.ministerio_nome} · ${item.local || "Local a confirmar"}`,
+      date: item.inicia_em,
+      action: "Responder à escala",
+      href: "/painel?view=ministerios",
+    }));
+    const postItems = posts.slice(0, 2).map((item) => ({
+      id: `post-${item.id}`,
+      kind: "Mural",
+      title: item.titulo,
+      detail: item.autor_nome || communityName,
+      date: item.criado_em,
+      action: "Ler publicação",
+      href: `#publicacao-${item.id}`,
+    }));
+    return [...eventItems, ...scheduleItems, ...postItems]
+      .filter((item) => !Number.isNaN(Date.parse(item.date)))
+      .sort((left, right) => Date.parse(left.date) - Date.parse(right.date))
+      .slice(0, 7);
+  }, [communityName, myUpcomingSchedules, posts, upcomingEvents]);
+  const currentMomentIndex = dayThread.findIndex(
+    (item) => Date.parse(item.date) >= renderedAt,
+  );
+
   async function respondToSchedule(
     scheduleId: number,
     status: "CONFIRMADA" | "INDISPONIVEL",
@@ -372,7 +383,9 @@ export default function CommunityHome({
       setScheduleFeedback(
         status === "CONFIRMADA"
           ? "Presença confirmada. A liderança responsável foi avisada."
-          : "Indisponibilidade registrada. A pessoa indicada recebeu a escala para confirmar.",
+          : substitutoVoluntarioId
+            ? "Indisponibilidade registrada. A pessoa indicada recebeu a escala para confirmar."
+            : "Indisponibilidade registrada. A liderança responsável foi avisada.",
       );
     } catch (cause) {
       setScheduleFeedback((cause as Error).message);
@@ -525,18 +538,15 @@ export default function CommunityHome({
     <section className="community-home" aria-busy={loading}>
       <header className="community-home-welcome community-home-command">
         <div className="community-home-intro">
-          <h1>Bem-vindo, {userName.split(/\s+/)[0]}</h1>
+          <h1>Seu dia no Vínkulo</h1>
           <p>
-            Acompanhe sua comunidade, responda às próximas escalas e encontre
-            o que precisa sem perder o contexto.
+            Olá, {userName.split(/\s+/)[0]}. Veja o que acontece hoje em {communityName}
+            e resolva cada pendência no contexto certo.
           </p>
         </div>
         <div className="community-home-actions">
+          {canPublish && <button type="button" className="community-composer-trigger" onClick={() => setComposerOpen(true)}>Criar publicação</button>}
           <Link href={`/comunidades/${communitySlug}`}>Página pública</Link>
-        </div>
-        <div className="community-home-kpis" aria-label="Resumo da comunidade">
-          <article><span aria-hidden="true">□</span><div><strong>{upcomingEvents.length}</strong><small>próximos eventos</small></div></article>
-          <article className={pendingSchedules ? "attention" : ""}><span aria-hidden="true">✓</span><div><strong>{pendingSchedules}</strong><small>escalas aguardando resposta</small></div></article>
         </div>
       </header>
 
@@ -556,19 +566,6 @@ export default function CommunityHome({
 
       {canPublish && (
         <section className="community-composer">
-          <button
-            type="button"
-            className="community-composer-trigger"
-            aria-haspopup="dialog"
-            aria-expanded={composerOpen}
-            onClick={() => setComposerOpen(true)}
-          >
-            <span>+</span>
-            <div>
-              <strong>Criar publicação</strong>
-              <small>Rascunho ou publicação interna da comunidade</small>
-            </div>
-          </button>
           {composerOpen && typeof document !== "undefined" && createPortal(
             <div
               className="community-composer-overlay"
@@ -683,10 +680,47 @@ export default function CommunityHome({
 
       <div className={`community-home-grid ${readOnlyFeed ? "feed-only" : ""}`}>
         <div className="community-feed-panel">
-          <header>
+          <section className="home-day-thread" aria-labelledby="home-day-thread-title">
+            <header>
+              <div>
+                <p className="pilot-kicker">FIO DO DIA</p>
+                <h2 id="home-day-thread-title">Hoje na comunidade</h2>
+              </div>
+              <time dateTime={new Date(renderedAt).toISOString()}>{formatLongDay(renderedAt)}</time>
+            </header>
+            {loading && !dayThread.length ? (
+              <p className="home-thread-empty">Organizando seu dia…</p>
+            ) : dayThread.length ? (
+              <ol className="home-timeline">
+                {dayThread.map((item, index) => (
+                  <li key={item.id}>
+                    {index === currentMomentIndex && (
+                      <div className="home-timeline-now" aria-label="Momento atual">
+                        <time>{formatTime(renderedAt)}</time><span>Agora</span>
+                      </div>
+                    )}
+                    <time dateTime={item.date}>{formatTime(item.date)}</time>
+                    <span className="home-timeline-node" aria-hidden="true" />
+                    <div className="home-timeline-content">
+                      <small>{item.kind}</small>
+                      <h3>{item.title}</h3>
+                      <p>{item.detail}</p>
+                      <Link href={item.href}>{item.action}</Link>
+                    </div>
+                  </li>
+                ))}
+                {currentMomentIndex < 0 && (
+                  <li className="home-timeline-now-row"><div className="home-timeline-now"><time>{formatTime(renderedAt)}</time><span>Agora</span></div></li>
+                )}
+              </ol>
+            ) : (
+              <div className="home-thread-empty"><strong>Seu dia está livre por enquanto</strong><p>Consulte a agenda completa para planejar os próximos encontros.</p><Link href="/painel?view=eventos">Abrir agenda</Link></div>
+            )}
+          </section>
+          <header id="mural">
             <div>
-              <p className="pilot-kicker">FEED DA COMUNIDADE</p>
-              <h2>Atualizações recentes</h2>
+              <p className="pilot-kicker">MURAL</p>
+              <h2>Atualizações da comunidade</h2>
             </div>
             <span className={loading ? "community-home-loading" : "community-feed-count"}>
               {loading ? "Atualizando…" : `${posts.length}`}
@@ -999,7 +1033,7 @@ export default function CommunityHome({
               {scheduleFeedback && <p className="community-schedule-feedback" role="status">{scheduleFeedback}</p>}
               {myUpcomingSchedules.length ? (
                 <div className="community-schedule-list">
-                  {myUpcomingSchedules.map((schedule) => {
+                  {myUpcomingSchedules.slice(0, 1).map((schedule) => {
                     const assignment = schedule.designacoes.find((item) => Boolean(item.is_mine));
                     if (!assignment) return null;
                     const pending = assignment.status === "PENDENTE";
@@ -1021,7 +1055,13 @@ export default function CommunityHome({
                               type="button"
                               disabled={scheduleWorkingId === schedule.id}
                               onClick={() => void respondToSchedule(schedule.id, "CONFIRMADA")}
-                            >Confirmar</button>
+                            >Confirmar minha presença</button>
+                            <button
+                              type="button"
+                              className="secondary"
+                              disabled={scheduleWorkingId === schedule.id}
+                              onClick={() => void respondToSchedule(schedule.id, "INDISPONIVEL")}
+                            >Não poderei participar</button>
                             <button
                               type="button"
                               className="secondary"
@@ -1030,7 +1070,7 @@ export default function CommunityHome({
                                 setReplacementScheduleId(schedule.id);
                                 setReplacementVolunteerId(0);
                               }}
-                            >Não posso</button>
+                            >Pedir substituição</button>
                           </div>
                         ) : (
                           <span className={`community-schedule-state ${assignment.status.toLowerCase()}`}>
@@ -1078,7 +1118,14 @@ export default function CommunityHome({
               )}
             </section>
           )}
-          <CommunityPresencePanel />
+          <section className="home-needs-you">
+            <header><div><p className="pilot-kicker">PRECISA DE VOCÊ</p><strong>Pendências</strong></div><span>{pendingSchedules}</span></header>
+            {pendingSchedules ? (
+              <div><strong>{pendingSchedules === 1 ? "Uma escala aguarda resposta" : `${pendingSchedules} escalas aguardam resposta`}</strong><p>Confirme sua presença ou avise a liderança com antecedência.</p><Link href="/painel?view=ministerios">Ver todas as escalas</Link></div>
+            ) : (
+              <div className="home-rail-empty"><strong>Nada pendente agora</strong><p>Quando uma ação depender de você, ela aparecerá aqui.</p><Link href="/painel?view=ministerios">Ver ministérios</Link></div>
+            )}
+          </section>
           <section>
             <header>
               <p className="pilot-kicker">PRÓXIMOS EVENTOS</p>
@@ -1099,49 +1146,6 @@ export default function CommunityHome({
               ))
             ) : (
               <p className="home-rail-empty">Nenhum evento publicado.</p>
-            )}
-          </section>
-          <section>
-            <header>
-              <p className="pilot-kicker">MINISTÉRIOS</p>
-              <strong>Servir e participar</strong>
-            </header>
-            {ministries.slice(0, 3).map((item) => (
-              <article className="home-ministry-item" key={item.id}>
-                <span>{item.nome.slice(0, 1)}</span>
-                <div>
-                  <strong>{item.nome}</strong>
-                  <small>
-                    {item.voluntarios?.length || 0} pessoas na equipe
-                  </small>
-                </div>
-              </article>
-            ))}
-            {!ministries.length && (
-              <p className="home-rail-empty">Nenhum ministério ativo.</p>
-            )}
-          </section>
-          <section>
-            <header>
-              <p className="pilot-kicker">CÉLULAS</p>
-              <strong>Pequenos grupos</strong>
-            </header>
-            {!canViewCells ? (
-              <p className="home-rail-empty">
-                Acesso conforme o perfil e o vínculo da pessoa.
-              </p>
-            ) : cells.length ? (
-              cells.slice(0, 3).map((item) => (
-                <article className="home-ministry-item" key={item.id}>
-                  <span>◇</span>
-                  <div>
-                    <strong>{item.nome}</strong>
-                    <small>Responsável: {item.responsavel}</small>
-                  </div>
-                </article>
-              ))
-            ) : (
-              <p className="home-rail-empty">Nenhuma célula cadastrada.</p>
             )}
           </section>
         </aside>}
@@ -1206,6 +1210,25 @@ function formatDateTime(value: string) {
     minute: "2-digit",
     timeZone: "America/Sao_Paulo",
   }).format(date);
+}
+
+function formatTime(value: string | number) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "--:--";
+  return new Intl.DateTimeFormat("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "America/Sao_Paulo",
+  }).format(date);
+}
+
+function formatLongDay(value: number) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+    timeZone: "America/Sao_Paulo",
+  }).format(new Date(value));
 }
 
 function parsePostLinks(value?: string) {

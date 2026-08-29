@@ -16,11 +16,11 @@ const STATUS = new Set([
 const PAGE_SIZE = 10;
 
 const VISIONS = new Set([
-  "visitantes",
-  "acompanhamentos",
+  "todos",
+  "novos",
+  "acompanhamento",
   "pendencias",
-  "encaminhamentos",
-  "historico",
+  "sem_contato",
   "arquivados",
 ]);
 
@@ -31,8 +31,8 @@ export async function GET(request: Request) {
   const search = String(params.get("busca") || "").trim().slice(0, 80);
   const cursor = Math.max(0, Number(params.get("cursor") || 0) || 0);
   const categoryParam = String(params.get("categoria") || "").trim();
-  const requestedVision = String(params.get("visao") || "visitantes").trim();
-  const vision = VISIONS.has(requestedVision) ? requestedVision : "visitantes";
+  const requestedVision = String(params.get("visao") || "todos").trim();
+  const vision = VISIONS.has(requestedVision) ? requestedVision : "todos";
   const categoryMode = categoryParam === "sem-categoria"
     ? -1
     : Math.max(0, Number(categoryParam) || 0);
@@ -100,20 +100,24 @@ export async function GET(request: Request) {
           OR (? <> 'arquivados' AND v.ativo = 1)
         )
         AND (
-          ? = 'visitantes'
+          ? = 'todos'
           OR ? = 'arquivados'
-          OR (? IN ('acompanhamentos', 'historico') AND EXISTS (
-            SELECT 1 FROM acompanhamentos ax
-            WHERE ax.visitante_id = v.id AND ax.comunidade_id = v.comunidade_id
-              AND ax.escopo_confirmado = 1
-          ))
+          OR (? = 'novos' AND v.status = 'NOVO')
+          OR (? = 'acompanhamento' AND v.status = 'EM_ACOMPANHAMENTO')
           OR (? = 'pendencias' AND EXISTS (
             SELECT 1 FROM acompanhamentos ax
             WHERE ax.visitante_id = v.id AND ax.comunidade_id = v.comunidade_id
               AND ax.escopo_confirmado = 1 AND ax.proximo_contato IS NOT NULL
               AND ax.proximo_contato <= date('now')
           ))
-          OR (? = 'encaminhamentos' AND v.status IN ('EM_CONTATO', 'EM_ACOMPANHAMENTO'))
+          OR (? = 'sem_contato'
+            AND date(v.data_entrada) <= date('now', '-15 days')
+            AND NOT EXISTS (
+              SELECT 1 FROM acompanhamentos ax
+              WHERE ax.visitante_id = v.id AND ax.comunidade_id = v.comunidade_id
+                AND ax.escopo_confirmado = 1
+                AND datetime(ax.criado_em) > datetime('now', '-15 days')
+            ))
         )
         AND (? = 0 OR v.id < ?)
         AND (? = 0 OR (? = -1 AND v.categoria_id IS NULL) OR v.categoria_id = ?)
@@ -123,6 +127,7 @@ export async function GET(request: Request) {
     )
     .bind(
       access.context.comunidadeId,
+      vision,
       vision,
       vision,
       vision,
@@ -160,21 +165,24 @@ export async function GET(request: Request) {
   const counts = await db
     .prepare(
       `SELECT
-        SUM(CASE WHEN v.ativo = 1 THEN 1 ELSE 0 END) AS visitantes,
+        SUM(CASE WHEN v.ativo = 1 THEN 1 ELSE 0 END) AS todos,
         SUM(CASE WHEN v.ativo = 0 THEN 1 ELSE 0 END) AS arquivados,
-        SUM(CASE WHEN v.ativo = 1 AND EXISTS (
-          SELECT 1 FROM acompanhamentos a
-          WHERE a.visitante_id = v.id AND a.comunidade_id = v.comunidade_id
-            AND a.escopo_confirmado = 1
-        ) THEN 1 ELSE 0 END) AS acompanhamentos,
+        SUM(CASE WHEN v.ativo = 1 AND v.status = 'NOVO' THEN 1 ELSE 0 END) AS novos,
+        SUM(CASE WHEN v.ativo = 1 AND v.status = 'EM_ACOMPANHAMENTO' THEN 1 ELSE 0 END) AS acompanhamento,
         SUM(CASE WHEN v.ativo = 1 AND EXISTS (
           SELECT 1 FROM acompanhamentos a
           WHERE a.visitante_id = v.id AND a.comunidade_id = v.comunidade_id
             AND a.escopo_confirmado = 1 AND a.proximo_contato IS NOT NULL
             AND a.proximo_contato <= date('now')
         ) THEN 1 ELSE 0 END) AS pendencias,
-        SUM(CASE WHEN v.ativo = 1 AND v.status IN ('EM_CONTATO', 'EM_ACOMPANHAMENTO')
-          THEN 1 ELSE 0 END) AS encaminhamentos
+        SUM(CASE WHEN v.ativo = 1
+          AND date(v.data_entrada) <= date('now', '-15 days')
+          AND NOT EXISTS (
+            SELECT 1 FROM acompanhamentos a
+            WHERE a.visitante_id = v.id AND a.comunidade_id = v.comunidade_id
+              AND a.escopo_confirmado = 1
+              AND datetime(a.criado_em) > datetime('now', '-15 days')
+          ) THEN 1 ELSE 0 END) AS sem_contato
       FROM visitantes v
       WHERE v.comunidade_id = ? AND v.escopo_confirmado = 1`,
     )
@@ -186,11 +194,11 @@ export async function GET(request: Request) {
       nextCursor: hasMore ? Number(visitors.at(-1)?.id || 0) : null,
       aniversariantes: birthdays.results,
       contagens: {
-        visitantes: Number(counts?.visitantes || 0),
-        acompanhamentos: Number(counts?.acompanhamentos || 0),
+        todos: Number(counts?.todos || 0),
+        novos: Number(counts?.novos || 0),
+        acompanhamento: Number(counts?.acompanhamento || 0),
         pendencias: Number(counts?.pendencias || 0),
-        encaminhamentos: Number(counts?.encaminhamentos || 0),
-        historico: Number(counts?.acompanhamentos || 0),
+        sem_contato: Number(counts?.sem_contato || 0),
         arquivados: Number(counts?.arquivados || 0),
       },
     },

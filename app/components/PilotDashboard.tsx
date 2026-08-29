@@ -70,18 +70,18 @@ type View =
   | "mensagens"
   | "conta";
 const MENU: { id: View; label: string; permission: string; symbol: string }[] = [
-  { id: "inicio", label: "Visão geral", permission: "dashboard.view", symbol: "◇" },
-  { id: "eventos", label: "Eventos", permission: "events.view", symbol: "▣" },
+  { id: "inicio", label: "Início", permission: "dashboard.view", symbol: "◇" },
+  { id: "eventos", label: "Agenda", permission: "events.view", symbol: "▣" },
   { id: "ministerios", label: "Ministérios", permission: "ministries.view", symbol: "✣" },
-  { id: "solicitacoes", label: "Oração e solicitações", permission: "dashboard.view", symbol: "♡" },
+  { id: "solicitacoes", label: "Pedidos", permission: "dashboard.view", symbol: "♡" },
   { id: "visitantes", label: "Visitantes", permission: "visitors.view", symbol: "◎" },
   { id: "celulas", label: "Células", permission: "cells.view", symbol: "⬡" },
   { id: "estacionamento", label: "Estacionamento", permission: "parking.view", symbol: "▣" },
   { id: "redes", label: "Redes e unidades", permission: "networks.view", symbol: "⌘" },
   { id: "membro", label: "Painel do membro", permission: "dashboard.view", symbol: "○" },
   { id: "lider", label: "Painel de liderança", permission: "leadership.panel.view", symbol: "△" },
-  { id: "pessoas", label: "Pessoas e oficiais", permission: "people.view", symbol: "♙" },
-  { id: "comunidade", label: "Gestão da comunidade", permission: "dashboard.view", symbol: "□" },
+  { id: "pessoas", label: "Pessoas", permission: "people.view", symbol: "♙" },
+  { id: "comunidade", label: "Configurações", permission: "dashboard.view", symbol: "□" },
   { id: "continuidade", label: "Continuidade", permission: "community.lifecycle.request", symbol: "↻" },
 ];
 const COMMUNITY_MANAGEMENT_VIEWS: CommunityManagementView[] = [
@@ -193,6 +193,8 @@ export default function PilotDashboard({
     "menu" | "perfil" | "actions" | null
   >(null);
   const [communitySearch, setCommunitySearch] = useState("");
+  const [navigationSearch, setNavigationSearch] = useState("");
+  const [navigationSearchOpen, setNavigationSearchOpen] = useState(false);
   const [switching, setSwitching] = useState(false);
   const [viewLoading, setViewLoading] = useState(false);
   const [fontScale, setFontScale] = useState(1);
@@ -312,6 +314,48 @@ export default function PilotDashboard({
       ),
     [allowedMenu],
   );
+  const sidebarGroups = useMemo(() => {
+    const byId = new Map(allowedMenu.map((item) => [item.id, item]));
+    const makeItem = (id: View, label?: string, key?: string) => {
+      const item = byId.get(id);
+      return item ? { ...item, label: label || item.label, key: key || item.id } : null;
+    };
+    return [
+      {
+        label: "Principal",
+        items: [
+          makeItem("inicio", "Início"),
+          makeItem("inicio", "Mural", "mural"),
+          makeItem("eventos", "Agenda"),
+        ].filter(Boolean),
+      },
+      {
+        label: "Comunidade",
+        items: [
+          makeItem("pessoas", "Pessoas"),
+          makeItem("ministerios", "Ministérios"),
+          makeItem("ministerios", "Escalas", "escalas"),
+          makeItem("visitantes", "Visitantes"),
+          makeItem("solicitacoes", "Pedidos"),
+          makeItem("estacionamento", "Estacionamento"),
+          makeItem("celulas"),
+          makeItem("redes"),
+          makeItem("diaconia"),
+        ].filter(Boolean),
+      },
+      {
+        label: "Gestão",
+        items: [makeItem("comunidade", "Configurações")].filter(Boolean),
+      },
+    ];
+  }, [allowedMenu]);
+  const navigationSearchResults = useMemo(() => {
+    const term = navigationSearch.trim().toLocaleLowerCase("pt-BR");
+    return sidebarGroups
+      .flatMap((group) => group.items)
+      .filter((item) => !term || item!.label.toLocaleLowerCase("pt-BR").includes(term))
+      .slice(0, 7);
+  }, [navigationSearch, sidebarGroups]);
   const communityManagementItems = useMemo(
     () =>
       allowedMenu
@@ -409,6 +453,18 @@ export default function PilotDashboard({
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
   }, [communityInfoOpen, mobileMenu]);
+
+  useEffect(() => {
+    const openSearch = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setNavigationSearchOpen(true);
+      }
+      if (event.key === "Escape") setNavigationSearchOpen(false);
+    };
+    document.addEventListener("keydown", openSearch);
+    return () => document.removeEventListener("keydown", openSearch);
+  }, []);
 
   useEffect(() => {
     if (!communityInfoOpen) return;
@@ -702,6 +758,16 @@ export default function PilotDashboard({
               </nav>
             </div>
           </details>
+          <button
+            type="button"
+            className="pilot-command-search-trigger"
+            onClick={() => setNavigationSearchOpen(true)}
+            aria-label="Buscar uma área do Vínkulo"
+          >
+            <span aria-hidden="true">⌕</span>
+            <span>Buscar</span>
+            <kbd>⌘K</kbd>
+          </button>
           <PilotNotificationCenter />
           {active.communityAccess !== "FEED_ONLY" && (
             <button
@@ -782,6 +848,26 @@ export default function PilotDashboard({
           </details>
         </div>
       </header>
+      {navigationSearchOpen && (
+        <div className="pilot-command-search-backdrop" role="presentation" onMouseDown={() => setNavigationSearchOpen(false)}>
+          <section className="pilot-command-search" role="dialog" aria-modal="true" aria-label="Buscar uma área" onMouseDown={(event) => event.stopPropagation()}>
+            <label>
+              <span aria-hidden="true">⌕</span>
+              <input autoFocus type="search" value={navigationSearch} onChange={(event) => setNavigationSearch(event.target.value)} placeholder="Buscar pessoas, agenda, pedidos…" />
+              <kbd>ESC</kbd>
+            </label>
+            <nav aria-label="Resultados da busca">
+              {navigationSearchResults.map((item) => item && (
+                <button key={item.key} type="button" onClick={() => { setNavigationSearchOpen(false); setNavigationSearch(""); openView(item.id); }}>
+                  <span aria-hidden="true"><MenuIcon id={item.id} /></span>
+                  <strong>{item.label}</strong>
+                </button>
+              ))}
+              {navigationSearchResults.length === 0 && <p>Nenhuma área disponível com esse nome.</p>}
+            </nav>
+          </section>
+        </div>
+      )}
       {switching && (
         <div className="pilot-community-switching-v3" role="status" aria-live="polite">
           <span className="pilot-loading-spinner" aria-hidden="true" />
@@ -914,26 +1000,23 @@ export default function PilotDashboard({
                 <span className="pilot-sidebar-label">Área do proprietário</span>
               </Link>
             )}
-            {primaryMenu.map((item) => (
-              <button
-                key={item.id}
-                data-editor-key={`menu-principal-${item.id}`}
-                className={
-                  visibleView === item.id ||
-                  (item.id === "comunidade" &&
-                    COMMUNITY_MANAGEMENT_VIEWS.includes(
-                      visibleView as CommunityManagementView,
-                    ))
-                    ? "active"
-                    : ""
-                }
-                onClick={() => openView(item.id)}
-                aria-label={item.label}
-                title={item.label}
-              >
-                <span className="pilot-sidebar-icon" aria-hidden="true"><MenuIcon id={item.id} /></span>
-                <span className="pilot-sidebar-label">{item.label}</span>
-              </button>
+            {sidebarGroups.map((group) => (
+              <section className="pilot-sidebar-group" key={group.label} aria-label={group.label}>
+                <h2>{group.label}</h2>
+                {group.items.map((item) => item && (
+                  <button
+                    key={item.key}
+                    data-editor-key={`menu-principal-${item.key}`}
+                    className={visibleView === item.id ? "active" : ""}
+                    onClick={() => openView(item.id)}
+                    aria-label={item.label}
+                    title={item.label}
+                  >
+                    <span className="pilot-sidebar-icon" aria-hidden="true"><MenuIcon id={item.id} /></span>
+                    <span className="pilot-sidebar-label">{item.label}</span>
+                  </button>
+                ))}
+              </section>
             ))}
             <Link
               className="pilot-public-directory-link"
@@ -948,7 +1031,7 @@ export default function PilotDashboard({
           {(systemOwner || active.papel === "SUPERADMIN") && (
             <EditorialSidebarSchedule onOpen={() => window.location.assign("/proprietario?tab=editorial")} />
           )}
-          <div className="pilot-sidebar-note"><strong>Ambiente controlado</strong><p>Nenhum menu substitui as verificações do backend.</p></div>
+          <div className="pilot-sidebar-note"><strong>{allowedMenu.length} áreas disponíveis</strong><p>As demais dependem das permissões do seu perfil.</p></div>
         </aside>
         <section
           className={`pilot-workspace${viewLoading ? " is-view-loading" : ""}${
@@ -1094,34 +1177,18 @@ export default function PilotDashboard({
           <span className="pilot-mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5v8a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5z"/><path d="M9.5 20v-6h5v6"/></svg></span>
           <small className="pilot-mobile-label">Início</small>
         </button>
-        {eventViewAvailable && (
-          <button
-            type="button"
-            className={visibleView === "eventos" && !mobileMenu ? "active" : ""}
-            onClick={() => openView("eventos")}
-            aria-label="Eventos"
-          >
-            <span className="pilot-mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="14" rx="2"/><path d="M8 3.5v4M16 3.5v4M4 10h16M8 14h3M14 14h2"/></svg></span>
-            <small className="pilot-mobile-label">Eventos</small>
-          </button>
-        )}
-        {quickActions.length > 0 && (
-          <button
-          className={`pilot-mobile-menu-button pilot-mobile-create-button ${
-            mobileMenu === "actions" ? "active" : ""
-          }`}
-          type="button"
-          onClick={() =>
-            setMobileMenu((current) => current === "actions" ? null : "actions")
-          }
-          aria-expanded={mobileMenu === "actions"}
-          aria-controls="pilot-mobile-sheet"
-          aria-label="Abrir ações rápidas"
-        >
-          <span aria-hidden="true">+</span>
-          <small className="pilot-mobile-label">Adicionar</small>
+        <button type="button" className={mobileMenu === "perfil" ? "active" : ""} onClick={() => setMobileMenu((current) => current === "perfil" ? null : "perfil")} aria-label="Comunidade">
+          <span className="pilot-mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 19v-7l7-5 7 5v7M9 19v-4h6v4M8 8V5h3"/></svg></span>
+          <small className="pilot-mobile-label">Comunidade</small>
         </button>
-        )}
+        <button type="button" className={visibleView === "eventos" && !mobileMenu ? "active" : ""} onClick={() => eventViewAvailable ? openView("eventos") : setMobileMenu("menu")} aria-label="Agenda">
+          <span className="pilot-mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="14" rx="2"/><path d="M8 3.5v4M16 3.5v4M4 10h16M8 14h3M14 14h2"/></svg></span>
+          <small className="pilot-mobile-label">Agenda</small>
+        </button>
+        <button type="button" className={visibleView === "solicitacoes" && !mobileMenu ? "active" : ""} onClick={() => openView("solicitacoes")} aria-label="Pedidos">
+          <span className="pilot-mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z"/></svg></span>
+          <small className="pilot-mobile-label">Pedidos</small>
+        </button>
         <button
           className={mobileMenu === "menu" ? "active" : ""}
           type="button"
@@ -1138,17 +1205,6 @@ export default function PilotDashboard({
             <i />
           </span>
           <small className="pilot-mobile-label">Menu</small>
-        </button>
-        <button
-          type="button"
-          className={mobileMenu === "perfil" ? "active" : ""}
-          onClick={() => setMobileMenu((current) => current === "perfil" ? null : "perfil")}
-          aria-expanded={mobileMenu === "perfil"}
-          aria-controls="pilot-mobile-sheet"
-          aria-label="Perfil"
-        >
-          <span className="mobile-profile-initials" aria-hidden="true">{userPhotoUrl ? <img src={userPhotoUrl} alt="" /> : userInitials}</span>
-          <small className="pilot-mobile-label">Perfil</small>
         </button>
       </nav>
       {mobileMenu && (
@@ -1332,7 +1388,7 @@ function MenuIcon({ id }: { id: View }) {
     membro: "M20 21a8 8 0 0 0-16 0m8-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8",
     lider: "M12 3 3 8l3 13h12l3-13-9-5Zm0 0v18",
     pessoas: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2m8-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8m8 1a4 4 0 0 1 4 4v2m-4-18a4 4 0 0 1 0 8",
-    comunidade: "M4 21V8l8-5 8 5v13M8 21v-6h8v6",
+    comunidade: "M4 5h16v14H4V5Zm3 3h4v4H7V8Zm7 0h3m-3 3h3M7 15h10",
     continuidade: "M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5",
     redes: "M12 8a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM5 22v-2a7 7 0 0 1 14 0v2",
     "visual-editor": "m4 20 4.5-1 10-10a2.8 2.8 0 0 0-4-4l-10 10L4 20Zm9-13 4 4",

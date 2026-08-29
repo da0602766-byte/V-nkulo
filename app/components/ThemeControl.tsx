@@ -28,6 +28,14 @@ export default function ThemeControl({
     return () => window.clearTimeout(timer);
   }, [individualKey]);
 
+  useEffect(() => {
+    if (theme !== "AUTO") return;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const syncAutomaticTheme = () => applyTheme("AUTO");
+    media.addEventListener("change", syncAutomaticTheme);
+    return () => media.removeEventListener("change", syncAutomaticTheme);
+  }, [theme]);
+
   function update(next: Theme) {
     setTheme(next);
     window.localStorage.setItem("vinkulo-theme", next);
@@ -95,12 +103,16 @@ function themeStorageKey(storageId: string) {
 }
 
 function applyTheme(theme: Theme) {
+  const root = document.documentElement;
   if (theme === "AUTO") {
-    document.documentElement.removeAttribute("data-pilot-theme");
-    document.documentElement.style.colorScheme = "light dark";
+    root.removeAttribute("data-pilot-theme");
+    const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    root.dataset.theme = isDark ? "dark" : "light";
+    root.style.colorScheme = isDark ? "dark" : "light";
     return;
   }
-  document.documentElement.dataset.pilotTheme = theme.toLowerCase();
-  document.documentElement.style.colorScheme =
-    theme === "ESCURO" ? "dark" : "light";
+  const isDark = theme === "ESCURO";
+  root.dataset.pilotTheme = theme.toLowerCase();
+  root.dataset.theme = isDark ? "dark" : "light";
+  root.style.colorScheme = isDark ? "dark" : "light";
 }

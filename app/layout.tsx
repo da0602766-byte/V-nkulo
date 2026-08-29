@@ -1,19 +1,30 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import {
+  Bricolage_Grotesque,
+  IBM_Plex_Mono,
+  Instrument_Sans,
+} from "next/font/google";
 import "./globals.css";
 import "./secretary.css";
 import SmartScrollHeader from "./components/SmartScrollHeader";
 import MobileAppInstall from "./components/MobileAppInstall";
 import GlobalFeedbackLauncher from "./components/GlobalFeedbackLauncher";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const instrumentSans = Instrument_Sans({
+  variable: "--font-body",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const bricolageGrotesque = Bricolage_Grotesque({
+  variable: "--font-display",
   subsets: ["latin"],
+  weight: ["600"],
+});
+
+const ibmPlexMono = IBM_Plex_Mono({
+  variable: "--font-mono",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
 });
 
 export const metadata: Metadata = {
@@ -48,8 +59,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f7fafc" },
-    { media: "(prefers-color-scheme: dark)", color: "#0c1722" },
+    { media: "(prefers-color-scheme: light)", color: "#F7F5FB" },
+    { media: "(prefers-color-scheme: dark)", color: "#181022" },
   ],
 };
 
@@ -64,12 +75,12 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "try{const r=document.documentElement,t=localStorage.getItem('vinkulo-theme');if(t==='CLARO'||t==='ESCURO'){r.dataset.pilotTheme=t.toLowerCase();r.style.colorScheme=t==='ESCURO'?'dark':'light'}else{r.style.colorScheme='light dark'}const z=Number(localStorage.getItem('vinkulo:font-scale'));if(Number.isFinite(z)&&z>=.85&&z<=1.25){r.style.zoom=String(z);r.style.setProperty('--vinkulo-ui-scale',String(z));r.style.setProperty('--vinkulo-ui-scale-inverse',String(1/z));r.dataset.vinkuloScale=z>1?'ampliado':z<1?'reduzido':'normal'}}catch{}",
+              "try{const r=document.documentElement,t=localStorage.getItem('vinkulo-theme'),d=t==='ESCURO'||(t!=='CLARO'&&matchMedia('(prefers-color-scheme: dark)').matches);r.dataset.theme=d?'dark':'light';if(t==='CLARO'||t==='ESCURO')r.dataset.pilotTheme=t.toLowerCase();else delete r.dataset.pilotTheme;r.style.colorScheme=d?'dark':'light';const z=Number(localStorage.getItem('vinkulo:font-scale'));if(Number.isFinite(z)&&z>=.85&&z<=1.25){r.style.zoom=String(z);r.style.setProperty('--vinkulo-ui-scale',String(z));r.style.setProperty('--vinkulo-ui-scale-inverse',String(1/z));r.dataset.vinkuloScale=z>1?'ampliado':z<1?'reduzido':'normal'}}catch{}",
           }}
         />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${instrumentSans.variable} ${bricolageGrotesque.variable} ${ibmPlexMono.variable} antialiased`}
       >
         <SmartScrollHeader />
         {children}
