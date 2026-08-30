@@ -9,6 +9,7 @@ import { publishDueEditorialEntries } from "../../../lib/editorial-scheduler";
 import { isSystemOwnerAccount } from "../../../lib/local-auth";
 import { recordTenantAudit } from "../../../lib/tenant-audit";
 import { requireTenantPermission } from "../../../lib/tenant";
+import { notifyUser } from "../../../lib/pilot-notifications";
 
 export async function GET(request: Request) {
   const access = await requireTenantPermission("feed.view");
@@ -21,6 +22,9 @@ export async function GET(request: Request) {
     return Response.json({ error: "Cursor do feed inválido." }, { status: 400 });
   }
   const limit = normalizeFeedLimit(url.searchParams.get("limit"));
+  const placementSql = url.searchParams.get("placement") === "sidebar"
+    ? "AND p.canal_lateral = 1"
+    : "AND p.canal_feed = 1";
   const canPublish = access.context.permissions.includes("feed.publish");
   const canModerate = access.context.permissions.includes("feed.moderate");
   const canDelete = access.user.system_owner === true;
@@ -33,7 +37,8 @@ export async function GET(request: Request) {
       p.visibilidade, p.status, p.origem, p.criado_em, p.atualizado_em,
       p.criado_por, p.comentarios_habilitados, p.imagem_url,
       p.imagem_thumbnail_url, p.imagem_alt, p.imagem_width, p.imagem_height,
-      p.links_json,
+      p.links_json, p.audiencia_tipo, p.ministerios_json,
+      p.canal_feed, p.canal_lateral, p.aprovacao_status,
       u.nome AS autor_nome, u.foto_perfil AS autor_foto,
       u.email AS autor_email, u.criado_em AS autor_criado_em,
       (SELECT uc.papel FROM usuario_comunidades uc
@@ -47,7 +52,13 @@ export async function GET(request: Request) {
     FROM publicacoes_piloto p
     LEFT JOIN usuarios u ON u.id = p.criado_por
     WHERE p.comunidade_id = ?
-      AND (p.status = 'PUBLICADA' OR ? = 1)
+      ${placementSql}
+      AND (p.audiencia_tipo <> 'MINISTERIOS' OR ? = 1 OR EXISTS (
+        SELECT 1 FROM json_each(p.ministerios_json) audiencia
+        JOIN ministerio_voluntarios mv ON mv.ministerio_id = CAST(audiencia.value AS INTEGER)
+        WHERE mv.usuario_id = ? AND mv.ativo = 1
+      ))
+      AND (p.status = 'PUBLICADA' OR p.criado_por = ? OR ? = 1)
       AND p.status <> 'ARQUIVADA'
       ${cursorSql}
     ORDER BY p.criado_em DESC, p.id DESC
@@ -61,7 +72,10 @@ export async function GET(request: Request) {
           canModerate ? 1 : 0,
           canDelete ? 1 : 0,
           access.context.comunidadeId,
-          canPublish ? 1 : 0,
+          canModerate ? 1 : 0,
+          access.user.id,
+          access.user.id,
+          canModerate ? 1 : 0,
           cursor.criadoEm,
           cursor.criadoEm,
           cursor.id,
@@ -75,7 +89,10 @@ export async function GET(request: Request) {
           canModerate ? 1 : 0,
           canDelete ? 1 : 0,
           access.context.comunidadeId,
-          canPublish ? 1 : 0,
+          canModerate ? 1 : 0,
+          access.user.id,
+          access.user.id,
+          canModerate ? 1 : 0,
           limit + 1,
         )
         .all<Record<string, unknown>>();
@@ -116,6 +133,31 @@ export async function POST(request: Request) {
     return Response.json({ error: parsed.error }, { status: 400 });
   }
   const db = getD1();
+  const audienciaTipo = String(payload.audienciaTipo || "PUBLICO").toUpperCase() === "MINISTERIOS" ? "MINISTERIOS" : "PUBLICO";
+  const requestedMinistryIds = Array.isArray(payload.ministerioIds)
+    ? [...new Set(payload.ministerioIds.map(Number).filter((id) => Number.isInteger(id) && id > 0))].slice(0, 50)
+    : [];
+  if (audienciaTipo === "MINISTERIOS" && !requestedMinistryIds.length) {
+    return Response.json({ error: "Escolha pelo menos um ministério." }, { status: 400 });
+  }
+  if (requestedMinistryIds.length) {
+    const placeholders = requestedMinistryIds.map(() => "?").join(",");
+    const valid = await db.prepare(
+      `SELECT id FROM ministerios_comunidade WHERE comunidade_id = ? AND status = 'ATIVO' AND id IN (${placeholders})`,
+    ).bind(access.context.comunidadeId, ...requestedMinistryIds).all<{ id: number }>();
+    if (valid.results.length !== requestedMinistryIds.length) {
+      return Response.json({ error: "Um dos ministérios escolhidos não pertence à comunidade ativa." }, { status: 400 });
+    }
+  }
+  const canalFeed = payload.canalFeed !== false;
+  const canalLateral = payload.canalLateral === true;
+  if (!canalFeed && !canalLateral) {
+    return Response.json({ error: "Escolha Feed, Lateral ou os dois." }, { status: 400 });
+  }
+  const canModerate = access.context.permissions.includes("feed.moderate") || access.user.system_owner === true;
+  const wantsPublish = parsed.status === "PUBLICADA";
+  const status = wantsPublish && !canModerate ? "EM_ANALISE" : parsed.status;
+  const approvalStatus = wantsPublish && !canModerate ? "PENDENTE" : "APROVADA";
   let linksJson = parsed.linksJson;
   let postContent = parsed.conteudo;
   let postSummary = parsed.resumo;
@@ -146,8 +188,11 @@ export async function POST(request: Request) {
       (comunidade_id, titulo, resumo, conteudo, categoria, visibilidade,
        status, origem, comentarios_habilitados, criado_por, imagem_url,
        imagem_thumbnail_url, imagem_alt, imagem_width, imagem_height, links_json,
+       audiencia_tipo, ministerios_json, canal_feed, canal_lateral,
+       aprovacao_status, aprovado_por, aprovado_em,
        atualizado_em)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'COMUNIDADE', ?, ?, ?, ?, ?, ?, ?, ?,
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'COMUNIDADE', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+        CASE WHEN ? = 'APROVADA' THEN CURRENT_TIMESTAMP ELSE NULL END,
         CURRENT_TIMESTAMP)`,
     )
     .bind(
@@ -157,7 +202,7 @@ export async function POST(request: Request) {
       postContent,
       parsed.categoria,
       "COMUNIDADE",
-      parsed.status,
+      status,
       parsed.comentariosHabilitados ? 1 : 0,
       access.user.id,
       parsed.imagemUrl,
@@ -166,6 +211,13 @@ export async function POST(request: Request) {
       parsed.imagemWidth,
       parsed.imagemHeight,
       linksJson,
+      audienciaTipo,
+      JSON.stringify(requestedMinistryIds),
+      canalFeed ? 1 : 0,
+      canalLateral ? 1 : 0,
+      approvalStatus,
+      approvalStatus === "APROVADA" ? access.user.id : null,
+      approvalStatus,
     )
     .run();
   const postId = Number(result.meta.last_row_id);
@@ -177,9 +229,24 @@ export async function POST(request: Request) {
     "SUCESSO",
     {
       publicacaoId: postId,
-      status: parsed.status,
+      status,
       visibilidade: "COMUNIDADE",
+      audienciaTipo,
+      ministerioIds: requestedMinistryIds,
+      canais: { feed: canalFeed, lateral: canalLateral },
     },
   );
-  return Response.json({ id: postId }, { status: 201 });
+  if (approvalStatus === "PENDENTE") {
+    const managers = await db.prepare(
+      `SELECT DISTINCT u.id FROM usuarios u JOIN usuario_comunidades uc ON uc.usuario_id = u.id
+       WHERE uc.comunidade_id = ? AND uc.status = 'ATIVO' AND u.ativo = 1
+         AND (uc.papel IN ('PASTOR','ADMIN_COMUNIDADE') OR u.perfil = 'ADMIN')`,
+    ).bind(access.context.comunidadeId).all<{ id: number }>();
+    await Promise.all(managers.results.filter((item) => item.id !== access.user.id).map((item) => notifyUser(db, {
+      userId: item.id, title: "Publicação aguardando aprovação",
+      message: `${access.user.nome} enviou “${parsed.titulo}” para análise.`, entityId: postId,
+      destination: `/painel?view=inicio#publicacao-${postId}`, createdBy: "VÍNKULO",
+    })));
+  }
+  return Response.json({ id: postId, status, message: approvalStatus === "PENDENTE" ? "Publicação enviada ao responsável para aprovação." : parsed.status === "RASCUNHO" ? "Rascunho salvo." : "Publicação criada." }, { status: 201 });
 }

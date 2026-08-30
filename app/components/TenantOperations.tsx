@@ -44,11 +44,11 @@ type Visitor = {
 };
 
 type VisitorVision =
-  | "visitantes"
-  | "acompanhamentos"
+  | "todos"
+  | "novos"
+  | "acompanhamento"
   | "pendencias"
-  | "encaminhamentos"
-  | "historico"
+  | "sem_contato"
   | "arquivados";
 
 type VisitorCounts = Record<VisitorVision, number>;
@@ -174,17 +174,18 @@ export function VisitorsWorkspace({
   const [importing, setImporting] = useState(false);
   const [importFileName, setImportFileName] = useState("");
   const [importRows, setImportRows] = useState<VisitorImportRow[]>([]);
-  const [activeVision, setActiveVision] = useState<VisitorVision>("visitantes");
+  const [activeVision, setActiveVision] = useState<VisitorVision>("todos");
   const [counts, setCounts] = useState<VisitorCounts>({
-    visitantes: 0,
-    acompanhamentos: 0,
+    todos: 0,
+    novos: 0,
+    acompanhamento: 0,
     pendencias: 0,
-    encaminhamentos: 0,
-    historico: 0,
+    sem_contato: 0,
     arquivados: 0,
   });
   const [selectedRows, setSelectedRows] = useState<number[]>([]);
   const [columnsOpen, setColumnsOpen] = useState(false);
+  const [exportReviewOpen, setExportReviewOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const categoriesRef = useRef<VisitorCategory[]>([]);
@@ -1226,12 +1227,11 @@ export function VisitorsWorkspace({
       <section className="visitor-relations-v2" aria-label="Relacionamento com visitantes">
         <nav className="visitor-view-tabs-v2" aria-label="Visões de visitantes">
           {([
-            ["visitantes", "Visitantes"],
-            ["acompanhamentos", "Acompanhamentos"],
+            ["todos", "Todos"],
+            ["novos", "Novos"],
+            ["acompanhamento", "Em acompanhamento"],
             ["pendencias", "Pendências"],
-            ["encaminhamentos", "Encaminhamentos"],
-            ["historico", "Histórico"],
-            ["arquivados", "Arquivados"],
+            ["sem_contato", "Sem contato há 15 dias"],
           ] as Array<[VisitorVision, string]>).map(([vision, label]) => (
             <button
               type="button"
@@ -1247,7 +1247,7 @@ export function VisitorsWorkspace({
 
         <div className="visitor-category-strip-v2" aria-label="Categorias de visitantes">
           <button type="button" className={categoryFilter === "all" ? "active" : ""} onClick={() => setCategoryFilter("all")}>
-            <span aria-hidden="true">◎</span><strong>Todos</strong><b>{counts.visitantes}</b>
+            <span aria-hidden="true">◎</span><strong>Todos</strong><b>{counts.todos}</b>
           </button>
           {categories.map((category) => (
             <button
@@ -1268,7 +1268,7 @@ export function VisitorsWorkspace({
         <div className="visitor-insights-v2">
           <article>
             <span className="visitor-insight-icon-v2" aria-hidden="true">◫</span>
-            <div><small>Pessoas ativas</small><strong>{counts.visitantes}</strong><span>Cadastro central da comunidade</span></div>
+            <div><small>Pessoas ativas</small><strong>{counts.todos}</strong><span>Cadastro central da comunidade</span></div>
           </article>
           <article>
             <span className="visitor-insight-icon-v2 is-warning" aria-hidden="true">!</span>
@@ -1294,9 +1294,20 @@ export function VisitorsWorkspace({
             <div><p className="pilot-kicker">DIRETÓRIO CENTRAL</p><h2 id="visitor-sheet-title">Pessoas e próximos cuidados</h2><span>Uma ficha por pessoa, em todas as visões.</span></div>
             <div>
               {canCreate && <><input ref={importInputRef} className="visitor-import-input-v2" type="file" accept=".xlsx,.xls,.csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) void prepareVisitorImport(file); }} /><button type="button" disabled={importing} onClick={() => importInputRef.current?.click()}>⇧ Importar Excel</button></>}
-              <button type="button" onClick={() => void exportVisitors()}>⇩ Exportar Excel</button>
+              <button type="button" onClick={() => setExportReviewOpen(true)}>⇩ Revisar e exportar</button>
             </div>
           </header>
+
+          {exportReviewOpen && <section className="visitor-export-review-v2" aria-label="Revisão antes da exportação">
+            <div><p className="pilot-kicker">ANTES DE EXPORTAR</p><h3>Revise e organize as informações</h3><p>Abra a ficha de qualquer pessoa para editar dados. A planilha só deve sair depois dessa conferência.</p></div>
+            <dl>
+              <div><dt>Sem categoria</dt><dd>{visitors.filter((item) => !item.categoria_id).length}</dd></div>
+              <div><dt>Sem telefone</dt><dd>{visitors.filter((item) => !item.telefone).length}</dd></div>
+              <div><dt>Sem responsável</dt><dd>{visitors.filter((item) => !item.responsavel_email && !item.acompanhante).length}</dd></div>
+            </dl>
+            <div className="visitor-export-suggestions-v2"><strong>Categorias sugeridas</strong><span>Novo visitante</span><span>Primeiro contato</span><span>Em acompanhamento</span><span>Integrado</span><span>Sem contato há 15 dias</span></div>
+            <footer><button type="button" onClick={() => setExportReviewOpen(false)}>Continuar editando</button><button type="button" className="primary" onClick={() => { setExportReviewOpen(false); void exportVisitors(); }}>Exportar informações revisadas</button></footer>
+          </section>}
 
           <form className="visitor-commandbar-v2" onSubmit={(event) => { event.preventDefault(); void loadVisitors(); }}>
             <label className="visitor-search-v2"><span aria-hidden="true">⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nome, telefone ou e-mail" /></label>
@@ -1310,6 +1321,14 @@ export function VisitorsWorkspace({
             <div className="visitor-filter-panel-v2">
               <label>Categoria<select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option value="all">Todas</option><option value="sem-categoria">Sem categoria</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.nome}</option>)}</select></label>
               <button type="button" onClick={() => { setSearch(""); setCategoryFilter("all"); }}>Limpar filtros</button>
+              <button type="button" onClick={() => changeVision("arquivados")}>Ver arquivados ({counts.arquivados})</button>
+            </div>
+          )}
+          {(search.trim() || categoryFilter !== "all" || activeVision === "arquivados") && (
+            <div className="visitor-active-filters-v2" aria-label="Filtros ativos">
+              {search.trim() && <button type="button" onClick={() => setSearch("")}>Busca: {search.trim()} <span aria-hidden="true">×</span></button>}
+              {categoryFilter !== "all" && <button type="button" onClick={() => setCategoryFilter("all")}>Categoria ativa <span aria-hidden="true">×</span></button>}
+              {activeVision === "arquivados" && <button type="button" onClick={() => changeVision("todos")}>Arquivados <span aria-hidden="true">×</span></button>}
             </div>
           )}
           {columnsOpen && <div className="visitor-column-panel-v2"><span>Colunas essenciais do Figma</span><b>Nome</b><b>Contato</b><b>Categoria</b><b>Responsável</b><b>Status</b><b>Próxima ação</b></div>}
@@ -1323,7 +1342,7 @@ export function VisitorsWorkspace({
             <table className="visitor-table-v2">
               <thead><tr>
                 <th><input type="checkbox" aria-label="Selecionar página" checked={Boolean(visibleVisitors.length && selectedRows.length === visibleVisitors.length)} onChange={(event) => setSelectedRows(event.target.checked ? visibleVisitors.map((visitor) => visitor.id) : [])} /></th>
-                <th>Nome</th><th>Contato</th><th>Categoria</th><th>Ministério</th><th>Responsável</th><th>Status</th><th>Último contato</th><th>Próxima ação</th><th aria-label="Ações" />
+                <th>Nome</th><th>Contato</th><th>Categoria</th><th>Ministério</th><th>Responsável</th><th>Status</th><th>Último contato</th><th>Próximo passo</th><th aria-label="Ações" />
               </tr></thead>
               <tbody>
                 {visibleVisitors.map((visitor) => (
@@ -1336,7 +1355,7 @@ export function VisitorsWorkspace({
                     <td><strong>{visitor.responsavel_email?.split("@")[0] || visitor.acompanhante || "A definir"}</strong></td>
                     <td>{canEdit && activeVision !== "arquivados" ? <select aria-label={`Status de ${visitor.nome_completo}`} value={visitor.status} onChange={(event) => void updateVisitorField(visitor, { status: event.target.value })}><option value="NOVO">Novo</option><option value="EM_CONTATO">Em contato</option><option value="EM_ACOMPANHAMENTO">Em acompanhamento</option><option value="INTEGRADO">Integrado</option></select> : <span className={`status-pill status-${visitor.status.toLowerCase()}`}>{activeVision === "arquivados" ? "Arquivado" : statusLabel(visitor.status)}</span>}</td>
                     <td>{visitor.ultimo_contato ? formatDateTime(visitor.ultimo_contato) : "Sem contato"}</td>
-                    <td className={visitor.proximo_contato && visitor.proximo_contato <= new Date().toISOString().slice(0, 10) ? "overdue" : ""}>{visitor.proximo_contato ? formatDate(visitor.proximo_contato) : "Não definida"}</td>
+                    <td className={visitor.proximo_contato && visitor.proximo_contato <= new Date().toISOString().slice(0, 10) ? "overdue" : ""}><button type="button" className="visitor-next-step-v2" onClick={() => void loadFollowups(visitor.id)}>{canFollowup ? "Registrar contato" : "Abrir ficha"}</button>{visitor.proximo_contato && <small>{formatDate(visitor.proximo_contato)}</small>}</td>
                     <td><button type="button" className="visitor-row-open-v2" aria-label={`Abrir ficha de ${visitor.nome_completo}`} onClick={() => void loadFollowups(visitor.id)}>›</button></td>
                   </tr>
                 ))}

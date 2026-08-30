@@ -1191,6 +1191,13 @@ export const publicacoesPiloto = sqliteTable("publicacoes_piloto", {
   imagemWidth: integer("imagem_width").notNull().default(0),
   imagemHeight: integer("imagem_height").notNull().default(0),
   linksJson: text("links_json").notNull().default("[]"),
+  audienciaTipo: text("audiencia_tipo").notNull().default("PUBLICO"),
+  ministeriosJson: text("ministerios_json").notNull().default("[]"),
+  canalFeed: integer("canal_feed", { mode: "boolean" }).notNull().default(true),
+  canalLateral: integer("canal_lateral", { mode: "boolean" }).notNull().default(false),
+  aprovacaoStatus: text("aprovacao_status").notNull().default("APROVADA"),
+  aprovadoPor: integer("aprovado_por").references(() => usuarios.id, { onDelete: "set null" }),
+  aprovadoEm: text("aprovado_em"),
   criadoPor: integer("criado_por").references(() => usuarios.id, {
     onDelete: "set null",
   }),

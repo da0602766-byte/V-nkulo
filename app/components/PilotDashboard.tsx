@@ -209,6 +209,7 @@ export default function PilotDashboard({
   const [communityInfoError, setCommunityInfoError] = useState("");
   const [canEditCommunity, setCanEditCommunity] = useState(false);
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [messageCenterOpen, setMessageCenterOpen] = useState(false);
 
   useEffect(() => {
     const initial = window.setTimeout(() => {
@@ -773,7 +774,10 @@ export default function PilotDashboard({
             <button
               type="button"
               className="pilot-message-shortcut"
-              onClick={() => openView("mensagens")}
+              onClick={() => {
+                if (window.matchMedia("(max-width: 760px)").matches) openView("mensagens");
+                else setMessageCenterOpen((current) => !current);
+              }}
               aria-label={
                 unreadMessages
                   ? `Mensagens: ${unreadMessages} não lidas`
@@ -848,6 +852,14 @@ export default function PilotDashboard({
           </details>
         </div>
       </header>
+      {messageCenterOpen && (
+        <div className="pilot-message-popover-backdrop" role="presentation" onMouseDown={() => setMessageCenterOpen(false)}>
+          <section className="pilot-message-popover" role="dialog" aria-modal="false" aria-label="Conversas" onMouseDown={(event) => event.stopPropagation()}>
+            <header><div><p className="pilot-kicker">MENSAGENS</p><h2>Conversas</h2></div><button type="button" onClick={() => setMessageCenterOpen(false)} aria-label="Fechar mensagens">×</button></header>
+            <PrivateChatWorkspace />
+          </section>
+        </div>
+      )}
       {navigationSearchOpen && (
         <div className="pilot-command-search-backdrop" role="presentation" onMouseDown={() => setNavigationSearchOpen(false)}>
           <section className="pilot-command-search" role="dialog" aria-modal="true" aria-label="Buscar uma área" onMouseDown={(event) => event.stopPropagation()}>
@@ -1129,7 +1141,7 @@ export default function PilotDashboard({
           )}
           {visibleView === "conta" && <AccountProfileWorkspace />}
           {visibleView === "comunidade" && (
-            <section>
+            <section className="community-central-workspace">
               <header className="workspace-heading"><div><p className="pilot-kicker">GESTÃO DA COMUNIDADE</p><h1>Central da comunidade</h1><p>Pessoas, liderança, continuidade, solicitações e preferências reunidas no contexto da comunidade ativa.</p></div></header>
               {active.permissions.includes("invites.manage") && (
                 <>

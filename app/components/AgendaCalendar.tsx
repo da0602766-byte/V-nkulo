@@ -18,6 +18,7 @@ type ItemAgenda = {
   origemId: number;
   visibilidade?: "PRIVADO" | "PUBLICO";
   meu?: boolean;
+  aprovacaoStatus?: "PENDENTE" | "APROVADA";
 };
 
 type Visao = "dia" | "semana" | "mes";
@@ -120,9 +121,11 @@ function distribuirColunas(itens: ItemAgenda[]) {
 
 export default function AgendaCalendar({
   podeVerEventos,
+  podeAprovar,
   aoCriarEvento,
 }: {
   podeVerEventos: boolean;
+  podeAprovar: boolean;
   // Quem hospeda o calendário decide o que "criar evento" faz; aqui só existe
   // o lugar certo para essa ação morar — junto da navegação de período.
   aoCriarEvento?: () => void;
@@ -252,8 +255,9 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
           visibilidade: form.get("visibilidade"),
         }),
       });
-      const dados = (await resposta.json()) as { error?: string };
+      const dados = (await resposta.json()) as { error?: string; message?: string };
       if (!resposta.ok) throw new Error(dados.error || "Não foi possível salvar.");
+      if (dados.message) setErro(dados.message);
       setFormAberto(false);
       await carregar();
     } catch (motivo) {
@@ -271,6 +275,14 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
       setErro(dados.error || "Não foi possível remover.");
       return;
     }
+    await carregar();
+  }
+
+  async function aprovarCompromisso(origemId: number) {
+    setErro("");
+    const resposta = await fetch("/api/pilot/agenda", { method:"PATCH", headers:{"content-type":"application/json"}, body:JSON.stringify({ id:origemId, acao:"APROVAR" }) });
+    const dados = await resposta.json() as { error?:string };
+    if (!resposta.ok) { setErro(dados.error || "Não foi possível aprovar."); return; }
     await carregar();
   }
 
@@ -436,6 +448,9 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
                       Remover
                     </button>
                   )}
+                  {item.camada === "PESSOAL" && item.aprovacaoStatus === "PENDENTE" && podeAprovar && (
+                    <button type="button" className="agenda-aprovar" onClick={() => void aprovarCompromisso(item.origemId)}>Aprovar publicação</button>
+                  )}
                 </div>
               </article>
             ))
@@ -561,6 +576,9 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
                     >
                       Remover
                     </button>
+                  )}
+                  {item.camada === "PESSOAL" && item.aprovacaoStatus === "PENDENTE" && podeAprovar && (
+                    <button type="button" className="agenda-aprovar" onClick={() => void aprovarCompromisso(item.origemId)}>Aprovar publicação</button>
                   )}
                 </li>
               ))}
