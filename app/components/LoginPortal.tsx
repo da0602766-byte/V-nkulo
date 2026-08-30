@@ -178,7 +178,7 @@ export default function LoginPortal({
   ].filter((item): item is { label: string; icon: string; href: string } => Boolean(item.href));
   const shellStyle = {
     "--login-bg": config.backgroundColor || "#050817",
-    "--login-accent": config.accentColor || "#3488ff",
+    "--login-accent": config.accentColor || "#b25a33",
     "--login-card": config.cardColor || "#ffffff",
   } as React.CSSProperties;
 
@@ -224,10 +224,14 @@ export default function LoginPortal({
             <h2>Sua comunidade organizada em um só lugar.</h2>
             <span>Entre para acompanhar pessoas, eventos, equipes e escalas com segurança.</span>
           </header>
+          {/* Os três itens diziam "Seguro por contexto", "Feito para pessoas" e
+              "Rotina conectada" — elogios que não informam nada a quem está
+              parado na tela de senha. Agora dizem o que a conta faz e o que
+              fazer quando ela ainda não existe, que é a dúvida real aqui. */}
           <div className="login-v2-benefits">
-            <span><i>✓</i><div><strong>Seguro por contexto</strong><small>Dados e permissões protegidos em cada comunidade</small></div></span>
-            <span><i>◎</i><div><strong>Feito para pessoas</strong><small>Uma experiência simples para membros e lideranças</small></div></span>
-            <span><i>▣</i><div><strong>Rotina conectada</strong><small>Eventos, equipes e escalas no mesmo ambiente</small></div></span>
+            <span><i>✓</i><div><strong>Uma conta, suas comunidades</strong><small>Você vê apenas os dados das comunidades de que participa</small></div></span>
+            <span><i>◎</i><div><strong>O que depende de você</strong><small>Eventos, equipes e escalas em que seu nome está</small></div></span>
+            <span><i>▣</i><div><strong>Ainda não tem acesso?</strong><small>Crie a conta e peça entrada: a liderança da comunidade aprova</small></div></span>
           </div>
         </aside>}
 

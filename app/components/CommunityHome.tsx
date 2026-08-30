@@ -540,7 +540,9 @@ export default function CommunityHome({
         <div className="community-home-intro">
           <h1>Seu dia no Vínkulo</h1>
           <p>
-            Olá, {userName.split(/\s+/)[0]}. Veja o que acontece hoje em {communityName}
+            {/* A quebra de linha depois da expressão não vira espaço no JSX:
+                a saudação lia "…em Comunidade Nova Aliançae resolva…". */}
+            Olá, {userName.split(/\s+/)[0]}. Veja o que acontece hoje em {communityName}{" "}
             e resolva cada pendência no contexto certo.
           </p>
         </div>

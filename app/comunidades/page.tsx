@@ -6,6 +6,12 @@ import { getPublicCommunities } from "../lib/pilot-data";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = {
+  title: "Comunidades | VÍNKULO",
+  description:
+    "Diretório público de comunidades no VÍNKULO. Encontre uma comunidade por cidade e conheça a página institucional antes de solicitar entrada.",
+};
+
 export default async function CommunitiesPage({
   searchParams,
 }: {

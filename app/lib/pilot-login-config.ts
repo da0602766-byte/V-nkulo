@@ -103,7 +103,10 @@ export const DEFAULT_PILOT_LOGIN_CONFIG: PilotLoginConfig = {
   logoUrl: "",
   backgroundImageUrl: "",
   backgroundColor: "#050817",
-  accentColor: "#23cbd1",
+  // Padrão da plataforma, não dado de tenant: quem configurou uma cor própria
+  // no login continua com a dela. O ciano era a última cor de marca que ainda
+  // divergia do acento cobre em quem nunca abriu essa configuração.
+  accentColor: "#b25a33",
   cardColor: "#ffffff",
   layout: "CENTERED",
   cardStyle: "GLASS",

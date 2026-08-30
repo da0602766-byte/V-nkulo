@@ -193,8 +193,11 @@ build, testes e evidências próprios:
    rodapé com a consequência) e ao cadastro de visitante (rodapé dizendo que só
    o nome é obrigatório). Dois defeitos anteriores foram corrigidos junto: a
    data em UTC e o botão de confirmar invisível. Ver seção 6.
-6. **Superfície pública** — recepção, login, perfil da comunidade. A recepção
-   recebeu a cor no bloco 1; layout e conteúdo seguem pendentes.
+6. **Superfície pública** — feito. Recepção, login e perfil da comunidade. O
+   trabalho não foi o previsto: a cor do bloco 1 não chegava a nenhuma dessas
+   telas, e a causa está na seção 7.2. Além disso, cada página passou a ter
+   título próprio na aba, e a coluna do login trocou três elogios por três
+   informações. Ver seção 7.2.
 
 ## 7.1 O que só apareceu ao rodar
 
@@ -218,6 +221,58 @@ teste de conteúdo:
 A lição fica registrada: teste de conteúdo prova que o código diz o que se
 espera, não que a tela funciona. Os quatro casos acima passavam em 226 testes.
 
+## 7.2 A segunda marca
+
+O bloco 1 trocou a paleta e os testes confirmaram a troca. Mesmo assim, ao
+abrir o perfil público de uma comunidade, o avatar da barra móvel continuava
+azul-e-verde. A busca por texto no CSS não achava nada: a única regra que
+citava aquela classe já estava em cobre.
+
+A regra que vencia não cita a classe. É `.public-mobile-profile-link > span`,
+com especificidade maior, pintando com `var(--pilot-gradient)`. E o valor
+daquele token vinha de:
+
+```css
+:is(.pilot-dashboard,.owner-area,.social-public-community)[data-ui-version="v2"] {
+  --pilot-primary: var(--v2-blue) !important;
+  --pilot-accent: var(--v2-teal) !important;
+  --pilot-gradient: linear-gradient(135deg,var(--v2-blue),var(--v2-teal)) !important;
+}
+```
+
+A camada v2 tinha a **própria marca** — azul `#2554b8` e verde `#168778` — e a
+impunha com `!important` sobre os tokens da plataforma. Existiam duas marcas
+no produto, e a de baixo vencia em tudo que estivesse marcado como v2: o
+painel inteiro, o login, a área do proprietário e o perfil público. O acento
+cobre do bloco 1 só aparecia onde a v2 não chegava.
+
+A correção é de cinco linhas, no lugar certo: `--v2-blue` e `--v2-teal` passam
+a apontar para `var(--violet)`, e os blocos escuros deixam de redeclará-los,
+porque o acento já troca sozinho por tema. `--v2-danger` e `--v2-warning`
+continuam com valor próprio: ali a cor é estado.
+
+Como encontrar isso: não por busca de texto — o culpado não cita a classe. Foi
+`CSS.getMatchedStylesForNode`, via CDP, no elemento errado, que devolveu a
+lista de regras que de fato o atingem, em ordem de cascata.
+
+Depois disso, uma varredura por cor computada nas quatro páginas públicas e nas
+nove views do painel, em tema claro e escuro, a 1440px e 390px, encontrou mais
+quatro pontos fora da paleta, todos decorativos: os dois pontinhos da recepção
+(o de "Gestão, conexão e cuidado" parecia dizer "no ar" sem indicar nada), a
+bolinha do botão de ajuda, a capa das comunidades sem foto e a marca do login.
+O único verde que ficou é o do aviso "Escala confirmada": ali a cor é
+informação, e a regra da seção 2 manda deixar.
+
+Dois defeitos apareceram de brinde, nenhum deles de cor:
+
+1. **A tela de login não existe em `/entrar`.** A rota é `/login`, e sob host
+   local ela redireciona para o autologin de prévia. As primeiras varreduras
+   "do login" mediram, sem avisar, uma página 404 — e voltaram limpas. Só o
+   acesso pelo endereço de rede alcançou a tela de verdade.
+2. **A saudação do painel colava duas palavras**: "…em Comunidade Nova
+   Aliançae resolva…". A quebra de linha depois de uma expressão não vira
+   espaço no JSX.
+
 ## 8. Validação
 
 Base `1c6d447`, em 30/08/2026: build aprovado, 206 de 206 testes, lint com
@@ -226,6 +281,12 @@ Base `1c6d447`, em 30/08/2026: build aprovado, 206 de 206 testes, lint com
 Depois dos blocos 1 a 5: build e artefato do Sites aprovados, **235 de 235
 testes** (29 novos em `tests/v190-reforma-visual-v5.test.mjs`), lint com
 0 erros e os mesmos 47 avisos de `@next/next/no-img-element`.
+
+Depois do bloco 6: build e artefato aprovados, **242 de 242 testes** (36 no
+arquivo da reforma), lint com 0 erros e os mesmos 47 avisos. A varredura por
+cor computada — quatro páginas públicas e nove views do painel, dois temas,
+1440px e 390px — devolve zero pontos fora da paleta, com a única exceção
+declarada do aviso "Escala confirmada".
 
 **Seis dos dez itens do bloco 4 caíram ao serem conferidos contra o código**:
 Ministérios, Pedidos, Estacionamento, Agenda, Pessoas e Criar feed já estavam

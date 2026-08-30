@@ -344,3 +344,92 @@ test("o diálogo portalizado carrega os tokens que perde ao sair do escopo", asy
   assert.match(styles, /\.cell-create-overlay-v2 \{[^}]*--v2-accent:/);
   assert.match(styles, /\.cell-create-dialog-v2 footer button:not\(:last-child\)/);
 });
+
+// --------------------------------------------------------------------------
+// Bloco 6 — superfície pública (recepção, login e perfil da comunidade)
+// --------------------------------------------------------------------------
+
+test("a camada v2 não mantém uma segunda marca competindo com o acento", async () => {
+  const styles = await read("app/globals.css");
+  // A camada v2 declarava azul #2554b8 e verde #168778 e os impunha com
+  // !important sobre --pilot-primary/--pilot-accent/--pilot-gradient. Era por
+  // isso que o cobre não chegava ao painel, ao login nem ao perfil público:
+  // havia duas marcas, e a de baixo vencia.
+  assert.doesNotMatch(styles, /--v2-blue:\s*#2554b8/);
+  assert.doesNotMatch(styles, /--v2-teal:\s*#168778/);
+  assert.doesNotMatch(styles, /--v2-blue:\s*#4d9fff/);
+  assert.doesNotMatch(styles, /--v2-teal:\s*#3fc9b0/);
+  assert.match(styles, /--v2-blue:var\(--violet\)/);
+  assert.match(styles, /--v2-teal:var\(--violet\)/);
+  // Estado continua com cor própria: erro e aviso não viram cobre.
+  assert.match(styles, /--v2-danger:#c63e56/);
+  assert.match(styles, /--v2-warning:#a66a13/);
+});
+
+test("cada página pública tem o próprio título na aba", async () => {
+  // As quatro abriam como "VÍNKULO | Gestão para igrejas e comunidades": com
+  // duas abas abertas não dava para saber qual pedia a senha.
+  const login = await read("app/login/page.tsx");
+  assert.match(login, /export const metadata = \{\s*\n\s*title: "Entrar \| VÍNKULO"/);
+
+  const diretorio = await read("app/comunidades/page.tsx");
+  assert.match(diretorio, /title: "Comunidades \| VÍNKULO"/);
+
+  const perfil = await read("app/comunidades/[slug]/page.tsx");
+  assert.match(perfil, /export async function generateMetadata/);
+  assert.match(perfil, /\$\{community\.nome\} \| VÍNKULO/);
+});
+
+test("o acento do login é configurável e o degradê respeita a cor escolhida", async () => {
+  const config = await read("app/lib/pilot-login-config.ts");
+  assert.match(config, /accentColor: "#b25a33"/);
+  const portal = await read("app/components/LoginPortal.tsx");
+  assert.match(portal, /"--login-accent": config\.accentColor \|\| "#b25a33"/);
+
+  const styles = await read("app/globals.css");
+  // A segunda parada era ciano fixo: quem escolhesse outro acento via um
+  // degradê que terminava sempre em ciano.
+  assert.doesNotMatch(styles, /linear-gradient\(145deg,var\(--login-accent\),#3fc9d0\)/);
+  assert.match(styles, /linear-gradient\(145deg,var\(--login-accent\),color-mix\(in srgb,var\(--login-accent\)/);
+});
+
+test("a coluna do login diz o que a conta faz, não elogios", async () => {
+  const portal = await read("app/components/LoginPortal.tsx");
+  // Procura no texto renderizado, não no comentário que cita a versão antiga.
+  assert.doesNotMatch(portal, /<strong>Seguro por contexto<\/strong>/);
+  assert.doesNotMatch(portal, /<strong>Rotina conectada<\/strong>/);
+  assert.match(portal, /Ainda não tem acesso\?/);
+  assert.match(portal, /a liderança da comunidade aprova/);
+
+  const styles = await read("app/globals.css");
+  // Em três colunas de ~150px qualquer frase quebrava em cinco linhas.
+  assert.match(styles, /\.login-shell\[data-ui-version="v2"\] \.login-v2-benefits \{ grid-template-columns:1fr;/);
+});
+
+test("os pontos decorativos da recepção deixaram de imitar estado", async () => {
+  const styles = await read("app/globals.css");
+  // O ponto ao lado de "Gestão, conexão e cuidado em um só lugar" era
+  // verde-menta e lia como "no ar", sem indicar nada.
+  assert.doesNotMatch(styles, /\.landing-status-badge > span \{[^}]*background: #44d6b4/);
+  assert.doesNotMatch(styles, /\.landing-preview-label span \{[^}]*background: #34c99f/);
+  assert.match(styles, /\.landing-status-badge > span \{[^}]*var\(--landing-c,#d9784c\)/);
+  // "Escala confirmada" continua verde: ali a cor é informação.
+  assert.match(styles, /\.landing-preview-notice > span \{[^}]*color: #4bd6b2/);
+});
+
+test("a capa de comunidade sem foto usa o mesmo par da capa do perfil", async () => {
+  const styles = await read("app/globals.css");
+  assert.doesNotMatch(styles, /linear-gradient\(145deg,#111c3a,#4b3da2\)/);
+  assert.match(styles, /\.directory-profile-visual \{[^}]*linear-gradient\(145deg,#161c2e,#2b2233\)/);
+  // O botão de ajuda flutua fora de .vinkulo-site, então não pode depender
+  // de var(--pilot-gradient): ali o token não existe.
+  assert.doesNotMatch(styles, /linear-gradient\(135deg,#7255ef,#2cbfbd\)/);
+  assert.match(styles, /\.global-feedback-trigger>span \{[^}]*linear-gradient\(135deg,#b25a33,#d9784c\)/);
+});
+
+test("a saudação do painel não cola o nome da comunidade na frase seguinte", async () => {
+  const home = await read("app/components/CommunityHome.tsx");
+  // A quebra de linha depois da expressão não vira espaço no JSX: lia
+  // "…em Comunidade Nova Aliançae resolva…".
+  assert.match(home, /\{communityName\}\{" "\}/);
+});

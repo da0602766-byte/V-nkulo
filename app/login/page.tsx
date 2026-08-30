@@ -8,6 +8,14 @@ import { safeRelativeReturnPath } from "../lib/safe-return-path";
 
 export const dynamic = "force-dynamic";
 
+/* A aba do navegador dizia "VÍNKULO | Gestão para igrejas e comunidades" —
+   o mesmo título da recepção. Quem deixa o login aberto numa aba e volta
+   depois precisa reconhecer qual das abas pede a senha. */
+export const metadata = {
+  title: "Entrar | VÍNKULO",
+  description: "Acesse sua conta para acompanhar sua comunidade no VÍNKULO.",
+};
+
 export default async function LoginPage({
   searchParams,
 }: {
