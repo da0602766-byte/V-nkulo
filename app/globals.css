@@ -29789,3 +29789,67 @@ body {
 .community-settings-nav-v5 button:not(.active) > span {
   background: var(--pilot-surface-2); color: var(--pilot-muted);
 }
+
+/* ===== Fio do dia — indicadores e coluna lateral =====
+   O que a linha do tempo não responde de relance: quantos vieram, quantos
+   pedidos abriram, se a escala do dia fechou. */
+.day-thread-stats-v5 {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 11px;
+}
+.day-thread-stats-v5 article {
+  display: grid; gap: 4px; border: 1px solid var(--pilot-line); border-radius: 14px;
+  background: var(--pilot-surface); padding: 13px 15px;
+}
+.day-thread-stats-v5 small {
+  color: var(--pilot-muted); font-size: var(--fs-2xs); font-weight: 750;
+  letter-spacing: .05em; text-transform: uppercase;
+}
+.day-thread-stats-v5 strong {
+  font-family: var(--font-mono), monospace; font-size: var(--fs-5xl); font-weight: 700;
+  line-height: 1; letter-spacing: -.02em;
+}
+.day-thread-stats-v5 strong > span { color: var(--pilot-muted); font-size: var(--fs-2xl); }
+.day-thread-stats-v5 em { color: var(--pilot-muted); font-size: var(--fs-2xs); font-style: normal; }
+/* Escala incompleta é a única que pede ação, e por isso é a única marcada. */
+.day-thread-stats-v5 article[data-alerta="1"] {
+  border-color: color-mix(in srgb, var(--amber) 40%, var(--pilot-line));
+  background: color-mix(in srgb, var(--amber) 7%, var(--pilot-surface));
+}
+.day-thread-stats-v5 article[data-alerta="1"] strong { color: var(--amber); }
+
+.day-thread-body-v5 { display: grid; grid-template-columns: minmax(0, 1fr) 268px; gap: 22px; align-items: start; }
+.day-thread-main-v5 { min-width: 0; }
+.day-thread-aside-v5 { display: grid; gap: 14px; position: sticky; top: 16px; }
+.day-thread-aside-v5 section {
+  border: 1px solid var(--pilot-line); border-radius: 14px;
+  background: var(--pilot-surface); padding: 14px;
+}
+.day-thread-aside-v5 h3 {
+  margin: 0 0 11px; color: var(--pilot-muted); font-size: var(--fs-2xs);
+  font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+}
+.day-thread-aside-empty-v5 { margin: 0; color: var(--pilot-muted); font-size: var(--fs-xs); }
+.day-thread-bar-v5 { display: grid; gap: 5px; margin-bottom: 10px; }
+.day-thread-bar-v5:last-child { margin-bottom: 0; }
+.day-thread-bar-v5 > span {
+  display: flex; justify-content: space-between; gap: 10px;
+  font-size: var(--fs-2xs); color: var(--pilot-text);
+}
+.day-thread-bar-v5 > span > b { font-family: var(--font-mono), monospace; color: var(--pilot-muted); }
+.day-thread-bar-v5 > i { display: block; height: 5px; border-radius: 3px; background: var(--pilot-surface-2); overflow: hidden; }
+.day-thread-bar-v5 > i > em { display: block; height: 100%; border-radius: 3px; background: var(--pilot-primary); }
+.day-thread-next-v5 {
+  display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: 9px; align-items: baseline;
+  padding: 7px 0; border-bottom: 1px solid var(--pilot-line);
+}
+.day-thread-next-v5:last-child { border-bottom: 0; padding-bottom: 0; }
+.day-thread-next-v5 > span {
+  font-family: var(--font-mono), monospace; font-size: var(--fs-2xs); color: var(--pilot-muted);
+}
+.day-thread-next-v5 strong { display: block; font-size: var(--fs-xs); font-weight: 650; }
+.day-thread-next-v5 small { color: var(--pilot-muted); font-size: var(--fs-2xs); }
+
+@media (max-width: 1000px) {
+  .day-thread-body-v5 { grid-template-columns: 1fr; }
+  .day-thread-aside-v5 { position: static; }
+}

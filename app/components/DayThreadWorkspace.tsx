@@ -5,6 +5,14 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 // O fio reúne o que já aconteceu e o que ainda vai acontecer no dia, numa
 // ordem só. O que o sistema não capta sozinho entra como registro manual.
 
+type ResumoFio = {
+  visitantes: number | null;
+  pedidos: number;
+  registros: number;
+  escalas: { total: number; confirmadas: number };
+  visitantesPorCategoria: { nome: string; total: number }[];
+};
+
 type ItemFio = {
   id: string;
   camada: "CULTOS" | "PESSOAS" | "OPERACAO" | "CUIDADO";
@@ -70,6 +78,7 @@ export default function DayThreadWorkspace() {
   const hoje = useMemo(() => diaLocal(new Date()), []);
   const [dia, setDia] = useState(hoje);
   const [itens, setItens] = useState<ItemFio[]>([]);
+  const [resumo, setResumo] = useState<ResumoFio | null>(null);
   const [camadasAtivas, setCamadasAtivas] = useState<ItemFio["camada"][]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
@@ -101,6 +110,7 @@ export default function DayThreadWorkspace() {
           throw new Error(resultado.error || "Não foi possível abrir o fio do dia.");
         }
         setItens(resultado.itens || []);
+        setResumo(resultado.resumo || null);
         setErro("");
       } catch (falha) {
         if (!cancelado) setErro((falha as Error).message);
@@ -229,6 +239,37 @@ export default function DayThreadWorkspace() {
         </div>
       </header>
 
+      {resumo && (
+        <div className="day-thread-stats-v5">
+          <article>
+            <small>Registros</small>
+            <strong>{resumo.registros}</strong>
+            <em>no fio de hoje</em>
+          </article>
+          {resumo.visitantes !== null && (
+            <article>
+              <small>Visitantes</small>
+              <strong>{resumo.visitantes}</strong>
+              <em>{resumo.visitantes === 1 ? "recebido" : "recebidos"}</em>
+            </article>
+          )}
+          <article>
+            <small>Pedidos</small>
+            <strong>{resumo.pedidos}</strong>
+            <em>{resumo.pedidos === 1 ? "aberto" : "abertos"}</em>
+          </article>
+          <article data-alerta={
+            resumo.escalas.total > 0 && resumo.escalas.confirmadas < resumo.escalas.total
+              ? "1"
+              : undefined
+          }>
+            <small>Escalas</small>
+            <strong>{resumo.escalas.confirmadas}<span>/{resumo.escalas.total}</span></strong>
+            <em>{resumo.escalas.total === 0 ? "nenhuma hoje" : "confirmadas"}</em>
+          </article>
+        </div>
+      )}
+
       <div className="day-thread-layers" role="group" aria-label="Camadas do fio">
         <button
           type="button"
@@ -319,6 +360,8 @@ export default function DayThreadWorkspace() {
         </p>
       )}
 
+      <div className="day-thread-body-v5">
+      <div className="day-thread-main-v5">
       {carregando && !itens.length ? (
         <p className="home-thread-empty">Organizando o dia…</p>
       ) : visiveis.length ? (
@@ -372,6 +415,45 @@ export default function DayThreadWorkspace() {
           </p>
         </div>
       )}
+      </div>
+
+      <aside className="day-thread-aside-v5" aria-label="Resumo do dia">
+        {resumo && resumo.visitantesPorCategoria.length > 0 && (
+          <section>
+            <h3>Visitantes por categoria</h3>
+            {(() => {
+              const teto = Math.max(
+                1,
+                ...resumo.visitantesPorCategoria.map((linha) => linha.total),
+              );
+              return resumo.visitantesPorCategoria.map((linha) => (
+                <div key={linha.nome} className="day-thread-bar-v5">
+                  <span>{linha.nome}<b>{linha.total}</b></span>
+                  <i><em style={{ width: `${Math.round((linha.total / teto) * 100)}%` }} /></i>
+                </div>
+              ));
+            })()}
+          </section>
+        )}
+        <section>
+          <h3>{dia === hoje ? "Ainda hoje" : "Depois deste ponto"}</h3>
+          {(() => {
+            const futuros = agora
+              ? visiveis.filter((item) => Date.parse(item.ocorreEm) > agora)
+              : [];
+            if (!futuros.length) {
+              return <p className="day-thread-aside-empty-v5">Nada mais marcado.</p>;
+            }
+            return futuros.slice(0, 5).map((item) => (
+              <div key={item.id} className="day-thread-next-v5">
+                <span>{formatarHora(item.ocorreEm)}</span>
+                <div><strong>{item.titulo}</strong><small>{item.origem}</small></div>
+              </div>
+            ));
+          })()}
+        </section>
+      </aside>
+      </div>
     </section>
   );
 }

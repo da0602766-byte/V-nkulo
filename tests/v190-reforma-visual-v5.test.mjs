@@ -285,3 +285,23 @@ test("o convite mora na seção Acessos, não flutuando acima das abas", async (
   // Acessos precisa existir quando só há convite, sem link de cadastro.
   assert.match(admin, /canManageRegistrationLinks \|\| Boolean\(accessSlot\)/);
 });
+
+test("o fio devolve o resumo do dia e a página o exibe", async () => {
+  const route = await read("app/api/pilot/fio/route.ts");
+  assert.match(route, /const resumo = \{/);
+  assert.match(route, /visitantesPorCategoria/);
+  // O resumo respeita a mesma janela de um dia das demais consultas.
+  const trecho = route.slice(route.indexOf("const resumo = {") - 1800);
+  assert.match(trecho, /BETWEEN datetime\(\?\) AND datetime\(\?\)/);
+  // Visitantes só entram no resumo de quem pode vê-los.
+  assert.match(route, /visitantes: permissions\.includes\("visitors\.view"\)/);
+
+  const workspace = await read("app/components/DayThreadWorkspace.tsx");
+  assert.match(workspace, /day-thread-stats-v5/);
+  assert.match(workspace, /day-thread-aside-v5/);
+  assert.match(workspace, /setResumo\(resultado\.resumo \|\| null\)/);
+  // Escala incompleta é a única marcada: é a única que pede ação.
+  assert.match(workspace, /resumo\.escalas\.confirmadas < resumo\.escalas\.total/);
+  const styles = await read("app/globals.css");
+  assert.match(styles, /\.day-thread-stats-v5 article\[data-alerta="1"\]/);
+});

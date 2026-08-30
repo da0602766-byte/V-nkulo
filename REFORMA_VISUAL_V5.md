@@ -53,13 +53,17 @@ que hoje está espalhado por nove: culto, presença, visitantes, pedidos,
 escalas, estacionamento, células e diaconia.
 
 Entregue: cabeçalho com troca de dia, filtro por camada (cultos, pessoas,
-operação, cuidado), linha do tempo com marcador "agora", futuro tracejado e o
-formulário de registro manual.
+operação, cuidado), linha do tempo com marcador "agora", futuro tracejado,
+formulário de registro manual, os quatro indicadores do topo (registros,
+visitantes, pedidos e escalas confirmadas) e a coluna lateral com visitantes
+por categoria e o que ainda vai acontecer.
 
-Ainda não entregue, do desenho original: os quatro indicadores do topo, os
-cartões expansíveis e a coluna lateral com ocupação do salão e visitantes por
-categoria. Presença, estacionamento, células e diaconia ainda não são fontes do
-agregador — hoje ele lê eventos, escalas, visitantes, pedidos e mural.
+Escala incompleta é o único indicador que muda de cor, porque é o único que
+pede ação. Visitantes só entram no resumo de quem tem `visitors.view`.
+
+Ainda não entregue: os cartões expansíveis. Presença, estacionamento, células e
+diaconia seguem fora do agregador — hoje ele lê eventos, escalas, visitantes,
+pedidos e mural. A ocupação do salão depende de presença, que ainda não é fonte.
 
 **Esta é a única parte da reforma que exige migração de banco.** A tabela
 `fio_registros` (`drizzle/0059_fio_registros.sql`) guarda os lançamentos
@@ -90,9 +94,9 @@ Contadores no trilho apenas para pendências que exigem ação.
 
 | Aba | Mudança |
 | --- | --- |
-| Criar feed | Deixa de ser aba e vira o composer no topo do Mural, com o tipo escolhido por aba (publicação, aviso, evento, pedido). |
-| Agenda | Camadas ligáveis sobre a mesma grade; a escala de cada evento aparece na própria linha. |
-| Pessoas | Filtros por situação, ações reveladas na linha sob o cursor, remoção sempre com motivo registrado. |
+| Criar feed | ~~Deixa de ser aba e vira composer no topo do Mural.~~ Nunca foi aba: é o botão "Criar publicação", que já abre um composer com dois gatilhos — um no topo da Início e outro compacto ao lado do título do Mural, este último adicionado de propósito em `1c6d447`. Convertê-lo de modal para embutido é decisão em aberto, não correção. |
+| Agenda | ~~Camadas ligáveis sobre a mesma grade.~~ Já existia: `AgendaCalendar.tsx:133` alterna EVENTO, ESCALA e PESSOAL, entregue no commit `15fcb80`, cujo título é literalmente "agenda com camadas". |
+| Pessoas | ~~Filtros por situação.~~ Premissa errada: `app/api/pilot/pessoas/route.ts:56` só devolve vínculos `ATIVO`, então não há outras situações na lista — quem está pendente vive em Solicitações de entrada. A remoção com motivo já veio em `1c6d447`. Ações só no hover ficaram de fora de propósito: esconderiam as ações por completo em telas de toque. |
 | Visitantes | O funil vira o assunto da página; a tabela vem depois dele. |
 | Pedidos | ~~Pedido confidencial não mostra o corpo na listagem.~~ Já resolvido, e melhor: `app/api/pilot/solicitacoes/route.ts:53-64` filtra por destinatário, então um pedido que não é seu nem foi endereçado a você não sai do servidor. Triagem por urgência exigiria coluna nova e ficou fora. |
 | Estacionamento | ~~Mapa de vagas clicável no lugar da lista.~~ Já existia: `ParkingWorkspace.tsx:571-585` desenha as vagas por setor como botões com estado livre, reservada e ocupada, e seleção. Terceiro item do diagnóstico que caiu ao ser checado contra o código. |
@@ -163,8 +167,10 @@ build, testes e evidências próprios:
    removida junto, e com ela um verde que estava fora da paleta.
    E **Configurações**, que era o balde previsto: virou navegação por assunto,
    com o convite realocado para a seção Acessos.
-   Verificados e já resolvidos no código: Pedidos, Ministérios e Estacionamento
-   (ver seção 5). Pendentes: Criar feed, Agenda e Pessoas.
+   Verificados e já resolvidos no código, ou com premissa errada no diagnóstico:
+   Pedidos, Ministérios, Estacionamento, Agenda, Pessoas e Criar feed — o
+   composer já existe como modal, e "Criar feed" nunca foi uma aba. Ver seção 5.
+   Este bloco está encerrado.
 5. **Formulários**, aplicando as cinco regras. *(pendente)*
 6. **Superfície pública** — recepção, login, perfil da comunidade. A recepção
    recebeu a cor no bloco 1; layout e conteúdo seguem pendentes.
@@ -196,9 +202,15 @@ espera, não que a tela funciona. Os quatro casos acima passavam em 226 testes.
 Base `1c6d447`, em 30/08/2026: build aprovado, 206 de 206 testes, lint com
 0 erros e 47 avisos.
 
-Depois dos blocos 1 a 4: build e artefato do Sites aprovados, **230 de 230
-testes** (24 novos em `tests/v190-reforma-visual-v5.test.mjs`), lint com
+Depois dos blocos 1 a 4: build e artefato do Sites aprovados, **231 de 231
+testes** (25 novos em `tests/v190-reforma-visual-v5.test.mjs`), lint com
 0 erros e os mesmos 47 avisos de `@next/next/no-img-element`.
+
+**Seis dos dez itens do bloco 4 caíram ao serem conferidos contra o código**:
+Ministérios, Pedidos, Estacionamento, Agenda, Pessoas e Criar feed já estavam
+resolvidos ou partiam de premissa errada no diagnóstico. O que sobrou e foi
+construído: Células, Visitantes, Notificações, Área do proprietário e
+Configurações.
 
 As telas do Fio do dia, Células e Visitantes foram abertas autenticadas num
 banco local semeado, o que produziu as correções da seção 7.1.

@@ -258,7 +258,74 @@ export async function GET(request: Request) {
     (esquerda, direita) =>
       Date.parse(esquerda.ocorreEm) - Date.parse(direita.ocorreEm),
   );
-  return Response.json({ ok: true, dia: inicio, itens: itens.slice(0, MAX_ITENS) });
+
+  // Resumo do dia. Os números saem das mesmas consultas já feitas acima, exceto
+  // as escalas da comunidade inteira e os visitantes por categoria, que pedem
+  // duas leituras a mais — ambas presas ao mesmo dia.
+  const visitantesPorCategoria = permissions.includes("visitors.view")
+    ? await db
+        .prepare(
+          `SELECT COALESCE(vc.nome, 'Sem categoria') AS nome, COUNT(*) AS total
+           FROM visitantes v
+           LEFT JOIN visitante_categorias vc ON vc.id = v.categoria_id
+           WHERE v.comunidade_id = ?
+             AND v.ativo = 1
+             AND v.escopo_confirmado = 1
+             AND datetime(v.criado_em) BETWEEN datetime(?) AND datetime(?)
+           GROUP BY vc.id, vc.nome
+           ORDER BY total DESC
+           LIMIT 6`,
+        )
+        .bind(comunidadeId, inicio, fim)
+        .all<{ nome: string; total: number }>()
+    : { results: [] as { nome: string; total: number }[] };
+
+  const escalasDoDia = await db
+    .prepare(
+      `SELECT COUNT(*) AS total,
+        SUM(CASE WHEN d.status = 'CONFIRMADA' THEN 1 ELSE 0 END) AS confirmadas
+       FROM escala_designacoes d
+       JOIN escalas_ministerio e ON e.id = d.escala_id
+       WHERE d.comunidade_id = ?
+         AND d.ativo = 1
+         AND datetime(e.inicia_em) BETWEEN datetime(?) AND datetime(?)`,
+    )
+    .bind(comunidadeId, inicio, fim)
+    .first<{ total: number; confirmadas: number }>();
+
+  const resumo = {
+    visitantes: permissions.includes("visitors.view")
+      ? Number(
+          (
+            await db
+              .prepare(
+                `SELECT COUNT(*) AS total FROM visitantes
+                 WHERE comunidade_id = ? AND ativo = 1 AND escopo_confirmado = 1
+                   AND datetime(criado_em) BETWEEN datetime(?) AND datetime(?)`,
+              )
+              .bind(comunidadeId, inicio, fim)
+              .first<{ total: number }>()
+          )?.total || 0,
+        )
+      : null,
+    pedidos: totalPedidos,
+    registros: itens.length,
+    escalas: {
+      total: Number(escalasDoDia?.total || 0),
+      confirmadas: Number(escalasDoDia?.confirmadas || 0),
+    },
+    visitantesPorCategoria: (visitantesPorCategoria.results || []).map((linha) => ({
+      nome: linha.nome,
+      total: Number(linha.total || 0),
+    })),
+  };
+
+  return Response.json({
+    ok: true,
+    dia: inicio,
+    itens: itens.slice(0, MAX_ITENS),
+    resumo,
+  });
 }
 
 export async function POST(request: Request) {
