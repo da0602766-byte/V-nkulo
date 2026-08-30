@@ -45,6 +45,12 @@ type PeopleResponse = {
   error?: string;
 };
 
+type RemovalBlocker = {
+  label: string;
+  detail: string;
+  href: string;
+};
+
 const PERMISSION_LABELS: Record<string, string> = {
   "visitors.view": "Consultar visitantes",
   "visitors.create": "Cadastrar visitantes",
@@ -100,6 +106,7 @@ export default function PeopleWorkspace({
   const [editing, setEditing] = useState<Person | null>(null);
   const [removing, setRemoving] = useState<Person | null>(null);
   const [removeConfirmation, setRemoveConfirmation] = useState("");
+  const [removalIssue, setRemovalIssue] = useState<{ message: string; blockers: RemovalBlocker[] } | null>(null);
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -215,8 +222,14 @@ export default function PeopleWorkspace({
           action: form.get("action"),
         }),
       });
-      const result = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(result.error || "Não foi possível concluir.");
+      const result = (await response.json()) as { error?: string; message?: string; blockers?: RemovalBlocker[] };
+      if (!response.ok) {
+        if (result.blockers?.length) {
+          setRemovalIssue({ message: result.error || "A ação precisa de atenção.", blockers: result.blockers });
+          return;
+        }
+        throw new Error(result.error || "Não foi possível concluir.");
+      }
       const removedMembershipId = removing.membership_id;
       setRemoving(null);
       setRemoveConfirmation("");
@@ -224,7 +237,8 @@ export default function PeopleWorkspace({
         ...current,
         people: current.people.filter((person) => person.membership_id !== removedMembershipId),
       }));
-      setMessage("A ação foi concluída e registrada na auditoria.");
+      setRemovalIssue(null);
+      setMessage(result.message || "A ação foi concluída e registrada na auditoria.");
     } catch (removeError) {
       setError((removeError as Error).message);
     } finally {
@@ -374,7 +388,7 @@ export default function PeopleWorkspace({
                 <button
                   type="button"
                   className="danger"
-                  onClick={() => { setRemoveConfirmation(""); setRemoving(person); }}
+                  onClick={() => { setRemoveConfirmation(""); setRemovalIssue(null); setRemoving(person); }}
                 >
                   Remover pessoa
                 </button>
@@ -486,7 +500,7 @@ export default function PeopleWorkspace({
         </div>
       )}
       {removing && (
-        <div className="people-modal-backdrop" onMouseDown={() => { setRemoving(null); setRemoveConfirmation(""); }}>
+        <div className="people-modal-backdrop" onMouseDown={() => { setRemoving(null); setRemoveConfirmation(""); setRemovalIssue(null); }}>
           <section
             className="people-modal"
             role="dialog"
@@ -501,17 +515,33 @@ export default function PeopleWorkspace({
                 <strong className="people-remove-name">{removing.nome}</strong>
                 <p>O vínculo será removido, mas históricos e registros protegidos continuarão preservados.</p>
               </div>
-              <button type="button" onClick={() => { setRemoving(null); setRemoveConfirmation(""); }} aria-label="Fechar">×</button>
+              <button type="button" onClick={() => { setRemoving(null); setRemoveConfirmation(""); setRemovalIssue(null); }} aria-label="Fechar">×</button>
             </header>
             <form className="people-role-form" onSubmit={removePerson}>
               <label>
                 Ação
                 <select name="action" defaultValue="REMOVE_COMMUNITY">
-                  <option value="REMOVE_COMMUNITY">Remover somente desta comunidade</option>
+                  <option value="REMOVE_COMMUNITY">Remover desta comunidade e liberar funções e escalas</option>
                   {data.canDeleteGlobal && <option value="DEACTIVATE_ACCOUNT">Desativar a conta inteira</option>}
                   {data.canDeleteGlobal && <option value="DELETE_ACCOUNT">Excluir definitivamente se não houver histórico</option>}
                 </select>
+                {data.canDeleteGlobal && <small>O proprietário pode encerrar o vínculo mesmo com funções ou escalas ativas. O VÍNKULO libera os compromissos, preserva o histórico e avisa os responsáveis.</small>}
               </label>
+              {removalIssue && (
+                <div className="people-removal-guidance" role="alert">
+                  <strong>Não foi possível excluir definitivamente</strong>
+                  <p>{removalIssue.message}</p>
+                  <div>
+                    {removalIssue.blockers.map((blocker) => (
+                      <a href={blocker.href} key={`${blocker.label}-${blocker.href}`}>
+                        <span>{blocker.label}</span>
+                        <small>{blocker.detail}</small>
+                        <b>Ir para o local →</b>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
               <label>
                 <span>Confirmação</span>
                 <small>Digite <strong>REMOVER</strong> para liberar a ação.</small>
@@ -527,7 +557,7 @@ export default function PeopleWorkspace({
                 />
               </label>
               <div className="people-modal-actions">
-                <button type="button" className="secondary" onClick={() => { setRemoving(null); setRemoveConfirmation(""); }}>
+                <button type="button" className="secondary" onClick={() => { setRemoving(null); setRemoveConfirmation(""); setRemovalIssue(null); }}>
                   Cancelar
                 </button>
                 <button type="submit" className="danger" disabled={saving || removeConfirmation !== "REMOVER"}>

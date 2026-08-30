@@ -2,6 +2,7 @@ import { getD1 } from "../../../../db";
 import { OFFICIAL_PERMISSION_CATALOG } from "../../../lib/tenant-policy.mjs";
 import { parseOfficialUpdate } from "../../../lib/people-validation";
 import { isSystemOwnerAccount } from "../../../lib/local-auth";
+import { notifyUser } from "../../../lib/pilot-notifications";
 import { recordTenantAudit } from "../../../lib/tenant-audit";
 import { requireTenantPermission } from "../../../lib/tenant";
 
@@ -189,6 +190,28 @@ export async function DELETE(request: Request) {
   }
 
   if (action === "REMOVE_COMMUNITY") {
+    const [releasedSchedules, releasedMinistries] = await Promise.all([
+      db
+        .prepare(
+          `SELECT DISTINCT s.id, s.titulo, COALESCE(s.atualizado_por, s.criado_por) AS responsavel_id
+           FROM escala_designacoes d
+           JOIN escalas_ministerio s
+             ON s.id = d.escala_id AND s.comunidade_id = d.comunidade_id
+           WHERE d.usuario_id = ? AND d.comunidade_id = ? AND d.ativo = 1`,
+        )
+        .bind(target.usuario_id, access.context.comunidadeId)
+        .all<{ id: number; titulo: string; responsavel_id: number | null }>(),
+      db
+        .prepare(
+          `SELECT DISTINCT m.id, m.nome, m.responsavel_usuario_id AS responsavel_id
+           FROM ministerio_voluntarios mv
+           JOIN ministerios_comunidade m
+             ON m.id = mv.ministerio_id AND m.comunidade_id = mv.comunidade_id
+           WHERE mv.usuario_id = ? AND mv.comunidade_id = ? AND mv.ativo = 1`,
+        )
+        .bind(target.usuario_id, access.context.comunidadeId)
+        .all<{ id: number; nome: string; responsavel_id: number | null }>(),
+    ]);
     await db.batch([
       db
         .prepare(
@@ -217,7 +240,39 @@ export async function DELETE(request: Request) {
       "SUCESSO",
       { usuarioId: target.usuario_id, membershipId },
     );
-    return Response.json({ ok: true, action });
+    await Promise.all([
+      ...releasedSchedules.results
+        .filter((item) => Number(item.responsavel_id || 0) > 0 && Number(item.responsavel_id) !== target.usuario_id)
+        .map((item) =>
+          notifyUser(db, {
+            userId: Number(item.responsavel_id),
+            title: "Participante liberado da escala",
+            message: `${target.nome} foi removido de “${item.titulo}” pelo VÍNKULO após o encerramento do vínculo com a comunidade.`,
+            entityId: Number(item.id),
+            area: "ESCALAS",
+            destination: "/painel?view=escalas",
+            createdBy: "VÍNKULO",
+          }),
+        ),
+      ...releasedMinistries.results
+        .filter((item) => Number(item.responsavel_id || 0) > 0 && Number(item.responsavel_id) !== target.usuario_id)
+        .map((item) =>
+          notifyUser(db, {
+            userId: Number(item.responsavel_id),
+            title: "Integrante removido do ministério",
+            message: `${target.nome} foi retirado de “${item.nome}” pelo VÍNKULO após o encerramento do vínculo com a comunidade.`,
+            entityId: Number(item.id),
+            area: "USUARIOS",
+            destination: "/painel?view=ministerios",
+            createdBy: "VÍNKULO",
+          }),
+        ),
+    ]);
+    return Response.json({
+      ok: true,
+      action,
+      message: "Pessoa removida da comunidade. Funções e escalas foram liberadas, os responsáveis foram avisados e o histórico foi preservado.",
+    });
   }
 
   if (action === "DEACTIVATE_ACCOUNT") {
@@ -258,15 +313,14 @@ export async function DELETE(request: Request) {
   const protectedRecords = await db
     .prepare(
       `SELECT
-        (SELECT COUNT(*) FROM comunidades WHERE proprietario_usuario_id = ?) +
-        (SELECT COUNT(*) FROM auditoria_piloto WHERE usuario_id = ?) +
-        (SELECT COUNT(*) FROM publicacoes_piloto WHERE criado_por = ?) +
-        (SELECT COUNT(*) FROM comentarios_publicacao WHERE usuario_id = ?) +
-        (SELECT COUNT(*) FROM escalas_ministerio WHERE criado_por = ? OR atualizado_por = ?) +
-        (SELECT COUNT(*) FROM ministerios_comunidade WHERE criado_por = ? OR atualizado_por = ?) +
-        (SELECT COUNT(*) FROM estacionamento_movimentacoes WHERE criado_por = ? OR atualizado_por = ?) +
-        (SELECT COUNT(*) FROM estacionamento_ocorrencias WHERE criado_por = ?)
-        AS total`,
+        (SELECT COUNT(*) FROM comunidades WHERE proprietario_usuario_id = ?) AS comunidades,
+        (SELECT COUNT(*) FROM auditoria_piloto WHERE usuario_id = ?) AS auditoria,
+        (SELECT COUNT(*) FROM publicacoes_piloto WHERE criado_por = ?) AS publicacoes,
+        (SELECT COUNT(*) FROM comentarios_publicacao WHERE usuario_id = ?) AS comentarios,
+        (SELECT COUNT(*) FROM escalas_ministerio WHERE criado_por = ? OR atualizado_por = ?) AS escalas,
+        (SELECT COUNT(*) FROM ministerios_comunidade WHERE criado_por = ? OR atualizado_por = ?) AS ministerios,
+        (SELECT COUNT(*) FROM estacionamento_movimentacoes WHERE criado_por = ? OR atualizado_por = ?) AS estacionamento_movimentacoes,
+        (SELECT COUNT(*) FROM estacionamento_ocorrencias WHERE criado_por = ?) AS estacionamento_ocorrencias`,
     )
     .bind(
       target.usuario_id,
@@ -281,20 +335,23 @@ export async function DELETE(request: Request) {
       target.usuario_id,
       target.usuario_id,
     )
-    .first<{ total: number }>();
-  if (Number(protectedRecords?.total || 0) > 0) {
+    .first<Record<string, number>>();
+  const blockers = buildRemovalBlockers(protectedRecords || {});
+  const protectedTotal = Object.values(protectedRecords || {}).reduce((total, value) => total + Number(value || 0), 0);
+  if (protectedTotal > 0) {
     await recordTenantAudit(
       db,
       access.context,
       access.user.id,
       "EXCLUSAO_DEFINITIVA_DE_CONTA_BLOQUEADA",
       "NEGADO",
-      { usuarioId: target.usuario_id, registrosProtegidos: Number(protectedRecords?.total || 0) },
+      { usuarioId: target.usuario_id, registrosProtegidos: protectedTotal },
     );
     return Response.json(
       {
         error:
-          "A exclusão definitiva foi bloqueada porque existem históricos protegidos. Use a desativação da conta.",
+          "Existem vínculos ou históricos que precisam permanecer auditáveis. Abra um dos locais abaixo ou escolha remover da comunidade para o VÍNKULO liberar automaticamente funções e escalas.",
+        blockers,
       },
       { status: 409 },
     );
@@ -314,6 +371,20 @@ export async function DELETE(request: Request) {
     db.prepare("DELETE FROM usuarios WHERE id = ?").bind(target.usuario_id),
   ]);
   return Response.json({ ok: true, action });
+}
+
+function buildRemovalBlockers(counts: Record<string, number>) {
+  const blockers: Array<{ label: string; detail: string; href: string }> = [];
+  const add = (count: number, label: string, href: string) => {
+    if (count > 0) blockers.push({ label, detail: `${count} registro${count === 1 ? "" : "s"} relacionado${count === 1 ? "" : "s"}`, href });
+  };
+  add(Number(counts.comunidades || 0), "Comunidades sob responsabilidade", "/proprietario");
+  add(Number(counts.auditoria || 0), "Histórico de auditoria", "/proprietario?view=auditoria");
+  add(Number(counts.publicacoes || 0) + Number(counts.comentarios || 0), "Publicações e comentários", "/painel?view=inicio#mural");
+  add(Number(counts.escalas || 0), "Escalas", "/painel?view=escalas");
+  add(Number(counts.ministerios || 0), "Ministérios", "/painel?view=ministerios");
+  add(Number(counts.estacionamento_movimentacoes || 0) + Number(counts.estacionamento_ocorrencias || 0), "Estacionamento", "/painel?view=estacionamento");
+  return blockers;
 }
 
 export async function PATCH(request: Request) {

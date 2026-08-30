@@ -722,10 +722,22 @@ export default function CommunityHome({
               <p className="pilot-kicker">MURAL</p>
               <h2>Atualizações da comunidade</h2>
             </div>
-            <span className={loading ? "community-home-loading" : "community-feed-count"}>
-              {loading ? "Atualizando…" : `${posts.length}`}
-              {!loading && <small> no feed</small>}
-            </span>
+            <div className="community-feed-heading-actions">
+              {canPublish && (
+                <button
+                  type="button"
+                  className="community-feed-create"
+                  onClick={() => setComposerOpen(true)}
+                >
+                  <span aria-hidden="true">＋</span>
+                  Criar publicação
+                </button>
+              )}
+              <span className={loading ? "community-home-loading" : "community-feed-count"}>
+                {loading ? "Atualizando…" : `${posts.length}`}
+                {!loading && <small> no feed</small>}
+              </span>
+            </div>
           </header>
           {loading && !posts.length ? (
             <div className="community-feed-loading" role="status" aria-label="Carregando publicações">
