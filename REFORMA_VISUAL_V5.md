@@ -6,8 +6,8 @@ proprietário em 30/08/2026 como direção.
 - **Base:** `1c6d447` — "Exibe ações essenciais e orienta remoções".
 - **Prévias navegáveis:** duas páginas publicadas fora do repositório, com as
   telas e os formulários desenhados. Os links estão com o proprietário.
-- **Estado:** blocos 1, 2 e 3 concluídos; bloco 4 parcial. Blocos 5 e 6
-  pendentes. Ver seção 7 para o recorte por commit.
+- **Estado:** blocos 1 a 5 concluídos. Bloco 6 pendente. Ver seção 7 para o
+  recorte por commit.
 
 ## 1. Diagnóstico
 
@@ -141,6 +141,23 @@ Os campos desenhados saíram de `db/schema.ts` e das rotas em `app/api/pilot/`.
 Com a exceção do Fio do dia, **a reforma não exige migração de banco** — o que
 muda é ordem, agrupamento e texto.
 
+**O que foi conferido e o que foi feito.** As regras 4 e 5 já estavam
+atendidas: escalas nascem com `defaultValue="RASCUNHO"`, e a remoção com motivo
+e lista de blocos veio em `1c6d447`. Sobraram as regras 1, 2 e 3, aplicadas ao
+diálogo de célula e ao cadastro de visitante.
+
+Dois defeitos apareceram no caminho, ambos anteriores a esta reforma:
+
+- **A data de entrada do visitante usava `toISOString()`, que é UTC.** No Brasil
+  isso significa que, das 21h em diante, a data já virou: um visitante recebido
+  no culto de domingo à noite era gravado como segunda-feira. Passou a usar as
+  partes locais da data.
+- **O botão "Criar célula" era invisível.** O diálogo é montado com
+  `createPortal` direto no `body`, fora de `.cells-workspace-v2`, que é onde os
+  tokens `--v2-*` são declarados. Sem eles, `background: var(--v2-accent)` não
+  resolve e o botão ficava branco sobre branco — a ação principal do diálogo não
+  existia visualmente. Os tokens passaram a ser declarados no próprio overlay.
+
 ## 7. Ordem sugerida
 
 A reforma é grande demais para um commit. Sugestão de recorte, cada bloco com
@@ -171,7 +188,11 @@ build, testes e evidências próprios:
    Pedidos, Ministérios, Estacionamento, Agenda, Pessoas e Criar feed — o
    composer já existe como modal, e "Criar feed" nunca foi uma aba. Ver seção 5.
    Este bloco está encerrado.
-5. **Formulários**, aplicando as cinco regras. *(pendente)*
+5. **Formulários** — feito. Regras 4 e 5 já estavam atendidas. As regras 1, 2 e
+   3 foram aplicadas ao diálogo de célula (bloco público separado e avisado,
+   rodapé com a consequência) e ao cadastro de visitante (rodapé dizendo que só
+   o nome é obrigatório). Dois defeitos anteriores foram corrigidos junto: a
+   data em UTC e o botão de confirmar invisível. Ver seção 6.
 6. **Superfície pública** — recepção, login, perfil da comunidade. A recepção
    recebeu a cor no bloco 1; layout e conteúdo seguem pendentes.
 
@@ -202,8 +223,8 @@ espera, não que a tela funciona. Os quatro casos acima passavam em 226 testes.
 Base `1c6d447`, em 30/08/2026: build aprovado, 206 de 206 testes, lint com
 0 erros e 47 avisos.
 
-Depois dos blocos 1 a 4: build e artefato do Sites aprovados, **231 de 231
-testes** (25 novos em `tests/v190-reforma-visual-v5.test.mjs`), lint com
+Depois dos blocos 1 a 5: build e artefato do Sites aprovados, **235 de 235
+testes** (29 novos em `tests/v190-reforma-visual-v5.test.mjs`), lint com
 0 erros e os mesmos 47 avisos de `@next/next/no-img-element`.
 
 **Seis dos dez itens do bloco 4 caíram ao serem conferidos contra o código**:

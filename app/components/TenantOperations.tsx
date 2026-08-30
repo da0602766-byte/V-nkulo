@@ -80,6 +80,16 @@ type VisitorGrowth = { categoria_id: number; mes: string; novos: number };
 const VISITOR_CATEGORY_ICONS = ["◎", "◇", "♡", "✦", "♙", "▣", "○", "△"];
 const VISITOR_CATEGORY_COLORS = ["#7357e8", "#2f80ed", "#12a879", "#e09a21", "#df5b72", "#8d5bd2"];
 
+// A data de hoje em fuso local. toISOString() devolve UTC: no Brasil, das 21h
+// em diante a data já virou, e um visitante recebido no culto de domingo à
+// noite era gravado como segunda-feira.
+function hojeLocal() {
+  const agora = new Date();
+  const mes = String(agora.getMonth() + 1).padStart(2, "0");
+  const dia = String(agora.getDate()).padStart(2, "0");
+  return `${agora.getFullYear()}-${mes}-${dia}`;
+}
+
 type Cell = {
   id: number;
   nome: string;
@@ -784,7 +794,7 @@ export function VisitorsWorkspace({
       ];
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Visitantes");
-      XLSX.writeFile(workbook, `visitantes-${new Date().toISOString().slice(0, 10)}.xlsx`, { compression: true });
+      XLSX.writeFile(workbook, `visitantes-${hojeLocal()}.xlsx`, { compression: true });
     } catch (caught) {
       setError(`Não foi possível gerar a planilha: ${(caught as Error).message}`);
     }
@@ -845,7 +855,7 @@ export function VisitorsWorkspace({
             body: JSON.stringify({
               ...row,
               batizado: "NAO_INFORMADO",
-              dataEntrada: row.dataEntrada || new Date().toISOString().slice(0, 10),
+              dataEntrada: row.dataEntrada || hojeLocal(),
             }),
           });
           imported += 1;
@@ -1243,12 +1253,12 @@ export function VisitorsWorkspace({
               <header><span><b>4</b><strong>Finalização</strong><small>Entrada, status e observações</small></span></header>
               <fieldset>
                 <legend>Observações e finalização</legend>
-                <label>Entrada*<input name="dataEntrada" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} /></label>
+                <label>Entrada<input name="dataEntrada" type="date" required defaultValue={hojeLocal()} /></label>
                 <label>Status<select name="status" defaultValue="NOVO"><option value="NOVO">Novo</option><option value="EM_CONTATO">Em contato</option><option value="EM_ACOMPANHAMENTO">Em acompanhamento</option><option value="INTEGRADO">Integrado</option></select></label>
                 <label className="visitor-wide-field">Observações<textarea name="observacoes" maxLength={1000} rows={3} /></label>
               </fieldset>
             </section>
-            <footer className="visitor-registration-actions"><button type="button" onClick={() => setRegistrationOpen(false)} disabled={saving}>Cancelar</button><button disabled={saving}>{saving ? "Salvando…" : "Salvar visitante"}</button></footer>
+            <footer className="visitor-registration-actions"><p className="form-consequence-v5"><span aria-hidden="true">◉</span>Só o nome é obrigatório. O visitante entra no fio do dia na hora e abre um acompanhamento para o contato.</p><button type="button" onClick={() => setRegistrationOpen(false)} disabled={saving}>Cancelar</button><button disabled={saving}>{saving ? "Salvando…" : "Salvar visitante"}</button></footer>
           </form>
         </section>
         </div>, document.body)}
@@ -1366,7 +1376,7 @@ export function VisitorsWorkspace({
                     <td><strong>{visitor.responsavel_email?.split("@")[0] || visitor.acompanhante || "A definir"}</strong></td>
                     <td>{canEdit && activeVision !== "arquivados" ? <select aria-label={`Status de ${visitor.nome_completo}`} value={visitor.status} onChange={(event) => void updateVisitorField(visitor, { status: event.target.value })}><option value="NOVO">Novo</option><option value="EM_CONTATO">Em contato</option><option value="EM_ACOMPANHAMENTO">Em acompanhamento</option><option value="INTEGRADO">Integrado</option></select> : <span className={`status-pill status-${visitor.status.toLowerCase()}`}>{activeVision === "arquivados" ? "Arquivado" : statusLabel(visitor.status)}</span>}</td>
                     <td>{visitor.ultimo_contato ? formatDateTime(visitor.ultimo_contato) : "Sem contato"}</td>
-                    <td className={visitor.proximo_contato && visitor.proximo_contato <= new Date().toISOString().slice(0, 10) ? "overdue" : ""}>{visitor.proximo_contato ? formatDate(visitor.proximo_contato) : "Não definida"}</td>
+                    <td className={visitor.proximo_contato && visitor.proximo_contato <= hojeLocal() ? "overdue" : ""}>{visitor.proximo_contato ? formatDate(visitor.proximo_contato) : "Não definida"}</td>
                     <td><button type="button" className="visitor-row-open-v2" aria-label={`Abrir ficha de ${visitor.nome_completo}`} onClick={() => void loadFollowups(visitor.id)}>›</button></td>
                   </tr>
                 ))}
@@ -1988,7 +1998,7 @@ export function CellsWorkspace({
           </section>
         </div>, document.body,
       )}
-      {createOpen && createPortal(<div className="cell-create-overlay-v2" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setCreateOpen(false); }}><form className="pilot-form cell-create-dialog-v2" role="dialog" aria-modal="true" aria-label="Criar célula" onSubmit={createCell}><header><div><small>NOVA CÉLULA</small><h2>Informações essenciais</h2></div><button type="button" aria-label="Fechar" onClick={() => setCreateOpen(false)}>×</button></header><label>Nome da célula<input name="nome" required maxLength={100} /></label><label>Líder<select name="liderUsuarioId" required defaultValue=""><option value="" disabled>Selecione</option>{availableUsers.map((user)=><option value={user.id} key={user.id}>{user.nome} · {user.papel}</option>)}</select></label><fieldset className="cell-days-field-v2"><legend>Dias de encontro (obrigatório)</legend>{Object.entries(dayLabels).map(([value,label]) => <label key={value}><input type="checkbox" name="diasReuniao" value={value} />{label}</label>)}</fieldset><label>Endereço público<input name="enderecoPublico" maxLength={240} /></label><label className="cell-wide-field">Descrição pública<textarea name="descricaoPublica" rows={2} maxLength={700} /></label><label className="cell-wide-field">Observações internas<textarea name="observacoes" rows={2} maxLength={1000} /></label><footer><button type="button" onClick={() => setCreateOpen(false)}>Cancelar</button><button disabled={saving}>{saving ? "Criando…" : "Criar célula"}</button></footer></form></div>, document.body)}
+      {createOpen && createPortal(<div className="cell-create-overlay-v2" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setCreateOpen(false); }}><form className="pilot-form cell-create-dialog-v2" role="dialog" aria-modal="true" aria-label="Criar célula" onSubmit={createCell}><header><div><small>NOVA CÉLULA</small><h2>Informações essenciais</h2></div><button type="button" aria-label="Fechar" onClick={() => setCreateOpen(false)}>×</button></header><label>Nome da célula<input name="nome" required maxLength={100} /></label><label>Líder<select name="liderUsuarioId" required defaultValue=""><option value="" disabled>Selecione</option>{availableUsers.map((user)=><option value={user.id} key={user.id}>{user.nome} · {user.papel}</option>)}</select></label><fieldset className="cell-days-field-v2"><legend>Dias de encontro (obrigatório)</legend>{Object.entries(dayLabels).map(([value,label]) => <label key={value}><input type="checkbox" name="diasReuniao" value={value} />{label}</label>)}</fieldset><label className="cell-wide-field">Observações internas <small>só a liderança vê</small><textarea name="observacoes" rows={2} maxLength={1000} /></label><fieldset className="form-public-block-v5"><legend>Página pública</legend><p className="form-public-warning-v5"><span aria-hidden="true">◉</span>O que for preenchido aqui aparece na internet, no perfil público da comunidade. Deixe em branco para manter a célula fora do diretório.</p><label>Endereço público<input name="enderecoPublico" maxLength={240} placeholder="Rua e bairro do encontro" /><small>Não use o endereço da casa de alguém sem permissão.</small></label><label className="cell-wide-field">Descrição pública<textarea name="descricaoPublica" rows={2} maxLength={700} placeholder="Uma frase para quem procura uma célula perto de casa" /></label></fieldset><footer><p className="form-consequence-v5"><span aria-hidden="true">◉</span>Cria a célula, dá acesso de líder a quem você escolheu e abre o primeiro ciclo de relatórios semanais.</p><button type="button" onClick={() => setCreateOpen(false)}>Cancelar</button><button disabled={saving}>{saving ? "Criando…" : "Criar célula"}</button></footer></form></div>, document.body)}
     </section>
   );
 }

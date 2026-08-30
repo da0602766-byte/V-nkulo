@@ -29853,3 +29853,59 @@ body {
   .day-thread-body-v5 { grid-template-columns: 1fr; }
   .day-thread-aside-v5 { position: static; }
 }
+
+/* ===== Formulários — consequência no rodapé e separação do que é público =====
+   Nenhum diálogo deve terminar só com "Salvar": quem confirma precisa saber
+   quem será notificado e o que passa a ser visível. */
+.form-consequence-v5 {
+  flex: 1; min-width: 200px; display: flex; align-items: flex-start; gap: 8px;
+  margin: 0; color: var(--pilot-muted); font-size: var(--fs-2xs); line-height: 1.5;
+  text-align: left;
+}
+.form-consequence-v5 > span { color: var(--pilot-primary); line-height: 1.35; }
+
+/* O bloco público fica visualmente destacado porque o que entra nele sai da
+   comunidade e vai para a internet. */
+.form-public-block-v5 {
+  grid-column: 1 / -1; display: grid; gap: 11px; margin: 4px 0 0;
+  border: 1px solid color-mix(in srgb, var(--pilot-primary) 30%, var(--pilot-line));
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--pilot-primary) 5%, var(--pilot-surface));
+  padding: 13px 15px 15px;
+}
+.form-public-block-v5 > legend {
+  padding: 0 7px; color: var(--pilot-primary);
+  font-size: var(--fs-2xs); font-weight: 850; letter-spacing: .08em; text-transform: uppercase;
+}
+.form-public-warning-v5 {
+  display: flex; align-items: flex-start; gap: 8px; margin: 0;
+  color: var(--pilot-muted); font-size: var(--fs-2xs); line-height: 1.5;
+}
+.form-public-warning-v5 > span { color: var(--pilot-primary); line-height: 1.35; }
+.form-public-block-v5 label > small { color: var(--pilot-muted); font-size: var(--fs-2xs); line-height: 1.4; }
+
+/* ===== Diálogo de criar célula — tokens que o portal deixa para trás =====
+   O diálogo é montado com createPortal direto no body, então fica fora de
+   .cells-workspace-v2, que é onde os tokens --v2-* são declarados. Sem eles,
+   `background: var(--v2-accent)` não resolve e o botão de confirmar ficava
+   branco sobre branco: a ação principal do diálogo era invisível. */
+.cell-create-overlay-v2 {
+  --v2-accent: var(--pilot-primary, #b25a33);
+  --v2-accent-contrast: #fff;
+  --v2-bg: var(--pilot-surface-2, #eef0f4);
+  --v2-surface: var(--pilot-surface, #fff);
+  --v2-border: var(--pilot-line, #d6dbe0);
+  --v2-hover: color-mix(in srgb, var(--pilot-primary, #b25a33) 9%, var(--pilot-surface, #fff));
+  --v2-text: var(--pilot-text, #1b2430);
+  --v2-muted: var(--pilot-muted, #687380);
+}
+/* Cancelar é ação secundária: contorno, não preenchimento. Antes as duas
+   ficavam iguais, e a de desistir tinha o mesmo peso da de confirmar. */
+.cell-create-dialog-v2 footer button:not(:last-child) {
+  border: 1px solid var(--v2-border);
+  border-radius: 10px;
+  background: var(--v2-surface);
+  color: var(--v2-text);
+  padding: 11px 16px;
+  font-weight: 750;
+}

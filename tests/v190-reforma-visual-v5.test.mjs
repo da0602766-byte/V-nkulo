@@ -305,3 +305,42 @@ test("o fio devolve o resumo do dia e a página o exibe", async () => {
   const styles = await read("app/globals.css");
   assert.match(styles, /\.day-thread-stats-v5 article\[data-alerta="1"\]/);
 });
+
+test("o diálogo de célula separa o que vai para a internet do que é interno", async () => {
+  const operations = await read("app/components/TenantOperations.tsx");
+  const dialogo = operations.slice(operations.indexOf("cell-create-dialog-v2"));
+  // Endereço e descrição públicos ficam num bloco avisado, não soltos na lista.
+  assert.match(dialogo, /form-public-block-v5/);
+  assert.match(dialogo, /aparece na internet/);
+  const bloco = dialogo.slice(dialogo.indexOf("form-public-block-v5"), dialogo.indexOf("</fieldset>", dialogo.indexOf("form-public-block-v5")));
+  assert.match(bloco, /name="enderecoPublico"/);
+  assert.match(bloco, /name="descricaoPublica"/);
+  // Observações internas ficam de fora do bloco público.
+  assert.doesNotMatch(bloco, /name="observacoes"/);
+});
+
+test("os diálogos dizem a consequência no rodapé", async () => {
+  const operations = await read("app/components/TenantOperations.tsx");
+  const rodapes = operations.match(/form-consequence-v5/g) || [];
+  assert.ok(rodapes.length >= 2, `esperava ao menos 2 rodapés, achei ${rodapes.length}`);
+  assert.match(operations, /Só o nome é obrigatório/);
+  const styles = await read("app/globals.css");
+  assert.match(styles, /\.form-consequence-v5/);
+});
+
+test("a data de entrada do visitante usa o fuso local, não UTC", async () => {
+  const operations = await read("app/components/TenantOperations.tsx");
+  // toISOString devolve UTC: no Brasil, das 21h em diante a data já virou e um
+  // visitante do culto de domingo à noite era gravado como segunda.
+  assert.match(operations, /function hojeLocal\(\)/);
+  assert.doesNotMatch(operations, /new Date\(\)\.toISOString\(\)\.slice\(0, 10\)/);
+  assert.match(operations, /defaultValue=\{hojeLocal\(\)\}/);
+});
+
+test("o diálogo portalizado carrega os tokens que perde ao sair do escopo", async () => {
+  const styles = await read("app/globals.css");
+  // createPortal monta o diálogo no body, fora de .cells-workspace-v2, onde os
+  // --v2-* são declarados. Sem eles o botão de confirmar ficava branco no branco.
+  assert.match(styles, /\.cell-create-overlay-v2 \{[^}]*--v2-accent:/);
+  assert.match(styles, /\.cell-create-dialog-v2 footer button:not\(:last-child\)/);
+});
