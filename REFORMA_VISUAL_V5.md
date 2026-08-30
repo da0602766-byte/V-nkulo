@@ -167,25 +167,54 @@ build, testes e evidências próprios:
 6. **Superfície pública** — recepção, login, perfil da comunidade. A recepção
    recebeu a cor no bloco 1; layout e conteúdo seguem pendentes.
 
+## 7.1 O que só apareceu ao rodar
+
+Os blocos 1 a 4 foram validados por build, testes e lint, mas nenhuma tela
+tinha sido aberta com dados reais. Ao semear um banco local e entrar no painel,
+quatro defeitos apareceram de uma vez — três deles invisíveis para qualquer
+teste de conteúdo:
+
+1. **`?view=fio` caía no Início.** `app/painel/page.tsx` mantém uma lista branca
+   própria de views, e o bloco 3 não a atualizou. A aba abria no clique e se
+   perdia ao recarregar, porque `openView` grava `?view=` na URL.
+2. **`diaconia` tinha o mesmo problema, desde antes desta reforma.** Apareceu
+   pelo teste escrito para o caso do fio.
+3. **A coluna de saúde da célula não cabia na linha.** Foi movida para dentro da
+   coluna do nome em vez de alargar a grade.
+4. **A regra do badge "Ativa" vazava.** `.cell-row-copy-v4 i`, como descendente
+   solto e com `color: #23b88a !important`, pintava de verde e dava forma de
+   pílula a qualquer `<i>` da coluna — inclusive as barras de frequência e a
+   pílula de saúde. Foi restringida ao elemento que deveria estilizar.
+
+A lição fica registrada: teste de conteúdo prova que o código diz o que se
+espera, não que a tela funciona. Os quatro casos acima passavam em 226 testes.
+
 ## 8. Validação
 
 Base `1c6d447`, em 30/08/2026: build aprovado, 206 de 206 testes, lint com
 0 erros e 47 avisos.
 
-Depois dos blocos 1 a 4: build e artefato do Sites aprovados, **226 de 226
-testes** (20 novos em `tests/v190-reforma-visual-v5.test.mjs`), lint com
+Depois dos blocos 1 a 4: build e artefato do Sites aprovados, **228 de 228
+testes** (22 novos em `tests/v190-reforma-visual-v5.test.mjs`), lint com
 0 erros e os mesmos 47 avisos de `@next/next/no-img-element`.
+
+As telas do Fio do dia, Células e Visitantes foram abertas autenticadas num
+banco local semeado, o que produziu as correções da seção 7.1.
 
 Duas afirmações do diagnóstico original caíram ao serem checadas contra o
 código: Equipes já era aba própria no ministério, e pedidos já eram filtrados
 por destinatário no servidor. Ambas estão corrigidas nas seções 5 e 7 em vez de
 apagadas — o erro faz parte do registro.
 
-O que **não** foi verificado em execução: o caminho autenticado da rota
-`/api/pilot/fio`. Sem sessão e sem banco semeado neste ambiente, só deu para
-confirmar que ela responde `401` limpo a quem não está logado e que a migração
-aplica sem violar integridade referencial. A agregação em si está coberta por
-teste de conteúdo, não de comportamento.
+A rota `/api/pilot/fio` foi exercitada autenticada: agrega eventos, escalas,
+visitantes, pedidos, mural e registros manuais, com o marcador "agora" no lugar
+certo e o futuro tracejado.
+
+O que segue **sem** verificação com dados de verdade: os limiares da saúde da
+célula (70% de queda, 3 semanas de atraso, média ≥ 15 para multiplicar) foram
+calibrados contra dados semeados por quem os escreveu, o que não prova nada
+sobre uma comunidade real. A heurística do "precisa de você" nas notificações
+classifica por palavra no texto e tem o mesmo problema.
 
 Observação para quem for validar: 39 testes de integração dependem de
 `dist/server/index.js`. Rodar a suíte sem o build antes produz 39 falsas

@@ -231,3 +231,29 @@ test("a área do proprietário mostra o escopo global sem exigir clique", async 
   // A regra órfã saiu junto, com o verde que estava fora da paleta.
   assert.doesNotMatch(styles, /owner-scope-note/);
 });
+
+test("a lista branca do servidor cobre todas as views do painel", async () => {
+  const page = await read("app/painel/page.tsx");
+  const dashboard = await read("app/components/PilotDashboard.tsx");
+  const bloco = page.slice(page.indexOf("const VALID_VIEWS"), page.indexOf("]);", page.indexOf("const VALID_VIEWS")));
+  const aceitas = new Set([...bloco.matchAll(/"([a-z-]+)"/g)].map((m) => m[1]));
+  const tipo = dashboard.slice(dashboard.indexOf("type View ="), dashboard.indexOf(";", dashboard.indexOf("type View =")));
+  const declaradas = [...tipo.matchAll(/"([a-z-]+)"/g)].map((m) => m[1]);
+  assert.ok(declaradas.length > 10, "não li o tipo View");
+  for (const view of declaradas) {
+    // Sem isso a view abre no clique e some ao recarregar: openView grava
+    // ?view= na URL e a validação do servidor devolve para "inicio".
+    if (view === "visual-editor") continue;
+    assert.ok(aceitas.has(view), `view "${view}" não está em VALID_VIEWS`);
+  }
+});
+
+test("o badge da célula não vaza estilo para a linha de saúde", async () => {
+  const styles = await read("app/globals.css");
+  // Como descendente solto, a regra do badge "Ativa" pintava de verde e dava
+  // forma de pílula a qualquer <i> da coluna, inclusive as barras de
+  // frequência e a pílula de saúde.
+  assert.doesNotMatch(styles, /^\.cell-row-copy-v4 i \{/m);
+  assert.match(styles, /\.cell-row-copy-v4 > span:not\(\.cell-row-health-v5\) > i \{/);
+  assert.doesNotMatch(styles, /^\.cell-row-copy-v4 small \{/m);
+});

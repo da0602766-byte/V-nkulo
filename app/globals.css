@@ -17078,8 +17078,12 @@ textarea { resize: none !important; }
 .cell-row-copy-v4 { min-width:0; display:block; }
 .cell-row-copy-v4>span { display:flex; align-items:center; gap:8px; }
 .cell-row-copy-v4 strong { min-width:0; overflow:hidden; font-size:var(--fs-md); text-overflow:ellipsis; white-space:nowrap; }
-.cell-row-copy-v4 i { order:2; padding:3px 6px; border-radius:999px; background:color-mix(in srgb,#23b88a 13%,transparent); color:#23b88a!important; font-size:var(--fs-2xs); font-style:normal; font-weight:850; text-transform:uppercase; }
-.cell-row-copy-v4 small { margin-top:5px!important; font-size:var(--fs-xs)!important; }
+/* Escopo restrito ao badge "Ativa/Arquivada", que é o <i> dentro do span do
+   nome. Como descendente solto, esta regra pintava de verde e dava forma de
+   pílula a qualquer <i> da coluna — inclusive as barras de frequência e a
+   pílula de saúde da célula. */
+.cell-row-copy-v4 > span:not(.cell-row-health-v5) > i { order:2; padding:3px 6px; border-radius:999px; background:color-mix(in srgb,#23b88a 13%,transparent); color:#23b88a!important; font-size:var(--fs-2xs); font-style:normal; font-weight:850; text-transform:uppercase; }
+.cell-row-copy-v4 > small { margin-top:5px!important; font-size:var(--fs-xs)!important; }
 .cell-row-fact-v4 { min-width:0; display:block; }
 .cell-row-fact-v4 small,.cell-row-fact-v4 strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .cell-row-fact-v4 small { margin:0 0 5px!important; color:var(--v2-muted); font-size:var(--fs-2xs)!important; font-weight:750; text-transform:uppercase; letter-spacing:.06em; }
@@ -29651,7 +29655,9 @@ body {
   font-family: var(--font-mono), monospace; font-size: var(--fs-2xs);
 }
 
-.cell-row-health-v5 { min-width: 0; display: grid; gap: 5px; justify-items: start; }
+.cell-row-health-v5 {
+  min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 7px;
+}
 .cell-row-health-v5 > small { color: var(--pilot-muted); font-size: var(--fs-2xs); }
 
 /* A cor aqui é informação de estado, não decoração: verde é em dia, âmbar é
@@ -29682,6 +29688,8 @@ body {
 .cells-summary-v4 article[data-alerta="1"] strong { color: var(--rose); }
 
 @media (max-width: 900px) {
+  /* A coluna de saúde sai numa tela estreita, e a grade precisa voltar a seis
+     colunas — senão sobra um vão do tamanho dela no fim de cada linha. */
   .cell-row-health-v5 { display: none; }
 }
 
