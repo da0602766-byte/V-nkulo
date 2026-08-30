@@ -257,3 +257,31 @@ test("o badge da célula não vaza estilo para a linha de saúde", async () => {
   assert.match(styles, /\.cell-row-copy-v4 > span:not\(\.cell-row-health-v5\) > i \{/);
   assert.doesNotMatch(styles, /^\.cell-row-copy-v4 small \{/m);
 });
+
+test("configurações têm navegação por assunto em vez de uma página só", async () => {
+  const admin = await read("app/components/CommunityAdminWorkspace.tsx");
+  assert.match(admin, /community-settings-nav-v5/);
+  for (const secao of ["atalhos", "aparencia", "acessos", "modulos", "privacidade", "solicitacoes"]) {
+    assert.ok(admin.includes(`"${secao}" as const`), `seção ${secao} ausente`);
+  }
+  // Cada bloco só aparece na sua seção.
+  assert.match(admin, /secaoAtiva === "aparencia" && canManageCommunity && <CommunityThemeEditor \/>/);
+  assert.match(admin, /secaoAtiva === "solicitacoes" && canManageRequests/);
+  const styles = await read("app/globals.css");
+  assert.match(styles, /\.community-settings-nav-v5 button\.active/);
+});
+
+test("o convite mora na seção Acessos, não flutuando acima das abas", async () => {
+  const dashboard = await read("app/components/PilotDashboard.tsx");
+  const admin = await read("app/components/CommunityAdminWorkspace.tsx");
+  // O formulário é passado para dentro do componente em vez de renderizado antes.
+  assert.match(dashboard, /accessSlot=\{/);
+  assert.doesNotMatch(
+    dashboard.slice(dashboard.indexOf('visibleView === "comunidade"'), dashboard.indexOf("<CommunityAdminWorkspace")),
+    /invite-generator/,
+  );
+  assert.match(admin, /accessSlot\?: React\.ReactNode;/);
+  assert.match(admin, /secaoAtiva === "acessos" && \(/);
+  // Acessos precisa existir quando só há convite, sem link de cadastro.
+  assert.match(admin, /canManageRegistrationLinks \|\| Boolean\(accessSlot\)/);
+});

@@ -1161,19 +1161,21 @@ export default function PilotDashboard({
           {visibleView === "comunidade" && (
             <section>
               <header className="workspace-heading"><div><p className="pilot-kicker">GESTÃO DA COMUNIDADE</p><h1>Central da comunidade</h1><p>Pessoas, liderança, continuidade, solicitações e preferências reunidas no contexto da comunidade ativa.</p></div></header>
-              {active.permissions.includes("invites.manage") && (
-                <>
-                  <form className="pilot-form invite-generator" onSubmit={createInvite}>
-                    <label>E-mail da pessoa<input name="email" type="email" required autoComplete="off" /></label>
-                    <label>Perfil<select name="papel" value="MEMBRO" disabled><option value="MEMBRO">Membro</option></select></label>
-                    <button disabled={inviteLoading}>{inviteLoading ? "Criando…" : "Criar convite"}</button>
-                  </form>
-                  {inviteMessage && <p className="pilot-form-message" role="status">{inviteMessage}</p>}
-                  {inviteLink && <div className="invite-result"><label>Link individual<input readOnly value={inviteLink} onFocus={(event) => event.currentTarget.select()} /></label><button onClick={() => navigator.clipboard.writeText(inviteLink)}>Copiar link</button></div>}
-                  <div className="sensitive-action-note"><strong>Perfis privilegiados bloqueados</strong><p>Convites para líderes, pastores ou administradores exigirão MFA, reautenticação e revisão.</p></div>
-                </>
-              )}
               <CommunityAdminWorkspace
+                accessSlot={
+                  active.permissions.includes("invites.manage") ? (
+                    <>
+                      <form className="pilot-form invite-generator" onSubmit={createInvite}>
+                        <label>E-mail da pessoa<input name="email" type="email" required autoComplete="off" /></label>
+                        <label>Perfil<select name="papel" value="MEMBRO" disabled><option value="MEMBRO">Membro</option></select></label>
+                        <button disabled={inviteLoading}>{inviteLoading ? "Criando…" : "Criar convite"}</button>
+                      </form>
+                      {inviteMessage && <p className="pilot-form-message" role="status">{inviteMessage}</p>}
+                      {inviteLink && <div className="invite-result"><label>Link individual<input readOnly value={inviteLink} onFocus={(event) => event.currentTarget.select()} /></label><button onClick={() => navigator.clipboard.writeText(inviteLink)}>Copiar link</button></div>}
+                      <div className="sensitive-action-note"><strong>Perfis privilegiados bloqueados</strong><p>Convites para líderes, pastores ou administradores exigirão MFA, reautenticação e revisão.</p></div>
+                    </>
+                  ) : null
+                }
                 managementItems={communityManagementItems}
                 onOpenManagementView={(nextView) => openView(nextView)}
                 canManageCommunity={active.permissions.includes(

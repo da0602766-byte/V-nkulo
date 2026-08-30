@@ -29761,3 +29761,31 @@ body {
 .owner-scope-banner-v5 > span { display: grid; place-items: center; color: var(--pilot-primary); }
 .owner-scope-banner-v5 svg { width: 18px; height: 18px; }
 .owner-scope-banner-v5 b { color: var(--pilot-text); font-weight: 850; }
+
+/* ===== Configurações — navegação por assunto =====
+   Era uma página só, com convite, atalhos, aparência, privacidade, módulos e
+   solicitações empilhados. Quem vinha resolver uma coisa rolava por todas. */
+.community-settings-nav-v5 {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px;
+  border-bottom: 1px solid var(--pilot-line); padding-bottom: 14px;
+}
+.community-settings-nav-v5 button {
+  display: inline-flex; align-items: center; gap: 7px; min-height: 34px;
+  border: 1px solid var(--pilot-line); border-radius: 999px; background: var(--pilot-surface);
+  color: var(--pilot-muted); padding: 0 14px; font-size: var(--fs-xs); font-weight: 750;
+  cursor: pointer; transition: border-color .16s, color .16s, background .16s;
+}
+.community-settings-nav-v5 button:hover { border-color: var(--pilot-line); color: var(--pilot-text); }
+.community-settings-nav-v5 button.active {
+  border-color: var(--pilot-primary);
+  background: color-mix(in srgb, var(--pilot-primary) 12%, var(--pilot-surface));
+  color: var(--pilot-primary);
+}
+/* O contador só aparece quando há pendência: número zerado é ruído. */
+.community-settings-nav-v5 button > span {
+  border-radius: 999px; background: var(--pilot-primary); color: #fff;
+  padding: 1px 7px; font-family: var(--font-mono), monospace; font-size: var(--fs-2xs);
+}
+.community-settings-nav-v5 button:not(.active) > span {
+  background: var(--pilot-surface-2); color: var(--pilot-muted);
+}

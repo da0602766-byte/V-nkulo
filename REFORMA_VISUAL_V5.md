@@ -95,10 +95,10 @@ Contadores no trilho apenas para pendências que exigem ação.
 | Pessoas | Filtros por situação, ações reveladas na linha sob o cursor, remoção sempre com motivo registrado. |
 | Visitantes | O funil vira o assunto da página; a tabela vem depois dele. |
 | Pedidos | ~~Pedido confidencial não mostra o corpo na listagem.~~ Já resolvido, e melhor: `app/api/pilot/solicitacoes/route.ts:53-64` filtra por destinatário, então um pedido que não é seu nem foi endereçado a você não sai do servidor. Triagem por urgência exigiria coluna nova e ficou fora. |
-| Estacionamento | Mapa de vagas clicável no lugar da lista. |
+| Estacionamento | ~~Mapa de vagas clicável no lugar da lista.~~ Já existia: `ParkingWorkspace.tsx:571-585` desenha as vagas por setor como botões com estado livre, reservada e ocupada, e seleção. Terceiro item do diagnóstico que caiu ao ser checado contra o código. |
 | Células | De lista de nomes para mapa de saúde: relatórios em dia, frequência das últimas oito semanas e prontidão para multiplicar. |
 | Notificações | Agrupadas por dia, com filtro "precisa de você" e ícones em traçado — eram `P # ▣ ♡ □ ✦`. Mensagens privadas já estavam fora do sino. |
-| Configurações | Navegação por assunto no lugar do balde único. |
+| Configurações | Navegação por assunto — Áreas, Aparência, Acessos, Módulos, Privacidade e Solicitações — no lugar da página única. O formulário de convite saiu de cima das abas e passou para Acessos, onde é assunto. |
 | Área do proprietário | Faixa de escopo permanente: a nota existia, mas dentro de um `<details>` fechado. Trilho mais escuro ficou de fora. |
 
 ### Ministérios
@@ -161,8 +161,10 @@ build, testes e evidências próprios:
    você" e ícones em traçado; e **Área do proprietário**, com a faixa de escopo
    permanente no lugar da nota escondida — a regra CSS órfã que sobrou foi
    removida junto, e com ela um verde que estava fora da paleta.
-   Verificados e já resolvidos no código: Pedidos e Ministérios (ver seção 5).
-   Pendentes: Criar feed, Agenda, Pessoas, Estacionamento e Configurações.
+   E **Configurações**, que era o balde previsto: virou navegação por assunto,
+   com o convite realocado para a seção Acessos.
+   Verificados e já resolvidos no código: Pedidos, Ministérios e Estacionamento
+   (ver seção 5). Pendentes: Criar feed, Agenda e Pessoas.
 5. **Formulários**, aplicando as cinco regras. *(pendente)*
 6. **Superfície pública** — recepção, login, perfil da comunidade. A recepção
    recebeu a cor no bloco 1; layout e conteúdo seguem pendentes.
@@ -194,8 +196,8 @@ espera, não que a tela funciona. Os quatro casos acima passavam em 226 testes.
 Base `1c6d447`, em 30/08/2026: build aprovado, 206 de 206 testes, lint com
 0 erros e 47 avisos.
 
-Depois dos blocos 1 a 4: build e artefato do Sites aprovados, **228 de 228
-testes** (22 novos em `tests/v190-reforma-visual-v5.test.mjs`), lint com
+Depois dos blocos 1 a 4: build e artefato do Sites aprovados, **230 de 230
+testes** (24 novos em `tests/v190-reforma-visual-v5.test.mjs`), lint com
 0 erros e os mesmos 47 avisos de `@next/next/no-img-element`.
 
 As telas do Fio do dia, Células e Visitantes foram abertas autenticadas num
