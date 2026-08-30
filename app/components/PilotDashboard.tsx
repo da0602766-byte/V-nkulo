@@ -69,20 +69,21 @@ type View =
   | "solicitacoes"
   | "mensagens"
   | "conta";
-const MENU: { id: View; label: string; permission: string; symbol: string }[] = [
-  { id: "inicio", label: "Início", permission: "dashboard.view", symbol: "◇" },
-  { id: "eventos", label: "Agenda", permission: "events.view", symbol: "▣" },
-  { id: "ministerios", label: "Ministérios", permission: "ministries.view", symbol: "✣" },
-  { id: "solicitacoes", label: "Pedidos", permission: "dashboard.view", symbol: "♡" },
-  { id: "visitantes", label: "Visitantes", permission: "visitors.view", symbol: "◎" },
-  { id: "celulas", label: "Células", permission: "cells.view", symbol: "⬡" },
-  { id: "estacionamento", label: "Estacionamento", permission: "parking.view", symbol: "▣" },
-  { id: "redes", label: "Redes e unidades", permission: "networks.view", symbol: "⌘" },
-  { id: "membro", label: "Painel do membro", permission: "dashboard.view", symbol: "○" },
-  { id: "lider", label: "Painel de liderança", permission: "leadership.panel.view", symbol: "△" },
-  { id: "pessoas", label: "Pessoas", permission: "people.view", symbol: "♙" },
-  { id: "comunidade", label: "Configurações", permission: "dashboard.view", symbol: "□" },
-  { id: "continuidade", label: "Continuidade", permission: "community.lifecycle.request", symbol: "↻" },
+type NavigationFocus = { anchor?: string; event?: string };
+const MENU: { id: View; label: string; permission: string }[] = [
+  { id: "inicio", label: "Início", permission: "dashboard.view" },
+  { id: "eventos", label: "Agenda", permission: "events.view" },
+  { id: "ministerios", label: "Ministérios", permission: "ministries.view" },
+  { id: "solicitacoes", label: "Pedidos", permission: "dashboard.view" },
+  { id: "visitantes", label: "Visitantes", permission: "visitors.view" },
+  { id: "celulas", label: "Células", permission: "cells.view" },
+  { id: "estacionamento", label: "Estacionamento", permission: "parking.view" },
+  { id: "redes", label: "Redes e unidades", permission: "networks.view" },
+  { id: "membro", label: "Painel do membro", permission: "dashboard.view" },
+  { id: "lider", label: "Painel de liderança", permission: "leadership.panel.view" },
+  { id: "pessoas", label: "Pessoas", permission: "people.view" },
+  { id: "comunidade", label: "Configurações", permission: "dashboard.view" },
+  { id: "continuidade", label: "Continuidade", permission: "community.lifecycle.request" },
 ];
 const COMMUNITY_MANAGEMENT_VIEWS: CommunityManagementView[] = [
   "membro",
@@ -316,16 +317,23 @@ export default function PilotDashboard({
   );
   const sidebarGroups = useMemo(() => {
     const byId = new Map(allowedMenu.map((item) => [item.id, item]));
-    const makeItem = (id: View, label?: string, key?: string) => {
+    const makeItem = (
+      id: View,
+      label?: string,
+      key?: string,
+      focus?: NavigationFocus,
+    ) => {
       const item = byId.get(id);
-      return item ? { ...item, label: label || item.label, key: key || item.id } : null;
+      return item
+        ? { ...item, label: label || item.label, key: key || item.id, focus }
+        : null;
     };
     return [
       {
-        label: "Principal",
+        label: "Dia",
         items: [
           makeItem("inicio", "Início"),
-          makeItem("inicio", "Mural", "mural"),
+          makeItem("inicio", "Mural", "mural", { anchor: "mural" }),
           makeItem("eventos", "Agenda"),
         ].filter(Boolean),
       },
@@ -334,7 +342,9 @@ export default function PilotDashboard({
         items: [
           makeItem("pessoas", "Pessoas"),
           makeItem("ministerios", "Ministérios"),
-          makeItem("ministerios", "Escalas", "escalas"),
+          makeItem("ministerios", "Escalas", "escalas", {
+            event: "vinkulo:open-schedules",
+          }),
           makeItem("visitantes", "Visitantes"),
           makeItem("solicitacoes", "Pedidos"),
           makeItem("estacionamento", "Estacionamento"),
@@ -385,7 +395,7 @@ export default function PilotDashboard({
               ? {
                   label: "Novo visitante",
                   description: "Abrir cadastro de visitante",
-                  symbol: "◎",
+                  icon: "visitantes" as MenuIconId,
                   view: "visitantes" as View,
                   event: "vinkulo:new-visitor",
                 }
@@ -394,7 +404,7 @@ export default function PilotDashboard({
               ? {
                   label: "Estacionamento",
                   description: "Entrada, saída ou ocorrência",
-                  symbol: "P",
+                  icon: "estacionamento" as MenuIconId,
                   view: "estacionamento" as View,
                   event: "vinkulo:parking-action",
                 }
@@ -403,7 +413,7 @@ export default function PilotDashboard({
               ? {
                   label: "Novo evento",
                   description: "Criar evento da comunidade",
-                  symbol: "▣",
+                  icon: "eventos" as MenuIconId,
                   view: "eventos" as View,
                   event: "vinkulo:new-event",
                 }
@@ -412,7 +422,7 @@ export default function PilotDashboard({
               ? {
                   label: "Nova escala",
                   description: "Criar escala ministerial",
-                  symbol: "≡",
+                  icon: "escalas" as MenuIconId,
                   view: "ministerios" as View,
                   event: "vinkulo:new-schedule",
                 }
@@ -420,14 +430,14 @@ export default function PilotDashboard({
             {
               label: "Oração ou solicitação",
               description: "Enviar pedido com privacidade",
-              symbol: "♡",
+              icon: "solicitacoes" as MenuIconId,
               view: "solicitacoes" as View,
               event: "vinkulo:new-request",
             },
           ].filter(Boolean) as {
             label: string;
             description: string;
-            symbol: string;
+            icon: MenuIconId;
             view: View;
             event: string;
           }[],
@@ -582,11 +592,26 @@ export default function PilotDashboard({
       ? view
       : "inicio";
 
-  function openView(nextView: View) {
+  function openView(nextView: View, focus?: NavigationFocus) {
     if (nextView === "visual-editor") {
       setMobileMenu(null);
       window.dispatchEvent(new CustomEvent("vinkulo:open-visual-editor"));
       return;
+    }
+    // "Mural" e "Escalas" apontam para a mesma view que "Início" e
+    // "Ministérios". Sem um destino próprio os quatro itens levavam ao mesmo
+    // lugar, e dois deles mentiam sobre onde iam parar. O foco resolve isso
+    // sem duplicar view: leva à seção certa depois que a tela monta.
+    if (focus) {
+      window.setTimeout(() => {
+        if (focus.event) {
+          window.dispatchEvent(new CustomEvent(focus.event));
+          return;
+        }
+        document
+          .getElementById(focus.anchor as string)
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 220);
     }
     setViewLoading(true);
     setView(nextView);
@@ -1008,7 +1033,7 @@ export default function PilotDashboard({
                     key={item.key}
                     data-editor-key={`menu-principal-${item.key}`}
                     className={visibleView === item.id ? "active" : ""}
-                    onClick={() => openView(item.id)}
+                    onClick={() => openView(item.id, item.focus)}
                     aria-label={item.label}
                     title={item.label}
                   >
@@ -1275,7 +1300,7 @@ export default function PilotDashboard({
                     key={action.label}
                     onClick={() => runQuickAction(action)}
                   >
-                    <span aria-hidden="true">{action.symbol}</span>
+                    <span aria-hidden="true"><MenuIcon id={action.icon} /></span>
                     <div>
                       <strong>{action.label}</strong>
                       <small>{action.description}</small>

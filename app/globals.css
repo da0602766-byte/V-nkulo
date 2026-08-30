@@ -19226,9 +19226,8 @@ html[data-pilot-theme="escuro"] .public-welcome-card::after {
   letter-spacing: -.055em;
 }
 .landing-hero h1 span {
-  background: linear-gradient(100deg, #a18aff, #6ddfd2);
-  background-clip: text;
-  color: transparent;
+  display: block;
+  color: var(--violet);
 }
 .landing-hero-copy > p:not(.landing-eyebrow) {
   max-width: 660px;
