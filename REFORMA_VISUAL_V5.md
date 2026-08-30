@@ -94,7 +94,7 @@ Contadores no trilho apenas para pendências que exigem ação.
 | Agenda | Camadas ligáveis sobre a mesma grade; a escala de cada evento aparece na própria linha. |
 | Pessoas | Filtros por situação, ações reveladas na linha sob o cursor, remoção sempre com motivo registrado. |
 | Visitantes | O funil vira o assunto da página; a tabela vem depois dele. |
-| Pedidos | Triagem por urgência; pedido confidencial não mostra o corpo na listagem. |
+| Pedidos | ~~Pedido confidencial não mostra o corpo na listagem.~~ Já resolvido, e melhor: `app/api/pilot/solicitacoes/route.ts:53-64` filtra por destinatário, então um pedido que não é seu nem foi endereçado a você não sai do servidor. Triagem por urgência exigiria coluna nova e ficou fora. |
 | Estacionamento | Mapa de vagas clicável no lugar da lista. |
 | Células | De lista de nomes para mapa de saúde: relatórios em dia, frequência das últimas oito semanas e prontidão para multiplicar. |
 | Notificações | Agrupadas por dia e origem, com aba "precisa de você". Mensagens privadas seguem fora do sino. |
@@ -106,12 +106,13 @@ Contadores no trilho apenas para pendências que exigem ação.
 A aba lista os ministérios em cartões que respondem à pergunta real da
 liderança: tem gente suficiente e a próxima escala está fechada?
 
-Dentro de um ministério, seis abas. Hoje são cinco
-(`app/components/MinistriesWorkspace.tsx:168`: `visao`, `escalas`, `recursos`,
-`participantes`, `historico`) e **Equipes vive dentro de Participantes**. Na
-reforma ela sobe ao mesmo nível:
-
-**Visão · Equipes · Integrantes · Escalas · Recursos · Histórico**
+**Correção.** O diagnóstico original dizia que Equipes vivia dentro de
+Participantes, citando `MinistriesWorkspace.tsx:168`. Está errado: aquele é um
+componente secundário. A tela real do ministério é
+`SecretaryMinisterialWorkspace.tsx:1143-1152` e **já tem oito abas, com Equipes
+como aba própria** — Visão geral, Integrantes, Equipes, Escalas, Checklists,
+Relatórios, Histórico e Configurações. Nada a fazer aqui; o que a reforma
+propunha já existia.
 
 ## 6. Formulários
 
@@ -152,7 +153,13 @@ build, testes e evidências próprios:
    "Dia".
 3. **Fio do dia** — migração, rota agregadora e página com filtro por camada,
    troca de dia e registro manual.
-4. **Módulos**, um por vez, na ordem da tabela da seção 5. *(pendente)*
+4. **Módulos** — parcial. Feito: **Células**, que era o item mais fundo, com
+   mapa de saúde (relatórios em dia, frequência das oito últimas semanas,
+   prontidão para multiplicar) calculado dos relatórios que a rota já devolvia,
+   sem consulta nova; e **Visitantes**, com o funil na frente da tabela.
+   Verificados e já resolvidos no código: Pedidos e Ministérios (ver seção 5).
+   Pendentes: Criar feed, Agenda, Pessoas, Estacionamento, Notificações,
+   Configurações e Área do proprietário.
 5. **Formulários**, aplicando as cinco regras. *(pendente)*
 6. **Superfície pública** — recepção, login, perfil da comunidade. A recepção
    recebeu a cor no bloco 1; layout e conteúdo seguem pendentes.
@@ -162,9 +169,14 @@ build, testes e evidências próprios:
 Base `1c6d447`, em 30/08/2026: build aprovado, 206 de 206 testes, lint com
 0 erros e 47 avisos.
 
-Depois dos blocos 1 a 3: build e artefato do Sites aprovados, **219 de 219
-testes** (13 novos em `tests/v190-reforma-visual-v5.test.mjs`), lint com
+Depois dos blocos 1 a 4: build e artefato do Sites aprovados, **222 de 222
+testes** (16 novos em `tests/v190-reforma-visual-v5.test.mjs`), lint com
 0 erros e os mesmos 47 avisos de `@next/next/no-img-element`.
+
+Duas afirmações do diagnóstico original caíram ao serem checadas contra o
+código: Equipes já era aba própria no ministério, e pedidos já eram filtrados
+por destinatário no servidor. Ambas estão corrigidas nas seções 5 e 7 em vez de
+apagadas — o erro faz parte do registro.
 
 O que **não** foi verificado em execução: o caminho autenticado da rota
 `/api/pilot/fio`. Sem sessão e sem banco semeado neste ambiente, só deu para

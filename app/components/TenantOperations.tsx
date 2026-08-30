@@ -952,6 +952,21 @@ export function VisitorsWorkspace({
     setFollowups([]);
   }
 
+  // O funil é o assunto da página: quantos chegaram e quantos avançaram. A
+  // tabela responde "quem"; isto responde "como está indo", que é a pergunta
+  // que a liderança faz primeiro. Os estágios já existem como status.
+  const funnelStages = ([
+    ["NOVO", "Recebidos"],
+    ["EM_CONTATO", "Contatados"],
+    ["EM_ACOMPANHAMENTO", "Em acompanhamento"],
+    ["INTEGRADO", "Integrados"],
+  ] as const).map(([id, label]) => ({
+    id,
+    label,
+    total: visitors.filter((visitor) => visitor.status === id).length,
+  }));
+  const funnelTotal = funnelStages.reduce((soma, etapa) => soma + etapa.total, 0);
+
   return (
     <section className="visitor-workspace-redesign">
       <header className="visitor-hero">
@@ -1085,6 +1100,21 @@ export function VisitorsWorkspace({
           )}
         </div>
       </header>
+      <section className="visitor-funnel-v5" aria-label="Funil de acolhimento">
+        {funnelStages.map((etapa) => {
+          const proporcao = funnelTotal ? Math.round((etapa.total / funnelTotal) * 100) : 0;
+          return (
+            <article key={etapa.id} data-etapa={etapa.id}>
+              <small>{etapa.label}</small>
+              <strong>{etapa.total}</strong>
+              <span className="visitor-funnel-bar-v5" aria-hidden="true">
+                <i style={{ width: `${proporcao}%` }} />
+              </span>
+              <em>{proporcao}% do total</em>
+            </article>
+          );
+        })}
+      </section>
 
       <div className="visitor-overview-grid">
       <section className="visitor-dashboard" aria-labelledby="visitor-growth-title">
@@ -1582,6 +1612,93 @@ export function VisitorsWorkspace({
   );
 }
 
+// Saúde da célula. O diretório listava nome, dia e liderança — dados que não
+// respondem à pergunta que a liderança faz de fato: qual célula parou de
+// reportar, qual está encolhendo e qual já tem gente para multiplicar. Tudo
+// abaixo sai dos relatórios que a rota já devolve; nada de consulta nova.
+type CellHealth = {
+  id: "AGUARDANDO" | "SEM_RELATORIO" | "ATENCAO" | "MULTIPLICAR" | "SAUDAVEL";
+  label: string;
+  weeks: number[];
+  semanasEmDia: number;
+  mediaPresentes: number;
+};
+
+const CELL_HEALTH_WEEKS = 8;
+const CELL_REPORT_GRACE_DAYS = 21;
+
+function cellHealth(cell: Cell, agora: number): CellHealth {
+  // Antes do relógio acertar no cliente não dá para julgar atraso sem chutar
+  // uma data, e chutar aqui pintaria célula saudável de vermelho.
+  if (!agora) {
+    return {
+      id: "AGUARDANDO",
+      label: "Calculando",
+      weeks: [],
+      semanasEmDia: 0,
+      mediaPresentes: 0,
+    };
+  }
+  // Os relatórios chegam da rota em ordem decrescente de data.
+  const recentes = cell.relatorios.slice(0, CELL_HEALTH_WEEKS);
+  const weeks = [...recentes]
+    .reverse()
+    .map((item) => (item.aconteceu ? Number(item.presentes) || 0 : 0));
+  const semanasEmDia = recentes.filter((item) => item.aconteceu).length;
+  const comPresenca = weeks.filter((valor) => valor > 0);
+  const mediaPresentes = comPresenca.length
+    ? Math.round(comPresenca.reduce((soma, valor) => soma + valor, 0) / comPresenca.length)
+    : 0;
+
+  const ultimo = cell.ultimo_relatorio_em
+    ? Date.parse(cell.ultimo_relatorio_em)
+    : Number.NaN;
+  const diasSemReportar = Number.isNaN(ultimo)
+    ? Number.POSITIVE_INFINITY
+    : Math.floor((agora - ultimo) / 86400000);
+
+  if (diasSemReportar > CELL_REPORT_GRACE_DAYS) {
+    const semanas = Number.isFinite(diasSemReportar)
+      ? Math.floor(diasSemReportar / 7)
+      : 0;
+    return {
+      id: "SEM_RELATORIO",
+      label: semanas
+        ? `Sem relatório há ${semanas} ${semanas === 1 ? "semana" : "semanas"}`
+        : "Sem relatório",
+      weeks,
+      semanasEmDia,
+      mediaPresentes,
+    };
+  }
+
+  // Encolhendo: a média das duas últimas semanas caiu abaixo de 70% da média
+  // das quatro anteriores. Uma semana ruim sozinha não acusa nada.
+  const ultimas = weeks.slice(-2).filter((valor) => valor > 0);
+  const anteriores = weeks.slice(-6, -2).filter((valor) => valor > 0);
+  const mediaUltimas = ultimas.length
+    ? ultimas.reduce((soma, valor) => soma + valor, 0) / ultimas.length
+    : 0;
+  const mediaAnteriores = anteriores.length
+    ? anteriores.reduce((soma, valor) => soma + valor, 0) / anteriores.length
+    : 0;
+  const encolhendo = mediaAnteriores > 0 && mediaUltimas < mediaAnteriores * 0.7;
+
+  if (encolhendo) {
+    return { id: "ATENCAO", label: "Atenção", weeks, semanasEmDia, mediaPresentes };
+  }
+  if (mediaPresentes >= 15 && semanasEmDia >= 6) {
+    return {
+      id: "MULTIPLICAR",
+      label: "Pronta p/ multiplicar",
+      weeks,
+      semanasEmDia,
+      mediaPresentes,
+    };
+  }
+  return { id: "SAUDAVEL", label: "Saudável", weeks, semanasEmDia, mediaPresentes };
+}
+
 export function CellsWorkspace({
   permissions,
   communityName,
@@ -1601,6 +1718,10 @@ export function CellsWorkspace({
   const [selectedMemberProfile, setSelectedMemberProfile] = useState<Cell["membros"][number] | null>(null);
   const [cellSearch, setCellSearch] = useState("");
   const [cellStatus, setCellStatus] = useState<"all" | "active" | "archived">("all");
+  const [cellHealthFilter, setCellHealthFilter] = useState<"all" | CellHealth["id"]>("all");
+  // O relógio vem de estado: lê-lo durante a renderização daria valores
+  // diferentes no servidor e no cliente e quebraria a hidratação.
+  const [agora, setAgora] = useState(0);
   const canManage = permissions.includes("cells.manage");
 
   const loadCells = useCallback(async (quiet = false) => {
@@ -1624,6 +1745,16 @@ export function CellsWorkspace({
     }, 0);
     return () => window.clearTimeout(timer);
   }, [loadCells]);
+
+  useEffect(() => {
+    const acertar = () => setAgora(Date.now());
+    const primeiro = window.setTimeout(acertar, 0);
+    const relogio = window.setInterval(acertar, 3600000);
+    return () => {
+      window.clearTimeout(primeiro);
+      window.clearInterval(relogio);
+    };
+  }, []);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -1755,9 +1886,17 @@ export function CellsWorkspace({
   const membersTotal = activeCells.reduce((total, cell) => total + cell.membros_total, 0);
   const meetingsTotal = activeCells.reduce((total, cell) => total + cell.agenda.length, 0);
   const normalizedCellSearch = cellSearch.trim().toLocaleLowerCase("pt-BR");
+  const healthById = new Map(cells.map((cell) => [cell.id, cellHealth(cell, agora)]));
+  const healthCounts = cells.reduce<Record<string, number>>((acc, cell) => {
+    if (!cell.ativo) return acc;
+    const id = healthById.get(cell.id)!.id;
+    acc[id] = (acc[id] || 0) + 1;
+    return acc;
+  }, {});
   const visibleCells = cells.filter((cell) => {
     if (cellStatus === "active" && !cell.ativo) return false;
     if (cellStatus === "archived" && cell.ativo) return false;
+    if (cellHealthFilter !== "all" && healthById.get(cell.id)!.id !== cellHealthFilter) return false;
     if (!normalizedCellSearch) return true;
     return [cell.nome, cell.descricao_publica, cell.endereco_publico, cell.lider_nome, cell.responsavel]
       .filter(Boolean)
@@ -1776,6 +1915,7 @@ export function CellsWorkspace({
         <article><small>Pessoas</small><strong>{membersTotal}</strong></article>
         <article><small>Próximos encontros</small><strong>{meetingsTotal}</strong></article>
         <article><small>Relatórios em dia</small><strong>{activeCells.filter((cell) => cell.ultimo_relatorio_em).length}<span> de {activeCells.length}</span></strong></article>
+        <article data-alerta={(healthCounts.SEM_RELATORIO || 0) > 0 ? "1" : undefined}><small>Sem relatório</small><strong>{healthCounts.SEM_RELATORIO || 0}<span> há mais de 3 semanas</span></strong></article>
       </section>
       <div className="cell-shell-v2 cell-shell-v4">
         <aside className="cell-index-v2" aria-label="Células da comunidade">
@@ -1785,9 +1925,29 @@ export function CellsWorkspace({
             <div className="cell-directory-status-v4" role="group" aria-label="Filtrar células por situação">
               {([['all','Todas'],['active','Ativas'],['archived','Arquivadas']] as const).map(([value, label]) => <button key={value} type="button" className={cellStatus === value ? "active" : ""} aria-pressed={cellStatus === value} onClick={() => setCellStatus(value)}>{label}</button>)}
             </div>
+            <div className="cell-health-filter-v5" role="group" aria-label="Filtrar células por saúde">
+              {([
+                ['all', 'Saúde: todas', 0],
+                ['SEM_RELATORIO', 'Sem relatório', healthCounts.SEM_RELATORIO || 0],
+                ['ATENCAO', 'Atenção', healthCounts.ATENCAO || 0],
+                ['MULTIPLICAR', 'Prontas p/ multiplicar', healthCounts.MULTIPLICAR || 0],
+                ['SAUDAVEL', 'Saudáveis', healthCounts.SAUDAVEL || 0],
+              ] as const).map(([value, label, count]) => (
+                <button
+                  key={value}
+                  type="button"
+                  data-saude={value}
+                  className={cellHealthFilter === value ? "active" : ""}
+                  aria-pressed={cellHealthFilter === value}
+                  onClick={() => setCellHealthFilter(value as "all" | CellHealth["id"])}
+                >
+                  {label}{value !== 'all' && <span>{count}</span>}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="cell-directory-v4">
-            {visibleCells.map((cell) => <button type="button" key={cell.id} className={`${selectedId === cell.id ? "active" : ""}${!cell.ativo ? " archived" : ""}`} onClick={() => { setSelectedId(cell.id); setTab("visao"); }}><span className="cell-row-avatar-v4" aria-hidden="true">{cell.nome.slice(0, 1)}</span><span className="cell-row-copy-v4"><span><i>{cell.ativo ? "Ativa" : "Arquivada"}</i><strong>{cell.nome}</strong></span><small>{cell.descricao_publica || "Descrição pública ainda não informada."}</small></span><span className="cell-row-fact-v4"><small>Encontros</small><strong>{cell.dias_reuniao.map((day) => dayLabels[day] || day).join(", ") || "A definir"}</strong></span><span className="cell-row-fact-v4"><small>Pessoas</small><strong>{cell.membros_total + cell.visitantes_ativos}</strong></span><span className="cell-row-fact-v4"><small>Liderança</small><strong>{cell.lider_nome || cell.responsavel || "A definir"}</strong></span><span className="cell-row-arrow-v4" aria-hidden="true">›</span></button>)}
+            {visibleCells.map((cell) => <button type="button" key={cell.id} className={`${selectedId === cell.id ? "active" : ""}${!cell.ativo ? " archived" : ""}`} onClick={() => { setSelectedId(cell.id); setTab("visao"); }}><span className="cell-row-avatar-v4" aria-hidden="true">{cell.nome.slice(0, 1)}</span><span className="cell-row-copy-v4"><span><i>{cell.ativo ? "Ativa" : "Arquivada"}</i><strong>{cell.nome}</strong></span><small>{cell.descricao_publica || "Descrição pública ainda não informada."}</small></span><span className="cell-row-fact-v4"><small>Encontros</small><strong>{cell.dias_reuniao.map((day) => dayLabels[day] || day).join(", ") || "A definir"}</strong></span><span className="cell-row-fact-v4"><small>Pessoas</small><strong>{cell.membros_total + cell.visitantes_ativos}</strong></span><span className="cell-row-fact-v4"><small>Liderança</small><strong>{cell.lider_nome || cell.responsavel || "A definir"}</strong></span><span className="cell-row-health-v5"><i className="cell-health-pill-v5" data-saude={healthById.get(cell.id)!.id}>{healthById.get(cell.id)!.label}</i><span className="cell-health-weeks-v5" aria-hidden="true">{(() => { const saude = healthById.get(cell.id)!; const teto = Math.max(1, ...saude.weeks); return saude.weeks.map((valor, indice) => <i key={indice} data-vazio={valor === 0 ? "1" : undefined} style={{ height: `${Math.max(12, Math.round((valor / teto) * 100))}%` }} />); })()}</span><small>{healthById.get(cell.id)!.semanasEmDia}/8 relatórios</small></span><span className="cell-row-arrow-v4" aria-hidden="true">›</span></button>)}
             {!loading && !visibleCells.length && <p className="cell-directory-empty-v4">Nenhuma célula encontrada com esses filtros.</p>}
           </div>
         </aside>

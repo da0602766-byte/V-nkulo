@@ -154,3 +154,40 @@ test("o fio não lê o relógio durante a renderização nem escreve estado dire
   assert.match(workspace, /if \(cancelado\) return;/);
   assert.match(workspace, /cancelado = true;/);
 });
+
+test("células ganham mapa de saúde calculado dos relatórios já carregados", async () => {
+  const operations = await read("app/components/TenantOperations.tsx");
+  assert.match(operations, /function cellHealth\(cell: Cell, agora: number\): CellHealth/);
+  for (const estado of ["SEM_RELATORIO", "ATENCAO", "MULTIPLICAR", "SAUDAVEL"]) {
+    assert.ok(operations.includes(`"${estado}"`), `estado ${estado} ausente`);
+  }
+  // Nenhuma consulta nova: a saúde sai dos relatórios que a rota já devolve.
+  assert.match(operations, /cell\.relatorios\.slice\(0, CELL_HEALTH_WEEKS\)/);
+  assert.match(operations, /cellHealthFilter/);
+  const styles = await read("app/globals.css");
+  assert.match(styles, /\.cell-health-pill-v5\[data-saude="SEM_RELATORIO"\]/);
+  assert.match(styles, /\.cell-health-weeks-v5/);
+});
+
+test("a saúde da célula não julga atraso antes do relógio acertar", async () => {
+  const operations = await read("app/components/TenantOperations.tsx");
+  const inicio = operations.indexOf("function cellHealth");
+  const corpo = operations.slice(inicio, inicio + 900);
+  // Sem isso, uma célula em dia apareceria vermelha no primeiro quadro.
+  assert.match(corpo, /if \(!agora\) \{/);
+  assert.match(corpo, /id: "AGUARDANDO"/);
+});
+
+test("visitantes mostram o funil antes da tabela", async () => {
+  const operations = await read("app/components/TenantOperations.tsx");
+  assert.match(operations, /const funnelStages = /);
+  for (const etapa of ["NOVO", "EM_CONTATO", "EM_ACOMPANHAMENTO", "INTEGRADO"]) {
+    assert.ok(operations.includes(`["${etapa}"`) || operations.includes(`"${etapa}",`), etapa);
+  }
+  // O funil precisa vir antes da tabela na ordem do documento.
+  const funil = operations.indexOf('className="visitor-funnel-v5"');
+  const tabela = operations.indexOf("visitor-bulkbar-v2");
+  assert.ok(funil > 0 && funil < tabela, "o funil não está antes da tabela");
+  const styles = await read("app/globals.css");
+  assert.match(styles, /\.visitor-funnel-v5 article\[data-etapa="INTEGRADO"\]/);
+});

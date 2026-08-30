@@ -29629,3 +29629,88 @@ body {
   .day-thread-actions { width: 100%; }
   .day-thread-register { flex: 1; }
 }
+
+/* ===== Células — mapa de saúde =====
+   O diretório listava nome, dia e liderança. Nada ali respondia qual célula
+   parou de reportar ou está encolhendo, que é o que a liderança precisa ver
+   antes de abrir qualquer célula. */
+.cell-health-filter-v5 { display: flex; flex-wrap: wrap; gap: 6px; grid-column: 1 / -1; }
+.cell-health-filter-v5 button {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 30px;
+  border: 1px solid var(--pilot-line); border-radius: 999px; background: var(--pilot-surface);
+  color: var(--pilot-muted); padding: 0 11px; font-size: var(--fs-2xs); font-weight: 750;
+  cursor: pointer;
+}
+.cell-health-filter-v5 button:hover { color: var(--pilot-text); }
+.cell-health-filter-v5 button.active {
+  border-color: var(--pilot-primary);
+  background: color-mix(in srgb, var(--pilot-primary) 12%, var(--pilot-surface));
+  color: var(--pilot-primary);
+}
+.cell-health-filter-v5 button > span {
+  border-radius: 999px; background: var(--pilot-surface-2); padding: 1px 6px;
+  font-family: var(--font-mono), monospace; font-size: var(--fs-2xs);
+}
+
+.cell-row-health-v5 { min-width: 0; display: grid; gap: 5px; justify-items: start; }
+.cell-row-health-v5 > small { color: var(--pilot-muted); font-size: var(--fs-2xs); }
+
+/* A cor aqui é informação de estado, não decoração: verde é em dia, âmbar é
+   encolhendo, rosa é parada e o acento marca quem já pode multiplicar. */
+.cell-health-pill-v5 {
+  display: inline-flex; align-items: center; gap: 5px; border-radius: 999px;
+  border: 1px solid transparent; padding: 2px 9px; font-size: var(--fs-2xs);
+  font-weight: 800; font-style: normal; white-space: nowrap;
+}
+.cell-health-pill-v5::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.cell-health-pill-v5[data-saude="SAUDAVEL"] { background: var(--green-soft); color: var(--green); border-color: color-mix(in srgb, var(--green) 24%, transparent); }
+.cell-health-pill-v5[data-saude="ATENCAO"] { background: var(--amber-soft); color: var(--amber); border-color: color-mix(in srgb, var(--amber) 24%, transparent); }
+.cell-health-pill-v5[data-saude="SEM_RELATORIO"] { background: var(--rose-soft); color: var(--rose); border-color: color-mix(in srgb, var(--rose) 24%, transparent); }
+.cell-health-pill-v5[data-saude="MULTIPLICAR"] { background: color-mix(in srgb, var(--pilot-primary) 13%, var(--pilot-surface)); color: var(--pilot-primary); border-color: color-mix(in srgb, var(--pilot-primary) 30%, transparent); }
+.cell-health-pill-v5[data-saude="AGUARDANDO"] { background: var(--pilot-surface-2); color: var(--pilot-muted); border-color: var(--pilot-line); }
+
+.cell-health-weeks-v5 { display: flex; align-items: flex-end; gap: 2px; width: 74px; height: 20px; }
+.cell-health-weeks-v5 > i {
+  flex: 1; min-height: 2px; border-radius: 2px 2px 0 0;
+  background: var(--pilot-primary); opacity: .85;
+}
+.cell-health-weeks-v5 > i[data-vazio="1"] { background: var(--pilot-line); opacity: 1; }
+
+.cells-summary-v4 article[data-alerta="1"] {
+  border-color: color-mix(in srgb, var(--rose) 34%, var(--pilot-line));
+  background: color-mix(in srgb, var(--rose) 6%, var(--pilot-surface));
+}
+.cells-summary-v4 article[data-alerta="1"] strong { color: var(--rose); }
+
+@media (max-width: 900px) {
+  .cell-row-health-v5 { display: none; }
+}
+
+/* ===== Visitantes — o funil vem antes da tabela =====
+   A tabela responde "quem". O funil responde "como está indo", que é a
+   pergunta que a liderança faz primeiro. */
+.visitor-funnel-v5 {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 11px;
+  margin: 16px 0 4px;
+}
+.visitor-funnel-v5 article {
+  display: grid; gap: 5px; border: 1px solid var(--pilot-line); border-radius: 14px;
+  background: var(--pilot-surface); padding: 13px 15px;
+}
+.visitor-funnel-v5 small {
+  color: var(--pilot-muted); font-size: var(--fs-2xs); font-weight: 750;
+  letter-spacing: .05em; text-transform: uppercase;
+}
+.visitor-funnel-v5 strong {
+  font-family: var(--font-mono), monospace; font-size: var(--fs-5xl); font-weight: 700;
+  line-height: 1; letter-spacing: -.02em;
+}
+.visitor-funnel-bar-v5 { height: 5px; border-radius: 3px; background: var(--pilot-surface-2); overflow: hidden; }
+.visitor-funnel-bar-v5 > i { display: block; height: 100%; border-radius: 3px; background: var(--pilot-primary); }
+.visitor-funnel-v5 em { color: var(--pilot-muted); font-size: var(--fs-2xs); font-style: normal; }
+/* A cor acompanha o avanço no funil: quem chegou agora é neutro, quem
+   integrou é verde. É informação de etapa, não decoração. */
+.visitor-funnel-v5 article[data-etapa="NOVO"] .visitor-funnel-bar-v5 > i { background: var(--navy-2); }
+.visitor-funnel-v5 article[data-etapa="EM_CONTATO"] .visitor-funnel-bar-v5 > i { background: var(--pilot-primary); }
+.visitor-funnel-v5 article[data-etapa="EM_ACOMPANHAMENTO"] .visitor-funnel-bar-v5 > i { background: var(--amber); }
+.visitor-funnel-v5 article[data-etapa="INTEGRADO"] .visitor-funnel-bar-v5 > i { background: var(--green); }
