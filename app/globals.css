@@ -29550,3 +29550,82 @@ body {
   .people-removal-guidance a { grid-template-columns: 1fr; }
   .people-removal-guidance a > b { grid-column: 1; grid-row: auto; }
 }
+
+/* ===== Fio do dia — página própria =====
+   Reusa .home-timeline, que já desenhava o fio embutido na Início. O que
+   entra aqui é só o que a página dedicada acrescenta: cabeçalho com troca de
+   dia, filtro por camada e o formulário de registro manual. */
+.day-thread-workspace { display: grid; gap: 18px; }
+.day-thread-head { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px; }
+.day-thread-head h2 { margin: 2px 0 0; font-size: var(--fs-4xl); letter-spacing: -.02em; }
+.day-thread-count { margin: 4px 0 0; color: var(--pilot-muted); font-size: var(--fs-xs); }
+.day-thread-actions { margin-left: auto; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 9px; }
+.day-thread-date { display: grid; gap: 4px; color: var(--pilot-muted); font-size: var(--fs-2xs); font-weight: 700; }
+.day-thread-date input {
+  min-height: 38px; border: 1px solid var(--pilot-line); border-radius: 10px;
+  background: var(--pilot-surface-2); color: var(--pilot-text); padding: 0 10px;
+}
+.day-thread-register {
+  min-height: 38px; border: 0; border-radius: 10px; background: var(--pilot-primary);
+  color: #fff; padding: 0 15px; font-size: var(--fs-xs); font-weight: 800; cursor: pointer;
+  white-space: nowrap;
+}
+.day-thread-register:hover { filter: brightness(1.06); }
+
+.day-thread-layers { display: flex; flex-wrap: wrap; gap: 6px; }
+.day-thread-layers button {
+  display: inline-flex; align-items: center; gap: 7px; min-height: 34px;
+  border: 1px solid var(--pilot-line); border-radius: 999px; background: var(--pilot-surface);
+  color: var(--pilot-muted); padding: 0 13px; font-size: var(--fs-2xs); font-weight: 750;
+  cursor: pointer;
+}
+.day-thread-layers button:hover { color: var(--pilot-text); }
+.day-thread-layers button.active {
+  border-color: var(--pilot-primary);
+  background: color-mix(in srgb, var(--pilot-primary) 12%, var(--pilot-surface));
+  color: var(--pilot-primary);
+}
+.day-thread-layers i { width: 8px; height: 8px; border-radius: 2px; display: block; background: var(--pilot-muted); }
+.day-thread-layers i[data-camada="CULTOS"] { background: var(--pilot-primary); }
+.day-thread-layers i[data-camada="PESSOAS"] { background: var(--green); }
+.day-thread-layers i[data-camada="OPERACAO"] { background: var(--navy-2); }
+.day-thread-layers i[data-camada="CUIDADO"] { background: var(--rose); }
+
+.day-thread-form {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px;
+  border: 1px solid var(--pilot-line); border-radius: 14px; background: var(--pilot-surface); padding: 16px;
+}
+.day-thread-form label { display: grid; gap: 5px; color: var(--pilot-muted); font-size: var(--fs-2xs); font-weight: 750; }
+.day-thread-form label small { font-weight: 600; color: var(--pilot-muted); opacity: .8; }
+.day-thread-form-wide { grid-column: 1 / -1; }
+.day-thread-form :is(input, select, textarea) {
+  min-height: 38px; border: 1px solid var(--pilot-line); border-radius: 10px;
+  background: var(--pilot-surface-2); color: var(--pilot-text); padding: 8px 10px;
+  font: inherit; font-size: var(--fs-xs);
+}
+.day-thread-form textarea { min-height: 62px; resize: vertical; }
+.day-thread-form footer {
+  grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 9px;
+  border-top: 1px solid var(--pilot-line); padding-top: 12px;
+}
+.day-thread-form footer small { flex: 1; min-width: 180px; color: var(--pilot-muted); font-size: var(--fs-2xs); }
+.day-thread-form footer button {
+  min-height: 38px; border: 1px solid var(--pilot-line); border-radius: 10px;
+  background: var(--pilot-surface); color: var(--pilot-text); padding: 0 14px;
+  font-size: var(--fs-2xs); font-weight: 800; cursor: pointer;
+}
+.day-thread-form footer button[type="submit"] { border-color: var(--pilot-primary); background: var(--pilot-primary); color: #fff; }
+.day-thread-form footer button[disabled] { opacity: .55; cursor: not-allowed; }
+
+/* O que ainda vai acontecer fica tracejado: a direção do tempo é lida sem
+   legenda, do mesmo jeito que na prévia da reforma. */
+.day-thread-timeline > li[data-futuro="1"] .home-timeline-content { border-style: dashed; opacity: .82; }
+.day-thread-timeline > li[data-futuro="1"] .home-timeline-node { background: var(--pilot-surface); border: 2px dashed var(--pilot-line); }
+.day-thread-timeline > li[data-camada="PESSOAS"] .home-timeline-node { background: var(--green); }
+.day-thread-timeline > li[data-camada="OPERACAO"] .home-timeline-node { background: var(--navy-2); }
+.day-thread-timeline > li[data-camada="CUIDADO"] .home-timeline-node { background: var(--rose); }
+
+@media (max-width: 640px) {
+  .day-thread-actions { width: 100%; }
+  .day-thread-register { flex: 1; }
+}

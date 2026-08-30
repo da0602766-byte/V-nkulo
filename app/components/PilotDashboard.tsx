@@ -13,6 +13,7 @@ import CommunityAdminWorkspace, {
 } from "./CommunityAdminWorkspace";
 import CommunityLifecycleWorkspace from "./CommunityLifecycleWorkspace";
 import CommunityHome from "./CommunityHome";
+import DayThreadWorkspace from "./DayThreadWorkspace";
 import AccountProfileWorkspace from "./AccountProfileWorkspace";
 import EventsWorkspace from "./EventsWorkspace";
 import GlobalVisualEditor from "./GlobalVisualEditor";
@@ -52,6 +53,7 @@ type CommunityProfile = {
 };
 type View =
   | "inicio"
+  | "fio"
   | "eventos"
   | "ministerios"
   | "visitantes"
@@ -72,6 +74,7 @@ type View =
 type NavigationFocus = { anchor?: string; event?: string };
 const MENU: { id: View; label: string; permission: string }[] = [
   { id: "inicio", label: "Início", permission: "dashboard.view" },
+  { id: "fio", label: "Fio do dia", permission: "dashboard.view" },
   { id: "eventos", label: "Agenda", permission: "events.view" },
   { id: "ministerios", label: "Ministérios", permission: "ministries.view" },
   { id: "solicitacoes", label: "Pedidos", permission: "dashboard.view" },
@@ -332,6 +335,7 @@ export default function PilotDashboard({
       {
         label: "Dia",
         items: [
+          makeItem("fio", "Fio do dia"),
           makeItem("inicio", "Início"),
           makeItem("inicio", "Mural", "mural", { anchor: "mural" }),
           makeItem("eventos", "Agenda"),
@@ -1102,6 +1106,7 @@ export default function PilotDashboard({
               readOnlyFeed={active.communityAccess === "FEED_ONLY"}
             />
           )}
+          {visibleView === "fio" && !accessDeniedView && <DayThreadWorkspace />}
           {visibleView === "visitantes" && (
             <VisitorsWorkspace
               permissions={active.permissions}
@@ -1405,6 +1410,7 @@ type MenuIconId = View | "mural" | "escalas";
 function MenuIcon({ id }: { id: MenuIconId }) {
   const paths: Partial<Record<MenuIconId, string>> = {
     inicio: "M3 11.5 12 4l9 7.5v8a1.5 1.5 0 0 1-1.5 1.5h-5v-6h-5v6h-5A1.5 1.5 0 0 1 3 19.5v-8Z",
+    fio: "M6 5h.01M6 12h.01M6 19h.01M11 5h9M11 12h9M11 19h6",
     eventos: "M5 4h14a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm0 6h14M8 2v4m8-4v4",
     ministerios: "M12 3v18m-7-9h14M7 7h10v10H7z",
     escalas: "M7 4h10v3H7V4Zm-2 2h14v15H5V6Zm3 6 2 2 4-4m-6 7h7",

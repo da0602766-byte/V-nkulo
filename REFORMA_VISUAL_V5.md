@@ -1,12 +1,13 @@
 # Reforma Visual V5 — especificação
 
 Documento de referência para a reforma de UI/UX do VÍNKULO. Aprovado pelo
-proprietário em 30/08/2026 como direção; a implementação ainda não começou.
+proprietário em 30/08/2026 como direção.
 
 - **Base:** `1c6d447` — "Exibe ações essenciais e orienta remoções".
 - **Prévias navegáveis:** duas páginas publicadas fora do repositório, com as
   telas e os formulários desenhados. Os links estão com o proprietário.
-- **Estado:** especificação. Nenhuma tela foi implementada.
+- **Estado:** blocos 1, 2 e 3 implementados (ver seção 7). Blocos 4 a 6
+  pendentes.
 
 ## 1. Diagnóstico
 
@@ -47,20 +48,32 @@ dois.
 
 ### Fio do dia — página nova
 
-Primeiro item da barra de navegação, em `/painel/fio`. Reúne numa página só o
+Primeiro item da barra de navegação, em `/painel?view=fio`. Reúne numa tela só o
 que hoje está espalhado por nove: culto, presença, visitantes, pedidos,
 escalas, estacionamento, células e diaconia.
 
-- Cabeçalho com a data e quatro indicadores do dia.
-- Filtro por camada: cultos, pessoas, operação, cuidado.
-- Cartões expansíveis com o detalhe de cada registro.
-- Coluna lateral com ocupação do salão, visitantes por categoria e o que ainda
-  vai acontecer.
+Entregue: cabeçalho com troca de dia, filtro por camada (cultos, pessoas,
+operação, cuidado), linha do tempo com marcador "agora", futuro tracejado e o
+formulário de registro manual.
 
-**Esta é a única parte da reforma que exige migração de banco.** Precisa de uma
-tabela `fio_registros` para os lançamentos manuais — o que o sistema não capta
-sozinho, como uma visita pastoral ou um imprevisto. Todo o resto do fio é
-agregação de dados que já existem.
+Ainda não entregue, do desenho original: os quatro indicadores do topo, os
+cartões expansíveis e a coluna lateral com ocupação do salão e visitantes por
+categoria. Presença, estacionamento, células e diaconia ainda não são fontes do
+agregador — hoje ele lê eventos, escalas, visitantes, pedidos e mural.
+
+**Esta é a única parte da reforma que exige migração de banco.** A tabela
+`fio_registros` (`drizzle/0059_fio_registros.sql`) guarda os lançamentos
+manuais — o que o sistema não capta sozinho, como uma visita pastoral ou um
+imprevisto. Todo o resto do fio é agregação de dados que já existem.
+
+Ao implementar, descobriu-se que o fio já existia embutido em
+`CommunityHome.tsx`, com linha do tempo e marcador "agora", montado no cliente
+a partir de três fontes. A página dedicada promove esse trecho e troca a
+montagem no cliente por um agregador no servidor
+(`app/api/pilot/fio/route.ts`), que lê cinco fontes e filtra visibilidade no
+próprio SQL. Visitantes e pedidos entram agregados por contagem: quatorze
+linhas iguais não são quatorze acontecimentos, e o corpo de um pedido nunca é
+lido pela rota.
 
 ## 4. Navegação
 
@@ -128,21 +141,36 @@ muda é ordem, agrupamento e texto.
 A reforma é grande demais para um commit. Sugestão de recorte, cada bloco com
 build, testes e evidências próprios:
 
-1. **Fundação** — colapsar as duas paletas, definir os tokens, quebrar o
-   `globals.css`. Sem mudança visível de layout.
-2. **Ícones e navegação** — jogo de SVG, três seções, fim dos itens duplicados.
-3. **Fio do dia** — migração `fio_registros`, rota agregadora, página.
-4. **Módulos**, um por vez, na ordem da tabela da seção 5.
-5. **Formulários**, aplicando as cinco regras.
-6. **Superfície pública** — recepção, login, perfil da comunidade.
+1. **Fundação** — feito em `095fbdf`. Paletas colapsadas num acento de cobre,
+   três declarações mortas removidas de `:root`, preset Cobre como padrão da
+   plataforma. A quebra do `globals.css` em arquivos ficou de fora: o arquivo
+   segue com ~29,6 mil linhas e é dívida aberta.
+2. **Ícones e navegação** — feito em `79c8fbc`. O trilho e a barra móvel já
+   usavam SVG; o que restava eram as ações rápidas e o campo `symbol` morto no
+   `MENU`. "Mural" e "Escalas" deixaram de repetir a view de "Início" e
+   "Ministérios" e passaram a ter destino próprio. Seção "Principal" virou
+   "Dia".
+3. **Fio do dia** — migração, rota agregadora e página com filtro por camada,
+   troca de dia e registro manual.
+4. **Módulos**, um por vez, na ordem da tabela da seção 5. *(pendente)*
+5. **Formulários**, aplicando as cinco regras. *(pendente)*
+6. **Superfície pública** — recepção, login, perfil da comunidade. A recepção
+   recebeu a cor no bloco 1; layout e conteúdo seguem pendentes.
 
-## 8. Validação da base
+## 8. Validação
 
-Executada em 30/08/2026 sobre `1c6d447`:
+Base `1c6d447`, em 30/08/2026: build aprovado, 206 de 206 testes, lint com
+0 erros e 47 avisos.
 
-- `npm run build` — build concluído e artefato do Sites validado.
-- `node --test tests/*.test.mjs` — 206 de 206 passando.
-- `npm run lint` — 0 erros, 47 avisos, todos de `@next/next/no-img-element`.
+Depois dos blocos 1 a 3: build e artefato do Sites aprovados, **219 de 219
+testes** (13 novos em `tests/v190-reforma-visual-v5.test.mjs`), lint com
+0 erros e os mesmos 47 avisos de `@next/next/no-img-element`.
+
+O que **não** foi verificado em execução: o caminho autenticado da rota
+`/api/pilot/fio`. Sem sessão e sem banco semeado neste ambiente, só deu para
+confirmar que ela responde `401` limpo a quem não está logado e que a migração
+aplica sem violar integridade referencial. A agregação em si está coberta por
+teste de conteúdo, não de comportamento.
 
 Observação para quem for validar: 39 testes de integração dependem de
 `dist/server/index.js`. Rodar a suíte sem o build antes produz 39 falsas
