@@ -8,16 +8,27 @@ export type PlatformBranding = {
 };
 
 export type PlatformThemePreset =
+  | "COBRE"
   | "VIOLETA"
   | "ESMERALDA"
   | "AURORA"
   | "GRAFITE";
 
+export const PLATFORM_THEME_PRESETS: PlatformThemePreset[] = [
+  "COBRE",
+  "VIOLETA",
+  "ESMERALDA",
+  "AURORA",
+  "GRAFITE",
+];
+
 export const DEFAULT_PLATFORM_BRANDING: PlatformBranding = {
   siteName: "VÍNKULO",
   logoUrl: "",
   feedBannerUrl: "",
-  themePreset: "VIOLETA",
+  // Cobre é o acento único da Reforma Visual V5. Violeta continua disponível
+  // como preset nomeado para quem já o escolheu.
+  themePreset: "COBRE",
 };
 
 function safeText(value: unknown, fallback: string, maximum: number) {
@@ -43,9 +54,9 @@ export function parsePlatformBranding(value: unknown): PlatformBranding {
       ? (value as Partial<PlatformBranding>)
       : {};
   const candidate = String(source.themePreset || "").toUpperCase();
-  const themePreset = ["VIOLETA", "ESMERALDA", "AURORA", "GRAFITE"].includes(
-    candidate,
-  )
+  const themePreset = (
+    PLATFORM_THEME_PRESETS as string[]
+  ).includes(candidate)
     ? (candidate as PlatformThemePreset)
     : DEFAULT_PLATFORM_BRANDING.themePreset;
   return {
