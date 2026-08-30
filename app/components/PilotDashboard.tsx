@@ -20,7 +20,9 @@ import SecretaryMinisterialWorkspace from "./SecretaryMinisterialWorkspace";
 import NetworkWorkspace from "./NetworkWorkspace";
 import ParkingWorkspace from "./ParkingWorkspace";
 import PeopleWorkspace from "./PeopleWorkspace";
-import PilotNotificationCenter from "./PilotNotificationCenter";
+import PilotNotificationCenter, {
+  type NotificationUnreadSummary,
+} from "./PilotNotificationCenter";
 import PrivateChatWorkspace from "./PrivateChatWorkspace";
 import RequestsWorkspace from "./RequestsWorkspace";
 import ThemeControl from "./ThemeControl";
@@ -209,6 +211,15 @@ export default function PilotDashboard({
   const [communityInfoError, setCommunityInfoError] = useState("");
   const [canEditCommunity, setCanEditCommunity] = useState(false);
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [unreadNotifications, setUnreadNotifications] =
+    useState<NotificationUnreadSummary>({
+      total: 0,
+      escalas: 0,
+      eventos: 0,
+      pedidos: 0,
+      mensagens: 0,
+      sistema: 0,
+    });
   const [messageCenterOpen, setMessageCenterOpen] = useState(false);
 
   useEffect(() => {
@@ -377,6 +388,8 @@ export default function PilotDashboard({
   );
   const userInitials = getInitials(userName);
   const eventViewAvailable = allowedMenu.some((item) => item.id === "eventos");
+  const agendaAlerts = unreadNotifications.eventos + unreadNotifications.escalas;
+  const menuAlerts = unreadNotifications.total + unreadMessages;
   const quickActions = useMemo(
     () =>
       active.communityAccess === "FEED_ONLY"
@@ -769,7 +782,7 @@ export default function PilotDashboard({
             <span>Buscar</span>
             <kbd>⌘K</kbd>
           </button>
-          <PilotNotificationCenter />
+          <PilotNotificationCenter onUnreadChange={setUnreadNotifications} />
           {active.communityAccess !== "FEED_ONLY" && (
             <button
               type="button"
@@ -1189,17 +1202,27 @@ export default function PilotDashboard({
           <span className="pilot-mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5v8a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5z"/><path d="M9.5 20v-6h5v6"/></svg></span>
           <small className="pilot-mobile-label">Início</small>
         </button>
-        <button type="button" className={mobileMenu === "perfil" ? "active" : ""} onClick={() => setMobileMenu((current) => current === "perfil" ? null : "perfil")} aria-label="Comunidade">
-          <span className="pilot-mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 19v-7l7-5 7 5v7M9 19v-4h6v4M8 8V5h3"/></svg></span>
-          <small className="pilot-mobile-label">Comunidade</small>
-        </button>
         <button type="button" className={visibleView === "eventos" && !mobileMenu ? "active" : ""} onClick={() => eventViewAvailable ? openView("eventos") : setMobileMenu("menu")} aria-label="Agenda">
           <span className="pilot-mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="14" rx="2"/><path d="M8 3.5v4M16 3.5v4M4 10h16M8 14h3M14 14h2"/></svg></span>
           <small className="pilot-mobile-label">Agenda</small>
+          {agendaAlerts > 0 && <b className="pilot-mobile-badge">{Math.min(agendaAlerts, 99)}</b>}
+        </button>
+        <button
+          className={`pilot-mobile-create-button ${mobileMenu === "actions" ? "active" : ""}`}
+          type="button"
+          onClick={() => setMobileMenu((current) => current === "actions" ? null : "actions")}
+          aria-expanded={mobileMenu === "actions"}
+          aria-controls="pilot-mobile-sheet"
+          aria-label="Adicionar ou cadastrar"
+          disabled={quickActions.length === 0}
+        >
+          <span className="pilot-mobile-create-icon" aria-hidden="true">+</span>
+          <small className="pilot-mobile-label">Adicionar</small>
         </button>
         <button type="button" className={visibleView === "solicitacoes" && !mobileMenu ? "active" : ""} onClick={() => openView("solicitacoes")} aria-label="Pedidos">
           <span className="pilot-mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z"/></svg></span>
           <small className="pilot-mobile-label">Pedidos</small>
+          {unreadNotifications.pedidos > 0 && <b className="pilot-mobile-badge">{Math.min(unreadNotifications.pedidos, 99)}</b>}
         </button>
         <button
           className={mobileMenu === "menu" ? "active" : ""}
@@ -1217,6 +1240,7 @@ export default function PilotDashboard({
             <i />
           </span>
           <small className="pilot-mobile-label">Menu</small>
+          {menuAlerts > 0 && <b className="pilot-mobile-badge">{Math.min(menuAlerts, 99)}</b>}
         </button>
       </nav>
       {mobileMenu && (
@@ -1252,10 +1276,49 @@ export default function PilotDashboard({
                       : userName}
                 </h2>
               </div>
-              <button type="button" onClick={() => setMobileMenu(null)} aria-label="Fechar menu">×</button>
+              <div className="pilot-mobile-sheet-actions">
+                {mobileMenu === "menu" && (
+                  <button
+                    type="button"
+                    className="pilot-mobile-profile-shortcut"
+                    onClick={() => setMobileMenu("perfil")}
+                    aria-label="Abrir perfil e configurações"
+                    title="Perfil e configurações"
+                  >
+                    {userPhotoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={userPhotoUrl} alt="" />
+                    ) : userInitials}
+                  </button>
+                )}
+                {mobileMenu !== "menu" && (
+                  <button type="button" className="pilot-mobile-sheet-back" onClick={() => setMobileMenu("menu")} aria-label="Voltar ao menu">‹</button>
+                )}
+                <button type="button" className="pilot-mobile-sheet-close" onClick={() => setMobileMenu(null)} aria-label="Fechar menu">×</button>
+              </div>
             </header>
             {mobileMenu === "menu" ? (
               <div className="pilot-mobile-menu-content">
+                <div className="pilot-mobile-task-summary" aria-label="Pendências e mensagens">
+                  {active.communityAccess !== "FEED_ONLY" && (
+                    <button type="button" onClick={() => openView("mensagens")}>
+                      <span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 15.25A3.75 3.75 0 0 1 16.25 19H8l-4.5 2 1.25-3.75A6 6 0 0 1 3 13V8.75A3.75 3.75 0 0 1 6.75 5h9.5A3.75 3.75 0 0 1 20 8.75v6.5Z"/><path d="M7.5 10h8.75M7.5 14h5.5"/></svg></span>
+                      <strong>Mensagens</strong>
+                      <b>{Math.min(unreadMessages, 99)}</b>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenu(null);
+                      window.dispatchEvent(new CustomEvent("vinkulo:open-notifications"));
+                    }}
+                  >
+                    <span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></span>
+                    <strong>Atualizações</strong>
+                    <b>{Math.min(unreadNotifications.total, 99)}</b>
+                  </button>
+                </div>
                 <div className="pilot-mobile-menu-grid">
                   {primaryMenu.map((item) => (
                     <button
@@ -1308,6 +1371,13 @@ export default function PilotDashboard({
                 <dl>
                   <div><dt>Comunidade ativa</dt><dd>{active.comunidadeNome}</dd></div>
                 </dl>
+                <button
+                  type="button"
+                  className="pilot-profile-settings"
+                  onClick={() => openView("conta")}
+                >
+                  Perfil e configurações
+                </button>
                 {active.isOwner && (
                   <Link className="pilot-profile-manage" href="/proprietario">
                     Abrir Área do Proprietário
@@ -1353,13 +1423,6 @@ export default function PilotDashboard({
                   </button>
                 </details>
                 <PersonalizationControls userEmail={userEmail} fontScale={fontScale} onDecrease={() => changeFontScale(-0.05)} onReset={() => setFontScale(1)} onIncrease={() => changeFontScale(0.05)} />
-                <button
-                  type="button"
-                  className="pilot-profile-manage"
-                  onClick={() => openView("conta")}
-                >
-                  Minha conta
-                </button>
                 <Link href={`/comunidades/${active.comunidadeSlug}`}>Ver página pública</Link>
                 <a className="pilot-mobile-logout" href="/api/auth/logout">Sair da plataforma</a>
               </div>
