@@ -6,8 +6,8 @@ proprietário em 30/08/2026 como direção.
 - **Base:** `1c6d447` — "Exibe ações essenciais e orienta remoções".
 - **Prévias navegáveis:** duas páginas publicadas fora do repositório, com as
   telas e os formulários desenhados. Os links estão com o proprietário.
-- **Estado:** blocos 1, 2 e 3 implementados (ver seção 7). Blocos 4 a 6
-  pendentes.
+- **Estado:** blocos 1, 2 e 3 concluídos; bloco 4 parcial. Blocos 5 e 6
+  pendentes. Ver seção 7 para o recorte por commit.
 
 ## 1. Diagnóstico
 
@@ -97,9 +97,9 @@ Contadores no trilho apenas para pendências que exigem ação.
 | Pedidos | ~~Pedido confidencial não mostra o corpo na listagem.~~ Já resolvido, e melhor: `app/api/pilot/solicitacoes/route.ts:53-64` filtra por destinatário, então um pedido que não é seu nem foi endereçado a você não sai do servidor. Triagem por urgência exigiria coluna nova e ficou fora. |
 | Estacionamento | Mapa de vagas clicável no lugar da lista. |
 | Células | De lista de nomes para mapa de saúde: relatórios em dia, frequência das últimas oito semanas e prontidão para multiplicar. |
-| Notificações | Agrupadas por dia e origem, com aba "precisa de você". Mensagens privadas seguem fora do sino. |
+| Notificações | Agrupadas por dia, com filtro "precisa de você" e ícones em traçado — eram `P # ▣ ♡ □ ✦`. Mensagens privadas já estavam fora do sino. |
 | Configurações | Navegação por assunto no lugar do balde único. |
-| Área do proprietário | Trilho mais escuro e faixa de escopo permanente. |
+| Área do proprietário | Faixa de escopo permanente: a nota existia, mas dentro de um `<details>` fechado. Trilho mais escuro ficou de fora. |
 
 ### Ministérios
 
@@ -157,9 +157,12 @@ build, testes e evidências próprios:
    mapa de saúde (relatórios em dia, frequência das oito últimas semanas,
    prontidão para multiplicar) calculado dos relatórios que a rota já devolvia,
    sem consulta nova; e **Visitantes**, com o funil na frente da tabela.
+   Também feitos: **Notificações**, agrupadas por dia com filtro "precisa de
+   você" e ícones em traçado; e **Área do proprietário**, com a faixa de escopo
+   permanente no lugar da nota escondida — a regra CSS órfã que sobrou foi
+   removida junto, e com ela um verde que estava fora da paleta.
    Verificados e já resolvidos no código: Pedidos e Ministérios (ver seção 5).
-   Pendentes: Criar feed, Agenda, Pessoas, Estacionamento, Notificações,
-   Configurações e Área do proprietário.
+   Pendentes: Criar feed, Agenda, Pessoas, Estacionamento e Configurações.
 5. **Formulários**, aplicando as cinco regras. *(pendente)*
 6. **Superfície pública** — recepção, login, perfil da comunidade. A recepção
    recebeu a cor no bloco 1; layout e conteúdo seguem pendentes.
@@ -169,8 +172,8 @@ build, testes e evidências próprios:
 Base `1c6d447`, em 30/08/2026: build aprovado, 206 de 206 testes, lint com
 0 erros e 47 avisos.
 
-Depois dos blocos 1 a 4: build e artefato do Sites aprovados, **222 de 222
-testes** (16 novos em `tests/v190-reforma-visual-v5.test.mjs`), lint com
+Depois dos blocos 1 a 4: build e artefato do Sites aprovados, **226 de 226
+testes** (20 novos em `tests/v190-reforma-visual-v5.test.mjs`), lint com
 0 erros e os mesmos 47 avisos de `@next/next/no-img-element`.
 
 Duas afirmações do diagnóstico original caíram ao serem checadas contra o

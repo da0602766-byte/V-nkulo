@@ -191,3 +191,43 @@ test("visitantes mostram o funil antes da tabela", async () => {
   const styles = await read("app/globals.css");
   assert.match(styles, /\.visitor-funnel-v5 article\[data-etapa="INTEGRADO"\]/);
 });
+
+test("notificações agrupam por dia e separam o que precisa de resposta", async () => {
+  const center = await read("app/components/PilotNotificationCenter.tsx");
+  assert.match(center, /function needsYou\(item: Notification\)/);
+  assert.match(center, /function dayLabel\(value: string, agora: number\)/);
+  assert.match(center, /scope === "precisa" \? items\.filter\(needsYou\) : items/);
+  assert.match(center, /notification-day-v5/);
+  // Já lida nunca conta como pendência.
+  const corpo = center.slice(center.indexOf("function needsYou"), center.indexOf("function needsYou") + 500);
+  assert.match(corpo, /if \(item\.read\) return false;/);
+});
+
+test("os ícones das notificações deixaram de ser caracteres de texto", async () => {
+  const center = await read("app/components/PilotNotificationCenter.tsx");
+  assert.match(center, /const NOTIFICATION_ICONS: Record<string, string>/);
+  assert.match(center, /<NotificationIcon id=\{notificationVisual\(item\)\.key\} \/>/);
+  for (const glifo of ["▣", "♡", "✦"]) {
+    assert.ok(!center.includes(`icon: "${glifo}"`), `glifo ${glifo} ainda presente`);
+  }
+});
+
+test("o rótulo Hoje/Ontem não é calculado durante a renderização", async () => {
+  const center = await read("app/components/PilotNotificationCenter.tsx");
+  // Sem relógio em estado, servidor e cliente discordariam do dia na hidratação.
+  assert.match(center, /const \[agora, setAgora\] = useState\(0\)/);
+  const corpo = center.slice(center.indexOf("function dayLabel"), center.indexOf("function dayLabel") + 400);
+  assert.match(corpo, /if \(!agora\) return "";/);
+});
+
+test("a área do proprietário mostra o escopo global sem exigir clique", async () => {
+  const owner = await read("app/components/OwnerWorkspace.tsx");
+  assert.match(owner, /owner-scope-banner-v5/);
+  assert.match(owner, /Tudo aqui alcança a plataforma inteira/);
+  // A versão antiga ficava dentro de um <details> fechado.
+  assert.doesNotMatch(owner, /owner-scope-note/);
+  const styles = await read("app/globals.css");
+  assert.match(styles, /\.owner-scope-banner-v5/);
+  // A regra órfã saiu junto, com o verde que estava fora da paleta.
+  assert.doesNotMatch(styles, /owner-scope-note/);
+});

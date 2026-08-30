@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 type Notification = {
@@ -23,6 +23,10 @@ const DEVICE_NOTIFICATION_STORAGE_KEY = "vinkulo-device-notifications-v1";
 
 export default function PilotNotificationCenter() {
   const [items, setItems] = useState<Notification[]>([]);
+  const [scope, setScope] = useState<"tudo" | "precisa">("tudo");
+  // O relógio vem de estado para o rótulo "Hoje/Ontem" não divergir entre
+  // servidor e cliente na hidratação.
+  const [agora, setAgora] = useState(0);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
@@ -31,6 +35,16 @@ export default function PilotNotificationCenter() {
   const [config, setConfig] = useState<NotificationConfig>(DEFAULT_CONFIG);
   const [devicePermission, setDevicePermission] = useState<"unsupported" | NotificationPermission>("unsupported");
   const [showDevicePermissionHelp, setShowDevicePermissionHelp] = useState(false);
+
+  useEffect(() => {
+    const acertar = () => setAgora(Date.now());
+    const primeiro = window.setTimeout(acertar, 0);
+    const relogio = window.setInterval(acertar, 300000);
+    return () => {
+      window.clearTimeout(primeiro);
+      window.clearInterval(relogio);
+    };
+  }, []);
   const requestRef = useRef<AbortController | null>(null);
   const permissionRef = useRef<"unsupported" | NotificationPermission>("unsupported");
   const shownDeviceNotificationIds = useRef<Set<number> | null>(null);
@@ -265,11 +279,32 @@ export default function PilotNotificationCenter() {
             ) : items.length === 0 ? (
               <p className="notification-empty">Nenhuma solicitação nova.</p>
             ) : (
+              <>
+              <div className="notification-scope-v5" role="group" aria-label="Filtrar notificações">
+                <button type="button" className={scope === "tudo" ? "active" : ""} aria-pressed={scope === "tudo"} onClick={() => setScope("tudo")}>
+                  Tudo <span>{items.length}</span>
+                </button>
+                <button type="button" className={scope === "precisa" ? "active" : ""} aria-pressed={scope === "precisa"} onClick={() => setScope("precisa")}>
+                  Precisa de você <span>{items.filter(needsYou).length}</span>
+                </button>
+              </div>
               <div className="pilot-notification-list">
-                {items.map((item) => (
-                  <article key={item.id} className={item.read ? "" : "unread"}>
+                {(() => {
+                  const visiveis = scope === "precisa" ? items.filter(needsYou) : items;
+                  if (!visiveis.length) {
+                    return <p className="notification-empty">Nada esperando resposta sua.</p>;
+                  }
+                  let ultimoDia = "";
+                  return visiveis.map((item) => {
+                    const rotulo = dayLabel(item.createdAt, agora);
+                    const abreDia = Boolean(rotulo) && rotulo !== ultimoDia;
+                    if (abreDia) ultimoDia = rotulo;
+                    return (
+                  <Fragment key={item.id}>
+                  {abreDia && <p className="notification-day-v5">{rotulo}</p>}
+                  <article className={item.read ? "" : "unread"}>
                     <span className={`notification-source-icon source-${notificationVisual(item).key}`} aria-hidden="true">
-                      {notificationVisual(item).icon}
+                      <NotificationIcon id={notificationVisual(item).key} />
                     </span>
                     <div>
                       <strong>{item.title}</strong>
@@ -290,8 +325,12 @@ export default function PilotNotificationCenter() {
                       <button type="button" onClick={() => markRead(item.id)}>Lida</button>
                     ) : null}
                   </article>
-                ))}
+                  </Fragment>
+                    );
+                  });
+                })()}
               </div>
+              </>
             )}
             <footer>
               E-mail e WhatsApp serão conectados futuramente por provedores externos.
@@ -343,12 +382,59 @@ function formatDate(value: string) {
   }
 }
 
+// Os ícones eram caracteres de texto (P # ▣ ♡ □ ✦), com peso e altura que
+// nenhuma fonte garante. Viraram traçado, como no resto da navegação.
+const NOTIFICATION_ICONS: Record<string, string> = {
+  parking: "M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm4.8 13V7.6h3a2.9 2.9 0 0 1 0 5.8h-3",
+  ministry: "m12 3 9 4.8-9 4.8-9-4.8L12 3Zm-9 9.8 9 4.8 9-4.8",
+  event: "M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm-2 5h18M8 3v4m8-4v4",
+  request: "M12 20.5S4.5 15.8 4.5 10.4A4.1 4.1 0 0 1 12 7.8a4.1 4.1 0 0 1 7.5 2.6c0 5.4-7.5 10.1-7.5 10.1Z",
+  message: "M4 5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-5 4V6a1 1 0 0 1 1-1Z",
+  system: "M18.2 9.2a6.2 6.2 0 0 0-12.4 0c0 5.1-2 6.2-2 6.2h16.4s-2-1.1-2-6.2ZM10.4 19.4a2 2 0 0 0 3.2 0",
+};
+
+function NotificationIcon({ id }: { id: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d={NOTIFICATION_ICONS[id] || NOTIFICATION_ICONS.system} />
+    </svg>
+  );
+}
+
 function notificationVisual(item: Notification) {
   const source = `${item.category} ${item.area || ""} ${item.title} ${item.destination}`.toLocaleLowerCase("pt-BR");
-  if (source.includes("estacion") || source.includes("parking")) return { key: "parking", icon: "P", label: "Estacionamento" };
-  if (source.includes("escala") || source.includes("minister")) return { key: "ministry", icon: "#", label: "Ministérios e escalas" };
-  if (source.includes("evento")) return { key: "event", icon: "▣", label: "Eventos" };
-  if (source.includes("pedido") || source.includes("oração") || source.includes("solicita")) return { key: "request", icon: "♡", label: "Oração e solicitações" };
-  if (source.includes("mensagem") || source.includes("chat")) return { key: "message", icon: "□", label: "Mensagens" };
-  return { key: "system", icon: "✦", label: "Sistema Vínkulo" };
+  if (source.includes("estacion") || source.includes("parking")) return { key: "parking", label: "Estacionamento" };
+  if (source.includes("escala") || source.includes("minister")) return { key: "ministry", label: "Ministérios e escalas" };
+  if (source.includes("evento")) return { key: "event", label: "Eventos" };
+  if (source.includes("pedido") || source.includes("oração") || source.includes("solicita")) return { key: "request", label: "Oração e solicitações" };
+  if (source.includes("mensagem") || source.includes("chat")) return { key: "message", label: "Mensagens" };
+  return { key: "system", label: "Sistema Vínkulo" };
+}
+
+// Só o que exige uma ação de quem lê. Ler tudo é um dever de ninguém; o que
+// espera resposta precisa aparecer separado do que é só aviso.
+function needsYou(item: Notification) {
+  if (item.read) return false;
+  const fonte = `${item.category} ${item.area || ""} ${item.title}`.toLocaleLowerCase("pt-BR");
+  return (
+    Boolean(item.destination) ||
+    fonte.includes("escala") ||
+    fonte.includes("pedido") ||
+    fonte.includes("solicita") ||
+    fonte.includes("aprovaç") ||
+    fonte.includes("confirm")
+  );
+}
+
+// Agrupa por dia civil, com rótulo relativo para os dois mais recentes.
+function dayLabel(value: string, agora: number) {
+  const data = new Date(value);
+  if (Number.isNaN(data.getTime())) return "Sem data";
+  if (!agora) return "";
+  const inicioHoje = new Date(agora);
+  inicioHoje.setHours(0, 0, 0, 0);
+  const diff = Math.floor((inicioHoje.getTime() - new Date(data).setHours(0, 0, 0, 0)) / 86400000);
+  if (diff <= 0) return "Hoje";
+  if (diff === 1) return "Ontem";
+  return new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long" }).format(data);
 }
