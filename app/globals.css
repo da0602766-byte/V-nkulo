@@ -30407,3 +30407,101 @@ body {
   .owner-nav-group-v6 { display: contents; }
   .owner-nav-group-v6 > h2 { display: none; }
 }
+
+/* ===== Ambiente de ensaio do proprietário (V6) =====
+   A hierarquia visual segue o risco: o rascunho é discreto, a publicação pede
+   confirmação e a reversão fica sempre à vista no item publicado — não
+   escondida atrás de um menu, porque é ela que torna o resto seguro. */
+.rehearsal-v6 { display: grid; gap: 18px; }
+.rehearsal-intro-v6 h2 { margin: 2px 0 6px; font-size: var(--fs-2xl); letter-spacing: -.02em; }
+.rehearsal-intro-v6 p { max-width: 62ch; margin: 0; color: var(--v2-muted); font-size: var(--fs-sm); line-height: 1.55; }
+
+.rehearsal-form-v6 {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;
+  border: 1px solid var(--v2-line); border-radius: var(--v2-radius);
+  background: var(--v2-surface); padding: 18px;
+}
+.rehearsal-wide-v6 { grid-column: 1 / -1; }
+.rehearsal-field-v6 { display: grid; gap: 5px; align-content: start; }
+.rehearsal-field-v6 > label { color: var(--v2-ink); font-size: var(--fs-xs); font-weight: 800; }
+.rehearsal-field-v6 > small { color: var(--v2-muted); font-size: var(--fs-2xs); }
+.rehearsal-field-v6 :is(input[type="text"], input:not([type]), select) {
+  min-height: 42px; border: 1px solid var(--v2-line); border-radius: var(--v2-radius-sm);
+  background: var(--v2-surface); color: var(--v2-ink); padding: 0 11px; font: inherit;
+}
+
+.rehearsal-palette-v6 { display: grid; grid-template-columns: repeat(auto-fill, minmax(178px, 1fr)); gap: 9px; }
+.rehearsal-palette-v6 button {
+  display: grid; gap: 4px; border: 1px solid var(--v2-line); border-radius: var(--v2-radius-sm);
+  background: var(--v2-surface); color: var(--v2-ink); padding: 11px; text-align: left; cursor: pointer;
+}
+.rehearsal-palette-v6 button.active { border-color: var(--violet); box-shadow: 0 0 0 2px color-mix(in srgb, var(--violet) 20%, transparent); }
+.rehearsal-palette-v6 strong { font-size: var(--fs-xs); }
+.rehearsal-palette-v6 small { color: var(--v2-muted); font-size: var(--fs-2xs); line-height: 1.4; }
+.rehearsal-swatch-v6 { height: 22px; border-radius: 7px; }
+
+.rehearsal-modules-v6 { display: grid; grid-template-columns: repeat(auto-fill, minmax(228px, 1fr)); gap: 8px; }
+.rehearsal-modules-v6 > label,
+.rehearsal-communities-v6 > label {
+  display: flex; align-items: flex-start; gap: 8px; border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-sm); background: var(--v2-surface); padding: 9px 11px;
+  color: var(--v2-ink); font-size: var(--fs-xs); cursor: pointer;
+}
+.rehearsal-modules-v6 span { display: grid; gap: 2px; }
+.rehearsal-modules-v6 small { color: var(--v2-muted); font-size: var(--fs-2xs); line-height: 1.4; }
+.rehearsal-communities-v6 { display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 7px; margin-top: 8px; }
+
+.rehearsal-target-v6 { display: flex; flex-wrap: wrap; gap: 7px; }
+.rehearsal-target-v6 button {
+  min-height: 38px; border: 1px solid var(--v2-line); border-radius: 999px;
+  background: var(--v2-surface); color: var(--v2-muted); padding: 0 14px;
+  font-size: var(--fs-xs); font-weight: 800; cursor: pointer;
+}
+.rehearsal-target-v6 button.active { border-color: var(--violet); background: var(--violet-soft); color: var(--violet); }
+
+.rehearsal-actions-v6 {
+  grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: space-between; gap: 11px; border-top: 1px solid var(--v2-line); padding-top: 13px;
+}
+.rehearsal-actions-v6 button {
+  min-height: 42px; border: 0; border-radius: var(--v2-radius-sm);
+  background: var(--violet); color: #fff; padding: 0 18px; font-weight: 800; cursor: pointer;
+}
+.rehearsal-actions-v6 button:disabled { opacity: .55; cursor: not-allowed; }
+
+.rehearsal-history-v6 > header h3 { margin: 0 0 10px; font-size: var(--fs-lg); }
+.rehearsal-history-v6 ul { display: grid; gap: 9px; margin: 0; padding: 0; list-style: none; }
+.rehearsal-history-v6 li {
+  display: grid; gap: 7px; border: 1px solid var(--v2-line); border-left-width: 3px;
+  border-radius: var(--v2-radius-sm); background: var(--v2-surface); padding: 12px 14px;
+}
+.rehearsal-history-v6 li[data-estado="PUBLICADO"] { border-left-color: var(--violet); }
+.rehearsal-history-v6 li[data-estado="REVERTIDO"] { border-left-color: var(--muted); }
+.rehearsal-history-v6 li[data-estado="RASCUNHO"] { border-left-color: var(--v2-line-strong); }
+.rehearsal-item-head-v6 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.rehearsal-item-head-v6 strong { font-size: var(--fs-sm); }
+.rehearsal-item-head-v6 small { color: var(--v2-muted); font-size: var(--fs-2xs); }
+.rehearsal-state-v6 {
+  border-radius: 999px; padding: 3px 9px; font-size: var(--fs-2xs); font-weight: 850;
+  background: var(--v2-surface-subtle); color: var(--v2-muted);
+}
+.rehearsal-state-v6[data-estado="PUBLICADO"] { background: var(--violet-soft); color: var(--violet); }
+.rehearsal-state-v6[data-estado="REVERTIDO"] { background: var(--amber-soft); color: var(--amber); }
+.rehearsal-note-v6 { margin: 0; color: var(--v2-muted); font-size: var(--fs-xs); }
+.rehearsal-item-actions-v6 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.rehearsal-item-actions-v6 button {
+  min-height: 36px; border: 0; border-radius: var(--v2-radius-sm);
+  background: var(--violet); color: #fff; padding: 0 13px; font-size: var(--fs-xs);
+  font-weight: 800; cursor: pointer;
+}
+.rehearsal-item-actions-v6 button.ghost { border: 1px solid var(--v2-line); background: transparent; color: var(--v2-muted); }
+.rehearsal-revert-v6 { background: transparent !important; border: 1px solid var(--violet) !important; color: var(--violet) !important; }
+.rehearsal-confirm-v6 { color: var(--amber); font-size: var(--fs-xs); font-weight: 800; }
+.rehearsal-locked-v6 { color: var(--v2-muted); font-size: var(--fs-2xs); }
+.rehearsal-empty-v6 { color: var(--v2-muted); font-size: var(--fs-sm); }
+
+@media (max-width: 760px) {
+  .rehearsal-form-v6 { grid-template-columns: 1fr; }
+  .rehearsal-actions-v6 { align-items: stretch; flex-direction: column; }
+  .rehearsal-actions-v6 button { width: 100%; }
+}

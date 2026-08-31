@@ -11,6 +11,7 @@ import PlatformControlsWorkspace from "./PlatformControlsWorkspace";
 import EditorialAutomationWorkspace from "./EditorialAutomationWorkspace";
 import StatisticsWorkspace from "./StatisticsWorkspace";
 import PlatformOptimizerWorkspace from "./PlatformOptimizerWorkspace";
+import PlatformRehearsalWorkspace from "./PlatformRehearsalWorkspace";
 import Link from "./StableLink";
 import ThemeControl from "./ThemeControl";
 import {
@@ -42,6 +43,7 @@ type OwnerTab =
   | "editorial"
   | "statistics"
   | "optimization"
+  | "rehearsal"
   | "controls";
 type OwnerGridPreset = "2x2" | "2x4" | "4x2" | "4x4";
 type OwnerMetricKey =
@@ -69,6 +71,7 @@ const TABS: {
   { id: "communities", label: "Comunidades", icon: "comunidade", grupo: "Operação" },
   { id: "users", label: "Pessoas", icon: "pessoas", grupo: "Operação" },
   { id: "feedback", label: "Feedback e denúncias", icon: "feedback", grupo: "Operação" },
+  { id: "rehearsal", label: "Ensaio e publicação", icon: "ensaio", grupo: "Plataforma" },
   { id: "editorial", label: "IA Editorial", icon: "editorial", grupo: "Plataforma" },
   { id: "controls", label: "Configurações", icon: "configuracoes", grupo: "Plataforma" },
   { id: "statistics", label: "Estatísticas", icon: "estatisticas", grupo: "Evidência" },
@@ -565,6 +568,7 @@ export default function OwnerWorkspace({
           {tab === "editorial" && <EditorialAutomationWorkspace />}
           {tab === "statistics" && <StatisticsWorkspace />}
           {tab === "optimization" && <PlatformOptimizerWorkspace />}
+          {tab === "rehearsal" && <PlatformRehearsalWorkspace />}
           {tab === "controls" && <PlatformControlsWorkspace features={features} currentCommunityId={currentCommunityId} />}
         </section>
       </div>
@@ -813,6 +817,7 @@ function tabDescription(tab: OwnerTab) {
     editorial: "Revise e programe conteúdos da plataforma fora do contexto comunitário.",
     statistics: "Consulte indicadores globais sem expor ferramentas da plataforma nos menus comunitários.",
     optimization: "Diagnostique e execute retenções seguras sem remover dados ativos.",
+    rehearsal: "Prepare a mudança em rascunho, escolha quem recebe e publique — com reversão em um clique.",
     controls: "Configure identidade, módulos e regras globais da plataforma.",
   }[tab];
 }

@@ -8,8 +8,7 @@ de várias coisas pedidas.
 - **Base:** `a034cbf`, com a Reforma V5 integrada e aguardando publicação.
 - **Decidido:** começar pela área do proprietário (seção 5); o mapa de
   visitantes será agregado por bairro, não por endereço (seção 1.2).
-- **Estado:** seção 5.1 (coerência) feita. Seção 5.2 (ambiente simulado) é a
-  próxima.
+- **Estado:** seção 5.1 (coerência) e 5.2 (ambiente de ensaio) feitas.
 
 ## Registro de execução
 
@@ -34,6 +33,42 @@ O que apareceu ao fazer, e que o diagnóstico não previa:
 **Dívida aberta:** os marcadores de tipo de feedback (`✦ ↗ ⚑ !`) continuam
 glifos. São classificação de conteúdo, não navegação, e trocá-los é outro
 recorte.
+
+### 5.2 Ambiente de ensaio — feito
+
+Rascunho → alvo → publicação → reversão, na aba "Ensaio e publicação".
+
+**A decisão que organizou tudo:** publicar é escrever, em `configuracoes`, a
+chave de cada comunidade alvo (`community_theme:<id>`, `community_modules:<id>`).
+Antes de escrever, o valor que estava lá é guardado comunidade por comunidade
+em `anterior_json`, **no mesmo lote da escrita**. É esse retrato que torna a
+reversão possível; sem ele, desfazer seria adivinhação.
+
+Quatro regras que valem a pena registrar:
+
+1. **Só rascunho publica.** Publicar duas vezes sobrescreveria o retrato do
+   original com o valor que o próprio ensaio acabou de gravar.
+2. **Só o último publicado de cada assunto é reversível.** Reverter um
+   anterior apagaria o que veio depois. A checagem está no servidor, não só na
+   interface — a lista da tela pode estar trinta segundos atrasada.
+3. **Chave que não existia antes é apagada na reversão**, não gravada como a
+   string `"null"`.
+4. **Publicado não se apaga.** É o registro do que aconteceu, e apagá-lo
+   levaria junto o retrato que permite reverter.
+
+Escrever exige as duas coisas: a permissão `platform.admin.view` **e** a conta
+de proprietário do sistema. A permissão sozinha existe para leitura.
+
+**Verificado com o sistema rodando**, não só por teste de conteúdo: o ciclo
+completo foi exercido contra o banco real, incluindo publicar sobre um valor
+existente e reverter em cadeia — o valor voltou byte a byte ao original. Os
+seis guardas (publicar duas vezes, descartar publicado, reverter duas vezes,
+reverter fora de ordem, alvo vazio, assunto inválido) recusaram com o código
+certo.
+
+**Ainda não entregue:** a prévia renderizada. Hoje o rascunho mostra a paleta
+em amostra, não a plataforma inteira aplicada. O "ver como uma comunidade vê",
+em modo somente leitura, também segue pendente — é a peça (c) da seção 5.2.
 
 ## 0. O que já existe (e muda o preço do pedido)
 
