@@ -46,6 +46,25 @@ type ConflictItem = {
   sugestao: string;
 };
 
+type RegionalItem = {
+  id: number;
+  nome: string;
+  total_visitantes: number;
+  novos: number;
+  integrados: number;
+};
+
+type CadenciaAvancadaItem = {
+  id: number;
+  nome_completo: string;
+  ultimo_contato: string | null;
+  dias_sem_contato: number;
+  categoria: string | null;
+  responsavel: string | null;
+  prioridade: "urgente" | "alta" | "normal" | "baixa";
+  sugestao: string;
+};
+
 interface RelacionamentoToolsProps {
   visitantes?: EngagementData[];
   compacto?: boolean;
@@ -356,13 +375,194 @@ function ConflictDetection({ items }: { items: ConflictItem[] }) {
 // ============================================
 
 /**
+ * FERRAMENTA 6: Regional Grouping
+ * Agrupa visitantes por região/célula
+ */
+function RegionalGrouping({ items }: { items: RegionalItem[] }) {
+  if (items.length === 0) return null;
+
+  const maxVisitantes = Math.max(...items.map((i) => i.total_visitantes), 1);
+
+  return (
+    <div
+      style={{
+        padding: "16px",
+        border: "1px solid var(--color-border)",
+        borderRadius: "8px",
+        marginTop: "16px",
+      }}
+    >
+      <h3 style={{ marginTop: 0, marginBottom: "12px", fontSize: "14px", fontWeight: "bold" }}>
+        🗺️ Agrupamento Regional ({items.length} célula(s))
+      </h3>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+          gap: "12px",
+        }}
+      >
+        {items.map((item) => (
+          <div
+            key={item.id}
+            style={{
+              padding: "12px",
+              border: "1px solid var(--color-border)",
+              borderRadius: "6px",
+              background: "var(--color-surface)",
+            }}
+          >
+            <div style={{ marginBottom: "8px" }}>
+              <strong style={{ fontSize: "13px" }}>{item.nome}</strong>
+            </div>
+            <div
+              style={{
+                background: "var(--color-border)",
+                borderRadius: "4px",
+                height: "6px",
+                marginBottom: "8px",
+              }}
+            >
+              <div
+                style={{
+                  background: "linear-gradient(90deg, #3b82f6, #10b981)",
+                  height: "100%",
+                  width: `${(item.total_visitantes / maxVisitantes) * 100}%`,
+                }}
+              />
+            </div>
+            <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>
+              <div>👥 {item.total_visitantes} visitante(s)</div>
+              <div>🆕 {item.novos} novo(s)</div>
+              <div>✓ {item.integrados} integrado(s)</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * FERRAMENTA 7: Cadência Avançada
+ * Recomendações inteligentes de contato
+ */
+function CadenciaAvancada({ items, limite = 10 }: { items: CadenciaAvancadaItem[]; limite?: number }) {
+  const prioritarios = items.slice(0, limite);
+
+  const corPrioridade = (prioridade: string) => {
+    switch (prioridade) {
+      case "urgente":
+        return "#ef4444";
+      case "alta":
+        return "#f59e0b";
+      case "normal":
+        return "#3b82f6";
+      default:
+        return "#10b981";
+    }
+  };
+
+  const iconPrioridade = (prioridade: string) => {
+    switch (prioridade) {
+      case "urgente":
+        return "🚨";
+      case "alta":
+        return "⚠️";
+      case "normal":
+        return "⏱️";
+      default:
+        return "✓";
+    }
+  };
+
+  return (
+    <div
+      style={{
+        padding: "16px",
+        border: "1px solid var(--color-border)",
+        borderRadius: "8px",
+        marginTop: "16px",
+      }}
+    >
+      <h3 style={{ marginTop: 0, marginBottom: "12px", fontSize: "14px", fontWeight: "bold" }}>
+        🎯 Cadência Inteligente ({items.length} sugestão(s))
+      </h3>
+      {prioritarios.length === 0 ? (
+        <p style={{ margin: 0, color: "var(--color-text-muted)", fontSize: "13px" }}>
+          Nenhuma ação urgente no momento.
+        </p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          {prioritarios.map((item) => (
+            <div
+              key={item.id}
+              style={{
+                padding: "10px 12px",
+                background: corPrioridade(item.prioridade) + "10",
+                border: `1px solid ${corPrioridade(item.prioridade)}30`,
+                borderRadius: "6px",
+                fontSize: "12px",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  marginBottom: "6px",
+                }}
+              >
+                <div>
+                  <strong>{item.nome_completo}</strong>
+                  {item.categoria && (
+                    <div style={{ color: "var(--color-text-muted)", fontSize: "11px" }}>
+                      {item.categoria}
+                    </div>
+                  )}
+                </div>
+                <span
+                  style={{
+                    background: corPrioridade(item.prioridade),
+                    color: "white",
+                    padding: "2px 8px",
+                    borderRadius: "3px",
+                    fontWeight: "bold",
+                    fontSize: "10px",
+                    whiteSpace: "nowrap",
+                    marginLeft: "8px",
+                  }}
+                >
+                  {iconPrioridade(item.prioridade)} {item.prioridade.toUpperCase()}
+                </span>
+              </div>
+              <div style={{ color: "var(--color-text-muted)", fontSize: "11px", marginBottom: "4px" }}>
+                {item.dias_sem_contato} dias sem contato
+                {item.responsavel && ` · Responsável: ${item.responsavel}`}
+              </div>
+              {item.sugestao && (
+                <div style={{ background: "rgba(255,255,255,0.5)", padding: "4px 6px", borderRadius: "3px" }}>
+                  💡 {item.sugestao}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
  * RelacionamentoTools
  * Componente integrado que exibe todas as ferramentas de relacionamento
  */
 export function RelacionamentoTools({ visitantes = [], compacto = false }: RelacionamentoToolsProps) {
   const [engagement, setEngagement] = useState<EngagementData[]>([]);
   const [cadencia, setCadencia] = useState<CadenciaItem[]>([]);
+  const [cadenciaAvancada, setCadenciaAvancada] = useState<CadenciaAvancadaItem[]>([]);
   const [carga, setCarga] = useState<LoadMetricItem[]>([]);
+  const [regional, setRegional] = useState<RegionalItem[]>([]);
   const [conflitos, setConflitos] = useState<ConflictItem[]>([]);
   const [carregando, setCarregando] = useState(true);
 
@@ -372,17 +572,21 @@ export function RelacionamentoTools({ visitantes = [], compacto = false }: Relac
         setCarregando(true);
 
         // Carregar todas as ferramentas em paralelo
-        const [resEngagement, resCadencia, resCarga, resConflitos] = await Promise.all([
+        const [resEngagement, resCadencia, resCarga, resRegional, resConflitos, resCadenciaAvancada] = await Promise.all([
           fetch("/api/pilot/relacionamento?ferramenta=engagement").then((r) => r.json()),
           fetch("/api/pilot/relacionamento?ferramenta=cadencia").then((r) => r.json()),
           fetch("/api/pilot/relacionamento?ferramenta=carga").then((r) => r.json()),
+          fetch("/api/pilot/relacionamento?ferramenta=regional").then((r) => r.json()),
           fetch("/api/pilot/relacionamento?ferramenta=conflitos").then((r) => r.json()),
+          fetch("/api/pilot/relacionamento?ferramenta=cadencia-avancada").then((r) => r.json()),
         ]);
 
         setEngagement(resEngagement.dados || []);
         setCadencia(resCadencia.dados || []);
         setCarga(resCarga.dados || []);
+        setRegional(resRegional.dados || []);
         setConflitos(resConflitos.dados || []);
+        setCadenciaAvancada(resCadenciaAvancada.dados || []);
       } catch (erro) {
         console.error("Erro ao carregar ferramentas de relacionamento:", erro);
       } finally {
@@ -412,7 +616,10 @@ export function RelacionamentoTools({ visitantes = [], compacto = false }: Relac
               <strong>👥 Visitantes:</strong> {engagement.length}
             </div>
             <div>
-              <strong>📞 Para Contatar:</strong> {cadencia.filter((c) => c.dias_sem_contato > 7).length}
+              <strong>📞 Para Contatar:</strong> {cadenciaAvancada.filter((c) => c.prioridade === "urgente").length}
+            </div>
+            <div>
+              <strong>🗺️ Regiões Ativas:</strong> {regional.length}
             </div>
             <div>
               <strong>🚨 Conflitos:</strong> {conflitos.length}
@@ -480,6 +687,12 @@ export function RelacionamentoTools({ visitantes = [], compacto = false }: Relac
           {/* Cadência */}
           {cadencia.length > 0 && <CadenciaContato items={cadencia} limite={8} />}
 
+          {/* Cadência Avançada */}
+          {cadenciaAvancada.length > 0 && <CadenciaAvancada items={cadenciaAvancada} limite={10} />}
+
+          {/* Regional Grouping */}
+          {regional.length > 0 && <RegionalGrouping items={regional} />}
+
           {/* Load Metrics */}
           {carga.length > 0 && <LoadMetrics items={carga} />}
 
@@ -487,7 +700,7 @@ export function RelacionamentoTools({ visitantes = [], compacto = false }: Relac
           {conflitos.length > 0 && <ConflictDetection items={conflitos} />}
 
           {/* Resumo */}
-          {engagement.length === 0 && cadencia.length === 0 && carga.length === 0 && conflitos.length === 0 && (
+          {engagement.length === 0 && cadencia.length === 0 && carga.length === 0 && conflitos.length === 0 && regional.length === 0 && cadenciaAvancada.length === 0 && (
             <div style={{ padding: "24px", textAlign: "center", color: "var(--color-text-muted)" }}>
               📊 Nenhum dado disponível no momento
             </div>

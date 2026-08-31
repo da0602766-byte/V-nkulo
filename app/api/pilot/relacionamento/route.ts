@@ -52,6 +52,25 @@ type ConflictItem = {
   sugestao: string;
 };
 
+type RegionalItem = {
+  id: number;
+  nome: string;
+  total_visitantes: number;
+  novos: number;
+  integrados: number;
+};
+
+type CadenciaAvancadaItem = {
+  id: number;
+  nome_completo: string;
+  ultimo_contato: string | null;
+  dias_sem_contato: number;
+  categoria: string | null;
+  responsavel: string | null;
+  prioridade: "urgente" | "alta" | "normal" | "baixa";
+  sugestao: string;
+};
+
 /**
  * Calcula o Engagement Score de um visitante (0-100)
  * Pontos:
@@ -323,6 +342,82 @@ export async function GET(request: Request) {
       return Response.json({
         ferramenta: "regional",
         dados: result.results || [],
+      });
+    }
+  }
+
+  // ============================================
+  // FERRAMENTA 6: CADÊNCIA AVANÇADA
+  // ============================================
+  if (ferramenta === "todas" || ferramenta === "cadencia-avancada") {
+    const result = await db
+      .prepare(
+        `SELECT
+           v.id, v.nome_completo, v.ultimo_contato, v.criado_por as responsavel,
+           c.nome as categoria, v.categoria_id
+         FROM visitantes v
+         LEFT JOIN categorias_acompanhamento c ON c.id = v.categoria_id
+         WHERE v.comunidade_id = ? AND v.ativo = 1
+         ORDER BY
+           CASE
+             WHEN datetime(v.ultimo_contato) < datetime('now', '-60 days') THEN 0
+             WHEN datetime(v.ultimo_contato) < datetime('now', '-30 days') THEN 1
+             WHEN datetime(v.ultimo_contato) < datetime('now', '-7 days') THEN 2
+             ELSE 3
+           END ASC,
+           v.ultimo_contato ASC
+         LIMIT 100`
+      )
+      .bind(comunidadeId)
+      .all<{
+        id: number;
+        nome_completo: string;
+        ultimo_contato: string | null;
+        responsavel: string | null;
+        categoria: string | null;
+        categoria_id: number | null;
+      }>();
+
+    if (ferramenta === "cadencia-avancada") {
+      const agora = new Date();
+      const cadenciaAvancada = (result.results || []).map((v) => {
+        const ultimo = v.ultimo_contato ? new Date(v.ultimo_contato) : null;
+        const diasSemContato = ultimo
+          ? Math.floor((agora.getTime() - ultimo.getTime()) / (1000 * 60 * 60 * 24))
+          : 999;
+
+        let prioridade: "urgente" | "alta" | "normal" | "baixa";
+        let sugestao: string;
+
+        if (diasSemContato > 60) {
+          prioridade = "urgente";
+          sugestao = "Contato urgente — mais de 2 meses sem comunicação";
+        } else if (diasSemContato > 30) {
+          prioridade = "alta";
+          sugestao = "Contato necessário — considere uma ligação ou visita";
+        } else if (diasSemContato > 7) {
+          prioridade = "normal";
+          sugestao = "Contato agendado — envie mensagem ou confirme presença";
+        } else {
+          prioridade = "baixa";
+          sugestao = "Contato recente — mantenha comunicação";
+        }
+
+        return {
+          id: v.id,
+          nome_completo: v.nome_completo,
+          ultimo_contato: v.ultimo_contato,
+          dias_sem_contato: diasSemContato,
+          categoria: v.categoria,
+          responsavel: v.responsavel,
+          prioridade,
+          sugestao,
+        };
+      });
+
+      return Response.json({
+        ferramenta: "cadencia-avancada",
+        dados: cadenciaAvancada,
       });
     }
   }
