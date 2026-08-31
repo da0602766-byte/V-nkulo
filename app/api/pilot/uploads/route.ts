@@ -1,12 +1,14 @@
-import { getRuntimeEnv } from "../../../../db/runtime-env";
 import { getD1 } from "../../../../db";
 import { getSessionUser } from "../../../lib/local-auth";
 import { canManageMinistry } from "../../../lib/ministry-access";
 import { getActiveTenantContext } from "../../../lib/tenant";
+import { UPLOAD_PURPOSES } from "../../../lib/upload-key-policy.mjs";
 import {
-  getUploadOwnerSegment,
-  UPLOAD_PURPOSES,
-} from "../../../lib/upload-key-policy.mjs";
+  ensurePersonalDriveStorage,
+  getDriveAccessToken,
+  makeStorageReference,
+  uploadDriveFile,
+} from "../../../lib/google-integration";
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const IMAGE_TYPES = new Map([
@@ -93,37 +95,66 @@ export async function POST(request: Request) {
       { status: 415 },
     );
   }
-  const bucket = getRuntimeEnv().BUCKET;
-  if (!bucket) {
+  const preference = await getD1().prepare(
+    "SELECT provider FROM storage_preferences WHERE usuario_id = ? LIMIT 1",
+  ).bind(user.id).first<{ provider: string }>();
+  if (preference?.provider !== "GOOGLE_DRIVE") {
     return Response.json(
-      { error: "O armazenamento de imagens ainda não está disponível." },
-      { status: 503 },
+      {
+        error:
+          "Esta imagem está configurada para ficar somente neste aparelho. Para compartilhá-la nesta área, conecte o Google Drive em Minha conta.",
+      },
+      { status: 409 },
     );
   }
-  const key = [
-    "images",
-    purpose,
-    getUploadOwnerSegment(purpose, {
-      userId: user.id,
-      ministryId: resourceId,
-      communityId: context?.comunidadeId || 0,
-    }),
-    `${crypto.randomUUID()}.${extension}`,
-  ].join("/");
-  await bucket.put(key, bytes.buffer, {
-    httpMetadata: { contentType: file.type, cacheControl: "public, max-age=31536000, immutable" },
-    customMetadata: {
-      uploadedBy: String(user.id),
-      communityId: String(context?.comunidadeId || 0),
-      purpose,
-    },
-  });
-  return Response.json({
-    url: `/api/pilot/uploads/${key}`,
-    name: file.name.slice(0, 160),
-    size: file.size,
-    type: file.type,
-  });
+  const personal = purpose === "profile-photo" || isPlatformAsset;
+  let driveOwnerId = user.id;
+  let folderId = "";
+  if (personal) {
+    const accessToken = await getDriveAccessToken(user.id);
+    folderId = (await ensurePersonalDriveStorage(user.id, accessToken)).mediaFolderId;
+  } else {
+    if (!context) {
+      return Response.json({ error: "Selecione uma comunidade para guardar esta imagem." }, { status: 409 });
+    }
+    const storage = await getD1().prepare(
+      `SELECT proprietario_usuario_id, pasta_midias_id
+       FROM community_drive_storage WHERE comunidade_id = ? LIMIT 1`,
+    ).bind(context.comunidadeId).first<{ proprietario_usuario_id: number; pasta_midias_id: string }>();
+    if (!storage) {
+      return Response.json(
+        { error: "A administração ainda precisa ativar a pasta Google Drive desta comunidade." },
+        { status: 409 },
+      );
+    }
+    driveOwnerId = storage.proprietario_usuario_id;
+    folderId = storage.pasta_midias_id;
+  }
+  try {
+    const accessToken = await getDriveAccessToken(driveOwnerId);
+    const stored = await uploadDriveFile(accessToken, {
+      name: `${purpose}-${crypto.randomUUID()}.${extension}`,
+      type: file.type,
+      bytes,
+      parentId: folderId,
+      properties: {
+        purpose,
+        uploadedBy: String(user.id),
+        communityId: String(context?.comunidadeId || 0),
+      },
+    });
+    const scope = personal && purpose === "profile-photo" ? "profile" : "public";
+    const reference = await makeStorageReference(scope, driveOwnerId, stored.id);
+    return Response.json({
+      url: `/api/storage/media/${reference}`,
+      name: file.name.slice(0, 160),
+      size: file.size,
+      type: file.type,
+      storage: "GOOGLE_DRIVE",
+    });
+  } catch (error) {
+    return Response.json({ error: (error as Error).message }, { status: 409 });
+  }
 }
 
 function hasValidImageSignature(bytes: Uint8Array, type: string) {

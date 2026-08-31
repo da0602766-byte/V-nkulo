@@ -3,7 +3,7 @@
 import { FormEvent, useState } from "react";
 import PdfComposer from "./PdfComposer";
 import NewsInteractions from "./NewsInteractions";
-import { prepareImageDataUrl } from "../lib/client-image";
+import { saveImageOutsidePlatform } from "../lib/media-upload-client";
 
 export type PortalData = {
   avisos: Record<string, unknown>[];
@@ -352,7 +352,7 @@ export default function PortalModules({
         ) as HTMLInputElement
       ).files?.[0];
       let imagem = String(form.get("imagem") || "").trim();
-      if (file) imagem = await prepareImageDataUrl(file);
+      if (file) imagem = (await saveImageOutsidePlatform(file, "post-image")).url;
       else if (form.get("removerImagem") === "on") imagem = "";
       else if (!imagem && selectedItem?.imagem)
         imagem = String(selectedItem.imagem);
@@ -1273,7 +1273,9 @@ export default function PortalModules({
                               const file = event.target.files?.[0];
                               if (!file) return;
                               try {
-                                updateModuleBlock(block.id, { imagem: await prepareImageDataUrl(file) });
+                                updateModuleBlock(block.id, {
+                                  imagem: (await saveImageOutsidePlatform(file, "post-image")).url,
+                                });
                               } catch (error) {
                                 notify((error as Error).message);
                               }

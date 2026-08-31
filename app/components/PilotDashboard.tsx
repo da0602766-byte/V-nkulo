@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "./StableLink";
+import dynamic from "next/dynamic";
 import { type CSSProperties, FormEvent, useEffect, useMemo, useState } from "react";
 import type { PilotFeatureState } from "../lib/pilot-data";
 import type { TenantContext, TenantMembership } from "../lib/tenant";
@@ -11,28 +12,32 @@ import {
 import CommunityAdminWorkspace, {
   type CommunityManagementView,
 } from "./CommunityAdminWorkspace";
-import CommunityLifecycleWorkspace from "./CommunityLifecycleWorkspace";
 import CommunityHome from "./CommunityHome";
-import AccountProfileWorkspace from "./AccountProfileWorkspace";
-import EventsWorkspace from "./EventsWorkspace";
 import GlobalVisualEditor from "./GlobalVisualEditor";
-import SecretaryMinisterialWorkspace from "./SecretaryMinisterialWorkspace";
-import NetworkWorkspace from "./NetworkWorkspace";
-import ParkingWorkspace from "./ParkingWorkspace";
-import PeopleWorkspace from "./PeopleWorkspace";
 import PilotNotificationCenter, {
   type NotificationUnreadSummary,
 } from "./PilotNotificationCenter";
-import PrivateChatWorkspace from "./PrivateChatWorkspace";
-import RequestsWorkspace from "./RequestsWorkspace";
 import ThemeControl from "./ThemeControl";
-import { CellsWorkspace, VisitorsWorkspace } from "./TenantOperations";
-import LeadershipWorkspace from "./LeadershipWorkspace";
 import WorkspaceErrorBoundary from "./WorkspaceErrorBoundary";
 import VerifiedOwnerName from "./VerifiedOwnerName";
 import TemporaryAccessWatcher from "./TemporaryAccessWatcher";
 import CloseDetailsOnOutside from "./CloseDetailsOnOutside";
 import EditorialSidebarSchedule from "./EditorialSidebarSchedule";
+
+const moduleLoading = () => <section className="workspace-module-loading" aria-busy="true" role="status"><span className="pilot-loading-spinner" aria-hidden="true" /><strong>Carregando esta área…</strong><small>Somente o necessário para esta tela está sendo preparado.</small></section>;
+const AccountProfileWorkspace = dynamic(() => import("./AccountProfileWorkspace"), { loading: moduleLoading });
+const CommunityLifecycleWorkspace = dynamic(() => import("./CommunityLifecycleWorkspace"), { loading: moduleLoading });
+const DayThreadWorkspace = dynamic(() => import("./DayThreadWorkspace"), { loading: moduleLoading });
+const EventsWorkspace = dynamic(() => import("./EventsWorkspace"), { loading: moduleLoading });
+const LeadershipWorkspace = dynamic(() => import("./LeadershipWorkspace"), { loading: moduleLoading });
+const NetworkWorkspace = dynamic(() => import("./NetworkWorkspace"), { loading: moduleLoading });
+const ParkingWorkspace = dynamic(() => import("./ParkingWorkspace"), { loading: moduleLoading });
+const PeopleWorkspace = dynamic(() => import("./PeopleWorkspace"), { loading: moduleLoading });
+const PrivateChatWorkspace = dynamic(() => import("./PrivateChatWorkspace"), { loading: moduleLoading });
+const RequestsWorkspace = dynamic(() => import("./RequestsWorkspace"), { loading: moduleLoading });
+const SecretaryMinisterialWorkspace = dynamic(() => import("./SecretaryMinisterialWorkspace"), { loading: moduleLoading });
+const CellsWorkspace = dynamic(() => import("./TenantOperations").then((module) => module.CellsWorkspace), { loading: moduleLoading });
+const VisitorsWorkspace = dynamic(() => import("./TenantOperations").then((module) => module.VisitorsWorkspace), { loading: moduleLoading });
 
 type FeedItem = {
   id: number;
@@ -54,6 +59,7 @@ type CommunityProfile = {
 };
 type View =
   | "inicio"
+  | "fio"
   | "eventos"
   | "ministerios"
   | "visitantes"
@@ -71,20 +77,22 @@ type View =
   | "solicitacoes"
   | "mensagens"
   | "conta";
-const MENU: { id: View; label: string; permission: string; symbol: string }[] = [
-  { id: "inicio", label: "Início", permission: "dashboard.view", symbol: "◇" },
-  { id: "eventos", label: "Agenda", permission: "events.view", symbol: "▣" },
-  { id: "ministerios", label: "Ministérios", permission: "ministries.view", symbol: "✣" },
-  { id: "solicitacoes", label: "Pedidos", permission: "dashboard.view", symbol: "♡" },
-  { id: "visitantes", label: "Visitantes", permission: "visitors.view", symbol: "◎" },
-  { id: "celulas", label: "Células", permission: "cells.view", symbol: "⬡" },
-  { id: "estacionamento", label: "Estacionamento", permission: "parking.view", symbol: "▣" },
-  { id: "redes", label: "Redes e unidades", permission: "networks.view", symbol: "⌘" },
-  { id: "membro", label: "Painel do membro", permission: "dashboard.view", symbol: "○" },
-  { id: "lider", label: "Painel de liderança", permission: "leadership.panel.view", symbol: "△" },
-  { id: "pessoas", label: "Pessoas", permission: "people.view", symbol: "♙" },
-  { id: "comunidade", label: "Configurações", permission: "dashboard.view", symbol: "□" },
-  { id: "continuidade", label: "Continuidade", permission: "community.lifecycle.request", symbol: "↻" },
+type NavigationFocus = { anchor?: string; event?: string };
+const MENU: { id: View; label: string; permission: string }[] = [
+  { id: "inicio", label: "Início", permission: "dashboard.view" },
+  { id: "fio", label: "Fio do dia", permission: "dashboard.view" },
+  { id: "eventos", label: "Agenda", permission: "events.view" },
+  { id: "ministerios", label: "Ministérios", permission: "ministries.view" },
+  { id: "solicitacoes", label: "Pedidos", permission: "dashboard.view" },
+  { id: "visitantes", label: "Visitantes", permission: "visitors.view" },
+  { id: "celulas", label: "Células", permission: "cells.view" },
+  { id: "estacionamento", label: "Estacionamento", permission: "parking.view" },
+  { id: "redes", label: "Redes e unidades", permission: "networks.view" },
+  { id: "membro", label: "Painel do membro", permission: "dashboard.view" },
+  { id: "lider", label: "Painel de liderança", permission: "leadership.panel.view" },
+  { id: "pessoas", label: "Pessoas", permission: "people.view" },
+  { id: "comunidade", label: "Configurações", permission: "dashboard.view" },
+  { id: "continuidade", label: "Continuidade", permission: "community.lifecycle.request" },
 ];
 const COMMUNITY_MANAGEMENT_VIEWS: CommunityManagementView[] = [
   "membro",
@@ -137,12 +145,20 @@ function PersonalizationControls({
   onDecrease,
   onReset,
   onIncrease,
+  glassOpacity,
+  onGlassOpacityChange,
+  dataSaver,
+  onDataSaverChange,
 }: {
   userEmail: string;
   fontScale: number;
   onDecrease: () => void;
   onReset: () => void;
   onIncrease: () => void;
+  glassOpacity: number;
+  onGlassOpacityChange: (value: number) => void;
+  dataSaver: boolean;
+  onDataSaverChange: (value: boolean) => void;
 }) {
   return (
     <div className="account-personalization-v4" role="group" aria-label="Aparência individual">
@@ -158,6 +174,16 @@ function PersonalizationControls({
         <button type="button" onClick={onIncrease} disabled={fontScale >= MAX_FONT_SCALE} aria-label="Aumentar todo o sistema" title="Aumentar">
           <MagnifierIcon operation="plus" />
         </button>
+      </div>
+      <div className="account-surface-preferences">
+        <label>
+          <span>Intensidade do vidro <b>{glassOpacity}%</b></span>
+          <input type="range" min="45" max="88" step="1" value={glassOpacity} onChange={(event) => onGlassOpacityChange(Number(event.target.value))} />
+        </label>
+        <label className="account-data-saver">
+          <input type="checkbox" checked={dataSaver} onChange={(event) => onDataSaverChange(event.target.checked)} />
+          <span><strong>Economizar dados</strong><small>Imagens leves e menos animações</small></span>
+        </label>
       </div>
     </div>
   );
@@ -201,6 +227,8 @@ export default function PilotDashboard({
   const [viewLoading, setViewLoading] = useState(false);
   const [fontScale, setFontScale] = useState(1);
   const [fontScaleHydrated, setFontScaleHydrated] = useState(false);
+  const [glassOpacity, setGlassOpacity] = useState(62);
+  const [dataSaver, setDataSaver] = useState(false);
   const [inviteMessage, setInviteMessage] = useState("");
   const [inviteLink, setInviteLink] = useState("");
   const [inviteLoading, setInviteLoading] = useState(false);
@@ -244,6 +272,9 @@ export default function PilotDashboard({
         if (Number.isFinite(saved)) {
           setFontScale(Math.min(MAX_FONT_SCALE, Math.max(MIN_FONT_SCALE, Math.round(saved * 100) / 100)));
         }
+        const savedGlass = Number(window.localStorage.getItem("vinkulo:glass-opacity"));
+        if (Number.isFinite(savedGlass) && savedGlass >= 45 && savedGlass <= 88) setGlassOpacity(savedGlass);
+        setDataSaver(window.localStorage.getItem("vinkulo:data-saver") === "true");
       } catch {
         // Mantém o tamanho padrão quando a preferência local não está disponível.
       } finally {
@@ -260,16 +291,21 @@ export default function PilotDashboard({
     root.style.setProperty("--vinkulo-ui-scale", String(fontScale));
     root.style.setProperty("--vinkulo-ui-scale-inverse", String(1 / fontScale));
     root.dataset.vinkuloScale = fontScale > 1 ? "ampliado" : fontScale < 1 ? "reduzido" : "normal";
+    root.style.setProperty("--vinkulo-glass-alpha", String(glassOpacity / 100));
+    root.dataset.dataSaver = dataSaver ? "true" : "false";
     try {
       window.localStorage.setItem(
         `vinkulo:font-scale:${userEmail.trim().toLowerCase()}`,
         String(fontScale),
       );
       window.localStorage.setItem("vinkulo:font-scale", String(fontScale));
+      window.localStorage.setItem("vinkulo:glass-opacity", String(glassOpacity));
+      window.localStorage.setItem("vinkulo:data-saver", String(dataSaver));
     } catch {
       // A preferência continua ativa na sessão atual.
     }
-  }, [fontScale, fontScaleHydrated, userEmail]);
+    window.dispatchEvent(new CustomEvent("vinkulo:network-mode"));
+  }, [dataSaver, fontScale, fontScaleHydrated, glassOpacity, userEmail]);
 
   function changeFontScale(delta: number) {
     setFontScale((current) => Math.min(MAX_FONT_SCALE, Math.max(MIN_FONT_SCALE, Math.round((current + delta) * 100) / 100)));
@@ -328,16 +364,24 @@ export default function PilotDashboard({
   );
   const sidebarGroups = useMemo(() => {
     const byId = new Map(allowedMenu.map((item) => [item.id, item]));
-    const makeItem = (id: View, label?: string, key?: string) => {
+    const makeItem = (
+      id: View,
+      label?: string,
+      key?: string,
+      focus?: NavigationFocus,
+    ) => {
       const item = byId.get(id);
-      return item ? { ...item, label: label || item.label, key: key || item.id } : null;
+      return item
+        ? { ...item, label: label || item.label, key: key || item.id, focus }
+        : null;
     };
     return [
       {
-        label: "Principal",
+        label: "Dia",
         items: [
+          makeItem("fio", "Fio do dia"),
           makeItem("inicio", "Início"),
-          makeItem("inicio", "Mural", "mural"),
+          makeItem("inicio", "Mural", "mural", { anchor: "mural" }),
           makeItem("eventos", "Agenda"),
         ].filter(Boolean),
       },
@@ -346,7 +390,9 @@ export default function PilotDashboard({
         items: [
           makeItem("pessoas", "Pessoas"),
           makeItem("ministerios", "Ministérios"),
-          makeItem("ministerios", "Escalas", "escalas"),
+          makeItem("ministerios", "Escalas", "escalas", {
+            event: "vinkulo:open-schedules",
+          }),
           makeItem("visitantes", "Visitantes"),
           makeItem("solicitacoes", "Pedidos"),
           makeItem("estacionamento", "Estacionamento"),
@@ -399,7 +445,7 @@ export default function PilotDashboard({
               ? {
                   label: "Novo visitante",
                   description: "Abrir cadastro de visitante",
-                  symbol: "◎",
+                  icon: "visitantes" as MenuIconId,
                   view: "visitantes" as View,
                   event: "vinkulo:new-visitor",
                 }
@@ -408,7 +454,7 @@ export default function PilotDashboard({
               ? {
                   label: "Estacionamento",
                   description: "Entrada, saída ou ocorrência",
-                  symbol: "P",
+                  icon: "estacionamento" as MenuIconId,
                   view: "estacionamento" as View,
                   event: "vinkulo:parking-action",
                 }
@@ -417,7 +463,7 @@ export default function PilotDashboard({
               ? {
                   label: "Novo evento",
                   description: "Criar evento da comunidade",
-                  symbol: "▣",
+                  icon: "eventos" as MenuIconId,
                   view: "eventos" as View,
                   event: "vinkulo:new-event",
                 }
@@ -426,7 +472,7 @@ export default function PilotDashboard({
               ? {
                   label: "Nova escala",
                   description: "Criar escala ministerial",
-                  symbol: "≡",
+                  icon: "escalas" as MenuIconId,
                   view: "ministerios" as View,
                   event: "vinkulo:new-schedule",
                 }
@@ -434,14 +480,14 @@ export default function PilotDashboard({
             {
               label: "Oração ou solicitação",
               description: "Enviar pedido com privacidade",
-              symbol: "♡",
+              icon: "solicitacoes" as MenuIconId,
               view: "solicitacoes" as View,
               event: "vinkulo:new-request",
             },
           ].filter(Boolean) as {
             label: string;
             description: string;
-            symbol: string;
+            icon: MenuIconId;
             view: View;
             event: string;
           }[],
@@ -596,14 +642,30 @@ export default function PilotDashboard({
       ? view
       : "inicio";
 
-  function openView(nextView: View) {
+  function openView(nextView: View, focus?: NavigationFocus) {
     if (nextView === "visual-editor") {
       setMobileMenu(null);
       window.dispatchEvent(new CustomEvent("vinkulo:open-visual-editor"));
       return;
     }
+    // "Mural" e "Escalas" apontam para a mesma view que "Início" e
+    // "Ministérios". Sem um destino próprio os quatro itens levavam ao mesmo
+    // lugar, e dois deles mentiam sobre onde iam parar. O foco resolve isso
+    // sem duplicar view: leva à seção certa depois que a tela monta.
+    if (focus) {
+      window.setTimeout(() => {
+        if (focus.event) {
+          window.dispatchEvent(new CustomEvent(focus.event));
+          return;
+        }
+        document
+          .getElementById(focus.anchor as string)
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 220);
+    }
     setViewLoading(true);
     setView(nextView);
+    rememberRecentView(nextView);
     const address = new URL(window.location.href);
     address.searchParams.set("view", nextView);
     if (new URL(window.location.href).searchParams.get("view") !== nextView) {
@@ -625,6 +687,7 @@ export default function PilotDashboard({
 
   function runQuickAction(action: (typeof quickActions)[number]) {
     setView(action.view);
+    rememberRecentView(action.view);
     const address = new URL(window.location.href);
     address.searchParams.set("view", action.view);
     window.history.pushState(
@@ -856,7 +919,7 @@ export default function PilotDashboard({
                   </nav>
                 </details>
               )}
-              <PersonalizationControls userEmail={userEmail} fontScale={fontScale} onDecrease={() => changeFontScale(-0.05)} onReset={() => setFontScale(1)} onIncrease={() => changeFontScale(0.05)} />
+              <PersonalizationControls userEmail={userEmail} fontScale={fontScale} onDecrease={() => changeFontScale(-0.05)} onReset={() => setFontScale(1)} onIncrease={() => changeFontScale(0.05)} glassOpacity={glassOpacity} onGlassOpacityChange={setGlassOpacity} dataSaver={dataSaver} onDataSaverChange={setDataSaver} />
               <button type="button" onClick={() => openView("conta")}>Minha conta</button>
               {active.isOwner && <Link href="/proprietario">Área do proprietário</Link>}
               <Link href={`/comunidades/${active.comunidadeSlug}`}>Página pública</Link>
@@ -1033,7 +1096,7 @@ export default function PilotDashboard({
                     key={item.key}
                     data-editor-key={`menu-principal-${item.key}`}
                     className={visibleView === item.id ? "active" : ""}
-                    onClick={() => openView(item.id)}
+                    onClick={() => openView(item.id, item.focus)}
                     aria-label={item.label}
                     title={item.label}
                   >
@@ -1102,6 +1165,9 @@ export default function PilotDashboard({
               readOnlyFeed={active.communityAccess === "FEED_ONLY"}
             />
           )}
+          {visibleView === "fio" && !accessDeniedView && (
+            <DayThreadWorkspace permissions={active.permissions} />
+          )}
           {visibleView === "visitantes" && (
             <VisitorsWorkspace
               permissions={active.permissions}
@@ -1156,19 +1222,21 @@ export default function PilotDashboard({
           {visibleView === "comunidade" && (
             <section className="community-central-workspace">
               <header className="workspace-heading"><div><p className="pilot-kicker">GESTÃO DA COMUNIDADE</p><h1>Central da comunidade</h1><p>Pessoas, liderança, continuidade, solicitações e preferências reunidas no contexto da comunidade ativa.</p></div></header>
-              {active.permissions.includes("invites.manage") && (
-                <>
-                  <form className="pilot-form invite-generator" onSubmit={createInvite}>
-                    <label>E-mail da pessoa<input name="email" type="email" required autoComplete="off" /></label>
-                    <label>Perfil<select name="papel" value="MEMBRO" disabled><option value="MEMBRO">Membro</option></select></label>
-                    <button disabled={inviteLoading}>{inviteLoading ? "Criando…" : "Criar convite"}</button>
-                  </form>
-                  {inviteMessage && <p className="pilot-form-message" role="status">{inviteMessage}</p>}
-                  {inviteLink && <div className="invite-result"><label>Link individual<input readOnly value={inviteLink} onFocus={(event) => event.currentTarget.select()} /></label><button onClick={() => navigator.clipboard.writeText(inviteLink)}>Copiar link</button></div>}
-                  <div className="sensitive-action-note"><strong>Perfis privilegiados bloqueados</strong><p>Convites para líderes, pastores ou administradores exigirão MFA, reautenticação e revisão.</p></div>
-                </>
-              )}
               <CommunityAdminWorkspace
+                accessSlot={
+                  active.permissions.includes("invites.manage") ? (
+                    <>
+                      <form className="pilot-form invite-generator" onSubmit={createInvite}>
+                        <label>E-mail da pessoa<input name="email" type="email" required autoComplete="off" /></label>
+                        <label>Perfil<select name="papel" value="MEMBRO" disabled><option value="MEMBRO">Membro</option></select></label>
+                        <button disabled={inviteLoading}>{inviteLoading ? "Criando…" : "Criar convite"}</button>
+                      </form>
+                      {inviteMessage && <p className="pilot-form-message" role="status">{inviteMessage}</p>}
+                      {inviteLink && <div className="invite-result"><label>Link individual<input readOnly value={inviteLink} onFocus={(event) => event.currentTarget.select()} /></label><button onClick={() => navigator.clipboard.writeText(inviteLink)}>Copiar link</button></div>}
+                      <div className="sensitive-action-note"><strong>Perfis privilegiados bloqueados</strong><p>Convites para líderes, pastores ou administradores exigirão MFA, reautenticação e revisão.</p></div>
+                    </>
+                  ) : null
+                }
                 managementItems={communityManagementItems}
                 onOpenManagementView={(nextView) => openView(nextView)}
                 canManageCommunity={active.permissions.includes(
@@ -1350,7 +1418,7 @@ export default function PilotDashboard({
                     key={action.label}
                     onClick={() => runQuickAction(action)}
                   >
-                    <span aria-hidden="true">{action.symbol}</span>
+                    <span aria-hidden="true"><MenuIcon id={action.icon} /></span>
                     <div>
                       <strong>{action.label}</strong>
                       <small>{action.description}</small>
@@ -1422,7 +1490,7 @@ export default function PilotDashboard({
                     Abrir seletor de ministérios
                   </button>
                 </details>
-                <PersonalizationControls userEmail={userEmail} fontScale={fontScale} onDecrease={() => changeFontScale(-0.05)} onReset={() => setFontScale(1)} onIncrease={() => changeFontScale(0.05)} />
+                <PersonalizationControls userEmail={userEmail} fontScale={fontScale} onDecrease={() => changeFontScale(-0.05)} onReset={() => setFontScale(1)} onIncrease={() => changeFontScale(0.05)} glassOpacity={glassOpacity} onGlassOpacityChange={setGlassOpacity} dataSaver={dataSaver} onDataSaverChange={setDataSaver} />
                 <Link href={`/comunidades/${active.comunidadeSlug}`}>Ver página pública</Link>
                 <a className="pilot-mobile-logout" href="/api/auth/logout">Sair da plataforma</a>
               </div>
@@ -1441,6 +1509,16 @@ export default function PilotDashboard({
   );
 }
 
+function rememberRecentView(view: View) {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem("vinkulo:recent-views") || "[]") as unknown;
+    const current = Array.isArray(saved) ? saved.filter((item): item is string => typeof item === "string" && item !== view) : [];
+    window.localStorage.setItem("vinkulo:recent-views", JSON.stringify([view, ...current].slice(0, 5)));
+  } catch {
+    // A navegação não depende do armazenamento local.
+  }
+}
+
 function getInitials(name: string) {
   return name
     .trim()
@@ -1455,6 +1533,7 @@ type MenuIconId = View | "mural" | "escalas";
 function MenuIcon({ id }: { id: MenuIconId }) {
   const paths: Partial<Record<MenuIconId, string>> = {
     inicio: "M3 11.5 12 4l9 7.5v8a1.5 1.5 0 0 1-1.5 1.5h-5v-6h-5v6h-5A1.5 1.5 0 0 1 3 19.5v-8Z",
+    fio: "M6 5h.01M6 12h.01M6 19h.01M11 5h9M11 12h9M11 19h6",
     eventos: "M5 4h14a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm0 6h14M8 2v4m8-4v4",
     ministerios: "M12 3v18m-7-9h14M7 7h10v10H7z",
     escalas: "M7 4h10v3H7V4Zm-2 2h14v15H5V6Zm3 6 2 2 4-4m-6 7h7",

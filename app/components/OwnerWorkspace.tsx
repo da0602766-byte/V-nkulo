@@ -400,9 +400,23 @@ export default function OwnerWorkspace({
               <button type="button" onClick={() => setTab("requests")}><span>◫</span> Revisar solicitações {pending.length > 0 && <b>{pending.length}</b>}</button>
               <button type="button" onClick={() => setTab("feedback")}><span>!</span> Feedback {pendingFeedback.length > 0 && <b>{pendingFeedback.length}</b>}</button>
               <button type="button" onClick={() => setTab("communities")}><span>◇</span> Abrir comunidades</button>
-              <details className="owner-scope-note"><summary>Escopo global</summary><p>Esta área independe da comunidade ativa e valida cada ação no servidor.</p></details>
             </div>
           </header>
+          {/* A nota de escopo vivia dentro de um <details> fechado: era preciso
+              clicar para descobrir que se está agindo sobre a plataforma
+              inteira. Aqui ela é permanente, porque saber em que camada a ação
+              cai não é detalhe opcional. */}
+          <p className="owner-scope-banner-v5" role="note">
+            <span aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2.8 19.4 6v5.9c0 4.5-3 8.2-7.4 9.3-4.4-1.1-7.4-4.8-7.4-9.3V6L12 2.8Z" />
+                <path d="m8.9 11.9 2.2 2.2 4.2-4.3" />
+              </svg>
+            </span>
+            <b>Escopo global</b>
+            Tudo aqui alcança a plataforma inteira, fora do contexto de qualquer
+            comunidade, e fica registrado na auditoria com o seu nome.
+          </p>
           {message && <p className="operations-feedback" role="status">{message}</p>}
           {loading && !data ? <div className="owner-loading">Carregando controles globais…</div> : null}
 

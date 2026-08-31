@@ -10,7 +10,7 @@ import TextBoxes from "./TextBoxes";
 import ChurchServicesModule from "./ChurchServicesModule";
 import DisplayMessageBanner, { type DisplayMessageItem } from "./DisplayMessageBanner";
 import ScheduledMessagesManager from "./ScheduledMessagesManager";
-import { prepareImageDataUrl } from "../lib/client-image";
+import { saveImageOutsidePlatform } from "../lib/media-upload-client";
 
 type AppUser = {
   id: number;
@@ -853,7 +853,9 @@ export default function AdoteDashboard({
       event.currentTarget.elements.namedItem("foto") as HTMLInputElement
     ).files?.[0];
     try {
-      const fotoPerfil = file ? await prepareImageDataUrl(file) : profile.foto_perfil;
+      const fotoPerfil = file
+        ? (await saveImageOutsidePlatform(file, "profile-photo")).url
+        : profile.foto_perfil;
       const result = await api("/api/perfil", {
         method: "PATCH",
         body: JSON.stringify({
@@ -918,7 +920,7 @@ export default function AdoteDashboard({
     let loginLogo: FormDataEntryValue | string | null;
     try {
       loginLogo = loginLogoFile
-        ? await prepareImageDataUrl(loginLogoFile)
+        ? (await saveImageOutsidePlatform(loginLogoFile, "login-logo")).url
         : form.get("loginLogo");
     } catch (error) {
       notify((error as Error).message);

@@ -1,14 +1,8 @@
 import { getD1 } from "../../../../../db";
-import { getRuntimeEnv } from "../../../../../db/runtime-env";
 import { getMemberRegistrationForm } from "../../../../lib/member-registration";
 import { createFirstAccessToken, generateTemporaryPassword, hashPassword } from "../../../../lib/local-auth";
 
 type Context = { params: Promise<{ token: string }> };
-const IMAGE_TYPES = new Map([
-  ["image/jpeg", "jpg"],
-  ["image/png", "png"],
-  ["image/webp", "webp"],
-]);
 const DAY_VALUES = new Set(["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"]);
 const PERIOD_VALUES = new Set(["MANHA", "TARDE", "NOITE", "FLEXIVEL"]);
 
@@ -113,35 +107,7 @@ export async function POST(request: Request, context: Context) {
     if (value) customAnswers[field.id] = value;
   }
 
-  const photo = form.get("photo");
-  let photoUrl = "";
-  if (photo instanceof File && photo.size > 0) {
-    const extension = IMAGE_TYPES.get(photo.type);
-    if (!extension || photo.size > 8 * 1024 * 1024) {
-      return Response.json(
-        { error: "A foto deve ser JPG, PNG ou WebP e ter no máximo 8 MB." },
-        { status: 415 },
-      );
-    }
-    const bytes = new Uint8Array(await photo.arrayBuffer());
-    if (!hasValidImageSignature(bytes, photo.type)) {
-      return Response.json({ error: "O arquivo enviado não é uma foto válida." }, { status: 415 });
-    }
-    const bucket = getRuntimeEnv().BUCKET;
-    if (!bucket) {
-      return Response.json({ error: "O envio de foto está temporariamente indisponível." }, { status: 503 });
-    }
-    const key = `images/member-registration-photo/${community.id}/${crypto.randomUUID()}.${extension}`;
-    await bucket.put(key, bytes.buffer, {
-      httpMetadata: { contentType: photo.type, cacheControl: "private, max-age=3600" },
-      customMetadata: {
-        communityId: String(community.id),
-        registrationLinkId: String(registration.id),
-        purpose: "member-registration-photo",
-      },
-    });
-    photoUrl = `/api/pilot/uploads/${key}`;
-  }
+  const photoUrl = "";
 
   const temporaryPassword = generateTemporaryPassword();
   const passwordData = await hashPassword(temporaryPassword);

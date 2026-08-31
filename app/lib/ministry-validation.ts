@@ -150,9 +150,8 @@ export function parseMinistryAssetUrl(
   const url = cleanText(value, 600);
   if (!url) return { value: "" } as const;
   if (
-    !/^\/api\/pilot\/uploads\/images\/ministry-banner\/ministry-\d+\/[0-9a-f-]+\.(jpg|png|webp)$/i.test(
-      url,
-    )
+    !/^\/api\/pilot\/uploads\/images\/ministry-banner\/ministry-\d+\/[0-9a-f-]+\.(jpg|png|webp)$/i.test(url) &&
+    !/^\/api\/storage\/media\/[A-Za-z0-9_.-]+$/i.test(url)
   ) {
     return {
       error: "Use uma imagem enviada pela área do próprio ministério.",

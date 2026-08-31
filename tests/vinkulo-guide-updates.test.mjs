@@ -86,7 +86,7 @@ test("proprietário controla identidade global, comunidades e organização dos 
   assert.match(ownerApi, /normalizeMetricOrder/);
 });
 
-test("portal de acesso oferece tema moderno e redes oficiais sem simular OAuth", async () => {
+test("portal de acesso oferece tema moderno, redes oficiais e Conta Google real", async () => {
   const [config, portal, customization] = await Promise.all([
     source("../app/lib/pilot-login-config.ts"),
     source("../app/components/LoginPortal.tsx"),
@@ -98,7 +98,8 @@ test("portal de acesso oferece tema moderno e redes oficiais sem simular OAuth",
   assert.match(portal, /login-v2-social/);
   assert.match(portal, /data-login-theme/);
   assert.match(customization, /Redes sociais oficiais/);
-  assert.doesNotMatch(portal, /Entrar com Google|Entrar com Apple/);
+  assert.match(portal, /Entrar com Google/);
+  assert.match(portal, /api\/auth\/google\/start/);
 });
 
 test("ajustes operacionais V4.7.4 conectam estacionamento, escalas, pessoas e eventos", async () => {

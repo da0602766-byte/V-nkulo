@@ -1,7 +1,13 @@
 import { getD1 } from "../../../db";
-import { getRuntimeEnv } from "../../../db/runtime-env";
 import { getSessionUser } from "../../lib/local-auth";
 import { getActiveTenantContext } from "../../lib/tenant";
+import {
+  deleteDriveFile,
+  ensurePersonalDriveStorage,
+  getDriveAccessToken,
+  makeStorageReference,
+  uploadDriveFile,
+} from "../../lib/google-integration";
 
 const FEEDBACK_TYPES = new Set(["PROBLEMA", "SUGESTAO", "MELHORIA", "DENUNCIA"]);
 const FEEDBACK_CATEGORIES = new Set([
@@ -65,25 +71,31 @@ export async function POST(request: Request) {
 
   const tenant = await getActiveTenantContext(user);
   const communityId = tenant.context?.comunidadeId || null;
-  const bucket = getRuntimeEnv().BUCKET;
   let imageKey = "";
   let imageName = "";
+  let uploadedDriveFileId = "";
 
   if (hasImage) {
-    if (!bucket) {
-      return Response.json({ error: "O armazenamento de fotos está indisponível." }, { status: 503 });
-    }
     const bytes = new Uint8Array(await image.arrayBuffer());
     if (!validImage(bytes, image.type)) {
       return Response.json({ error: "O arquivo selecionado não é uma imagem válida." }, { status: 415 });
     }
-    const extension = image.type === "image/jpeg" ? "jpg" : image.type === "image/png" ? "png" : "webp";
-    imageKey = `feedback/user-${user.id}/${crypto.randomUUID()}.${extension}`;
-    imageName = image.name.slice(0, 160);
-    await bucket.put(imageKey, bytes.buffer, {
-      httpMetadata: { contentType: image.type, cacheControl: "private, no-store" },
-      customMetadata: { uploadedBy: String(user.id), purpose: "feedback-evidence" },
-    });
+    try {
+      const accessToken = await getDriveAccessToken(user.id);
+      const storage = await ensurePersonalDriveStorage(user.id, accessToken);
+      const stored = await uploadDriveFile(accessToken, {
+        name: `feedback-${crypto.randomUUID()}.${image.type === "image/jpeg" ? "jpg" : image.type === "image/png" ? "png" : "webp"}`,
+        type: image.type,
+        bytes,
+        parentId: storage.mediaFolderId,
+        properties: { purpose: "feedback-evidence", uploadedBy: String(user.id) },
+      });
+      uploadedDriveFileId = stored.id;
+      imageKey = await makeStorageReference("feedback", user.id, stored.id);
+      imageName = image.name.slice(0, 160);
+    } catch (error) {
+      return Response.json({ error: (error as Error).message }, { status: 409 });
+    }
   }
 
   const db = getD1();
@@ -113,7 +125,10 @@ export async function POST(request: Request) {
     ).bind(communityId, user.id, JSON.stringify({ id, tipo, categoria, pagina })).run();
     return Response.json({ ok: true, id, status: "PENDENTE", userName: user.nome });
   } catch (error) {
-    if (imageKey && bucket) await bucket.delete(imageKey).catch(() => undefined);
+    if (uploadedDriveFileId) {
+      const token = await getDriveAccessToken(user.id).catch(() => "");
+      if (token) await deleteDriveFile(token, uploadedDriveFileId).catch(() => undefined);
+    }
     throw error;
   }
 }

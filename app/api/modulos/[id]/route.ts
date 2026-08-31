@@ -8,6 +8,12 @@ export async function PATCH(request: Request, context: Context) {
   if (access.error) return access.error;
   const id = Number((await context.params).id);
   const payload = (await request.json()) as { nome?: string; descricao?: string; icone?: string; campos?: unknown[]; conteudo?: unknown[]; cor?: string; ativo?: boolean };
+  if (/data:(?:image|audio|video|application)\//i.test(JSON.stringify(payload.conteudo ?? null))) {
+    return Response.json(
+      { error: "As imagens precisam estar no Google Drive; o Vínkulo não guarda arquivos no banco." },
+      { status: 400 },
+    );
+  }
   await getD1().prepare(
     "UPDATE ministerio_modulos SET nome = ?, descricao = ?, icone = ?, campos = ?, conteudo = ?, cor = ?, ativo = ? WHERE id = ?",
   ).bind(payload.nome || "Módulo", payload.descricao || null, payload.icone || "◇", JSON.stringify(payload.campos ?? []), JSON.stringify(payload.conteudo ?? []), payload.cor || "#17877f", payload.ativo === false ? 0 : 1, id).run();

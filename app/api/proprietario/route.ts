@@ -1,5 +1,6 @@
 import { getD1 } from "../../../db";
 import { getRuntimeEnv } from "../../../db/runtime-env";
+import { deleteDriveFile, getDriveAccessToken, readStorageReference } from "../../lib/google-integration";
 import { DEFAULT_COMMUNITY_THEME } from "../../lib/community-theme";
 import { getSessionUser, isSystemOwnerAccount } from "../../lib/local-auth";
 import { createSystemNotification } from "../../lib/system-notifications";
@@ -204,9 +205,14 @@ export async function PATCH(request: Request) {
 
     if (action === "FEEDBACK_EXCLUIR") {
       if (item.imagem_chave) {
-        const bucket = getRuntimeEnv().BUCKET;
-        if (!bucket) return Response.json({ error: "O armazenamento da foto está indisponível." }, { status: 503 });
-        await bucket.delete(item.imagem_chave);
+        const reference = await readStorageReference(item.imagem_chave);
+        if (reference?.scope === "feedback" && reference.ownerId === item.usuario_id) {
+          const accessToken = await getDriveAccessToken(reference.ownerId).catch(() => "");
+          if (accessToken) await deleteDriveFile(accessToken, reference.fileId);
+        } else {
+          const bucket = getRuntimeEnv().BUCKET;
+          if (bucket) await bucket.delete(item.imagem_chave);
+        }
       }
       await db.batch([
         db.prepare("DELETE FROM feedback_plataforma WHERE id = ?").bind(feedbackId),

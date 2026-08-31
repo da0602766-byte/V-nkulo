@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import CommunityThemeEditor from "./CommunityThemeEditor";
 import MemberRegistrationLinkManager from "./MemberRegistrationLinkManager";
 
@@ -33,6 +33,7 @@ export default function CommunityAdminWorkspace({
   canManageRequests = false,
   canConfigureParking = false,
   canManageRegistrationLinks = false,
+  accessSlot = null,
 }: {
   managementItems: ManagementItem[];
   onOpenManagementView: (view: CommunityManagementView) => void;
@@ -40,6 +41,7 @@ export default function CommunityAdminWorkspace({
   canManageRequests?: boolean;
   canConfigureParking?: boolean;
   canManageRegistrationLinks?: boolean;
+  accessSlot?: React.ReactNode;
 }) {
   const [requests, setRequests] = useState<JoinRequest[]>([]);
   const [parkingActive, setParkingActive] = useState(false);
@@ -163,8 +165,49 @@ export default function CommunityAdminWorkspace({
     }
   }
 
+  // Configurações era uma página só, com convite, atalhos, aparência,
+  // privacidade, módulos e solicitações empilhados. Agora cada assunto é uma
+  // seção própria: quem vem resolver uma coisa não rola por todas as outras.
+  const secoes = useMemo(
+    () =>
+      [
+        { id: "atalhos" as const, label: "Áreas da comunidade", visivel: true },
+        { id: "aparencia" as const, label: "Aparência", visivel: canManageCommunity },
+        { id: "acessos" as const, label: "Acessos", visivel: canManageRegistrationLinks || Boolean(accessSlot) },
+        { id: "modulos" as const, label: "Módulos", visivel: canConfigureParking },
+        { id: "privacidade" as const, label: "Privacidade", visivel: canManageCommunity },
+        {
+          id: "solicitacoes" as const,
+          label: "Solicitações de entrada",
+          visivel: canManageRequests,
+          contador: requests.filter((item) => item.status === "PENDENTE").length,
+        },
+      ].filter((secao) => secao.visivel),
+    [accessSlot, canConfigureParking, canManageCommunity, canManageRegistrationLinks, canManageRequests, requests],
+  );
+  const [secao, setSecao] = useState<string>("atalhos");
+  const secaoAtiva = secoes.some((item) => item.id === secao) ? secao : "atalhos";
+
   return (
     <div className="community-admin-extra">
+      <nav className="community-settings-nav-v5" aria-label="Assuntos das configurações">
+        {secoes.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className={secaoAtiva === item.id ? "active" : ""}
+            aria-current={secaoAtiva === item.id ? "page" : undefined}
+            onClick={() => setSecao(item.id)}
+          >
+            {item.label}
+            {typeof item.contador === "number" && item.contador > 0 && (
+              <span>{item.contador}</span>
+            )}
+          </button>
+        ))}
+      </nav>
+
+      {secaoAtiva === "atalhos" && (
       <section className="community-management-hub" aria-labelledby="community-management-title">
         <header>
           <div>
@@ -192,10 +235,12 @@ export default function CommunityAdminWorkspace({
           ))}
         </div>
       </section>
+      )}
 
-      {canManageCommunity && (
+      {secaoAtiva === "aparencia" && canManageCommunity && <CommunityThemeEditor />}
+
+      {secaoAtiva === "privacidade" && canManageCommunity && (
         <>
-          <CommunityThemeEditor />
           <section className="community-privacy-control">
             <div>
               <p className="pilot-kicker">PRIVACIDADE DA COMUNIDADE</p>
@@ -211,9 +256,14 @@ export default function CommunityAdminWorkspace({
         </>
       )}
 
-      {canManageRegistrationLinks && <MemberRegistrationLinkManager />}
+      {secaoAtiva === "acessos" && (
+        <>
+          {accessSlot}
+          {canManageRegistrationLinks && <MemberRegistrationLinkManager />}
+        </>
+      )}
 
-      {canConfigureParking && (
+      {secaoAtiva === "modulos" && canConfigureParking && (
         <section className="community-privacy-control parking-module-control">
           <div>
             <p className="pilot-kicker">MÓDULO OFICIAL</p>
@@ -241,7 +291,7 @@ export default function CommunityAdminWorkspace({
         </p>
       )}
 
-      {canManageRequests && <section className="join-requests-panel">
+      {secaoAtiva === "solicitacoes" && canManageRequests && <section className="join-requests-panel">
         <header>
           <div>
             <p className="pilot-kicker">SOLICITAÇÕES DE ENTRADA</p>

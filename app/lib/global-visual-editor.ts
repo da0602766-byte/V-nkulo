@@ -96,7 +96,8 @@ export function parseGlobalVisualConfig(value: unknown): GlobalVisualConfig {
         (
           item.imageUrl === "" ||
           /^https:\/\//i.test(item.imageUrl) ||
-          /^\/api\/pilot\/uploads\/images\/[a-z-]+\/\d+\/[0-9a-f-]+\.(jpg|png|webp)$/i.test(item.imageUrl)
+          /^\/api\/pilot\/uploads\/images\/[a-z-]+\/\d+\/[0-9a-f-]+\.(jpg|png|webp)$/i.test(item.imageUrl) ||
+          /^\/api\/storage\/media\/[A-Za-z0-9_.-]+$/i.test(item.imageUrl)
         )
       ) {
         rule.imageUrl = item.imageUrl.slice(0, 600);

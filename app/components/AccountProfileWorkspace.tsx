@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import NativeImageUpload from "./NativeImageUpload";
+import StoragePrivacyWorkspace from "./StoragePrivacyWorkspace";
 
 type DynamicField = {
   id: string;
@@ -99,6 +100,7 @@ export default function AccountProfileWorkspace({
           </p>
         </div>
       </header>
+      <StoragePrivacyWorkspace />
       <form className="account-profile-form" onSubmit={save}>
         <section className="account-profile-section">
           <header>
@@ -115,7 +117,7 @@ export default function AccountProfileWorkspace({
           <div className="account-profile-grid">
             <label>
               Nome completo
-              <input name="nome" defaultValue={data.account.nome} required />
+              <input name="nome" defaultValue={data.account.nome} required minLength={3} maxLength={120} pattern="[A-Za-zÀ-ÿ' -]{3,120}" autoComplete="name" title="Use apenas letras, espaços, apóstrofo ou hífen." />
             </label>
             <label>
               E-mail
@@ -164,6 +166,10 @@ export default function AccountProfileWorkspace({
                       defaultValue={field.value}
                       placeholder={field.placeholder}
                       required={field.required}
+                      inputMode={field.type === "tel" ? "tel" : field.id.toLowerCase().includes("cep") ? "numeric" : undefined}
+                      autoComplete={field.type === "tel" ? "tel" : field.id.toLowerCase().includes("cep") ? "postal-code" : undefined}
+                      pattern={field.type === "tel" ? "[0-9()+ .-]{10,20}" : field.id.toLowerCase().includes("cep") ? "[0-9. -]{8,10}" : undefined}
+                      maxLength={field.type === "tel" ? 20 : field.id.toLowerCase().includes("cep") ? 10 : undefined}
                     />
                   )}
                 </label>

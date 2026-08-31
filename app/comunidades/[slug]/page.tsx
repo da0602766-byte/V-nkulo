@@ -15,6 +15,26 @@ import {
 
 export const dynamic = "force-dynamic";
 
+// Sem isto toda página pública herda o título do layout, e o perfil de uma
+// comunidade fica indistinguível da home numa aba, num favorito ou no
+// resultado de uma busca.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const community = await getPublicCommunityBySlug(slug);
+  if (!community) return { title: "Comunidade não encontrada | VÍNKULO" };
+  const descricao =
+    community.descricao?.trim() ||
+    `Página pública de ${community.nome}${community.cidade ? ` em ${community.cidade}` : ""}.`;
+  return {
+    title: `${community.nome} | VÍNKULO`,
+    description: descricao.slice(0, 300),
+  };
+}
+
 export default async function PublicCommunityPage({
   params,
 }: {

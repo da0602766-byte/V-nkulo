@@ -20,8 +20,10 @@ function clean(value: unknown, maximum = 250) {
 
 function profilePhoto(value: unknown) {
   const candidate = clean(value, 900);
-  return /^\/api\/pilot\/uploads\/images\/profile-photo\/user-\d+\/[0-9a-f-]+\.(jpg|png|webp)$/i.test(
-    candidate,
+  return (
+    /^\/api\/pilot\/uploads\/images\/profile-photo\/user-\d+\/[0-9a-f-]+\.(jpg|png|webp)$/i.test(candidate) ||
+    /^\/api\/storage\/media\/[A-Za-z0-9_.-]+$/i.test(candidate) ||
+    /^\/local-media\/[0-9a-f-]{36}$/i.test(candidate)
   )
     ? candidate
     : "";

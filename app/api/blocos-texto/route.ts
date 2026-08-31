@@ -14,6 +14,9 @@ export async function POST(request: Request) {
   const payload = await request.json() as { area?: string; posicao?: string; titulo?: string; conteudo?: string; cor?: string; ordem?: number | string };
   const content = String(payload.conteudo || "").trim();
   if (!content) return Response.json({ error: "Digite o conteúdo da caixa de texto." }, { status: 400 });
+  if (/data:(?:image|audio|video|application)\//i.test(content)) {
+    return Response.json({ error: "Arquivos incorporados não são armazenados no Vínkulo." }, { status: 400 });
+  }
   const result = await getD1().prepare(
     "INSERT INTO blocos_texto (area, posicao, titulo, conteudo, cor, ordem, criado_por) VALUES (?, ?, ?, ?, ?, ?, ?)",
   ).bind(cleanArea(payload.area), payload.posicao === "RODAPE" ? "RODAPE" : "TOPO", optional(payload.titulo), content, cleanColor(payload.cor), Number(payload.ordem || 0), access.user!.email).run();

@@ -14,6 +14,8 @@ comunidades e ministérios.
 - Visitantes organizados por categorias configuráveis de cada comunidade.
 - Pedidos de oração e solicitações com públicos direcionados.
 - Conversas privadas otimizadas entre pessoas autorizadas da mesma comunidade.
+- Conta Google opcional, sem criação automática de conta, e autorização separada para o Google Drive.
+- Fotos e arquivos no Google Drive ou somente no aparelho; mensagens privadas criptografadas no Drive comunitário.
 - Automação editorial com política, revisão e agendamento somente para a comunidade escolhida.
 - Temas claro, escuro e automático e interface adaptada para computador e celular.
 - Banco D1 persistente com migrações Drizzle versionadas.
@@ -27,6 +29,7 @@ comunidades e ministérios.
 - Não há processamento de pagamentos.
 - MFA, geração livre por IA e notificações externas dependem de serviços externos.
 - Publicações editoriais automáticas obedecem às políticas e autorizações registradas.
+- Conteúdo novo não é persistido no bucket ou incorporado ao banco; o armazenamento da plataforma fica restrito a referências, preferências e metadados.
 
 O estado técnico e as limitações atuais estão em `ESTADO_DO_PROJETO.md`.
 

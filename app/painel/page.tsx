@@ -11,12 +11,17 @@ import { getCommunityTheme } from "../lib/community-theme";
 
 export const dynamic = "force-dynamic";
 
+// Esta lista precisa acompanhar o tipo View de PilotDashboard. Uma view que
+// existe no menu mas falta aqui é aceita no clique e perdida no recarregamento,
+// porque openView grava ?view= na URL e esta validação a devolve para "inicio".
 const VALID_VIEWS = new Set([
   "inicio",
+  "fio",
   "eventos",
   "ministerios",
   "visitantes",
   "celulas",
+  "diaconia",
   "estacionamento",
   "redes",
   "membro",

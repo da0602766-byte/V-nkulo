@@ -10,6 +10,9 @@ export async function PATCH(request: Request, context: Context) {
   const payload = await request.json() as { area?: string; posicao?: string; titulo?: string; conteudo?: string; cor?: string; ordem?: number | string };
   const content = String(payload.conteudo || "").trim();
   if (!id || !content) return Response.json({ error: "Conteúdo obrigatório." }, { status: 400 });
+  if (/data:(?:image|audio|video|application)\//i.test(content)) {
+    return Response.json({ error: "Arquivos incorporados não são armazenados no Vínkulo." }, { status: 400 });
+  }
   await getD1().prepare(
     "UPDATE blocos_texto SET area = ?, posicao = ?, titulo = ?, conteudo = ?, cor = ?, ordem = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?",
   ).bind(cleanArea(payload.area), payload.posicao === "RODAPE" ? "RODAPE" : "TOPO", optional(payload.titulo), content, cleanColor(payload.cor), Number(payload.ordem || 0), id).run();

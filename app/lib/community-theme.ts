@@ -233,7 +233,10 @@ export function getCommunityPalette(id: CommunityPaletteId) {
 function assetUrl(value: unknown) {
   const candidate = String(value || "").trim().slice(0, 900);
   if (!candidate) return "";
-  if (/^\/api\/pilot\/uploads\/images\/[a-z-]+\/\d+\/[0-9a-f-]+\.(jpg|png|webp)$/i.test(candidate)) {
+  if (
+    /^\/api\/pilot\/uploads\/images\/[a-z-]+\/\d+\/[0-9a-f-]+\.(jpg|png|webp)$/i.test(candidate) ||
+    /^\/api\/storage\/media\/[A-Za-z0-9_.-]+$/i.test(candidate)
+  ) {
     return candidate;
   }
   try {

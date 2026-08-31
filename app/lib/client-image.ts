@@ -1,6 +1,6 @@
 export const MAX_SOURCE_IMAGE_BYTES = 50 * 1024 * 1024;
 
-type ImagePurpose =
+export type ImagePurpose =
   | "community-logo"
   | "community-banner"
   | "ministry-banner"
@@ -40,12 +40,6 @@ export async function prepareImageForUpload(file: File, purpose: ImagePurpose) {
     `${file.name.replace(/\.[^.]+$/, "") || "imagem"}.webp`,
     { type: "image/webp", lastModified: Date.now() },
   );
-}
-
-export async function prepareImageDataUrl(file: File) {
-  validateSourceImage(file);
-  const blob = await convertToWebp(file, 1600, 620_000);
-  return await blobToDataUrl(blob);
 }
 
 function validateSourceImage(file: File) {
@@ -111,13 +105,4 @@ function canvasToBlob(canvas: HTMLCanvasElement, quality: number) {
   return new Promise<Blob | null>((resolve) =>
     canvas.toBlob(resolve, "image/webp", quality),
   );
-}
-
-function blobToDataUrl(blob: Blob) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error("Não foi possível preparar a imagem."));
-    reader.readAsDataURL(blob);
-  });
 }

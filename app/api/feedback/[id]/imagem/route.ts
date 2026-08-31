@@ -1,6 +1,6 @@
 import { getD1 } from "../../../../../db";
-import { getRuntimeEnv } from "../../../../../db/runtime-env";
 import { getSessionUser } from "../../../../lib/local-auth";
+import { getDriveAccessToken, readDriveFile, readStorageReference } from "../../../../lib/google-integration";
 
 export async function GET(
   _request: Request,
@@ -19,11 +19,17 @@ export async function GET(
     return new Response("Acesso não autorizado.", { status: 403 });
   }
 
-  const object = await getRuntimeEnv().BUCKET?.get(item.imagem_chave);
+  const reference = await readStorageReference(item.imagem_chave);
+  if (!reference || reference.scope !== "feedback") {
+    return new Response("Foto não encontrada.", { status: 404 });
+  }
+  const accessToken = await getDriveAccessToken(reference.ownerId).catch(() => "");
+  if (!accessToken) return new Response("Google Drive desconectado.", { status: 409 });
+  const object = await readDriveFile(accessToken, reference.fileId).catch(() => null);
   if (!object) return new Response("Foto não encontrada.", { status: 404 });
   return new Response(object.body, {
     headers: {
-      "Content-Type": object.httpMetadata?.contentType || "application/octet-stream",
+      "Content-Type": object.headers.get("content-type") || "application/octet-stream",
       "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff",
     },
