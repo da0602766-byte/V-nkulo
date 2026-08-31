@@ -9,6 +9,9 @@ export async function saveImageOutsidePlatform(
   resourceId?: number,
 ) {
   const prepared = await prepareImageForUpload(file, purpose);
+  if (purpose === "post-image") {
+    return uploadSharedImage(prepared, purpose, resourceId);
+  }
   const preferenceResponse = await fetch("/api/storage/preferences", {
     cache: "no-store",
   });
@@ -33,6 +36,14 @@ export async function saveImageOutsidePlatform(
     };
   }
 
+  return uploadSharedImage(prepared, purpose, resourceId);
+}
+
+async function uploadSharedImage(
+  prepared: File,
+  purpose: ImagePurpose,
+  resourceId?: number,
+) {
   const form = new FormData();
   form.set("purpose", purpose);
   form.set("file", prepared);
@@ -45,7 +56,13 @@ export async function saveImageOutsidePlatform(
   if (!response.ok || !result.url) {
     throw new Error(result.error || "Não foi possível enviar a imagem.");
   }
-  return { url: result.url, storage: "GOOGLE_DRIVE" as const };
+  return {
+    url: result.url,
+    storage:
+      purpose === "post-image"
+        ? ("PUBLICATION" as const)
+        : ("GOOGLE_DRIVE" as const),
+  };
 }
 
 async function readUploadResponse(response: Response) {

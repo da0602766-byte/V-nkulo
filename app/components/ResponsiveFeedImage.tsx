@@ -18,68 +18,83 @@ export default function ResponsiveFeedImage({
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
   const [dataSaver, setDataSaver] = useState(false);
-  const [allowDownload, setAllowDownload] = useState(false);
-  const [autoLoadRecent, setAutoLoadRecent] = useState(false);
-  const [preferenceReady, setPreferenceReady] = useState(false);
   const [requestedLoad, setRequestedLoad] = useState(false);
+
   useEffect(() => {
     const sync = () => {
       const root = document.documentElement;
-      setDataSaver(root.dataset.dataSaver === "true" || root.dataset.network === "slow");
+      setDataSaver(
+        root.dataset.dataSaver === "true" || root.dataset.network === "slow",
+      );
     };
     sync();
     window.addEventListener("vinkulo:network-mode", sync);
-    fetch("/api/storage/preferences", { cache: "no-store" })
-      .then((response) => response.ok ? response.json() : null)
-      .then((value) => {
-        setAutoLoadRecent(value?.preference?.auto_load_recent !== 0);
-        setAllowDownload(Boolean(value?.preference?.auto_download_files));
-      })
-      .catch(() => setAutoLoadRecent(true))
-      .finally(() => setPreferenceReady(true));
     return () => window.removeEventListener("vinkulo:network-mode", sync);
   }, []);
-  if (!src || failed) return null;
+
+  if (!src) return null;
   const optimizedSource = dataSaver && thumbnail ? thumbnail : src;
-  const shouldLoad = autoLoadRecent || requestedLoad;
+  const downloadUrl = src.startsWith("/api/")
+    ? `${src}${src.includes("?") ? "&" : "?"}download=1`
+    : src;
 
   return (
     <figure
-      className={`feed-responsive-image ${loaded ? "is-loaded" : ""}`}
-      aria-busy={preferenceReady && shouldLoad && !loaded}
+      className={`feed-responsive-image feed-image-attachment ${loaded ? "is-loaded" : ""}`}
+      aria-busy={requestedLoad && !loaded && !failed}
     >
-      <span className="feed-image-placeholder" aria-hidden="true" />
-      {preferenceReady && shouldLoad ? (
-        /* eslint-disable-next-line @next/next/no-img-element */
-        <img
-          src={optimizedSource}
-          srcSet={!dataSaver && thumbnail && thumbnail !== src ? `${thumbnail} 480w, ${src} 1280w` : undefined}
-          sizes="(max-width: 720px) 100vw, 720px"
-          alt={alt || "Imagem da publicação"}
-          width={width || 1280}
-          height={height || 720}
-          loading="lazy"
-          decoding="async"
-          onLoad={() => setLoaded(true)}
-          onError={() => setFailed(true)}
-        />
-      ) : preferenceReady ? (
-        <button type="button" className="feed-image-load" onClick={() => setRequestedLoad(true)}>
-          Carregar foto do Google Drive
-        </button>
-      ) : null}
-      {shouldLoad && allowDownload && src.startsWith("/api/storage/media/") && (
-        <a
-          className="feed-image-download"
-          href={`${src}?download=1`}
-          download
+      {!requestedLoad ? (
+        <div className="feed-image-attachment-summary">
+          <span aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14" />
+            </svg>
+          </span>
+          <div>
+            <strong>Imagem da publicação</strong>
+            <small>Abra quando quiser ou baixe uma cópia no aparelho.</small>
+          </div>
+        </div>
+      ) : failed ? (
+        <p className="feed-image-attachment-error" role="alert">
+          A prévia não abriu. O arquivo ainda pode ser baixado.
+        </p>
+      ) : (
+        <>
+          <span className="feed-image-placeholder" aria-hidden="true" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={optimizedSource}
+            srcSet={
+              !dataSaver && thumbnail && thumbnail !== src
+                ? `${thumbnail} 480w, ${src} 1280w`
+                : undefined
+            }
+            sizes="(max-width: 720px) 100vw, 720px"
+            alt={alt || "Imagem da publicação"}
+            width={width || 1280}
+            height={height || 720}
+            loading="lazy"
+            decoding="async"
+            onLoad={() => setLoaded(true)}
+            onError={() => setFailed(true)}
+          />
+        </>
+      )}
+      <div className="feed-image-attachment-actions">
+        <button
+          type="button"
+          onClick={() => {
+            setFailed(false);
+            setRequestedLoad((current) => !current);
+          }}
         >
-          Baixar foto
+          {requestedLoad ? "Fechar imagem" : "Visualizar imagem"}
+        </button>
+        <a href={downloadUrl} download>
+          Baixar imagem
         </a>
-      )}
-      {shouldLoad && !allowDownload && src.startsWith("/api/storage/media/") && (
-        <small className="feed-image-download-disabled">Download desativado em Minha conta</small>
-      )}
+      </div>
     </figure>
   );
 }

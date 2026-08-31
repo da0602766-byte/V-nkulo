@@ -47,12 +47,15 @@ export async function GET(request: Request) {
     if (state.purpose === "login") {
       let row = await getD1().prepare(
         `SELECT u.id, u.ativo
-         FROM usuarios u
-         LEFT JOIN google_connections gc ON gc.usuario_id = u.id
-         WHERE gc.google_sub = ? OR lower(u.email) = ?
-         ORDER BY CASE WHEN gc.google_sub = ? THEN 0 ELSE 1 END
-         LIMIT 1`,
-      ).bind(identity.sub, normalizeEmail(identity.email), identity.sub).first<{ id: number; ativo: number }>();
+         FROM google_connections gc
+         JOIN usuarios u ON u.id = gc.usuario_id
+         WHERE gc.google_sub = ? LIMIT 1`,
+      ).bind(identity.sub).first<{ id: number; ativo: number }>();
+      if (!row) {
+        row = await getD1().prepare(
+          "SELECT id, ativo FROM usuarios WHERE email = ? LIMIT 1",
+        ).bind(normalizeEmail(identity.email)).first<{ id: number; ativo: number }>();
+      }
       if (!row) {
         const loginConfig = await getPilotLoginConfig();
         if (!PILOT_CONFIG.openRegistrationEnabled || loginConfig.cadastroHabilitado === false) {
@@ -64,13 +67,14 @@ export async function GET(request: Request) {
         try {
           const result = await getD1().prepare(
             `INSERT INTO usuarios
-              (nome, email, perfil, permissoes, cadastro_dados, senha_hash, senha_salt,
+              (nome, email, perfil, permissoes, cadastro_dados, foto_perfil, senha_hash, senha_salt,
                titulo_eclesiastico, ativo)
-             VALUES (?, ?, 'LEITURA', '', ?, ?, ?, 'VISITANTE', 1)`,
+             VALUES (?, ?, 'LEITURA', '', ?, ?, ?, ?, 'VISITANTE', 1)`,
           ).bind(
             name.length >= 3 ? name : `Usuário ${name}`,
             normalizeEmail(identity.email),
             JSON.stringify({ origem: { label: "Origem", value: "Conta Google verificada" } }),
+            identity.picture || null,
             generatedPassword.hash,
             generatedPassword.salt,
           ).run();
@@ -105,6 +109,11 @@ export async function GET(request: Request) {
       }
     }
     await saveGoogleConnection(userId, identity, tokens, state.purpose === "drive");
+    if (identity.picture) {
+      await getD1().prepare(
+        "UPDATE usuarios SET foto_perfil = CASE WHEN foto_perfil IS NULL OR foto_perfil = '' THEN ? ELSE foto_perfil END, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?",
+      ).bind(identity.picture, userId).run();
+    }
     if (state.purpose === "drive") {
       await getD1().prepare(
         `INSERT INTO storage_preferences

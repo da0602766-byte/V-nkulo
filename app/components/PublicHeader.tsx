@@ -105,7 +105,7 @@ export default async function PublicHeader({
                   <PublicIcon name="community" size={18} />
                   Minha comunidade
                 </Link>
-                <Link href="/painel">
+                <Link href="/painel?view=conta" showLoading loadingLabel="Abrindo seu perfil…">
                   <PublicIcon name="user" size={18} />
                   Meu perfil
                 </Link>

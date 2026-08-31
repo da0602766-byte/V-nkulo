@@ -12,7 +12,8 @@ test("Conta Google usa OAuth real e cria cadastro neutro sem acesso comunitário
   ]);
   assert.match(start, /purpose === "drive"/);
   assert.match(callback, /google_sub = \?/);
-  assert.match(callback, /lower\(u\.email\) = \?/);
+  assert.match(callback, /WHERE email = \? LIMIT 1/);
+  assert.match(callback, /normalizeEmail\(identity\.email\)/);
   assert.match(callback, /INSERT INTO usuarios/);
   assert.match(callback, /'LEITURA'/);
   assert.match(callback, /membershipCreated: false/);
@@ -25,7 +26,7 @@ test("Conta Google usa OAuth real e cria cadastro neutro sem acesso comunitário
   assert.match(integration, /AES-GCM/);
 });
 
-test("fotos novas ficam no Drive ou no aparelho e não usam o bucket da plataforma", async () => {
+test("fotos pessoais ficam no Drive e anexos de publicação usam o bucket compartilhado", async () => {
   const [upload, localMedia, serviceWorker, feedback, publicRegistration, legacyProfile, notice, modules] = await Promise.all([
     read("app/api/pilot/uploads/route.ts"),
     read("app/lib/local-media.ts"),
@@ -37,7 +38,9 @@ test("fotos novas ficam no Drive ou no aparelho e não usam o bucket da platafor
     read("app/api/modulos/route.ts"),
   ]);
   assert.match(upload, /uploadDriveFile/);
-  assert.doesNotMatch(upload, /bucket\.put/);
+  assert.match(upload, /purpose === "post-image"[\s\S]*bucket\.put/);
+  assert.match(upload, /images\/post-image\/\$\{context\.comunidadeId\}/);
+  assert.match(upload, /storage: "PUBLICATION"/);
   assert.match(localMedia, /indexedDB\.open/);
   assert.match(serviceWorker, /\/local-media\//);
   assert.match(feedback, /feedback-evidence/);
@@ -66,7 +69,7 @@ test("chat grava conteúdo criptografado no Drive e remove o legado só após co
   assert.match(schema, /community_drive_storage/);
 });
 
-test("interface explica destino, carregamento recente e autorização de download", async () => {
+test("interface explica destino e deixa anexos de publicação sob demanda", async () => {
   const [privacy, storage, image, chat] = await Promise.all([
     read("app/privacidade/page.tsx"),
     read("app/components/StoragePrivacyWorkspace.tsx"),
@@ -77,8 +80,9 @@ test("interface explica destino, carregamento recente e autorização de downloa
   assert.match(storage, /Seus conteúdos não ficam no Vínkulo/);
   assert.match(storage, /Carregar os mais recentes automaticamente/);
   assert.match(storage, /Permitir baixar arquivos neste aparelho/);
-  assert.match(image, /auto_load_recent/);
-  assert.match(image, /Download desativado em Minha conta/);
+  assert.match(image, /Visualizar imagem/);
+  assert.match(image, /Baixar imagem/);
+  assert.match(image, /download=1/);
   assert.match(chat, /recentContentLoaded: loadRecent/);
 });
 

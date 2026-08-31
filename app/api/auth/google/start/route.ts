@@ -55,9 +55,20 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
+    const message = (error as Error).message;
+    if (androidChannel && url.searchParams.get("format") === "json") {
+      return Response.json(
+        { error: message },
+        { status: 503, headers: { "Cache-Control": "no-store" } },
+      );
+    }
     const target = new URL(purpose === "drive" ? "/painel" : "/login", url.origin);
-    if (purpose === "drive") target.searchParams.set("view", "conta");
-    target.searchParams.set("googleErro", (error as Error).message);
+    if (purpose === "drive") {
+      target.searchParams.set("view", "conta");
+      target.searchParams.set("googleErro", message);
+    } else {
+      target.searchParams.set("erro", message);
+    }
     return Response.redirect(target, 303);
   }
 }

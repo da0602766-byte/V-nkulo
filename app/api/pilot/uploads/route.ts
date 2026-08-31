@@ -1,4 +1,5 @@
 import { getD1 } from "../../../../db";
+import { getRuntimeEnv } from "../../../../db/runtime-env";
 import { getSessionUser } from "../../../lib/local-auth";
 import { canManageMinistry } from "../../../lib/ministry-access";
 import { getActiveTenantContext } from "../../../lib/tenant";
@@ -88,12 +89,48 @@ export async function POST(request: Request) {
       { status: 413 },
     );
   }
-  const bytes = new Uint8Array(await file.arrayBuffer());
+  const fileBuffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(fileBuffer);
   if (!hasValidImageSignature(bytes, file.type)) {
     return Response.json(
       { error: "O conteúdo do arquivo não corresponde a uma imagem válida." },
       { status: 415 },
     );
+  }
+  if (purpose === "post-image") {
+    if (!context) {
+      return Response.json(
+        { error: "Selecione uma comunidade para anexar esta imagem." },
+        { status: 409 },
+      );
+    }
+    const bucket = getRuntimeEnv().BUCKET;
+    if (!bucket) {
+      return Response.json(
+        { error: "O armazenamento de publicações está indisponível." },
+        { status: 503 },
+      );
+    }
+    const key = `images/post-image/${context.comunidadeId}/${crypto.randomUUID()}.${extension}`;
+    await bucket.put(key, fileBuffer, {
+      httpMetadata: {
+        contentType: file.type,
+        cacheControl: "public, max-age=31536000, immutable",
+      },
+      customMetadata: {
+        purpose,
+        uploadedBy: String(user.id),
+        communityId: String(context.comunidadeId),
+        originalName: file.name.slice(0, 160),
+      },
+    });
+    return Response.json({
+      url: `/api/pilot/uploads/${key}`,
+      name: file.name.slice(0, 160),
+      size: file.size,
+      type: file.type,
+      storage: "PUBLICATION",
+    });
   }
   const preference = await getD1().prepare(
     "SELECT provider FROM storage_preferences WHERE usuario_id = ? LIMIT 1",

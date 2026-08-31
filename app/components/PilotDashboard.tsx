@@ -888,8 +888,8 @@ export default function PilotDashboard({
               )}
               <PersonalizationControls userEmail={userEmail} fontScale={fontScale} onDecrease={() => changeFontScale(-0.05)} onReset={() => setFontScale(1)} onIncrease={() => changeFontScale(0.05)} glassOpacity={glassOpacity} onGlassOpacityChange={setGlassOpacity} dataSaver={dataSaver} onDataSaverChange={setDataSaver} />
               <button type="button" onClick={() => openView("conta")}>Minha conta</button>
-              {active.isOwner && <Link href="/proprietario">Área do proprietário</Link>}
-              <Link href={`/comunidades/${active.comunidadeSlug}`}>Página pública</Link>
+              {active.isOwner && <Link href="/proprietario" showLoading loadingLabel="Abrindo a Área do proprietário…">Área do proprietário</Link>}
+              <Link href={`/comunidades/${active.comunidadeSlug}`} showLoading loadingLabel="Abrindo a página pública…">Página pública</Link>
               <a className="danger" href="/api/auth/logout">Sair da plataforma</a>
             </div>
           </details>
@@ -1009,7 +1009,7 @@ export default function PilotDashboard({
               </>
             )}
             <footer>
-              <Link href={`/comunidades/${active.comunidadeSlug}`}>
+              <Link href={`/comunidades/${active.comunidadeSlug}`} showLoading loadingLabel="Abrindo a página pública…">
                 Ver página pública
               </Link>
               {canEditCommunity && (
@@ -1048,6 +1048,8 @@ export default function PilotDashboard({
               <Link
                 className="pilot-owner-area-link"
                 href="/proprietario"
+                showLoading
+                loadingLabel="Abrindo a Área do proprietário…"
                 aria-label="Área do proprietário"
                 title="Área do proprietário"
               >
@@ -1387,6 +1389,15 @@ export default function PilotDashboard({
                       <strong>{item.label}</strong>
                     </button>
                   ))}
+                  <button
+                    type="button"
+                    className={visibleView === "conta" ? "active" : ""}
+                    data-editor-key="menu-movel-google-drive"
+                    onClick={() => openView("conta")}
+                  >
+                    <span aria-hidden="true"><MenuIcon id="drive" /></span>
+                    <strong>Google Drive</strong>
+                  </button>
                 </div>
               </div>
             ) : mobileMenu === "actions" ? (
@@ -1426,7 +1437,7 @@ export default function PilotDashboard({
                   Perfil e configurações
                 </button>
                 {active.isOwner && (
-                  <Link className="pilot-profile-manage" href="/proprietario">
+                  <Link className="pilot-profile-manage" href="/proprietario" showLoading loadingLabel="Abrindo a Área do proprietário…">
                     Abrir Área do Proprietário
                   </Link>
                 )}
@@ -1470,7 +1481,7 @@ export default function PilotDashboard({
                   </button>
                 </details>
                 <PersonalizationControls userEmail={userEmail} fontScale={fontScale} onDecrease={() => changeFontScale(-0.05)} onReset={() => setFontScale(1)} onIncrease={() => changeFontScale(0.05)} glassOpacity={glassOpacity} onGlassOpacityChange={setGlassOpacity} dataSaver={dataSaver} onDataSaverChange={setDataSaver} />
-                <Link href={`/comunidades/${active.comunidadeSlug}`}>Ver página pública</Link>
+                <Link href={`/comunidades/${active.comunidadeSlug}`} showLoading loadingLabel="Abrindo a página pública…">Ver página pública</Link>
                 <a className="pilot-mobile-logout" href="/api/auth/logout">Sair da plataforma</a>
               </div>
             )}
@@ -1507,7 +1518,7 @@ function getInitials(name: string) {
     .join("") || "US";
 }
 
-type MenuIconId = View | "mural" | "escalas";
+type MenuIconId = View | "mural" | "escalas" | "drive";
 
 function MenuIcon({ id }: { id: MenuIconId }) {
   const paths: Partial<Record<MenuIconId, string>> = {
@@ -1528,6 +1539,7 @@ function MenuIcon({ id }: { id: MenuIconId }) {
     comunidade: "M4 7h10m4 0h2M14 5v4M4 17h2m4 0h10M8 15v4M4 12h4m4 0h8M10 10v4",
     continuidade: "M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5",
     redes: "M12 8a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM5 22v-2a7 7 0 0 1 14 0v2",
+    drive: "M7.5 18.5h10.2a4.3 4.3 0 0 0 .5-8.6A6.5 6.5 0 0 0 5.8 8.2 4.8 4.8 0 0 0 7.5 18.5Z",
     "visual-editor": "m4 20 4.5-1 10-10a2.8 2.8 0 0 0-4-4l-10 10L4 20Zm9-13 4 4",
   };
   return (

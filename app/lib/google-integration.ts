@@ -50,8 +50,10 @@ export async function createGoogleAuthorization(
   url.searchParams.set("scope", [...BASE_SCOPES, ...(state.purpose === "drive" ? [DRIVE_SCOPE] : [])].join(" "));
   url.searchParams.set("state", signedState);
   url.searchParams.set("include_granted_scopes", "true");
-  url.searchParams.set("prompt", state.purpose === "drive" ? "consent" : "select_account");
-  if (state.purpose === "drive") url.searchParams.set("access_type", "offline");
+  if (state.purpose === "drive") {
+    url.searchParams.set("prompt", "consent");
+    url.searchParams.set("access_type", "offline");
+  }
   return { url: url.toString(), nonce };
 }
 

@@ -344,7 +344,8 @@ test("páginas, temas e responsividade do VÍNKULO permanecem explícitos", asyn
   assert.match(uploadRoute, /MAX_IMAGE_BYTES/);
   assert.match(uploadRoute, /user\.system_owner/);
   assert.match(uploadRoute, /uploadDriveFile/);
-  assert.doesNotMatch(uploadRoute, /bucket\.put/);
+  assert.match(uploadRoute, /purpose === "post-image"[\s\S]*bucket\.put/);
+  assert.match(uploadRoute, /storage: "PUBLICATION"/);
   assert.match(secretaryStyles, /Secretaria: contenção mobile/);
   assert.match(secretaryStyles, /overflow-wrap:anywhere/);
   assert.match(visualEditor, /hoverEffect/);

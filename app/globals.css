@@ -30899,6 +30899,209 @@ html[data-theme="dark"] .pilot-dashboard[data-ui-version="v2"] :is(
   }
 }
 
+/* V198 — paleta real por comunidade, navegação segura e anexos sob demanda. */
+.pilot-dashboard[data-ui-version="v2"][data-community-palette] {
+  --bg: var(--community-light-bg);
+  --surface: var(--community-light-surface);
+  --violet-soft: var(--community-light-surface-2);
+  --ink: var(--community-light-text);
+  --muted: var(--community-light-muted);
+  --line: var(--community-light-line);
+  --violet: var(--community-light-primary);
+  --violet-deep: var(--community-light-secondary);
+  --green: var(--community-light-accent);
+  --pilot-bg: var(--community-light-bg);
+  --pilot-surface: var(--community-light-surface);
+  --pilot-surface-2: var(--community-light-surface-2);
+  --pilot-text: var(--community-light-text);
+  --pilot-muted: var(--community-light-muted);
+  --pilot-line: var(--community-light-line);
+  --pilot-purple: var(--community-light-primary);
+  --pilot-primary: var(--community-light-primary);
+  --pilot-blue: var(--community-light-secondary);
+  --pilot-cyan: var(--community-light-accent);
+  --pilot-accent: var(--community-light-accent);
+  --pilot-gradient: linear-gradient(135deg, var(--community-light-primary), var(--community-light-accent));
+  --pilot-shadow: var(--community-light-shadow);
+  --v2-bg: var(--community-light-bg);
+  --v2-surface: var(--community-light-surface);
+  --v2-surface-subtle: var(--community-light-surface-2);
+  --v2-line: var(--community-light-line);
+  --v2-border: var(--community-light-line);
+  --v2-ink: var(--community-light-text);
+  --v2-text: var(--community-light-text);
+  --v2-muted: var(--community-light-muted);
+  --v2-blue: var(--community-light-primary);
+  --v2-accent: var(--community-light-accent);
+  --v2-hover: color-mix(in srgb, var(--community-light-primary) 9%, var(--community-light-surface));
+  background:
+    radial-gradient(circle at 92% 0%, color-mix(in srgb, var(--community-light-accent) 20%, transparent), transparent 32rem),
+    radial-gradient(circle at 4% 44%, color-mix(in srgb, var(--community-light-primary) 12%, transparent), transparent 29rem),
+    var(--community-light-bg) !important;
+}
+
+html[data-theme="dark"] .pilot-dashboard[data-ui-version="v2"][data-community-palette] {
+  --bg: var(--community-dark-bg);
+  --surface: var(--community-dark-surface);
+  --violet-soft: var(--community-dark-surface-2);
+  --ink: var(--community-dark-text);
+  --muted: var(--community-dark-muted);
+  --line: var(--community-dark-line);
+  --violet: var(--community-dark-primary);
+  --violet-deep: var(--community-dark-secondary);
+  --green: var(--community-dark-accent);
+  --pilot-bg: var(--community-dark-bg);
+  --pilot-surface: var(--community-dark-surface);
+  --pilot-surface-2: var(--community-dark-surface-2);
+  --pilot-text: var(--community-dark-text);
+  --pilot-muted: var(--community-dark-muted);
+  --pilot-line: var(--community-dark-line);
+  --pilot-purple: var(--community-dark-primary);
+  --pilot-primary: var(--community-dark-primary);
+  --pilot-blue: var(--community-dark-secondary);
+  --pilot-cyan: var(--community-dark-accent);
+  --pilot-accent: var(--community-dark-accent);
+  --pilot-gradient: linear-gradient(135deg, var(--community-dark-primary), var(--community-dark-accent));
+  --pilot-shadow: var(--community-dark-shadow);
+  --v2-bg: var(--community-dark-bg);
+  --v2-surface: var(--community-dark-surface);
+  --v2-surface-subtle: var(--community-dark-surface-2);
+  --v2-line: var(--community-dark-line);
+  --v2-border: var(--community-dark-line);
+  --v2-ink: var(--community-dark-text);
+  --v2-text: var(--community-dark-text);
+  --v2-muted: var(--community-dark-muted);
+  --v2-blue: var(--community-dark-primary);
+  --v2-accent: var(--community-dark-accent);
+  --v2-hover: color-mix(in srgb, var(--community-dark-primary) 12%, var(--community-dark-surface));
+  background:
+    radial-gradient(circle at 92% 0%, color-mix(in srgb, var(--community-dark-accent) 22%, transparent), transparent 32rem),
+    radial-gradient(circle at 4% 44%, color-mix(in srgb, var(--community-dark-primary) 16%, transparent), transparent 29rem),
+    var(--community-dark-bg) !important;
+}
+
+.global-navigation-loading {
+  width: 100vw;
+  width: 100dvw;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 100svh;
+  overflow: hidden;
+  padding:
+    max(24px, env(safe-area-inset-top))
+    max(20px, env(safe-area-inset-right))
+    max(24px, env(safe-area-inset-bottom))
+    max(20px, env(safe-area-inset-left));
+}
+
+.feed-responsive-image.feed-image-attachment,
+.pilot-dashboard[data-ui-version="v2"] .feed-responsive-image.feed-image-attachment {
+  width: 100%;
+  max-height: none !important;
+  display: grid;
+  gap: 12px;
+  aspect-ratio: auto !important;
+  overflow: hidden;
+  border: 1px solid var(--pilot-line);
+  border-radius: 15px;
+  background: var(--pilot-surface-2);
+  padding: 14px;
+}
+.feed-image-attachment-summary {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 11px;
+}
+.feed-image-attachment-summary > span {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--pilot-primary) 12%, var(--pilot-surface));
+  color: var(--pilot-primary);
+}
+.feed-image-attachment-summary svg { width: 22px; height: 22px; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.feed-image-attachment-summary > div { min-width: 0; display: grid; gap: 3px; }
+.feed-image-attachment-summary strong { font-size: var(--fs-sm); }
+.feed-image-attachment-summary small { color: var(--pilot-muted); font-size: var(--fs-xs); line-height: 1.4; }
+.feed-image-attachment-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.feed-image-attachment-actions :is(button, a) {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--pilot-line);
+  border-radius: 11px;
+  background: var(--pilot-surface);
+  color: var(--pilot-text);
+  padding: 0 10px;
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: 850;
+  text-decoration: none;
+  cursor: pointer;
+}
+.feed-image-attachment-actions button { border-color: var(--pilot-primary); background: var(--pilot-primary); color: #fff; }
+.feed-responsive-image.feed-image-attachment > img {
+  width: 100%;
+  height: auto !important;
+  max-height: min(68vh, 720px);
+  border-radius: 11px;
+  object-fit: contain !important;
+}
+.feed-image-attachment-error { margin: 0; color: var(--rose); font-size: var(--fs-xs); }
+
+@media (max-width: 820px) {
+  .pilot-dashboard[data-ui-version="v2"][data-community-palette],
+  html[data-theme="dark"] .pilot-dashboard[data-ui-version="v2"][data-community-palette] {
+    background:
+      radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--pilot-accent) 20%, transparent), transparent 22rem),
+      var(--pilot-bg) !important;
+  }
+  .pilot-mobile-overlay {
+    align-items: stretch;
+    padding:
+      max(8px, env(safe-area-inset-top))
+      max(8px, env(safe-area-inset-right))
+      max(8px, env(safe-area-inset-bottom))
+      max(8px, env(safe-area-inset-left));
+  }
+  .pilot-mobile-sheet {
+    max-height: none;
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    align-self: stretch;
+    overflow: hidden;
+    padding: 14px;
+  }
+  .pilot-mobile-sheet > header {
+    position: relative;
+    z-index: 2;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--pilot-line);
+    background: var(--pilot-surface);
+  }
+  .pilot-mobile-sheet > :not(header) {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-bottom: max(18px, env(safe-area-inset-bottom));
+    scrollbar-gutter: stable;
+  }
+}
+
+@media (max-width: 430px), (max-height: 680px) {
+  .pilot-mobile-sheet { border-radius: 20px; }
+  .pilot-mobile-sheet > header h2 { font-size: var(--fs-2xl); }
+  .pilot-mobile-menu-grid > button { min-height: 82px; padding: 11px; }
+  .pilot-mobile-menu-grid > button > span { width: 31px; height: 31px; }
+}
+
 /* V197 — acabamento móvel, temas contrastantes, QR e alertas do aparelho. */
 html[data-pilot-theme="claro"] .pilot-dashboard[data-ui-version="v2"] .pilot-topbar {
   border-bottom-color: var(--pilot-line) !important;

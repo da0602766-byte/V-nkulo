@@ -376,7 +376,7 @@ export default function OwnerWorkspace({
           <ThemeControl compact />
           <PilotNotificationCenter />
           <span id="global-editor-toolbar-slot" className="global-editor-toolbar-slot" aria-label="Aparência" />
-          <Link href="/painel" className="owner-profile-link">
+          <Link href="/painel?view=conta" className="owner-profile-link" showLoading loadingLabel="Abrindo seu perfil…">
             <span>{ownerPhoto ? <img src={ownerPhoto} alt="" /> : initials(ownerName)}</span>
             <div><VerifiedOwnerName name={ownerName} verified /><small>Proprietário global</small></div>
           </Link>
@@ -389,8 +389,8 @@ export default function OwnerWorkspace({
           <nav aria-label="Menu do proprietário">
             {TABS.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => { setTab(item.id); setDirectoryPage(0); }}><span>{item.icon}</span>{item.label}{item.id === "requests" && pending.length > 0 ? <b>{pending.length}</b> : item.id === "feedback" && pendingFeedback.length > 0 ? <b>{pendingFeedback.length}</b> : null}</button>)}
           </nav>
-          <Link href="/painel">Abrir painel de comunidade →</Link>
-          <Link href="/comunidades">Ver diretório público →</Link>
+          <Link href="/painel" showLoading loadingLabel="Abrindo sua comunidade…">Abrir painel de comunidade →</Link>
+          <Link href="/comunidades" showLoading loadingLabel="Abrindo o diretório público…">Ver diretório público →</Link>
         </aside>
 
         <section className="owner-workspace">

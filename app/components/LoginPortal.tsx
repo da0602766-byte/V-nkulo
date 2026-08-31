@@ -81,9 +81,14 @@ async function submit(url: string, payload: Record<string, unknown>) {
     window.clearTimeout(timeout);
   }
   const text = await response.text();
-  let body: { error?: string; message?: string } = {};
+  let body: {
+    error?: string;
+    message?: string;
+    redirect?: string;
+    firstAccessRequired?: boolean;
+  } = {};
   try {
-    body = text ? JSON.parse(text) as { error?: string; message?: string } : {};
+    body = text ? JSON.parse(text) as typeof body : {};
   } catch {
     body = {};
   }
@@ -143,6 +148,14 @@ export default function LoginPortal({
   }, []);
 
   useEffect(() => {
+    const resetAfterBrowserReturn = () => {
+      if (!googlePairing) setLoading(false);
+    };
+    window.addEventListener("pageshow", resetAfterBrowserReturn);
+    return () => window.removeEventListener("pageshow", resetAfterBrowserReturn);
+  }, [googlePairing]);
+
+  useEffect(() => {
     if (!androidApp || !googlePairing) return;
     let stopped = false;
     let timer = 0;
@@ -195,8 +208,21 @@ export default function LoginPortal({
     setLoading(true);
     setMessage("");
     const data = Object.fromEntries(new FormData(event.currentTarget).entries());
+    let navigating = false;
     try {
-      if (mode === "esqueci") {
+      if (mode === "login") {
+        const result = await submit("/api/auth/login", data);
+        const target = String(result.redirect || returnTo || "/painel");
+        setMessage("Login confirmado. Abrindo sua conta…");
+        navigating = true;
+        window.setTimeout(() => {
+          window.location.assign(
+            target.startsWith("/") && !target.startsWith("//")
+              ? target
+              : "/painel",
+          );
+        }, 180);
+      } else if (mode === "esqueci") {
         const result = await submit("/api/auth/esqueci-senha", data);
         setMessage(result.message || "Solicitação enviada ao administrador.");
       } else if (mode === "cadastro") {
@@ -211,7 +237,7 @@ export default function LoginPortal({
     } catch (error) {
       setMessage((error as Error).message);
     } finally {
-      setLoading(false);
+      if (!navigating) setLoading(false);
     }
   }
 
@@ -226,11 +252,12 @@ export default function LoginPortal({
   }
 
   async function startGoogleLogin() {
+    setLoading(true);
+    setMessage("Abrindo a Conta Google com segurança…");
     if (!androidApp) {
-      window.location.href = `/api/auth/google/start?purpose=login&returnTo=${encodeURIComponent(returnTo || "/painel")}`;
+      window.location.assign(`/api/auth/google/start?purpose=login&returnTo=${encodeURIComponent(returnTo || "/painel")}`);
       return;
     }
-    setLoading(true);
     setMessage("Abra o Google no navegador. O Vínkulo concluirá o acesso automaticamente.");
     try {
       const bytes = crypto.getRandomValues(new Uint8Array(32));
@@ -353,9 +380,7 @@ export default function LoginPortal({
 
           <form
             className={`login-form ${mode === "cadastro" ? "login-signup-form" : ""}`}
-            action={mode === "login" ? "/api/auth/login" : undefined}
-            method={mode === "login" ? "post" : undefined}
-            onSubmit={mode === "login" ? () => { setLoading(true); setMessage(""); } : handle}
+            onSubmit={handle}
           >
             {mode === "login" && returnTo && (
               <input type="hidden" name="returnTo" value={returnTo} />
@@ -380,7 +405,7 @@ export default function LoginPortal({
               {config.recuperacaoHabilitada !== false && <button type="button" onClick={() => changeMode("esqueci")}>{config.recoveryLinkText || "Esqueci minha senha"}</button>}
             </div>}
             {message && <p className="login-feedback" role="alert">{message}</p>}
-            <button className="login-submit" disabled={loading}>{loading ? "Processando…" : mode === "login" ? config.loginButtonText || "Entrar" : mode === "cadastro" ? "Criar conta" : "Solicitar redefinição"}</button>
+            <button className="login-submit" disabled={loading}>{loading ? mode === "login" ? "Entrando…" : "Processando…" : mode === "login" ? config.loginButtonText || "Entrar" : mode === "cadastro" ? "Criar conta" : "Solicitar redefinição"}</button>
           </form>
 
           {mode === "login" && (
