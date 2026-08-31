@@ -12,6 +12,7 @@ import {
 import {
   ParkingQrCheckin,
   ParkingReservationQr,
+  type ParkingQrValidationResult,
 } from "./ParkingReservationQr";
 
 type Space = {
@@ -372,16 +373,54 @@ export default function ParkingWorkspace({
   }
 
   async function reservationAction(body: Record<string,unknown>) {
+    const isCheckin = String(body.acao || "").toUpperCase() === "CHECKIN";
     setWorking(true); setError(""); setFeedback("");
     try {
       const response=await fetch("/api/pilot/estacionamento/reservas",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-      const result=await readJson<{error?:string;reserva?:{nomeCompleto:string;documento:string;inicioEm:string;vaga:string;codigo:string}}>(response);
+      const result=await readJson<{error?:string;reserva?:{nomeCompleto:string;documento:string;inicioEm:string;fimEm:string;vaga:string;placaVeiculo:string;tipoVeiculo:string;modeloVeiculo:string;corVeiculo:string}}>(response);
       if(!response.ok) throw new Error(result.error||"Reserva não atualizada.");
       setFeedback(result.reserva ? `Check-in confirmado: ${result.reserva.nomeCompleto} · vaga ${result.reserva.vaga} · ${result.reserva.documento} · ${formatTime(result.reserva.inicioEm)}.` : "Reserva atualizada.");
       if (String(body.acao || "").toUpperCase() === "CHECKIN") await load(true);
       else await refreshReservations();
+      if (isCheckin && result.reserva) {
+        return {
+          ok: true,
+          title: "QR Code verificado",
+          message: `Entrada de ${result.reserva.nomeCompleto} liberada com sucesso.`,
+          details: [
+            `Vaga ${result.reserva.vaga}`,
+            `${result.reserva.tipoVeiculo} · ${result.reserva.modeloVeiculo} · ${result.reserva.corVeiculo}`,
+            `Reserva até ${formatTime(result.reserva.fimEm)}`,
+          ],
+        } satisfies ParkingQrValidationResult;
+      }
       return true;
-    } catch(cause){ const message=(cause as Error).message; setError(message); return message; } finally { setWorking(false); }
+    } catch(cause){
+      const message=(cause as Error).message;
+      setError(message);
+      return isCheckin
+        ? ({ ok:false, title:"Acesso não liberado", message } satisfies ParkingQrValidationResult)
+        : message;
+    } finally { setWorking(false); }
+  }
+  async function deleteReservationHistory(id: number) {
+    if (working || !window.confirm("Excluir esta reserva encerrada do histórico?")) return;
+    setWorking(true); setError(""); setFeedback("");
+    try {
+      const response = await fetch("/api/pilot/estacionamento/reservas", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const result = await readJson<{ error?: string }>(response);
+      if (!response.ok) throw new Error(result.error || "Não foi possível excluir esta reserva.");
+      setFeedback("Reserva encerrada removida do histórico.");
+      await refreshReservations();
+    } catch (cause) {
+      setError((cause as Error).message);
+    } finally {
+      setWorking(false);
+    }
   }
   async function clearReservationHistory() {
     if (working || !window.confirm("Limpar reservas recusadas, canceladas e confirmações já vencidas?")) return;
@@ -557,7 +596,7 @@ export default function ParkingWorkspace({
     const suggestedStart = reservationStartsAt && !Number.isNaN(reservationStartsAt.getTime()) ? toLocalDateTimeInput(new Date(reservationStartsAt.getTime() - 90 * 60 * 1000)) : "";
     const suggestedEnd = reservationEndsAt && !Number.isNaN(reservationEndsAt.getTime()) ? toLocalDateTimeInput(new Date(reservationEndsAt.getTime() + 2 * 60 * 60 * 1000)) : "";
     return (<>
-      <ParkingMobileExperience communityName={communityName} data={data} sectors={sectors} reservations={reservations} eventOptions={eventOptions} loading={loading} working={working} feedback={feedback} error={error} onRetry={load} onReserve={createReservation} />
+      <ParkingMobileExperience communityName={communityName} data={data} sectors={sectors} reservations={reservations} eventOptions={eventOptions} loading={loading} working={working} feedback={feedback} error={error} onRetry={load} onReserve={createReservation} onDeleteHistory={deleteReservationHistory} />
       <section className="parking-workspace parking-member-workspace parking-desktop-shell" style={{ "--parking-accent": data?.config.cor_destaque || "#d99a32" } as React.CSSProperties}>
         <header className="parking-member-heading">
           <div><p className="pilot-kicker">ESTACIONAMENTO · {communityName}</p><h1>Escolha sua vaga</h1><p>Toque em uma vaga livre para iniciar a reserva.</p></div>
@@ -607,6 +646,7 @@ export default function ParkingWorkspace({
             <div>{reservations.length ? reservations.slice(0, 5).map((reservation) => <article key={reservation.id} className={`status-${reservation.status.toLowerCase()}`}>
               <div className="parking-member-ticket-summary"><span>{reservation.vaga_codigo}</span><div><strong>{reservation.setor_nome}</strong><small>{formatTime(reservation.inicio_em)} · {reservation.status}</small></div></div>
               {reservation.status === "CONFIRMADA" && reservation.codigo ? <details className="parking-member-qr-ticket"><summary>▦ Mostrar QR Code de acesso</summary><ParkingReservationQr code={reservation.codigo} label={`${reservation.vaga_codigo} · ${reservation.setor_nome}`} expiresAt={reservation.fim_em} /></details> : <p>{reservation.status === "PENDENTE" ? "Aguardando confirmação do responsável." : reservation.status === "CHECKIN" ? "Entrada já liberada." : "Esta reserva não possui acesso ativo."}</p>}
+              {canDeleteReservationHistory(reservation) && <button type="button" className="parking-history-delete" onClick={() => void deleteReservationHistory(reservation.id)} disabled={working}>Excluir histórico</button>}
             </article>) : <p>Nenhuma reserva neste período.</p>}</div>
           </section>
         </>}
@@ -615,7 +655,7 @@ export default function ParkingWorkspace({
   }
 
   return (<>
-    {!mobileManagerView && <ParkingMobileExperience communityName={communityName} data={data} sectors={sectors} reservations={reservations} eventOptions={eventOptions} loading={loading} working={working} feedback={feedback} error={error} onRetry={load} canManage={Boolean(canManageReservations && (canEntry || canExit || canEdit || canConfigure))} onManage={() => setMobileManagerView(true)} onReserve={createReservation} />}
+    {!mobileManagerView && <ParkingMobileExperience communityName={communityName} data={data} sectors={sectors} reservations={reservations} eventOptions={eventOptions} loading={loading} working={working} feedback={feedback} error={error} onRetry={load} canManage={Boolean(canManageReservations && (canEntry || canExit || canEdit || canConfigure))} onManage={() => setMobileManagerView(true)} onReserve={createReservation} onDeleteHistory={deleteReservationHistory} />}
     <section
       className={`parking-workspace parking-desktop-shell${mobileManagerView ? " mobile-manager-active" : ""}`}
       style={
@@ -667,7 +707,7 @@ export default function ParkingWorkspace({
                 : "Responsável ainda não definido"}
             </em>
           </section>}
-          {canEntry&&<section className="parking-checkin-hub parking-checkin-primary-v4"><div><p className="pilot-kicker">PORTARIA DIGITAL</p><h3>Ler acesso da reserva</h3><p>Aponte a câmera para o QR Code do usuário. O leitor permanece aberto para conferir várias reservas em sequência.</p></div><ParkingQrCheckin promptOnMount disabled={working} onDetected={async (codigo)=>{ await reservationAction({codigo,acao:"CHECKIN"}); }} /></section>}
+          {canEntry&&<section className="parking-checkin-hub parking-checkin-primary-v4"><div><p className="pilot-kicker">PORTARIA DIGITAL</p><h3>Ler acesso da reserva</h3><p>Aponte a câmera para o QR Code do usuário. O leitor mostra o resultado e o motivo antes da próxima leitura.</p></div><ParkingQrCheckin promptOnMount disabled={working} onDetected={(codigo)=>reservationAction({codigo,acao:"CHECKIN"})} /></section>}
           <div className="parking-metrics">
             <Metric icon="●" label="Vagas ocupadas" value={data.stats.ocupadas} tone="green" />
             <Metric icon="○" label="Vagas disponíveis" value={data.stats.livres} tone="cyan" />
@@ -721,7 +761,7 @@ export default function ParkingWorkspace({
                 {reservations.map((reservation)=><article key={reservation.id}>
                   <div><small>{reservation.status}</small><strong>{reservation.vaga_codigo} · {reservation.setor_nome}</strong><span>{reservation.nome_completo} · {formatTime(reservation.inicio_em)}</span>{reservation.evento_titulo&&<em className="parking-reservation-event-v4">▣ {reservation.evento_titulo}</em>}</div>
                   {canManageReservations&&<details className="parking-reservation-person"><summary>Exibir informações</summary><dl><div><dt>Nome</dt><dd>{reservation.nome_completo}</dd></div><div><dt>Documento</dt><dd>{reservation.documento_mascarado}</dd></div><div><dt>E-mail</dt><dd>{reservation.email || "Não informado"}</dd></div><div><dt>Celular</dt><dd>{reservation.telefone}</dd></div><div><dt>Veículo</dt><dd>{reservation.placa_veiculo} · {reservation.tipo_veiculo}</dd></div><div><dt>Modelo e cor</dt><dd>{reservation.modelo_veiculo} · {reservation.cor_veiculo}</dd></div>{reservation.evento_titulo&&<div><dt>Evento ou culto</dt><dd>{reservation.evento_titulo}</dd></div>}<div><dt>Período</dt><dd>{formatTime(reservation.inicio_em)} até {formatTime(reservation.fim_em)}</dd></div></dl></details>}
-                  {canManageReservations&&reservation.status==="PENDENTE"&&<footer><button onClick={()=>void reservationAction({id:reservation.id,acao:"CONFIRMAR"})}>Confirmar</button><button className="danger-link" onClick={()=>void reservationAction({id:reservation.id,acao:"RECUSAR"})}>Recusar</button></footer>}
+                  {(canManageReservations&&reservation.status==="PENDENTE" || canDeleteReservationHistory(reservation))&&<footer>{canManageReservations&&reservation.status==="PENDENTE"&&<><button onClick={()=>void reservationAction({id:reservation.id,acao:"CONFIRMAR"})}>Confirmar</button><button className="danger-link" onClick={()=>void reservationAction({id:reservation.id,acao:"RECUSAR"})}>Recusar</button></>}{canDeleteReservationHistory(reservation)&&<button className="danger-link" onClick={()=>void deleteReservationHistory(reservation.id)}>Excluir histórico</button>}</footer>}
                 </article>)}
                 {!reservations.length&&<p>Nenhuma reserva neste período.</p>}
               </div>
@@ -1167,6 +1207,10 @@ export default function ParkingWorkspace({
   </>);
 }
 
+function canDeleteReservationHistory(reservation: Reservation) {
+  return ["RECUSADA", "CANCELADA", "CHECKIN"].includes(reservation.status);
+}
+
 function ParkingMobileExperience({
   communityName,
   data,
@@ -1181,6 +1225,7 @@ function ParkingMobileExperience({
   canManage = false,
   onManage,
   onReserve,
+  onDeleteHistory,
 }: {
   communityName: string;
   data: ParkingData | null;
@@ -1195,6 +1240,7 @@ function ParkingMobileExperience({
   canManage?: boolean;
   onManage?: () => void;
   onReserve: (values: Record<string, FormDataEntryValue>) => Promise<{ codigo?:string; id?:number; status?:string } | null>;
+  onDeleteHistory: (id: number) => Promise<void>;
 }) {
   const [step, setStep] = useState<"local"|"space"|"details"|"success">("local");
   const [sectorId, setSectorId] = useState("");
@@ -1328,6 +1374,13 @@ function ParkingMobileExperience({
           })}
           {!sectors.length && <div className="parking-mobile-empty-sectors"><strong>Nenhum setor disponível</strong><p>O responsável ainda não cadastrou vagas neste estacionamento.</p></div>}
         </div>
+        {reservations.some(canDeleteReservationHistory) && <details className="parking-mobile-reservation-history">
+          <summary>Histórico de reservas <span>{reservations.filter(canDeleteReservationHistory).length}</span></summary>
+          <div>{reservations.filter(canDeleteReservationHistory).map((reservation) => <article key={reservation.id}>
+            <div><strong>Vaga {reservation.vaga_codigo}</strong><small>{formatTime(reservation.inicio_em)} · {reservation.status}</small></div>
+            <button type="button" disabled={working} onClick={() => void onDeleteHistory(reservation.id)}>Excluir</button>
+          </article>)}</div>
+        </details>}
       </>}
 
       {step === "space" && selectedSector && <>
@@ -1383,7 +1436,7 @@ function ParkingMobileExperience({
       {step === "success" && ticketCode && <>
         <section className={`parking-mobile-success status-${ticketStatus.toLowerCase()}`}><span>{ticketStatus === "CHECKIN" ? "✓" : ticketStatus === "CONFIRMADA" ? "▦" : "✓"}</span><p className="parking-mobile-step-label">{ticketStatus === "CHECKIN" ? "ACESSO AUTENTICADO" : ticketStatus === "CONFIRMADA" ? "RESERVA CONFIRMADA" : "SOLICITAÇÃO ENVIADA"}</p><h1>Vaga <em>{ticketSpace}</em><br/>{ticketStatus === "CHECKIN" ? "liberada." : "reservada."}</h1><p>{ticketStatus === "CHECKIN" ? "QR Code validado pelo responsável. Esta confirmação será fechada automaticamente." : ticketStatus === "CONFIRMADA" ? "Apresente o QR Code abaixo ao responsável na entrada." : "Aguardando a confirmação do responsável. O QR Code já está pronto e será validado após a aprovação."}</p></section>
         <section className="parking-mobile-ticket"><div><span>▦</span><p><small>CÓDIGO DA RESERVA</small><strong>{ticketCode}</strong></p><button type="button" className="parking-mobile-copy" onClick={()=>void copyCode()}>{copyMessage || "Copiar"}</button></div>{ticketReservation?.evento_titulo&&<div><span>◷</span><p><small>EVENTO OU CULTO</small><strong>{ticketReservation.evento_titulo}</strong></p></div>}<div><span>⌖</span><p><small>LOCAL</small><strong>{ticketSector}<br/>{communityName}</strong></p></div><footer><span><small>STATUS</small><strong>{ticketStatus === "CHECKIN" ? "Autenticado" : ticketStatus === "CONFIRMADA" ? "Pronto para entrada" : "Aguardando confirmação"}</strong></span><span><small>VAGA</small><strong>{ticketSpace}</strong></span></footer></section>
-        {ticketStatus !== "CHECKIN" && <ParkingReservationQr code={ticketCode} label={`${ticketSpace} · ${ticketSector}`}/>}
+        {ticketStatus !== "CHECKIN" && <ParkingReservationQr code={ticketCode} label={`${ticketSpace} · ${ticketSector}`} expiresAt={ticketReservation?.fim_em}/>}
         <button type="button" className="parking-mobile-secondary" onClick={() => {setDismissedCode(ticketCode);setStep("local");setSpaceId(null);setCreatedCode("");}}>Fazer outra reserva</button>
       </>}
     </main>

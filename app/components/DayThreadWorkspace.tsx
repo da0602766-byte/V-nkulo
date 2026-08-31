@@ -383,6 +383,15 @@ export default function DayThreadWorkspace({
             <li
               key={item.id}
               data-camada={item.camada}
+              data-status={
+                dia !== hoje
+                  ? dia < hoje ? "concluido" : "futuro"
+                  : indice === indiceAgora
+                    ? "agora"
+                    : agora && Date.parse(item.ocorreEm) < agora
+                      ? "concluido"
+                      : "futuro"
+              }
               data-futuro={
                 dia === hoje && agora && Date.parse(item.ocorreEm) > agora ? "1" : undefined
               }

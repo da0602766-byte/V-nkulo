@@ -1353,6 +1353,18 @@ export default function PilotDashboard({
                     <strong>Atualizações</strong>
                     <b>{Math.min(unreadNotifications.total, 99)}</b>
                   </button>
+                  <button
+                    type="button"
+                    className="pilot-mobile-device-notifications"
+                    onClick={() => {
+                      setMobileMenu(null);
+                      window.dispatchEvent(new CustomEvent("vinkulo:enable-device-notifications"));
+                    }}
+                  >
+                    <span aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M10 5h4M10 18.5h4M18 8a4 4 0 0 1 3 3.8"/></svg></span>
+                    <strong>Avisar neste celular</strong>
+                    <b>ON</b>
+                  </button>
                 </div>
                 <div className="pilot-mobile-menu-grid">
                   {primaryMenu.map((item) => (

@@ -6,7 +6,10 @@ export type CommunityPaletteId =
   | "CORPORATIVO"
   | "ACOLHEDOR"
   | "SERENIDADE"
-  | "CELEBRACAO";
+  | "CELEBRACAO"
+  | "NOITE_CARMESIM"
+  | "NOITE_OCEANO"
+  | "NOITE_DOURADA";
 
 export type CommunityThemeTokens = {
   background: string;
@@ -212,6 +215,93 @@ export const COMMUNITY_PALETTES: CommunityPalette[] = [
       secondary: "#ed789b",
       accent: "#f0b258",
       shadow: "0 24px 72px rgba(0, 0, 0, 0.44)",
+    },
+  },
+  {
+    id: "NOITE_CARMESIM",
+    name: "Preto & Carmesim",
+    description: "Preto profundo, vermelho carmesim e contraste marcante.",
+    light: {
+      background: "#f5f2f2",
+      surface: "#fffafa",
+      surface2: "#eee5e6",
+      text: "#211719",
+      muted: "#756467",
+      line: "#dfd1d3",
+      primary: "#8e2439",
+      secondary: "#3a252a",
+      accent: "#c44258",
+      shadow: "0 22px 60px rgba(62, 20, 29, 0.13)",
+    },
+    dark: {
+      background: "#050506",
+      surface: "#0d0b0c",
+      surface2: "#181113",
+      text: "#fff5f6",
+      muted: "#bea7ab",
+      line: "#352126",
+      primary: "#ff526f",
+      secondary: "#d73d59",
+      accent: "#ff8799",
+      shadow: "0 26px 78px rgba(0, 0, 0, 0.68)",
+    },
+  },
+  {
+    id: "NOITE_OCEANO",
+    name: "Preto & Elétrico",
+    description: "Preto, azul elétrico e ciano para uma presença tecnológica.",
+    light: {
+      background: "#eef3f8",
+      surface: "#fbfdff",
+      surface2: "#e1eaf3",
+      text: "#132331",
+      muted: "#607486",
+      line: "#ccd9e5",
+      primary: "#075db5",
+      secondary: "#163e67",
+      accent: "#008da2",
+      shadow: "0 22px 60px rgba(17, 63, 105, 0.13)",
+    },
+    dark: {
+      background: "#030609",
+      surface: "#081019",
+      surface2: "#0d1c2a",
+      text: "#f0f8ff",
+      muted: "#98afc4",
+      line: "#17324a",
+      primary: "#38a0ff",
+      secondary: "#167bd8",
+      accent: "#31d8e8",
+      shadow: "0 26px 78px rgba(0, 0, 0, 0.68)",
+    },
+  },
+  {
+    id: "NOITE_DOURADA",
+    name: "Preto & Dourado",
+    description: "Preto elegante, dourado e areia com leitura sofisticada.",
+    light: {
+      background: "#f4f1e9",
+      surface: "#fffdf8",
+      surface2: "#ebe5d7",
+      text: "#282218",
+      muted: "#756d5f",
+      line: "#dcd3c0",
+      primary: "#8a6215",
+      secondary: "#4e4431",
+      accent: "#bd8822",
+      shadow: "0 22px 60px rgba(65, 49, 20, 0.13)",
+    },
+    dark: {
+      background: "#050504",
+      surface: "#0e0d0a",
+      surface2: "#1b1810",
+      text: "#fff9e9",
+      muted: "#beb49d",
+      line: "#38301e",
+      primary: "#f1bd4f",
+      secondary: "#c99028",
+      accent: "#ffdb81",
+      shadow: "0 26px 78px rgba(0, 0, 0, 0.68)",
     },
   },
 ];

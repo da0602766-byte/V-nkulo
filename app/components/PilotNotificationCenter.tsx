@@ -218,7 +218,7 @@ export default function PilotNotificationCenter({
     setItems((current) => current.filter((item) => id ? item.id !== id : !item.read));
   }
 
-  async function enableDeviceNotifications() {
+  const enableDeviceNotifications = useCallback(async () => {
     if (!("Notification" in window) || !("serviceWorker" in navigator)) {
       setDevicePermission("unsupported");
       return;
@@ -236,7 +236,7 @@ export default function PilotNotificationCenter({
       data: { url: "/painel" },
     });
     await load();
-  }
+  }, [load]);
 
   function handleDeviceNotificationPermission() {
     if (devicePermission === "denied") {
@@ -245,6 +245,15 @@ export default function PilotNotificationCenter({
     }
     void enableDeviceNotifications();
   }
+
+  useEffect(() => {
+    const enableFromMobileMenu = () => {
+      setOpen(true);
+      void enableDeviceNotifications();
+    };
+    window.addEventListener("vinkulo:enable-device-notifications", enableFromMobileMenu);
+    return () => window.removeEventListener("vinkulo:enable-device-notifications", enableFromMobileMenu);
+  }, [enableDeviceNotifications]);
 
   return (
     <div className="pilot-notification-center">
