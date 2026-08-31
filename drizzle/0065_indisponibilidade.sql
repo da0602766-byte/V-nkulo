@@ -1,5 +1,5 @@
 -- Indisponibilidade: Bloqueios de datas/horários
-CREATE TABLE `indisponibilidades` (
+CREATE TABLE IF NOT EXISTS `indisponibilidades` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`comunidade_id` integer NOT NULL,
 	`usuario_id` integer NOT NULL,
@@ -19,6 +19,6 @@ CREATE TABLE `indisponibilidades` (
 	FOREIGN KEY (`usuario_id`) REFERENCES `usuarios`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE INDEX `indisponibilidades_usuario_idx` ON `indisponibilidades` (`comunidade_id`,`usuario_id`,`data_inicio`);
+CREATE INDEX IF NOT EXISTS `indisponibilidades_usuario_idx` ON `indisponibilidades` (`comunidade_id`,`usuario_id`,`data_inicio`);
 --> statement-breakpoint
-CREATE INDEX `indisponibilidades_periodo_idx` ON `indisponibilidades` (`data_inicio`,`data_fim`,`comunidade_id`);
+CREATE INDEX IF NOT EXISTS `indisponibilidades_periodo_idx` ON `indisponibilidades` (`data_inicio`,`data_fim`,`comunidade_id`);

@@ -1,5 +1,5 @@
 -- Visita Tracking: Rastreamento de visitas presenciais
-CREATE TABLE `visitor_visits` (
+CREATE TABLE IF NOT EXISTS `visitor_visits` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`comunidade_id` integer NOT NULL,
 	`visitante_id` integer NOT NULL,
@@ -18,8 +18,8 @@ CREATE TABLE `visitor_visits` (
 	FOREIGN KEY (`responsavel_id`) REFERENCES `usuarios`(`id`) ON UPDATE no action ON DELETE set null
 );
 --> statement-breakpoint
-CREATE INDEX `visitor_visits_visitante_idx` ON `visitor_visits` (`comunidade_id`,`visitante_id`,`data_visita`);
+CREATE INDEX IF NOT EXISTS `visitor_visits_visitante_idx` ON `visitor_visits` (`comunidade_id`,`visitante_id`,`data_visita`);
 --> statement-breakpoint
-CREATE INDEX `visitor_visits_responsavel_idx` ON `visitor_visits` (`responsavel_id`,`data_visita`);
+CREATE INDEX IF NOT EXISTS `visitor_visits_responsavel_idx` ON `visitor_visits` (`responsavel_id`,`data_visita`);
 --> statement-breakpoint
-CREATE INDEX `visitor_visits_data_idx` ON `visitor_visits` (`data_visita`,`comunidade_id`);
+CREATE INDEX IF NOT EXISTS `visitor_visits_data_idx` ON `visitor_visits` (`data_visita`,`comunidade_id`);
