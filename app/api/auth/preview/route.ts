@@ -36,10 +36,15 @@ export async function GET(request: Request) {
         AND u.senha_salt IS NOT NULL
         AND uc.status = 'ATIVO'
         AND c.status = 'ATIVA'
+      -- Os papéis 'PROPRIETARIO' e 'ADMIN' não existem no catálogo atual
+      -- (LIDER, PASTOR, ADMIN_COMUNIDADE, PROPRIETARIO_VISUALIZADOR,
+      -- SUPERADMIN), então SUPERADMIN e ADMIN_COMUNIDADE caíam no ELSE e a
+      -- prévia local elegia um pastor. Efeito prático: a área do proprietário
+      -- ficava inacessível justamente na prévia, que é onde se confere.
       ORDER BY
         CASE uc.papel
-          WHEN 'PROPRIETARIO' THEN 0
-          WHEN 'ADMIN' THEN 1
+          WHEN 'SUPERADMIN' THEN 0
+          WHEN 'ADMIN_COMUNIDADE' THEN 1
           WHEN 'PASTOR' THEN 2
           WHEN 'LIDER' THEN 3
           ELSE 4

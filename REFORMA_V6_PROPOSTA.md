@@ -6,7 +6,34 @@ checados. O que já existe está marcado como **já existe**, e isso muda o cust
 de várias coisas pedidas.
 
 - **Base:** `a034cbf`, com a Reforma V5 integrada e aguardando publicação.
-- **Estado:** nada implementado. Aguardando escolha de prioridade.
+- **Decidido:** começar pela área do proprietário (seção 5); o mapa de
+  visitantes será agregado por bairro, não por endereço (seção 1.2).
+- **Estado:** seção 5.1 (coerência) feita. Seção 5.2 (ambiente simulado) é a
+  próxima.
+
+## Registro de execução
+
+### 5.1 Coerência da área do proprietário — feito
+
+O que apareceu ao fazer, e que o diagnóstico não previa:
+
+1. **`MenuIcon` não era exportado.** Vivia dentro de `PilotDashboard.tsx`. Foi
+   extraído para `app/components/MenuIcon.tsx` em vez de duplicado, porque dois
+   conjuntos de ícones viram duas verdades sobre o mesmo desenho.
+2. **A prévia local elegia um pastor, não o superadmin.** A rota
+   `/api/auth/preview` ordenava por papéis que não existem mais
+   (`PROPRIETARIO`, `ADMIN`), então `SUPERADMIN` caía no `ELSE`. Efeito: a área
+   do proprietário ficava inacessível justamente na prévia, que é onde se
+   confere. Corrigido.
+3. **O acento cobre nunca tinha chegado aqui.** Dezesseis pontos em roxo
+   pré-reforma (`#694af1`, `#7157e8`, `#6544df`, `#6749df`, `#6546df`,
+   `#6648de`) e dois verdes fora do token. Restaram três verdes, todos de
+   estado ("Dados em tempo real", "Servidor protegido", "✓"), agora em
+   `var(--green)`.
+
+**Dívida aberta:** os marcadores de tipo de feedback (`✦ ↗ ⚑ !`) continuam
+glifos. São classificação de conteúdo, não navegação, e trocá-los é outro
+recorte.
 
 ## 0. O que já existe (e muda o preço do pedido)
 

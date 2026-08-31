@@ -13,9 +13,12 @@ test("menu móvel preserva dimensões visíveis para todos os ícones", () => {
 });
 
 test("Mural usa símbolo diferente da página inicial", () => {
+  // Os traçados saíram de PilotDashboard.tsx para MenuIcon.tsx, para que a
+  // área do proprietário use o mesmo conjunto. A garantia é a mesma.
+  const icons = read("app/components/MenuIcon.tsx");
   const dashboard = read("app/components/PilotDashboard.tsx");
-  const home = dashboard.match(/inicio: "([^"]+)"/)?.[1];
-  const wall = dashboard.match(/mural: "([^"]+)"/)?.[1];
+  const home = icons.match(/inicio: "([^"]+)"/)?.[1];
+  const wall = icons.match(/mural: "([^"]+)"/)?.[1];
 
   assert.ok(home && wall);
   assert.notEqual(wall, home);
@@ -24,9 +27,9 @@ test("Mural usa símbolo diferente da página inicial", () => {
 });
 
 test("Escalas usa símbolo diferente de Ministérios", () => {
-  const dashboard = read("app/components/PilotDashboard.tsx");
-  const ministries = dashboard.match(/ministerios: "([^"]+)"/)?.[1];
-  const schedules = dashboard.match(/escalas: "([^"]+)"/)?.[1];
+  const icons = read("app/components/MenuIcon.tsx");
+  const ministries = icons.match(/ministerios: "([^"]+)"/)?.[1];
+  const schedules = icons.match(/escalas: "([^"]+)"/)?.[1];
 
   assert.ok(ministries && schedules);
   assert.notEqual(schedules, ministries);

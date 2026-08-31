@@ -6,6 +6,7 @@ import type { PilotFeatureState } from "../lib/pilot-data";
 import GlobalVisualEditor from "./GlobalVisualEditor";
 import PilotNotificationCenter from "./PilotNotificationCenter";
 import VerifiedOwnerName from "./VerifiedOwnerName";
+import MenuIcon, { type MenuIconId } from "./MenuIcon";
 import PlatformControlsWorkspace from "./PlatformControlsWorkspace";
 import EditorialAutomationWorkspace from "./EditorialAutomationWorkspace";
 import StatisticsWorkspace from "./StatisticsWorkspace";
@@ -51,17 +52,28 @@ type OwnerMetricKey =
   | "eventos_futuros"
   | "conversas_mes";
 
-const TABS: { id: OwnerTab; label: string; icon: string }[] = [
-  { id: "overview", label: "Painel geral", icon: "▦" },
-  { id: "requests", label: "Solicitações", icon: "◫" },
-  { id: "communities", label: "Comunidades", icon: "◇" },
-  { id: "users", label: "Pessoas", icon: "◎" },
-  { id: "audit", label: "Segurança e auditoria", icon: "✓" },
-  { id: "feedback", label: "Feedback e denúncias", icon: "!" },
-  { id: "editorial", label: "IA Editorial", icon: "✦" },
-  { id: "statistics", label: "Estatísticas", icon: "▥" },
-  { id: "optimization", label: "Otimização", icon: "↻" },
-  { id: "controls", label: "Configurações", icon: "⚙" },
+/* As dez abas viviam num nível só, com glifos tipográficos que a V5 já tinha
+   removido do painel. Agora se agrupam pelo que a pessoa foi fazer ali:
+   Operação é fila de trabalho, Plataforma é o que muda para todo mundo,
+   Evidência é o que se consulta para decidir. */
+type OwnerGroup = "Operação" | "Plataforma" | "Evidência";
+
+const TABS: {
+  id: OwnerTab;
+  label: string;
+  icon: MenuIconId;
+  grupo: OwnerGroup;
+}[] = [
+  { id: "overview", label: "Painel geral", icon: "painel-geral", grupo: "Operação" },
+  { id: "requests", label: "Solicitações", icon: "solicitacoes", grupo: "Operação" },
+  { id: "communities", label: "Comunidades", icon: "comunidade", grupo: "Operação" },
+  { id: "users", label: "Pessoas", icon: "pessoas", grupo: "Operação" },
+  { id: "feedback", label: "Feedback e denúncias", icon: "feedback", grupo: "Operação" },
+  { id: "editorial", label: "IA Editorial", icon: "editorial", grupo: "Plataforma" },
+  { id: "controls", label: "Configurações", icon: "configuracoes", grupo: "Plataforma" },
+  { id: "statistics", label: "Estatísticas", icon: "estatisticas", grupo: "Evidência" },
+  { id: "audit", label: "Segurança e auditoria", icon: "auditoria", grupo: "Evidência" },
+  { id: "optimization", label: "Otimização", icon: "otimizacao", grupo: "Evidência" },
 ];
 
 const OWNER_METRICS: {
@@ -387,7 +399,12 @@ export default function OwnerWorkspace({
         <aside className="owner-sidebar">
           <div className="owner-identity-card"><span>DA</span><div><small>ACESSO INTEGRAL</small><VerifiedOwnerName name={ownerName} verified /><p>Todas as comunidades, usuários, módulos e configurações.</p></div></div>
           <nav aria-label="Menu do proprietário">
-            {TABS.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => { setTab(item.id); setDirectoryPage(0); }}><span>{item.icon}</span>{item.label}{item.id === "requests" && pending.length > 0 ? <b>{pending.length}</b> : item.id === "feedback" && pendingFeedback.length > 0 ? <b>{pendingFeedback.length}</b> : null}</button>)}
+            {(["Operação", "Plataforma", "Evidência"] as OwnerGroup[]).map((grupo) => (
+              <div className="owner-nav-group-v6" key={grupo}>
+                <h2>{grupo}</h2>
+                {TABS.filter((item) => item.grupo === grupo).map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => { setTab(item.id); setDirectoryPage(0); }}><span className="owner-nav-icon-v6" aria-hidden="true"><MenuIcon id={item.icon} /></span>{item.label}{item.id === "requests" && pending.length > 0 ? <b>{pending.length}</b> : item.id === "feedback" && pendingFeedback.length > 0 ? <b>{pendingFeedback.length}</b> : null}</button>)}
+              </div>
+            ))}
           </nav>
           <Link href="/painel">Abrir painel de comunidade →</Link>
           <Link href="/comunidades">Ver diretório público →</Link>
@@ -397,9 +414,9 @@ export default function OwnerWorkspace({
           <header className="owner-page-heading owner-page-heading-v97">
             <div><p className="pilot-kicker">CENTRAL DO PROPRIETÁRIO</p><h1>{tabLabel(tab)}</h1><p>{tabDescription(tab)}</p></div>
             <div className="owner-page-quick-actions">
-              <button type="button" onClick={() => setTab("requests")}><span>◫</span> Revisar solicitações {pending.length > 0 && <b>{pending.length}</b>}</button>
-              <button type="button" onClick={() => setTab("feedback")}><span>!</span> Feedback {pendingFeedback.length > 0 && <b>{pendingFeedback.length}</b>}</button>
-              <button type="button" onClick={() => setTab("communities")}><span>◇</span> Abrir comunidades</button>
+              <button type="button" onClick={() => setTab("requests")}><span aria-hidden="true"><MenuIcon id="solicitacoes" /></span> Revisar solicitações {pending.length > 0 && <b>{pending.length}</b>}</button>
+              <button type="button" onClick={() => setTab("feedback")}><span aria-hidden="true"><MenuIcon id="feedback" /></span> Feedback {pendingFeedback.length > 0 && <b>{pendingFeedback.length}</b>}</button>
+              <button type="button" onClick={() => setTab("communities")}><span aria-hidden="true"><MenuIcon id="comunidade" /></span> Abrir comunidades</button>
             </div>
           </header>
           {/* A nota de escopo vivia dentro de um <details> fechado: era preciso
@@ -776,7 +793,7 @@ function Metric({
     onDrop={onDrop}
   ><span className="owner-metric-grip" aria-hidden="true">⋮⋮</span><div className="owner-metric-touch-actions" aria-label={`Reordenar ${label}`}><button type="button" onClick={onMoveUp} disabled={!onMoveUp} aria-label={`Mover ${label} para cima`}>↑</button><button type="button" onClick={onMoveDown} disabled={!onMoveDown} aria-label={`Mover ${label} para baixo`}>↓</button></div><small>{label}</small><strong>{Number(value || 0)}</strong><p>{detail}</p></article>;
 }
-function Empty({ title, text }: { title: string; text: string }) { return <div className="owner-empty"><span>◇</span><strong>{title}</strong><p>{text}</p></div>; }
+function Empty({ title, text }: { title: string; text: string }) { return <div className="owner-empty"><span aria-hidden="true"><MenuIcon id="comunidade" /></span><strong>{title}</strong><p>{text}</p></div>; }
 function OwnerAvatar({ image = "", name }: { image?: string; name: string }) {
   return <span className="owner-profile-avatar">{image ? <img src={image} alt="" loading="lazy" /> : initials(name)}</span>;
 }
