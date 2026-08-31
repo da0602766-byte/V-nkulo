@@ -95,7 +95,7 @@ test("o Fio do dia tem view, rota e item próprios no trilho", async () => {
 });
 
 test("a migração do fio existe e isola por comunidade", async () => {
-  const sql = await read("drizzle/0059_fio_registros.sql");
+  const sql = await read("drizzle/0060_fio_registros.sql");
   assert.match(sql, /CREATE TABLE `fio_registros`/);
   assert.match(sql, /`comunidade_id` integer NOT NULL/);
   assert.match(sql, /REFERENCES `comunidades`\(`id`\)[^,]*ON DELETE cascade/);

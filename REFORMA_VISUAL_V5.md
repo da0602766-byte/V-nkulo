@@ -66,7 +66,7 @@ diaconia seguem fora do agregador — hoje ele lê eventos, escalas, visitantes,
 pedidos e mural. A ocupação do salão depende de presença, que ainda não é fonte.
 
 **Esta é a única parte da reforma que exige migração de banco.** A tabela
-`fio_registros` (`drizzle/0059_fio_registros.sql`) guarda os lançamentos
+`fio_registros` (`drizzle/0060_fio_registros.sql`) guarda os lançamentos
 manuais — o que o sistema não capta sozinho, como uma visita pastoral ou um
 imprevisto. Todo o resto do fio é agregação de dados que já existem.
 
