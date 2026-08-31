@@ -49,6 +49,8 @@ test("CSS final remove cartões e estabiliza o detalhe móvel de Células", asyn
   assert.match(styles, /event-poll-toggle[\s\S]*box-shadow:\s*none\s*!important/);
   assert.match(styles, /parking-sector-editor\[open\]::before/);
   assert.match(styles, /community-central-workspace > \.workspace-heading[\s\S]*background:\s*transparent/);
+  assert.match(styles, /cell-detail-v2\.cell-detail-v4[\s\S]*width:\s*100%\s*!important/);
+  assert.doesNotMatch(styles, /cell-detail-v2\.cell-detail-v4[\s\S]{0,160}width:\s*100vw\s*!important/);
   assert.match(styles, /cell-detail-v4 \.cell-tabs-v2[\s\S]*flex-flow:\s*row nowrap\s*!important/);
   assert.match(styles, /cell-detail-content-v4[\s\S]*overflow-y:\s*auto\s*!important/);
 });

@@ -31085,7 +31085,8 @@ html[data-theme="dark"] .pilot-dashboard[data-ui-version="v2"] :is(
     background: var(--v2-bg) !important;
   }
   .pilot-dashboard[data-ui-version="v2"] .cell-detail-overlay-v2 .cell-detail-v2.cell-detail-v4 {
-    width: 100vw !important;
+    width: 100% !important;
+    max-width: 100% !important;
     height: 100dvh !important;
     min-height: 0 !important;
     border: 0 !important;
