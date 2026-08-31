@@ -22,13 +22,14 @@ deixam ambíguo o que aplicar; quem chega depois assume o número seguinte. As
 duas foram aplicadas ao mesmo banco local, na ordem, sem conflito — é assim que
 se sabe que convivem.
 
-A `0060` cria uma tabela nova (`fio_registros`) e dois índices. Não altera nem
-remove nada existente, então é reversível por `DROP TABLE`.
+A `0060` cria uma tabela nova (`fio_registros`) e um índice
+(`fio_registros_dia_idx`). Não altera nem remove nada existente, então é
+reversível por `DROP TABLE`.
 
 ## O que publicar
 
-Os 14 commits entre `1c6d447` e `90eeffe`. O conjunto mexe em 45 arquivos:
-2.814 linhas somadas, 157 removidas.
+Os 15 commits que o branch tem à frente de `main` — de `90bdb09` a `b7e7886`.
+O conjunto mexe em 46 arquivos: 2.932 linhas somadas, 157 removidas.
 
 | # | Commit | O que entrega |
 | --- | --- | --- |
@@ -46,6 +47,7 @@ Os 14 commits entre `1c6d447` e `90eeffe`. O conjunto mexe em 45 arquivos:
 | 12 | `97d4da1` | Bloco 6: superfície pública com um acento só |
 | 13 | `7b7caf0` | Renumera a migração do fio para `0060` |
 | 14 | `90eeffe` | Integra a reforma ao seu trabalho publicado |
+| 15 | `b7e7886` | Este documento |
 
 ## O que foi preservado do seu trabalho
 
@@ -92,8 +94,13 @@ Agora usa `hojeLocal()`.
    React reclama no console. Está nos dois lados desde antes desta reforma, e
    por isso não foi tocado aqui.
 2. **O verde-água da agenda** (`#3fc9b0`, camada pessoal) permanece de
-   propósito: ali a cor distingue camadas, e distinguir é informar. A regra da
-   reforma é "verde, âmbar e rosa só significam estado" — camada é estado.
+   propósito, e vale dizer com precisão por quê: camada **não** é estado, é
+   categoria. A regra escrita na reforma ("verde, âmbar e rosa só significam
+   estado") não cobre esse caso — o que ela quer dizer é que cor precisa
+   informar, não decorar, e distinguir três camadas na mesma grade informa.
+   Se você preferir fechar a regra em vez de interpretá-la, o caminho é
+   declarar as cores de camada como um conjunto categórico próprio, separado
+   dos tokens de estado.
 
 ## Passos
 
