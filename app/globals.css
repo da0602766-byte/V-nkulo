@@ -29648,6 +29648,19 @@ body {
 }
 .agenda-novo-evento:hover { border-color:var(--pilot-primary); color:var(--pilot-primary); }
 
+.agenda-fio-link {
+  display:inline-flex;
+  align-items:center;
+  min-height:38px;
+  padding:0 12px;
+  font-size:var(--fs-xs);
+  font-weight:700;
+  color:var(--pilot-text-muted);
+  text-decoration:none;
+  white-space:nowrap;
+}
+.agenda-fio-link:hover { color:var(--pilot-primary); text-decoration:underline; }
+
 /* Sem o cartão em volta, a grade precisa da própria moldura para os dias
    continuarem lendo como uma tabela. */
 .agenda-grade { gap:0; border:1px solid var(--pilot-line); border-radius:12px; overflow:hidden; }
@@ -29947,6 +29960,18 @@ body {
   white-space: nowrap;
 }
 .day-thread-register:hover { filter: brightness(1.06); }
+.day-thread-agenda-link {
+  display:inline-flex;
+  align-items:center;
+  min-height:38px;
+  padding:0 12px;
+  font-size:var(--fs-xs);
+  font-weight:700;
+  color:var(--pilot-text-muted);
+  text-decoration:none;
+  white-space:nowrap;
+}
+.day-thread-agenda-link:hover { color:var(--pilot-primary); text-decoration:underline; }
 
 .day-thread-layers { display: flex; flex-wrap: wrap; gap: 6px; }
 .day-thread-layers button {

@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { RelacionamentoTools } from "./RelacionamentoTools";
 
 type Visitor = {
   id: number;
@@ -1328,6 +1329,12 @@ export function VisitorsWorkspace({
             </div>
           </section>
         </div>
+
+        {/* Ferramentas de Relacionamento — complementam o funil acima com visão por pessoa */}
+        <section style={{ padding: "24px", background: "var(--color-surface)", borderRadius: "8px", marginBottom: "24px" }} aria-labelledby="relacionamento-tools-title">
+          <h2 id="relacionamento-tools-title" style={{ marginTop: 0, marginBottom: "16px", fontSize: "16px", fontWeight: "bold" }}>🛠️ Ferramentas de Relacionamento</h2>
+          <RelacionamentoTools visitantes={visitors} compacto={false} />
+        </section>
 
         <section className="visitor-sheet-v2" aria-labelledby="visitor-sheet-title">
           <header className="visitor-sheet-head-v2">

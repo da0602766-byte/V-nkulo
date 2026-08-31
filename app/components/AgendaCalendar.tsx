@@ -337,6 +337,13 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
             </button>
           ))}
         </div>
+        <a
+          className="agenda-fio-link"
+          href="/painel?view=fio"
+          title="Ver o registro cronológico do dia, com pedidos e visitantes"
+        >
+          Ver Fio do dia →
+        </a>
         </div>
       </header>
 

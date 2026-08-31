@@ -249,6 +249,13 @@ export default function DayThreadWorkspace({
               Registrar no fio
             </button>
           )}
+          <a
+            className="day-thread-agenda-link"
+            href="/painel?view=eventos"
+            title="Ver a semana e o mês em formato de calendário"
+          >
+            Ver agenda completa →
+          </a>
         </div>
       </header>
 

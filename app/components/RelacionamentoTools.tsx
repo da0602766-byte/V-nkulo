@@ -150,43 +150,37 @@ function EngagementScoreBadge({ score }: { score: number }) {
 
 /**
  * FERRAMENTA 2: Régua de Acompanhamento
- * Barra visual mostrando progresso do visitante
+ * O funil (visitor-funnel-v5) já mostra a distribuição agregada por estágio;
+ * aqui a régua vira só o rótulo do estágio individual, sem repetir a barra.
  */
 function ReguaAcompanhamento({ status }: { status: string }) {
+  const rotulos: Record<string, string> = {
+    NOVO: "Recebido",
+    EM_CONTATO: "Contatado",
+    EM_ACOMPANHAMENTO: "Em acompanhamento",
+    INTEGRADO: "Integrado",
+  };
   const etapas = ["NOVO", "EM_CONTATO", "EM_ACOMPANHAMENTO", "INTEGRADO"];
-  const indexAtual = etapas.indexOf(status);
+  const indexAtual = Math.max(etapas.indexOf(status), 0);
+  const cor = status === "INTEGRADO" ? "#10b981" : status === "EM_ACOMPANHAMENTO" ? "#3b82f6" : status === "EM_CONTATO" ? "#f59e0b" : "var(--color-text-muted)";
 
   return (
     <div
       className="regua-acompanhamento"
       style={{
         display: "flex",
-        gap: "12px",
         alignItems: "center",
-        marginTop: "12px",
-        marginBottom: "12px",
-        fontSize: "12px",
+        gap: "6px",
+        marginTop: "8px",
+        marginBottom: "8px",
+        fontSize: "11px",
+        color: "var(--color-text-muted)",
       }}
+      title={`Etapa ${indexAtual + 1} de ${etapas.length} no funil de acolhimento`}
     >
-      <span style={{ color: "var(--color-text-muted)", minWidth: "80px" }}>
-        Progresso:
-      </span>
-      <div style={{ display: "flex", gap: "8px", flex: 1 }}>
-        {etapas.map((etapa, index) => (
-          <div
-            key={etapa}
-            style={{
-              flex: 1,
-              height: "8px",
-              background: index <= indexAtual ? "var(--color-primary, #3b82f6)" : "var(--color-border, #e5e7eb)",
-              borderRadius: "4px",
-              position: "relative",
-              transition: "background 200ms",
-            }}
-            title={etapa.replace(/_/g, " ")}
-          />
-        ))}
-      </div>
+      <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: cor, display: "inline-block" }} />
+      <span style={{ fontWeight: "bold", color: "var(--color-text)" }}>{rotulos[status] || status}</span>
+      <span>· etapa {indexAtual + 1}/{etapas.length}</span>
     </div>
   );
 }
