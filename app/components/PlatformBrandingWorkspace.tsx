@@ -10,6 +10,7 @@ const PLATFORM_THEMES: {
   description: string;
   colors: [string, string, string];
 }[] = [
+  { id: "COBRE", name: "Cobre", description: "Padrão do VÍNKULO", colors: ["#161c2e", "#b25a33", "#d9784c"] },
   { id: "VIOLETA", name: "Violeta", description: "Tecnologia e conexão", colors: ["#0b1740", "#7551f4", "#36cbd0"] },
   { id: "ESMERALDA", name: "Esmeralda", description: "Gestão e crescimento", colors: ["#062c28", "#139b70", "#8ce7c2"] },
   { id: "AURORA", name: "Aurora", description: "Acolhimento e energia", colors: ["#39200d", "#d59026", "#ef7b75"] },
@@ -21,7 +22,7 @@ export default function PlatformBrandingWorkspace() {
   const [logoUrl, setLogoUrl] = useState("");
   const [feedBannerUrl, setFeedBannerUrl] = useState("");
   const [themePreset, setThemePreset] =
-    useState<PlatformThemePreset>("VIOLETA");
+    useState<PlatformThemePreset>("COBRE");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -36,7 +37,7 @@ export default function PlatformBrandingWorkspace() {
         setSiteName(result.branding?.siteName || "VÍNKULO");
         setLogoUrl(result.branding?.logoUrl || "");
         setFeedBannerUrl(result.branding?.feedBannerUrl || "");
-        setThemePreset(result.branding?.themePreset || "VIOLETA");
+        setThemePreset(result.branding?.themePreset || "COBRE");
       })
       .catch((error) => setMessage(error.message))
       .finally(() => setLoading(false));

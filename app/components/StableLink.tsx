@@ -7,6 +7,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 
 export default function StableLink({
   href,
@@ -58,13 +59,13 @@ export default function StableLink({
       <a href={href} onClick={handleClick} {...props}>
         {children}
       </a>
-      {pending && (
+      {pending && typeof document !== "undefined" && createPortal((
         <div className="global-navigation-loading" role="status" aria-live="polite" aria-busy="true">
           <span className="pilot-loader" aria-hidden="true" />
           <strong>{loadingLabel}</strong>
           <small>Preparando sua sessão, comunidade e permissões.</small>
         </div>
-      )}
+      ), document.body)}
     </>
   );
 }

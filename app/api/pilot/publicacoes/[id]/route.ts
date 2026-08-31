@@ -2,6 +2,7 @@ import { getD1 } from "../../../../../db";
 import { parseFeedPostPayload } from "../../../../lib/feed-validation";
 import { recordTenantAudit } from "../../../../lib/tenant-audit";
 import { requireTenantPermission } from "../../../../lib/tenant";
+import { notifyUser } from "../../../../lib/pilot-notifications";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -29,6 +30,21 @@ export async function PATCH(request: Request, context: Context) {
   }
   const isOwner = existing.criado_por === access.user.id;
   const canModerate = access.context.permissions.includes("feed.moderate");
+  if (String(payload.acao || "").toUpperCase() === "APROVAR") {
+    if (!canModerate && access.user.system_owner !== true) {
+      return Response.json({ error: "Somente o responsável da comunidade pode aprovar." }, { status: 403 });
+    }
+    await db.prepare(
+      `UPDATE publicacoes_piloto SET status = 'PUBLICADA', aprovacao_status = 'APROVADA',
+       aprovado_por = ?, aprovado_em = CURRENT_TIMESTAMP, atualizado_em = CURRENT_TIMESTAMP
+       WHERE id = ? AND comunidade_id = ? AND status = 'EM_ANALISE'`,
+    ).bind(access.user.id, id, access.context.comunidadeId).run();
+    if (existing.criado_por && existing.criado_por !== access.user.id) {
+      await notifyUser(db, { userId: existing.criado_por, title: "Publicação aprovada", message: "Sua publicação foi aprovada pelo responsável da comunidade.", entityId: id, destination: `/painel?view=inicio#publicacao-${id}`, createdBy: "VÍNKULO" });
+    }
+    await recordTenantAudit(db, access.context, access.user.id, "PUBLICACAO_APROVADA", "SUCESSO", { publicacaoId: id });
+    return Response.json({ ok: true });
+  }
   if (String(payload.acao || "").toUpperCase() === "ARQUIVAR") {
     if (!isOwner && !canModerate) {
       return Response.json(
@@ -70,11 +86,12 @@ export async function PATCH(request: Request, context: Context) {
   if ("error" in parsed) {
     return Response.json({ error: parsed.error }, { status: 400 });
   }
+  const nextStatus = parsed.status === "PUBLICADA" && !canModerate && access.user.system_owner !== true ? "EM_ANALISE" : parsed.status;
   await db
     .prepare(
       `UPDATE publicacoes_piloto SET
         titulo = ?, resumo = ?, conteudo = ?, categoria = ?,
-        visibilidade = ?, status = ?, comentarios_habilitados = ?,
+        visibilidade = ?, status = ?, aprovacao_status = ?, comentarios_habilitados = ?,
         imagem_url = ?, imagem_thumbnail_url = ?, imagem_alt = ?,
         imagem_width = ?, imagem_height = ?, links_json = ?,
         atualizado_em = CURRENT_TIMESTAMP
@@ -86,7 +103,8 @@ export async function PATCH(request: Request, context: Context) {
       parsed.conteudo,
       parsed.categoria,
       "COMUNIDADE",
-      parsed.status,
+      nextStatus,
+      nextStatus === "EM_ANALISE" ? "PENDENTE" : "APROVADA",
       parsed.comentariosHabilitados ? 1 : 0,
       parsed.imagemUrl,
       parsed.imagemThumbnailUrl,
@@ -106,7 +124,7 @@ export async function PATCH(request: Request, context: Context) {
     "SUCESSO",
     {
       publicacaoId: id,
-      status: parsed.status,
+      status: nextStatus,
       visibilidade: "COMUNIDADE",
     },
   );

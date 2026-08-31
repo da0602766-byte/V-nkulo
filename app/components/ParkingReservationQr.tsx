@@ -10,6 +10,13 @@ import {
 
 const QR_PREFIX = "VINKULO:PARKING:";
 
+export type ParkingQrValidationResult = {
+  ok: boolean;
+  title?: string;
+  message: string;
+  details?: string[];
+};
+
 export function normalizeParkingQrCode(value: string) {
   const match = value.trim().toUpperCase().match(/VK-[A-F0-9]{8,32}/);
   return match?.[0] || "";
@@ -103,13 +110,14 @@ export function ParkingQrCheckin({
 }: {
   disabled?: boolean;
   promptOnMount?: boolean;
-  onDetected: (code: string) => boolean | void | Promise<boolean | void>;
+  onDetected: (code: string) => ParkingQrValidationResult | boolean | string | void | Promise<ParkingQrValidationResult | boolean | string | void>;
 }) {
   const [open, setOpen] = useState(false);
   const [welcomeOpen, setWelcomeOpen] = useState(promptOnMount);
   const [scanning, setScanning] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [message, setMessage] = useState("");
+  const [result, setResult] = useState<ParkingQrValidationResult | null>(null);
   const [cameraPermission, setCameraPermission] = useState<"unknown" | "prompt" | "granted" | "denied" | "unsupported">("unknown");
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -159,27 +167,53 @@ export function ParkingQrCheckin({
   const submitCode = useCallback(async (rawValue: string) => {
     const code = normalizeParkingQrCode(rawValue);
     if (!code) {
-      setMessage("Este QR Code não pertence a uma reserva do Vínkulo.");
+      setResult({
+        ok: false,
+        title: "QR Code não reconhecido",
+        message: "Este código não pertence a uma reserva do Vínkulo.",
+      });
       return;
     }
     if (foundRef.current) return;
     foundRef.current = true;
     stopCamera();
     setProcessing(true);
+    setResult(null);
     setMessage("Validando reserva…");
     try {
       const accepted = await onDetected(code);
+      if (accepted && typeof accepted === "object") {
+        setMessage("");
+        setResult(accepted);
+        return;
+      }
       if (typeof accepted === "string") {
-        setMessage(accepted);
+        setMessage("");
+        setResult({ ok: false, title: "Acesso não liberado", message: accepted });
         return;
       }
       if (accepted === false) {
-        setMessage("Não foi possível liberar esta reserva. Confira o motivo informado e tente o próximo QR Code.");
-        window.setTimeout(() => void startCameraRef.current(true), 1700);
+        setMessage("");
+        setResult({
+          ok: false,
+          title: "Acesso não liberado",
+          message: "Não foi possível liberar esta reserva. Confira os dados e tente novamente.",
+        });
         return;
       }
-      setMessage("QR Code autenticado. Entrada liberada — o leitor continuará aberto para a próxima reserva.");
-      window.setTimeout(() => void startCameraRef.current(true), 1300);
+      setMessage("");
+      setResult({
+        ok: true,
+        title: "QR Code verificado",
+        message: "Entrada liberada com sucesso.",
+      });
+    } catch (cause) {
+      setMessage("");
+      setResult({
+        ok: false,
+        title: "Falha na verificação",
+        message: (cause as Error).message || "Não foi possível consultar esta reserva.",
+      });
     } finally {
       setProcessing(false);
       foundRef.current = false;
@@ -220,6 +254,7 @@ export function ParkingQrCheckin({
 
   async function startCamera(preserveMessage = false) {
     if (!preserveMessage) setMessage("");
+    setResult(null);
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraPermission("unsupported");
       setMessage("A câmera não está disponível neste aparelho. Digite o código da reserva.");
@@ -286,6 +321,7 @@ export function ParkingQrCheckin({
     stopCamera();
     setOpen(false);
     setMessage("");
+    setResult(null);
   }
 
   return (
@@ -316,22 +352,37 @@ export function ParkingQrCheckin({
               <div><small>CHECK-IN DE RESERVA</small><h2 id="parking-qr-title">Ler QR Code</h2></div>
               <button type="button" onClick={close} aria-label="Fechar leitor">×</button>
             </header>
-            <div className={`parking-qr-camera${scanning ? " active" : ""}`}>
-              <video ref={videoRef} muted autoPlay playsInline aria-label="Visualização da câmera" />
-              <span aria-hidden="true" />
-              {!scanning && <button type="button" disabled={processing} onClick={() => void startCamera()}>{cameraPermission === "denied" ? "Tentar novamente" : "Permitir câmera"}</button>}
-            </div>
-            {!scanning && <section className={`parking-camera-permission status-${cameraPermission}`} aria-live="polite">
-              <strong>{cameraPermission === "granted" ? "Câmera autorizada" : cameraPermission === "denied" ? "Permissão bloqueada" : "Confirmação necessária"}</strong>
-              <p>{cameraPermission === "denied" ? "No aplicativo: abra Configurações do celular › Aplicativos › Vínkulo › Permissões › Câmera e escolha Permitir. No navegador, use o cadeado ao lado do endereço." : "O celular mostrará agora a confirmação de acesso. O Vínkulo usa a câmera somente durante a leitura."}</p>
-            </section>}
+            {result ? (
+              <section className={`parking-qr-result ${result.ok ? "success" : "error"}`} role="status" aria-live="assertive">
+                <span className="parking-qr-result-icon" aria-hidden="true">{result.ok ? "✓" : "!"}</span>
+                <small>{result.ok ? "ACESSO AUTENTICADO" : "VERIFICAÇÃO INTERROMPIDA"}</small>
+                <h3>{result.title || (result.ok ? "QR Code verificado" : "Acesso não liberado")}</h3>
+                <p>{result.message}</p>
+                {result.details?.length ? <ul>{result.details.map((detail) => <li key={detail}>{detail}</li>)}</ul> : null}
+                <button type="button" onClick={() => void startCamera()}>
+                  {result.ok ? "Ler próximo QR Code" : "Tentar novamente"}
+                </button>
+              </section>
+            ) : (
+              <>
+                <div className={`parking-qr-camera${scanning ? " active" : ""}`}>
+                  <video ref={videoRef} muted autoPlay playsInline aria-label="Visualização da câmera" />
+                  <span aria-hidden="true" />
+                  {!scanning && <button type="button" disabled={processing} onClick={() => void startCamera()}>{cameraPermission === "denied" ? "Tentar novamente" : "Permitir câmera"}</button>}
+                </div>
+                {!scanning && <section className={`parking-camera-permission status-${cameraPermission}`} aria-live="polite">
+                  <strong>{cameraPermission === "granted" ? "Câmera autorizada" : cameraPermission === "denied" ? "Permissão bloqueada" : "Confirmação necessária"}</strong>
+                  <p>{cameraPermission === "denied" ? "No aplicativo: abra Configurações do celular › Aplicativos › Vínkulo › Permissões › Câmera e escolha Permitir. No navegador, use o cadeado ao lado do endereço." : "O celular mostrará agora a confirmação de acesso. O Vínkulo usa a câmera somente durante a leitura."}</p>
+                </section>}
+              </>
+            )}
             <canvas ref={canvasRef} hidden />
-            <div className="parking-qr-alternatives parking-qr-manual-only">
+            {!result && <div className="parking-qr-alternatives parking-qr-manual-only">
               <form onSubmit={submitManual}>
                 <label><span>Ou digite o código</span><input name="codigo" placeholder="VK-XXXXXXXX" required /></label>
                 <button disabled={processing}>Validar</button>
               </form>
-            </div>
+            </div>}
             {message && <p className="parking-qr-message" role="status">{message}</p>}
             <footer>O QR contém somente um token de reserva. Os dados pessoais são consultados no servidor após a leitura.</footer>
           </section>

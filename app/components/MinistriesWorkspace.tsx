@@ -272,6 +272,16 @@ export default function MinistriesWorkspace({
     return () => window.removeEventListener("vinkulo:new-schedule", open);
   }, [canViewSchedules, manageableMinistries.length]);
 
+  // "Escalas" no menu lateral abre a aba sem abrir o formulário: quem clica ali
+  // quer ver as escalas, não criar uma. Depende só de poder ver — ter ministério
+  // administrável é requisito de criar, não de olhar.
+  useEffect(() => {
+    if (!canViewSchedules) return;
+    const reveal = () => setTab("escalas");
+    window.addEventListener("vinkulo:open-schedules", reveal);
+    return () => window.removeEventListener("vinkulo:open-schedules", reveal);
+  }, [canViewSchedules]);
+
   async function request(
     key: string,
     url: string,

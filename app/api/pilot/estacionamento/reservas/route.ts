@@ -173,10 +173,50 @@ function formatReservationTime(value: string) {
   }).format(date);
 }
 
-export async function DELETE() {
-  const access = await requireTenantPermission("parking.edit");
+export async function DELETE(request: Request) {
+  const access = await requireTenantPermission("parking.reserve");
   if ("error" in access) return access.error;
+  const payload = await request.json().catch(() => ({})) as Record<string, unknown>;
+  const reservationId = Number(payload.id) || 0;
   const db = getD1();
+  const canManage = ["parking.entry", "parking.exit", "parking.edit", "parking.configure"]
+    .some((permission) => access.context.permissions.includes(permission));
+
+  if (reservationId) {
+    const reservation = await db.prepare(
+      `SELECT id, usuario_id, status, fim_em
+       FROM estacionamento_reservas
+       WHERE id = ? AND comunidade_id = ? LIMIT 1`,
+    ).bind(reservationId, access.context.comunidadeId).first<{
+      id: number;
+      usuario_id: number;
+      status: string;
+      fim_em: string;
+    }>();
+    if (!reservation) {
+      return Response.json({ error: "Reserva não encontrada." }, { status: 404 });
+    }
+    if (!canManage && Number(reservation.usuario_id) !== access.user.id) {
+      return Response.json({ error: "Você só pode excluir o seu próprio histórico." }, { status: 403 });
+    }
+    const expiredConfirmation = reservation.status === "CONFIRMADA" && Date.parse(reservation.fim_em) < Date.now();
+    if (!["RECUSADA", "CANCELADA", "CHECKIN"].includes(reservation.status) && !expiredConfirmation) {
+      return Response.json({ error: "A reserva ainda está ativa e não pode ser removida do histórico." }, { status: 409 });
+    }
+    await db.prepare(
+      `DELETE FROM estacionamento_reservas WHERE id = ? AND comunidade_id = ?`,
+    ).bind(reservationId, access.context.comunidadeId).run();
+    await recordTenantAudit(db, access.context, access.user.id, "ESTACIONAMENTO_HISTORICO_EXCLUIDO", "SUCESSO", {
+      reservaId: reservationId,
+      status: reservation.status,
+      proprioRegistro: Number(reservation.usuario_id) === access.user.id,
+    });
+    return Response.json({ ok: true, removidos: 1 });
+  }
+
+  if (!canManage) {
+    return Response.json({ error: "Somente a gestão pode limpar todo o histórico." }, { status: 403 });
+  }
   const result = await db.prepare(
     `DELETE FROM estacionamento_reservas
      WHERE comunidade_id = ? AND (

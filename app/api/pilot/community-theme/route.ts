@@ -26,18 +26,9 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
-  const access = await requireTenantPermission("dashboard.view");
+  const access = await requireTenantPermission("community.theme.manage");
   if ("error" in access) return access.error;
-  const canEdit = access.context.permissions.includes(
-    "community.theme.manage",
-  );
-  const canEditWallpaper = canEdit;
-  if (!canEdit) {
-    return Response.json(
-      { error: "Você não pode alterar o tema desta comunidade." },
-      { status: 403 },
-    );
-  }
+  const canEditWallpaper = true;
   const requested = (await request.json()) as Partial<CommunityTheme>;
   const currentTheme = await getCommunityTheme(access.context.comunidadeId);
   const requestedWallpaper = Object.prototype.hasOwnProperty.call(

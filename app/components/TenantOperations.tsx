@@ -10,7 +10,6 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { RelacionamentoTools } from "./RelacionamentoTools";
 
 type Visitor = {
   id: number;
@@ -45,11 +44,11 @@ type Visitor = {
 };
 
 type VisitorVision =
-  | "visitantes"
-  | "acompanhamentos"
+  | "todos"
+  | "novos"
+  | "acompanhamento"
   | "pendencias"
-  | "encaminhamentos"
-  | "historico"
+  | "sem_contato"
   | "arquivados";
 
 type VisitorCounts = Record<VisitorVision, number>;
@@ -80,6 +79,16 @@ type VisitorGrowth = { categoria_id: number; mes: string; novos: number };
 
 const VISITOR_CATEGORY_ICONS = ["◎", "◇", "♡", "✦", "♙", "▣", "○", "△"];
 const VISITOR_CATEGORY_COLORS = ["#7357e8", "#2f80ed", "#12a879", "#e09a21", "#df5b72", "#8d5bd2"];
+
+// A data de hoje em fuso local. toISOString() devolve UTC: no Brasil, das 21h
+// em diante a data já virou, e um visitante recebido no culto de domingo à
+// noite era gravado como segunda-feira.
+function hojeLocal() {
+  const agora = new Date();
+  const mes = String(agora.getMonth() + 1).padStart(2, "0");
+  const dia = String(agora.getDate()).padStart(2, "0");
+  return `${agora.getFullYear()}-${mes}-${dia}`;
+}
 
 type Cell = {
   id: number;
@@ -175,17 +184,18 @@ export function VisitorsWorkspace({
   const [importing, setImporting] = useState(false);
   const [importFileName, setImportFileName] = useState("");
   const [importRows, setImportRows] = useState<VisitorImportRow[]>([]);
-  const [activeVision, setActiveVision] = useState<VisitorVision>("visitantes");
+  const [activeVision, setActiveVision] = useState<VisitorVision>("todos");
   const [counts, setCounts] = useState<VisitorCounts>({
-    visitantes: 0,
-    acompanhamentos: 0,
+    todos: 0,
+    novos: 0,
+    acompanhamento: 0,
     pendencias: 0,
-    encaminhamentos: 0,
-    historico: 0,
+    sem_contato: 0,
     arquivados: 0,
   });
   const [selectedRows, setSelectedRows] = useState<number[]>([]);
   const [columnsOpen, setColumnsOpen] = useState(false);
+  const [exportReviewOpen, setExportReviewOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const categoriesRef = useRef<VisitorCategory[]>([]);
@@ -785,7 +795,7 @@ export function VisitorsWorkspace({
       ];
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Visitantes");
-      XLSX.writeFile(workbook, `visitantes-${new Date().toISOString().slice(0, 10)}.xlsx`, { compression: true });
+      XLSX.writeFile(workbook, `visitantes-${hojeLocal()}.xlsx`, { compression: true });
     } catch (caught) {
       setError(`Não foi possível gerar a planilha: ${(caught as Error).message}`);
     }
@@ -846,7 +856,7 @@ export function VisitorsWorkspace({
             body: JSON.stringify({
               ...row,
               batizado: "NAO_INFORMADO",
-              dataEntrada: row.dataEntrada || new Date().toISOString().slice(0, 10),
+              dataEntrada: row.dataEntrada || hojeLocal(),
             }),
           });
           imported += 1;
@@ -952,6 +962,21 @@ export function VisitorsWorkspace({
     setSelectedId(null);
     setFollowups([]);
   }
+
+  // O funil é o assunto da página: quantos chegaram e quantos avançaram. A
+  // tabela responde "quem"; isto responde "como está indo", que é a pergunta
+  // que a liderança faz primeiro. Os estágios já existem como status.
+  const funnelStages = ([
+    ["NOVO", "Recebidos"],
+    ["EM_CONTATO", "Contatados"],
+    ["EM_ACOMPANHAMENTO", "Em acompanhamento"],
+    ["INTEGRADO", "Integrados"],
+  ] as const).map(([id, label]) => ({
+    id,
+    label,
+    total: visitors.filter((visitor) => visitor.status === id).length,
+  }));
+  const funnelTotal = funnelStages.reduce((soma, etapa) => soma + etapa.total, 0);
 
   return (
     <section className="visitor-workspace-redesign">
@@ -1086,6 +1111,21 @@ export function VisitorsWorkspace({
           )}
         </div>
       </header>
+      <section className="visitor-funnel-v5" aria-label="Funil de acolhimento">
+        {funnelStages.map((etapa) => {
+          const proporcao = funnelTotal ? Math.round((etapa.total / funnelTotal) * 100) : 0;
+          return (
+            <article key={etapa.id} data-etapa={etapa.id}>
+              <small>{etapa.label}</small>
+              <strong>{etapa.total}</strong>
+              <span className="visitor-funnel-bar-v5" aria-hidden="true">
+                <i style={{ width: `${proporcao}%` }} />
+              </span>
+              <em>{proporcao}% do total</em>
+            </article>
+          );
+        })}
+      </section>
 
       <div className="visitor-overview-grid">
       <section className="visitor-dashboard" aria-labelledby="visitor-growth-title">
@@ -1214,12 +1254,12 @@ export function VisitorsWorkspace({
               <header><span><b>4</b><strong>Finalização</strong><small>Entrada, status e observações</small></span></header>
               <fieldset>
                 <legend>Observações e finalização</legend>
-                <label>Entrada*<input name="dataEntrada" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} /></label>
+                <label>Entrada<input name="dataEntrada" type="date" required defaultValue={hojeLocal()} /></label>
                 <label>Status<select name="status" defaultValue="NOVO"><option value="NOVO">Novo</option><option value="EM_CONTATO">Em contato</option><option value="EM_ACOMPANHAMENTO">Em acompanhamento</option><option value="INTEGRADO">Integrado</option></select></label>
                 <label className="visitor-wide-field">Observações<textarea name="observacoes" maxLength={1000} rows={3} /></label>
               </fieldset>
             </section>
-            <footer className="visitor-registration-actions"><button type="button" onClick={() => setRegistrationOpen(false)} disabled={saving}>Cancelar</button><button disabled={saving}>{saving ? "Salvando…" : "Salvar visitante"}</button></footer>
+            <footer className="visitor-registration-actions"><p className="form-consequence-v5"><span aria-hidden="true">◉</span>Só o nome é obrigatório. O visitante entra no fio do dia na hora e abre um acompanhamento para o contato.</p><button type="button" onClick={() => setRegistrationOpen(false)} disabled={saving}>Cancelar</button><button disabled={saving}>{saving ? "Salvando…" : "Salvar visitante"}</button></footer>
           </form>
         </section>
         </div>, document.body)}
@@ -1227,12 +1267,11 @@ export function VisitorsWorkspace({
       <section className="visitor-relations-v2" aria-label="Relacionamento com visitantes">
         <nav className="visitor-view-tabs-v2" aria-label="Visões de visitantes">
           {([
-            ["visitantes", "Visitantes"],
-            ["acompanhamentos", "Acompanhamentos"],
+            ["todos", "Todos"],
+            ["novos", "Novos"],
+            ["acompanhamento", "Em acompanhamento"],
             ["pendencias", "Pendências"],
-            ["encaminhamentos", "Encaminhamentos"],
-            ["historico", "Histórico"],
-            ["arquivados", "Arquivados"],
+            ["sem_contato", "Sem contato há 15 dias"],
           ] as Array<[VisitorVision, string]>).map(([vision, label]) => (
             <button
               type="button"
@@ -1248,7 +1287,7 @@ export function VisitorsWorkspace({
 
         <div className="visitor-category-strip-v2" aria-label="Categorias de visitantes">
           <button type="button" className={categoryFilter === "all" ? "active" : ""} onClick={() => setCategoryFilter("all")}>
-            <span aria-hidden="true">◎</span><strong>Todos</strong><b>{counts.visitantes}</b>
+            <span aria-hidden="true">◎</span><strong>Todos</strong><b>{counts.todos}</b>
           </button>
           {categories.map((category) => (
             <button
@@ -1269,7 +1308,7 @@ export function VisitorsWorkspace({
         <div className="visitor-insights-v2">
           <article>
             <span className="visitor-insight-icon-v2" aria-hidden="true">◫</span>
-            <div><small>Pessoas ativas</small><strong>{counts.visitantes}</strong><span>Cadastro central da comunidade</span></div>
+            <div><small>Pessoas ativas</small><strong>{counts.todos}</strong><span>Cadastro central da comunidade</span></div>
           </article>
           <article>
             <span className="visitor-insight-icon-v2 is-warning" aria-hidden="true">!</span>
@@ -1290,20 +1329,25 @@ export function VisitorsWorkspace({
           </section>
         </div>
 
-        {/* Ferramentas de Relacionamento */}
-        <section style={{ padding: "24px", background: "var(--color-surface)", borderRadius: "8px", marginBottom: "24px" }} aria-labelledby="relacionamento-tools-title">
-          <h2 id="relacionamento-tools-title" style={{ marginTop: 0, marginBottom: "16px", fontSize: "16px", fontWeight: "bold" }}>🛠️ Ferramentas de Relacionamento</h2>
-          <RelacionamentoTools visitantes={visitors} compacto={false} />
-        </section>
-
         <section className="visitor-sheet-v2" aria-labelledby="visitor-sheet-title">
           <header className="visitor-sheet-head-v2">
             <div><p className="pilot-kicker">DIRETÓRIO CENTRAL</p><h2 id="visitor-sheet-title">Pessoas e próximos cuidados</h2><span>Uma ficha por pessoa, em todas as visões.</span></div>
             <div>
               {canCreate && <><input ref={importInputRef} className="visitor-import-input-v2" type="file" accept=".xlsx,.xls,.csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) void prepareVisitorImport(file); }} /><button type="button" disabled={importing} onClick={() => importInputRef.current?.click()}>⇧ Importar Excel</button></>}
-              <button type="button" onClick={() => void exportVisitors()}>⇩ Exportar Excel</button>
+              <button type="button" onClick={() => setExportReviewOpen(true)}>⇩ Revisar e exportar</button>
             </div>
           </header>
+
+          {exportReviewOpen && <section className="visitor-export-review-v2" aria-label="Revisão antes da exportação">
+            <div><p className="pilot-kicker">ANTES DE EXPORTAR</p><h3>Revise e organize as informações</h3><p>Abra a ficha de qualquer pessoa para editar dados. A planilha só deve sair depois dessa conferência.</p></div>
+            <dl>
+              <div><dt>Sem categoria</dt><dd>{visitors.filter((item) => !item.categoria_id).length}</dd></div>
+              <div><dt>Sem telefone</dt><dd>{visitors.filter((item) => !item.telefone).length}</dd></div>
+              <div><dt>Sem responsável</dt><dd>{visitors.filter((item) => !item.responsavel_email && !item.acompanhante).length}</dd></div>
+            </dl>
+            <div className="visitor-export-suggestions-v2"><strong>Categorias sugeridas</strong><span>Novo visitante</span><span>Primeiro contato</span><span>Em acompanhamento</span><span>Integrado</span><span>Sem contato há 15 dias</span></div>
+            <footer><button type="button" onClick={() => setExportReviewOpen(false)}>Continuar editando</button><button type="button" className="primary" onClick={() => { setExportReviewOpen(false); void exportVisitors(); }}>Exportar informações revisadas</button></footer>
+          </section>}
 
           <form className="visitor-commandbar-v2" onSubmit={(event) => { event.preventDefault(); void loadVisitors(); }}>
             <label className="visitor-search-v2"><span aria-hidden="true">⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nome, telefone ou e-mail" /></label>
@@ -1317,6 +1361,14 @@ export function VisitorsWorkspace({
             <div className="visitor-filter-panel-v2">
               <label>Categoria<select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option value="all">Todas</option><option value="sem-categoria">Sem categoria</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.nome}</option>)}</select></label>
               <button type="button" onClick={() => { setSearch(""); setCategoryFilter("all"); }}>Limpar filtros</button>
+              <button type="button" onClick={() => changeVision("arquivados")}>Ver arquivados ({counts.arquivados})</button>
+            </div>
+          )}
+          {(search.trim() || categoryFilter !== "all" || activeVision === "arquivados") && (
+            <div className="visitor-active-filters-v2" aria-label="Filtros ativos">
+              {search.trim() && <button type="button" onClick={() => setSearch("")}>Busca: {search.trim()} <span aria-hidden="true">×</span></button>}
+              {categoryFilter !== "all" && <button type="button" onClick={() => setCategoryFilter("all")}>Categoria ativa <span aria-hidden="true">×</span></button>}
+              {activeVision === "arquivados" && <button type="button" onClick={() => changeVision("todos")}>Arquivados <span aria-hidden="true">×</span></button>}
             </div>
           )}
           {columnsOpen && <div className="visitor-column-panel-v2"><span>Colunas essenciais do Figma</span><b>Nome</b><b>Contato</b><b>Categoria</b><b>Responsável</b><b>Status</b><b>Próxima ação</b></div>}
@@ -1330,7 +1382,7 @@ export function VisitorsWorkspace({
             <table className="visitor-table-v2">
               <thead><tr>
                 <th><input type="checkbox" aria-label="Selecionar página" checked={Boolean(visibleVisitors.length && selectedRows.length === visibleVisitors.length)} onChange={(event) => setSelectedRows(event.target.checked ? visibleVisitors.map((visitor) => visitor.id) : [])} /></th>
-                <th>Nome</th><th>Contato</th><th>Categoria</th><th>Ministério</th><th>Responsável</th><th>Status</th><th>Último contato</th><th>Próxima ação</th><th aria-label="Ações" />
+                <th>Nome</th><th>Contato</th><th>Categoria</th><th>Ministério</th><th>Responsável</th><th>Status</th><th>Último contato</th><th>Próximo passo</th><th aria-label="Ações" />
               </tr></thead>
               <tbody>
                 {visibleVisitors.map((visitor) => (
@@ -1343,7 +1395,7 @@ export function VisitorsWorkspace({
                     <td><strong>{visitor.responsavel_email?.split("@")[0] || visitor.acompanhante || "A definir"}</strong></td>
                     <td>{canEdit && activeVision !== "arquivados" ? <select aria-label={`Status de ${visitor.nome_completo}`} value={visitor.status} onChange={(event) => void updateVisitorField(visitor, { status: event.target.value })}><option value="NOVO">Novo</option><option value="EM_CONTATO">Em contato</option><option value="EM_ACOMPANHAMENTO">Em acompanhamento</option><option value="INTEGRADO">Integrado</option></select> : <span className={`status-pill status-${visitor.status.toLowerCase()}`}>{activeVision === "arquivados" ? "Arquivado" : statusLabel(visitor.status)}</span>}</td>
                     <td>{visitor.ultimo_contato ? formatDateTime(visitor.ultimo_contato) : "Sem contato"}</td>
-                    <td className={visitor.proximo_contato && visitor.proximo_contato <= new Date().toISOString().slice(0, 10) ? "overdue" : ""}>{visitor.proximo_contato ? formatDate(visitor.proximo_contato) : "Não definida"}</td>
+                    <td className={visitor.proximo_contato && visitor.proximo_contato <= hojeLocal() ? "overdue" : ""}><button type="button" className="visitor-next-step-v2" onClick={() => void loadFollowups(visitor.id)}>{canFollowup ? "Registrar contato" : "Abrir ficha"}</button>{visitor.proximo_contato && <small>{formatDate(visitor.proximo_contato)}</small>}</td>
                     <td><button type="button" className="visitor-row-open-v2" aria-label={`Abrir ficha de ${visitor.nome_completo}`} onClick={() => void loadFollowups(visitor.id)}>›</button></td>
                   </tr>
                 ))}
@@ -1589,6 +1641,93 @@ export function VisitorsWorkspace({
   );
 }
 
+// Saúde da célula. O diretório listava nome, dia e liderança — dados que não
+// respondem à pergunta que a liderança faz de fato: qual célula parou de
+// reportar, qual está encolhendo e qual já tem gente para multiplicar. Tudo
+// abaixo sai dos relatórios que a rota já devolve; nada de consulta nova.
+type CellHealth = {
+  id: "AGUARDANDO" | "SEM_RELATORIO" | "ATENCAO" | "MULTIPLICAR" | "SAUDAVEL";
+  label: string;
+  weeks: number[];
+  semanasEmDia: number;
+  mediaPresentes: number;
+};
+
+const CELL_HEALTH_WEEKS = 8;
+const CELL_REPORT_GRACE_DAYS = 21;
+
+function cellHealth(cell: Cell, agora: number): CellHealth {
+  // Antes do relógio acertar no cliente não dá para julgar atraso sem chutar
+  // uma data, e chutar aqui pintaria célula saudável de vermelho.
+  if (!agora) {
+    return {
+      id: "AGUARDANDO",
+      label: "Calculando",
+      weeks: [],
+      semanasEmDia: 0,
+      mediaPresentes: 0,
+    };
+  }
+  // Os relatórios chegam da rota em ordem decrescente de data.
+  const recentes = cell.relatorios.slice(0, CELL_HEALTH_WEEKS);
+  const weeks = [...recentes]
+    .reverse()
+    .map((item) => (item.aconteceu ? Number(item.presentes) || 0 : 0));
+  const semanasEmDia = recentes.filter((item) => item.aconteceu).length;
+  const comPresenca = weeks.filter((valor) => valor > 0);
+  const mediaPresentes = comPresenca.length
+    ? Math.round(comPresenca.reduce((soma, valor) => soma + valor, 0) / comPresenca.length)
+    : 0;
+
+  const ultimo = cell.ultimo_relatorio_em
+    ? Date.parse(cell.ultimo_relatorio_em)
+    : Number.NaN;
+  const diasSemReportar = Number.isNaN(ultimo)
+    ? Number.POSITIVE_INFINITY
+    : Math.floor((agora - ultimo) / 86400000);
+
+  if (diasSemReportar > CELL_REPORT_GRACE_DAYS) {
+    const semanas = Number.isFinite(diasSemReportar)
+      ? Math.floor(diasSemReportar / 7)
+      : 0;
+    return {
+      id: "SEM_RELATORIO",
+      label: semanas
+        ? `Sem relatório há ${semanas} ${semanas === 1 ? "semana" : "semanas"}`
+        : "Sem relatório",
+      weeks,
+      semanasEmDia,
+      mediaPresentes,
+    };
+  }
+
+  // Encolhendo: a média das duas últimas semanas caiu abaixo de 70% da média
+  // das quatro anteriores. Uma semana ruim sozinha não acusa nada.
+  const ultimas = weeks.slice(-2).filter((valor) => valor > 0);
+  const anteriores = weeks.slice(-6, -2).filter((valor) => valor > 0);
+  const mediaUltimas = ultimas.length
+    ? ultimas.reduce((soma, valor) => soma + valor, 0) / ultimas.length
+    : 0;
+  const mediaAnteriores = anteriores.length
+    ? anteriores.reduce((soma, valor) => soma + valor, 0) / anteriores.length
+    : 0;
+  const encolhendo = mediaAnteriores > 0 && mediaUltimas < mediaAnteriores * 0.7;
+
+  if (encolhendo) {
+    return { id: "ATENCAO", label: "Atenção", weeks, semanasEmDia, mediaPresentes };
+  }
+  if (mediaPresentes >= 15 && semanasEmDia >= 6) {
+    return {
+      id: "MULTIPLICAR",
+      label: "Pronta p/ multiplicar",
+      weeks,
+      semanasEmDia,
+      mediaPresentes,
+    };
+  }
+  return { id: "SAUDAVEL", label: "Saudável", weeks, semanasEmDia, mediaPresentes };
+}
+
 export function CellsWorkspace({
   permissions,
   communityName,
@@ -1608,6 +1747,10 @@ export function CellsWorkspace({
   const [selectedMemberProfile, setSelectedMemberProfile] = useState<Cell["membros"][number] | null>(null);
   const [cellSearch, setCellSearch] = useState("");
   const [cellStatus, setCellStatus] = useState<"all" | "active" | "archived">("all");
+  const [cellHealthFilter, setCellHealthFilter] = useState<"all" | CellHealth["id"]>("all");
+  // O relógio vem de estado: lê-lo durante a renderização daria valores
+  // diferentes no servidor e no cliente e quebraria a hidratação.
+  const [agora, setAgora] = useState(0);
   const canManage = permissions.includes("cells.manage");
 
   const loadCells = useCallback(async (quiet = false) => {
@@ -1631,6 +1774,16 @@ export function CellsWorkspace({
     }, 0);
     return () => window.clearTimeout(timer);
   }, [loadCells]);
+
+  useEffect(() => {
+    const acertar = () => setAgora(Date.now());
+    const primeiro = window.setTimeout(acertar, 0);
+    const relogio = window.setInterval(acertar, 3600000);
+    return () => {
+      window.clearTimeout(primeiro);
+      window.clearInterval(relogio);
+    };
+  }, []);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -1762,9 +1915,17 @@ export function CellsWorkspace({
   const membersTotal = activeCells.reduce((total, cell) => total + cell.membros_total, 0);
   const meetingsTotal = activeCells.reduce((total, cell) => total + cell.agenda.length, 0);
   const normalizedCellSearch = cellSearch.trim().toLocaleLowerCase("pt-BR");
+  const healthById = new Map(cells.map((cell) => [cell.id, cellHealth(cell, agora)]));
+  const healthCounts = cells.reduce<Record<string, number>>((acc, cell) => {
+    if (!cell.ativo) return acc;
+    const id = healthById.get(cell.id)!.id;
+    acc[id] = (acc[id] || 0) + 1;
+    return acc;
+  }, {});
   const visibleCells = cells.filter((cell) => {
     if (cellStatus === "active" && !cell.ativo) return false;
     if (cellStatus === "archived" && cell.ativo) return false;
+    if (cellHealthFilter !== "all" && healthById.get(cell.id)!.id !== cellHealthFilter) return false;
     if (!normalizedCellSearch) return true;
     return [cell.nome, cell.descricao_publica, cell.endereco_publico, cell.lider_nome, cell.responsavel]
       .filter(Boolean)
@@ -1783,6 +1944,7 @@ export function CellsWorkspace({
         <article><small>Pessoas</small><strong>{membersTotal}</strong></article>
         <article><small>Próximos encontros</small><strong>{meetingsTotal}</strong></article>
         <article><small>Relatórios em dia</small><strong>{activeCells.filter((cell) => cell.ultimo_relatorio_em).length}<span> de {activeCells.length}</span></strong></article>
+        <article data-alerta={(healthCounts.SEM_RELATORIO || 0) > 0 ? "1" : undefined}><small>Sem relatório</small><strong>{healthCounts.SEM_RELATORIO || 0}<span> há mais de 3 semanas</span></strong></article>
       </section>
       <div className="cell-shell-v2 cell-shell-v4">
         <aside className="cell-index-v2" aria-label="Células da comunidade">
@@ -1792,9 +1954,29 @@ export function CellsWorkspace({
             <div className="cell-directory-status-v4" role="group" aria-label="Filtrar células por situação">
               {([['all','Todas'],['active','Ativas'],['archived','Arquivadas']] as const).map(([value, label]) => <button key={value} type="button" className={cellStatus === value ? "active" : ""} aria-pressed={cellStatus === value} onClick={() => setCellStatus(value)}>{label}</button>)}
             </div>
+            <div className="cell-health-filter-v5" role="group" aria-label="Filtrar células por saúde">
+              {([
+                ['all', 'Saúde: todas', 0],
+                ['SEM_RELATORIO', 'Sem relatório', healthCounts.SEM_RELATORIO || 0],
+                ['ATENCAO', 'Atenção', healthCounts.ATENCAO || 0],
+                ['MULTIPLICAR', 'Prontas p/ multiplicar', healthCounts.MULTIPLICAR || 0],
+                ['SAUDAVEL', 'Saudáveis', healthCounts.SAUDAVEL || 0],
+              ] as const).map(([value, label, count]) => (
+                <button
+                  key={value}
+                  type="button"
+                  data-saude={value}
+                  className={cellHealthFilter === value ? "active" : ""}
+                  aria-pressed={cellHealthFilter === value}
+                  onClick={() => setCellHealthFilter(value as "all" | CellHealth["id"])}
+                >
+                  {label}{value !== 'all' && <span>{count}</span>}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="cell-directory-v4">
-            {visibleCells.map((cell) => <button type="button" key={cell.id} className={`${selectedId === cell.id ? "active" : ""}${!cell.ativo ? " archived" : ""}`} onClick={() => { setSelectedId(cell.id); setTab("visao"); }}><span className="cell-row-avatar-v4" aria-hidden="true">{cell.nome.slice(0, 1)}</span><span className="cell-row-copy-v4"><span><i>{cell.ativo ? "Ativa" : "Arquivada"}</i><strong>{cell.nome}</strong></span><small>{cell.descricao_publica || "Descrição pública ainda não informada."}</small></span><span className="cell-row-fact-v4"><small>Encontros</small><strong>{cell.dias_reuniao.map((day) => dayLabels[day] || day).join(", ") || "A definir"}</strong></span><span className="cell-row-fact-v4"><small>Pessoas</small><strong>{cell.membros_total + cell.visitantes_ativos}</strong></span><span className="cell-row-fact-v4"><small>Liderança</small><strong>{cell.lider_nome || cell.responsavel || "A definir"}</strong></span><span className="cell-row-arrow-v4" aria-hidden="true">›</span></button>)}
+            {visibleCells.map((cell) => <button type="button" key={cell.id} className={`${selectedId === cell.id ? "active" : ""}${!cell.ativo ? " archived" : ""}`} onClick={() => { setSelectedId(cell.id); setTab("visao"); }}><span className="cell-row-avatar-v4" aria-hidden="true">{cell.nome.slice(0, 1)}</span><span className="cell-row-copy-v4"><span><i>{cell.ativo ? "Ativa" : "Arquivada"}</i><strong>{cell.nome}</strong></span><small>{cell.descricao_publica || "Descrição pública ainda não informada."}</small><span className="cell-row-health-v5">{(() => { const saude = healthById.get(cell.id)!; const teto = Math.max(1, ...saude.weeks); return (<><i className="cell-health-pill-v5" data-saude={saude.id}>{saude.label}</i><span className="cell-health-weeks-v5" aria-hidden="true">{saude.weeks.map((valor, indice) => <i key={indice} data-vazio={valor === 0 ? "1" : undefined} style={{ height: `${Math.max(12, Math.round((valor / teto) * 100))}%` }} />)}</span><small>{saude.semanasEmDia}/8 relatórios</small></>); })()}</span></span><span className="cell-row-fact-v4"><small>Encontros</small><strong>{cell.dias_reuniao.map((day) => dayLabels[day] || day).join(", ") || "A definir"}</strong></span><span className="cell-row-fact-v4"><small>Pessoas</small><strong>{cell.membros_total + cell.visitantes_ativos}</strong></span><span className="cell-row-fact-v4"><small>Liderança</small><strong>{cell.lider_nome || cell.responsavel || "A definir"}</strong></span><span className="cell-row-arrow-v4" aria-hidden="true">›</span></button>)}
             {!loading && !visibleCells.length && <p className="cell-directory-empty-v4">Nenhuma célula encontrada com esses filtros.</p>}
           </div>
         </aside>
@@ -1835,7 +2017,7 @@ export function CellsWorkspace({
           </section>
         </div>, document.body,
       )}
-      {createOpen && createPortal(<div className="cell-create-overlay-v2" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setCreateOpen(false); }}><form className="pilot-form cell-create-dialog-v2" role="dialog" aria-modal="true" aria-label="Criar célula" onSubmit={createCell}><header><div><small>NOVA CÉLULA</small><h2>Informações essenciais</h2></div><button type="button" aria-label="Fechar" onClick={() => setCreateOpen(false)}>×</button></header><label>Nome da célula<input name="nome" required maxLength={100} /></label><label>Líder<select name="liderUsuarioId" required defaultValue=""><option value="" disabled>Selecione</option>{availableUsers.map((user)=><option value={user.id} key={user.id}>{user.nome} · {user.papel}</option>)}</select></label><fieldset className="cell-days-field-v2"><legend>Dias de encontro (obrigatório)</legend>{Object.entries(dayLabels).map(([value,label]) => <label key={value}><input type="checkbox" name="diasReuniao" value={value} />{label}</label>)}</fieldset><label>Endereço público<input name="enderecoPublico" maxLength={240} /></label><label className="cell-wide-field">Descrição pública<textarea name="descricaoPublica" rows={2} maxLength={700} /></label><label className="cell-wide-field">Observações internas<textarea name="observacoes" rows={2} maxLength={1000} /></label><footer><button type="button" onClick={() => setCreateOpen(false)}>Cancelar</button><button disabled={saving}>{saving ? "Criando…" : "Criar célula"}</button></footer></form></div>, document.body)}
+      {createOpen && createPortal(<div className="cell-create-overlay-v2" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setCreateOpen(false); }}><form className="pilot-form cell-create-dialog-v2" role="dialog" aria-modal="true" aria-label="Criar célula" onSubmit={createCell}><header><div><small>NOVA CÉLULA</small><h2>Informações essenciais</h2></div><button type="button" aria-label="Fechar" onClick={() => setCreateOpen(false)}>×</button></header><label>Nome da célula<input name="nome" required maxLength={100} /></label><label>Líder<select name="liderUsuarioId" required defaultValue=""><option value="" disabled>Selecione</option>{availableUsers.map((user)=><option value={user.id} key={user.id}>{user.nome} · {user.papel}</option>)}</select></label><fieldset className="cell-days-field-v2"><legend>Dias de encontro (obrigatório)</legend>{Object.entries(dayLabels).map(([value,label]) => <label key={value}><input type="checkbox" name="diasReuniao" value={value} />{label}</label>)}</fieldset><label className="cell-wide-field">Observações internas <small>só a liderança vê</small><textarea name="observacoes" rows={2} maxLength={1000} /></label><fieldset className="form-public-block-v5"><legend>Página pública</legend><p className="form-public-warning-v5"><span aria-hidden="true">◉</span>O que for preenchido aqui aparece na internet, no perfil público da comunidade. Deixe em branco para manter a célula fora do diretório.</p><label>Endereço público<input name="enderecoPublico" maxLength={240} placeholder="Rua e bairro do encontro" /><small>Não use o endereço da casa de alguém sem permissão.</small></label><label className="cell-wide-field">Descrição pública<textarea name="descricaoPublica" rows={2} maxLength={700} placeholder="Uma frase para quem procura uma célula perto de casa" /></label></fieldset><footer><p className="form-consequence-v5"><span aria-hidden="true">◉</span>Cria a célula, dá acesso de líder a quem você escolheu e abre o primeiro ciclo de relatórios semanais.</p><button type="button" onClick={() => setCreateOpen(false)}>Cancelar</button><button disabled={saving}>{saving ? "Criando…" : "Criar célula"}</button></footer></form></div>, document.body)}
     </section>
   );
 }

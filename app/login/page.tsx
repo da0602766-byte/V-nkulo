@@ -5,8 +5,17 @@ import { getSessionUser } from "../lib/local-auth";
 import { getPilotLoginConfig } from "../lib/pilot-login-config";
 import { listTenantMemberships } from "../lib/tenant";
 import { safeRelativeReturnPath } from "../lib/safe-return-path";
+import { googleIntegrationAvailable } from "../lib/google-integration";
 
 export const dynamic = "force-dynamic";
+
+/* A aba do navegador dizia "VÍNKULO | Gestão para igrejas e comunidades" —
+   o mesmo título da recepção. Quem deixa o login aberto numa aba e volta
+   depois precisa reconhecer qual das abas pede a senha. */
+export const metadata = {
+  title: "Entrar | VÍNKULO",
+  description: "Acesse sua conta para acompanhar sua comunidade no VÍNKULO.",
+};
 
 export default async function LoginPage({
   searchParams,
@@ -57,6 +66,7 @@ export default async function LoginPage({
       config={config}
       returnTo={returnTo}
       initialMode={params.modo === "cadastro" && config.cadastroHabilitado !== false ? "cadastro" : "login"}
+      googleAvailable={googleIntegrationAvailable()}
     />
   );
 }

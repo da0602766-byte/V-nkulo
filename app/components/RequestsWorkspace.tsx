@@ -272,6 +272,24 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
         <span className="scope-badge">Acesso validado no servidor</span>
       </header>
 
+      <aside className="request-start-guide" role="status" aria-label="Como criar um pedido">
+        <span aria-hidden="true">＋</span>
+        <div>
+          <strong>Precisa de oração, visita ou apoio?</strong>
+          <p>Comece por aqui. O VÍNKULO orientará cada etapa e avisará somente as pessoas autorizadas.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            if (!formRef.current) return;
+            formRef.current.open = true;
+            window.requestAnimationFrame(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+          }}
+        >
+          Criar pedido
+        </button>
+      </aside>
+
       {canManage && (
         <section className="request-dashboard" aria-label="Resumo das solicitações">
           <Metric label="Abertas" value={metrics.abertas} tone="open" />

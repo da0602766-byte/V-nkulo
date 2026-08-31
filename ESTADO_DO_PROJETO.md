@@ -2,8 +2,8 @@
 
 ## Identificação
 
-- **Versão-base:** V4.7.5, com a Reforma Oficial do VÍNKULO, os ajustes operacionais V4.7.4 e o bloco de estabilidade e desempenho concluído em 28/08/2026.
-- **Data da última análise:** 28/08/2026.
+- **Versão-base:** V4.9.0, com Conta Google, Google Drive/local e política de conteúdo sem cópia persistente na plataforma concluídos em 31/08/2026.
+- **Data da última análise:** 31/08/2026.
 - **Estado deste documento:** vigente. Decisões históricas incompatíveis foram removidas deste arquivo.
 - **Publicação automática do Site:** autorizada pelo proprietário para grupos completos que tenham build, testes e evidências aprovados; uma etapa com falha não pode ser publicada.
 - **Regra global:** toda evolução funcional vale para comunidades existentes e futuras, exceto quando o proprietário solicitar explicitamente uma exceção.
@@ -29,6 +29,11 @@
 17. O compartilhamento pode selecionar várias pessoas, mas preserva um token pessoal e intransferível por usuário, inclusive quando a mensagem é enviada a um grupo.
 18. Continuidade permanece dentro de Gestão da Comunidade, mas somente o dono cadastrado daquela comunidade recebe acesso operacional; o proprietário global conserva a supervisão protegida da plataforma. Pastor, Líder e Administrador não recebem essa permissão somente pelo cargo.
 19. A Área do Proprietário possui um otimizador seguro, manual e automático, limitado a registros vencidos e às retenções oficiais. Usuários, comunidades, ministérios, conteúdos, imagens, arquivos e registros ativos nunca fazem parte da limpeza.
+20. Conta Google e autorização do Google Drive são consentimentos separados. O login Google encontra apenas contas Vínkulo já existentes e nunca cria conta ou vínculo automaticamente.
+21. Fotos e arquivos novos ficam no Google Drive autorizado ou somente no aparelho do usuário. O Vínkulo persiste apenas referências assinadas, preferências e metadados operacionais.
+22. Mensagens privadas novas são criptografadas e armazenadas no Google Drive comunitário. O banco mantém apenas a conversa e o ponteiro do Drive, sem o texto do chat.
+23. Conteúdo legado é copiado e validado no Drive antes da exclusão da cópia antiga. Falhas interrompem a migração sem apagar o original.
+24. Pré-visualização dos conteúdos recentes e download automático são escolhas independentes do usuário; o download automático começa desativado.
 
 ## Estrutura atual do Site
 
@@ -114,7 +119,9 @@
 - Automação editorial com revisão humana, políticas, agenda e auditoria.
 - Painel pastoral com indicadores restritos à comunidade e delegação controlada.
 - Editor Visual e paletas predefinidas, com suporte a celular e computador.
-- Upload nativo de imagens via armazenamento configurado no ambiente hospedado.
+- Upload nativo de imagens para Google Drive ou armazenamento local do aparelho, sem nova cópia no bucket da plataforma.
+- Conta Google via OAuth 2.0/OIDC, sem cadastro automático, e consentimento separado para o Google Drive.
+- Conversas privadas criptografadas no Drive comunitário, com migração segura do histórico.
 - Comentários públicos persistentes para usuários ativos, com opção de ocultar o perfil.
 - Perfil pessoal reorganizado em seções legíveis e recolhíveis, com campos complementares e controles de privacidade preservados.
 
@@ -135,12 +142,15 @@
 - WebSocket para presença, digitação e entrega de mensagens em tempo real.
 - Agendador externo para garantir despacho editorial sem qualquer tráfego no sistema.
 - Relatórios físicos avançados, leitura automática de placas e integração com cancelas.
+- Ativação em produção do cliente OAuth do Google, dependente de `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` configurados como segredos no ambiente do Site.
 
 ## Limitações do ambiente
 
 - O runtime do Sites hospeda o frontend e as APIs, mas integrações externas exigem serviços e credenciais configurados no backend.
 - Segredos não podem ser colocados no frontend.
-- Uploads dependem do bucket configurado no ambiente hospedado.
+- O bucket permanece disponível somente para leitura e migração do conteúdo legado; nenhuma foto, arquivo ou mensagem nova é gravada nele.
+- O modo Google Drive depende de um cliente OAuth Web do Google Cloud, da Drive API habilitada e do redirecionamento autorizado do Site.
+- O modo local usa IndexedDB e permanece restrito ao aparelho/navegador em que o conteúdo foi salvo.
 - A interface não deve ser tratada como segurança; autorização continua sendo responsabilidade do servidor.
 
 ## Riscos e controles
@@ -153,10 +163,29 @@
 - **Risco editorial:** toda programação exige autorização humana e é convertida para visibilidade `COMUNIDADE`.
 - **Risco de chat lento:** mitigado por busca incremental, polling condicional e atualização local após envio.
 - **Risco de arquivamento indevido:** mitigado por migração corretiva auditada, que restaura apenas comunidades reais gerenciadas e mantém as sementes piloto arquivadas.
-- **Risco de regressão:** coberto pela suíte automatizada de 199 testes, incluindo isolamento, segurança, estacionamento móvel, remoções e sincronização sem bloqueio integral da tela.
+- **Risco de regressão:** coberto pela suíte automatizada de 222 testes, incluindo isolamento, segurança, armazenamento externo, estacionamento móvel, remoções e sincronização sem bloqueio integral da tela.
 - **Risco de exclusão indevida pelo otimizador:** mitigado por lista fechada de seis tarefas, bloqueio de concorrência, auditoria e testes que preservam sessão ativa e solicitação pendente.
+- **Risco de perda durante a migração:** mitigado por cópia para o Drive antes da exclusão, estado persistente de migração, processamento em lotes e interrupção segura em caso de falha.
+- **Risco de associação indevida de Conta Google:** mitigado pela verificação de `aud`, `iss`, expiração, e-mail verificado e identificador `sub`, sem criação automática de usuário.
+- **Risco de credenciais expostas:** refresh tokens são criptografados com AES-GCM; Client Secret e chave de criptografia ficam exclusivamente no ambiente hospedado.
 
 ## Último bloco concluído
+
+- V4.9.0 — Conta Google e privacidade de armazenamento: login Google separado da autorização do Drive, sem criação automática de contas e com revogação pelo usuário.
+- Fotos de perfil podem ficar somente no aparelho; conteúdos compartilhados usam a pasta Drive da comunidade. Todas as telas deixam explícito que o Vínkulo não mantém cópia.
+- Conversas novas são gravadas como arquivos criptografados no Drive; o carregamento automático dos itens recentes e o download automático são preferências independentes.
+- A migração cobre chats, publicações, programações editoriais, capas ministeriais, perfis, cadastros temporários, temas, layouts atuais e históricos, avisos, módulos e evidências de feedback. O legado só é excluído depois da cópia e da troca das referências.
+- Rotas antigas que gravavam imagens embutidas no banco foram bloqueadas e passaram a reutilizar o fluxo Drive/local.
+- Banco V4.9.0: migration `0060_google_drive_privacy.sql` acrescenta conexões Google, preferências, pastas pessoais/comunitárias e ponteiros de conversa.
+- Validação V4.9.0: TypeScript com zero erros, build e artefato Sites aprovados e **222/222 testes automatizados aprovados**.
+
+- Redesign visual V4.8.0: a aplicação passou a usar os tokens violeta, superfícies claras e modo escuro definidos no elemento `<html>`, sem inverter cores e sem substituir a autorização existente.
+- Bricolage Grotesque, Instrument Sans e IBM Plex Mono foram carregadas com `next/font`; títulos e textos fortes declaram a cor de leitura explicitamente nos dois temas.
+- O painel desktop recebeu barra superior de 60 px, busca de áreas por `⌘K`, sidebar de 236 px recolhível e agrupada por Principal, Comunidade e Gestão, sempre filtrada pelas permissões reais do usuário.
+- A navegação móvel agora possui os cinco destinos oficiais — Início, Comunidade, Agenda, Pedidos e Menu — com alvos de toque adequados e decisões de escala nomeadas por extenso.
+- A tela inicial foi convertida em “fio do dia”, com horários monoespaçados, linha contínua, marcador do momento atual, ação por item e coluna lateral de 316 px para próxima escala, pendências e eventos.
+- Visitantes mantém uma base única e uma tabela central. As visões agora são Todos, Novos, Em acompanhamento, Pendências e Sem contato há 15 dias; filtros ativos podem ser removidos e a última coluna informa o próximo passo.
+- Validação V4.8.0: TypeScript com zero erros, lint com zero erros, build e artefato Sites aprovados e **199/199 testes automatizados aprovados**.
 
 - Estabilidade V4.7.5: a dívida central de tipagem do tenant, validações e D1 foi eliminada; a checagem TypeScript passou de 1.128 ocorrências para zero sem remover dados, páginas ou permissões.
 - Ações de administração e estacionamento deixam o conteúdo atual visível durante a sincronização silenciosa, evitando a impressão de travamento após adicionar, alterar, confirmar ou excluir.
@@ -222,7 +251,7 @@
 
 ## Próximo bloco autorizado
 
-- Acompanhar a primeira execução automática em produção e continuar as melhorias funcionais solicitadas pelo proprietário, sempre com evidências antes da publicação.
+- Configurar o cliente OAuth Web no Google Cloud, adicionar os segredos ao ambiente hospedado, publicar a versão e executar a migração pelo painel antes de encerrar a leitura do bucket legado.
 
 ## Principais arquivos alterados
 

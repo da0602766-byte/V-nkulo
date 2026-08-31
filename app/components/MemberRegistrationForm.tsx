@@ -46,8 +46,6 @@ export default function MemberRegistrationForm({
     ministryId: initialCommunity?.ministries[0] ? String(initialCommunity.ministries[0].id) : "",
     functionId: "", availableDays: [], period: "FLEXIVEL", extras: {}, acceptedTerms: false,
   });
-  const [photo, setPhoto] = useState<File | null>(null);
-  const [photoPreview, setPhotoPreview] = useState("");
   const [reviewing, setReviewing] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
@@ -64,9 +62,6 @@ export default function MemberRegistrationForm({
     () => community?.ministries.find((item) => String(item.id) === values.ministryId),
     [community, values.ministryId],
   );
-  useEffect(() => () => {
-    if (photoPreview) URL.revokeObjectURL(photoPreview);
-  }, [photoPreview]);
   useEffect(() => {
     if (registration.state !== "AGUARDANDO" && registration.state !== "ABERTO") return;
     const timer = window.setInterval(() => {
@@ -80,10 +75,6 @@ export default function MemberRegistrationForm({
 
   function update<K extends keyof Values>(key: K, value: Values[K]) {
     setValues((current) => ({ ...current, [key]: value }));
-  }
-  function choosePhoto(file: File | null) {
-    setPhoto(file);
-    setPhotoPreview(file ? URL.createObjectURL(file) : "");
   }
   function chooseCommunity(id: string) {
     const next = registration.communities.find((item) => String(item.id) === id);
@@ -107,7 +98,6 @@ export default function MemberRegistrationForm({
       });
       values.availableDays.forEach((day) => body.append("availableDays", day));
       Object.entries(values.extras).forEach(([id, value]) => body.set(`extra:${id}`, value));
-      if (photo) body.set("photo", photo);
       const response = await fetch(`/api/public/cadastro-membro/${token}`, { method: "POST", body });
       const result = await response.json() as { error?: string; firstAccess?: FirstAccess };
       if (!response.ok) throw new Error(result.error || "Não foi possível enviar o cadastro.");
@@ -143,7 +133,7 @@ export default function MemberRegistrationForm({
       {!reviewing ? (
         <form className="member-registration-public-form" onSubmit={(event) => { event.preventDefault(); setError(""); setReviewing(true); }}>
           <section><header><b>01</b><div><h2>Seus dados e sua conta</h2><p>Preencha o cadastro e crie o acesso que você usará na comunidade.</p></div></header><div className="member-registration-fields">
-            <label className="member-registration-photo"><span>{photoPreview ? <img src={photoPreview} alt="Prévia da foto escolhida" /> : "+"}</span><strong>Foto <small>Opcional</small></strong><input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => choosePhoto(event.target.files?.[0] || null)} /></label>
+            <div className="member-registration-photo member-registration-photo-private"><span aria-hidden="true">☁</span><strong>Foto após o primeiro acesso <small>A imagem será salva no seu Google Drive ou somente no aparelho; nunca no Vínkulo.</small></strong></div>
             <label>Nome completo*<input required minLength={5} maxLength={120} value={values.fullName} onChange={(event) => update("fullName", event.target.value)} autoComplete="name" /></label>
             <label>E-mail*<input required type="email" maxLength={180} value={values.email} onChange={(event) => update("email", event.target.value)} autoComplete="email" /></label>
             <label>CPF <small>Opcional</small><input inputMode="numeric" maxLength={14} value={values.cpf} onChange={(event) => update("cpf", event.target.value)} /></label>
@@ -167,7 +157,7 @@ export default function MemberRegistrationForm({
           <button className="member-registration-primary" disabled={!ministry || !values.acceptedTerms}>Revisar cadastro e conta <span aria-hidden="true">→</span></button>
         </form>
       ) : (
-        <section className="member-registration-review"><header><p>REVISÃO FINAL</p><h2>Confira antes de criar sua conta</h2><span>Ao confirmar, sua conta será criada e você receberá um link com login e senha temporária para o primeiro acesso.</span></header>{photoPreview && <img src={photoPreview} alt="Foto escolhida" />}<dl><div><dt>Nome</dt><dd>{values.fullName}</dd></div><div><dt>E-mail</dt><dd>{values.email}</dd></div><div><dt>CPF</dt><dd>{values.cpf || "Não informado"}</dd></div><div><dt>CEP</dt><dd>{values.cep}</dd></div><div><dt>Nascimento</dt><dd>{formatSimpleDate(values.birthDate)}</dd></div><div><dt>Comunidade</dt><dd>{community?.name}</dd></div><div><dt>Unção</dt><dd>{community?.anointings.find((item) => item.id === values.anointing)?.name}</dd></div><div><dt>Ministério</dt><dd>{ministry?.name}</dd></div><div><dt>Dias disponíveis</dt><dd>{values.availableDays.length ? values.availableDays.map((day) => DAYS.find(([id]) => id === day)?.[1]).join(", ") : "A combinar"}</dd></div></dl>{error && <p className="member-registration-feedback" role="alert">{error}</p>}<footer><button type="button" onClick={() => setReviewing(false)}>← Editar informações</button><button type="button" disabled={sending} onClick={() => void submit()}>{sending ? "Criando primeiro acesso…" : "Criar conta e gerar primeiro acesso"}</button></footer></section>
+        <section className="member-registration-review"><header><p>REVISÃO FINAL</p><h2>Confira antes de criar sua conta</h2><span>Ao confirmar, sua conta será criada e você receberá um link com login e senha temporária para o primeiro acesso.</span></header><dl><div><dt>Nome</dt><dd>{values.fullName}</dd></div><div><dt>E-mail</dt><dd>{values.email}</dd></div><div><dt>CPF</dt><dd>{values.cpf || "Não informado"}</dd></div><div><dt>CEP</dt><dd>{values.cep}</dd></div><div><dt>Nascimento</dt><dd>{formatSimpleDate(values.birthDate)}</dd></div><div><dt>Comunidade</dt><dd>{community?.name}</dd></div><div><dt>Unção</dt><dd>{community?.anointings.find((item) => item.id === values.anointing)?.name}</dd></div><div><dt>Ministério</dt><dd>{ministry?.name}</dd></div><div><dt>Dias disponíveis</dt><dd>{values.availableDays.length ? values.availableDays.map((day) => DAYS.find(([id]) => id === day)?.[1]).join(", ") : "A combinar"}</dd></div></dl>{error && <p className="member-registration-feedback" role="alert">{error}</p>}<footer><button type="button" onClick={() => setReviewing(false)}>← Editar informações</button><button type="button" disabled={sending} onClick={() => void submit()}>{sending ? "Criando primeiro acesso…" : "Criar conta e gerar primeiro acesso"}</button></footer></section>
       )}
       <footer className="member-registration-privacy">As informações ficam restritas ao proprietário das comunidades exibidas neste formulário.</footer>
     </main>

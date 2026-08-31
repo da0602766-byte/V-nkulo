@@ -104,8 +104,9 @@ function clean(value: unknown, maxLength: number) {
 function safePostImage(value: unknown) {
   const candidate = clean(value, 900);
   if (!candidate) return "";
-  return /^\/api\/pilot\/uploads\/images\/post-image\/\d+\/[0-9a-f-]+\.(jpg|png|webp)$/i.test(
-    candidate,
+  return (
+    /^\/api\/pilot\/uploads\/images\/post-image\/\d+\/[0-9a-f-]+\.(jpg|png|webp)$/i.test(candidate) ||
+    /^\/api\/storage\/media\/[A-Za-z0-9_.-]+$/i.test(candidate)
   )
     ? candidate
     : "";

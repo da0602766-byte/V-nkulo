@@ -23,7 +23,7 @@ type FeedItem = {
   conteudo: string;
   categoria: string;
   visibilidade: "COMUNIDADE" | "PLATAFORMA";
-  status: "RASCUNHO" | "PUBLICADA";
+  status: "RASCUNHO" | "EM_ANALISE" | "PUBLICADA";
   origem: string;
   criado_em: string;
   criado_por?: number | null;
@@ -42,7 +42,13 @@ type FeedItem = {
   imagem_width?: number;
   imagem_height?: number;
   links_json?: string;
+  audiencia_tipo?: "PUBLICO" | "MINISTERIOS";
+  ministerios_json?: string;
+  canal_feed?: number;
+  canal_lateral?: number;
 };
+
+type MinistryOption = { id: number; nome: string };
 
 type EventItem = {
   id: number;
@@ -129,6 +135,9 @@ export default function CommunityHome({
   const composerTitleRef = useRef<HTMLInputElement | null>(null);
   const composerContentRef = useRef<HTMLTextAreaElement | null>(null);
   const [selectedEventId, setSelectedEventId] = useState("");
+  const [ministries, setMinistries] = useState<MinistryOption[]>([]);
+  const [audienceType, setAudienceType] = useState<"PUBLICO" | "MINISTERIOS">("PUBLICO");
+  const [selectedMinistries, setSelectedMinistries] = useState<number[]>([]);
   const feedAbortRef = useRef<AbortController | null>(null);
   const feedRequestRef = useRef(0);
   const canPublish = permissions.includes("feed.publish");
@@ -152,6 +161,20 @@ export default function CommunityHome({
       document.body.style.overflow = previousOverflow;
     };
   }, [composerOpen]);
+
+  useEffect(() => {
+    if (!composerOpen || ministries.length) return;
+    let active = true;
+    void fetch("/api/pilot/ministerios", { cache: "no-store" })
+      .then((response) => response.ok ? response.json() : {})
+      .then((result: { ministerios?: Array<Record<string, unknown>> }) => {
+        if (!active) return;
+        setMinistries((result.ministerios || []).map((item) => ({
+          id: Number(item.id), nome: String(item.nome || "Ministério"),
+        })).filter((item) => item.id > 0));
+      }).catch(() => undefined);
+    return () => { active = false; };
+  }, [composerOpen, ministries.length]);
 
   const loadHome = useCallback(async () => {
     setLoading(true);
@@ -312,43 +335,6 @@ export default function CommunityHome({
     ),
   ).length;
 
-  const dayThread = useMemo(() => {
-    const eventItems = upcomingEvents.map((item) => ({
-      id: `event-${item.id}`,
-      kind: "Evento",
-      title: item.titulo,
-      detail: item.local || "Local a confirmar",
-      date: item.inicia_em,
-      action: "Ver na agenda",
-      href: "/painel?view=eventos",
-    }));
-    const scheduleItems = myUpcomingSchedules.map((item) => ({
-      id: `schedule-${item.id}`,
-      kind: "Escala",
-      title: item.titulo,
-      detail: `${item.ministerio_nome} · ${item.local || "Local a confirmar"}`,
-      date: item.inicia_em,
-      action: "Responder à escala",
-      href: "/painel?view=ministerios",
-    }));
-    const postItems = posts.slice(0, 2).map((item) => ({
-      id: `post-${item.id}`,
-      kind: "Mural",
-      title: item.titulo,
-      detail: item.autor_nome || communityName,
-      date: item.criado_em,
-      action: "Ler publicação",
-      href: `#publicacao-${item.id}`,
-    }));
-    return [...eventItems, ...scheduleItems, ...postItems]
-      .filter((item) => !Number.isNaN(Date.parse(item.date)))
-      .sort((left, right) => Date.parse(left.date) - Date.parse(right.date))
-      .slice(0, 7);
-  }, [communityName, myUpcomingSchedules, posts, upcomingEvents]);
-  const currentMomentIndex = dayThread.findIndex(
-    (item) => Date.parse(item.date) >= renderedAt,
-  );
-
   async function respondToSchedule(
     scheduleId: number,
     status: "CONFIRMADA" | "INDISPONIVEL",
@@ -416,24 +402,46 @@ export default function CommunityHome({
           imagemAlt: form.get("imagemAlt"),
           links: String(form.get("links") || "").split(/\r?\n/),
           eventId: form.get("eventId") || undefined,
+          audienciaTipo: audienceType,
+          ministerioIds: audienceType === "MINISTERIOS" ? selectedMinistries : [],
+          canalFeed: form.get("canalFeed") === "on",
+          canalLateral: form.get("canalLateral") === "on",
         }),
       });
-      const result = (await response.json()) as { error?: string };
+      const result = (await response.json()) as { error?: string; message?: string };
       if (!response.ok) {
         throw new Error(result.error || "Não foi possível publicar.");
       }
-      setFeedback(
-        form.get("status") === "PUBLICADA"
-          ? "Publicação criada."
-          : "Rascunho salvo.",
-      );
+      setFeedback(result.message || (form.get("status") === "PUBLICADA" ? "Publicação enviada para aprovação." : "Rascunho salvo."));
       formElement.reset();
       setComposerImageUrl("");
       setSelectedEventId("");
+      setAudienceType("PUBLICO");
+      setSelectedMinistries([]);
       setComposerOpen(false);
       await refreshFeed();
     } catch (saveError) {
       setError((saveError as Error).message);
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function approvePost(id: number) {
+    setWorking(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/pilot/publicacoes/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acao: "APROVAR" }),
+      });
+      const result = await readJson<{ error?: string }>(response);
+      if (!response.ok) throw new Error(result.error || "Não foi possível aprovar.");
+      setFeedback("Publicação aprovada e liberada nos canais escolhidos.");
+      await refreshFeed();
+    } catch (cause) {
+      setError((cause as Error).message);
     } finally {
       setWorking(false);
     }
@@ -540,7 +548,9 @@ export default function CommunityHome({
         <div className="community-home-intro">
           <h1>Seu dia no Vínkulo</h1>
           <p>
-            Olá, {userName.split(/\s+/)[0]}. Veja o que acontece hoje em {communityName}
+            {/* A quebra de linha depois da expressão não vira espaço no JSX:
+                a saudação lia "…em Comunidade Nova Aliançae resolva…". */}
+            Olá, {userName.split(/\s+/)[0]}. Veja o que acontece hoje em {communityName}{" "}
             e resolva cada pendência no contexto certo.
           </p>
         </div>
@@ -574,7 +584,7 @@ export default function CommunityHome({
                 if (event.target === event.currentTarget && !working) setComposerOpen(false);
               }}
             >
-          <form className="pilot-form community-composer-dialog" role="dialog" aria-modal="true" aria-label="Criar publicação" onSubmit={createPost}>
+          <form className="pilot-form community-composer-dialog community-composer-organized" role="dialog" aria-modal="true" aria-label="Criar publicação" onSubmit={createPost}>
             <header>
               <div><small>NOVA PUBLICAÇÃO</small><strong>Criar publicação</strong></div>
               <button type="button" className="community-composer-close" aria-label="Fechar criação de publicação" onClick={() => setComposerOpen(false)}>×</button>
@@ -593,27 +603,21 @@ export default function CommunityHome({
                 <select
                   name="eventId"
                   value={selectedEventId}
-                  onChange={(event) => setSelectedEventId(event.target.value)}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setSelectedEventId(value);
+                    const item = myEvents.find((candidate) => String(candidate.id) === value);
+                    if (!item) return;
+                    if (composerTitleRef.current) composerTitleRef.current.value = item.titulo;
+                    if (composerContentRef.current) composerContentRef.current.value = `${item.descricao || ""}\n\n📅 ${formatDateTime(item.inicia_em)}${item.local ? ` · ${item.local}` : ""}`.trim();
+                  }}
                 >
                   <option value="">Não vincular evento</option>
                   {myEvents.map((item) => (
                     <option value={item.id} key={item.id}>{item.titulo}</option>
                   ))}
                 </select>
-                <button
-                  type="button"
-                  className="secondary-action"
-                  disabled={!selectedEventId}
-                  onClick={() => {
-                    const item = myEvents.find((candidate) => String(candidate.id) === selectedEventId);
-                    if (!item) return;
-                    if (composerTitleRef.current) composerTitleRef.current.value = item.titulo;
-                    if (composerContentRef.current) {
-                      composerContentRef.current.value = `${item.descricao || ""}\n\n📅 ${formatDateTime(item.inicia_em)}${item.local ? ` · ${item.local}` : ""}`.trim();
-                    }
-                  }}
-                >Adicionar dados do evento ao rascunho</button>
-                <small>O link próprio de inscrição será incluído automaticamente na publicação.</small>
+                <small>Ao selecionar, os dados do evento e o link próprio de inscrição são incluídos automaticamente.</small>
               </label>
             )}
             <div className="composer-wide">
@@ -650,10 +654,29 @@ export default function CommunityHome({
             <label>
               Estado
               <select name="status" defaultValue="PUBLICADA">
-                <option value="PUBLICADA">Publicar agora</option>
+                <option value="PUBLICADA">Enviar para aprovação</option>
                 <option value="RASCUNHO">Salvar rascunho</option>
               </select>
             </label>
+            <label>
+              Quem verá
+              <select value={audienceType} onChange={(event) => setAudienceType(event.target.value as "PUBLICO" | "MINISTERIOS")}>
+                <option value="PUBLICO">Toda a comunidade</option>
+                <option value="MINISTERIOS">Ministérios específicos</option>
+              </select>
+            </label>
+            {audienceType === "MINISTERIOS" && (
+              <fieldset className="composer-ministry-audience composer-wide">
+                <legend>Escolha os ministérios</legend>
+                {ministries.map((ministry) => <label key={ministry.id}><input type="checkbox" checked={selectedMinistries.includes(ministry.id)} onChange={(event) => setSelectedMinistries((current) => event.target.checked ? [...new Set([...current, ministry.id])] : current.filter((id) => id !== ministry.id))} /><span>{ministry.nome}</span></label>)}
+                {!ministries.length && <small>Nenhum ministério ativo disponível.</small>}
+              </fieldset>
+            )}
+            <fieldset className="composer-channels composer-wide">
+              <legend>Onde deve aparecer</legend>
+              <label><input type="checkbox" name="canalFeed" defaultChecked /><span>Feed</span></label>
+              <label><input type="checkbox" name="canalLateral" /><span>Lateral</span></label>
+            </fieldset>
             <label className="composer-share">
               <input
                 type="checkbox"
@@ -680,52 +703,27 @@ export default function CommunityHome({
 
       <div className={`community-home-grid ${readOnlyFeed ? "feed-only" : ""}`}>
         <div className="community-feed-panel">
-          <section className="home-day-thread" aria-labelledby="home-day-thread-title">
-            <header>
-              <div>
-                <p className="pilot-kicker">FIO DO DIA</p>
-                <h2 id="home-day-thread-title">Hoje na comunidade</h2>
-              </div>
-              <time dateTime={new Date(renderedAt).toISOString()}>{formatLongDay(renderedAt)}</time>
-            </header>
-            {loading && !dayThread.length ? (
-              <p className="home-thread-empty">Organizando seu dia…</p>
-            ) : dayThread.length ? (
-              <ol className="home-timeline">
-                {dayThread.map((item, index) => (
-                  <li key={item.id}>
-                    {index === currentMomentIndex && (
-                      <div className="home-timeline-now" aria-label="Momento atual">
-                        <time>{formatTime(renderedAt)}</time><span>Agora</span>
-                      </div>
-                    )}
-                    <time dateTime={item.date}>{formatTime(item.date)}</time>
-                    <span className="home-timeline-node" aria-hidden="true" />
-                    <div className="home-timeline-content">
-                      <small>{item.kind}</small>
-                      <h3>{item.title}</h3>
-                      <p>{item.detail}</p>
-                      <Link href={item.href}>{item.action}</Link>
-                    </div>
-                  </li>
-                ))}
-                {currentMomentIndex < 0 && (
-                  <li className="home-timeline-now-row"><div className="home-timeline-now"><time>{formatTime(renderedAt)}</time><span>Agora</span></div></li>
-                )}
-              </ol>
-            ) : (
-              <div className="home-thread-empty"><strong>Seu dia está livre por enquanto</strong><p>Consulte a agenda completa para planejar os próximos encontros.</p><Link href="/painel?view=eventos">Abrir agenda</Link></div>
-            )}
-          </section>
           <header id="mural">
             <div>
               <p className="pilot-kicker">MURAL</p>
               <h2>Atualizações da comunidade</h2>
             </div>
-            <span className={loading ? "community-home-loading" : "community-feed-count"}>
-              {loading ? "Atualizando…" : `${posts.length}`}
-              {!loading && <small> no feed</small>}
-            </span>
+            <div className="community-feed-heading-actions">
+              {canPublish && (
+                <button
+                  type="button"
+                  className="community-feed-create"
+                  onClick={() => setComposerOpen(true)}
+                >
+                  <span aria-hidden="true">＋</span>
+                  Criar publicação
+                </button>
+              )}
+              <span className={loading ? "community-home-loading" : "community-feed-count"}>
+                {loading ? "Atualizando…" : `${posts.length}`}
+                {!loading && <small> no feed</small>}
+              </span>
+            </div>
           </header>
           {loading && !posts.length ? (
             <div className="community-feed-loading" role="status" aria-label="Carregando publicações">
@@ -803,6 +801,13 @@ export default function CommunityHome({
                               void deletePost(post.id);
                             }}>Excluir</button>
                           )}
+                          {post.status === "EM_ANALISE" && permissions.includes("feed.moderate") && (
+                            <button type="button" disabled={working} onClick={() => { setPostActionsId(null); void approvePost(post.id); }}>Aprovar publicação</button>
+                          )}
+                          <button type="button" onClick={() => {
+                            setPostActionsId(null);
+                            window.dispatchEvent(new CustomEvent("vinkulo:open-feedback", { detail: { type: "DENUNCIA", entityType: "PUBLICACAO", entityId: post.id } }));
+                          }}>Denunciar publicação</button>
                             </div>
                           </section>
                         </div>,
@@ -940,7 +945,7 @@ export default function CommunityHome({
                     <nav className="community-post-links" aria-label={`Links de ${post.titulo}`}>
                       {parsePostLinks(post.links_json).map((link, index) => (
                         <a href={link} target="_blank" rel="noreferrer" key={link} title={link}>
-                          <span aria-hidden="true">↗</span><span><small>Link {index + 1}</small>{linkLabel(link, index)}</span>
+                          <span aria-hidden="true">↗</span><span><small>Link {index + 1}</small>{post.titulo}</span>
                         </a>
                       ))}
                     </nav>
@@ -956,7 +961,7 @@ export default function CommunityHome({
                   ) : null}
                   <footer>
                     <span>
-                      {post.status === "RASCUNHO" ? "Rascunho" : "Publicada"}
+                      {post.status === "RASCUNHO" ? "Rascunho" : post.status === "EM_ANALISE" ? "Aguardando aprovação" : "Publicada"}
                     </span>
                     {post.status === "PUBLICADA" && (
                       <CommunityPostShare
@@ -1212,25 +1217,6 @@ function formatDateTime(value: string) {
   }).format(date);
 }
 
-function formatTime(value: string | number) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "--:--";
-  return new Intl.DateTimeFormat("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "America/Sao_Paulo",
-  }).format(date);
-}
-
-function formatLongDay(value: number) {
-  return new Intl.DateTimeFormat("pt-BR", {
-    weekday: "long",
-    day: "2-digit",
-    month: "long",
-    timeZone: "America/Sao_Paulo",
-  }).format(new Date(value));
-}
-
 function parsePostLinks(value?: string) {
   try {
     const parsed = JSON.parse(String(value || "[]"));
@@ -1241,15 +1227,6 @@ function parsePostLinks(value?: string) {
       .slice(0, 5);
   } catch {
     return [];
-  }
-}
-
-function linkLabel(value: string, index: number) {
-  try {
-    const host = new URL(value).hostname.replace(/^www\./, "");
-    return host || `Link ${index + 1}`;
-  } catch {
-    return `Link ${index + 1}`;
   }
 }
 

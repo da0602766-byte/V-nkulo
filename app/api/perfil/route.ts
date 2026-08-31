@@ -12,7 +12,16 @@ export async function PATCH(request: Request) {
   const access = await requireApiPermission();
   if (access.error) return access.error;
   const { fotoPerfil, nome, email, senhaAtual, telefone, dataNascimento, endereco, celula, ministerio, observacoes } = await request.json() as { fotoPerfil?: string | null; nome?: string; email?: string; senhaAtual?: string; telefone?: string; dataNascimento?: string; endereco?: string; celula?: string; ministerio?: string; observacoes?: string };
-  if (fotoPerfil && (!fotoPerfil.startsWith("data:image/") || fotoPerfil.length > 900000)) return Response.json({ error: "A foto convertida ficou grande demais. Tente outra imagem." }, { status: 400 });
+  if (
+    fotoPerfil &&
+    !/^\/api\/storage\/media\/[A-Za-z0-9_.-]+$/i.test(fotoPerfil) &&
+    !/^\/local-media\/[0-9a-f-]{36}$/i.test(fotoPerfil)
+  ) {
+    return Response.json(
+      { error: "A foto precisa estar no Google Drive ou somente neste aparelho." },
+      { status: 400 },
+    );
+  }
   const cleanName = String(nome || access.user!.nome).trim();
   const cleanEmail = normalizeEmail(email || access.user!.email);
   if (!cleanName) return Response.json({ error: "Informe seu nome." }, { status: 400 });

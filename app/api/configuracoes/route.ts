@@ -4,6 +4,12 @@ export async function PATCH(request: Request) {
   const access = await requireApiPermission("SISTEMA_PERSONALIZAR");
   if (access.error) return access.error;
   const body = await request.json() as { tema?: unknown; abas?: unknown; site?: unknown; login?: unknown; manutencao?: unknown; ordemMenu?: unknown; textos?: unknown; layoutAbas?: unknown; abasOcultas?: unknown; hierarquias?: unknown };
+  if (/data:(?:image|audio|video|application)\//i.test(JSON.stringify(body))) {
+    return Response.json(
+      { error: "Fotos e arquivos precisam estar no Google Drive ou somente no aparelho." },
+      { status: 400 },
+    );
+  }
   const db = getD1();
   const hierarquias = Array.isArray(body.hierarquias)
     ? body.hierarquias.flatMap((item) => {

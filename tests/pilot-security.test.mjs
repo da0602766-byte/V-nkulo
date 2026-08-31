@@ -343,7 +343,9 @@ test("páginas, temas e responsividade do VÍNKULO permanecem explícitos", asyn
   assert.match(communityTheme, /CORPORATIVO/);
   assert.match(uploadRoute, /MAX_IMAGE_BYTES/);
   assert.match(uploadRoute, /user\.system_owner/);
-  assert.match(uploadRoute, /bucket\.put/);
+  assert.match(uploadRoute, /uploadDriveFile/);
+  assert.match(uploadRoute, /purpose === "post-image"[\s\S]*bucket\.put/);
+  assert.match(uploadRoute, /storage: "PUBLICATION"/);
   assert.match(secretaryStyles, /Secretaria: contenção mobile/);
   assert.match(secretaryStyles, /overflow-wrap:anywhere/);
   assert.match(visualEditor, /hoverEffect/);
@@ -398,8 +400,13 @@ test("Ministérios, Diaconia, uploads e Aparência mantêm os novos bloqueios", 
   assert.match(editor, /navigationLocked/);
   assert.match(editor, /Restaurar todas as cores/);
   assert.match(editor, /background-color:/);
-  assert.match(upload, /prepareImage/);
-  assert.match(upload, /response\.text\(\)/);
+  assert.match(upload, /saveImageOutsidePlatform/);
+  const mediaUpload = await readFile(
+    new URL("../app/lib/media-upload-client.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(mediaUpload, /prepareImageForUpload/);
+  assert.match(mediaUpload, /response\.text\(\)/);
 });
 
 test("comunidades novas exigem solicitação ao proprietário, ficha rígida e automação editorial interna", async () => {
@@ -446,7 +453,8 @@ test("comunidades novas exigem solicitação ao proprietário, ficha rígida e a
   assert.match(editorUi, /PROGRAMAÇÃO AUTORIZADA/);
   assert.match(editorUi, /Autorizar e iniciar contador/);
   assert.match(editorUi, /value="COMUNIDADE"/);
-  assert.match(dashboard, /pilot-desktop-community-switcher/);
+  assert.doesNotMatch(dashboard, /pilot-desktop-community-switcher/);
+  assert.match(dashboard, /Trocar comunidade pelo menu da conta/);
   assert.match(dashboard, /window\.location\.assign\("\/painel\?view=inicio"\)/);
   assert.match(mobileNav, /CreateCommunityShortcut/);
   assert.match(styles, /grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/);

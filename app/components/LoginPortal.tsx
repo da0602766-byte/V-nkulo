@@ -53,6 +53,13 @@ type Maintenance = {
 type Mode = "login" | "esqueci" | "cadastro";
 type LoginTheme = "auto" | "claro" | "escuro";
 
+function isInstalledVinkuloApp() {
+  return Boolean(window.VinkuloAndroid) ||
+    ["standalone", "fullscreen", "minimal-ui"].some((mode) => window.matchMedia(`(display-mode: ${mode})`).matches) ||
+    (window.navigator as Navigator & { standalone?: boolean }).standalone === true ||
+    document.referrer.startsWith("android-app://");
+}
+
 async function submit(url: string, payload: Record<string, unknown>) {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 15000);
@@ -74,9 +81,14 @@ async function submit(url: string, payload: Record<string, unknown>) {
     window.clearTimeout(timeout);
   }
   const text = await response.text();
-  let body: { error?: string; message?: string } = {};
+  let body: {
+    error?: string;
+    message?: string;
+    redirect?: string;
+    firstAccessRequired?: boolean;
+  } = {};
   try {
-    body = text ? JSON.parse(text) as { error?: string; message?: string } : {};
+    body = text ? JSON.parse(text) as typeof body : {};
   } catch {
     body = {};
   }
@@ -92,6 +104,7 @@ export default function LoginPortal({
   initialMessage = "",
   returnTo = "",
   initialMode = "login",
+  googleAvailable = false,
 }: {
   config: LoginConfig;
   siteName: string;
@@ -100,10 +113,13 @@ export default function LoginPortal({
   initialMessage?: string;
   returnTo?: string;
   initialMode?: Mode;
+  googleAvailable?: boolean;
 }) {
   const [mode, setMode] = useState<Mode>(initialMode);
   const [message, setMessage] = useState(initialMessage);
   const [loading, setLoading] = useState(false);
+  const [androidApp, setAndroidApp] = useState(false);
+  const [googlePairing, setGooglePairing] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [activeMessageIndex, setActiveMessageIndex] = useState(0);
   const [loginTheme, setLoginTheme] = useState<LoginTheme>(
@@ -121,6 +137,63 @@ export default function LoginPortal({
   }, []);
 
   useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const insideAndroidApp = isInstalledVinkuloApp();
+      setAndroidApp(insideAndroidApp);
+      if (insideAndroidApp) {
+        setGooglePairing(window.sessionStorage.getItem("vinkulo-google-pairing") || "");
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const resetAfterBrowserReturn = () => {
+      if (!googlePairing) setLoading(false);
+    };
+    window.addEventListener("pageshow", resetAfterBrowserReturn);
+    return () => window.removeEventListener("pageshow", resetAfterBrowserReturn);
+  }, [googlePairing]);
+
+  useEffect(() => {
+    if (!androidApp || !googlePairing) return;
+    let stopped = false;
+    let timer = 0;
+    const poll = async () => {
+      try {
+        const response = await fetch("/api/auth/google/native/complete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pairing: googlePairing }),
+          credentials: "same-origin",
+        });
+        const body = await response.json() as { status?: string; error?: string; returnTo?: string };
+        if (body.status === "complete") {
+          window.sessionStorage.removeItem("vinkulo-google-pairing");
+          const target = String(body.returnTo || returnTo || "/painel");
+          window.location.assign(target.startsWith("/") && !target.startsWith("//") ? target : "/painel");
+          return;
+        }
+        if (body.status === "failed" || body.status === "expired" || body.status === "invalid") {
+          window.sessionStorage.removeItem("vinkulo-google-pairing");
+          setGooglePairing("");
+          setLoading(false);
+          setMessage(body.error || "Não foi possível concluir o login com Google.");
+          return;
+        }
+      } catch {
+        // Mantém a espera quando o aplicativo alternar entre o Chrome e o Vínkulo.
+      }
+      if (!stopped) timer = window.setTimeout(() => void poll(), 1500);
+    };
+    void poll();
+    return () => {
+      stopped = true;
+      window.clearTimeout(timer);
+    };
+  }, [androidApp, googlePairing, returnTo]);
+
+  useEffect(() => {
     if (scheduledMessages.length < 2) return;
     const current = scheduledMessages[activeMessageIndex % scheduledMessages.length];
     const timer = window.setTimeout(
@@ -135,8 +208,21 @@ export default function LoginPortal({
     setLoading(true);
     setMessage("");
     const data = Object.fromEntries(new FormData(event.currentTarget).entries());
+    let navigating = false;
     try {
-      if (mode === "esqueci") {
+      if (mode === "login") {
+        const result = await submit("/api/auth/login", data);
+        const target = String(result.redirect || returnTo || "/painel");
+        setMessage("Login confirmado. Abrindo sua conta…");
+        navigating = true;
+        window.setTimeout(() => {
+          window.location.assign(
+            target.startsWith("/") && !target.startsWith("//")
+              ? target
+              : "/painel",
+          );
+        }, 180);
+      } else if (mode === "esqueci") {
         const result = await submit("/api/auth/esqueci-senha", data);
         setMessage(result.message || "Solicitação enviada ao administrador.");
       } else if (mode === "cadastro") {
@@ -151,7 +237,7 @@ export default function LoginPortal({
     } catch (error) {
       setMessage((error as Error).message);
     } finally {
-      setLoading(false);
+      if (!navigating) setLoading(false);
     }
   }
 
@@ -163,6 +249,36 @@ export default function LoginPortal({
   function changeTheme(next: LoginTheme) {
     setLoginTheme(next);
     window.localStorage.setItem("vinkulo-login-theme", next);
+  }
+
+  async function startGoogleLogin() {
+    setLoading(true);
+    setMessage("Abrindo a Conta Google com segurança…");
+    if (!androidApp) {
+      window.location.assign(`/api/auth/google/start?purpose=login&returnTo=${encodeURIComponent(returnTo || "/painel")}`);
+      return;
+    }
+    setMessage("Abra o Google no navegador. O Vínkulo concluirá o acesso automaticamente.");
+    try {
+      const bytes = crypto.getRandomValues(new Uint8Array(32));
+      const pairing = btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+      const query = new URLSearchParams({
+        purpose: "login",
+        returnTo: returnTo || "/painel",
+        channel: "android",
+        pairing,
+        format: "json",
+      });
+      const response = await fetch(`/api/auth/google/start?${query}`, { credentials: "same-origin" });
+      const body = await response.json() as { authorizationUrl?: string; error?: string };
+      if (!response.ok || !body.authorizationUrl) throw new Error(body.error || "Não foi possível abrir o Google.");
+      window.sessionStorage.setItem("vinkulo-google-pairing", pairing);
+      setGooglePairing(pairing);
+      window.location.href = body.authorizationUrl;
+    } catch (error) {
+      setLoading(false);
+      setMessage((error as Error).message);
+    }
   }
 
   const activeScheduledMessage = scheduledMessages.length
@@ -178,7 +294,7 @@ export default function LoginPortal({
   ].filter((item): item is { label: string; icon: string; href: string } => Boolean(item.href));
   const shellStyle = {
     "--login-bg": config.backgroundColor || "#050817",
-    "--login-accent": config.accentColor || "#3488ff",
+    "--login-accent": config.accentColor || "#b25a33",
     "--login-card": config.cardColor || "#ffffff",
   } as React.CSSProperties;
 
@@ -224,10 +340,14 @@ export default function LoginPortal({
             <h2>Sua comunidade organizada em um só lugar.</h2>
             <span>Entre para acompanhar pessoas, eventos, equipes e escalas com segurança.</span>
           </header>
+          {/* Os três itens diziam "Seguro por contexto", "Feito para pessoas" e
+              "Rotina conectada" — elogios que não informam nada a quem está
+              parado na tela de senha. Agora dizem o que a conta faz e o que
+              fazer quando ela ainda não existe, que é a dúvida real aqui. */}
           <div className="login-v2-benefits">
-            <span><i>✓</i><div><strong>Seguro por contexto</strong><small>Dados e permissões protegidos em cada comunidade</small></div></span>
-            <span><i>◎</i><div><strong>Feito para pessoas</strong><small>Uma experiência simples para membros e lideranças</small></div></span>
-            <span><i>▣</i><div><strong>Rotina conectada</strong><small>Eventos, equipes e escalas no mesmo ambiente</small></div></span>
+            <span><i>✓</i><div><strong>Uma conta, suas comunidades</strong><small>Você vê apenas os dados das comunidades de que participa</small></div></span>
+            <span><i>◎</i><div><strong>O que depende de você</strong><small>Eventos, equipes e escalas em que seu nome está</small></div></span>
+            <span><i>▣</i><div><strong>Ainda não tem acesso?</strong><small>Crie a conta e peça entrada: a liderança da comunidade aprova</small></div></span>
           </div>
         </aside>}
 
@@ -260,9 +380,7 @@ export default function LoginPortal({
 
           <form
             className={`login-form ${mode === "cadastro" ? "login-signup-form" : ""}`}
-            action={mode === "login" ? "/api/auth/login" : undefined}
-            method={mode === "login" ? "post" : undefined}
-            onSubmit={mode === "login" ? () => { setLoading(true); setMessage(""); } : handle}
+            onSubmit={handle}
           >
             {mode === "login" && returnTo && (
               <input type="hidden" name="returnTo" value={returnTo} />
@@ -287,8 +405,25 @@ export default function LoginPortal({
               {config.recuperacaoHabilitada !== false && <button type="button" onClick={() => changeMode("esqueci")}>{config.recoveryLinkText || "Esqueci minha senha"}</button>}
             </div>}
             {message && <p className="login-feedback" role="alert">{message}</p>}
-            <button className="login-submit" disabled={loading}>{loading ? "Processando…" : mode === "login" ? config.loginButtonText || "Entrar" : mode === "cadastro" ? "Criar conta" : "Solicitar redefinição"}</button>
+            <button className="login-submit" disabled={loading}>{loading ? mode === "login" ? "Entrando…" : "Processando…" : mode === "login" ? config.loginButtonText || "Entrar" : mode === "cadastro" ? "Criar conta" : "Solicitar redefinição"}</button>
           </form>
+
+          {mode === "login" && (
+            <section className="login-google-access" aria-label="Entrar com Conta Google">
+              <span>ou</span>
+              {googleAvailable ? (
+                <button type="button" onClick={() => void startGoogleLogin()} disabled={loading}>
+                  <b aria-hidden="true">G</b> {androidApp && googlePairing ? "Aguardando o Google…" : "Entrar com Google"}
+                </button>
+              ) : (
+                <button type="button" disabled title="A integração Google ainda precisa ser ativada pelo proprietário.">
+                  <b aria-hidden="true">G</b> Conta Google aguardando ativação
+                </button>
+              )}
+              <small>O login não autoriza o Drive. O armazenamento é solicitado separadamente e somente com seu consentimento.</small>
+              <small>Ao continuar, você aceita os <Link href="/termos">Termos de Uso</Link> e a <Link href="/privacidade">Política de Privacidade</Link>. Contas novas ficam sem acesso a comunidades até aprovação.</small>
+            </section>
+          )}
 
           <div className="login-links">
             {mode !== "login" && <button onClick={() => changeMode("login")}>Voltar para entrar</button>}

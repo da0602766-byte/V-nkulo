@@ -32,10 +32,9 @@ test("papel de parede exige permissão comunitária validada no backend", async 
     source("app/components/CommunityThemeEditor.tsx"),
   ]);
 
-  const permissionCheck = /access\.context\.permissions\.includes\(\s*"community\.theme\.manage",\s*\)/g;
-  assert.equal([...route.matchAll(permissionCheck)].length, 2);
-  assert.match(route, /const canEditWallpaper = canEdit;/);
-  assert.match(route, /wallpaperUrl: canEditWallpaper\s*\? requestedWallpaper\s*: currentTheme\.wallpaperUrl/);
+  assert.match(route, /export async function PATCH[\s\S]*requireTenantPermission\("community\.theme\.manage"\)/);
+  assert.match(route, /const canEditWallpaper = true;/);
+  assert.match(route, /wallpaperUrl: canEditWallpaper[\s\S]*requestedWallpaper[\s\S]*currentTheme\.wallpaperUrl/);
   assert.match(route, /theme: await getCommunityTheme[\s\S]*?canEditWallpaper/);
   assert.match(editor, /\{data\.canEditWallpaper && \(/);
   assert.match(editor, /Papel de parede da página inicial/);

@@ -647,6 +647,8 @@ export const conversasPrivadas = sqliteTable(
       .notNull()
       .references(() => usuarios.id, { onDelete: "cascade" }),
     cicloMes: text("ciclo_mes").notNull(),
+    driveFileId: text("drive_file_id"),
+    storageProvider: text("storage_provider").notNull().default("PLATFORM_LEGACY"),
     atualizadoEm: text("atualizado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
     criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
@@ -668,6 +670,66 @@ export const conversasPrivadas = sqliteTable(
       table.atualizadoEm,
     ),
   ],
+);
+
+export const googleConnections = sqliteTable(
+  "google_connections",
+  {
+    userId: integer("usuario_id")
+      .primaryKey()
+      .references(() => usuarios.id, { onDelete: "cascade" }),
+    googleSub: text("google_sub").notNull().unique(),
+    googleEmail: text("google_email").notNull(),
+    refreshTokenCiphertext: text("refresh_token_ciphertext"),
+    refreshTokenIv: text("refresh_token_iv"),
+    scopes: text("scopes").notNull().default("openid email profile"),
+    driveEnabled: integer("drive_enabled", { mode: "boolean" }).notNull().default(false),
+    connectedAt: text("connected_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    revokedAt: text("revoked_at"),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [index("google_connections_email_idx").on(table.googleEmail)],
+);
+
+export const storagePreferences = sqliteTable("storage_preferences", {
+  userId: integer("usuario_id")
+    .primaryKey()
+    .references(() => usuarios.id, { onDelete: "cascade" }),
+  provider: text("provider").notNull().default("LOCAL"),
+  autoLoadRecent: integer("auto_load_recent", { mode: "boolean" }).notNull().default(true),
+  autoDownloadFiles: integer("auto_download_files", { mode: "boolean" }).notNull().default(false),
+  consentedAt: text("consented_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const userDriveStorage = sqliteTable("user_drive_storage", {
+  userId: integer("usuario_id")
+    .primaryKey()
+    .references(() => usuarios.id, { onDelete: "cascade" }),
+  rootFolderId: text("pasta_raiz_id").notNull(),
+  privateMediaFolderId: text("pasta_midias_privadas_id").notNull(),
+  createdAt: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("atualizado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const communityDriveStorage = sqliteTable(
+  "community_drive_storage",
+  {
+    communityId: integer("comunidade_id")
+      .primaryKey()
+      .references(() => comunidades.id, { onDelete: "cascade" }),
+    ownerUserId: integer("proprietario_usuario_id")
+      .notNull()
+      .references(() => usuarios.id, { onDelete: "restrict" }),
+    rootFolderId: text("pasta_raiz_id").notNull(),
+    mediaFolderId: text("pasta_midias_id").notNull(),
+    chatFolderId: text("pasta_conversas_id").notNull(),
+    migrationStatus: text("status_migracao").notNull().default("PENDING"),
+    migratedAt: text("migrado_em"),
+    createdAt: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("atualizado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [index("community_drive_owner_idx").on(table.ownerUserId)],
 );
 
 export const mensagensPrivadas = sqliteTable(
@@ -1191,6 +1253,13 @@ export const publicacoesPiloto = sqliteTable("publicacoes_piloto", {
   imagemWidth: integer("imagem_width").notNull().default(0),
   imagemHeight: integer("imagem_height").notNull().default(0),
   linksJson: text("links_json").notNull().default("[]"),
+  audienciaTipo: text("audiencia_tipo").notNull().default("PUBLICO"),
+  ministeriosJson: text("ministerios_json").notNull().default("[]"),
+  canalFeed: integer("canal_feed", { mode: "boolean" }).notNull().default(true),
+  canalLateral: integer("canal_lateral", { mode: "boolean" }).notNull().default(false),
+  aprovacaoStatus: text("aprovacao_status").notNull().default("APROVADA"),
+  aprovadoPor: integer("aprovado_por").references(() => usuarios.id, { onDelete: "set null" }),
+  aprovadoEm: text("aprovado_em"),
   criadoPor: integer("criado_por").references(() => usuarios.id, {
     onDelete: "set null",
   }),

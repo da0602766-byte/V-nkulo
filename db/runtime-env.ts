@@ -20,6 +20,9 @@ type RuntimeBindings = {
   DB?: D1Database;
   BUCKET?: R2BucketBinding;
   AUTH_SECRET?: string;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  GOOGLE_CREDENTIALS_SECRET?: string;
   SYSTEM_OWNER_EMAIL?: string;
   SYSTEM_OWNER_LOCKED_BEFORE?: string;
 };

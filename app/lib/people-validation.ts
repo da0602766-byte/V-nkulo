@@ -1,4 +1,5 @@
 import { normalizeOfficialPermissions } from "./tenant-policy.mjs";
+import { normalizeBrazilianPhone } from "./brazilian-validation";
 
 const OFFICIAL_TITLES = [
   "LÍDER",
@@ -54,13 +55,20 @@ export function parseSelfProfileUpdate(value: unknown) {
     return { error: "Dados do perfil inválidos." } as const;
   }
   const payload = value as Record<string, unknown>;
-  const telefone = clean(payload.telefone, 30);
+  const telefoneRaw = clean(payload.telefone, 30);
+  const telefone = telefoneRaw ? normalizeBrazilianPhone(telefoneRaw) : "";
   const dataNascimento = clean(payload.dataNascimento, 10);
   const endereco = clean(payload.endereco, 180);
   const celula = clean(payload.celula, 100);
   const ministerio = clean(payload.ministerio, 100);
   if (dataNascimento && !/^\d{4}-\d{2}-\d{2}$/.test(dataNascimento)) {
     return { error: "Data de nascimento inválida." } as const;
+  }
+  if (telefoneRaw && !telefone) {
+    return { error: "Telefone inválido. Informe o DDD e o número." } as const;
+  }
+  if (dataNascimento && Date.parse(`${dataNascimento}T12:00:00Z`) > Date.now()) {
+    return { error: "A data de nascimento não pode estar no futuro." } as const;
   }
   return {
     data: { telefone, dataNascimento, endereco, celula, ministerio },

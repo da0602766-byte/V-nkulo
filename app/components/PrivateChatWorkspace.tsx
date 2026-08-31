@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 type Person = {
   id: number;
@@ -38,6 +38,10 @@ type ChatData = {
   messages: Message[];
   currentUserId: number;
   cycle: string;
+  storage?: "GOOGLE_DRIVE";
+  privacyNotice?: string;
+  autoLoadRecent?: boolean;
+  recentContentLoaded?: boolean;
 };
 
 export default function PrivateChatWorkspace() {
@@ -52,21 +56,28 @@ export default function PrivateChatWorkspace() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const loadRecentRef = useRef(false);
 
-  async function load(conversationId = activeId, quiet = false) {
+  async function load(
+    conversationId = activeId,
+    quiet = false,
+    forceRecent = loadRecentRef.current,
+  ) {
     if (!quiet) setLoading(true);
     const latestId = quiet
       ? Math.max(0, ...(data?.messages || []).filter((item) => item.id > 0).map((item) => item.id))
       : 0;
+    const force = forceRecent ? "&loadRecent=1" : "";
     const query = quiet && conversationId > 0
-      ? `?conversation=${conversationId}&messagesOnly=1&after=${latestId}`
+      ? `?conversation=${conversationId}&messagesOnly=1&after=${latestId}${force}`
       : conversationId > 0
-        ? `?conversation=${conversationId}`
+        ? `?conversation=${conversationId}${force}`
         : "";
     try {
       const response = await fetch(`/api/pilot/chat${query}`, { cache: "no-store" });
       const result = await readResult(response) as ChatData & { error?: string };
       if (!response.ok) throw new Error(result.error || "Não foi possível carregar as mensagens.");
+      if (result.recentContentLoaded) loadRecentRef.current = true;
       if (quiet && conversationId > 0) {
         setData((current) => current ? {
           ...current,
@@ -93,7 +104,11 @@ export default function PrivateChatWorkspace() {
   useEffect(() => {
     const initial = window.setTimeout(() => void load(initialConversation), 0);
     const timer = window.setInterval(() => {
-      if (activeId > 0 && document.visibilityState === "visible") void load(activeId, true);
+      if (
+        activeId > 0 &&
+        loadRecentRef.current &&
+        document.visibilityState === "visible"
+      ) void load(activeId, true);
     }, 4_000);
     return () => {
       window.clearTimeout(initial);
@@ -103,6 +118,7 @@ export default function PrivateChatWorkspace() {
   }, [activeId]);
 
   async function openConversation(conversationId: number) {
+    loadRecentRef.current = false;
     setActiveId(conversationId);
     const address = new URL(window.location.href);
     address.searchParams.set("view", "mensagens");
@@ -212,6 +228,9 @@ export default function PrivateChatWorkspace() {
         </div>
         <span>Conversas do mês atual</span>
       </header>
+      <p className="private-chat-storage-notice" role="status">
+        ☁ {data?.privacyNotice || "As mensagens recentes são carregadas do Google Drive. O Vínkulo não mantém uma cópia do conteúdo."}
+      </p>
       {error && <p className="pilot-form-message" role="alert">{error}</p>}
       <div className={`private-chat-layout ${activeId ? "has-thread" : ""}`}>
         <aside className="private-chat-sidebar">
@@ -251,6 +270,18 @@ export default function PrivateChatWorkspace() {
                 <div><strong>{activeConversation.participante_nome}</strong><small>{metadata(activeConversation.hierarquia, activeConversation.ministerio)} · {activeConversation.online ? "Online" : "Offline"}</small></div>
               </header>
               <div className="private-chat-messages">
+                {data?.recentContentLoaded === false && (
+                  <button
+                    type="button"
+                    className="private-chat-load-recent"
+                    onClick={() => {
+                      loadRecentRef.current = true;
+                      void load(activeId, false, true);
+                    }}
+                  >
+                    Carregar mensagens recentes do Google Drive
+                  </button>
+                )}
                 {(data?.messages || []).map((message) => {
                   const own = Number(message.remetente_id) === Number(data?.currentUserId);
                   return <article key={message.id} className={own ? "own" : ""}>

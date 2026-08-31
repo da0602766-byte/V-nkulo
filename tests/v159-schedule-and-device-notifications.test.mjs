@@ -25,6 +25,6 @@ test("every unread purple notice is forwarded once to the Android tray", async (
   assert.match(center, /registration\.showNotification/);
   assert.match(center, /await load\(\);/);
   assert.match(center, /adote:refresh-notifications/);
-  assert.match(serviceWorker, /vinkulo-shell-v2/);
+  assert.match(serviceWorker, /vinkulo-shell-v4/);
   assert.match(serviceWorker, /renotify: true/);
 });

@@ -12,6 +12,7 @@ test("imagens aceitam originais maiores e são convertidas automaticamente", () 
   const clientImage = source("app/lib/client-image.ts");
   const upload = source("app/api/pilot/uploads/route.ts");
   const nativeUpload = source("app/components/NativeImageUpload.tsx");
+  const mediaUpload = source("app/lib/media-upload-client.ts");
   const loginConfig = source("app/lib/pilot-login-config.ts");
   const loginPortal = source("app/components/LoginPortal.tsx");
 
@@ -21,7 +22,9 @@ test("imagens aceitam originais maiores e são convertidas automaticamente", () 
   assert.match(clientImage, /canvas\.toBlob\(resolve, "image\/webp"/);
   assert.match(clientImage, /file\.type === "image\/svg\+xml"/);
   assert.match(upload, /8 \* 1024 \* 1024/);
-  assert.match(nativeUpload, /prepareImageForUpload\(file, purpose\)/);
+  assert.match(nativeUpload, /saveImageOutsidePlatform\(file, purpose, resourceId\)/);
+  assert.match(mediaUpload, /prepareImageForUpload\(file, purpose\)/);
+  assert.match(mediaUpload, /storeLocalMedia\(prepared\)/);
   assert.match(nativeUpload, /accept="image\/\*"/);
   assert.match(loginConfig, /backgroundFit: "SMART" \| "COVER"/);
   assert.match(loginPortal, /className="login-v2-top-banner"/);

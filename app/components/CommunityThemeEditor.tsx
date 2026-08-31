@@ -32,6 +32,8 @@ export default function CommunityThemeEditor() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [paletteId, setPaletteId] = useState<CommunityPaletteId>("MODERNO");
+  const [savedPaletteId, setSavedPaletteId] =
+    useState<CommunityPaletteId>("MODERNO");
   const [logoUrl, setLogoUrl] = useState("");
   const [bannerUrl, setBannerUrl] = useState("");
   const [wallpaperUrl, setWallpaperUrl] = useState("");
@@ -61,6 +63,7 @@ export default function CommunityThemeEditor() {
         setCanEditProfile(Boolean(communityResult.canEdit));
         if (result.theme) {
           setPaletteId(result.theme.paletteId);
+          setSavedPaletteId(result.theme.paletteId);
           setLogoUrl(result.theme.logoUrl);
           setBannerUrl(result.theme.bannerUrl);
           setWallpaperUrl(result.theme.wallpaperUrl);
@@ -68,6 +71,15 @@ export default function CommunityThemeEditor() {
       })
       .catch((error) => setMessage(error.message));
   }, []);
+
+  useEffect(() => {
+    const dashboard = document.querySelector<HTMLElement>(
+      ".pilot-dashboard[data-community-palette]",
+    );
+    if (!dashboard) return;
+    applyPalettePreview(dashboard, paletteId);
+    return () => applyPalettePreview(dashboard, savedPaletteId);
+  }, [paletteId, savedPaletteId]);
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -83,6 +95,10 @@ export default function CommunityThemeEditor() {
       const result = (await themeResponse.json()) as ThemeResponse;
       if (!themeResponse.ok) {
         throw new Error(result.error || "Falha ao salvar o tema.");
+      }
+      if (result.theme) {
+        setData((current) => ({ ...current, theme: result.theme }));
+        setSavedPaletteId(result.theme.paletteId);
       }
       if (canEditProfile) {
         const communityResponse = await fetch("/api/pilot/comunidades", {
@@ -181,4 +197,37 @@ export default function CommunityThemeEditor() {
       </form>
     </section>
   );
+}
+
+function applyPalettePreview(
+  dashboard: HTMLElement,
+  paletteId: CommunityPaletteId,
+) {
+  const palette = getCommunityPalette(paletteId);
+  dashboard.dataset.communityPalette = paletteId.toLowerCase();
+  const tokens = {
+    "--community-light-bg": palette.light.background,
+    "--community-light-surface": palette.light.surface,
+    "--community-light-surface-2": palette.light.surface2,
+    "--community-light-text": palette.light.text,
+    "--community-light-muted": palette.light.muted,
+    "--community-light-line": palette.light.line,
+    "--community-light-primary": palette.light.primary,
+    "--community-light-secondary": palette.light.secondary,
+    "--community-light-accent": palette.light.accent,
+    "--community-light-shadow": palette.light.shadow,
+    "--community-dark-bg": palette.dark.background,
+    "--community-dark-surface": palette.dark.surface,
+    "--community-dark-surface-2": palette.dark.surface2,
+    "--community-dark-text": palette.dark.text,
+    "--community-dark-muted": palette.dark.muted,
+    "--community-dark-line": palette.dark.line,
+    "--community-dark-primary": palette.dark.primary,
+    "--community-dark-secondary": palette.dark.secondary,
+    "--community-dark-accent": palette.dark.accent,
+    "--community-dark-shadow": palette.dark.shadow,
+  };
+  for (const [name, value] of Object.entries(tokens)) {
+    dashboard.style.setProperty(name, value);
+  }
 }

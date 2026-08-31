@@ -21,6 +21,12 @@ export async function POST(request: Request) {
   const access = await requireApiPermission("MODULOS_GERENCIAR");
   if (access.error) return access.error;
   const payload = (await request.json()) as { nome?: string; descricao?: string; icone?: string; campos?: unknown[]; conteudo?: unknown[]; cor?: string; permissao?: string };
+  if (hasEmbeddedMedia(payload.conteudo)) {
+    return Response.json(
+      { error: "As imagens precisam estar no Google Drive; o Vínkulo não guarda arquivos no banco." },
+      { status: 400 },
+    );
+  }
   const nome = payload.nome?.trim() ?? "";
   const slug = slugify(nome);
   if (!nome || !slug) return Response.json({ error: "Informe um nome válido para a aba." }, { status: 400 });
@@ -37,4 +43,8 @@ export async function POST(request: Request) {
     criadoPor: access.user!.email,
   });
   return Response.json({ id: result.meta.last_row_id }, { status: 201 });
+}
+
+function hasEmbeddedMedia(value: unknown) {
+  return /data:(?:image|audio|video|application)\//i.test(JSON.stringify(value ?? null));
 }

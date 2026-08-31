@@ -677,7 +677,7 @@ test("Bloco 13 isola pessoas e valida oficiais e permissões no backend", async 
   assert.equal(
     database.prepare("SELECT telefone FROM usuarios WHERE id = ?").get(memberId)
       .telefone,
-    "(47) 99999-0000",
+    "+5547999990000",
   );
   const unauthorizedManagement = await worker.fetch(
     new Request("http://localhost/api/pilot/pessoas", {

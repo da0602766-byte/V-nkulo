@@ -1137,6 +1137,29 @@ export default function SecretaryMinisterialWorkspace({
         >
           ← Todos os ministérios
         </button>
+        {canManage && (
+          <div className="secretary-toolbar-actions">
+            <button
+              type="button"
+              className="secretary-toolbar-secondary"
+              onClick={() => setTab("checklist")}
+            >
+              ✓ Checklist
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setTab("escalas");
+                setScheduleCreatorOpen(true);
+                window.setTimeout(() => {
+                  scheduleDetails.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }, 80);
+              }}
+            >
+              + Criar escala
+            </button>
+          </div>
+        )}
       </div>
 
       <nav className="secretary-tabs" aria-label="Seções do Ministério">

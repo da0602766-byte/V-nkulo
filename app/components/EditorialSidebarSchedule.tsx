@@ -11,12 +11,14 @@ type QueueItem = {
   status: string;
 };
 type SidebarNotification = { id:number; title:string; message:string; destination:string; read:boolean; category:string };
+type SidebarPost = { id:number; titulo:string; resumo:string; conteudo:string; categoria:string; criado_em:string };
 
 const STORAGE_KEY = "adote:editorial-sidebar-visible";
 
 export default function EditorialSidebarSchedule({ onOpen }: { onOpen: () => void }) {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [notifications, setNotifications] = useState<SidebarNotification[]>([]);
+  const [posts, setPosts] = useState<SidebarPost[]>([]);
   const [visible, setVisible] = useState(true);
   const [now, setNow] = useState(0);
 
@@ -32,9 +34,10 @@ export default function EditorialSidebarSchedule({ onOpen }: { onOpen: () => voi
     let active = true;
     async function load() {
       try {
-        const [scheduleResponse, notificationResponse] = await Promise.all([
+        const [scheduleResponse, notificationResponse, postResponse] = await Promise.all([
           fetch("/api/pilot/editorial/programacoes", { cache: "no-store" }),
           fetch("/api/pilot/notificacoes", { cache: "no-store" }),
+          fetch("/api/pilot/publicacoes?placement=sidebar&limit=4", { cache: "no-store" }),
         ]);
         if (scheduleResponse.ok) {
           const result = (await scheduleResponse.json()) as { queue?: QueueItem[] };
@@ -43,6 +46,10 @@ export default function EditorialSidebarSchedule({ onOpen }: { onOpen: () => voi
         if (notificationResponse.ok) {
           const result = (await notificationResponse.json()) as { notifications?: SidebarNotification[] };
           if (active) setNotifications(result.notifications || []);
+        }
+        if (postResponse.ok) {
+          const result = (await postResponse.json()) as { publicacoes?: SidebarPost[] };
+          if (active) setPosts(result.publicacoes || []);
         }
       } catch {
         // O painel é informativo; uma falha de rede não interrompe a navegação.
@@ -91,6 +98,9 @@ export default function EditorialSidebarSchedule({ onOpen }: { onOpen: () => voi
           <small>{latest.message}</small>
         </button>
       )}
+      {posts.length > 0 && <div className="editorial-sidebar-posts" aria-label="Publicações na lateral">
+        {posts.map((post) => <button key={post.id} type="button" onClick={() => window.location.assign(`/painel?view=inicio#publicacao-${post.id}`)}><small>{post.categoria.replaceAll("_", " ")}</small><strong>{post.titulo}</strong><span>{post.resumo || post.conteudo}</span></button>)}
+      </div>}
       {next ? (
         <button className="editorial-sidebar-next" type="button" onClick={onOpen}>
           <small>Próxima publicação</small>

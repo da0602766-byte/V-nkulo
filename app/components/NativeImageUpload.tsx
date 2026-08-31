@@ -1,7 +1,7 @@
 "use client";
 
 import { DragEvent, useId, useRef, useState } from "react";
-import { prepareImageForUpload } from "../lib/client-image";
+import { saveImageOutsidePlatform } from "../lib/media-upload-client";
 
 type UploadPurpose =
   | "community-logo"
@@ -44,22 +44,16 @@ export default function NativeImageUpload({
     setUploading(true);
     setMessage("");
     try {
-      const prepared = await prepareImageForUpload(file, purpose);
-      const form = new FormData();
-      form.set("purpose", purpose);
-      form.set("file", prepared);
-      if (resourceId) form.set("resourceId", String(resourceId));
-      const response = await fetch("/api/pilot/uploads", {
-        method: "POST",
-        body: form,
-      });
-      const result = await readUploadResponse(response);
-      if (!response.ok || !result.url) {
-        throw new Error(result.error || "Não foi possível enviar a imagem.");
-      }
+      const result = await saveImageOutsidePlatform(file, purpose, resourceId);
       onChange(result.url);
       setMessageTone("success");
-      setMessage("Imagem convertida para WebP, otimizada e enviada com segurança.");
+      setMessage(
+        result.storage === "LOCAL"
+          ? "Imagem salva somente neste aparelho. O Vínkulo não recebeu uma cópia."
+          : result.storage === "PUBLICATION"
+            ? "Imagem anexada. Na publicação, cada pessoa poderá visualizar ou baixar."
+            : "Imagem otimizada e salva no Google Drive. O Vínkulo não mantém uma cópia.",
+      );
     } catch (error) {
       setMessageTone("error");
       setMessage((error as Error).message);
@@ -128,22 +122,4 @@ export default function NativeImageUpload({
       )}
     </div>
   );
-}
-
-async function readUploadResponse(response: Response) {
-  const text = await response.text();
-  try {
-    return JSON.parse(text) as { url?: string; error?: string };
-  } catch {
-    if (response.status === 413 || /payload too large/i.test(text)) {
-      return {
-        error:
-          "A imagem ficou grande demais para o envio. Escolha outra foto ou tente uma versão menor.",
-      };
-    }
-    return {
-      error:
-        text.trim().slice(0, 180) || "O servidor não conseguiu processar a imagem.",
-    };
-  }
 }
