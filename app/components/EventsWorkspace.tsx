@@ -431,7 +431,7 @@ export default function EventsWorkspace({
           ref={detailsRef}
           key={editing?.id || "new"}
         >
-          <summary>
+          <summary className="event-form-summary">
             <span aria-hidden="true">＋</span><div><strong>{editing ? `Editar: ${editing.titulo}` : "Novo evento"}</strong><small>Abra uma caixa simples e preserve todos os detalhes.</small></div><i aria-hidden="true">⌄</i>
           </summary>
           <form className="pilot-form event-form" onSubmit={saveEvent}>
@@ -600,6 +600,19 @@ export default function EventsWorkspace({
               />
             </label>
             <div className="event-form-actions">
+              {!editing && (
+                <button
+                  type="button"
+                  className="secondary-action"
+                  onClick={() => {
+                    setPollEnabled(false);
+                    setPollOptions(["", ""]);
+                    if (detailsRef.current) detailsRef.current.open = false;
+                  }}
+                >
+                  Fechar
+                </button>
+              )}
               {editing && (
                 <button
                   type="button"

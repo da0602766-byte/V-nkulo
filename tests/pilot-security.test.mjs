@@ -452,7 +452,8 @@ test("comunidades novas exigem solicitação ao proprietário, ficha rígida e a
   assert.match(editorUi, /PROGRAMAÇÃO AUTORIZADA/);
   assert.match(editorUi, /Autorizar e iniciar contador/);
   assert.match(editorUi, /value="COMUNIDADE"/);
-  assert.match(dashboard, /pilot-desktop-community-switcher/);
+  assert.doesNotMatch(dashboard, /pilot-desktop-community-switcher/);
+  assert.match(dashboard, /Trocar comunidade pelo menu da conta/);
   assert.match(dashboard, /window\.location\.assign\("\/painel\?view=inicio"\)/);
   assert.match(mobileNav, /CreateCommunityShortcut/);
   assert.match(styles, /grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/);

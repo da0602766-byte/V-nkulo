@@ -324,11 +324,6 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
           </button>
         </div>
         <div className="agenda-calendario-acoes">
-          {aoCriarEvento && (
-            <button type="button" className="agenda-novo-evento" onClick={aoCriarEvento}>
-              + Criar novo evento
-            </button>
-          )}
         <div className="agenda-calendario-visoes" role="group" aria-label="Formato do calendário">
           {(["dia", "semana", "mes"] as Visao[]).map((modo) => (
             <button
@@ -361,6 +356,11 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
             {camada.rotulo}
           </button>
         ))}
+        {aoCriarEvento && (
+          <button type="button" className="agenda-novo-evento" onClick={aoCriarEvento}>
+            + Novo evento
+          </button>
+        )}
         <button
           type="button"
           className="agenda-novo"

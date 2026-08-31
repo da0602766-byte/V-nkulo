@@ -835,7 +835,7 @@ export default function ParkingWorkspace({
             </section>}
 
             <aside className="parking-map-panel">
-              <header><div><p className="pilot-kicker">MAPA DO ESTACIONAMENTO</p><h2>Ocupação por setor</h2></div><div className="parking-map-head-actions"><span>{data.stats.livres} livres</span>{canConfigure&&<button type="button" className={mapEditing?"active":""} onClick={()=>setMapEditing((value)=>!value)}>{mapEditing?"Concluir posições":"Editar posições"}</button>}</div></header>
+              <header><div><p className="pilot-kicker">MAPA DO ESTACIONAMENTO</p><h2>Ocupação por setor</h2></div><div className="parking-map-head-actions"><span>{data.stats.livres} livres</span></div></header>
               {mapEditing&&<>
                 <p className="parking-map-edit-hint">Clique, segure e arraste cada vaga para reorganizar sua posição.</p>
                 <div className="parking-layout-suggestions" aria-label="Sugestões de posicionamento">
@@ -861,6 +861,7 @@ export default function ParkingWorkspace({
                           <form
                             onSubmit={(event) => {
                               event.preventDefault();
+                              const editor = event.currentTarget.closest("details");
                               const values = Object.fromEntries(
                                 new FormData(event.currentTarget).entries(),
                               );
@@ -873,7 +874,9 @@ export default function ParkingWorkspace({
                                 },
                                 `Setor “${sector.name}” atualizado no mapa.`,
                                 "PATCH",
-                              );
+                              ).then(() => {
+                                if (editor) editor.open = false;
+                              });
                             }}
                           >
                             <label>
@@ -888,7 +891,30 @@ export default function ParkingWorkspace({
                               Posição
                               <input name="ordem" type="number" min="0" max="99" defaultValue={sector.order} />
                             </label>
-                            <button disabled={working}>Salvar setor</button>
+                            <div className="parking-sector-editor-actions">
+                              <button
+                                type="button"
+                                className="secondary"
+                                onClick={(event) => {
+                                  const editor = event.currentTarget.closest("details");
+                                  setMapEditing((value) => !value);
+                                  if (editor) editor.open = false;
+                                }}
+                              >
+                                {mapEditing ? "Concluir posições" : "Editar posições"}
+                              </button>
+                              <button disabled={working}>Salvar setor</button>
+                              <button
+                                type="button"
+                                className="secondary"
+                                onClick={(event) => {
+                                  const editor = event.currentTarget.closest("details");
+                                  if (editor) editor.open = false;
+                                }}
+                              >
+                                Fechar
+                              </button>
+                            </div>
                           </form>
                         </details>
                       )}

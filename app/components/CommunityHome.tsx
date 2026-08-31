@@ -335,43 +335,6 @@ export default function CommunityHome({
     ),
   ).length;
 
-  const dayThread = useMemo(() => {
-    const eventItems = upcomingEvents.map((item) => ({
-      id: `event-${item.id}`,
-      kind: "Evento",
-      title: item.titulo,
-      detail: item.local || "Local a confirmar",
-      date: item.inicia_em,
-      action: "Ver na agenda",
-      href: "/painel?view=eventos",
-    }));
-    const scheduleItems = myUpcomingSchedules.map((item) => ({
-      id: `schedule-${item.id}`,
-      kind: "Escala",
-      title: item.titulo,
-      detail: `${item.ministerio_nome} · ${item.local || "Local a confirmar"}`,
-      date: item.inicia_em,
-      action: "Responder à escala",
-      href: "/painel?view=ministerios",
-    }));
-    const postItems = posts.slice(0, 2).map((item) => ({
-      id: `post-${item.id}`,
-      kind: "Mural",
-      title: item.titulo,
-      detail: item.autor_nome || communityName,
-      date: item.criado_em,
-      action: "Ler publicação",
-      href: `#publicacao-${item.id}`,
-    }));
-    return [...eventItems, ...scheduleItems, ...postItems]
-      .filter((item) => !Number.isNaN(Date.parse(item.date)))
-      .sort((left, right) => Date.parse(left.date) - Date.parse(right.date))
-      .slice(0, 7);
-  }, [communityName, myUpcomingSchedules, posts, upcomingEvents]);
-  const currentMomentIndex = dayThread.findIndex(
-    (item) => Date.parse(item.date) >= renderedAt,
-  );
-
   async function respondToSchedule(
     scheduleId: number,
     status: "CONFIRMADA" | "INDISPONIVEL",
@@ -740,43 +703,6 @@ export default function CommunityHome({
 
       <div className={`community-home-grid ${readOnlyFeed ? "feed-only" : ""}`}>
         <div className="community-feed-panel">
-          <section className="home-day-thread" aria-labelledby="home-day-thread-title">
-            <header>
-              <div>
-                <p className="pilot-kicker">FIO DO DIA</p>
-                <h2 id="home-day-thread-title">Hoje na comunidade</h2>
-              </div>
-              <time dateTime={new Date(renderedAt).toISOString()}>{formatLongDay(renderedAt)}</time>
-            </header>
-            {loading && !dayThread.length ? (
-              <p className="home-thread-empty">Organizando seu dia…</p>
-            ) : dayThread.length ? (
-              <ol className="home-timeline">
-                {dayThread.map((item, index) => (
-                  <li key={item.id}>
-                    {index === currentMomentIndex && (
-                      <div className="home-timeline-now" aria-label="Momento atual">
-                        <time>{formatTime(renderedAt)}</time><span>Agora</span>
-                      </div>
-                    )}
-                    <time dateTime={item.date}>{formatTime(item.date)}</time>
-                    <span className="home-timeline-node" aria-hidden="true" />
-                    <div className="home-timeline-content">
-                      <small>{item.kind}</small>
-                      <h3>{item.title}</h3>
-                      <p>{item.detail}</p>
-                      <Link href={item.href}>{item.action}</Link>
-                    </div>
-                  </li>
-                ))}
-                {currentMomentIndex < 0 && (
-                  <li className="home-timeline-now-row"><div className="home-timeline-now"><time>{formatTime(renderedAt)}</time><span>Agora</span></div></li>
-                )}
-              </ol>
-            ) : (
-              <div className="home-thread-empty"><strong>Seu dia está livre por enquanto</strong><p>Consulte a agenda completa para planejar os próximos encontros.</p><Link href="/painel?view=eventos">Abrir agenda</Link></div>
-            )}
-          </section>
           <header id="mural">
             <div>
               <p className="pilot-kicker">MURAL</p>
@@ -1289,25 +1215,6 @@ function formatDateTime(value: string) {
     minute: "2-digit",
     timeZone: "America/Sao_Paulo",
   }).format(date);
-}
-
-function formatTime(value: string | number) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "--:--";
-  return new Intl.DateTimeFormat("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "America/Sao_Paulo",
-  }).format(date);
-}
-
-function formatLongDay(value: number) {
-  return new Intl.DateTimeFormat("pt-BR", {
-    weekday: "long",
-    day: "2-digit",
-    month: "long",
-    timeZone: "America/Sao_Paulo",
-  }).format(new Date(value));
 }
 
 function parsePostLinks(value?: string) {

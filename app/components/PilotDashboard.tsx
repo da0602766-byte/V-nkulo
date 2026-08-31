@@ -799,42 +799,9 @@ export default function PilotDashboard({
           </span>
           <span>
             <strong>{active.comunidadeNome}</strong>
-            <small>Informações da comunidade</small>
           </span>
         </button>
         <div className="pilot-account-cluster" data-editor-key="conta-notificacoes">
-          <details className="pilot-desktop-community-switcher">
-            <summary title="Trocar comunidade" aria-label="Trocar comunidade">
-              <span>{getInitials(active.comunidadeNome)}</span>
-              <strong>{active.comunidadeNome}</strong>
-              <i>⌄</i>
-            </summary>
-            <div>
-              <label>
-                <span className="sr-only">Pesquisar comunidade</span>
-                <input
-                  type="search"
-                  value={communitySearch}
-                  onChange={(event) => setCommunitySearch(event.target.value)}
-                  placeholder="Pesquisar comunidade"
-                />
-              </label>
-              <nav aria-label="Comunidades vinculadas">
-                {filteredMemberships.map((membership) => (
-                  <button
-                    key={membership.comunidadeId}
-                    type="button"
-                    className={membership.comunidadeId === active.comunidadeId ? "active" : ""}
-                    disabled={switching || membership.comunidadeId === active.comunidadeId}
-                    onClick={() => void switchCommunity(membership.comunidadeId)}
-                  >
-                    <span>{getInitials(membership.comunidadeNome)}</span>
-                    <div><strong>{membership.comunidadeNome}</strong><small>{membership.comunidadeId === active.comunidadeId ? "Ativa agora" : "Trocar contexto"}</small></div>
-                  </button>
-                ))}
-              </nav>
-            </div>
-          </details>
           <button
             type="button"
             className="pilot-command-search-trigger"
