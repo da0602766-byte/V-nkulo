@@ -151,12 +151,82 @@ export async function GET(request: Request) {
   const access = await requireTenantPermission("dashboard.view");
   if ("error" in access) return access.error;
 
-  const { comunidadeId } = access.context;
+  const { comunidadeId, userId } = access.context;
   const url = new URL(request.url);
   const ferramenta = url.searchParams.get("ferramenta") || "todas";
   const visitanteId = url.searchParams.get("visitanteId");
 
   const db = getD1();
+
+  // ============================================
+  // CONTACT LOGGING - Histórico de contatos
+  // ============================================
+  if (ferramenta === "contatos" && visitanteId) {
+    const result = await db
+      .prepare(
+        `SELECT c.id, c.tipo, c.canal, c.resultado, c.descricao, c.duracao_minutos,
+                c.proxima_acao, c.responsavel_id, u.nome as responsavel_nome, c.criado_em
+         FROM visitor_contacts c
+         LEFT JOIN usuarios u ON u.id = c.responsavel_id
+         WHERE c.comunidade_id = ? AND c.visitante_id = ?
+         ORDER BY c.criado_em DESC
+         LIMIT 50`
+      )
+      .bind(comunidadeId, Number(visitanteId))
+      .all<{
+        id: number;
+        tipo: string;
+        canal: string;
+        resultado: string;
+        descricao: string;
+        duracao_minutos: number | null;
+        proxima_acao: string | null;
+        responsavel_id: number | null;
+        responsavel_nome: string | null;
+        criado_em: string;
+      }>();
+
+    return Response.json({
+      ferramenta: "contatos",
+      visitanteId,
+      dados: result.results || [],
+    });
+  }
+
+  // ============================================
+  // VISITA TRACKING - Histórico de visitas
+  // ============================================
+  if (ferramenta === "visitas" && visitanteId) {
+    const result = await db
+      .prepare(
+        `SELECT v.id, v.data_visita, v.local, v.tipo, v.duracao_minutos, v.resultado,
+                v.proxima_visita_sugerida, v.responsavel_id, u.nome as responsavel_nome, v.notas
+         FROM visitor_visits v
+         LEFT JOIN usuarios u ON u.id = v.responsavel_id
+         WHERE v.comunidade_id = ? AND v.visitante_id = ?
+         ORDER BY v.data_visita DESC
+         LIMIT 50`
+      )
+      .bind(comunidadeId, Number(visitanteId))
+      .all<{
+        id: number;
+        data_visita: string;
+        local: string;
+        tipo: string;
+        duracao_minutos: number | null;
+        resultado: string | null;
+        proxima_visita_sugerida: string | null;
+        responsavel_id: number | null;
+        responsavel_nome: string | null;
+        notas: string;
+      }>();
+
+    return Response.json({
+      ferramenta: "visitas",
+      visitanteId,
+      dados: result.results || [],
+    });
+  }
 
   // ============================================
   // 1. ENGAGEMENT SCORE
@@ -504,6 +574,170 @@ export async function GET(request: Request) {
 
   // Retornar todas as ferramentas
   return Response.json({
-    mensagem: "Use ferramenta=engagement|cadencia|carga|regional|conflitos para dados específicos",
+    mensagem: "Use ferramenta=engagement|cadencia|carga|regional|conflitos|contatos|visitas para dados específicos",
   });
+}
+
+export async function POST(request: Request) {
+  const access = await requireTenantPermission("dashboard.view");
+  if ("error" in access) return access.error;
+  const { comunidadeId, userId } = access.context;
+
+  let corpo: Record<string, unknown>;
+  try {
+    corpo = (await request.json()) as Record<string, unknown>;
+  } catch {
+    return Response.json({ error: "Envio inválido." }, { status: 400 });
+  }
+
+  const tipo = String(corpo.tipo || "").toUpperCase();
+  const db = getD1();
+
+  // ============================================
+  // POST: CONTACT LOGGING
+  // ============================================
+  if (tipo === "CONTATO") {
+    const visitanteId = Number(corpo.visitanteId || 0);
+    const canal = String(corpo.canal || "OUTRO");
+    const resultado = String(corpo.resultado || "").trim().slice(0, 160);
+
+    if (!visitanteId || !resultado) {
+      return Response.json(
+        { error: "Visitante e resultado são obrigatórios." },
+        { status: 400 }
+      );
+    }
+
+    const criado = await db
+      .prepare(
+        `INSERT INTO visitor_contacts
+          (comunidade_id, visitante_id, tipo, canal, resultado, descricao, duracao_minutos, proxima_acao, responsavel_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         RETURNING id`
+      )
+      .bind(
+        comunidadeId,
+        visitanteId,
+        "CONTATO",
+        canal,
+        resultado,
+        String(corpo.descricao || "").trim().slice(0, 1000),
+        corpo.duracao_minutos ? Number(corpo.duracao_minutos) : null,
+        corpo.proxima_acao ? String(corpo.proxima_acao).slice(0, 100) : null,
+        userId
+      )
+      .first<{ id: number }>();
+
+    // Atualizar último contato do visitante
+    await db
+      .prepare(`UPDATE visitantes SET ultimo_contato = datetime('now') WHERE id = ? AND comunidade_id = ?`)
+      .bind(visitanteId, comunidadeId)
+      .run();
+
+    return Response.json({ id: criado?.id, tipo: "contato" }, { status: 201 });
+  }
+
+  // ============================================
+  // POST: VISITA TRACKING
+  // ============================================
+  if (tipo === "VISITA") {
+    const visitanteId = Number(corpo.visitanteId || 0);
+    const dataVisita = String(corpo.dataVisita || "").trim();
+    const visitaTipo = String(corpo.visitaTipo || "ACOMPANHAMENTO");
+
+    if (!visitanteId || !dataVisita) {
+      return Response.json(
+        { error: "Visitante e data da visita são obrigatórios." },
+        { status: 400 }
+      );
+    }
+
+    if (Number.isNaN(Date.parse(dataVisita))) {
+      return Response.json(
+        { error: "Data da visita inválida." },
+        { status: 400 }
+      );
+    }
+
+    const criado = await db
+      .prepare(
+        `INSERT INTO visitor_visits
+          (comunidade_id, visitante_id, data_visita, local, tipo, duracao_minutos, resultado, proxima_visita_sugerida, responsavel_id, notas)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         RETURNING id`
+      )
+      .bind(
+        comunidadeId,
+        visitanteId,
+        new Date(dataVisita).toISOString(),
+        String(corpo.local || "Igreja").slice(0, 180),
+        visitaTipo,
+        corpo.duracao_minutos ? Number(corpo.duracao_minutos) : null,
+        corpo.resultado ? String(corpo.resultado).slice(0, 500) : null,
+        corpo.proxima_visita_sugerida ? String(corpo.proxima_visita_sugerida) : null,
+        userId,
+        String(corpo.notas || "").trim().slice(0, 1000)
+      )
+      .first<{ id: number }>();
+
+    return Response.json({ id: criado?.id, tipo: "visita" }, { status: 201 });
+  }
+
+  return Response.json({ error: "Tipo de solicitação desconhecido." }, { status: 400 });
+}
+
+export async function DELETE(request: Request) {
+  const access = await requireTenantPermission("dashboard.view");
+  if ("error" in access) return access.error;
+  const { comunidadeId, userId } = access.context;
+
+  const url = new URL(request.url);
+  const tipo = url.searchParams.get("tipo");
+  const id = Number(url.searchParams.get("id"));
+
+  if (!tipo || !id || id <= 0) {
+    return Response.json({ error: "Tipo e ID obrigatórios." }, { status: 400 });
+  }
+
+  const db = getD1();
+
+  // ============================================
+  // DELETE: CONTACT LOGGING
+  // ============================================
+  if (tipo === "contato") {
+    const resultado = await db
+      .prepare(
+        `DELETE FROM visitor_contacts
+         WHERE id = ? AND comunidade_id = ? AND responsavel_id = ?`
+      )
+      .bind(id, comunidadeId, userId)
+      .run();
+
+    if (!resultado.meta.changes) {
+      return Response.json({ error: "Contato não encontrado ou sem permissão." }, { status: 404 });
+    }
+
+    return Response.json({ ok: true });
+  }
+
+  // ============================================
+  // DELETE: VISITA TRACKING
+  // ============================================
+  if (tipo === "visita") {
+    const resultado = await db
+      .prepare(
+        `DELETE FROM visitor_visits
+         WHERE id = ? AND comunidade_id = ? AND responsavel_id = ?`
+      )
+      .bind(id, comunidadeId, userId)
+      .run();
+
+    if (!resultado.meta.changes) {
+      return Response.json({ error: "Visita não encontrada ou sem permissão." }, { status: 404 });
+    }
+
+    return Response.json({ ok: true });
+  }
+
+  return Response.json({ error: "Tipo desconhecido." }, { status: 400 });
 }

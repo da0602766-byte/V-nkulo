@@ -65,6 +65,30 @@ type CadenciaAvancadaItem = {
   sugestao: string;
 };
 
+type ContactItem = {
+  id: number;
+  tipo: string;
+  canal: string;
+  resultado: string;
+  descricao: string;
+  duracao_minutos: number | null;
+  proxima_acao: string | null;
+  responsavel_nome: string | null;
+  criado_em: string;
+};
+
+type VisitaItem = {
+  id: number;
+  data_visita: string;
+  local: string;
+  tipo: string;
+  duracao_minutos: number | null;
+  resultado: string | null;
+  proxima_visita_sugerida: string | null;
+  responsavel_nome: string | null;
+  notas: string;
+};
+
 interface RelacionamentoToolsProps {
   visitantes?: EngagementData[];
   compacto?: boolean;
@@ -375,6 +399,159 @@ function ConflictDetection({ items }: { items: ConflictItem[] }) {
 // ============================================
 
 /**
+ * FERRAMENTA 8: Contact Logging
+ * Histórico de contatos realizados
+ */
+function ContactLogList({ items, visitanteId }: { items: ContactItem[]; visitanteId?: number }) {
+  if (items.length === 0) return null;
+
+  const canalIcon = (canal: string) => {
+    switch (canal) {
+      case "WHATSAPP":
+        return "💬";
+      case "TELEFONE":
+        return "☎️";
+      case "PRESENCIAL":
+        return "👤";
+      case "EMAIL":
+        return "📧";
+      default:
+        return "📝";
+    }
+  };
+
+  return (
+    <div
+      style={{
+        padding: "16px",
+        border: "1px solid var(--color-border)",
+        borderRadius: "8px",
+        marginTop: "16px",
+      }}
+    >
+      <h3 style={{ marginTop: 0, marginBottom: "12px", fontSize: "14px", fontWeight: "bold" }}>
+        📋 Histórico de Contatos ({items.length})
+      </h3>
+      <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "400px", overflowY: "auto" }}>
+        {items.map((item) => (
+          <div
+            key={item.id}
+            style={{
+              padding: "10px 12px",
+              border: "1px solid var(--color-border)",
+              borderRadius: "6px",
+              fontSize: "12px",
+              background: "var(--color-surface)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+              <strong>{canalIcon(item.canal)} {item.canal}</strong>
+              <time style={{ color: "var(--color-text-muted)", fontSize: "11px" }}>
+                {new Date(item.criado_em).toLocaleDateString("pt-BR")}
+              </time>
+            </div>
+            <div style={{ marginBottom: "4px" }}>
+              <span style={{ fontWeight: "bold" }}>{item.resultado}</span>
+            </div>
+            {item.descricao && (
+              <div style={{ color: "var(--color-text-muted)", fontSize: "11px", marginBottom: "4px" }}>
+                {item.descricao}
+              </div>
+            )}
+            {(item.duracao_minutos || item.proxima_acao || item.responsavel_nome) && (
+              <div style={{ fontSize: "10px", color: "var(--color-text-muted)" }}>
+                {item.duracao_minutos && <span>⏱️ {item.duracao_minutos}min </span>}
+                {item.proxima_acao && <span>→ {item.proxima_acao} </span>}
+                {item.responsavel_nome && <span>· {item.responsavel_nome}</span>}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * FERRAMENTA 9: Visita Tracking
+ * Rastreamento de visitas presenciais
+ */
+function VisitaTrackingList({ items }: { items: VisitaItem[] }) {
+  if (items.length === 0) return null;
+
+  const tipoIcon = (tipo: string) => {
+    switch (tipo) {
+      case "ACOLHIDA":
+        return "👋";
+      case "ACOMPANHAMENTO":
+        return "🤝";
+      case "ESPECIALIZADO":
+        return "⭐";
+      default:
+        return "📍";
+    }
+  };
+
+  return (
+    <div
+      style={{
+        padding: "16px",
+        border: "1px solid var(--color-border)",
+        borderRadius: "8px",
+        marginTop: "16px",
+      }}
+    >
+      <h3 style={{ marginTop: 0, marginBottom: "12px", fontSize: "14px", fontWeight: "bold" }}>
+        🏃 Rastreamento de Visitas ({items.length})
+      </h3>
+      <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "400px", overflowY: "auto" }}>
+        {items.map((item) => (
+          <div
+            key={item.id}
+            style={{
+              padding: "10px 12px",
+              border: "1px solid var(--color-border)",
+              borderRadius: "6px",
+              fontSize: "12px",
+              background: "var(--color-surface)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+              <strong>{tipoIcon(item.tipo)} {item.tipo}</strong>
+              <time style={{ color: "var(--color-text-muted)", fontSize: "11px" }}>
+                {new Date(item.data_visita).toLocaleDateString("pt-BR")}
+              </time>
+            </div>
+            <div style={{ color: "var(--color-text-muted)", fontSize: "11px", marginBottom: "4px" }}>
+              📍 {item.local}
+            </div>
+            {item.resultado && (
+              <div style={{ marginBottom: "4px" }}>
+                <span>{item.resultado}</span>
+              </div>
+            )}
+            {(item.duracao_minutos || item.proxima_visita_sugerida || item.responsavel_nome) && (
+              <div style={{ fontSize: "10px", color: "var(--color-text-muted)" }}>
+                {item.duracao_minutos && <span>⏱️ {item.duracao_minutos}min </span>}
+                {item.proxima_visita_sugerida && (
+                  <span>→ Próxima: {new Date(item.proxima_visita_sugerida).toLocaleDateString("pt-BR")} </span>
+                )}
+                {item.responsavel_nome && <span>· {item.responsavel_nome}</span>}
+              </div>
+            )}
+            {item.notas && (
+              <div style={{ fontSize: "10px", background: "rgba(255,255,255,0.3)", padding: "4px 6px", marginTop: "4px", borderRadius: "3px" }}>
+                💬 {item.notas}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
  * FERRAMENTA 6: Regional Grouping
  * Agrupa visitantes por região/célula
  */
@@ -564,7 +741,10 @@ export function RelacionamentoTools({ visitantes = [], compacto = false }: Relac
   const [carga, setCarga] = useState<LoadMetricItem[]>([]);
   const [regional, setRegional] = useState<RegionalItem[]>([]);
   const [conflitos, setConflitos] = useState<ConflictItem[]>([]);
+  const [contatos, setContatos] = useState<ContactItem[]>([]);
+  const [visitas, setVisitas] = useState<VisitaItem[]>([]);
   const [carregando, setCarregando] = useState(true);
+  const [selecionadoVisitanteId, setSelecionadoVisitanteId] = useState<number | null>(null);
 
   useEffect(() => {
     const carregarDados = async () => {
@@ -696,11 +876,17 @@ export function RelacionamentoTools({ visitantes = [], compacto = false }: Relac
           {/* Load Metrics */}
           {carga.length > 0 && <LoadMetrics items={carga} />}
 
+          {/* Contact Logging */}
+          {contatos.length > 0 && <ContactLogList items={contatos} visitanteId={selecionadoVisitanteId || undefined} />}
+
+          {/* Visita Tracking */}
+          {visitas.length > 0 && <VisitaTrackingList items={visitas} />}
+
           {/* Conflitos */}
           {conflitos.length > 0 && <ConflictDetection items={conflitos} />}
 
           {/* Resumo */}
-          {engagement.length === 0 && cadencia.length === 0 && carga.length === 0 && conflitos.length === 0 && regional.length === 0 && cadenciaAvancada.length === 0 && (
+          {engagement.length === 0 && cadencia.length === 0 && carga.length === 0 && conflitos.length === 0 && regional.length === 0 && cadenciaAvancada.length === 0 && contatos.length === 0 && visitas.length === 0 && (
             <div style={{ padding: "24px", textAlign: "center", color: "var(--color-text-muted)" }}>
               📊 Nenhum dado disponível no momento
             </div>
