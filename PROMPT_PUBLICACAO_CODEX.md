@@ -28,8 +28,18 @@ reversível por `DROP TABLE`.
 
 ## O que publicar
 
-Os 15 commits que o branch tem à frente de `main` — de `90bdb09` a `b7e7886`.
-O conjunto mexe em 46 arquivos: 2.932 linhas somadas, 157 removidas.
+Tudo o que o branch tem à frente de `main`, começando em `90bdb09`. A contagem
+exata muda a cada ajuste neste documento, então confira na fonte em vez de
+confiar num número aqui:
+
+```
+git log --oneline --reverse origin/main..origin/claude/system-preview-last-commit-dsr0q4
+git diff --shortstat origin/main...origin/claude/system-preview-last-commit-dsr0q4
+```
+
+Na última medição eram 15 commits, 46 arquivos, 2.932 linhas somadas e 157
+removidas — os commits de código são os 14 primeiros da tabela; o que vier
+depois de `90eeffe` é só documentação.
 
 | # | Commit | O que entrega |
 | --- | --- | --- |
@@ -47,7 +57,7 @@ O conjunto mexe em 46 arquivos: 2.932 linhas somadas, 157 removidas.
 | 12 | `97d4da1` | Bloco 6: superfície pública com um acento só |
 | 13 | `7b7caf0` | Renumera a migração do fio para `0060` |
 | 14 | `90eeffe` | Integra a reforma ao seu trabalho publicado |
-| 15 | `b7e7886` | Este documento |
+| 15+ | `b7e7886` e seguintes | Este documento e suas correções |
 
 ## O que foi preservado do seu trabalho
 
