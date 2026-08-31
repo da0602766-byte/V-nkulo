@@ -273,6 +273,51 @@ Dois defeitos apareceram de brinde, nenhum deles de cor:
    Aliançae resolva…". A quebra de linha depois de uma expressão não vira
    espaço no JSX.
 
+## 7.3 A integração com o trabalho do Codex
+
+Enquanto a reforma corria, o Codex publicou dois commits em `main`:
+`b05ed09` (governança editorial e redesenho de gestão) e `8d9aca2` (barra
+móvel orgânica e cabeçalho público). A mesclagem teve 54 conflitos. O critério
+foi um só: **o que o Codex publicou e é capacidade nova permanece; o que é
+apenas a versão anterior daquilo que a reforma substituiu, cede.**
+
+Onde o trabalho dele venceu, e por quê:
+
+- **A barra móvel é a dele.** Os dois lados chegaram com cinco itens
+  diferentes: ele acrescentou o botão central "Adicionar" e contadores em
+  Agenda e Pedidos; a reforma acrescentara um item "Comunidade". Somar os dois
+  daria seis itens em cinco espaços. O dele já está publicado e traz contagem
+  de pendências, que é informação; o item "Comunidade" era conveniência, e o
+  Fio do dia continua alcançável pela folha do menu.
+- **Os nomes das visões de Visitantes são os dele** — `todos`, `novos`,
+  `acompanhamento`, `pendencias`, `sem_contato` — junto com "Revisar e
+  exportar", "Ver arquivados" e a coluna "Próximo passo". A reforma tinha
+  renomeado os mesmos conceitos de outro jeito, sem ganho.
+- **O popover de mensagens no desktop e a folha móvel redesenhada** são dele.
+
+Onde a reforma venceu: os ícones em SVG (o lado dele ainda trazia os glifos
+`◇ ▣ ✣ ♡ ⬡`), o Fio do dia, os grupos do trilho, o funil de visitantes, a
+saúde das células, o diálogo de célula reestruturado e a correção de fuso —
+esta última reaplicada sobre a estrutura nova dele, porque a coluna "Próximo
+passo" que ele escreveu ainda comparava datas em UTC.
+
+**As duas migrações colidiram no número 0059.** A dele
+(`0059_publication_governance.sql`) já estava publicada; a da reforma passou a
+`0060_fio_registros.sql`. As duas foram aplicadas ao mesmo banco local, na
+ordem, sem conflito — foi assim que se confirmou que convivem.
+
+Evidência de que a integração respeitou os dois lados: a suíte passa com
+**250 de 250 testes**, incluindo os `v183` e `v187` que ele escreveu para o
+próprio trabalho, sem nenhuma adaptação.
+
+Duas coisas ficaram de fora de propósito, e são dele para decidir:
+
+1. **Aviso de hidratação em `CommunityHome`.** `renderedAt` guarda
+   `Date.now()` num `useState`, que roda no servidor e no cliente com valores
+   diferentes. Está nos dois lados desde antes desta reforma.
+2. **O verde-água da agenda** (`#3fc9b0`, camada pessoal) permanece: ali a cor
+   distingue camadas, e distinguir é informar.
+
 ## 8. Validação
 
 Base `1c6d447`, em 30/08/2026: build aprovado, 206 de 206 testes, lint com

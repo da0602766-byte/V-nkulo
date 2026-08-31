@@ -73,7 +73,7 @@ export default async function PublicHeader({
           )}
           {user ? (
             <details className="public-account-menu">
-              <summary aria-label="Abrir menu da conta">
+              <summary className="reception-account-summary" aria-label="Abrir menu da conta">
                 <span className="public-account-avatar">
                   {user.foto_perfil ? <img src={user.foto_perfil} alt="" /> : initials(user.nome)}
                 </span>

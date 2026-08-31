@@ -1,5 +1,6 @@
 import { getD1 } from "../../../../db";
 import { requireTenantPermission } from "../../../lib/tenant";
+import { notifyUser } from "../../../lib/pilot-notifications";
 
 // A agenda é uma leitura só: várias fontes que já existem no banco viram
 // camadas de um mesmo calendário. Só os compromissos pessoais nascem aqui.
@@ -29,6 +30,7 @@ type ItemAgenda = {
   origemId: number;
   visibilidade?: "PRIVADO" | "PUBLICO";
   meu?: boolean;
+  aprovacaoStatus?: "PENDENTE" | "APROVADA";
 };
 
 function janela(url: URL) {
@@ -131,21 +133,23 @@ export async function GET(request: Request) {
     .prepare(
       `SELECT c.id, c.titulo, c.descricao, c.categoria, c.inicia_em, c.termina_em,
         c.local, c.dia_inteiro, c.concluido, c.visibilidade, c.usuario_id,
+        c.aprovacao_status,
         u.nome AS autor
        FROM agenda_compromissos c
        JOIN usuarios u ON u.id = c.usuario_id
        WHERE c.comunidade_id = ?
-         AND (c.usuario_id = ? OR c.visibilidade = 'PUBLICO')
+         AND (c.usuario_id = ? OR (c.visibilidade = 'PUBLICO' AND c.aprovacao_status = 'APROVADA') OR ? = 1)
          AND datetime(c.inicia_em) BETWEEN datetime(?) AND datetime(?)
        ORDER BY datetime(c.inicia_em) ASC
        LIMIT ?`,
     )
-    .bind(comunidadeId, userId, de, ate, MAX_COMPROMISSOS)
+    .bind(comunidadeId, userId, permissions.includes("events.manage") ? 1 : 0, de, ate, MAX_COMPROMISSOS)
     .all<{
       id: number; titulo: string; descricao: string; categoria: string;
       inicia_em: string; termina_em: string | null; local: string;
       dia_inteiro: number; concluido: number; visibilidade: string;
       usuario_id: number; autor: string;
+      aprovacao_status: string;
     }>();
   for (const linha of pessoais.results || []) {
     const meu = linha.usuario_id === userId;
@@ -165,6 +169,7 @@ export async function GET(request: Request) {
       origemId: linha.id,
       visibilidade: linha.visibilidade === "PUBLICO" ? "PUBLICO" : "PRIVADO",
       meu,
+      aprovacaoStatus: linha.aprovacao_status === "PENDENTE" ? "PENDENTE" : "APROVADA",
     });
   }
 
@@ -202,12 +207,17 @@ export async function POST(request: Request) {
   const categoria = String(corpo.categoria || "PESSOAL").toUpperCase();
 
   const db = getD1();
+  const publico = corpo.visibilidade === "PUBLICO";
+  const canApprove = access.context.permissions.includes("events.manage") || access.user.system_owner === true;
+  const approvalStatus = publico && !canApprove ? "PENDENTE" : "APROVADA";
   const criado = await db
     .prepare(
       `INSERT INTO agenda_compromissos
         (comunidade_id, usuario_id, titulo, descricao, categoria, inicia_em,
-         termina_em, local, dia_inteiro, visibilidade)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         termina_em, local, dia_inteiro, visibilidade, aprovacao_status,
+         aprovado_por, aprovado_em)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+         CASE WHEN ? = 'APROVADA' THEN CURRENT_TIMESTAMP ELSE NULL END)
        RETURNING id`,
     )
     .bind(
@@ -220,11 +230,44 @@ export async function POST(request: Request) {
       terminaEmBruto ? new Date(terminaEmBruto).toISOString() : null,
       String(corpo.local || "").trim().slice(0, 180),
       corpo.diaInteiro ? 1 : 0,
-      corpo.visibilidade === "PUBLICO" ? "PUBLICO" : "PRIVADO",
+      publico ? "PUBLICO" : "PRIVADO",
+      approvalStatus,
+      approvalStatus === "APROVADA" ? userId : null,
+      approvalStatus,
     )
     .first<{ id: number }>();
 
-  return Response.json({ id: criado?.id }, { status: 201 });
+  if (criado?.id && approvalStatus === "PENDENTE") {
+    const managers = await db.prepare(
+      `SELECT DISTINCT u.id FROM usuarios u JOIN usuario_comunidades uc ON uc.usuario_id = u.id
+       WHERE uc.comunidade_id = ? AND uc.status = 'ATIVO' AND u.ativo = 1
+         AND (uc.papel IN ('PASTOR','ADMIN_COMUNIDADE') OR u.perfil = 'ADMIN')`,
+    ).bind(comunidadeId).all<{ id: number }>();
+    await Promise.all(managers.results.filter((item) => item.id !== userId).map((item) => notifyUser(db, {
+      userId: item.id, title: "Compromisso aguardando aprovação", message: `${access.user.nome} solicitou publicação de “${titulo}” na agenda.`, entityId: criado.id,
+      destination: "/painel?view=eventos", createdBy: "VÍNKULO",
+    })));
+  }
+  return Response.json({ id: criado?.id, aprovacaoStatus: approvalStatus, message: approvalStatus === "PENDENTE" ? "Enviado ao responsável da comunidade para aprovação." : "Compromisso salvo." }, { status: 201 });
+}
+
+export async function PATCH(request: Request) {
+  const access = await requireTenantPermission("dashboard.view");
+  if ("error" in access) return access.error;
+  if (!access.context.permissions.includes("events.manage") && access.user.system_owner !== true) {
+    return Response.json({ error: "Somente o responsável da comunidade pode aprovar." }, { status: 403 });
+  }
+  const body = await request.json() as Record<string, unknown>;
+  const id = Number(body.id || 0);
+  if (!Number.isInteger(id) || id <= 0 || String(body.acao || "").toUpperCase() !== "APROVAR") {
+    return Response.json({ error: "Ação inválida." }, { status: 400 });
+  }
+  const db = getD1();
+  const item = await db.prepare("SELECT usuario_id, titulo FROM agenda_compromissos WHERE id = ? AND comunidade_id = ? AND aprovacao_status = 'PENDENTE'").bind(id, access.context.comunidadeId).first<{ usuario_id:number; titulo:string }>();
+  if (!item) return Response.json({ error: "Solicitação não encontrada." }, { status: 404 });
+  await db.prepare("UPDATE agenda_compromissos SET aprovacao_status = 'APROVADA', aprovado_por = ?, aprovado_em = CURRENT_TIMESTAMP, atualizado_em = CURRENT_TIMESTAMP WHERE id = ? AND comunidade_id = ?").bind(access.user.id, id, access.context.comunidadeId).run();
+  if (item.usuario_id !== access.user.id) await notifyUser(db, { userId:item.usuario_id, title:"Compromisso aprovado", message:`“${item.titulo}” foi liberado na agenda da comunidade.`, entityId:id, destination:"/painel?view=eventos", createdBy:"VÍNKULO" });
+  return Response.json({ ok:true });
 }
 
 export async function DELETE(request: Request) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 type Notification = {
@@ -13,15 +13,21 @@ type Notification = {
   senderName: string;
   hierarchy: string;
   ministry: string;
-  category: string;
+  category: NotificationCategory;
   area?: string;
 };
 
 type NotificationConfig = { escalas: boolean; eventos: boolean; pedidos: boolean; mensagens: boolean; sistema: boolean };
+type NotificationCategory = keyof NotificationConfig;
+export type NotificationUnreadSummary = Record<NotificationCategory, number> & { total: number };
 const DEFAULT_CONFIG: NotificationConfig = { escalas: true, eventos: true, pedidos: true, mensagens: true, sistema: true };
 const DEVICE_NOTIFICATION_STORAGE_KEY = "vinkulo-device-notifications-v1";
 
-export default function PilotNotificationCenter() {
+export default function PilotNotificationCenter({
+  onUnreadChange,
+}: {
+  onUnreadChange?: (summary: NotificationUnreadSummary) => void;
+}) {
   const [items, setItems] = useState<Notification[]>([]);
   const [scope, setScope] = useState<"tudo" | "precisa">("tudo");
   // O relógio vem de estado para o rótulo "Hoje/Ontem" não divergir entre
@@ -49,6 +55,26 @@ export default function PilotNotificationCenter() {
   const permissionRef = useRef<"unsupported" | NotificationPermission>("unsupported");
   const shownDeviceNotificationIds = useRef<Set<number> | null>(null);
   const unread = items.filter((item) => !item.read).length;
+  const unreadSummary = useMemo<NotificationUnreadSummary>(() => {
+    const summary: NotificationUnreadSummary = {
+      total: 0,
+      escalas: 0,
+      eventos: 0,
+      pedidos: 0,
+      mensagens: 0,
+      sistema: 0,
+    };
+    for (const item of items) {
+      if (item.read) continue;
+      summary.total += 1;
+      summary[item.category] += 1;
+    }
+    return summary;
+  }, [items]);
+
+  useEffect(() => {
+    onUnreadChange?.(unreadSummary);
+  }, [onUnreadChange, unreadSummary]);
 
   const showUnreadOnDevice = useCallback(async (nextItems: Notification[]) => {
     if (permissionRef.current !== "granted" || !("serviceWorker" in navigator)) return;
@@ -135,13 +161,19 @@ export default function PilotNotificationCenter() {
       if (document.visibilityState === "visible") void load();
     };
     const refreshAfterAppAction = () => void load();
+    const openFromNavigation = () => {
+      setOpen(true);
+      void load();
+    };
     document.addEventListener("visibilitychange", refreshWhenVisible);
     window.addEventListener("adote:refresh-notifications", refreshAfterAppAction);
+    window.addEventListener("vinkulo:open-notifications", openFromNavigation);
     return () => {
       window.clearTimeout(initial);
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
       window.removeEventListener("adote:refresh-notifications", refreshAfterAppAction);
+      window.removeEventListener("vinkulo:open-notifications", openFromNavigation);
       requestRef.current?.abort();
     };
   }, [load]);

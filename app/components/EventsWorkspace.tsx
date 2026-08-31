@@ -99,9 +99,9 @@ export default function EventsWorkspace({
     );
   }, [registrantSearch, registrantSearchEvent]);
 
-  const loadEvents = useCallback(async () => {
-    setLoading(true);
-    setError("");
+  const loadEvents = useCallback(async (quiet = false) => {
+    if (!quiet) setLoading(true);
+    if (!quiet) setError("");
     try {
       const response = await fetch("/api/pilot/eventos", {
         cache: "no-store",
@@ -112,15 +112,22 @@ export default function EventsWorkspace({
       }
       setEvents(result.eventos || []);
     } catch (loadError) {
-      setError((loadError as Error).message);
+      if (!quiet) setError((loadError as Error).message);
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadEvents(), 0);
     return () => window.clearTimeout(timer);
+  }, [loadEvents]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void loadEvents(true);
+    }, 3_000);
+    return () => window.clearInterval(timer);
   }, [loadEvents]);
 
   useEffect(() => {
@@ -251,6 +258,21 @@ export default function EventsWorkspace({
   }
 
   async function votePoll(item: CommunityEvent, option: number) {
+    const previous = events;
+    setEvents((current) => current.map((event) => event.id !== item.id || !event.enquete ? event : {
+      ...event,
+      enquete: {
+        ...event.enquete,
+        minha_opcao: option,
+        total_votos: event.enquete.total_votos + (event.enquete.minha_opcao ? 0 : 1),
+        opcoes: event.enquete.opcoes.map((choice) => ({
+          ...choice,
+          votos: choice.id === option
+            ? choice.votos + (event.enquete?.minha_opcao === option ? 0 : 1)
+            : choice.id === event.enquete?.minha_opcao ? Math.max(0, choice.votos - 1) : choice.votos,
+        })),
+      },
+    }));
     setWorkingId(item.id);
     setError("");
     try {
@@ -262,8 +284,9 @@ export default function EventsWorkspace({
       const result = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(result.error || "Não foi possível registrar o voto.");
       setFeedback("Voto registrado.");
-      await loadEvents();
+      await loadEvents(true);
     } catch (cause) {
+      setEvents(previous);
       setError((cause as Error).message);
     } finally {
       setWorkingId(null);
@@ -381,6 +404,7 @@ export default function EventsWorkspace({
           marcou. A lista de gestão de eventos continua abaixo. */}
       <AgendaCalendar
         podeVerEventos={permissions.includes("events.view")}
+        podeAprovar={canManage}
         aoCriarEvento={
           canManage
             ? () => {
@@ -408,7 +432,7 @@ export default function EventsWorkspace({
           key={editing?.id || "new"}
         >
           <summary>
-            {editing ? `Editar: ${editing.titulo}` : "Criar novo evento"}
+            <span aria-hidden="true">＋</span><div><strong>{editing ? `Editar: ${editing.titulo}` : "Novo evento"}</strong><small>Abra uma caixa simples e preserve todos os detalhes.</small></div><i aria-hidden="true">⌄</i>
           </summary>
           <form className="pilot-form event-form" onSubmit={saveEvent}>
             <label className="event-wide-field">
@@ -712,13 +736,13 @@ export default function EventsWorkspace({
                           )
                         }
                       >
-                        {workingId === item.id
+                        <span aria-hidden="true">✓</span><span className="event-action-label">{workingId === item.id
                           ? "Atualizando…"
                           : isConfirmed
                             ? "Cancelar presença"
                             : isFull
                               ? "Lotado"
-                              : "Confirmar presença"}
+                              : "Confirmar presença"}</span>
                       </button>
                     )}
                     {isPublished && (
@@ -727,14 +751,14 @@ export default function EventsWorkspace({
                         href={eventUrl(item)}
                         target="_blank"
                         rel="noreferrer"
-                      >Link próprio</a>
+                      aria-label="Abrir link próprio" title="Link próprio"><span aria-hidden="true">↗</span><span className="event-action-label">Link próprio</span></a>
                     )}
                     {isPublished && (
                       <button
                         type="button"
                         className="event-link-action event-share-action"
                         onClick={() => void shareEvent(item)}
-                      ><span aria-hidden="true">➤</span> Compartilhar inscrição</button>
+                      aria-label="Compartilhar inscrição" title="Compartilhar inscrição"><span aria-hidden="true">➤</span><span className="event-action-label">Compartilhar inscrição</span></button>
                     )}
                   </div>
                   {item.enquete && isPublished && (

@@ -83,6 +83,16 @@ const TITLES = [
   "SECRETÁRIA",
 ];
 
+const HIERARCHY_PERMISSION_PRESETS: Record<string, string[]> = {
+  "LÍDER": ["visitors.view", "visitors.create", "visitors.edit", "followups.view", "followups.manage", "cells.view", "events.view", "ministries.view", "schedules.view", "feed.publish"],
+  "DIÁCONO": ["visitors.view", "followups.view", "events.view", "ministries.view", "schedules.view", "parking.view", "parking.report"],
+  "DIACONISA": ["visitors.view", "followups.view", "events.view", "ministries.view", "schedules.view", "parking.view", "parking.report"],
+  "PRESBÍTERO": ["visitors.view", "visitors.create", "visitors.edit", "followups.view", "followups.manage", "cells.view", "events.view", "events.manage", "ministries.view", "schedules.view", "schedules.manage", "feed.publish"],
+  "PRESBÍTERA": ["visitors.view", "visitors.create", "visitors.edit", "followups.view", "followups.manage", "cells.view", "events.view", "events.manage", "ministries.view", "schedules.view", "schedules.manage", "feed.publish"],
+  "PASTOR": ["visitors.view", "visitors.create", "visitors.edit", "followups.view", "followups.manage", "cells.view", "events.view", "events.manage", "ministries.view", "schedules.view", "schedules.manage", "parking.view", "feed.publish"],
+  "PASTORA": ["visitors.view", "visitors.create", "visitors.edit", "followups.view", "followups.manage", "cells.view", "events.view", "events.manage", "ministries.view", "schedules.view", "schedules.manage", "parking.view", "feed.publish"],
+};
+
 export default function PeopleWorkspace({
   communityName,
   mode = "manage",
@@ -104,6 +114,8 @@ export default function PeopleWorkspace({
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Person | null>(null);
+  const [permissionDraft, setPermissionDraft] = useState<string[]>([]);
+  const [presetTitle, setPresetTitle] = useState("LÍDER");
   const [removing, setRemoving] = useState<Person | null>(null);
   const [removeConfirmation, setRemoveConfirmation] = useState("");
   const [removalIssue, setRemovalIssue] = useState<{ message: string; blockers: RemovalBlocker[] } | null>(null);
@@ -380,7 +392,7 @@ export default function PeopleWorkspace({
             </div>
             <div className="people-card-actions">
               {data.canManage && (
-                <button type="button" onClick={() => setEditing(person)}>
+                <button type="button" onClick={() => { setEditing(person); setPermissionDraft(person.permissoes.split(",").filter(Boolean)); setPresetTitle(person.titulo_oficial || "LÍDER"); }}>
                   Editar função
                 </button>
               )}
@@ -469,6 +481,13 @@ export default function PeopleWorkspace({
                   </select>
                 </label>
               </div>
+              <section className="people-hierarchy-builder" aria-label="Modelo de permissões por hierarquia">
+                <div><strong>Modelo da hierarquia</strong><small>Use uma base pronta e ajuste cada permissão antes de salvar.</small></div>
+                <select value={presetTitle} onChange={(event) => setPresetTitle(event.target.value)} aria-label="Hierarquia usada como modelo">
+                  {TITLES.map((title) => <option key={title} value={title}>{title}</option>)}
+                </select>
+                <button type="button" onClick={() => setPermissionDraft((HIERARCHY_PERMISSION_PRESETS[presetTitle] || ["events.view", "ministries.view", "schedules.view"]).filter((permission) => (data.permissionCatalog || []).includes(permission)))}>Aplicar modelo</button>
+              </section>
               <fieldset>
                 <legend>Permissões adicionais</legend>
                 <div className="people-permission-grid">
@@ -478,9 +497,8 @@ export default function PeopleWorkspace({
                         type="checkbox"
                         name="permissions"
                         value={permission}
-                        defaultChecked={editing.permissoes
-                          .split(",")
-                          .includes(permission)}
+                        checked={permissionDraft.includes(permission)}
+                        onChange={(event) => setPermissionDraft((current) => event.target.checked ? [...new Set([...current, permission])] : current.filter((item) => item !== permission))}
                       />
                       <span>{PERMISSION_LABELS[permission] || permission}</span>
                     </label>
