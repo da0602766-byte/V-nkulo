@@ -15,7 +15,7 @@ test("as cinco migrações de relacionamento e agenda são aditivas e ordenadas"
   const tables = ["visitor_contacts", "visitor_visits", "escala_respostas", "indisponibilidades", "metas_objetivos"];
 
   migrations.forEach((sql, index) => {
-    assert.ok(sql.includes("CREATE TABLE `" + tables[index] + "`"));
+    assert.match(sql, new RegExp("CREATE TABLE(?: IF NOT EXISTS)? `" + tables[index] + "`"));
     assert.match(sql, /CREATE (?:UNIQUE )?INDEX/);
     assert.doesNotMatch(sql, /DROP TABLE|ALTER TABLE|DELETE FROM/i);
   });
