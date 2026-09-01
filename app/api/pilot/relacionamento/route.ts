@@ -212,14 +212,28 @@ export async function GET(request: Request) {
   // ============================================
   if (ferramenta === "todas" || ferramenta === "engagement") {
     const query = visitanteId
-      ? `SELECT v.id, v.nome_completo, v.status, v.ultimo_contato, v.data_entrada,
-              v.acompanhamentos_total, v.encontro_com_deus, v.curso_membros,
+      ? `SELECT v.id, v.nome_completo, v.status,
+              (SELECT MAX(a.criado_em) FROM acompanhamentos a
+               WHERE a.visitante_id = v.id AND a.comunidade_id = v.comunidade_id
+                 AND a.escopo_confirmado = 1) AS ultimo_contato,
+              v.data_entrada,
+              (SELECT COUNT(*) FROM acompanhamentos a
+               WHERE a.visitante_id = v.id AND a.comunidade_id = v.comunidade_id
+                 AND a.escopo_confirmado = 1) AS acompanhamentos_total,
+              v.encontro_com_deus, v.curso_membros,
               v.categoria_id, v.ministerio
          FROM visitantes v
          WHERE v.comunidade_id = ? AND v.id = ?
          LIMIT 1`
-      : `SELECT v.id, v.nome_completo, v.status, v.ultimo_contato, v.data_entrada,
-              v.acompanhamentos_total, v.encontro_com_deus, v.curso_membros,
+      : `SELECT v.id, v.nome_completo, v.status,
+              (SELECT MAX(a.criado_em) FROM acompanhamentos a
+               WHERE a.visitante_id = v.id AND a.comunidade_id = v.comunidade_id
+                 AND a.escopo_confirmado = 1) AS ultimo_contato,
+              v.data_entrada,
+              (SELECT COUNT(*) FROM acompanhamentos a
+               WHERE a.visitante_id = v.id AND a.comunidade_id = v.comunidade_id
+                 AND a.escopo_confirmado = 1) AS acompanhamentos_total,
+              v.encontro_com_deus, v.curso_membros,
               v.categoria_id, v.ministerio
          FROM visitantes v
          WHERE v.comunidade_id = ? AND v.ativo = 1
@@ -263,7 +277,10 @@ export async function GET(request: Request) {
   if (ferramenta === "todas" || ferramenta === "cadencia") {
     const result = await db
       .prepare(
-        `SELECT v.id, v.nome_completo, v.ultimo_contato,
+        `SELECT v.id, v.nome_completo,
+                (SELECT MAX(a.criado_em) FROM acompanhamentos a
+                 WHERE a.visitante_id = v.id AND a.comunidade_id = v.comunidade_id
+                   AND a.escopo_confirmado = 1) AS ultimo_contato,
                 (SELECT a.proximo_contato
                  FROM acompanhamentos a
                  WHERE a.visitante_id = v.id
@@ -276,12 +293,12 @@ export async function GET(request: Request) {
          WHERE v.comunidade_id = ? AND v.ativo = 1
          ORDER BY
            CASE
-             WHEN v.ultimo_contato IS NULL THEN 0
-             WHEN datetime(v.ultimo_contato) < datetime('now', '-30 days') THEN 1
-             WHEN datetime(v.ultimo_contato) < datetime('now', '-7 days') THEN 2
+             WHEN ultimo_contato IS NULL THEN 0
+             WHEN datetime(ultimo_contato) < datetime('now', '-30 days') THEN 1
+             WHEN datetime(ultimo_contato) < datetime('now', '-7 days') THEN 2
              ELSE 3
            END ASC,
-           v.ultimo_contato ASC
+           ultimo_contato ASC
          LIMIT 100`
       )
       .bind(comunidadeId)
@@ -411,7 +428,11 @@ export async function GET(request: Request) {
     const result = await db
       .prepare(
         `SELECT
-           v.id, v.nome_completo, v.ultimo_contato, v.criado_por as responsavel,
+           v.id, v.nome_completo,
+           (SELECT MAX(a.criado_em) FROM acompanhamentos a
+            WHERE a.visitante_id = v.id AND a.comunidade_id = v.comunidade_id
+              AND a.escopo_confirmado = 1) AS ultimo_contato,
+           v.criado_por as responsavel,
            c.nome as categoria, v.categoria_id
          FROM visitantes v
          LEFT JOIN visitante_categorias c
@@ -419,12 +440,13 @@ export async function GET(request: Request) {
          WHERE v.comunidade_id = ? AND v.ativo = 1
          ORDER BY
            CASE
-             WHEN datetime(v.ultimo_contato) < datetime('now', '-60 days') THEN 0
-             WHEN datetime(v.ultimo_contato) < datetime('now', '-30 days') THEN 1
-             WHEN datetime(v.ultimo_contato) < datetime('now', '-7 days') THEN 2
+             WHEN ultimo_contato IS NULL THEN 0
+             WHEN datetime(ultimo_contato) < datetime('now', '-60 days') THEN 1
+             WHEN datetime(ultimo_contato) < datetime('now', '-30 days') THEN 2
+             WHEN datetime(ultimo_contato) < datetime('now', '-7 days') THEN 3
              ELSE 3
            END ASC,
-           v.ultimo_contato ASC
+           ultimo_contato ASC
          LIMIT 100`
       )
       .bind(comunidadeId)
