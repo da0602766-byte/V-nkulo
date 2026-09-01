@@ -182,7 +182,7 @@ export default async function Home() {
       <footer className="landing-footer">
         <strong>VÍNKULO</strong>
         <span>Gestão para igrejas e comunidades</span>
-        <nav><Link href="/privacidade">Privacidade</Link><Link href="/termos">Termos</Link><Link href="/comunidades">Comunidades</Link></nav>
+        <nav><Link href="/privacidade">Privacidade</Link><Link href="/termos">Termos</Link><Link href="/exclusao-de-dados">Exclusão de dados</Link><Link href="/contato">Contato</Link><Link href="/comunidades">Comunidades</Link></nav>
       </footer>
     </main>
   );

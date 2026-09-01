@@ -77,6 +77,20 @@
 .storage-privacy-card h2 { margin: 3px 0 6px; font-size: clamp(1.25rem, 3vw, 1.65rem); }
 .storage-privacy-card p { margin: 0; color: var(--muted, #6e667f); line-height: 1.55; }
 
+.storage-google-identity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--line, #e9e4f2);
+  border-radius: 12px;
+  font-size: var(--fs-xs, 0.8rem);
+}
+.storage-google-identity > span { color: var(--muted, #6e667f); font-weight: 700; }
+.storage-google-identity b.is-linked { color: #12a879; }
+.storage-google-identity b.is-unlinked { color: var(--muted, #6e667f); }
+
 .storage-destination-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

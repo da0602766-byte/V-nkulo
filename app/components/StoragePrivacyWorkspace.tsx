@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 type StorageData = {
   googleAvailable: boolean;
-  google: null | { email: string; connected: boolean; connectedAt: string };
+  google: null | { email: string; linked: boolean; connected: boolean; connectedAt: string };
   preference: {
     provider: "LOCAL" | "GOOGLE_DRIVE";
     auto_load_recent: number;
@@ -144,6 +144,13 @@ export default function StoragePrivacyWorkspace() {
           <p>Fotos, arquivos e conteúdo de conversas ficam no Google Drive autorizado ou somente neste aparelho. A plataforma guarda apenas referências técnicas, consentimentos e permissões.</p>
         </div>
       </header>
+
+      <div className="storage-google-identity" role="status">
+        <span>Conta Google</span>
+        {data.google?.linked
+          ? <b className="is-linked">Vinculada · {data.google.email}</b>
+          : <b className="is-unlinked">Não vinculada</b>}
+      </div>
 
       <div className="storage-destination-grid">
         <button type="button" className={data.preference.provider === "GOOGLE_DRIVE" ? "selected" : ""} disabled={busy || !driveConnected} onClick={() => void savePreference({ provider: "GOOGLE_DRIVE" })}>
