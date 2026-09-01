@@ -263,7 +263,15 @@ export async function GET(request: Request) {
   if (ferramenta === "todas" || ferramenta === "cadencia") {
     const result = await db
       .prepare(
-        `SELECT v.id, v.nome_completo, v.ultimo_contato, v.proximo_contato
+        `SELECT v.id, v.nome_completo, v.ultimo_contato,
+                (SELECT a.proximo_contato
+                 FROM acompanhamentos a
+                 WHERE a.visitante_id = v.id
+                   AND a.comunidade_id = v.comunidade_id
+                   AND a.escopo_confirmado = 1
+                   AND a.proximo_contato IS NOT NULL
+                 ORDER BY a.id DESC
+                 LIMIT 1) AS proximo_contato
          FROM visitantes v
          WHERE v.comunidade_id = ? AND v.ativo = 1
          ORDER BY
