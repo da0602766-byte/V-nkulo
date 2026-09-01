@@ -559,7 +559,13 @@ export async function GET(request: Request) {
         `SELECT id, nome_completo
          FROM visitantes
          WHERE comunidade_id = ? AND status = 'INTEGRADO'
-           AND (acompanhamentos_total = 0 OR acompanhamentos_total IS NULL)
+           AND ativo = 1
+           AND NOT EXISTS (
+             SELECT 1 FROM acompanhamentos a
+             WHERE a.visitante_id = visitantes.id
+               AND a.comunidade_id = visitantes.comunidade_id
+               AND a.escopo_confirmado = 1
+           )
          LIMIT 20`
       )
       .bind(comunidadeId)

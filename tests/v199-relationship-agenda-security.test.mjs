@@ -35,6 +35,8 @@ test("relacionamento separa leitura e escrita e valida o visitante no tenant", a
   assert.match(route, /SELECT MAX\(a\.criado_em\) FROM acompanhamentos a/);
   assert.doesNotMatch(route, /SELECT v\.id, v\.nome_completo, v\.status, v\.ultimo_contato/);
   assert.doesNotMatch(route, /SELECT v\.id, v\.nome_completo, v\.ultimo_contato/);
+  assert.doesNotMatch(route, /acompanhamentos_total = 0/);
+  assert.match(route, /NOT EXISTS \([\s\S]*SELECT 1 FROM acompanhamentos a/);
   assert.doesNotMatch(route, /categorias_acompanhamento/);
   assert.match(route, /LEFT JOIN visitante_categorias c/);
 });
