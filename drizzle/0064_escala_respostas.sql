@@ -1,5 +1,5 @@
 -- Confirmação de Escalas: Respostas dos designados
-CREATE TABLE `escala_respostas` (
+CREATE TABLE IF NOT EXISTS `escala_respostas` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`comunidade_id` integer NOT NULL,
 	`escala_designacao_id` integer NOT NULL,
@@ -17,4 +17,4 @@ CREATE TABLE `escala_respostas` (
 --> statement-breakpoint
 CREATE UNIQUE INDEX `escala_respostas_unique` ON `escala_respostas` (`escala_designacao_id`,`usuario_id`);
 --> statement-breakpoint
-CREATE INDEX `escala_respostas_comunidade_idx` ON `escala_respostas` (`comunidade_id`,`confirmado_em`);
+CREATE INDEX IF NOT EXISTS `escala_respostas_comunidade_idx` ON `escala_respostas` (`comunidade_id`,`confirmado_em`);

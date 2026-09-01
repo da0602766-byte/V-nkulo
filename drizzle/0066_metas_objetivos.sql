@@ -1,5 +1,5 @@
 -- Metas e Objetivos: Rastreamento integrado ao calendário
-CREATE TABLE `metas_objetivos` (
+CREATE TABLE IF NOT EXISTS `metas_objetivos` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`comunidade_id` integer NOT NULL,
 	`usuario_id` integer NOT NULL,
@@ -20,6 +20,6 @@ CREATE TABLE `metas_objetivos` (
 	FOREIGN KEY (`usuario_id`) REFERENCES `usuarios`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE INDEX `metas_usuario_idx` ON `metas_objetivos` (`comunidade_id`,`usuario_id`,`data_alvo`);
+CREATE INDEX IF NOT EXISTS `metas_usuario_idx` ON `metas_objetivos` (`comunidade_id`,`usuario_id`,`data_alvo`);
 --> statement-breakpoint
-CREATE INDEX `metas_status_idx` ON `metas_objetivos` (`status`,`comunidade_id`,`data_alvo`);
+CREATE INDEX IF NOT EXISTS `metas_status_idx` ON `metas_objetivos` (`status`,`comunidade_id`,`data_alvo`);

@@ -8546,6 +8546,39 @@ html[data-pilot-theme="escuro"] .pilot-dashboard[data-community-palette] {
   }
 }
 
+/* Relacionamento e Agenda — histórico individual sem competir com o funil. */
+.relacionamento-history-picker {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 18px;
+  border: 1px solid var(--pilot-line);
+  border-radius: 14px;
+  background: var(--pilot-surface-2);
+  padding: 14px;
+}
+.relacionamento-history-picker > div { min-width: 0; display: grid; gap: 4px; }
+.relacionamento-history-picker strong { color: var(--pilot-text); font-size: var(--fs-sm); }
+.relacionamento-history-picker small { color: var(--pilot-muted); font-size: var(--fs-xs); }
+.relacionamento-history-picker select {
+  width: min(320px, 100%);
+  min-height: 42px;
+  border: 1px solid var(--pilot-line);
+  border-radius: 11px;
+  background: var(--pilot-surface);
+  color: var(--pilot-text);
+  padding: 0 12px;
+  font: inherit;
+}
+.relacionamento-history-state { margin: 12px 0 0; color: var(--pilot-muted); font-size: var(--fs-xs); }
+.relacionamento-history-state.is-error { color: var(--rose); }
+
+@media (max-width: 620px) {
+  .relacionamento-history-picker { align-items: stretch; flex-direction: column; }
+  .relacionamento-history-picker select { width: 100%; }
+}
+
 /* VÍNKULO REDESIGN 2026 — tabelas administrativas e filtros explícitos. */
 .pilot-dashboard[data-ui-version="v2"] .visitor-workspace-redesign { color: var(--ink); }
 .pilot-dashboard[data-ui-version="v2"] .visitor-view-tabs-v2 {

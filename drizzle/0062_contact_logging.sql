@@ -1,5 +1,5 @@
 -- Contact Logging: Registro de cada contato realizado com visitante
-CREATE TABLE `visitor_contacts` (
+CREATE TABLE IF NOT EXISTS `visitor_contacts` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`comunidade_id` integer NOT NULL,
 	`visitante_id` integer NOT NULL,
@@ -17,6 +17,6 @@ CREATE TABLE `visitor_contacts` (
 	FOREIGN KEY (`responsavel_id`) REFERENCES `usuarios`(`id`) ON UPDATE no action ON DELETE set null
 );
 --> statement-breakpoint
-CREATE INDEX `visitor_contacts_visitante_idx` ON `visitor_contacts` (`comunidade_id`,`visitante_id`,`criado_em`);
+CREATE INDEX IF NOT EXISTS `visitor_contacts_visitante_idx` ON `visitor_contacts` (`comunidade_id`,`visitante_id`,`criado_em`);
 --> statement-breakpoint
-CREATE INDEX `visitor_contacts_responsavel_idx` ON `visitor_contacts` (`responsavel_id`,`criado_em`);
+CREATE INDEX IF NOT EXISTS `visitor_contacts_responsavel_idx` ON `visitor_contacts` (`responsavel_id`,`criado_em`);

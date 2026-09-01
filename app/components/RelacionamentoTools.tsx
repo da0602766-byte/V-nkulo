@@ -90,7 +90,7 @@ type VisitaItem = {
 };
 
 interface RelacionamentoToolsProps {
-  visitantes?: EngagementData[];
+  visitantes?: Array<Pick<EngagementData, "id" | "nome_completo" | "status">>;
   compacto?: boolean;
 }
 
@@ -396,9 +396,7 @@ function ConflictDetection({ items }: { items: ConflictItem[] }) {
  * FERRAMENTA 8: Contact Logging
  * Histórico de contatos realizados
  */
-function ContactLogList({ items, visitanteId }: { items: ContactItem[]; visitanteId?: number }) {
-  if (items.length === 0) return null;
-
+function ContactLogList({ items }: { items: ContactItem[] }) {
   const canalIcon = (canal: string) => {
     switch (canal) {
       case "WHATSAPP":
@@ -426,6 +424,11 @@ function ContactLogList({ items, visitanteId }: { items: ContactItem[]; visitant
       <h3 style={{ marginTop: 0, marginBottom: "12px", fontSize: "14px", fontWeight: "bold" }}>
         📋 Histórico de Contatos ({items.length})
       </h3>
+      {items.length === 0 && (
+        <p style={{ margin: 0, color: "var(--color-text-muted)", fontSize: "12px" }}>
+          Nenhum contato registrado para esta pessoa.
+        </p>
+      )}
       <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "400px", overflowY: "auto" }}>
         {items.map((item) => (
           <div
@@ -471,8 +474,6 @@ function ContactLogList({ items, visitanteId }: { items: ContactItem[]; visitant
  * Rastreamento de visitas presenciais
  */
 function VisitaTrackingList({ items }: { items: VisitaItem[] }) {
-  if (items.length === 0) return null;
-
   const tipoIcon = (tipo: string) => {
     switch (tipo) {
       case "ACOLHIDA":
@@ -498,6 +499,11 @@ function VisitaTrackingList({ items }: { items: VisitaItem[] }) {
       <h3 style={{ marginTop: 0, marginBottom: "12px", fontSize: "14px", fontWeight: "bold" }}>
         🏃 Rastreamento de Visitas ({items.length})
       </h3>
+      {items.length === 0 && (
+        <p style={{ margin: 0, color: "var(--color-text-muted)", fontSize: "12px" }}>
+          Nenhuma visita registrada para esta pessoa.
+        </p>
+      )}
       <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "400px", overflowY: "auto" }}>
         {items.map((item) => (
           <div
@@ -738,7 +744,10 @@ export function RelacionamentoTools({ visitantes = [], compacto = false }: Relac
   const [contatos, setContatos] = useState<ContactItem[]>([]);
   const [visitas, setVisitas] = useState<VisitaItem[]>([]);
   const [carregando, setCarregando] = useState(true);
+  const [historicoCarregando, setHistoricoCarregando] = useState(false);
+  const [historicoErro, setHistoricoErro] = useState("");
   const [selecionadoVisitanteId, setSelecionadoVisitanteId] = useState<number | null>(null);
+  const visitanteHistoricoId = selecionadoVisitanteId ?? visitantes[0]?.id ?? null;
 
   useEffect(() => {
     const carregarDados = async () => {
@@ -770,6 +779,42 @@ export function RelacionamentoTools({ visitantes = [], compacto = false }: Relac
 
     carregarDados();
   }, []);
+
+  useEffect(() => {
+    if (!visitanteHistoricoId) return;
+    let active = true;
+    const loadHistory = async () => {
+      setHistoricoCarregando(true);
+      setHistoricoErro("");
+      try {
+        const [contactsResponse, visitsResponse] = await Promise.all([
+          fetch(`/api/pilot/relacionamento?ferramenta=contatos&visitanteId=${visitanteHistoricoId}`),
+          fetch(`/api/pilot/relacionamento?ferramenta=visitas&visitanteId=${visitanteHistoricoId}`),
+        ]);
+        if (!contactsResponse.ok || !visitsResponse.ok) {
+          throw new Error("Não foi possível carregar o histórico desta pessoa.");
+        }
+        const [contactsPayload, visitsPayload] = await Promise.all([
+          contactsResponse.json(),
+          visitsResponse.json(),
+        ]);
+        if (!active) return;
+        setContatos(contactsPayload.dados || []);
+        setVisitas(visitsPayload.dados || []);
+      } catch (error) {
+        if (!active) return;
+        setContatos([]);
+        setVisitas([]);
+        setHistoricoErro((error as Error).message);
+      } finally {
+        if (active) setHistoricoCarregando(false);
+      }
+    };
+    void loadHistory();
+    return () => {
+      active = false;
+    };
+  }, [visitanteHistoricoId]);
 
   if (compacto) {
     // Versão compacta: mostra apenas resumo
@@ -819,6 +864,24 @@ export function RelacionamentoTools({ visitantes = [], compacto = false }: Relac
         </div>
       ) : (
         <>
+          {visitantes.length > 0 && (
+            <section className="relacionamento-history-picker" aria-labelledby="relacionamento-history-title">
+              <div>
+                <strong id="relacionamento-history-title">Contatos e visitas</strong>
+                <small>Escolha uma pessoa para consultar o histórico individual.</small>
+              </div>
+              <select
+                aria-label="Pessoa do histórico de relacionamento"
+                value={visitanteHistoricoId || ""}
+                onChange={(event) => setSelecionadoVisitanteId(Number(event.target.value) || null)}
+              >
+                {visitantes.map((visitor) => (
+                  <option key={visitor.id} value={visitor.id}>{visitor.nome_completo}</option>
+                ))}
+              </select>
+            </section>
+          )}
+
           {/* Seção de Engagement */}
           {engagement.length > 0 && (
             <div style={{ marginBottom: "24px" }}>
@@ -871,10 +934,16 @@ export function RelacionamentoTools({ visitantes = [], compacto = false }: Relac
           {carga.length > 0 && <LoadMetrics items={carga} />}
 
           {/* Contact Logging */}
-          {contatos.length > 0 && <ContactLogList items={contatos} visitanteId={selecionadoVisitanteId || undefined} />}
+          {visitanteHistoricoId && !historicoCarregando && !historicoErro && (
+            <ContactLogList items={contatos} />
+          )}
 
           {/* Visita Tracking */}
-          {visitas.length > 0 && <VisitaTrackingList items={visitas} />}
+          {visitanteHistoricoId && !historicoCarregando && !historicoErro && (
+            <VisitaTrackingList items={visitas} />
+          )}
+          {historicoCarregando && <p className="relacionamento-history-state">Carregando contatos e visitas…</p>}
+          {historicoErro && <p className="relacionamento-history-state is-error" role="alert">{historicoErro}</p>}
 
           {/* Conflitos */}
           {conflitos.length > 0 && <ConflictDetection items={conflitos} />}

@@ -52,25 +52,6 @@ type ConflictItem = {
   sugestao: string;
 };
 
-type RegionalItem = {
-  id: number;
-  nome: string;
-  total_visitantes: number;
-  novos: number;
-  integrados: number;
-};
-
-type CadenciaAvancadaItem = {
-  id: number;
-  nome_completo: string;
-  ultimo_contato: string | null;
-  dias_sem_contato: number;
-  categoria: string | null;
-  responsavel: string | null;
-  prioridade: "urgente" | "alta" | "normal" | "baixa";
-  sugestao: string;
-};
-
 /**
  * Calcula o Engagement Score de um visitante (0-100)
  * Pontos:
@@ -141,20 +122,18 @@ function calcularEngagementScore(visitor: {
   return Math.min(Math.round(score), 100);
 }
 
-function classificarEngagement(score: number): "alto" | "medio" | "baixo" {
-  if (score >= 70) return "alto";
-  if (score >= 40) return "medio";
-  return "baixo";
-}
-
 export async function GET(request: Request) {
-  const access = await requireTenantPermission("dashboard.view");
+  const access = await requireTenantPermission("visitors.view");
   if ("error" in access) return access.error;
 
-  const { comunidadeId, userId } = access.context;
+  const { comunidadeId } = access.context;
   const url = new URL(request.url);
   const ferramenta = url.searchParams.get("ferramenta") || "todas";
-  const visitanteId = url.searchParams.get("visitanteId");
+  const visitanteIdParam = url.searchParams.get("visitanteId");
+  const visitanteId = visitanteIdParam ? Number(visitanteIdParam) : null;
+  if (visitanteIdParam && (!Number.isInteger(visitanteId) || Number(visitanteId) <= 0)) {
+    return Response.json({ error: "Visitante inválido." }, { status: 400 });
+  }
 
   const db = getD1();
 
@@ -172,7 +151,7 @@ export async function GET(request: Request) {
          ORDER BY c.criado_em DESC
          LIMIT 50`
       )
-      .bind(comunidadeId, Number(visitanteId))
+        .bind(comunidadeId, visitanteId)
       .all<{
         id: number;
         tipo: string;
@@ -207,7 +186,7 @@ export async function GET(request: Request) {
          ORDER BY v.data_visita DESC
          LIMIT 50`
       )
-      .bind(comunidadeId, Number(visitanteId))
+        .bind(comunidadeId, visitanteId)
       .all<{
         id: number;
         data_visita: string;
@@ -233,14 +212,28 @@ export async function GET(request: Request) {
   // ============================================
   if (ferramenta === "todas" || ferramenta === "engagement") {
     const query = visitanteId
-      ? `SELECT v.id, v.nome_completo, v.status, v.ultimo_contato, v.data_entrada,
-              v.acompanhamentos_total, v.encontro_com_deus, v.curso_membros,
+      ? `SELECT v.id, v.nome_completo, v.status,
+              (SELECT MAX(a.criado_em) FROM acompanhamentos a
+               WHERE a.visitante_id = v.id AND a.comunidade_id = v.comunidade_id
+                 AND a.escopo_confirmado = 1) AS ultimo_contato,
+              v.data_entrada,
+              (SELECT COUNT(*) FROM acompanhamentos a
+               WHERE a.visitante_id = v.id AND a.comunidade_id = v.comunidade_id
+                 AND a.escopo_confirmado = 1) AS acompanhamentos_total,
+              v.encontro_com_deus, v.curso_membros,
               v.categoria_id, v.ministerio
          FROM visitantes v
          WHERE v.comunidade_id = ? AND v.id = ?
          LIMIT 1`
-      : `SELECT v.id, v.nome_completo, v.status, v.ultimo_contato, v.data_entrada,
-              v.acompanhamentos_total, v.encontro_com_deus, v.curso_membros,
+      : `SELECT v.id, v.nome_completo, v.status,
+              (SELECT MAX(a.criado_em) FROM acompanhamentos a
+               WHERE a.visitante_id = v.id AND a.comunidade_id = v.comunidade_id
+                 AND a.escopo_confirmado = 1) AS ultimo_contato,
+              v.data_entrada,
+              (SELECT COUNT(*) FROM acompanhamentos a
+               WHERE a.visitante_id = v.id AND a.comunidade_id = v.comunidade_id
+                 AND a.escopo_confirmado = 1) AS acompanhamentos_total,
+              v.encontro_com_deus, v.curso_membros,
               v.categoria_id, v.ministerio
          FROM visitantes v
          WHERE v.comunidade_id = ? AND v.ativo = 1
@@ -248,7 +241,7 @@ export async function GET(request: Request) {
          LIMIT 200`;
 
     const params = visitanteId
-      ? [comunidadeId, Number(visitanteId)]
+      ? [comunidadeId, visitanteId]
       : [comunidadeId];
 
     const result = await db
@@ -284,16 +277,28 @@ export async function GET(request: Request) {
   if (ferramenta === "todas" || ferramenta === "cadencia") {
     const result = await db
       .prepare(
-        `SELECT v.id, v.nome_completo, v.ultimo_contato, v.proximo_contato
+        `SELECT v.id, v.nome_completo,
+                (SELECT MAX(a.criado_em) FROM acompanhamentos a
+                 WHERE a.visitante_id = v.id AND a.comunidade_id = v.comunidade_id
+                   AND a.escopo_confirmado = 1) AS ultimo_contato,
+                (SELECT a.proximo_contato
+                 FROM acompanhamentos a
+                 WHERE a.visitante_id = v.id
+                   AND a.comunidade_id = v.comunidade_id
+                   AND a.escopo_confirmado = 1
+                   AND a.proximo_contato IS NOT NULL
+                 ORDER BY a.id DESC
+                 LIMIT 1) AS proximo_contato
          FROM visitantes v
          WHERE v.comunidade_id = ? AND v.ativo = 1
          ORDER BY
            CASE
-             WHEN datetime(v.ultimo_contato) < datetime('now', '-7 days') THEN 0
-             WHEN datetime(v.ultimo_contato) < datetime('now', '-30 days') THEN 1
-             ELSE 2
+             WHEN ultimo_contato IS NULL THEN 0
+             WHEN datetime(ultimo_contato) < datetime('now', '-30 days') THEN 1
+             WHEN datetime(ultimo_contato) < datetime('now', '-7 days') THEN 2
+             ELSE 3
            END ASC,
-           v.ultimo_contato ASC
+           ultimo_contato ASC
          LIMIT 100`
       )
       .bind(comunidadeId)
@@ -423,19 +428,25 @@ export async function GET(request: Request) {
     const result = await db
       .prepare(
         `SELECT
-           v.id, v.nome_completo, v.ultimo_contato, v.criado_por as responsavel,
+           v.id, v.nome_completo,
+           (SELECT MAX(a.criado_em) FROM acompanhamentos a
+            WHERE a.visitante_id = v.id AND a.comunidade_id = v.comunidade_id
+              AND a.escopo_confirmado = 1) AS ultimo_contato,
+           v.criado_por as responsavel,
            c.nome as categoria, v.categoria_id
          FROM visitantes v
-         LEFT JOIN categorias_acompanhamento c ON c.id = v.categoria_id
+         LEFT JOIN visitante_categorias c
+           ON c.id = v.categoria_id AND c.comunidade_id = v.comunidade_id
          WHERE v.comunidade_id = ? AND v.ativo = 1
          ORDER BY
            CASE
-             WHEN datetime(v.ultimo_contato) < datetime('now', '-60 days') THEN 0
-             WHEN datetime(v.ultimo_contato) < datetime('now', '-30 days') THEN 1
-             WHEN datetime(v.ultimo_contato) < datetime('now', '-7 days') THEN 2
+             WHEN ultimo_contato IS NULL THEN 0
+             WHEN datetime(ultimo_contato) < datetime('now', '-60 days') THEN 1
+             WHEN datetime(ultimo_contato) < datetime('now', '-30 days') THEN 2
+             WHEN datetime(ultimo_contato) < datetime('now', '-7 days') THEN 3
              ELSE 3
            END ASC,
-           v.ultimo_contato ASC
+           ultimo_contato ASC
          LIMIT 100`
       )
       .bind(comunidadeId)
@@ -548,7 +559,13 @@ export async function GET(request: Request) {
         `SELECT id, nome_completo
          FROM visitantes
          WHERE comunidade_id = ? AND status = 'INTEGRADO'
-           AND (acompanhamentos_total = 0 OR acompanhamentos_total IS NULL)
+           AND ativo = 1
+           AND NOT EXISTS (
+             SELECT 1 FROM acompanhamentos a
+             WHERE a.visitante_id = visitantes.id
+               AND a.comunidade_id = visitantes.comunidade_id
+               AND a.escopo_confirmado = 1
+           )
          LIMIT 20`
       )
       .bind(comunidadeId)
@@ -579,7 +596,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const access = await requireTenantPermission("dashboard.view");
+  const access = await requireTenantPermission("followups.manage");
   if ("error" in access) return access.error;
   const { comunidadeId, userId } = access.context;
 
@@ -598,14 +615,21 @@ export async function POST(request: Request) {
   // ============================================
   if (tipo === "CONTATO") {
     const visitanteId = Number(corpo.visitanteId || 0);
-    const canal = String(corpo.canal || "OUTRO");
+    const canal = String(corpo.canal || "OUTRO").toUpperCase();
     const resultado = String(corpo.resultado || "").trim().slice(0, 160);
+    const duracaoMinutos = optionalDuration(corpo.duracao_minutos);
 
-    if (!visitanteId || !resultado) {
+    if (!Number.isInteger(visitanteId) || visitanteId <= 0 || !resultado) {
       return Response.json(
         { error: "Visitante e resultado são obrigatórios." },
         { status: 400 }
       );
+    }
+    if (!CONTACT_CHANNELS.has(canal) || duracaoMinutos === undefined) {
+      return Response.json({ error: "Canal ou duração inválidos." }, { status: 400 });
+    }
+    if (!(await visitorBelongsToCommunity(db, comunidadeId, visitanteId))) {
+      return Response.json({ error: "Visitante não encontrado nesta comunidade." }, { status: 404 });
     }
 
     const criado = await db
@@ -622,7 +646,7 @@ export async function POST(request: Request) {
         canal,
         resultado,
         String(corpo.descricao || "").trim().slice(0, 1000),
-        corpo.duracao_minutos ? Number(corpo.duracao_minutos) : null,
+        duracaoMinutos,
         corpo.proxima_acao ? String(corpo.proxima_acao).slice(0, 100) : null,
         userId
       )
@@ -643,20 +667,28 @@ export async function POST(request: Request) {
   if (tipo === "VISITA") {
     const visitanteId = Number(corpo.visitanteId || 0);
     const dataVisita = String(corpo.dataVisita || "").trim();
-    const visitaTipo = String(corpo.visitaTipo || "ACOMPANHAMENTO");
+    const visitaTipo = String(corpo.visitaTipo || "ACOMPANHAMENTO").toUpperCase();
+    const duracaoMinutos = optionalDuration(corpo.duracao_minutos);
 
-    if (!visitanteId || !dataVisita) {
+    if (!Number.isInteger(visitanteId) || visitanteId <= 0 || !dataVisita) {
       return Response.json(
         { error: "Visitante e data da visita são obrigatórios." },
         { status: 400 }
       );
     }
 
-    if (Number.isNaN(Date.parse(dataVisita))) {
+    if (
+      Number.isNaN(Date.parse(dataVisita)) ||
+      !VISIT_TYPES.has(visitaTipo) ||
+      duracaoMinutos === undefined
+    ) {
       return Response.json(
-        { error: "Data da visita inválida." },
+        { error: "Data, tipo ou duração da visita inválidos." },
         { status: 400 }
       );
+    }
+    if (!(await visitorBelongsToCommunity(db, comunidadeId, visitanteId))) {
+      return Response.json({ error: "Visitante não encontrado nesta comunidade." }, { status: 404 });
     }
 
     const criado = await db
@@ -672,7 +704,7 @@ export async function POST(request: Request) {
         new Date(dataVisita).toISOString(),
         String(corpo.local || "Igreja").slice(0, 180),
         visitaTipo,
-        corpo.duracao_minutos ? Number(corpo.duracao_minutos) : null,
+        duracaoMinutos,
         corpo.resultado ? String(corpo.resultado).slice(0, 500) : null,
         corpo.proxima_visita_sugerida ? String(corpo.proxima_visita_sugerida) : null,
         userId,
@@ -687,7 +719,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const access = await requireTenantPermission("dashboard.view");
+  const access = await requireTenantPermission("followups.manage");
   if ("error" in access) return access.error;
   const { comunidadeId, userId } = access.context;
 
@@ -740,4 +772,26 @@ export async function DELETE(request: Request) {
   }
 
   return Response.json({ error: "Tipo desconhecido." }, { status: 400 });
+}
+
+const CONTACT_CHANNELS = new Set(["WHATSAPP", "TELEFONE", "EMAIL", "PRESENCIAL", "OUTRO"]);
+const VISIT_TYPES = new Set(["ACOMPANHAMENTO", "PASTORAL", "SOCIAL", "HOSPITALAR", "OUTRO"]);
+
+function optionalDuration(value: unknown) {
+  if (value === undefined || value === null || value === "") return null;
+  const duration = Number(value);
+  if (!Number.isInteger(duration) || duration < 1 || duration > 1440) return undefined;
+  return duration;
+}
+
+async function visitorBelongsToCommunity(
+  db: ReturnType<typeof getD1>,
+  communityId: number,
+  visitorId: number,
+) {
+  const visitor = await db
+    .prepare("SELECT id FROM visitantes WHERE id = ? AND comunidade_id = ? AND ativo = 1 LIMIT 1")
+    .bind(visitorId, communityId)
+    .first<{ id: number }>();
+  return Boolean(visitor);
 }

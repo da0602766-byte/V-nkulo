@@ -49,9 +49,10 @@ export async function GET(request: Request) {
   const access = await requireTenantPermission("dashboard.view");
   if ("error" in access) return access.error;
 
-  const { comunidadeId } = access.context;
+  const { comunidadeId, userId, permissions } = access.context;
   const url = new URL(request.url);
   const tipo = url.searchParams.get("tipo");
+  const canManageSchedules = permissions.includes("schedules.manage");
 
   const db = getD1();
 
@@ -59,17 +60,26 @@ export async function GET(request: Request) {
   // CONFIRMAÇÃO DE ESCALAS
   // ============================================
   if (tipo === "escala-respostas") {
-    const escalaSemana = url.searchParams.get("semana"); // YYYY-WW
-    const designacaoId = url.searchParams.get("designacaoId");
+    if (!permissions.includes("schedules.view")) {
+      return Response.json({ error: "Você não pode visualizar escalas." }, { status: 403 });
+    }
+    const designacaoParam = url.searchParams.get("designacaoId");
+    const designacaoId = designacaoParam ? Number(designacaoParam) : null;
+    if (designacaoParam && (!Number.isInteger(designacaoId) || Number(designacaoId) <= 0)) {
+      return Response.json({ error: "Designação inválida." }, { status: 400 });
+    }
 
     if (designacaoId) {
       const result = await db
         .prepare(
           `SELECT er.id, er.escala_designacao_id, er.usuario_id, er.resposta, er.motivo_recusa, er.confirmado_em
            FROM escala_respostas er
-           WHERE er.comunidade_id = ? AND er.escala_designacao_id = ?`
+           WHERE er.comunidade_id = ? AND er.escala_designacao_id = ?
+             ${canManageSchedules ? "" : "AND er.usuario_id = ?"}`
         )
-        .bind(comunidadeId, Number(designacaoId))
+        .bind(...(canManageSchedules
+          ? [comunidadeId, designacaoId]
+          : [comunidadeId, designacaoId, userId]))
         .first<EscalaResposta>();
 
       return Response.json({
@@ -84,11 +94,12 @@ export async function GET(request: Request) {
         `SELECT er.id, er.escala_designacao_id, er.usuario_id, er.resposta, er.confirmado_em
          FROM escala_respostas er
          JOIN escala_designacoes ed ON ed.id = er.escala_designacao_id
-         WHERE er.comunidade_id = ?
+         WHERE er.comunidade_id = ? AND ed.comunidade_id = er.comunidade_id
+           ${canManageSchedules ? "" : "AND er.usuario_id = ?"}
          ORDER BY er.confirmado_em DESC
          LIMIT 100`
       )
-      .bind(comunidadeId)
+      .bind(...(canManageSchedules ? [comunidadeId] : [comunidadeId, userId]))
       .all<Omit<EscalaResposta, "motivo_recusa">>();
 
     return Response.json({
@@ -101,23 +112,34 @@ export async function GET(request: Request) {
   // INDISPONIBILIDADE
   // ============================================
   if (tipo === "indisponibilidades") {
-    const usuarioId = url.searchParams.get("usuarioId");
-    const meses = url.searchParams.get("meses") || "3";
+    const usuarioParam = url.searchParams.get("usuarioId");
+    const requestedUserId = usuarioParam ? Number(usuarioParam) : null;
+    if (usuarioParam && (!Number.isInteger(requestedUserId) || Number(requestedUserId) <= 0)) {
+      return Response.json({ error: "Usuário inválido." }, { status: 400 });
+    }
+    const requestedMonths = Number(url.searchParams.get("meses") || 3);
+    const months = Number.isInteger(requestedMonths)
+      ? Math.min(Math.max(requestedMonths, 1), 12)
+      : 3;
+    const targetUserId = canManageSchedules ? requestedUserId : userId;
 
     const dataFim = new Date();
-    dataFim.setMonth(dataFim.getMonth() + parseInt(meses));
+    dataFim.setMonth(dataFim.getMonth() + months);
 
     const result = await db
       .prepare(
         `SELECT id, usuario_id, titulo, descricao, data_inicio, data_fim,
                 todo_dia, hora_inicio, hora_fim, tipo
          FROM indisponibilidades
-         WHERE comunidade_id = ? ${usuarioId ? "AND usuario_id = ?" : ""}
+         WHERE comunidade_id = ? ${targetUserId ? "AND usuario_id = ?" : ""}
            AND data_fim >= datetime('now', '-1 day')
+           AND data_inicio <= ?
          ORDER BY data_inicio ASC
          LIMIT 200`
       )
-      .bind(usuarioId ? [comunidadeId, Number(usuarioId)] : [comunidadeId])
+      .bind(...(targetUserId
+        ? [comunidadeId, targetUserId, dataFim.toISOString()]
+        : [comunidadeId, dataFim.toISOString()]))
       .all<Indisponibilidade>();
 
     return Response.json({
@@ -130,20 +152,20 @@ export async function GET(request: Request) {
   // METAS & OBJETIVOS
   // ============================================
   if (tipo === "metas") {
-    const usuarioId = url.searchParams.get("usuarioId");
-    const status = url.searchParams.get("status") || "EM_PROGRESSO";
+    const requestedStatus = String(url.searchParams.get("status") || "EM_PROGRESSO").toUpperCase();
+    const status = GOAL_STATUSES.has(requestedStatus) ? requestedStatus : "EM_PROGRESSO";
 
     const result = await db
       .prepare(
         `SELECT id, usuario_id, titulo, descricao, categoria, prioridade,
                 data_inicio, data_alvo, progresso_percentual, status, metricas_chave, concluido_em
          FROM metas_objetivos
-         WHERE comunidade_id = ? ${usuarioId ? "AND usuario_id = ?" : ""}
+         WHERE comunidade_id = ? AND usuario_id = ?
            AND (status = ? OR status = 'CONCLUIDO')
          ORDER BY data_alvo ASC
          LIMIT 100`
       )
-      .bind(usuarioId ? [comunidadeId, Number(usuarioId), status] : [comunidadeId, status])
+      .bind(comunidadeId, userId, status)
       .all<MetaObjetivo>();
 
     return Response.json({
@@ -161,7 +183,7 @@ export async function POST(request: Request) {
   const access = await requireTenantPermission("dashboard.view");
   if ("error" in access) return access.error;
 
-  const { comunidadeId, userId } = access.context;
+  const { comunidadeId, userId, permissions } = access.context;
 
   let corpo: Record<string, unknown>;
   try {
@@ -180,8 +202,27 @@ export async function POST(request: Request) {
     const designacaoId = Number(corpo.designacaoId || 0);
     const resposta = String(corpo.resposta || "TALVEZ").toUpperCase();
 
-    if (!designacaoId || !["SIM", "NAO", "TALVEZ"].includes(resposta)) {
+    if (!permissions.includes("schedules.respond")) {
+      return Response.json({ error: "Você não pode responder escalas." }, { status: 403 });
+    }
+    if (
+      !Number.isInteger(designacaoId) ||
+      designacaoId <= 0 ||
+      !SCHEDULE_RESPONSES.has(resposta)
+    ) {
       return Response.json({ error: "Designação e resposta (SIM/NAO/TALVEZ) obrigatórias." }, { status: 400 });
+    }
+
+    const assignment = await db
+      .prepare(
+        `SELECT id FROM escala_designacoes
+         WHERE id = ? AND comunidade_id = ? AND usuario_id = ? AND ativo = 1
+         LIMIT 1`,
+      )
+      .bind(designacaoId, comunidadeId, userId)
+      .first<{ id: number }>();
+    if (!assignment) {
+      return Response.json({ error: "Esta designação não pertence à sua escala ativa." }, { status: 404 });
     }
 
     const resultado = await db
@@ -192,7 +233,8 @@ export async function POST(request: Request) {
          ON CONFLICT(escala_designacao_id, usuario_id) DO UPDATE SET
            resposta = excluded.resposta,
            motivo_recusa = excluded.motivo_recusa,
-           confirmado_em = CURRENT_TIMESTAMP
+           confirmado_em = CURRENT_TIMESTAMP,
+           atualizado_em = CURRENT_TIMESTAMP
          RETURNING id`
       )
       .bind(
@@ -222,6 +264,14 @@ export async function POST(request: Request) {
     if (Number.isNaN(Date.parse(dataInicio)) || Number.isNaN(Date.parse(dataFim))) {
       return Response.json({ error: "Datas inválidas." }, { status: 400 });
     }
+    const startsAt = new Date(dataInicio);
+    const endsAt = new Date(dataFim);
+    if (endsAt.getTime() < startsAt.getTime()) {
+      return Response.json({ error: "A data final deve ser igual ou posterior à inicial." }, { status: 400 });
+    }
+    const allDay = corpo.todoDia !== false;
+    const blockSchedules = corpo.bloqueioEscalas !== false;
+    const blockPersonal = corpo.bloqueioPessoal !== false;
 
     const criado = await db
       .prepare(
@@ -236,14 +286,14 @@ export async function POST(request: Request) {
         userId,
         titulo,
         String(corpo.descricao || "").trim().slice(0, 1000),
-        new Date(dataInicio).toISOString(),
-        new Date(dataFim).toISOString(),
-        corpo.todoDia ? 1 : 0,
+        startsAt.toISOString(),
+        endsAt.toISOString(),
+        allDay ? 1 : 0,
         corpo.horaInicio ? String(corpo.horaInicio).slice(0, 5) : null,
         corpo.horaFim ? String(corpo.horaFim).slice(0, 5) : null,
         "UNAVAILABLE",
-        corpo.bloqueioEscalas ? 1 : 0,
-        corpo.bloqueoPessoal ? 1 : 0
+        blockSchedules ? 1 : 0,
+        blockPersonal ? 1 : 0
       )
       .first<{ id: number }>();
 
@@ -256,14 +306,22 @@ export async function POST(request: Request) {
   if (tipo === "META") {
     const titulo = String(corpo.titulo || "").trim().slice(0, 140);
     const dataAlvo = String(corpo.dataAlvo || "").trim();
-    const categoria = String(corpo.categoria || "PESSOAL");
+    const categoria = String(corpo.categoria || "PESSOAL").trim().toUpperCase().slice(0, 60);
+    const prioridade = String(corpo.prioridade || "NORMAL").toUpperCase();
+    const progresso = Number(corpo.progresso || 0);
 
     if (!titulo || !dataAlvo) {
       return Response.json({ error: "Título e data alvo obrigatórios." }, { status: 400 });
     }
 
-    if (Number.isNaN(Date.parse(dataAlvo))) {
-      return Response.json({ error: "Data alvo inválida." }, { status: 400 });
+    if (
+      Number.isNaN(Date.parse(dataAlvo)) ||
+      !GOAL_PRIORITIES.has(prioridade) ||
+      !Number.isFinite(progresso) ||
+      progresso < 0 ||
+      progresso > 100
+    ) {
+      return Response.json({ error: "Data, prioridade ou progresso inválidos." }, { status: 400 });
     }
 
     const criado = await db
@@ -280,10 +338,10 @@ export async function POST(request: Request) {
         titulo,
         String(corpo.descricao || "").trim().slice(0, 1000),
         categoria,
-        String(corpo.prioridade || "NORMAL").toUpperCase(),
+        prioridade,
         new Date().toISOString(),
         new Date(dataAlvo).toISOString(),
-        Number(corpo.progresso || 0),
+        Math.round(progresso),
         "EM_PROGRESSO",
         corpo.metricasChave ? String(corpo.metricasChave).slice(0, 500) : null
       )
@@ -320,8 +378,16 @@ export async function PATCH(request: Request) {
       return Response.json({ error: "ID da meta obrigatório." }, { status: 400 });
     }
 
-    const progresso = Number(corpo.progresso || 0);
+    const progresso = Number(corpo.progresso ?? 0);
     const status = corpo.status ? String(corpo.status).toUpperCase() : undefined;
+    if (
+      !Number.isFinite(progresso) ||
+      progresso < 0 ||
+      progresso > 100 ||
+      (status !== undefined && !GOAL_STATUSES.has(status))
+    ) {
+      return Response.json({ error: "Progresso ou status inválidos." }, { status: 400 });
+    }
 
     const resultado = await db
       .prepare(
@@ -332,7 +398,7 @@ export async function PATCH(request: Request) {
              atualizado_em = datetime('now')
          WHERE id = ? AND comunidade_id = ? AND usuario_id = ?`
       )
-      .bind(progresso, status || null, id, comunidadeId, userId)
+      .bind(Math.round(progresso), status || null, id, comunidadeId, userId)
       .run();
 
     if (!resultado.meta.changes) {
@@ -344,6 +410,10 @@ export async function PATCH(request: Request) {
 
   return Response.json({ error: "Tipo desconhecido." }, { status: 400 });
 }
+
+const SCHEDULE_RESPONSES = new Set(["SIM", "NAO", "TALVEZ"]);
+const GOAL_PRIORITIES = new Set(["BAIXA", "NORMAL", "ALTA", "CRITICA"]);
+const GOAL_STATUSES = new Set(["EM_PROGRESSO", "CONCLUIDO", "PAUSADO", "CANCELADO"]);
 
 export async function DELETE(request: Request) {
   const access = await requireTenantPermission("dashboard.view");
