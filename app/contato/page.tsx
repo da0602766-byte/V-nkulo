@@ -1,4 +1,18 @@
 import Link from "../components/StableLink";
+import { CONTACT_EMAILS } from "../lib/contact-emails";
+
+function EmailList() {
+  return (
+    <>
+      {CONTACT_EMAILS.map((email, index) => (
+        <span key={email}>
+          {index > 0 && " ou "}
+          <a href={`mailto:${email}`}>{email}</a>
+        </span>
+      ))}
+    </>
+  );
+}
 
 export default function ContactPage() {
   return (
@@ -12,7 +26,7 @@ export default function ContactPage() {
         <h2>Suporte</h2>
         <p>
           Para dúvidas sobre sua conta, sua comunidade ou o funcionamento do
-          VÍNKULO: <strong>[e-mail de suporte a definir]</strong>.
+          VÍNKULO: <EmailList />.
         </p>
 
         <h2>Privacidade e Conta Google</h2>
@@ -20,7 +34,7 @@ export default function ContactPage() {
           Para dúvidas sobre como o VÍNKULO usa sua Conta Google, o Google
           Drive ou para pedir a exclusão da sua conta e dos seus dados,
           veja a página de <Link href="/exclusao-de-dados">Exclusão de conta e de dados</Link>{" "}
-          ou escreva para <strong>[e-mail de privacidade a definir]</strong>.
+          ou escreva para <EmailList />.
         </p>
 
         <h2>Responsável pela plataforma</h2>

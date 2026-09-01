@@ -168,10 +168,11 @@ OAuth"):
 
 ## 17. O que ainda precisa de ação manual (só você pode fazer)
 
-- [ ] Preencher `[e-mail de suporte a definir]` e `[e-mail de privacidade
-      a definir]` em `app/contato/page.tsx` e `app/exclusao-de-dados/page.tsx`
-      com endereços reais (posso fazer a troca de texto assim que você
-      me der os e-mails — é só texto, não mexe em nada sensível).
+- [x] E-mail de contato preenchido (`da0602766@gmail.com`), centralizado em
+      `app/lib/contact-emails.ts` — as páginas `/contato` e
+      `/exclusao-de-dados` leem essa lista automaticamente. Para adicionar
+      mais e-mails no futuro, basta incluir a string nesse arquivo; não
+      precisa editar as páginas.
 - [ ] Preencher `[Razão social / responsável legal a definir]` e endereço
       em `app/contato/page.tsx`, se o Google exigir na verificação.
 - [ ] Definir e preencher o prazo de exclusão em

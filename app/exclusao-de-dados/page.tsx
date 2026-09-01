@@ -1,4 +1,18 @@
 import Link from "../components/StableLink";
+import { CONTACT_EMAILS } from "../lib/contact-emails";
+
+function EmailList() {
+  return (
+    <>
+      {CONTACT_EMAILS.map((email, index) => (
+        <span key={email}>
+          {index > 0 && " ou "}
+          <a href={`mailto:${email}`}>{email}</a>
+        </span>
+      ))}
+    </>
+  );
+}
 
 export default function DataDeletionPage() {
   return (
@@ -28,8 +42,7 @@ export default function DataDeletionPage() {
           também usam.
         </p>
         <p>
-          Para solicitar, escreva para{" "}
-          <strong>[e-mail de suporte a definir]</strong> a partir do
+          Para solicitar, escreva para <EmailList /> a partir do
           endereço de e-mail cadastrado na sua conta, informando o nome
           completo e a comunidade a que você pertence. Pedimos a
           confirmação pelo mesmo e-mail para impedir que outra pessoa peça
