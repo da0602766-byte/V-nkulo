@@ -414,7 +414,8 @@ export async function GET(request: Request) {
            v.id, v.nome_completo, v.ultimo_contato, v.criado_por as responsavel,
            c.nome as categoria, v.categoria_id
          FROM visitantes v
-         LEFT JOIN categorias_acompanhamento c ON c.id = v.categoria_id
+         LEFT JOIN visitante_categorias c
+           ON c.id = v.categoria_id AND c.comunidade_id = v.comunidade_id
          WHERE v.comunidade_id = ? AND v.ativo = 1
          ORDER BY
            CASE

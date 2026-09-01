@@ -32,6 +32,8 @@ test("relacionamento separa leitura e escrita e valida o visitante no tenant", a
   assert.match(route, /ultimo_contato IS NULL[\s\S]*'-30 days'[\s\S]*'-7 days'/);
   assert.doesNotMatch(route, /v\.ultimo_contato, v\.proximo_contato/);
   assert.match(route, /FROM acompanhamentos a/);
+  assert.doesNotMatch(route, /categorias_acompanhamento/);
+  assert.match(route, /LEFT JOIN visitante_categorias c/);
 });
 
 test("refinamentos de agenda isolam respostas, indisponibilidade e metas", async () => {
