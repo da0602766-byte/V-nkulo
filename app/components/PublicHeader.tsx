@@ -29,7 +29,7 @@ export default async function PublicHeader({
           aria-label={`${branding.siteName} — início`}
         >
           <span className="adote-mark" aria-hidden="true">
-            <img src={branding.logoUrl || "/adote-symbol.svg"} alt="" />
+            <img loading="lazy" src={branding.logoUrl || "/adote-symbol.svg"} alt="" />
           </span>
           <span>
             <strong>{branding.siteName}</strong>
@@ -75,7 +75,7 @@ export default async function PublicHeader({
             <details className="public-account-menu">
               <summary className="reception-account-summary" aria-label="Abrir menu da conta">
                 <span className="public-account-avatar">
-                  {user.foto_perfil ? <img src={user.foto_perfil} alt="" /> : initials(user.nome)}
+                  {user.foto_perfil ? <img loading="lazy" src={user.foto_perfil} alt="" /> : initials(user.nome)}
                 </span>
                 <span className="public-account-copy">
                   <strong>{firstName(user.nome)}</strong>
@@ -86,7 +86,7 @@ export default async function PublicHeader({
               <div className="public-account-popover">
                 <header>
                   <span className="public-account-avatar">
-                    {user.foto_perfil ? <img src={user.foto_perfil} alt="" /> : initials(user.nome)}
+                    {user.foto_perfil ? <img loading="lazy" src={user.foto_perfil} alt="" /> : initials(user.nome)}
                   </span>
                   <div>
                     <strong>{user.nome}{user.system_owner ? " ✓" : ""}</strong>

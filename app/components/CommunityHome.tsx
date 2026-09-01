@@ -735,7 +735,7 @@ export default function CommunityHome({
                 <article key={post.id} id={`publicacao-${post.id}`} className="community-feed-entry">
                   <header>
                     <span className="community-feed-avatar">
-                      {post.autor_foto ? <img src={post.autor_foto} alt="" /> : getInitials(post.autor_nome || communityName)}
+                      {post.autor_foto ? <img loading="lazy" src={post.autor_foto} alt="" /> : getInitials(post.autor_nome || communityName)}
                     </span>
                     <div>
                       <VerifiedOwnerName
@@ -1096,7 +1096,7 @@ export default function CommunityHome({
                                       checked={replacementVolunteerId === candidate.voluntarioId}
                                       onChange={() => setReplacementVolunteerId(candidate.voluntarioId)}
                                     />
-                                    {candidate.fotoPerfil ? <img src={candidate.fotoPerfil} alt="" /> : <span aria-hidden="true">{getInitials(candidate.nome)}</span>}
+                                    {candidate.fotoPerfil ? <img loading="lazy" src={candidate.fotoPerfil} alt="" /> : <span aria-hidden="true">{getInitials(candidate.nome)}</span>}
                                     <span><b>{candidate.nome}</b><small>{candidate.funcao}</small></span>
                                   </label>
                                 ))}

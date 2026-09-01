@@ -82,7 +82,7 @@ export default function NativeImageUpload({
         onDragLeave={() => setDragging(false)}
         onDrop={drop}
       >
-        {value ? <img src={value} alt="Prévia da imagem selecionada" /> : <b>＋</b>}
+        {value ? <img loading="lazy" src={value} alt="Prévia da imagem selecionada" /> : <b>＋</b>}
         <span>
           <strong>{uploading ? "Enviando…" : "Arraste ou escolha uma imagem"}</strong>
           <small>{help}</small>

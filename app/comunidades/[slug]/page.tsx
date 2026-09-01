@@ -59,12 +59,12 @@ export default async function PublicCommunityPage({
           aria-label={community.bannerUrl ? `Capa da comunidade ${community.nome}` : `Identidade da comunidade ${community.nome}`}
         >
           {community.bannerUrl && (
-            <img src={community.bannerUrl} alt="" />
+            <img loading="lazy" src={community.bannerUrl} alt="" />
           )}
         </div>
         <div className="community-profile-identity-v120">
           <span className="community-public-avatar" aria-hidden="true">
-            {community.logoUrl ? <img src={community.logoUrl} alt="" /> : community.nome.slice(0, 1)}
+            {community.logoUrl ? <img loading="lazy" src={community.logoUrl} alt="" /> : community.nome.slice(0, 1)}
           </span>
           <div className="community-profile-copy">
             <p className="pilot-kicker">PÁGINA PÚBLICA DA COMUNIDADE</p>

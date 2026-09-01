@@ -319,7 +319,7 @@ export default function LoginPortal({
       <div className="login-v2-controls-row">
         <div className="login-v2-page-brand" aria-label={siteName}>
           {config.logoUrl
-            ? <img src={config.logoUrl} alt="" />
+            ? <img loading="lazy" src={config.logoUrl} alt="" />
             : <span aria-hidden="true">{siteName.slice(0, 1).toUpperCase()}</span>}
           <div>
             <strong>{siteName}</strong>

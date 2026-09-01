@@ -154,7 +154,7 @@ export default function CommunityPostInteractions({
                 {visible.map((comment) => (
                   <article key={comment.id} className="community-comment" data-pending={comment.pending ? "true" : undefined}>
                     {comment.foto
-                      ? <img src={comment.foto} alt="" />
+                      ? <img loading="lazy" src={comment.foto} alt="" />
                       : <span aria-hidden="true">{initials(comment.autor)}</span>}
                     <div className="community-comment-body">
                       <header>

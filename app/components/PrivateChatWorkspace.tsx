@@ -304,7 +304,7 @@ export default function PrivateChatWorkspace() {
 }
 
 function Avatar({ name, photo, online = false }: { name: string; photo: string | null; online?: boolean }) {
-  return <span className="private-chat-avatar">{photo ? <img src={photo} alt="" /> : initials(name)}<i className={online ? "online" : ""} /></span>;
+  return <span className="private-chat-avatar">{photo ? <img loading="lazy" src={photo} alt="" /> : initials(name)}<i className={online ? "online" : ""} /></span>;
 }
 function initials(value: string) {
   return value.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "U";

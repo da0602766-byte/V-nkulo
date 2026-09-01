@@ -269,7 +269,7 @@ export default function LeadershipWorkspace({
               <article key={leader.membership_id}>
                 <span>
                   {leader.foto_perfil ? (
-                    <img src={leader.foto_perfil} alt="" />
+                    <img loading="lazy" src={leader.foto_perfil} alt="" />
                   ) : (
                     initials(leader.nome)
                   )}

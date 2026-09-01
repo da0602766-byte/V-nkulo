@@ -107,7 +107,7 @@ export default async function SharedPublicationPage({ params }: { params: Promis
           <p>{post.conteudo || post.resumo}</p>
           {links.length > 0 && <nav aria-label="Links da publicação">{links.map((link) => <a key={link} href={link} target="_blank" rel="noreferrer">Abrir link ↗</a>)}</nav>}
         </div>
-        {image && <img src={image} alt={post.imagem_alt || post.titulo} />}
+        {image && <img loading="lazy" src={image} alt={post.imagem_alt || post.titulo} />}
         <footer><span>Compartilhado pelo VÍNKULO</span><a href="/login">Acessar a comunidade</a></footer>
       </article>
     </main>

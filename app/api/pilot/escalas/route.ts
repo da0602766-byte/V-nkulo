@@ -13,7 +13,7 @@ import { recordTenantAudit } from "../../../lib/tenant-audit";
 import { requireTenantPermission } from "../../../lib/tenant";
 import { notifyUser } from "../../../lib/pilot-notifications";
 import { isSystemOwnerAccount } from "../../../lib/local-auth";
-import { listScheduleSubstitutionCandidates } from "../../../lib/schedule-substitution";
+import { listScheduleSubstitutionCandidatesBatch } from "../../../lib/schedule-substitution";
 
 type ScheduleRow = Record<string, unknown> & { id: number };
 type AssignmentRow = Record<string, unknown> & { escala_id: number };
@@ -208,30 +208,23 @@ export async function GET() {
       access.user.id,
     )
     .all<Record<string, unknown>>();
-  const substitutionCandidatesBySchedule = new Map<
-    number,
-    Awaited<ReturnType<typeof listScheduleSubstitutionCandidates>>
-  >();
-  await Promise.all(
-    schedulesResult.results.map(async (schedule) => {
-      const scheduleId = Number(schedule.id);
+  const schedulesNeedingSubstitutes = schedulesResult.results
+    .filter((schedule) => {
       const hasPendingOwnAssignment = (
-        assignmentsBySchedule.get(scheduleId) || []
+        assignmentsBySchedule.get(Number(schedule.id)) || []
       ).some(
         (assignment) =>
           Boolean(assignment.is_mine) && assignment.status === "PENDENTE",
       );
-      if (!hasPendingOwnAssignment || schedule.status !== "PUBLICADA") return;
-      substitutionCandidatesBySchedule.set(
-        scheduleId,
-        await listScheduleSubstitutionCandidates(db, {
-          comunidadeId: access.context.comunidadeId,
-          escalaId: scheduleId,
-          usuarioAtualId: access.user.id,
-        }),
-      );
-    }),
-  );
+      return hasPendingOwnAssignment && schedule.status === "PUBLICADA";
+    })
+    .map((schedule) => Number(schedule.id));
+  const substitutionCandidatesBySchedule =
+    await listScheduleSubstitutionCandidatesBatch(db, {
+      comunidadeId: access.context.comunidadeId,
+      escalaIds: schedulesNeedingSubstitutes,
+      usuarioAtualId: access.user.id,
+    });
   return Response.json(
     {
       escalas: schedulesResult.results.map((schedule) => {

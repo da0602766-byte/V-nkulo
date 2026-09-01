@@ -792,7 +792,7 @@ export default function PilotDashboard({
         >
           <span className="adote-mark community-brand-mark" aria-hidden="true">
             {communityTheme.logoUrl ? (
-              <img src={communityTheme.logoUrl} alt="" />
+              <img loading="lazy" src={communityTheme.logoUrl} alt="" />
             ) : (
               <b>{getInitials(active.comunidadeNome)}</b>
             )}
@@ -848,7 +848,7 @@ export default function PilotDashboard({
             >
               <span>
                 {userPhotoUrl ? (
-                  <img src={userPhotoUrl} alt="" />
+                  <img loading="lazy" src={userPhotoUrl} alt="" />
                 ) : (
                   userInitials
                 )}
@@ -861,7 +861,7 @@ export default function PilotDashboard({
             </summary>
             <div className="pilot-user-popover">
               <header className="pilot-user-popover-head-v3">
-                <span>{userPhotoUrl ? <img src={userPhotoUrl} alt="" /> : userInitials}</span>
+                <span>{userPhotoUrl ? <img loading="lazy" src={userPhotoUrl} alt="" /> : userInitials}</span>
                 <div className="pilot-user-popover-identity"><VerifiedOwnerName name={userName} verified={active.isOwner} /><small>{userEmail}</small><em>{active.isOwner ? "Proprietário" : ROLE_LABELS[active.papel] || active.papel}</em></div>
               </header>
               <dl>
@@ -967,7 +967,7 @@ export default function PilotDashboard({
             <div className="community-info-identity">
               <span aria-hidden="true">
                 {communityTheme.logoUrl ? (
-                  <img src={communityTheme.logoUrl} alt="" />
+                  <img loading="lazy" src={communityTheme.logoUrl} alt="" />
                 ) : (
                   getInitials(active.comunidadeNome)
                 )}
@@ -1042,7 +1042,7 @@ export default function PilotDashboard({
               <strong>{sidebarCollapsed ? "Expandir" : "Recolher"}</strong>
             </button>
           </div>
-          <div className="pilot-profile-card"><span>{userPhotoUrl ? <img src={userPhotoUrl} alt="" /> : userInitials}</span><div><small><VerifiedOwnerName name={userName} verified={active.isOwner} /></small><strong>{active.communityAccess === "FEED_ONLY" ? "Proprietário · somente feed" : active.isOwner ? "Proprietário do sistema" : ROLE_LABELS[active.papel] || active.papel}</strong></div></div>
+          <div className="pilot-profile-card"><span>{userPhotoUrl ? <img loading="lazy" src={userPhotoUrl} alt="" /> : userInitials}</span><div><small><VerifiedOwnerName name={userName} verified={active.isOwner} /></small><strong>{active.communityAccess === "FEED_ONLY" ? "Proprietário · somente feed" : active.isOwner ? "Proprietário do sistema" : ROLE_LABELS[active.papel] || active.papel}</strong></div></div>
           <nav aria-label="Menu por perfil" data-editor-key="navegacao-principal">
             {active.isOwner && (
               <Link
@@ -1324,7 +1324,7 @@ export default function PilotDashboard({
                   >
                     {userPhotoUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={userPhotoUrl} alt="" />
+                      <img loading="lazy" src={userPhotoUrl} alt="" />
                     ) : userInitials}
                   </button>
                 )}
@@ -1419,7 +1419,7 @@ export default function PilotDashboard({
             ) : (
               <div className="pilot-mobile-profile">
                 <div className="pilot-mobile-profile-card">
-                  <span>{userPhotoUrl ? <img src={userPhotoUrl} alt="" /> : userInitials}</span>
+                  <span>{userPhotoUrl ? <img loading="lazy" src={userPhotoUrl} alt="" /> : userInitials}</span>
                   <div>
                     <VerifiedOwnerName name={userName} verified={active.isOwner} />
                     <small>{userEmail}</small>

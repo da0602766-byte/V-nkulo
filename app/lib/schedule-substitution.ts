@@ -66,6 +66,79 @@ export async function listScheduleSubstitutionCandidates(
   }));
 }
 
+/**
+ * Mesma regra de `listScheduleSubstitutionCandidates`, mas para várias
+ * escalas de uma vez (1 query em vez de 1 por escala) — usada em listagens
+ * onde N escalas podem precisar de candidatos de substituição.
+ */
+export async function listScheduleSubstitutionCandidatesBatch(
+  db: D1Database,
+  {
+    comunidadeId,
+    escalaIds,
+    usuarioAtualId,
+  }: {
+    comunidadeId: number;
+    escalaIds: number[];
+    usuarioAtualId: number;
+  },
+): Promise<Map<number, ScheduleSubstitutionCandidate[]>> {
+  const result = new Map<number, ScheduleSubstitutionCandidate[]>();
+  if (!escalaIds.length) return result;
+  const placeholders = escalaIds.map(() => "?").join(", ");
+  const rows = await db
+    .prepare(
+      `SELECT * FROM (
+         SELECT mv.id AS voluntario_id, mv.usuario_id, u.nome, mv.funcao,
+           u.foto_perfil, s.id AS escala_id,
+           ROW_NUMBER() OVER (PARTITION BY s.id ORDER BY u.nome ASC) AS rn
+         FROM escalas_ministerio s
+         JOIN ministerio_voluntarios mv
+           ON mv.ministerio_id = s.ministerio_id
+          AND mv.comunidade_id = s.comunidade_id
+          AND mv.ativo = 1
+         JOIN usuarios u ON u.id = mv.usuario_id AND u.ativo = 1
+         JOIN usuario_comunidades uc
+           ON uc.usuario_id = mv.usuario_id
+          AND uc.comunidade_id = mv.comunidade_id
+          AND uc.status = 'ATIVO'
+         WHERE s.id IN (${placeholders}) AND s.comunidade_id = ? AND s.status = 'PUBLICADA'
+           AND mv.usuario_id != ?
+           AND NOT EXISTS (
+             SELECT 1 FROM escala_designacoes existing
+             WHERE existing.escala_id = s.id
+               AND existing.comunidade_id = s.comunidade_id
+               AND existing.usuario_id = mv.usuario_id
+               AND existing.ativo = 1
+           )
+       ) ranked
+       WHERE rn <= 100
+       ORDER BY escala_id ASC, nome ASC`,
+    )
+    .bind(...escalaIds, comunidadeId, usuarioAtualId)
+    .all<{
+      voluntario_id: number;
+      usuario_id: number;
+      nome: string;
+      funcao: string;
+      foto_perfil: string | null;
+      escala_id: number;
+    }>();
+  for (const row of rows.results) {
+    const escalaId = Number(row.escala_id);
+    const list = result.get(escalaId) || [];
+    list.push({
+      voluntarioId: Number(row.voluntario_id),
+      usuarioId: Number(row.usuario_id),
+      nome: String(row.nome),
+      funcao: String(row.funcao),
+      fotoPerfil: row.foto_perfil || null,
+    });
+    result.set(escalaId, list);
+  }
+  return result;
+}
+
 export async function assignScheduleSubstitute(
   db: D1Database,
   {

@@ -517,7 +517,7 @@ function Metric({ label, value, tone }: { label: string; value: number; tone: st
   return <article className={`request-metric tone-${tone}`}><span>{label}</span><strong>{value}</strong></article>;
 }
 function Avatar({ name, photo }: { name: string; photo: string }) {
-  return photo ? <img src={photo} alt="" /> : <span className="request-avatar-fallback">{name.slice(0, 1).toUpperCase()}</span>;
+  return photo ? <img loading="lazy" src={photo} alt="" /> : <span className="request-avatar-fallback">{name.slice(0, 1).toUpperCase()}</span>;
 }
 function AudienceGroup({ title, items, selected, onChange }: {
   title: string; items: Array<{ key: string; label: string; detail?: string }>;

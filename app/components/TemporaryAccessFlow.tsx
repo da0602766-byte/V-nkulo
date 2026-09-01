@@ -301,7 +301,7 @@ export default function TemporaryAccessFlow({
                           onChange={() => setReplacementVolunteerId(candidate.voluntarioId)}
                         />
                         {candidate.fotoPerfil ? (
-                          <img src={candidate.fotoPerfil} alt="" />
+                          <img loading="lazy" src={candidate.fotoPerfil} alt="" />
                         ) : (
                           <span aria-hidden="true">{initials(candidate.nome)}</span>
                         )}

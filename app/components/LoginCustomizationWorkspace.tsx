@@ -350,7 +350,7 @@ export default function LoginCustomizationWorkspace() {
           } as React.CSSProperties}
         >
           <div>
-            {config.logoUrl ? <img src={config.logoUrl} alt="" /> : <b>{config.siteName.slice(0, 1)}</b>}
+            {config.logoUrl ? <img loading="lazy" src={config.logoUrl} alt="" /> : <b>{config.siteName.slice(0, 1)}</b>}
             <strong>{config.siteName}</strong>
           </div>
           <p>{config.kicker}</p>

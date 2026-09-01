@@ -54,13 +54,13 @@ export default function CommunityDirectoryCarousel({
         <article className="directory-community-profile" key={community.id}>
           <div className="directory-profile-visual">
             {community.bannerUrl ? (
-              <img src={community.bannerUrl} alt="" />
+              <img loading="lazy" src={community.bannerUrl} alt="" />
             ) : (
               <span className="directory-profile-placeholder" aria-hidden="true" />
             )}
             <div className="directory-profile-identity">
               <span className="directory-profile-avatar">
-                {community.logoUrl ? <img src={community.logoUrl} alt="" /> : community.nome.slice(0, 1)}
+                {community.logoUrl ? <img loading="lazy" src={community.logoUrl} alt="" /> : community.nome.slice(0, 1)}
               </span>
               <p><small>COMUNIDADE</small><strong>{community.nome}</strong></p>
             </div>

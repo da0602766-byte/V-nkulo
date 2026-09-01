@@ -157,7 +157,7 @@ export default async function Home() {
         <div>
           {communities.slice(0, 3).map((community) => (
             <article key={community.id}>
-              <span>{community.logoUrl ? <img src={community.logoUrl} alt="" /> : community.nome.slice(0, 1)}</span>
+              <span>{community.logoUrl ? <img loading="lazy" src={community.logoUrl} alt="" /> : community.nome.slice(0, 1)}</span>
               <div><small>{community.cidade}</small><h3>{community.nome}</h3><p>{community.descricao}</p></div>
               <Link href={`/comunidades/${community.slug}`}>Conhecer comunidade</Link>
             </article>

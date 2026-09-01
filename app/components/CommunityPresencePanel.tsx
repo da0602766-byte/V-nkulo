@@ -144,7 +144,7 @@ export default function CommunityPresencePanel() {
               <span className="presence-avatar" aria-hidden="true">
                 {person.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={person.avatarUrl} alt="" />
+                  <img loading="lazy" src={person.avatarUrl} alt="" />
                 ) : (
                   initials(person.name)
                 )}
