@@ -1,3 +1,4 @@
+import { canAttachPostMedia, bindPostMedia } from "../../../../lib/post-media";
 import { getD1 } from "../../../../../db";
 import { parseFeedPostPayload } from "../../../../lib/feed-validation";
 import { recordTenantAudit } from "../../../../lib/tenant-audit";
@@ -86,6 +87,10 @@ export async function PATCH(request: Request, context: Context) {
   if ("error" in parsed) {
     return Response.json({ error: parsed.error }, { status: 400 });
   }
+  if (!(await canAttachPostMedia(parsed.imagemUrl, access.user.id, access.context.comunidadeId, id)) || !(await canAttachPostMedia(parsed.imagemThumbnailUrl, access.user.id, access.context.comunidadeId, id))) {
+    return Response.json({ error: "Esta imagem não pertence a esta publicação. Envie um arquivo autorizado." }, { status: 403 });
+  }
+
   const nextStatus = parsed.status === "PUBLICADA" && !canModerate && access.user.system_owner !== true ? "EM_ANALISE" : parsed.status;
   await db
     .prepare(
@@ -116,6 +121,8 @@ export async function PATCH(request: Request, context: Context) {
       access.context.comunidadeId,
     )
     .run();
+  await bindPostMedia(parsed.imagemUrl, access.user.id, access.context.comunidadeId, id);
+  await bindPostMedia(parsed.imagemThumbnailUrl, access.user.id, access.context.comunidadeId, id);
   await recordTenantAudit(
     db,
     access.context,

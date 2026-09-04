@@ -50,9 +50,7 @@ export default function NativeImageUpload({
       setMessage(
         result.storage === "LOCAL"
           ? "Imagem salva somente neste aparelho. O Vínkulo não recebeu uma cópia."
-          : result.storage === "PUBLICATION"
-            ? "Imagem anexada. Na publicação, cada pessoa poderá visualizar ou baixar."
-            : "Imagem otimizada e salva no Google Drive. O Vínkulo não mantém uma cópia.",
+          : "Imagem otimizada e salva no Google Drive. O Vínkulo não mantém uma cópia.",
       );
     } catch (error) {
       setMessageTone("error");

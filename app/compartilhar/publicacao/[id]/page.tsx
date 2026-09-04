@@ -1,3 +1,6 @@
+import { getSessionUser } from "../../../lib/local-auth";
+import { getActiveTenantContext } from "../../../lib/tenant";
+import { canReadPost } from "../../../lib/media-access-policy.mjs";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getD1 } from "../../../../db";
@@ -22,15 +25,19 @@ export const dynamic = "force-dynamic";
 
 async function getSharedPost(id: number) {
   if (!Number.isInteger(id) || id <= 0) return null;
-  return getD1().prepare(
-    `SELECT p.id, p.titulo, p.conteudo, p.resumo, p.categoria,
+  const post = await getD1().prepare(
+    `SELECT p.*, c.status AS community_status, c.feed_publico_habilitado, c.selo_pastoral_status, p.id, p.titulo, p.conteudo, p.resumo, p.categoria,
       p.imagem_url, p.imagem_alt, p.links_json, p.criado_em,
       c.nome AS comunidade_nome
      FROM publicacoes_piloto p
      JOIN comunidades c ON c.id = p.comunidade_id
      WHERE p.id = ? AND p.status = 'PUBLICADA'
      LIMIT 1`,
-  ).bind(id).first<SharedPost>();
+  ).bind(id).first<SharedPost & { visibilidade: string }>();
+  if (!post) return null;
+  const user = await getSessionUser();
+  const tenant = user?.ativo ? await getActiveTenantContext(user) : null;
+  return await canReadPost(getD1(), post, user?.ativo ? user : null, tenant?.context) ? post : null;
 }
 
 function absoluteUrl(value: string | null | undefined) {
@@ -64,6 +71,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const post = await getSharedPost(Number(id));
   if (!post) return { title: "Publicação não encontrada | VÍNKULO", robots: { index: false, follow: false } };
+  if (post.visibilidade !== "PLATAFORMA") return { title: "Publicação privada | VÍNKULO", robots: { index: false, follow: false } };
   const description = excerpt(post);
   const image = absoluteUrl(post.imagem_url);
   const pageUrl = `${PRODUCTION_ORIGIN}/compartilhar/publicacao/${post.id}`;

@@ -9,9 +9,6 @@ export async function saveImageOutsidePlatform(
   resourceId?: number,
 ) {
   const prepared = await prepareImageForUpload(file, purpose);
-  if (purpose === "post-image") {
-    return uploadSharedImage(prepared, purpose, resourceId);
-  }
   const preferenceResponse = await fetch("/api/storage/preferences", {
     cache: "no-store",
   });
@@ -58,10 +55,7 @@ async function uploadSharedImage(
   }
   return {
     url: result.url,
-    storage:
-      purpose === "post-image"
-        ? ("PUBLICATION" as const)
-        : ("GOOGLE_DRIVE" as const),
+    storage: "GOOGLE_DRIVE" as const,
   };
 }
 

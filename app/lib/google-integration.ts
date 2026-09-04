@@ -1,3 +1,4 @@
+import { driveRead } from "./drive-request";
 import { getD1 } from "../../db";
 import { getRuntimeEnv } from "../../db/runtime-env";
 
@@ -294,7 +295,7 @@ export async function uploadDriveFile(
 }
 
 export async function readDriveFile(accessToken: string, fileId: string) {
-  const response = await fetch(`${DRIVE_API}/files/${encodeURIComponent(fileId)}?alt=media`, {
+  const response = await driveRead(`${DRIVE_API}/files/${encodeURIComponent(fileId)}?alt=media`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!response.ok) throw new Error("O arquivo não está mais disponível no Google Drive.");
@@ -311,25 +312,38 @@ export async function deleteDriveFile(accessToken: string, fileId: string) {
   }
 }
 
-export async function listDriveFiles(accessToken: string, parentId: string, pageSize = 100) {
-  const query = `'${parentId.replaceAll("'", "\\'")}' in parents and trashed = false`;
+export async function listDriveFilesPage(accessToken: string, parentId: string,
+  options: { pageToken?: string; since?: string; pageSize?: number } = {}) {
+  const clauses = [`'${parentId.replaceAll("'", "\\'")}' in parents`, "trashed = false"];
+  if (options.since) {
+    const since = Date.parse(options.since);
+    if (!Number.isFinite(since)) throw new Error("Cursor de mensagens inválido.");
+    clauses.push(`createdTime >= '${new Date(since).toISOString()}'`);
+  }
   const url = new URL(`${DRIVE_API}/files`);
-  url.searchParams.set("q", query);
-  url.searchParams.set("orderBy", "createdTime desc");
-  url.searchParams.set("pageSize", String(Math.min(100, Math.max(1, pageSize))));
-  url.searchParams.set("fields", "files(id,name,mimeType,createdTime,modifiedTime,appProperties,size)");
-  const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" } });
-  const body = await response.json() as { files?: Array<Record<string, unknown>>; error?: { message?: string } };
-  if (!response.ok) throw new Error(body.error?.message || "Não foi possível listar os arquivos do Google Drive.");
-  return body.files || [];
+  url.searchParams.set("q", clauses.join(" and "));
+  url.searchParams.set("orderBy", options.since ? "createdTime asc" : "createdTime desc");
+  url.searchParams.set("pageSize", String(Math.min(100, Math.max(1, options.pageSize || 30))));
+  if (options.pageToken) url.searchParams.set("pageToken", options.pageToken);
+  url.searchParams.set("fields", "nextPageToken,incompleteSearch,files(id,name,mimeType,createdTime,appProperties,size)");
+  const response = await driveRead(url, { headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" } });
+  const body = await response.json() as { files?: Array<Record<string, unknown>>; nextPageToken?: string; incompleteSearch?: boolean };
+  if (!response.ok) throw new Error("Não foi possível listar os arquivos do Google Drive. Tente novamente.");
+  return { files: body.files || [], nextPageToken: body.nextPageToken || null, incompleteSearch: Boolean(body.incompleteSearch) };
+}
+
+export async function listDriveFiles(accessToken: string, parentId: string, pageSize = 100) {
+  return (await listDriveFilesPage(accessToken, parentId, { pageSize })).files;
 }
 
 export async function encryptDrivePayload(value: unknown) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const clear = new TextEncoder().encode(JSON.stringify(value));
-  const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await encryptionKey(), clear);
+  const keyId = getRuntimeEnv().GOOGLE_ENCRYPTION_KEY_ID || "legacy";
+  const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await encryptionKey(keyId), clear);
   return new TextEncoder().encode(JSON.stringify({
-    version: 1,
+    version: 2,
+    keyId,
     algorithm: "AES-GCM",
     iv: toBase64Url(iv),
     ciphertext: toBase64Url(new Uint8Array(encrypted)),
@@ -339,26 +353,42 @@ export async function encryptDrivePayload(value: unknown) {
 export async function decryptDrivePayload<T>(bytes: Uint8Array): Promise<T> {
   const envelope = JSON.parse(new TextDecoder().decode(bytes)) as {
     version: number;
+    keyId?: string;
     iv: string;
     ciphertext: string;
   };
-  if (envelope.version !== 1 || !envelope.iv || !envelope.ciphertext) {
+  if (![1, 2].includes(envelope.version) || !envelope.iv || !envelope.ciphertext) {
     throw new Error("Conteúdo do Drive incompatível.");
   }
   const clear = await crypto.subtle.decrypt(
     { name: "AES-GCM", iv: fromBase64Url(envelope.iv) },
-    await encryptionKey(),
+    await encryptionKey(envelope.version === 1 ? "legacy" : envelope.keyId),
     fromBase64Url(envelope.ciphertext),
   );
   return JSON.parse(new TextDecoder().decode(clear)) as T;
 }
 
-export async function makeStorageReference(scope: string, ownerId: number, fileId: string) {
-  const payload = `${scope}:${ownerId}:${fileId}`;
-  return `${toBase64Url(new TextEncoder().encode(payload))}.${await hmac(payload)}`;
+export async function makeStorageReference(scope: string, ownerId: number, fileId: string,
+  metadata: { uploadedBy?: number; communityId?: number; purpose?: string; resourceId?: number } = {}) {
+  // Stable opaque locator, NOT a bearer capability. No signed URL persists as authorization.
+  const id = crypto.randomUUID();
+  await getD1().prepare(`INSERT INTO storage_files
+    (id, scope, owner_id, file_id, uploaded_by, community_id, purpose, resource_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    .bind(id, scope, ownerId, fileId, metadata.uploadedBy || ownerId,
+      metadata.communityId || null, metadata.purpose || scope, metadata.resourceId || null).run();
+  return id;
 }
 
 export async function readStorageReference(token: string) {
+  if (/^[0-9a-f-]{36}$/i.test(token)) {
+    const row = await getD1().prepare(`SELECT scope, owner_id, file_id FROM storage_files
+      WHERE id = ? AND revoked_at IS NULL LIMIT 1`).bind(token)
+      .first<{ scope: string; owner_id: number; file_id: string }>();
+    return row ? { scope: row.scope, ownerId: row.owner_id, fileId: row.file_id } : null;
+  }
+  // Legacy signatures are identifiers only. Delivery still checks current resource ACL.
+  if (token.length > 900 || token.split(".").length !== 2) return null;
   const [encoded, signature] = token.split(".");
   if (!encoded || !signature) return null;
   let payload = "";
@@ -367,8 +397,7 @@ export async function readStorageReference(token: string) {
   const [scope, owner, fileId] = payload.split(":");
   const ownerId = Number(owner);
   return scope && Number.isInteger(ownerId) && ownerId > 0 && fileId
-    ? { scope, ownerId, fileId }
-    : null;
+    ? { scope, ownerId, fileId } : null;
 }
 
 function requireGoogleConfig() {
@@ -400,8 +429,14 @@ async function hmac(value: string) {
   return toBase64Url(new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value))));
 }
 
-async function encryptionKey() {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`vinkulo-google:${credentialSecret()}`));
+async function encryptionKey(keyId = "legacy") {
+  let secret = credentialSecret();
+  if (keyId !== "legacy") {
+    const keyring = JSON.parse(getRuntimeEnv().GOOGLE_ENCRYPTION_KEYS || "{}") as Record<string, string>;
+    secret = keyring[keyId];
+  }
+  if (!secret || secret.length < 32) throw new Error("Chave de leitura indisponível. O histórico foi preservado.");
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`vinkulo-google:${secret}`));
   return crypto.subtle.importKey("raw", digest, "AES-GCM", false, ["encrypt", "decrypt"]);
 }
 

@@ -23,6 +23,8 @@ type RuntimeBindings = {
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
   GOOGLE_CREDENTIALS_SECRET?: string;
+  GOOGLE_ENCRYPTION_KEY_ID?: string;
+  GOOGLE_ENCRYPTION_KEYS?: string;
   SYSTEM_OWNER_EMAIL?: string;
   SYSTEM_OWNER_LOCKED_BEFORE?: string;
 };

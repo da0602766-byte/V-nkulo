@@ -1,3 +1,4 @@
+import { canAttachPostMedia } from "../../../../lib/post-media";
 import { getD1 } from "../../../../../db";
 import { publishDueEditorialEntries } from "../../../../lib/editorial-scheduler";
 import { verifyPassword } from "../../../../lib/local-auth";
@@ -66,6 +67,8 @@ export async function POST(request: Request) {
       { status: 409 },
     );
   }
+  if (!(await canAttachPostMedia(parsed.imagemUrl, access.user.id, parsed.comunidadeId)))
+    return Response.json({ error: "Envie uma imagem autorizada para a comunidade selecionada." }, { status: 403 });
   const authorizeNow = payload.authorizeNow === true;
   if (authorizeNow) {
     const password = String(payload.password || "");
@@ -124,6 +127,9 @@ export async function POST(request: Request) {
     )
     .run();
   const id = Number(created.meta.last_row_id);
+  if (parsed.imagemUrl) await db.prepare(`UPDATE storage_files SET purpose = 'editorial-image', resource_id = ?
+    WHERE id = ? AND uploaded_by = ? AND community_id = ? AND purpose = 'post-image' AND resource_id IS NULL`)
+    .bind(id, parsed.imagemUrl.slice('/api/storage/media/'.length), access.user.id, parsed.comunidadeId).run();
   await recordTenantAudit(
     db,
     { ...access.context, comunidadeId: parsed.comunidadeId },
@@ -283,7 +289,7 @@ function parseSchedule(payload: Record<string, unknown>) {
     return { error: "Informe a referência bíblica conferível." } as const;
   if (Number.isNaN(date.getTime()) || date.getTime() < Date.now() + 30_000)
     return { error: "Escolha uma data futura para a publicação." } as const;
-  if (imagemUrl && !/^\/api\/pilot\/uploads\/images\/post-image\//.test(imagemUrl))
+  if (imagemUrl && !/^\/api\/storage\/media\/[a-f0-9-]{36}$/i.test(imagemUrl))
     return { error: "Envie a imagem pelo seletor seguro da plataforma." } as const;
   return {
     comunidadeId,

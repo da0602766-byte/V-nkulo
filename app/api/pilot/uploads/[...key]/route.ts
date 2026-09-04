@@ -1,3 +1,5 @@
+import { getSessionUser } from "../../../../lib/local-auth";
+import { authorizeMedia } from "../../../../lib/media-access";
 import { getRuntimeEnv } from "../../../../../db/runtime-env";
 import { isSafeUploadKey } from "../../../../lib/upload-key-policy.mjs";
 
@@ -7,7 +9,10 @@ export async function GET(
 ) {
   const key = (await context.params).key.join("/");
   if (!isSafeUploadKey(key)) {
-    return new Response("Imagem inválida.", { status: 400 });
+    return new Response("Arquivo não encontrado.", { status: 404, headers: { "Cache-Control": "private, no-store" } });
+  }
+  if (!(await authorizeMedia(`/api/pilot/uploads/${key}`, await getSessionUser()))) {
+    return new Response("Arquivo não encontrado.", { status: 404, headers: { "Cache-Control": "private, no-store" } });
   }
   const bucket = getRuntimeEnv().BUCKET;
   if (!bucket) return new Response("Armazenamento indisponível.", { status: 503 });
@@ -18,7 +23,7 @@ export async function GET(
   return new Response(object.body, {
     headers: {
       "Content-Type": object.httpMetadata?.contentType || "application/octet-stream",
-      "Cache-Control": download ? "private, no-store" : "public, max-age=31536000, immutable",
+      "Cache-Control": "private, no-store",
       ...(download
         ? { "Content-Disposition": `attachment; filename="${fileName}"` }
         : {}),

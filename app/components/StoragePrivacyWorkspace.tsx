@@ -92,6 +92,7 @@ export default function StoragePrivacyWorkspace() {
     try {
       let complete = false;
       let migrated = 0;
+      let pendingPersonal = 0;
       for (let attempt = 0; attempt < 10 && !complete; attempt += 1) {
         const response = await fetch("/api/storage/migrate", { method: "POST" });
         const result = await response.json() as {
@@ -99,16 +100,18 @@ export default function StoragePrivacyWorkspace() {
           migratedChats?: number;
           migratedMedia?: number;
           complete?: boolean;
+          pendingPersonalPhotos?: number;
         };
         if (!response.ok) throw new Error(result.error || "Não foi possível migrar o histórico.");
         migrated += Number(result.migratedChats || 0) + Number(result.migratedMedia || 0);
         complete = result.complete === true;
+        pendingPersonal = result.pendingPersonalPhotos || 0;
         if (!complete && Number(result.migratedChats || 0) + Number(result.migratedMedia || 0) === 0) break;
       }
       await load();
       setMessage(complete
-        ? `Migração concluída. ${migrated} item(ns) foram confirmados no Drive antes da remoção da plataforma.`
-        : `Migração parcial concluída (${migrated} item(ns)). Execute novamente para continuar.`);
+        ? `Migração concluída. ${migrated} item(ns) foram confirmados no Drive; os originais legados foram preservados para recuperação.`
+        : `Migração parcial concluída (${migrated} item(ns)). ${pendingPersonal ? `${pendingPersonal} foto(s) pessoais exigem transferência pelo próprio titular; os originais permanecem preservados.` : "Execute novamente para continuar."}`);
     } catch (error) {
       setMessage((error as Error).message);
     } finally {
@@ -124,7 +127,7 @@ export default function StoragePrivacyWorkspace() {
       const result = await response.json() as { error?: string };
       if (!response.ok) throw new Error(result.error || "Não foi possível desconectar.");
       await load();
-      setMessage("Google Drive desconectado. O destino voltou para este aparelho.");
+      setMessage("Google Drive desconectado. Arquivos pessoais podem continuar somente neste aparelho; novos conteúdos compartilhados ficam indisponíveis até reconectar o Drive.");
     } catch (error) {
       setMessage((error as Error).message);
     } finally {
@@ -140,8 +143,8 @@ export default function StoragePrivacyWorkspace() {
         <span aria-hidden="true">☁</span>
         <div>
           <p className="pilot-kicker">PRIVACIDADE E ARMAZENAMENTO</p>
-          <h2 id="storage-privacy-title">Seus conteúdos não ficam no Vínkulo</h2>
-          <p>Fotos, arquivos e conteúdo de conversas ficam no Google Drive autorizado ou somente neste aparelho. A plataforma guarda apenas referências técnicas, consentimentos e permissões.</p>
+          <h2 id="storage-privacy-title">Escolha onde salvar seus conteúdos</h2>
+          <p>Arquivos pessoais podem ficar no Google Drive autorizado ou somente neste aparelho. Publicações, banners e conversas compartilhadas exigem o Drive da comunidade. A plataforma guarda apenas referências técnicas, consentimentos e permissões.</p>
         </div>
       </header>
 
@@ -168,6 +171,8 @@ export default function StoragePrivacyWorkspace() {
         )}
       </div>
 
+      <p>Pré-visualizar transfere o conteúdo necessário para a memória do aparelho. Baixar cria uma cópia que você pode guardar; salvar localmente mantém o arquivo apenas neste navegador/aplicativo. Cópias já baixadas não podem ser recolhidas ao revogar acesso.</p>
+      <p>Conteúdos compartilhados usam o Drive da comunidade; fotos pessoais usam o seu Drive. Na plataforma, cada acesso depende das permissões atuais. Quem controla a conta ou uma pasta compartilhada no Google Drive também controla esses arquivos. A opção local vale para arquivos pessoais; conversas compartilhadas exigem o Drive da comunidade. Não há chat offline.</p>
       <fieldset className="storage-download-controls" disabled={busy}>
         <legend>Carregamento e download</legend>
         <label>
@@ -198,7 +203,7 @@ export default function StoragePrivacyWorkspace() {
       <ul className="storage-privacy-facts">
         <li>O Vínkulo não guarda uma segunda cópia de fotos, arquivos ou mensagens novas.</li>
         <li>O usuário pode negar o Drive e manter conteúdo privado somente no aparelho.</li>
-        <li>Conteúdo antigo só será apagado da plataforma depois da migração confirmada.</li>
+        <li>Conteúdo antigo permanece preservado. A remoção exige uma operação posterior revisada.</li>
       </ul>
       {message && <p className="operations-feedback" role="status">{message}</p>}
     </section>

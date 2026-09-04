@@ -965,6 +965,7 @@ export default function CommunityHome({
                     </span>
                     {post.status === "PUBLICADA" && (
                       <CommunityPostShare
+                        isPublic={post.visibilidade === "PLATAFORMA" && post.audiencia_tipo !== "MINISTERIOS"}
                         postId={post.id}
                         title={post.titulo}
                         content={post.conteudo || post.resumo}

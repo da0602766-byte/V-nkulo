@@ -10,19 +10,21 @@ export default function CommunityPostShare({
   content,
   imageUrl,
   links,
+  isPublic = false,
 }: {
   postId: number;
   title: string;
   content: string;
   imageUrl?: string;
   links: string[];
+  isPublic?: boolean;
 }) {
   const [feedback, setFeedback] = useState("");
   const [openPanel, setOpenPanel] = useState(false);
   const shareData = useMemo(() => {
     if (typeof window === "undefined") return { pageUrl: "", image: "", message: "" };
     const pageUrl = `${window.location.origin}/compartilhar/publicacao/${postId}`;
-    const image = imageUrl ? new URL(imageUrl, window.location.origin).toString() : "";
+    const image = isPublic && imageUrl ? new URL(imageUrl, window.location.origin).toString() : "";
     const excerpt = content.trim().replace(/\s+/g, " ").slice(0, 320);
     const eventLinks = links.length
       ? `\n\nLinks do evento:\n${links.map((link) => `• ${link}`).join("\n")}`
@@ -30,9 +32,9 @@ export default function CommunityPostShare({
     return {
       pageUrl,
       image,
-      message: `📣 ${title}\n${pageUrl}\n\n${excerpt}${eventLinks}`,
+      message: isPublic ? `📣 ${title}\n${pageUrl}\n\n${excerpt}${eventLinks}` : `Publicação privada no Vínkulo. Acesso exige login e permissão na comunidade.\n${pageUrl}`,
     };
-  }, [content, imageUrl, links, postId, title]);
+  }, [content, imageUrl, isPublic, links, postId, title]);
 
   async function nativeShare() {
     setFeedback("");
@@ -45,7 +47,7 @@ export default function CommunityPostShare({
           files.push(new File([blob], `publicacao-${postId}.webp`, { type: blob.type || "image/webp" }));
         }
       }
-      const payload: ShareData = { title, text: shareData.message };
+      const payload: ShareData = { title: isPublic ? title : "Publicação privada", text: shareData.message };
       if (files.length && navigator.canShare?.({ files })) payload.files = files;
       if (!navigator.share) throw new Error("Compartilhamento nativo indisponível.");
       await navigator.share(payload);
@@ -68,7 +70,7 @@ export default function CommunityPostShare({
   async function copyMessage() {
     try {
       await navigator.clipboard.writeText(shareData.message);
-      setFeedback("Mensagem e link com prévia da imagem copiados.");
+      setFeedback(isPublic ? "Mensagem e link com prévia da imagem copiados." : "Link protegido copiado.");
     } catch {
       setFeedback("Não foi possível copiar automaticamente.");
     }
@@ -97,7 +99,7 @@ export default function CommunityPostShare({
           <section className="community-share-dialog" role="dialog" aria-modal="true" aria-label="Compartilhar publicação" onClick={(event) => event.stopPropagation()}>
             <header>
               <span><PaperPlaneIcon /></span>
-              <div><strong>Compartilhar publicação</strong><p>Escolha onde enviar ou copie a mensagem pronta.</p></div>
+              <div><strong>Compartilhar publicação</strong><p>{isPublic ? "Escolha onde enviar ou copie a mensagem pronta." : "Será enviado apenas um link protegido, sem texto ou imagem privados."}</p></div>
               <button type="button" aria-label="Fechar compartilhamento" onClick={() => setOpenPanel(false)}>×</button>
             </header>
             <div className="community-post-share-grid">

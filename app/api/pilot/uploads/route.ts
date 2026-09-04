@@ -1,5 +1,4 @@
 import { getD1 } from "../../../../db";
-import { getRuntimeEnv } from "../../../../db/runtime-env";
 import { getSessionUser } from "../../../lib/local-auth";
 import { canManageMinistry } from "../../../lib/ministry-access";
 import { getActiveTenantContext } from "../../../lib/tenant";
@@ -66,6 +65,7 @@ export async function POST(request: Request) {
           resourceId,
         )))) ||
     (purpose === "post-image" && !canPublish) ||
+    (purpose === "member-registration-photo" && !(user.system_owner === true || context?.communityAccess === "OWNER")) ||
     (isPlatformAsset && !canEditPlatform)
   ) {
     return Response.json({ error: "Você não pode enviar imagens para esta área." }, { status: 403 });
@@ -97,41 +97,6 @@ export async function POST(request: Request) {
       { status: 415 },
     );
   }
-  if (purpose === "post-image") {
-    if (!context) {
-      return Response.json(
-        { error: "Selecione uma comunidade para anexar esta imagem." },
-        { status: 409 },
-      );
-    }
-    const bucket = getRuntimeEnv().BUCKET;
-    if (!bucket) {
-      return Response.json(
-        { error: "O armazenamento de publicações está indisponível." },
-        { status: 503 },
-      );
-    }
-    const key = `images/post-image/${context.comunidadeId}/${crypto.randomUUID()}.${extension}`;
-    await bucket.put(key, fileBuffer, {
-      httpMetadata: {
-        contentType: file.type,
-        cacheControl: "public, max-age=31536000, immutable",
-      },
-      customMetadata: {
-        purpose,
-        uploadedBy: String(user.id),
-        communityId: String(context.comunidadeId),
-        originalName: file.name.slice(0, 160),
-      },
-    });
-    return Response.json({
-      url: `/api/pilot/uploads/${key}`,
-      name: file.name.slice(0, 160),
-      size: file.size,
-      type: file.type,
-      storage: "PUBLICATION",
-    });
-  }
   const preference = await getD1().prepare(
     "SELECT provider FROM storage_preferences WHERE usuario_id = ? LIMIT 1",
   ).bind(user.id).first<{ provider: string }>();
@@ -147,6 +112,7 @@ export async function POST(request: Request) {
   const personal = purpose === "profile-photo" || isPlatformAsset;
   let driveOwnerId = user.id;
   let folderId = "";
+  try {
   if (personal) {
     const accessToken = await getDriveAccessToken(user.id);
     folderId = (await ensurePersonalDriveStorage(user.id, accessToken)).mediaFolderId;
@@ -167,7 +133,6 @@ export async function POST(request: Request) {
     driveOwnerId = storage.proprietario_usuario_id;
     folderId = storage.pasta_midias_id;
   }
-  try {
     const accessToken = await getDriveAccessToken(driveOwnerId);
     const stored = await uploadDriveFile(accessToken, {
       name: `${purpose}-${crypto.randomUUID()}.${extension}`,
@@ -180,8 +145,10 @@ export async function POST(request: Request) {
         communityId: String(context?.comunidadeId || 0),
       },
     });
-    const scope = personal && purpose === "profile-photo" ? "profile" : "public";
-    const reference = await makeStorageReference(scope, driveOwnerId, stored.id);
+    const scope = personal && purpose === "profile-photo" ? "profile" : "community";
+    const reference = await makeStorageReference(scope, driveOwnerId, stored.id, {
+      uploadedBy: user.id, communityId: personal ? undefined : context?.comunidadeId, purpose, resourceId,
+    });
     return Response.json({
       url: `/api/storage/media/${reference}`,
       name: file.name.slice(0, 160),

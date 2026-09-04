@@ -1,3 +1,4 @@
+import { canAttachPostMedia, bindPostMedia } from "../../../lib/post-media";
 import { getD1 } from "../../../../db";
 import {
   decodeFeedCursor,
@@ -132,6 +133,10 @@ export async function POST(request: Request) {
   if ("error" in parsed) {
     return Response.json({ error: parsed.error }, { status: 400 });
   }
+  if (!(await canAttachPostMedia(parsed.imagemUrl, access.user.id, access.context.comunidadeId)) || !(await canAttachPostMedia(parsed.imagemThumbnailUrl, access.user.id, access.context.comunidadeId))) {
+    return Response.json({ error: "Esta imagem não pertence a esta publicação. Envie um arquivo autorizado." }, { status: 403 });
+  }
+
   const db = getD1();
   const audienciaTipo = String(payload.audienciaTipo || "PUBLICO").toUpperCase() === "MINISTERIOS" ? "MINISTERIOS" : "PUBLICO";
   const requestedMinistryIds = Array.isArray(payload.ministerioIds)
@@ -221,6 +226,8 @@ export async function POST(request: Request) {
     )
     .run();
   const postId = Number(result.meta.last_row_id);
+  await bindPostMedia(parsed.imagemUrl, access.user.id, access.context.comunidadeId, postId);
+  await bindPostMedia(parsed.imagemThumbnailUrl, access.user.id, access.context.comunidadeId, postId);
   await recordTenantAudit(
     db,
     access.context,

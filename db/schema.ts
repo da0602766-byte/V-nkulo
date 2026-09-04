@@ -2765,3 +2765,27 @@ export const feedbackPlataforma = sqliteTable(
     index("feedback_plataforma_tipo_idx").on(table.tipo, table.categoria, table.criadoEm),
   ],
 );
+
+// Security metadata only: no file or chat payload is stored in these tables.
+export const storageFiles = sqliteTable("storage_files", {
+  id: text("id").primaryKey(), scope: text("scope").notNull(),
+  ownerId: integer("owner_id").notNull().references(() => usuarios.id),
+  fileId: text("file_id").notNull(), uploadedBy: integer("uploaded_by").references(() => usuarios.id),
+  communityId: integer("community_id").references(() => comunidades.id),
+  purpose: text("purpose").notNull().default(""), resourceId: integer("resource_id"),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`), revokedAt: text("revoked_at"),
+}, table => [index("storage_files_drive_idx").on(table.ownerId, table.fileId)]);
+export const authRateLimits = sqliteTable("auth_rate_limits", {
+  key: text("key").primaryKey(), attempts: integer("attempts").notNull().default(0),
+  windowStart: integer("window_start").notNull(),
+});
+export const storageMigrationCopies = sqliteTable("storage_migration_copies", {
+  sourceKey: text("source_key").primaryKey(), destination: text("destination").notNull(),
+  sha256: text("sha256").notNull(), verifiedAt: text("verified_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const storageMigrationLocks = sqliteTable("storage_migration_locks", {
+  communityId: integer("community_id").primaryKey().references(() => comunidades.id),
+  leaseId: text("lease_id").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+});
