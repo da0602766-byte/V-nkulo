@@ -1,5 +1,7 @@
 "use client";
 
+import { mergeChatMessages } from "../lib/chat-page.mjs";
+
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 type Person = {
@@ -23,6 +25,8 @@ type Conversation = {
   online: number;
 };
 type Message = {
+  fileId?: string;
+  driveCreatedTime?: string;
   id: number;
   remetente_id: number;
   remetente_nome: string;
@@ -42,6 +46,9 @@ type ChatData = {
   privacyNotice?: string;
   autoLoadRecent?: boolean;
   recentContentLoaded?: boolean;
+  partial?: boolean;
+  nextPageToken?: string | null;
+  syncSince?: string | null;
 };
 
 export default function PrivateChatWorkspace() {
@@ -56,7 +63,23 @@ export default function PrivateChatWorkspace() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [sendError, setSendError] = useState("");
   const loadRecentRef = useRef(false);
+  const dataRef = useRef(data);
+  const activeRef = useRef(activeId);
+  const inFlightRef = useRef(false);
+  const syncRef = useRef<{ since?: string; pageToken?: string }>({});
+  const [olderPageToken, setOlderPageToken] = useState<string | null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [drafts, setDrafts] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+
+  useEffect(() => {
+    activeRef.current = activeId;
+  }, [activeId]);
 
   async function load(
     conversationId = activeId,
@@ -64,29 +87,40 @@ export default function PrivateChatWorkspace() {
     forceRecent = loadRecentRef.current,
   ) {
     if (!quiet) setLoading(true);
-    const latestId = quiet
-      ? Math.max(0, ...(data?.messages || []).filter((item) => item.id > 0).map((item) => item.id))
-      : 0;
-    const force = forceRecent ? "&loadRecent=1" : "";
-    const query = quiet && conversationId > 0
-      ? `?conversation=${conversationId}&messagesOnly=1&after=${latestId}${force}`
-      : conversationId > 0
-        ? `?conversation=${conversationId}${force}`
-        : "";
+    if (quiet && inFlightRef.current) return;
+    inFlightRef.current = true;
+    const params = new URLSearchParams();
+    if (conversationId > 0) params.set("conversation", String(conversationId));
+    if (forceRecent) params.set("loadRecent", "1");
+    if (quiet) {
+      params.set("messagesOnly", "1");
+      if (syncRef.current.since) params.set("since", syncRef.current.since);
+      if (syncRef.current.pageToken) params.set("pageToken", syncRef.current.pageToken);
+      params.set("known", (dataRef.current?.messages || []).slice(-200).map(m => m.fileId || "").filter(Boolean).join(","));
+    }
+    const query = `?${params}`;
     try {
       const response = await fetch(`/api/pilot/chat${query}`, { cache: "no-store" });
       const result = await readResult(response) as ChatData & { error?: string };
       if (!response.ok) throw new Error(result.error || "Não foi possível carregar as mensagens.");
+      if (activeRef.current !== conversationId) return;
       if (result.recentContentLoaded) loadRecentRef.current = true;
       if (quiet && conversationId > 0) {
         setData((current) => current ? {
           ...current,
-          messages: mergeMessages(current.messages, result.messages || []),
+          messages: mergeChatMessages(current.messages, result.messages || []),
+          partial: result.partial,
         } : current);
       } else {
         setData(result);
+        setOlderPageToken(result.nextPageToken || null);
       }
-      setError("");
+      if (!result.partial) {
+        syncRef.current = quiet && result.nextPageToken
+          ? { ...syncRef.current, pageToken: result.nextPageToken }
+          : { since: result.syncSince || syncRef.current.since };
+      }
+      setError(result.partial ? "Carregamento parcial: algumas mensagens não puderam ser lidas. Use Tentar novamente; o histórico não foi apagado." : "");
       if (conversationId > 0) {
         await fetch("/api/pilot/chat", {
           method: "PATCH",
@@ -97,12 +131,13 @@ export default function PrivateChatWorkspace() {
     } catch (loadError) {
       setError((loadError as Error).message);
     } finally {
+      inFlightRef.current = false;
       if (!quiet) setLoading(false);
     }
   }
 
   useEffect(() => {
-    const initial = window.setTimeout(() => void load(initialConversation), 0);
+    const initial = window.setTimeout(() => void load(activeId), 0);
     const timer = window.setInterval(() => {
       if (
         activeId > 0 &&
@@ -119,12 +154,16 @@ export default function PrivateChatWorkspace() {
 
   async function openConversation(conversationId: number) {
     loadRecentRef.current = false;
+    setSendError("");
+    activeRef.current = conversationId;
+    syncRef.current = {};
+    setOlderPageToken(null);
     setActiveId(conversationId);
     const address = new URL(window.location.href);
     address.searchParams.set("view", "mensagens");
     address.searchParams.set("conversation", String(conversationId));
     window.history.replaceState(window.history.state, "", address);
-    await load(conversationId);
+
   }
 
   async function startConversation(person: Person) {
@@ -147,44 +186,39 @@ export default function PrivateChatWorkspace() {
     const message = String(new FormData(form).get("message") || "").trim();
     const conversation = data?.conversations.find((item) => Number(item.id) === activeId);
     if (!message || !conversation) return;
-    const temporaryId = -Date.now();
-    const temporaryMessage: Message = {
-      id: temporaryId,
-      remetente_id: Number(data?.currentUserId || 0),
-      remetente_nome: "Você",
-      mensagem: message,
-      hierarquia: "",
-      ministerio: "",
-      criado_em: new Date().toISOString(),
-      lida_em: null,
-    };
-    setData((current) =>
-      current ? { ...current, messages: [...current.messages, temporaryMessage] } : current,
-    );
-    form.reset();
     setSending(true);
-    const response = await fetch("/api/pilot/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ targetUserId: conversation.participante_id, message }),
-    });
-    const result = await readResult(response) as { error?: string; message?: Message };
-    setSending(false);
-    if (!response.ok) {
-      setData((current) =>
-        current
-          ? { ...current, messages: current.messages.filter((item) => item.id !== temporaryId) }
-          : current,
-      );
-      setError(result.error || "Não foi possível enviar a mensagem.");
-      return;
-    }
-    if (result.message) {
-      setData((current) => current ? {
-        ...current,
-        messages: current.messages.map((item) => item.id === temporaryId ? result.message! : item),
+    setSendError("");
+    try {
+      const response = await fetch("/api/pilot/chat", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetUserId: conversation.participante_id, message }),
+      });
+      const result = await readResult(response) as { error?: string; message?: Message };
+      if (!response.ok || !result.message) throw new Error(result.error || "Não foi possível confirmar o envio.");
+      if (activeRef.current === conversation.id) setData(current => current ? {
+        ...current, messages: mergeChatMessages(current.messages, [result.message!]),
       } : current);
-    }
+      setDrafts(current => current[conversation.id]?.trim() === message ? { ...current, [conversation.id]: "" } : current);
+    } catch (caught) {
+      if (activeRef.current === conversation.id) setSendError(`${(caught as Error).message} Seu texto foi mantido para tentar novamente.`);
+    } finally { setSending(false); }
+  }
+
+  async function loadOlder() {
+    if (!olderPageToken || loadingOlder) return;
+    setLoadingOlder(true);
+    const conversationId = activeId;
+    try {
+      const params = new URLSearchParams({ conversation: String(activeId), messagesOnly: "1", loadRecent: "1", pageToken: olderPageToken });
+      const response = await fetch(`/api/pilot/chat?${params}`, { cache: "no-store" });
+      const result = await readResult(response) as ChatData & { error?: string };
+      if (!response.ok) throw new Error(result.error || "Não foi possível carregar o histórico.");
+      if (activeRef.current !== conversationId) return;
+      setData(current => current ? { ...current, messages: mergeChatMessages(current.messages, result.messages || []), partial: result.partial } : current);
+      if (!result.partial) setOlderPageToken(result.nextPageToken || null);
+      setError(result.partial ? "Histórico parcial. Tente carregar novamente para recuperar as mensagens com erro." : "");
+    } catch (caught) { setError((caught as Error).message); }
+    finally { setLoadingOlder(false); }
   }
 
   const filteredPeople = useMemo(() => {
@@ -224,14 +258,14 @@ export default function PrivateChatWorkspace() {
         <div>
           <p className="pilot-kicker">CONVERSAS PRIVADAS</p>
           <h1>Mensagens</h1>
-          <p>Somente você e a outra pessoa podem acessar cada conversa.</p>
+          <p>O acesso pela plataforma é restrito aos participantes com vínculo ativo. As chaves de leitura são mantidas pelo serviço.</p>
         </div>
         <span>Conversas do mês atual</span>
       </header>
       <p className="private-chat-storage-notice" role="status">
-        ☁ {data?.privacyNotice || "As mensagens recentes são carregadas do Google Drive. O Vínkulo não mantém uma cópia do conteúdo."}
+        ☁ {data?.privacyNotice || "Novas mensagens ficam no Google Drive da comunidade. Históricos legados permanecem preservados até a migração revisada."}
       </p>
-      {error && <p className="pilot-form-message" role="alert">{error}</p>}
+      {error && <p className="pilot-form-message" role="alert">{error} <button type="button" onClick={() => void load(activeId, true, true)}>Tentar novamente</button></p>}
       <div className={`private-chat-layout ${activeId ? "has-thread" : ""}`}>
         <aside className="private-chat-sidebar">
           <label>
@@ -270,6 +304,7 @@ export default function PrivateChatWorkspace() {
                 <div><strong>{activeConversation.participante_nome}</strong><small>{metadata(activeConversation.hierarquia, activeConversation.ministerio)} · {activeConversation.online ? "Online" : "Offline"}</small></div>
               </header>
               <div className="private-chat-messages">
+                {olderPageToken && <button type="button" disabled={loadingOlder} onClick={() => void loadOlder()}>{loadingOlder ? "Carregando…" : "Carregar mensagens antigas"}</button>}
                 {data?.recentContentLoaded === false && (
                   <button
                     type="button"
@@ -284,15 +319,16 @@ export default function PrivateChatWorkspace() {
                 )}
                 {(data?.messages || []).map((message) => {
                   const own = Number(message.remetente_id) === Number(data?.currentUserId);
-                  return <article key={message.id} className={own ? "own" : ""}>
+                  return <article key={message.fileId || message.id} className={own ? "own" : ""}>
                     <small>{message.remetente_nome} · {metadata(message.hierarquia, message.ministerio)}</small>
                     <p>{message.mensagem}</p>
                     <time>{formatDate(message.criado_em)}{own ? ` · ${message.lida_em ? "Visualizada" : "Enviada"}` : ""}</time>
                   </article>;
                 })}
               </div>
+              {sendError && <p role="alert" className="private-chat-send-error">{sendError}</p>}
               <form onSubmit={send}>
-                <textarea name="message" rows={2} maxLength={2000} required placeholder="Escreva uma mensagem privada…" />
+                <textarea aria-label="Mensagem" value={drafts[activeId] || ""} onChange={event => setDrafts(current => ({ ...current, [activeId]: event.target.value }))} name="message" rows={2} maxLength={2000} required placeholder="Escreva uma mensagem privada…" />
                 <button disabled={sending}>{sending ? "Enviando…" : "Enviar"}</button>
               </form>
             </>
@@ -313,7 +349,7 @@ function metadata(hierarchy: string, ministry: string) {
   return ministry ? `${hierarchy} · ${ministry}` : hierarchy;
 }
 function formatDate(value: string) {
-  try { return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(`${value.replace(" ", "T")}Z`)); }
+  try { return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(/Z$|[+-]\d\d:\d\d$/.test(value) ? value : `${value.replace(" ", "T")}Z`)); }
   catch { return value; }
 }
 async function readResult(response: Response) {
@@ -321,9 +357,4 @@ async function readResult(response: Response) {
   if (!text) return {};
   try { return JSON.parse(text) as unknown; }
   catch { return { error: "O servidor retornou uma resposta inválida." }; }
-}
-function mergeMessages(current: Message[], incoming: Message[]) {
-  const byId = new Map(current.map((item) => [item.id, item]));
-  for (const item of incoming) byId.set(item.id, item);
-  return [...byId.values()].sort((a, b) => a.id - b.id);
 }

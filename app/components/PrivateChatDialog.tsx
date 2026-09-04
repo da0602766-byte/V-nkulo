@@ -20,6 +20,9 @@ type ChatData = {
   conversations: Conversation[];
   messages: Message[];
   currentUserId: number;
+  partial?: boolean;
+  recentContentLoaded?: boolean;
+  nextPageToken?: string | null;
 };
 
 export default function PrivateChatDialog({
@@ -38,6 +41,7 @@ export default function PrivateChatDialog({
   const [error, setError] = useState("");
   const [minimized, setMinimized] = useState(false);
   const [maximized, setMaximized] = useState(false);
+  const [draft, setDraft] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -63,6 +67,7 @@ export default function PrivateChatDialog({
         if (!active) return;
         setActiveId(id);
         setData(result);
+        if (result.partial) setError("Carregamento parcial. Abra a central de mensagens para tentar novamente.");
         await fetch("/api/pilot/chat", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -86,6 +91,7 @@ export default function PrivateChatDialog({
     if (!message || !conversation) return;
     setSending(true);
     setError("");
+    try {
     const response = await fetch("/api/pilot/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -97,11 +103,12 @@ export default function PrivateChatDialog({
       setSending(false);
       return;
     }
-    form.reset();
+    setDraft(current => current.trim() === message ? "" : current);
     if (result.message) {
       setData((current) => current ? { ...current, messages: [...current.messages, result.message!] } : current);
     }
-    setSending(false);
+    } catch (caught) { setError(`${(caught as Error).message} Seu texto foi mantido.`); }
+    finally { setSending(false); }
   }
 
   const conversation = data?.conversations.find((item) => Number(item.id) === activeId);
@@ -127,7 +134,7 @@ export default function PrivateChatDialog({
             <button type="button" onClick={openMessageCenter} aria-label="Abrir central de mensagens" title="Abrir central de mensagens">↗</button>
             <button type="button" onClick={() => setMaximized((value) => !value)} aria-label={maximized ? "Restaurar janela" : "Maximizar janela"} title={maximized ? "Restaurar" : "Maximizar"}>{maximized ? "↙" : "□"}</button>
             <button type="button" onClick={() => setMinimized((value) => !value)} aria-label={minimized ? "Restaurar conversa" : "Minimizar conversa"} title={minimized ? "Restaurar" : "Minimizar"}>{minimized ? "▣" : "−"}</button>
-            <button type="button" onClick={onClose} aria-label="Fechar conversa" title="Fechar">×</button>
+            <button type="button" onClick={() => { if (!draft.trim() || window.confirm("Descartar a mensagem não enviada?")) onClose(); }} aria-label="Fechar conversa" title="Fechar">×</button>
           </div>
         </header>
         {!minimized && (loading ? (
@@ -137,6 +144,7 @@ export default function PrivateChatDialog({
         ) : (
           <>
             <div className="private-chat-dialog-messages" aria-live="polite">
+              {(data?.recentContentLoaded === false || data?.nextPageToken) && <button type="button" onClick={openMessageCenter}>Abrir histórico na central de mensagens</button>}
               {!data?.messages.length && <p>Nenhuma mensagem ainda. Escreva para iniciar.</p>}
               {(data?.messages || []).map((message) => (
                 <article key={message.id} className={Number(message.remetente_id) === Number(data?.currentUserId) ? "own" : ""}>
@@ -149,7 +157,7 @@ export default function PrivateChatDialog({
             <form onSubmit={send}>
               <label>
                 <span className="sr-only">Mensagem</span>
-                <textarea name="message" rows={2} maxLength={2000} required placeholder="Escreva sua mensagem…" />
+                <textarea value={draft} onChange={event => setDraft(event.target.value)} name="message" rows={2} maxLength={2000} required placeholder="Escreva sua mensagem…" />
               </label>
               <button type="submit" disabled={sending || !conversation}>{sending ? "Enviando…" : "Enviar"}</button>
             </form>
@@ -167,6 +175,6 @@ async function readResult(response: Response) {
   catch { return { error: "O servidor retornou uma resposta inválida." }; }
 }
 function formatDate(value: string) {
-  try { return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(`${value.replace(" ", "T")}Z`)); }
+  try { return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(/Z$|[+-]\d\d:\d\d$/.test(value) ? value : `${value.replace(" ", "T")}Z`)); }
   catch { return value; }
 }

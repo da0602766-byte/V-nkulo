@@ -1,10 +1,11 @@
+import { readMessagePage } from "../../../lib/chat-page.mjs";
 import { getD1 } from "../../../../db";
 import {
   createDriveFolder,
   decryptDrivePayload,
   encryptDrivePayload,
   getDriveAccessToken,
-  listDriveFiles,
+  listDriveFilesPage,
   readDriveFile,
   uploadDriveFile,
 } from "../../../lib/google-integration";
@@ -29,7 +30,12 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const conversationId = Number(url.searchParams.get("conversation") || 0);
   const messagesOnly = url.searchParams.get("messagesOnly") === "1";
-  const after = Math.max(0, Number(url.searchParams.get("after") || 0));
+  const pageToken = url.searchParams.get("pageToken") || undefined;
+  const since = url.searchParams.get("since") || undefined;
+  const knownIds = (url.searchParams.get("known") || "").split(",").filter(Boolean).slice(0, 200);
+  if ((pageToken && pageToken.length > 2000) || (since && !Number.isFinite(Date.parse(since))))
+    return badRequest("Cursor de mensagens inválido.");
+  const pageOptions = { pageToken, since, knownIds };
   const preference = await getD1().prepare(
     "SELECT auto_load_recent FROM storage_preferences WHERE usuario_id = ? LIMIT 1",
   ).bind(access.user.id).first<{ auto_load_recent: number }>();
@@ -40,12 +46,10 @@ export async function GET(request: Request) {
     const owned = await ownedConversation(access, conversationId);
     if (!owned) return Response.json({ error: "Conversa não encontrada." }, { status: 404 });
     try {
-      const messages = loadRecent
-        ? (await loadDriveMessages(access, conversationId)).filter((message) => message.id > after)
-        : [];
+      const page = loadRecent ? await loadDriveMessages(access, conversationId, pageOptions) : emptyPage();
       return Response.json(
         {
-          messages,
+          ...page,
           currentUserId: access.user.id,
           storage: "GOOGLE_DRIVE",
           autoLoadRecent,
@@ -133,12 +137,12 @@ export async function GET(request: Request) {
     ).bind(access.user.id, access.context.comunidadeId, access.user.id, communicationGroup).all<Record<string, unknown>>(),
   ]);
 
-  let messages: DriveMessage[] = [];
+  let page = emptyPage();
   if (loadRecent && Number.isInteger(conversationId) && conversationId > 0) {
     const owned = await ownedConversation(access, conversationId);
     if (!owned) return Response.json({ error: "Conversa não encontrada." }, { status: 404 });
     try {
-      messages = await loadDriveMessages(access, conversationId);
+      page = await loadDriveMessages(access, conversationId, pageOptions);
     } catch (error) {
       return Response.json({ error: (error as Error).message }, { status: 409 });
     }
@@ -147,14 +151,14 @@ export async function GET(request: Request) {
   return Response.json({
     people: people.results,
     conversations: conversations.results,
-    messages,
+    ...page,
     currentUserId: access.user.id,
     communicationGroup,
     cycle: new Date().toISOString().slice(0, 7),
     storage: "GOOGLE_DRIVE",
     autoLoadRecent,
     recentContentLoaded: loadRecent,
-    privacyNotice: "O conteúdo das conversas é carregado do Google Drive e não fica salvo no Vínkulo.",
+    privacyNotice: "Novas mensagens ficam no Google Drive. Históricos antigos podem permanecer na plataforma até a migração; nenhum original é apagado automaticamente.",
   }, { headers: { "Cache-Control": "no-store" } });
 }
 
@@ -206,7 +210,7 @@ export async function POST(request: Request) {
       lida_em: null,
     };
     const encrypted = await encryptDrivePayload(item);
-    await uploadDriveFile(drive.accessToken, {
+    const stored = await uploadDriveFile(drive.accessToken, {
       name: `mensagem-${item.id}.vinkulo`,
       type: "application/vnd.vinkulo.encrypted+json",
       bytes: encrypted,
@@ -215,7 +219,7 @@ export async function POST(request: Request) {
     });
     await db.prepare("UPDATE conversas_privadas SET atualizado_em = CURRENT_TIMESTAMP, storage_provider = 'GOOGLE_DRIVE' WHERE id = ?")
       .bind(conversation.id).run();
-    return Response.json({ ok: true, conversationId: conversation.id, message: item, storage: "GOOGLE_DRIVE" }, { status: 201 });
+    return Response.json({ ok: true, conversationId: conversation.id, message: { ...item, fileId: stored.id, driveCreatedTime: stored.createdTime }, storage: "GOOGLE_DRIVE" }, { status: 201 });
   } catch (error) {
     return Response.json({ error: (error as Error).message }, { status: 409 });
   }
@@ -232,20 +236,29 @@ export async function PATCH(request: Request) {
   return Response.json({ ok: true, storage: "GOOGLE_DRIVE" });
 }
 
-async function loadDriveMessages(access: ValidAccess, conversationId: number) {
+function emptyPage() {
+  return { messages: [] as Array<DriveMessage & { fileId: string; driveCreatedTime: string }>,
+    failedFileIds: [] as string[], partial: false, nextPageToken: null as string | null, syncSince: null as string | null };
+}
+
+async function loadDriveMessages(access: ValidAccess, conversationId: number,
+  options: { pageToken?: string; since?: string; knownIds: string[] }) {
   const drive = await ensureDriveConversation(access, conversationId);
-  const files = await listDriveFiles(drive.accessToken, drive.folderId, 100);
-  const messages: DriveMessage[] = [];
-  for (const file of files) {
-    if (String(file.mimeType || "") !== "application/vnd.vinkulo.encrypted+json" || !file.id) continue;
-    try {
+  const page = await listDriveFilesPage(drive.accessToken, drive.folderId, { ...options, pageSize: 30 });
+  const result = await readMessagePage(page.files, {
+    knownIds: options.knownIds,
+    read: async (file: Record<string, unknown>) => {
+      const props = file.appProperties as Record<string, string> | undefined;
+      if (props?.conversationId !== String(conversationId) || Number(file.size) > 32_768) throw new Error("Arquivo incompatível.");
       const response = await readDriveFile(drive.accessToken, String(file.id));
-      messages.push(await decryptDrivePayload<DriveMessage>(new Uint8Array(await response.arrayBuffer())));
-    } catch {
-      // Um arquivo inválido não impede que os demais itens recentes sejam exibidos.
-    }
-  }
-  return messages.sort((a, b) => a.id - b.id);
+      return decryptDrivePayload<DriveMessage>(new Uint8Array(await response.arrayBuffer()));
+    },
+  });
+  const latest = page.files.map((f) => String(f.createdTime || "")).filter(Boolean).sort().at(-1);
+  // Overlap covers concurrent timestamps; known IDs are filtered before any downloads.
+  const syncSince = latest ? new Date(Date.parse(latest) - 30_000).toISOString() : options.since || new Date(Date.now() - 30_000).toISOString();
+  return { ...result, partial: result.partial || page.incompleteSearch,
+    nextPageToken: page.nextPageToken, syncSince: (result.partial || page.incompleteSearch) ? options.since || null : syncSince };
 }
 
 async function ensureDriveConversation(access: ValidAccess, conversationId: number) {
@@ -266,51 +279,15 @@ async function ensureDriveConversation(access: ValidAccess, conversationId: numb
     throw new Error("A administração precisa ativar o Google Drive da comunidade antes de usar o chat.");
   }
   const accessToken = await getDriveAccessToken(row.proprietario_usuario_id);
+  if (row.drive_file_id && row.storage_provider !== "GOOGLE_DRIVE") throw new Error("Migração do histórico pendente. Continue em Minha conta > Armazenamento.");
   if (row.drive_file_id) return { accessToken, folderId: row.drive_file_id };
+  const legacy = await db.prepare("SELECT 1 FROM mensagens_privadas WHERE conversa_id = ? LIMIT 1").bind(conversationId).first();
+  if (legacy) throw new Error("O histórico precisa ser copiado e validado em Minha conta > Armazenamento antes de abrir esta conversa. Os originais estão preservados.");
   const folderId = await createDriveFolder(accessToken, `Conversa ${conversationId}`, row.pasta_conversas_id);
-  const legacy = await legacyMessages(conversationId);
-  for (const message of legacy) {
-    const encrypted = await encryptDrivePayload(message);
-    await uploadDriveFile(accessToken, {
-      name: `mensagem-${message.id}.vinkulo`,
-      type: "application/vnd.vinkulo.encrypted+json",
-      bytes: encrypted,
-      parentId: folderId,
-      properties: { type: "chat-message", conversationId: String(conversationId), messageId: String(message.id) },
-    });
-  }
-  await db.batch([
-    db.prepare("DELETE FROM mensagens_privadas WHERE conversa_id = ?").bind(conversationId),
-    db.prepare(
-      "UPDATE conversas_privadas SET drive_file_id = ?, storage_provider = 'GOOGLE_DRIVE', atualizado_em = CURRENT_TIMESTAMP WHERE id = ?",
-    ).bind(folderId, conversationId),
-  ]);
-  return { accessToken, folderId };
-}
-
-async function legacyMessages(conversationId: number) {
-  const result = await getD1().prepare(
-    `SELECT mp.id, mp.remetente_id, mp.mensagem, mp.lida_em, mp.criado_em,
-      u.nome AS remetente_nome,
-      CASE
-        WHEN u.perfil = 'ADMIN' THEN 'Proprietário do sistema'
-        WHEN uc.papel = 'ADMIN_COMUNIDADE' THEN 'Administrador da comunidade'
-        WHEN uc.papel = 'PASTOR' THEN 'Pastor'
-        WHEN uc.papel = 'LIDER' THEN 'Líder'
-        ELSE 'Membro'
-      END AS hierarquia,
-      COALESCE((SELECT group_concat(DISTINCT m.nome)
-        FROM ministerio_voluntarios mv
-        JOIN ministerios_comunidade m ON m.id = mv.ministerio_id
-        WHERE mv.usuario_id = u.id AND mv.comunidade_id = c.comunidade_id
-          AND mv.ativo = 1 AND m.status = 'ATIVO'), '') AS ministerio
-     FROM mensagens_privadas mp
-     JOIN conversas_privadas c ON c.id = mp.conversa_id
-     JOIN usuarios u ON u.id = mp.remetente_id
-     JOIN usuario_comunidades uc ON uc.usuario_id = u.id AND uc.comunidade_id = c.comunidade_id
-     WHERE mp.conversa_id = ? ORDER BY mp.id ASC LIMIT 500`,
-  ).bind(conversationId).all<DriveMessage>();
-  return result.results;
+  await db.prepare(`UPDATE conversas_privadas SET drive_file_id = ?, storage_provider = 'GOOGLE_DRIVE'
+    WHERE id = ? AND drive_file_id IS NULL`).bind(folderId, conversationId).run();
+  const selected = await db.prepare("SELECT drive_file_id FROM conversas_privadas WHERE id = ?").bind(conversationId).first<{ drive_file_id: string }>();
+  return { accessToken, folderId: selected!.drive_file_id };
 }
 
 async function chatAccess() {
@@ -335,7 +312,8 @@ async function ownedConversation(access: ValidAccess, id: number) {
     communicationClass(access.user.id, access.context.comunidadeId),
     communicationClass(row.other_user_id, access.context.comunidadeId),
   ]);
-  return currentGroup === otherGroup ? row : null;
+  const otherActive = await targetMetadata(row.other_user_id, access.context.comunidadeId);
+  return otherActive && currentGroup === otherGroup ? row : null;
 }
 
 async function communicationClass(userId: number, communityId: number) {
