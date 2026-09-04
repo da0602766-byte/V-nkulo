@@ -98,7 +98,9 @@ fi
 # aparece mesmo que outra tenha sido corrigida no mesmo ciclo.
 titulo "Suíte de testes"
 set +e
-node --test tests/*.test.mjs > "${trabalho}/testes.txt" 2>&1
+# Força TAP: versões recentes do Node podem escolher o reporter `spec` em
+# terminais interativos, e os contadores abaixo dependem das linhas `ok/not ok`.
+node --test --test-reporter=tap tests/*.test.mjs > "${trabalho}/testes.txt" 2>&1
 set -e
 
 grep "^not ok" "${trabalho}/testes.txt" \
