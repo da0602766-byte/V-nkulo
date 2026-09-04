@@ -26,7 +26,7 @@ test("Conta Google usa OAuth real e cria cadastro neutro sem acesso comunitário
   assert.match(integration, /AES-GCM/);
 });
 
-test("fotos pessoais ficam no Drive e anexos de publicação usam o bucket compartilhado", async () => {
+test("fotos e anexos novos usam Drive sem cópia na plataforma", async () => {
   const [upload, localMedia, serviceWorker, feedback, publicRegistration, legacyProfile, notice, modules] = await Promise.all([
     read("app/api/pilot/uploads/route.ts"),
     read("app/lib/local-media.ts"),
@@ -38,9 +38,8 @@ test("fotos pessoais ficam no Drive e anexos de publicação usam o bucket compa
     read("app/api/modulos/route.ts"),
   ]);
   assert.match(upload, /uploadDriveFile/);
-  assert.match(upload, /purpose === "post-image"[\s\S]*bucket\.put/);
-  assert.match(upload, /images\/post-image\/\$\{context\.comunidadeId\}/);
-  assert.match(upload, /storage: "PUBLICATION"/);
+  assert.doesNotMatch(upload, /bucket\.put/);
+  assert.match(upload, /storage: "GOOGLE_DRIVE"/);
   assert.match(localMedia, /indexedDB\.open/);
   assert.match(serviceWorker, /\/local-media\//);
   assert.match(feedback, /feedback-evidence/);
@@ -51,7 +50,7 @@ test("fotos pessoais ficam no Drive e anexos de publicação usam o bucket compa
   assert.match(modules, /Vínkulo não guarda arquivos no banco/);
 });
 
-test("chat grava conteúdo criptografado no Drive e remove o legado só após copiar", async () => {
+test("chat grava conteúdo criptografado no Drive e preserva o legado validado", async () => {
   const [chat, migration, schema] = await Promise.all([
     read("app/api/pilot/chat/route.ts"),
     read("app/api/storage/migrate/route.ts"),
@@ -60,7 +59,8 @@ test("chat grava conteúdo criptografado no Drive e remove o legado só após co
   assert.match(chat, /encryptDrivePayload/);
   assert.match(chat, /application\/vnd\.vinkulo\.encrypted\+json/);
   assert.doesNotMatch(chat, /INSERT INTO mensagens_privadas/);
-  assert.match(migration, /uploadDriveFile[\s\S]*DELETE FROM mensagens_privadas/);
+  assert.match(migration, /uploadVerifiedDriveFile/);
+  assert.doesNotMatch(migration, /DELETE FROM mensagens_privadas|bucket\.delete/);
   assert.match(migration, /status_migracao = 'COMPLETE'/);
   assert.match(migration, /cadastros_membros_temporarios/);
   assert.match(migration, /layouts_interface_historico/);
@@ -77,7 +77,8 @@ test("interface explica destino e deixa anexos de publicação sob demanda", asy
     read("app/api/pilot/chat/route.ts"),
   ]);
   assert.match(privacy, /não mantém cópia do conteúdo/i);
-  assert.match(storage, /Seus conteúdos não ficam no Vínkulo/);
+  assert.match(storage, /Escolha onde salvar seus conteúdos/);
+  assert.match(storage, /originais legados foram preservados/);
   assert.match(storage, /Carregar os mais recentes automaticamente/);
   assert.match(storage, /Permitir baixar arquivos neste aparelho/);
   assert.match(image, /Visualizar imagem/);

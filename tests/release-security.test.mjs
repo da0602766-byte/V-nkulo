@@ -45,7 +45,9 @@ test("gate final V4.5 não contém segredos e mantém proteções críticas", as
   assert.match(worker, /X-Permitted-Cross-Domain-Policies/);
   assert.match(auth, /__Host-adote_session/);
   assert.match(auth, /HttpOnly; Secure; SameSite=Strict/);
-  assert.match(auth, /DELETE FROM sessoes WHERE usuario_id = \?/);
+  assert.match(auth, /replacePasswordWithToken/);
+  const reset = await readFile(new URL("../app/lib/password-reset.mjs", import.meta.url), "utf8");
+  assert.match(reset, /DELETE FROM sessoes/);
   assert.match(pilot, /networkModuleEnabled:\s*false/);
   assert.match(pilot, /paymentsEnabled:\s*false/);
   assert.match(pilot, /aiAutoPublishEnabled:\s*false/);

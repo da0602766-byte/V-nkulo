@@ -1,11 +1,128 @@
 # ESTADO DO PROJETO — REFORMA OFICIAL DO VÍNKULO
 
+## Revisão de segurança, privacidade e confiabilidade — 04/09/2026
+
+Esta revisão foi feita sobre a versão atual do GitHub, commit-base `5b445e3`,
+na branch `codex/security-privacy-review-20260904`. Nada deste bloco foi
+publicado, aplicado em produção ou mesclado. A análise antiga da V210 foi usada
+como hipótese e cada risco foi reconfirmado no código atual antes da alteração.
+
+### Problemas confirmados e tratamento
+
+| Área | Confirmação na versão atual | Tratamento implementado |
+| --- | --- | --- |
+| Mídia privada | As duas rotas de leitura aceitavam conhecer o endereço como autorização; referências antigas do Drive não expiravam. | O endereço virou apenas localizador. Cada leitura consulta o recurso vivo, sessão, vínculo ativo, comunidade, permissão, revogação e estado público/privado. Respostas privadas usam `private, no-store`; downloads recebem `Content-Disposition` e todo conteúdo recebe `nosniff`. |
+| Compartilhamento público | A página de compartilhamento podia resolver uma publicação privada diretamente pelo ID. | Publicação pública exige status publicado/aprovado, audiência pública, visibilidade de plataforma e comunidade pública ativa. Publicações privadas não entregam conteúdo nem metadados sem acesso atual. |
+| Uploads | Imagens de publicações ainda podiam ser gravadas no bucket da plataforma. | Upload novo compartilhável usa exclusivamente o Drive autorizado da comunidade. Arquivo pessoal pode usar o Drive próprio ou armazenamento local do aparelho. Sem Drive, o envio compartilhado falha de forma explícita; não existe fallback silencioso para o bucket. |
+| Migração | O fluxo anterior não tinha controle completo de concorrência, integridade e recuperação para todos os itens. | Cópia em lotes, trava com prazo, diário idempotente, releitura, tamanho/SHA-256 e troca condicional de referência. A rotina nunca apaga o original legado. |
+| Login e senha | Respostas e limites permitiam inferência de conta ou bloqueio indevido; o hash legado tinha custo fixo menor. | Resposta genérica, trabalho equivalente para conta inexistente, limites atômicos por conta+origem e origem, sem bloqueio global provocado por terceiros. Novos hashes PBKDF2-SHA-256 usam 600.000 iterações e hashes legados são atualizados após login válido. |
+| Recuperação | A verificação e o consumo do token não eram uma única operação atômica. | Alteração de senha, consumo de todos os tokens equivalentes e revogação das sessões acontecem no mesmo lote transacional; sob concorrência existe um único vencedor. |
+| Política de scripts | A CSP permitia `unsafe-inline` para scripts. | Cada resposta HTML recebe um nonce novo, propagado ao framework e ao script inicial. `script-src-attr 'none'` bloqueia manipuladores inline; estilos inline permanecem temporariamente permitidos por compatibilidade. |
+| Planilhas | `xlsx` 0.18.5 estava desatualizado e importação/exportação podia ocupar a interface sem limites firmes. | SheetJS 0.20.3 instalado da distribuição oficial, processamento em Web Worker, máximo de 5 MB, 2.000 linhas, 64 colunas, 25 MB descompactados, 2.000 entradas ZIP e 10 segundos. Fórmulas, HTML e estilos não são interpretados. |
+| Chat | Até 100 arquivos eram baixados em sequência antes de filtrar novidades. | Listagem paginada no Drive, cursor temporal, IDs já conhecidos filtrados antes do download, página de 30 itens, paralelismo máximo de quatro, tentativas limitadas, deduplicação e ordem estável. Erros geram aviso de carga parcial e o texto digitado só é limpo após confirmação do envio. |
+| Interface | Havia rótulos muito pequenos, conflitos globais e superfícies que podiam cortar conteúdo no celular/zoom. | Tokens violetas e temas foram preservados. Regras novas ficaram em responsabilidade separada por área; campos e textos operacionais têm piso legível, foco visível, diálogos com retenção de preenchimento e contenção a 200%. Pedidos/Escalas mostram status, responsável e próxima ação; Visitantes mantém uma única base adaptada a tabela/cartão. |
+
+### Armazenamento e acesso
+
+- O banco mantém localizadores opacos, metadados, consentimentos e permissões;
+  ele não recebe o conteúdo dos novos arquivos, imagens ou mensagens.
+- Conteúdo pessoal pode ficar no Drive do usuário ou somente no aparelho.
+  Conteúdo compartilhado — publicação, banner ou conversa — exige o Drive da
+  comunidade. O responsável pela conta/pasta Google também controla o arquivo.
+- Pré-visualizar transfere bytes para memória. Baixar cria uma cópia escolhida
+  pelo usuário. Salvar localmente mantém a cópia apenas naquele
+  navegador/aplicativo, sem sincronização; limpar os dados, desinstalar ou perder
+  o aparelho pode apagar o conteúdo.
+- Revogar o vínculo ou tornar uma publicação privada interrompe novas leituras
+  pela plataforma. Uma cópia que já foi baixada não pode ser recolhida.
+- A criptografia do chat é de servidor, com AES-GCM e identificação da chave.
+  Não é criptografia de ponta a ponta, porque o serviço mantém as chaves de
+  leitura autorizada.
+
+### Migração `0068_security_storage.sql`
+
+A migração é aditiva: cria `storage_files`, `auth_rate_limits`,
+`storage_migration_copies`, `storage_migration_locks` e índices de associação.
+Ela não altera nem exclui conteúdo existente. O número `0067` ficou reservado
+pela migração de acesso por áreas já aplicada no Site e ainda ausente na
+linha-base do GitHub; a próxima numeração livre documentada é `0069`.
+
+Ordem operacional segura, ainda **não executada em produção**:
+
+1. exportar o D1 e inventariar os objetos legados;
+2. aplicar a migração aditiva e validar contagens;
+3. configurar Drive/chaves e migrar lotes pequenos;
+4. conferir diário, hash, tamanho, referências e permissões;
+5. manter os originais. Qualquer remoção futura deve ser uma operação separada,
+   com manifesto, nova autorização e possibilidade comprovada de restauração.
+
+Em falha, a referência antiga continua ativa e o original permanece intacto.
+O diário permite retomar sem duplicar cópias. Fotos pessoais legadas não são
+copiadas por um administrador para o Drive dele: dependem de um fluxo futuro de
+migração pelo próprio titular e, até lá, permanecem preservadas no legado.
+
+### Versionamento e rotação de chaves
+
+Novos envelopes registram `keyId`. `GOOGLE_ENCRYPTION_KEYS` mantém o chaveiro e
+`GOOGLE_ENCRYPTION_KEY_ID` escolhe a chave ativa. Para rotacionar, adiciona-se a
+nova chave, muda-se apenas o identificador ativo, valida-se leitura nova/antiga
+e só então se recriptografa o histórico gradualmente. Uma chave antiga não pode
+ser removida enquanto o inventário ainda encontrar envelopes associados.
+
+`GOOGLE_CREDENTIALS_SECRET` continua necessário para refresh tokens, envelopes
+versão 1 e referências assinadas legadas. Ele não deve ser removido antes da
+recriptografia e migração completas desses registros. O procedimento detalhado
+está em `GOOGLE_DRIVE_SETUP.md`.
+
+### Evidências desta branch
+
+- Build de produção e validação do artefato Sites: aprovados.
+- TypeScript: zero erros.
+- ESLint: zero erros; permanecem avisos preexistentes de uso de imagens HTML.
+- Suíte integral: **297/297 testes aprovados**, sem falhas.
+- Subconjunto comportamental novo: **16/16 aprovado**, com D1 SQLite real de
+  teste e Drive/bucket simulados, cobrindo ACL privada/pública, outro tenant,
+  vínculo revogado, corrida de recuperação, destino de upload, falha e retomada
+  da migração, chat incremental/paginado e falhas parciais.
+- `drizzle-kit check`, `git diff --check` e `npm audit`: executados. A auditoria
+  caiu para duas ocorrências altas, ambas em `image-size@2.0.2` transitivo de
+  `vinext@0.0.50`, sem versão corrigida publicada na linha atual.
+- Inspeção visual local, com dados sintéticos: desktop claro e celular escuro,
+  formulário, tabela, janela e ampliação de texto a 200%; sem rolagem horizontal
+  na raiz. Evidências: `docs/qa/desktop-light-table.jpg`,
+  `docs/qa/mobile-200.jpg` e `docs/qa/mobile-dark-dialog.jpg`.
+
+Fontes oficiais consultadas na revisão de dependências e compatibilidade:
+
+- instalação Node do SheetJS: https://docs.sheetjs.com/docs/getting-started/installation/nodejs/
+- avisos oficiais do SheetJS: https://cdn.sheetjs.com/advisories/
+- avisos `image-size`: https://github.com/advisories/GHSA-w3rx-r6r6-pgpr e https://github.com/advisories/GHSA-5p2g-fcmc-qvqq
+- orientação de nonce CSP do Next.js: https://nextjs.org/docs/app/guides/content-security-policy
+- Web Crypto no runtime Cloudflare: https://developers.cloudflare.com/workers/runtime-apis/nodejs/crypto/
+
+### Pendências e limites honestos
+
+- Nenhuma migração, chave ou credencial foi aplicada em produção nesta branch.
+- A integração foi testada com simuladores; o fluxo completo contra uma Conta
+  Google/Drive real precisa de homologação controlada antes de publicação.
+- O custo PBKDF2 de 600.000 iterações foi validado no runtime Workerd local, mas
+  ainda precisa de medição sob carga real antes de aumentar novamente.
+- A CSP sem `unsafe-inline` para scripts passou em build e navegador local; a
+  cobertura de rotas autenticadas reais depende de homologação antes do deploy.
+- A migração autônoma de fotos pessoais legadas pelo titular ainda não existe.
+  Os arquivos não são apagados enquanto esse fluxo não for implementado.
+- Os dois alertas transitivos de `image-size` dependem de correção/atualização
+  compatível do Vinext. Uma migração para Vinext 1 beta não foi feita nesta
+  revisão incremental.
+- A inspeção visual usou navegadores simulados; testes em aparelhos físicos e
+  com conteúdo real autorizado continuam necessários antes da publicação.
+
 ## Identificação
 
-- **Versão-base:** V4.9.0, com Conta Google, Google Drive/local e política de conteúdo sem cópia persistente na plataforma concluídos em 31/08/2026.
-- **Data da última análise:** 31/08/2026.
+- **Versão-base desta revisão:** commit `5b445e3` da linha atual do GitHub.
+- **Data da última análise:** 04/09/2026.
 - **Estado deste documento:** vigente. Decisões históricas incompatíveis foram removidas deste arquivo.
-- **Publicação automática do Site:** autorizada pelo proprietário para grupos completos que tenham build, testes e evidências aprovados; uma etapa com falha não pode ser publicada.
+- **Estado da entrega:** branch de revisão, sem merge, sem migração e sem publicação em produção.
 - **Regra global:** toda evolução funcional vale para comunidades existentes e futuras, exceto quando o proprietário solicitar explicitamente uma exceção.
 
 ## Decisões oficiais vigentes
@@ -30,9 +147,9 @@
 18. Continuidade permanece dentro de Gestão da Comunidade, mas somente o dono cadastrado daquela comunidade recebe acesso operacional; o proprietário global conserva a supervisão protegida da plataforma. Pastor, Líder e Administrador não recebem essa permissão somente pelo cargo.
 19. A Área do Proprietário possui um otimizador seguro, manual e automático, limitado a registros vencidos e às retenções oficiais. Usuários, comunidades, ministérios, conteúdos, imagens, arquivos e registros ativos nunca fazem parte da limpeza.
 20. Conta Google e autorização do Google Drive são consentimentos separados. O login Google encontra apenas contas Vínkulo já existentes e nunca cria conta ou vínculo automaticamente.
-21. Fotos e arquivos novos ficam no Google Drive autorizado ou somente no aparelho do usuário. O Vínkulo persiste apenas referências assinadas, preferências e metadados operacionais.
+21. Arquivos pessoais novos ficam no Google Drive autorizado ou somente no aparelho; conteúdos compartilhados exigem o Drive comunitário. O Vínkulo persiste apenas localizadores opacos, preferências e metadados operacionais.
 22. Mensagens privadas novas são criptografadas e armazenadas no Google Drive comunitário. O banco mantém apenas a conversa e o ponteiro do Drive, sem o texto do chat.
-23. Conteúdo legado é copiado e validado no Drive antes da exclusão da cópia antiga. Falhas interrompem a migração sem apagar o original.
+23. Conteúdo legado é copiado e validado no Drive antes da troca da referência. A rotina de migração nunca exclui o original; remoção futura exige procedimento separado e autorizado.
 24. Pré-visualização dos conteúdos recentes e download automático são escolhas independentes do usuário; o download automático começa desativado.
 
 ## Estrutura atual do Site
@@ -165,7 +282,7 @@
 - **Risco de arquivamento indevido:** mitigado por migração corretiva auditada, que restaura apenas comunidades reais gerenciadas e mantém as sementes piloto arquivadas.
 - **Risco de regressão:** coberto pela suíte automatizada de 222 testes, incluindo isolamento, segurança, armazenamento externo, estacionamento móvel, remoções e sincronização sem bloqueio integral da tela.
 - **Risco de exclusão indevida pelo otimizador:** mitigado por lista fechada de seis tarefas, bloqueio de concorrência, auditoria e testes que preservam sessão ativa e solicitação pendente.
-- **Risco de perda durante a migração:** mitigado por cópia para o Drive antes da exclusão, estado persistente de migração, processamento em lotes e interrupção segura em caso de falha.
+- **Risco de perda durante a migração:** mitigado por cópia verificada no Drive antes da troca da referência, diário persistente, processamento em lotes, trava com prazo e preservação integral dos originais.
 - **Risco de associação indevida de Conta Google:** mitigado pela verificação de `aud`, `iss`, expiração, e-mail verificado e identificador `sub`, sem criação automática de usuário.
 - **Risco de credenciais expostas:** refresh tokens são criptografados com AES-GCM; Client Secret e chave de criptografia ficam exclusivamente no ambiente hospedado.
 
@@ -174,7 +291,7 @@
 - V4.9.0 — Conta Google e privacidade de armazenamento: login Google separado da autorização do Drive, sem criação automática de contas e com revogação pelo usuário.
 - Fotos de perfil podem ficar somente no aparelho; conteúdos compartilhados usam a pasta Drive da comunidade. Todas as telas deixam explícito que o Vínkulo não mantém cópia.
 - Conversas novas são gravadas como arquivos criptografados no Drive; o carregamento automático dos itens recentes e o download automático são preferências independentes.
-- A migração cobre chats, publicações, programações editoriais, capas ministeriais, perfis, cadastros temporários, temas, layouts atuais e históricos, avisos, módulos e evidências de feedback. O legado só é excluído depois da cópia e da troca das referências.
+- A migração cobre chats, publicações, programações editoriais, capas ministeriais, cadastros temporários, temas, layouts atuais e históricos, avisos, módulos e evidências de feedback. Fotos pessoais legadas aguardam migração pelo próprio titular. Todos os originais são preservados depois da cópia e da troca das referências.
 - Rotas antigas que gravavam imagens embutidas no banco foram bloqueadas e passaram a reutilizar o fluxo Drive/local.
 - Banco V4.9.0: migration `0060_google_drive_privacy.sql` acrescenta conexões Google, preferências, pastas pessoais/comunitárias e ponteiros de conversa.
 - Validação V4.9.0: TypeScript com zero erros, build e artefato Sites aprovados e **222/222 testes automatizados aprovados**.
@@ -251,7 +368,9 @@
 
 ## Próximo bloco autorizado
 
-- Configurar o cliente OAuth Web no Google Cloud, adicionar os segredos ao ambiente hospedado, publicar a versão e executar a migração pelo painel antes de encerrar a leitura do bucket legado.
+- Revisar esta branch e homologar Drive/CSP em ambiente controlado. Configuração
+  de segredos, publicação, aplicação da migração e qualquer remoção de legado
+  dependem de autorização explícita posterior.
 
 ## Principais arquivos alterados
 

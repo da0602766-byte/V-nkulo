@@ -11,7 +11,7 @@ test("compartilhamento do feed usa página com metadados e imagem para o WhatsAp
     source("app/compartilhar/publicacao/[id]/page.tsx"),
   ]);
   assert.match(share, /\/compartilhar\/publicacao\/\$\{postId\}/);
-  assert.match(share, /message: `📣 \$\{title\}\\n\$\{pageUrl\}/);
+  assert.match(share, /message: isPublic \? `📣 \$\{title\}\\n\$\{pageUrl\}/);
   assert.doesNotMatch(share, /Imagem da publicação:/);
   assert.match(page, /generateMetadata/);
   assert.match(page, /openGraph:/);
@@ -23,7 +23,7 @@ test("página compartilhada entrega og:image público para a prévia", async () 
   const { database, d1 } = await createPilotD1();
   const post = database.prepare("SELECT id FROM publicacoes_piloto ORDER BY id LIMIT 1").get();
   database.prepare(
-    "UPDATE publicacoes_piloto SET status = 'PUBLICADA', titulo = ?, conteudo = ?, imagem_url = ? WHERE id = ?",
+    "UPDATE publicacoes_piloto SET status = 'PUBLICADA', visibilidade = 'PLATAFORMA', audiencia_tipo = 'PUBLICO', aprovacao_status = 'APROVADA', titulo = ?, conteudo = ?, imagem_url = ? WHERE id = ?",
   ).run("Publicação com imagem V145", "Conteúdo para compartilhar.", "https://cdn.example.test/post-v145.webp", post.id);
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("v145", `${process.pid}-${Date.now()}-${Math.random()}`);

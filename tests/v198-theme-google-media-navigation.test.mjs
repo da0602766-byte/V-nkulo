@@ -32,18 +32,16 @@ test("login informa sucesso ou erro e OAuth do APK devolve JSON real", async () 
   assert.doesNotMatch(integration, /state\.purpose === "drive" \? "consent" : "select_account"/);
 });
 
-test("imagem de publicação usa bucket próprio e oferece visualizar ou baixar", async () => {
+test("imagem de publicação usa Drive e oferece visualizar ou baixar", async () => {
   const [upload, client, image, download] = await Promise.all([
     read("app/api/pilot/uploads/route.ts"),
     read("app/lib/media-upload-client.ts"),
     read("app/components/ResponsiveFeedImage.tsx"),
     read("app/api/pilot/uploads/[...key]/route.ts"),
   ]);
-  const publicationBranch = upload.indexOf('if (purpose === "post-image")');
-  const drivePreference = upload.indexOf("SELECT provider FROM storage_preferences");
-  assert.ok(publicationBranch > 0 && publicationBranch < drivePreference);
-  assert.match(upload, /storage: "PUBLICATION"/);
-  assert.match(client, /purpose === "post-image"/);
+  assert.doesNotMatch(upload, /bucket\.put/);
+  assert.match(upload, /storage: "GOOGLE_DRIVE"/);
+  assert.match(client, /GOOGLE_DRIVE/);
   assert.match(image, /Visualizar imagem/);
   assert.match(image, /Baixar imagem/);
   assert.match(download, /Content-Disposition/);

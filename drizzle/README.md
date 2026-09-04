@@ -6,8 +6,14 @@ migração nova, leia isto.
 
 ## Próximo número livre
 
-**`0067`**. Use o próximo inteiro disponível a partir daí — não reaproveite
+**`0069`**. Use o próximo inteiro disponível a partir daí — não reaproveite
 um número já usado, mesmo que o arquivo tenha sido escrito à mão.
+
+`0067` ficou reservado pela migração de acesso por áreas já aplicada no Site,
+mas ainda ausente na linha de base do GitHub usada nesta revisão. A revisão de
+segurança usa `0068_security_storage.sql` para não colidir com o ambiente já
+existente. O salto é intencional e deve ser reconciliado antes de uma futura
+sincronização integral dos dois históricos.
 
 ## Se dois números colidirem
 

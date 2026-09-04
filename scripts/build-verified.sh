@@ -18,6 +18,11 @@ if [[ ! -x "${vinext}" ]]; then
   exit 69
 fi
 
+if [[ -e "${SITES_PROJECT_ROOT}/app/qa-security-fixture/page.tsx" ]]; then
+  echo "Remove the synthetic visual fixture before building: node scripts/visual-security-qa.mjs stop"
+  exit 65
+fi
+
 echo "Running bounded vinext build..."
 timeout \
   --signal=TERM \

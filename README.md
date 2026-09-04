@@ -15,7 +15,7 @@ comunidades e ministérios.
 - Pedidos de oração e solicitações com públicos direcionados.
 - Conversas privadas otimizadas entre pessoas autorizadas da mesma comunidade.
 - Conta Google opcional, sem criação automática de conta, e autorização separada para o Google Drive.
-- Fotos e arquivos no Google Drive ou somente no aparelho; mensagens privadas criptografadas no Drive comunitário.
+- Arquivos pessoais no Google Drive ou somente no aparelho; publicações, banners e mensagens compartilhadas exigem o Drive comunitário.
 - Automação editorial com política, revisão e agendamento somente para a comunidade escolhida.
 - Temas claro, escuro e automático e interface adaptada para computador e celular.
 - Banco D1 persistente com migrações Drizzle versionadas.
@@ -30,6 +30,8 @@ comunidades e ministérios.
 - MFA, geração livre por IA e notificações externas dependem de serviços externos.
 - Publicações editoriais automáticas obedecem às políticas e autorizações registradas.
 - Conteúdo novo não é persistido no bucket ou incorporado ao banco; o armazenamento da plataforma fica restrito a referências, preferências e metadados.
+- As URLs de mídia são apenas localizadores opacos: cada leitura revalida sessão, vínculo, comunidade, recurso e estado público/privado. Conteúdo público precisa estar explicitamente publicado.
+- Mensagens no Drive usam criptografia de servidor com rotação de chaves; não há criptografia de ponta a ponta.
 
 O estado técnico e as limitações atuais estão em `ESTADO_DO_PROJETO.md`.
 

@@ -32,8 +32,14 @@ no gerenciador seguro de variáveis do Site.
 - `GOOGLE_CLIENT_ID`: Client ID criado no Google Cloud.
 - `GOOGLE_CLIENT_SECRET`: Client Secret, marcado como segredo.
 - `GOOGLE_CREDENTIALS_SECRET`: segredo exclusivo usado para criptografar os
-  refresh tokens. Ele deve ser marcado como segredo e não deve ser trocado sem
-  um plano de reconexão das contas.
+  refresh tokens, ler envelopes legados e validar referências assinadas antigas.
+  Ele deve ser marcado como segredo e não pode ser removido enquanto esses
+  registros ainda existirem.
+- `GOOGLE_ENCRYPTION_KEYS`: objeto JSON secreto com as chaves de conteúdo por
+  identificador, por exemplo `{ "2026-09": "segredo-aleatorio-longo" }`.
+- `GOOGLE_ENCRYPTION_KEY_ID`: identificador da chave usada para novos conteúdos,
+  por exemplo `2026-09`. O identificador precisa existir em
+  `GOOGLE_ENCRYPTION_KEYS`.
 
 ## 4. Ordem segura de ativação
 
@@ -42,9 +48,30 @@ no gerenciador seguro de variáveis do Site.
 3. Entrar em **Minha conta → Conteúdo e privacidade**.
 4. Conectar a Conta Google e autorizar o Drive separadamente.
 5. Criar a pasta comunitária do Drive.
-6. Executar a migração. A exclusão do conteúdo antigo só acontece depois da
-   cópia e da atualização das referências.
-7. Confirmar que o painel informa **Migração concluída**.
+6. Fazer backup/exportação do D1 e inventário do bucket legado.
+7. Aplicar a migração aditiva `0068_security_storage.sql`.
+8. Executar a migração de conteúdo em lotes. Cada cópia é relida e validada por
+   tamanho e SHA-256 antes da troca da referência.
+9. Reconciliar a quantidade de originais e destinos e testar as permissões.
+   A rotina não apaga originais legados. Qualquer limpeza posterior exige uma
+   operação separada, manifestada e aprovada.
+10. Confirmar que o painel informa **Migração concluída**.
+
+## Rotação sem perder o histórico
+
+1. Gere uma nova chave aleatória e acrescente-a ao JSON existente; não substitua
+   nem reutilize o valor de uma chave anterior.
+2. Altere apenas `GOOGLE_ENCRYPTION_KEY_ID` para o novo identificador e publique
+   uma versão validada. Novos envelopes passam a registrar esse identificador.
+3. Verifique a leitura de mensagens novas, envelopes antigos e cópias de
+   recuperação. Se necessário, reprocesse os antigos gradualmente para a chave
+   ativa.
+4. Remova uma chave antiga somente depois de um inventário comprovar zero
+   referências a seu identificador e os backups terem sido testados.
+
+`GOOGLE_CREDENTIALS_SECRET` continua necessário para refresh tokens, envelopes
+versão 1 e URLs legadas. Sua rotação exige recriptografar esses registros e
+migrar as referências antigas; removê-lo antes disso torna o histórico ilegível.
 
 ## Garantias do fluxo
 
@@ -52,4 +79,8 @@ no gerenciador seguro de variáveis do Site.
 - Uma Conta Google não cria uma conta Vínkulo nem um vínculo comunitário.
 - Novas fotos e arquivos não são gravados no bucket da plataforma.
 - Novas mensagens são criptografadas antes de serem salvas no Drive.
+- Essa criptografia é aplicada pelo servidor; não é criptografia de ponta a
+  ponta, pois o serviço mantém as chaves necessárias à leitura autorizada.
 - O download automático começa desligado e depende da escolha do usuário.
+- A URL de um arquivo não concede acesso. Cada leitura revalida a sessão, o
+  vínculo, a comunidade, o recurso associado e o estado público/privado.

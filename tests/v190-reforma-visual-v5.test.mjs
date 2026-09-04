@@ -4,13 +4,13 @@ import test from "node:test";
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("o acento é o mesmo cobre nos dois temas, na superfície pública e no painel", async () => {
+test("o acento padrão é violeta nos dois temas e presets explícitos são preservados", async () => {
   const styles = await read("app/globals.css");
   const root = styles.slice(0, styles.indexOf('[data-theme="dark"]'));
-  assert.match(root, /--violet:\s*#B25A33/i);
-  assert.match(styles, /\[data-theme="dark"\][\s\S]{0,400}--violet:\s*#D9784C/i);
+  assert.match(root, /--violet:\s*#5B2FC4/i);
+  assert.match(styles, /\[data-theme="dark"\][\s\S]{0,400}--violet:\s*#B794F6/i);
   // O painel trocava de matiz entre os temas: dourado no claro, azul no escuro.
-  assert.match(styles, /--pilot-purple:\s*#b25a33/i);
+  assert.match(styles, /--pilot-purple:\s*#5b2fc4/i);
   assert.doesNotMatch(styles, /--pilot-purple:\s*#4d9fff/i);
   assert.doesNotMatch(styles, /--pilot-purple:\s*#e0a542/i);
 });
@@ -34,9 +34,9 @@ test("a recepção tem tema padrão e o título usa o acento chapado", async () 
   assert.doesNotMatch(styles, /landing-hero h1 span \{[^}]*linear-gradient/);
 });
 
-test("Cobre é o preset padrão da plataforma e Violeta continua disponível", async () => {
+test("Violeta é o preset padrão e Cobre continua disponível", async () => {
   const branding = await read("app/lib/platform-branding.ts");
-  assert.match(branding, /themePreset:\s*"COBRE"/);
+  assert.match(branding, /themePreset:\s*"VIOLETA"/);
   assert.match(branding, /PLATFORM_THEME_PRESETS/);
   for (const preset of ["COBRE", "VIOLETA", "ESMERALDA", "AURORA", "GRAFITE"]) {
     assert.ok(branding.includes(`"${preset}"`), `preset ${preset} sumiu`);

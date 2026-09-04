@@ -1,0 +1,28 @@
+"use client";
+// TEMPORARY LOCAL QA HARNESS: synthetic data only; removed before final build.
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import RequestsWorkspace from '../components/RequestsWorkspace';
+import StoragePrivacyWorkspace from '../components/StoragePrivacyWorkspace';
+import PrivateChatWorkspace from '../components/PrivateChatWorkspace';
+import { VisitorsWorkspace } from '../components/TenantOperations';
+const visitor={id:1,nome_completo:'Pessoa de teste',telefone:'',email:'teste@example.test',batizado:'NAO',status:'NOVO',ativo:1,encontro_com_deus:0,curso_membros:0,data_entrada:'2026-09-04',categoria_nome:'Visitante',criado_por:'Teste',criado_em:'2026-09-04',atualizado_em:'2026-09-04',acompanhamentos_total:0};
+const central={canManageRepositories:true,currentActor:{id:1,nome:'Responsável de teste'},whatsappPreference:{canConfigure:false,enabled:false,hasPhone:false},pastoresContato:[],ministries:[],repositories:[{id:1,tipo:'VISITA',nome:'Visitas',status:'ATIVO',ministerio_id:null,ministerio_nome:'',items:[{id:1,solicitacao_id:1,item_status:'ABERTO',titulo:'Visita de teste',descricao:'Conteúdo fictício para verificar o formulário de atendimento.',solicitante_nome:'Pessoa de teste',solicitante_telefone:'',criado_em:'2026-09-04',responsavel_nome:'Responsável de teste',responsavel_usuario_id:1,mensagem_atendimento:'',testemunho:'',testemunho_compartilhavel:0}]}]};
+function Surface(){return <main className="vinkulo-site pilot-dashboard" style={{padding:16,minHeight:'100vh'}}><h1>Teste visual — dados fictícios</h1><StoragePrivacyWorkspace/><RequestsWorkspace communityName="Comunidade de teste"/><VisitorsWorkspace permissions={['visitors.view','visitors.manage','visitors.edit','visitors.create']} communityName="Comunidade de teste"/><PrivateChatWorkspace/></main>}
+export default function Fixture(){
+ const embedded=typeof window!=="undefined"&&new URLSearchParams(window.location.search).has("embedded");
+ const [ready,setReady]=useState(false),[theme,setTheme]=useState('claro'),[width,setWidth]=useState(390),[zoom,setZoom]=useState(false),[doc,setDoc]=useState<Document|null>(null);const frame=useRef<HTMLIFrameElement>(null);
+ useEffect(()=>{const original=window.fetch;window.fetch=async(input,init)=>{const path=String(input);if(!path.startsWith('/api/'))return original(input,init);if(init?.method && init.method!=='GET')return Response.json({error:'Falha simulada: rascunho deve ser preservado.'},{status:409});
+ if(path.includes('storage/preferences'))return Response.json({googleAvailable:true,google:{email:'teste@example.test',connected:true,connectedAt:'2026-09-04'},preference:{provider:'GOOGLE_DRIVE',auto_load_recent:1,auto_download_files:0},communityStorage:{status_migracao:'PENDING',migrado_em:null,proprietario_nome:'Conta de teste'},canConfigureCommunity:true});
+ if(path.includes('solicitacoes/central'))return Response.json(central);
+ if(path.includes('solicitacoes'))return Response.json({solicitacoes:[],canManage:true,audienceOptions:{usuarios:[],ministerios:[],papeis:[],allowAllMembers:false}});
+ if(path.includes('visitante-categorias'))return Response.json({categorias:[],crescimento:[],meses:[],responsaveis:[],ministerios:[],canManage:true});
+ if(path.includes('visitantes'))return Response.json({visitantes:[visitor],nextCursor:null,aniversariantes:[],contagens:{todos:1,novos:1,acompanhamento:0,pendencias:0,sem_contato:1,arquivados:0}});
+ if(path.includes('celulas'))return Response.json({celulas:[]});
+ if(path.includes('chat'))return Response.json({people:[],conversations:[{id:1,participante_id:2,participante_nome:'Pessoa de teste',hierarquia:'Membro',ministerio:'',online:0,ultima_mensagem:'Mensagem fictícia',nao_lidas:0,atualizado_em:'2026-09-04'}],messages:[{id:1,fileId:'test-1',remetente_id:2,remetente_nome:'Pessoa de teste',mensagem:'Mensagem fictícia para inspecionar a leitura.',criado_em:'2026-09-04T12:00:00Z'}],currentUserId:1,cycle:'2026-09',autoLoadRecent:true,recentContentLoaded:true,partial:true,nextPageToken:'older',syncSince:'2026-09-04T12:00:00Z'});
+ return Response.json({});};setReady(true);return()=>{window.fetch=original;};},[]);
+ useEffect(()=>{for(const target of [document,doc]){if(!target)continue;target.documentElement.dataset.pilotTheme=theme;target.documentElement.dataset.theme=theme==='claro'?'light':'dark';target.documentElement.style.fontSize=zoom?'32px':'16px';}},[doc,theme,zoom]);
+ if(!ready)return null;
+ if(embedded)return <Surface/>;
+ return <><nav style={{position:'sticky',top:0,zIndex:10000,background:'white',color:'black',display:'flex',gap:12,padding:8}}><button onClick={()=>setTheme(theme==='claro'?'escuro':'claro')}>Alternar tema: {theme}</button><button onClick={()=>setWidth(width===390?1280:390)}>Largura: {width}</button><button onClick={()=>setZoom(!zoom)}>Texto: {zoom?'200%':'100%'}</button></nav><iframe title="Superfície de teste" src="/qa-security-fixture?embedded=1" style={{width,maxWidth:"100%",height:844,border:0}} onLoad={e=>setDoc(e.currentTarget.contentDocument)}/>{ready && null}</>;
+}
