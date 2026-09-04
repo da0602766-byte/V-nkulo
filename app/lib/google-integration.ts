@@ -137,6 +137,16 @@ export async function saveGoogleConnection(
     .prepare("SELECT refresh_token_ciphertext, refresh_token_iv, drive_enabled, scopes FROM google_connections WHERE usuario_id = ? LIMIT 1")
     .bind(userId)
     .first<{ refresh_token_ciphertext: string | null; refresh_token_iv: string | null; drive_enabled: number; scopes: string }>();
+  // google_sub tem índice único. Sem esta checagem o INSERT abaixo estoura a
+  // restrição e devolve o erro cru do banco para a tela do usuário, porque o
+  // ON CONFLICT só cobre usuario_id.
+  const linkedElsewhere = await getD1()
+    .prepare("SELECT usuario_id FROM google_connections WHERE google_sub = ? AND usuario_id <> ? LIMIT 1")
+    .bind(identity.sub, userId)
+    .first<{ usuario_id: number }>();
+  if (linkedElsewhere) {
+    throw new Error("Esta Conta Google já está vinculada a outro cadastro do Vínkulo.");
+  }
   const encrypted = tokens.refresh_token
     ? await encryptSecret(tokens.refresh_token)
     : existing?.refresh_token_ciphertext && existing.refresh_token_iv

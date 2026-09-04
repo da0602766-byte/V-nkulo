@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import GoogleStatusToast, { type GoogleToastState } from "./GoogleStatusToast";
 
 type StorageData = {
   googleAvailable: boolean;
-  google: null | { email: string; connected: boolean; connectedAt: string };
+  google: null | { email: string; connected: boolean; connectedAt: string; scopes: string };
   preference: {
     provider: "LOCAL" | "GOOGLE_DRIVE";
     auto_load_recent: number;
@@ -23,6 +24,7 @@ export default function StoragePrivacyWorkspace() {
   const [data, setData] = useState<StorageData | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [googleToast, setGoogleToast] = useState<GoogleToastState>(null);
 
   async function load() {
     const response = await fetch("/api/storage/preferences", { cache: "no-store" });
@@ -34,8 +36,22 @@ export default function StoragePrivacyWorkspace() {
   useEffect(() => {
     const params = new URL(window.location.href).searchParams;
     const timer = window.setTimeout(() => {
-      setMessage(params.get("google") === "connected" ? "Google Drive conectado com sucesso." : params.get("googleErro") || "");
-      void load().catch((error) => setMessage((error as Error).message));
+      // O callback do Google devolve o resultado na URL. Antes ele virava um
+      // parágrafo estático no rodapé do cartão e a autorização parecia não ter
+      // acontecido.
+      const failure = params.get("googleErro");
+      if (params.get("google") === "connected") {
+        setGoogleToast({
+          variant: "success",
+          title: "Google Drive conectado",
+          detail: "Arquivos que o Vínkulo criar ficam na sua Conta Google.",
+        });
+      } else if (failure) {
+        setGoogleToast({ variant: "error", title: "Não foi possível conectar o Drive", detail: failure });
+      }
+      void load().catch((error) =>
+        setGoogleToast({ variant: "error", title: "Não foi possível carregar", detail: (error as Error).message }),
+      );
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
@@ -78,9 +94,17 @@ export default function StoragePrivacyWorkspace() {
       const result = await response.json() as { error?: string };
       if (!response.ok) throw new Error(result.error || "Não foi possível configurar o Drive da comunidade.");
       await load();
-      setMessage("Pasta da comunidade criada no Google Drive.");
+      setGoogleToast({
+        variant: "success",
+        title: "Pasta da comunidade criada",
+        detail: "Publicações, banners e conversas compartilhadas passam a usar esta pasta.",
+      });
     } catch (error) {
-      setMessage((error as Error).message);
+      setGoogleToast({
+        variant: "error",
+        title: "Não foi possível criar a pasta",
+        detail: (error as Error).message,
+      });
     } finally {
       setBusy(false);
     }
@@ -88,7 +112,11 @@ export default function StoragePrivacyWorkspace() {
 
   async function migrateHistory() {
     setBusy(true);
-    setMessage("Migrando o histórico com segurança…");
+    setGoogleToast({
+      variant: "pending",
+      title: "Migrando o histórico",
+      detail: "Cada item é confirmado no Drive antes de sair da plataforma.",
+    });
     try {
       let complete = false;
       let migrated = 0;
@@ -106,11 +134,19 @@ export default function StoragePrivacyWorkspace() {
         if (!complete && Number(result.migratedChats || 0) + Number(result.migratedMedia || 0) === 0) break;
       }
       await load();
-      setMessage(complete
-        ? `Migração concluída. ${migrated} item(ns) foram confirmados no Drive antes da remoção da plataforma.`
-        : `Migração parcial concluída (${migrated} item(ns)). Execute novamente para continuar.`);
+      setGoogleToast({
+        variant: "success",
+        title: complete ? "Migração concluída" : "Migração parcial concluída",
+        detail: complete
+          ? `${migrated} item(ns) confirmados no Drive antes de sair da plataforma.`
+          : `${migrated} item(ns) migrados. Execute novamente para continuar.`,
+      });
     } catch (error) {
-      setMessage((error as Error).message);
+      setGoogleToast({
+        variant: "error",
+        title: "A migração parou",
+        detail: (error as Error).message,
+      });
     } finally {
       setBusy(false);
     }
@@ -124,9 +160,17 @@ export default function StoragePrivacyWorkspace() {
       const result = await response.json() as { error?: string };
       if (!response.ok) throw new Error(result.error || "Não foi possível desconectar.");
       await load();
-      setMessage("Google Drive desconectado. O destino voltou para este aparelho.");
+      setGoogleToast({
+        variant: "success",
+        title: "Google Drive desconectado",
+        detail: "O destino dos seus arquivos voltou para este aparelho.",
+      });
     } catch (error) {
-      setMessage((error as Error).message);
+      setGoogleToast({
+        variant: "error",
+        title: "Não foi possível desconectar",
+        detail: (error as Error).message,
+      });
     } finally {
       setBusy(false);
     }
@@ -162,11 +206,27 @@ export default function StoragePrivacyWorkspace() {
         {!data.googleAvailable ? (
           <p role="status">A integração está pronta, mas o proprietário ainda precisa ativar as credenciais Google.</p>
         ) : !driveConnected ? (
-          <a className="storage-connect-google" href="/api/auth/google/start?purpose=drive&returnTo=%2Fpainel%3Fview%3Dconta">Conectar Google Drive</a>
+          <a
+            className="storage-connect-google"
+            href="/api/auth/google/start?purpose=drive&returnTo=%2Fpainel%3Fview%3Dconta"
+            onClick={() => setGoogleToast({
+              variant: "pending",
+              title: "Abrindo a Conta Google",
+              detail: "Autorize o acesso ao Drive na janela do Google.",
+            })}
+          >Conectar Google Drive</a>
         ) : (
           <button type="button" disabled={busy} onClick={() => void disconnect()}>Desconectar Drive</button>
         )}
       </div>
+
+      {driveConnected && (
+        <dl className="storage-google-evidence">
+          <div><dt>Conta autorizada</dt><dd>{data.google?.email}</dd></div>
+          <div><dt>Autorizado em</dt><dd>{formatConnectedAt(data.google?.connectedAt)}</dd></div>
+          <div><dt>Permissões concedidas</dt><dd>{describeScopes(data.google?.scopes)}</dd></div>
+        </dl>
+      )}
 
       <fieldset className="storage-download-controls" disabled={busy}>
         <legend>Carregamento e download</legend>
@@ -201,6 +261,8 @@ export default function StoragePrivacyWorkspace() {
         <li>Conteúdo antigo só será apagado da plataforma depois da migração confirmada.</li>
       </ul>
       {message && <p className="operations-feedback" role="status">{message}</p>}
+
+      <GoogleStatusToast state={googleToast} onDismiss={() => setGoogleToast(null)} />
     </section>
   );
 }
@@ -210,4 +272,25 @@ function migrationLabel(status: string) {
   if (status === "IN_PROGRESS") return "em andamento";
   if (status === "FAILED") return "precisa de revisão";
   return "aguardando autorização";
+}
+
+function formatConnectedAt(value?: string) {
+  const parsed = Date.parse(String(value || "").replace(" ", "T") + "Z");
+  if (!Number.isFinite(parsed)) return "—";
+  return new Date(parsed).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+}
+
+const SCOPE_LABELS: Record<string, string> = {
+  openid: "Identificação da conta",
+  email: "Endereço de e-mail",
+  profile: "Nome e foto do perfil",
+  "https://www.googleapis.com/auth/drive.file": "Arquivos que o Vínkulo cria no seu Drive",
+};
+
+function describeScopes(scopes?: string) {
+  const labels = String(scopes || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((scope) => SCOPE_LABELS[scope] || scope);
+  return labels.length ? labels.join(" · ") : "—";
 }

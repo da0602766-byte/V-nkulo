@@ -1,0 +1,13 @@
+# Testes que falham na main e não são regressão de nenhuma entrega em curso.
+#
+# Antes de comparar, rode o build: a suíte precisa de dist/ para os testes que
+# leem o artefato. É o que `npm test` faz (build && node --test) e o que o
+# scripts/pre-publicacao.sh faz. Sem o build, 39 testes falham por falta do
+# artefato e não por defeito — não os adicione aqui.
+#
+# Medido com build em 5b445e3 (main): 286 passam, 1 falha.
+#
+# Se um nome novo aparecer, é regressão e precisa ser investigada antes de
+# publicar. Se um daqui voltar a passar, remova a linha.
+
+banner público é exibido inteiro e apresentação respeita margens móveis

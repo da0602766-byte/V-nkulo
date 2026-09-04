@@ -102,17 +102,23 @@ export async function createSession(userId: number) {
   return { token: `${encoded}.${await signSession(encoded)}`, expires };
 }
 
+// SameSite=Lax é obrigatório: o retorno do Google (accounts.google.com ->
+// /api/auth/google/callback -> /painel) é uma navegação iniciada por outro
+// site, e o navegador não envia cookies Strict nessa cadeia. Com Strict a
+// sessão só aparecia depois de um recarregamento manual. A proteção contra
+// CSRF continua no worker, que barra sec-fetch-site: cross-site e Origin
+// divergente em todos os métodos não seguros de /api/.
 export function attachSessionCookie(
   response: Response,
   session: { token: string; expires: Date },
 ) {
   response.headers.append(
     "Set-Cookie",
-    `${SESSION_COOKIE}=${session.token}; Path=/; Max-Age=${SESSION_DAYS * 86400}; Expires=${session.expires.toUTCString()}; HttpOnly; Secure; SameSite=Strict`,
+    `${SESSION_COOKIE}=${session.token}; Path=/; Max-Age=${SESSION_DAYS * 86400}; Expires=${session.expires.toUTCString()}; HttpOnly; Secure; SameSite=Lax`,
   );
   response.headers.append(
     "Set-Cookie",
-    `${LEGACY_SESSION_COOKIE}=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; Secure; SameSite=Strict`,
+    `${LEGACY_SESSION_COOKIE}=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; Secure; SameSite=Lax`,
   );
   return response;
 }
@@ -123,7 +129,7 @@ export function attachPreviewSessionCookie(
 ) {
   response.headers.append(
     "Set-Cookie",
-    `${PREVIEW_SESSION_COOKIE}=${session.token}; Path=/; Max-Age=${SESSION_DAYS * 86400}; Expires=${session.expires.toUTCString()}; HttpOnly; SameSite=Strict`,
+    `${PREVIEW_SESSION_COOKIE}=${session.token}; Path=/; Max-Age=${SESSION_DAYS * 86400}; Expires=${session.expires.toUTCString()}; HttpOnly; SameSite=Lax`,
   );
   return response;
 }
@@ -143,20 +149,20 @@ export async function destroySession() {
   jar.set(SESSION_COOKIE, "", {
     httpOnly: true,
     secure: true,
-    sameSite: "strict",
+    sameSite: "lax",
     path: "/",
     maxAge: 0,
   });
   jar.set(LEGACY_SESSION_COOKIE, "", {
     httpOnly: true,
     secure: true,
-    sameSite: "strict",
+    sameSite: "lax",
     path: "/",
     maxAge: 0,
   });
   jar.set(PREVIEW_SESSION_COOKIE, "", {
     httpOnly: true,
-    sameSite: "strict",
+    sameSite: "lax",
     path: "/",
     maxAge: 0,
   });

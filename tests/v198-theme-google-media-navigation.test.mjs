@@ -26,7 +26,9 @@ test("login informa sucesso ou erro e OAuth do APK devolve JSON real", async () 
   ]);
   assert.match(portal, /submit\("\/api\/auth\/login", data\)/);
   assert.match(portal, /Login confirmado\. Abrindo sua conta/);
-  assert.match(portal, /Abrindo a Conta Google com segurança/);
+  // O texto de andamento saiu do parágrafo estático e virou o aviso animado.
+  assert.match(portal, /title: "Abrindo a Conta Google"/);
+  assert.match(portal, /<GoogleStatusToast state=\{googleToast\}/);
   assert.match(start, /androidChannel && url\.searchParams\.get\("format"\) === "json"/);
   assert.match(start, /target\.searchParams\.set\("erro", message\)/);
   assert.doesNotMatch(integration, /state\.purpose === "drive" \? "consent" : "select_account"/);

@@ -22,7 +22,13 @@ export default function GoogleAppReturn({ error = "" }: { error?: string }) {
   return (
     <main className="google-app-return">
       <section>
-        <span className={error ? "error" : "success"} aria-hidden="true">{error ? "!" : "✓"}</span>
+        <span className={`google-return-mark ${error ? "error" : "success"}`} aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            {error
+              ? <><path d="M7 7 17 17" /><path d="M17 7 7 17" /></>
+              : <path d="M5 12.8 10 17.6 19 7.2" />}
+          </svg>
+        </span>
         <h1>{error ? "Não foi possível concluir" : "Login concluído"}</h1>
         <p>{error || "Sua conta foi confirmada. O Vínkulo receberá o acesso automaticamente."}</p>
         {!error && intentUrl && <a href={intentUrl}>Voltar ao aplicativo</a>}
