@@ -26,9 +26,8 @@ export const DEFAULT_PLATFORM_BRANDING: PlatformBranding = {
   siteName: "VÍNKULO",
   logoUrl: "",
   feedBannerUrl: "",
-  // Cobre é o acento único da Reforma Visual V5. Violeta continua disponível
-  // como preset nomeado para quem já o escolheu.
-  themePreset: "COBRE",
+  // Violeta é o padrão; escolhas explícitas já salvas são preservadas.
+  themePreset: "VIOLETA",
 };
 
 function safeText(value: unknown, fallback: string, maximum: number) {

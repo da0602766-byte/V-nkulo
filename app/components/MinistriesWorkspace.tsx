@@ -1064,6 +1064,14 @@ export default function MinistriesWorkspace({
                     </header>
                     <h2>{schedule.titulo}</h2>
                     <p>{schedule.observacoes || "Sem observações adicionais."}</p>
+                    <div className="schedule-next-action">
+                      <strong>Responsável: liderança de {schedule.ministerio_nome}</strong>
+                      <span>Próxima ação: {schedule.status === "ENCERRADA" ? "consultar o histórico" :
+                        mine?.status === "PENDENTE" ? "confirmar presença ou informar indisponibilidade" :
+                        schedule.status === "RASCUNHO" ? "revisar equipe e publicar" :
+                        schedule.status === "AGUARDANDO_CHECKLIST" ? "concluir o checklist" :
+                        schedule.designacoes.some(item => item.status === "PENDENTE") ? "acompanhar confirmações da equipe" : "consultar horário e local"}.</span>
+                    </div>
                     <dl>
                       <div>
                         <dt>Horário</dt>

@@ -1,4 +1,5 @@
 "use client";
+import { useDialogFocus } from "./useDialogFocus";
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -64,6 +65,8 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
   const [filter, setFilter] = useState<"TODAS" | Exclude<RequestType, "INFORMACAO">>("TODAS");
   const [pendingPastor, setPendingPastor] = useState<PastorContact | null>(null);
   const [selectedRepositoryItem, setSelectedRepositoryItem] = useState<(RepositoryItem & { repositoryType: Repository["tipo"] }) | null>(null);
+  const workflowDialogRef = useRef<HTMLElement>(null);
+  useDialogFocus(Boolean(selectedRepositoryItem), workflowDialogRef, closeWorkflow);
   const [workflowStatus, setWorkflowStatus] = useState<RepositoryItem["item_status"]>("ABERTO");
   const [workflowMessage, setWorkflowMessage] = useState("");
   const [workflowTestimony, setWorkflowTestimony] = useState("");
@@ -210,6 +213,12 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
     setWorkflowTestimony(item.testemunho || "");
     setTestimonyPermission(item.testemunho_compartilhavel === 1 ? "PERMITIR" : item.testemunho_compartilhavel === 0 ? "NAO_PERMITIR" : "");
     clearMessages();
+  }
+
+  function closeWorkflow() {
+    const changed = workflowMessage !== (selectedRepositoryItem?.mensagem_atendimento || "") ||
+      workflowTestimony !== (selectedRepositoryItem?.testemunho || "") || workflowStatus !== selectedRepositoryItem?.item_status;
+    if (!changed || window.confirm("Fechar sem salvar o atendimento?")) setSelectedRepositoryItem(null);
   }
 
   async function saveRepositoryWorkflow(event: FormEvent<HTMLFormElement>) {
@@ -382,8 +391,8 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
                   {repository.items.length ? repository.items.map((item) => (
                     <button type="button" key={item.id} onClick={() => openRepositoryWorkflow(item, repository.tipo)}>
                       <span className={`request-repository-item-mark type-${repository.tipo.toLowerCase()}`} aria-hidden="true">{repository.tipo === "ORACAO" ? "♡" : "⌂"}</span>
-                      <span><strong>{item.titulo}</strong><small>{item.solicitante_nome} · {repositoryStatusLabel(repository.tipo, item.item_status)}</small></span>
-                      <em>Atender</em>
+                      <span><strong>{item.titulo}</strong><small>{item.solicitante_nome} · {repositoryStatusLabel(repository.tipo, item.item_status)}</small><small>Responsável: {item.responsavel_nome || "A definir"}</small></span>
+                      <em>{["FINALIZADO", "ORACAO_ATENDIDA", "VISITA_CONCLUIDA"].includes(item.item_status) ? "Revisar atendimento" : item.responsavel_usuario_id ? "Continuar atendimento" : "Assumir atendimento"}</em>
                     </button>
                   )) : <p className="request-repository-empty">Nenhum pedido encaminhado.</p>}
                 </div>
@@ -482,15 +491,16 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
         </section>
       </div>}
 
-      {selectedRepositoryItem && <div className="request-workflow-backdrop" role="presentation" onMouseDown={() => setSelectedRepositoryItem(null)}>
-        <section className="request-workflow-dialog" role="dialog" aria-modal="true" aria-labelledby="request-workflow-title" onMouseDown={(event) => event.stopPropagation()}>
+      {selectedRepositoryItem && <div className="request-workflow-backdrop" role="presentation">
+        <section ref={workflowDialogRef} className="request-workflow-dialog" role="dialog" aria-modal="true" aria-labelledby="request-workflow-title" onMouseDown={(event) => event.stopPropagation()}>
           <header>
             <div><p className="pilot-kicker">{selectedRepositoryItem.repositoryType === "ORACAO" ? "ATENDIMENTO DE ORAÇÃO" : "ATENDIMENTO DE VISITA"}</p><h2 id="request-workflow-title">{selectedRepositoryItem.titulo}</h2></div>
-            <button type="button" aria-label="Fechar" onClick={() => setSelectedRepositoryItem(null)}>×</button>
+            <button type="button" aria-label="Fechar" onClick={closeWorkflow}>×</button>
           </header>
           <div className="request-workflow-request"><strong>{selectedRepositoryItem.solicitante_nome}</strong><p>{selectedRepositoryItem.descricao}</p></div>
+          {error && <p role="alert" className="request-workflow-error">{error}</p>}
           <form onSubmit={saveRepositoryWorkflow}>
-            <label>Responsável pelo atendimento<input readOnly value={selectedRepositoryItem.responsavel_nome || central.currentActor.nome} /></label>
+            <label>Responsável pelo atendimento<output>{selectedRepositoryItem.responsavel_nome || central.currentActor.nome}</output></label>
             <label>Situação<select value={workflowStatus} onChange={(event) => setWorkflowStatus(event.target.value as RepositoryItem["item_status"])}>
               {repositoryStatusOptions(selectedRepositoryItem.repositoryType).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select></label>
@@ -501,7 +511,7 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
               {workflowTestimony.trim() && <div><strong>Consentimento da pessoa atendida para compartilhar o testemunho</strong><label><input type="radio" name="testimonyPermission" checked={testimonyPermission === "PERMITIR"} onChange={() => setTestimonyPermission("PERMITIR")} />Permitir</label><label><input type="radio" name="testimonyPermission" checked={testimonyPermission === "NAO_PERMITIR"} onChange={() => setTestimonyPermission("NAO_PERMITIR")} />Não permitir</label></div>}
             </fieldset>
             <footer className="request-workflow-wide">
-              <button type="button" onClick={() => setSelectedRepositoryItem(null)}>Cancelar</button>
+              <button type="button" onClick={closeWorkflow}>Cancelar</button>
               {selectedRepositoryItem.testemunho && selectedRepositoryItem.testemunho_compartilhavel === 1 && !selectedRepositoryItem.testemunho_publicado_em && selectedRepositoryItem.responsavel_usuario_id === central.currentActor.id && <button type="button" className="request-testimony-share" disabled={busy === `testimony-${selectedRepositoryItem.id}`} onClick={() => void shareTestimony()}>Compartilhar testemunho</button>}
               <button disabled={busy === `workflow-${selectedRepositoryItem.id}`}>{busy === `workflow-${selectedRepositoryItem.id}` ? "Salvando…" : "Salvar atendimento"}</button>
             </footer>
