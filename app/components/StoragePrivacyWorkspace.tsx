@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 type StorageData = {
   googleAvailable: boolean;
-  google: null | { email: string; connected: boolean; connectedAt: string };
+  google: null | { email: string; connected: boolean; connectedAt: string; scopes: string };
   preference: {
     provider: "LOCAL" | "GOOGLE_DRIVE";
     auto_load_recent: number;
@@ -168,6 +168,14 @@ export default function StoragePrivacyWorkspace() {
         )}
       </div>
 
+      {driveConnected && (
+        <dl className="storage-google-evidence">
+          <div><dt>Conta autorizada</dt><dd>{data.google?.email}</dd></div>
+          <div><dt>Autorizado em</dt><dd>{formatConnectedAt(data.google?.connectedAt)}</dd></div>
+          <div><dt>Permissões concedidas</dt><dd>{describeScopes(data.google?.scopes)}</dd></div>
+        </dl>
+      )}
+
       <fieldset className="storage-download-controls" disabled={busy}>
         <legend>Carregamento e download</legend>
         <label>
@@ -210,4 +218,25 @@ function migrationLabel(status: string) {
   if (status === "IN_PROGRESS") return "em andamento";
   if (status === "FAILED") return "precisa de revisão";
   return "aguardando autorização";
+}
+
+function formatConnectedAt(value?: string) {
+  const parsed = Date.parse(String(value || "").replace(" ", "T") + "Z");
+  if (!Number.isFinite(parsed)) return "—";
+  return new Date(parsed).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+}
+
+const SCOPE_LABELS: Record<string, string> = {
+  openid: "Identificação da conta",
+  email: "Endereço de e-mail",
+  profile: "Nome e foto do perfil",
+  "https://www.googleapis.com/auth/drive.file": "Arquivos que o Vínkulo cria no seu Drive",
+};
+
+function describeScopes(scopes?: string) {
+  const labels = String(scopes || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((scope) => SCOPE_LABELS[scope] || scope);
+  return labels.length ? labels.join(" · ") : "—";
 }

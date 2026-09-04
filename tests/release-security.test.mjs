@@ -44,7 +44,11 @@ test("gate final V4.5 não contém segredos e mantém proteções críticas", as
   assert.match(worker, /frame-ancestors 'none'/);
   assert.match(worker, /X-Permitted-Cross-Domain-Policies/);
   assert.match(auth, /__Host-adote_session/);
-  assert.match(auth, /HttpOnly; Secure; SameSite=Strict/);
+  // O cookie de sessão precisa ser Lax para sobreviver ao retorno do OAuth do
+  // Google. A defesa contra CSRF fica no worker (sec-fetch-site + Origin).
+  assert.match(auth, /HttpOnly; Secure; SameSite=Lax/);
+  assert.doesNotMatch(auth, /SameSite=Strict/);
+  assert.doesNotMatch(auth, /sameSite: "strict"/);
   assert.match(auth, /DELETE FROM sessoes WHERE usuario_id = \?/);
   assert.match(pilot, /networkModuleEnabled:\s*false/);
   assert.match(pilot, /paymentsEnabled:\s*false/);

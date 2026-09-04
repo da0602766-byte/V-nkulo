@@ -104,6 +104,19 @@
 .storage-destination-grid small { color: var(--muted, #6e667f); line-height: 1.4; }
 
 .storage-google-actions { display: flex; align-items: center; gap: 12px; }
+
+.storage-google-evidence {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, #5b2fc4 24%, transparent);
+  border-radius: 13px;
+  background: color-mix(in srgb, #5b2fc4 6%, transparent);
+}
+.storage-google-evidence > div { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.storage-google-evidence dt { min-width: 148px; font-size: .82rem; color: var(--muted, #6e667f); }
+.storage-google-evidence dd { margin: 0; font-size: .9rem; font-weight: 600; overflow-wrap: anywhere; }
 .storage-google-actions a,
 .storage-google-actions button,
 .storage-community-status button {

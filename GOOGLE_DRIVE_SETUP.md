@@ -27,6 +27,27 @@ Crie uma credencial **OAuth Client ID** do tipo **Web application** e use:
 Copie o Client ID e o Client Secret. O Client Secret deve ser informado somente
 no gerenciador seguro de variáveis do Site.
 
+## 2.1 Liberar o acesso enquanto o app não é verificado
+
+A tela de consentimento nasce com o status **Em teste**. Nesse status o Google
+responde `Erro 403: access_denied` para qualquer conta que não esteja na lista
+de testadores — inclusive a conta proprietária do projeto, porque "proprietário
+do projeto" e "testador autorizado" são cadastros separados.
+
+1. Abra **Google Auth Platform → Público-alvo**
+   (`https://console.cloud.google.com/auth/audience`).
+2. Em **Usuários de teste**, adicione os e-mails que vão entrar (limite de 100).
+3. O acesso vale imediatamente, sem verificação do Google.
+
+Para abrir o app a qualquer pessoa é preciso publicar em produção e passar pela
+verificação do Google, porque `drive.file` é um escopo sensível. A verificação
+exige a Política de Privacidade e os Termos publicados, além da propriedade do
+domínio confirmada no Search Console:
+
+- Página inicial: `https://<dominio>/`
+- Política de Privacidade: `https://<dominio>/privacidade`
+- Termos de Serviço: `https://<dominio>/termos`
+
 ## 3. Variáveis do ambiente hospedado
 
 - `GOOGLE_CLIENT_ID`: Client ID criado no Google Cloud.

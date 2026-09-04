@@ -1,5 +1,7 @@
 import { getD1 } from "../../../../db";
 import {
+  attachSessionCookie,
+  createSession,
   hashPassword,
   normalizeEmail,
   validatePassword,
@@ -112,14 +114,22 @@ export async function POST(request: Request) {
         JSON.stringify({ membershipCreated: false, roleGranted: false }),
       )
       .run();
-    return Response.json(
-      {
-        ok: true,
-        message:
-          "Conta criada. Entre e solicite acesso à sua comunidade; o vínculo depende de aprovação.",
-        membershipCreated: false,
-      },
-      { status: 201 },
+    // A conta nasce sem vínculo comunitário, mas já entra logada: sem isto o
+    // usuário terminava o cadastro de volta no formulário de login, sem
+    // nenhuma indicação de que a conta havia sido criada.
+    const session = await createSession(userId);
+    return attachSessionCookie(
+      Response.json(
+        {
+          ok: true,
+          message:
+            "Conta criada. Agora escolha sua comunidade e solicite entrada; o vínculo depende de aprovação.",
+          membershipCreated: false,
+          redirect: "/sem-comunidade",
+        },
+        { status: 201 },
+      ),
+      session,
     );
   } catch {
     return Response.json(

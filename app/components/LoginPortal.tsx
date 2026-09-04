@@ -231,8 +231,16 @@ export default function LoginPortal({
           ...data,
           aceiteTermos: data.aceiteTermos === "on",
         });
-        setMode("login");
-        setMessage(result.message || "Conta criada. Agora você pode entrar.");
+        setMessage(result.message || "Conta criada. Abrindo sua conta…");
+        const target = String(result.redirect || "/sem-comunidade");
+        navigating = true;
+        window.setTimeout(() => {
+          window.location.assign(
+            target.startsWith("/") && !target.startsWith("//")
+              ? target
+              : "/sem-comunidade",
+          );
+        }, 180);
       }
     } catch (error) {
       setMessage((error as Error).message);
