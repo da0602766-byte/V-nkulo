@@ -1,3 +1,4 @@
+import { replacePasswordWithToken } from "./password-reset.mjs";
 import { cookies } from "next/headers";
 import { getD1 } from "../../db";
 import { getRuntimeEnv } from "../../db/runtime-env";
@@ -7,7 +8,7 @@ const SESSION_COOKIE = "__Host-adote_session";
 const PREVIEW_SESSION_COOKIE = "adote_preview_session";
 const LEGACY_SESSION_COOKIE = "adote_session";
 const SESSION_DAYS = 14;
-const PASSWORD_ITERATIONS = 100_000;
+const PASSWORD_ITERATIONS = 600_000;
 type SignedSessionPayload = { u: number; e: number; n: string; p: string };
 
 export function normalizeEmail(value: unknown) {
@@ -17,6 +18,7 @@ export function normalizeEmail(value: unknown) {
 }
 
 export function validatePassword(password: string) {
+  if (password.length > 256) return "A senha deve ter no máximo 256 caracteres.";
   if (password.length < 8)
     return "A senha precisa ter pelo menos 8 caracteres.";
   if (!/[A-Za-z]/.test(password) || !/\d/.test(password))
@@ -24,7 +26,7 @@ export function validatePassword(password: string) {
   return null;
 }
 
-export async function hashPassword(password: string, salt = randomHex(16)) {
+export async function hashPassword(password: string, salt = randomHex(16), iterations = PASSWORD_ITERATIONS) {
   const material = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(password),
@@ -37,12 +39,12 @@ export async function hashPassword(password: string, salt = randomHex(16)) {
       name: "PBKDF2",
       hash: "SHA-256",
       salt: hexToBytes(salt),
-      iterations: PASSWORD_ITERATIONS,
+      iterations,
     },
     material,
     256,
   );
-  return { salt, hash: bytesToHex(new Uint8Array(bits)) };
+  return { salt, hash: `pbkdf2-sha256$${iterations}$${bytesToHex(new Uint8Array(bits))}` };
 }
 
 export async function verifyPassword(
@@ -50,7 +52,11 @@ export async function verifyPassword(
   salt: string,
   expected: string,
 ) {
-  const actual = (await hashPassword(password, salt)).hash;
+  if (password.length > 256 || !/^[0-9a-f]{32}$/i.test(salt)) return false;
+  const legacy = /^[0-9a-f]{64}$/i.test(expected);
+  if (!legacy && !/^pbkdf2-sha256\$(100000|600000)\$[0-9a-f]{64}$/i.test(expected)) return false;
+  const encoded = (await hashPassword(password, salt, legacy ? 100_000 : Number(expected.split("$")[1]))).hash;
+  const actual = legacy ? encoded.split("$")[2] : encoded;
   if (actual.length !== expected.length) return false;
   let difference = 0;
   for (let index = 0; index < actual.length; index += 1)
@@ -68,7 +74,7 @@ export async function setUserPassword(userId: number, password: string) {
     .run();
 }
 
-export async function createSession(userId: number) {
+export async function createSession(userId: number, expectedPasswordHash?: string) {
   const token = randomHex(32);
   const tokenHash = await sha256(token);
   const expires = new Date(Date.now() + SESSION_DAYS * 86400000);
@@ -77,7 +83,7 @@ export async function createSession(userId: number) {
     .prepare("SELECT senha_hash FROM usuarios WHERE id = ? LIMIT 1")
     .bind(userId)
     .first<{ senha_hash: string | null }>();
-  if (!password?.senha_hash)
+  if (!password?.senha_hash || (expectedPasswordHash && expectedPasswordHash !== password.senha_hash))
     throw new Error(
       "Não foi possível criar uma sessão segura para este cadastro.",
     );
@@ -360,52 +366,16 @@ export async function consumeFirstAccessToken(input: {
   if (input.temporaryPassword === input.newPassword) {
     return { ok: false, reason: "SAME_PASSWORD" } as const;
   }
-  const claim = await db
-    .prepare("UPDATE redefinicoes_senha SET usado = 1 WHERE id = ? AND usado = 0")
-    .bind(row.id)
-    .run();
-  if (!Number((claim.meta as { changes?: number }).changes || 0)) {
-    return { ok: false, reason: "INVALID" } as const;
-  }
-  try {
-    await setUserPassword(row.usuario_id, input.newPassword);
-  } catch (error) {
-    await db
-      .prepare("UPDATE redefinicoes_senha SET usado = 0 WHERE id = ?")
-      .bind(row.id)
-      .run();
-    throw error;
-  }
-  await db
-    .prepare("UPDATE redefinicoes_senha SET usado = 1 WHERE usuario_id = ? AND usado = 0")
-    .bind(row.usuario_id)
-    .run();
-  await db
-    .prepare("DELETE FROM sessoes WHERE usuario_id = ?")
-    .bind(row.usuario_id)
-    .run();
+  const { hash, salt } = await hashPassword(input.newPassword);
+  const success = await replacePasswordWithToken(db, `first:${await sha256(input.token)}`, hash, salt, row.senha_hash);
+  if (!success) return { ok: false, reason: "INVALID" } as const;
   return { ok: true, userId: row.usuario_id } as const;
 }
 
 export async function consumeResetToken(token: string, password: string) {
-  const db = getD1();
-  const row = await db
-    .prepare(
-      "SELECT usuario_id FROM redefinicoes_senha WHERE token_hash = ? AND usado = 0 AND datetime(expira_em) > CURRENT_TIMESTAMP LIMIT 1",
-    )
-    .bind(await sha256(token))
-    .first<{ usuario_id: number }>();
-  if (!row) return false;
-  await setUserPassword(row.usuario_id, password);
-  await db
-    .prepare("UPDATE redefinicoes_senha SET usado = 1 WHERE usuario_id = ? AND usado = 0")
-    .bind(row.usuario_id)
-    .run();
-  await db
-    .prepare("DELETE FROM sessoes WHERE usuario_id = ?")
-    .bind(row.usuario_id)
-    .run();
-  return true;
+  if (!token || token.length > 256 || validatePassword(password)) return false;
+  const { hash, salt } = await hashPassword(password);
+  return replacePasswordWithToken(getD1(), await sha256(token), hash, salt);
 }
 
 export async function sha256(value: string) {

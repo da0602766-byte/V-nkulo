@@ -1,0 +1,102 @@
+/* Shared task surfaces: translucent shell, opaque-enough reading areas. */
+:root { --task-surface: rgb(255 255 255 / .96); --task-ink: #1b1027; --task-muted: #62566f; }
+:root[data-theme="dark"], :root[data-pilot-theme="escuro"] {
+  --task-surface: rgb(27 18 40 / .96); --task-ink: #f6f0ff; --task-muted: #c6b9d6;
+}
+:is(.private-chat-shell, .storage-privacy-card, .request-workflow-dialog, .visitor-workspace-redesign) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--task-ink);
+}
+:is(.request-workflow-dialog, .private-chat-dialog, .storage-privacy-card) {
+  background: var(--task-surface);
+  color: var(--task-ink);
+  max-width: calc(100vw - 1.5rem);
+}
+:is(.request-workflow-dialog, .private-chat-dialog) {
+  max-height: calc(100dvh - 1.5rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+:is(.request-workflow-dialog, .storage-privacy-card, .private-chat-shell, .private-chat-dialog) :is(input, select, textarea, button) {
+  font-size: 1rem;
+  min-height: 2.75rem;
+  max-width: 100%;
+}
+:is(.request-workflow-dialog, .storage-privacy-card, .private-chat-shell, .private-chat-dialog) :is(label, legend) {
+  font-size: .875rem;
+  line-height: 1.5;
+}
+:is(.private-chat-shell, .storage-privacy-card, .request-workflow-dialog) small {
+  font-size: .8125rem;
+  color: var(--task-muted);
+}
+:is(button, a, input, select, textarea, summary):focus-visible {
+  outline: 3px solid var(--violet, #5b2fc4);
+  outline-offset: 3px;
+}
+.private-chat-messages article, .private-chat-dialog-messages article { overflow-wrap: anywhere; }
+.private-chat-thread form { min-width: 0; align-items: end; }
+.private-chat-thread form textarea { min-width: 0; width: 100%; }
+.visitor-table-scroll-v2 { max-width: 100%; overflow-x: auto; }
+.visitor-table-v2 :is(th, td) { height: auto; min-height: 2.75rem; }
+.visitor-table-v2 td select { min-height: 2.5rem; }
+@media (max-width: 600px) {
+  .storage-destination-grid { grid-template-columns: minmax(0, 1fr); }
+  .private-chat-thread form { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .request-workflow-dialog form { grid-template-columns: minmax(0, 1fr); }
+  .pilot-mobile-label { white-space: normal; overflow-wrap: normal; line-height: 1.15; }
+}
+
+.schedule-next-action { display: grid; gap: .4rem; padding: .8rem; border-left: 3px solid var(--pilot-purple); background: var(--task-surface); color: var(--task-ink); font-size: .875rem; }
+.request-repository-items button { flex-wrap: wrap; }
+.request-repository-items button > span { min-width: 0; overflow-wrap: anywhere; }
+.request-repository-items em { white-space: normal; }
+
+.request-repository-items button > span:nth-child(2) { flex: 1 1 12rem; }
+.request-repository-items :is(strong, small), .request-repository summary :is(strong, small) { white-space: normal; overflow: visible; text-overflow: clip; }
+.request-repository-items button > em { flex: 0 1 auto; font-size: .8125rem; }
+@media (max-width: 600px) {
+  .visitor-person-cell-v2 { grid-template-columns: minmax(0, 1fr); }
+  .visitor-person-cell-v2 > span:first-child { display: none; }
+  .request-repository-items button { display: grid; grid-template-columns: 2rem minmax(0, 1fr); }
+  .request-repository-items button > em { grid-column: 2; justify-self: start; }
+}
+/* One scrolling surface keeps the title and actions reachable at 200% text. */
+.request-workflow-backdrop { padding: .75rem; place-items: center; }
+.request-workflow-dialog { display: block; max-height: calc(100dvh - 1.5rem); }
+.request-workflow-dialog > form { overflow: visible; }
+.request-workflow-dialog > header { position: sticky; top: 0; z-index: 2; background: var(--task-surface); }
+.request-workflow-dialog footer button:last-child { background: #5b2fc4; color: #fff; }
+.visitor-relations-v2 { grid-template-columns: minmax(0, 1fr); }
+.visitor-relations-v2 > * { min-width: 0; max-width: 100%; }
+@media (max-width: 600px) {
+  .visitor-commandbar-v2 { grid-template-columns: minmax(0, 1fr); }
+  .visitor-commandbar-v2 button { justify-self: start; max-width: 100%; white-space: normal; }
+  .visitor-table-scroll-v2 { overflow-x: auto; }
+}
+
+.request-workflow-dialog > form { grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); }
+.request-workflow-dialog output { display: block; padding: .75rem; border: 1px solid var(--pilot-line); border-radius: .7rem; color: var(--task-ink); background: var(--pilot-surface-2); overflow-wrap: anywhere; }
+.request-workflow-error { margin: .75rem 1rem; padding: .75rem; color: var(--task-ink); border-left: 4px solid #d94467; }
+.visitor-table-v2 th { overflow-wrap: normal; word-break: normal; }
+@media (min-width: 601px) {
+  .visitor-table-v2 th:nth-child(5) { width: 130px; }
+  .visitor-table-v2 th:nth-child(6) { width: 145px; }
+}
+
+.request-repository-items > button :is(strong, small), .request-repository > summary > span :is(strong, small) { white-space: normal; overflow: visible; text-overflow: clip; }
+/* The floating help launcher must not cover the composer or a task dialog. */
+body:has(.private-chat-shell:focus-within, .private-chat-dialog, .request-workflow-dialog) .global-feedback-launcher { visibility: hidden; pointer-events: none; }
+.private-chat-send-error { margin: .5rem; padding: .75rem; background: var(--task-surface); color: var(--task-ink); border-left: 4px solid #d94467; }
+@media (max-width: 600px) {
+  .visitor-table-v2 { display: block; }
+  .visitor-table-v2 thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .visitor-table-v2 tbody { display: block; }
+  .visitor-table-v2 tbody tr { display: grid; grid-template-columns: 2rem minmax(0, 1fr) 2rem; align-items: center; padding: .5rem; border-bottom: 1px solid var(--pilot-line); }
+  .visitor-table-v2 tbody :is(th, td) { width: auto; height: auto; border: 0; min-width: 0; }
+  .visitor-table-v2 tbody th { grid-column: 2 / -1; }
+  .visitor-table-v2 tbody td:nth-child(7) { grid-column: 2; }
+  .visitor-table-v2 tbody td:last-child { grid-column: 3; }
+  .visitor-person-cell-v2 :is(strong, small) { overflow-wrap: normal; word-break: normal; }
+}

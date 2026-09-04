@@ -1,5 +1,7 @@
 "use client";
 
+import { readVisitorSpreadsheet, exportVisitorSpreadsheet } from "../lib/visitor-spreadsheet";
+
 import {
   type CSSProperties,
   FormEvent,
@@ -775,7 +777,6 @@ export function VisitorsWorkspace({
   async function exportVisitors() {
     setError("");
     try {
-      const XLSX = await import("xlsx");
       const rows = visitors.map((visitor) => ({
         Nome: visitor.nome_completo,
         Telefone: visitor.telefone || "",
@@ -787,16 +788,7 @@ export function VisitorsWorkspace({
         "Data de entrada": visitor.data_entrada || "",
         "Próximo contato": visitor.proximo_contato || "",
       }));
-      const worksheet = XLSX.utils.json_to_sheet(rows, {
-        header: ["Nome", "Telefone", "E-mail", "Parente", "Categoria", "Ministério", "Status", "Data de entrada", "Próximo contato"],
-      });
-      worksheet["!cols"] = [
-        { wch: 30 }, { wch: 18 }, { wch: 30 }, { wch: 24 }, { wch: 20 },
-        { wch: 22 }, { wch: 20 }, { wch: 16 }, { wch: 18 },
-      ];
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Visitantes");
-      XLSX.writeFile(workbook, `visitantes-${hojeLocal()}.xlsx`, { compression: true });
+      await exportVisitorSpreadsheet(rows, `visitantes-${hojeLocal()}.xlsx`);
     } catch (caught) {
       setError(`Não foi possível gerar a planilha: ${(caught as Error).message}`);
     }
@@ -807,10 +799,7 @@ export function VisitorsWorkspace({
     setError("");
     setMessage("");
     try {
-      const XLSX = await import("xlsx");
-      const workbook = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: "", raw: false });
+      const rawRows = await readVisitorSpreadsheet(file);
       const normalizedCategories = new Map(categories.map((category) => [normalizeSpreadsheetKey(category.nome), category]));
       const normalizedRows = rawRows.map((raw) => {
         const values = new Map(Object.entries(raw).map(([key, value]) => [normalizeSpreadsheetKey(key), String(value ?? "").trim()]));
@@ -1357,7 +1346,7 @@ export function VisitorsWorkspace({
           </section>}
 
           <form className="visitor-commandbar-v2" onSubmit={(event) => { event.preventDefault(); void loadVisitors(); }}>
-            <label className="visitor-search-v2"><span aria-hidden="true">⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nome, telefone ou e-mail" /></label>
+            <label className="visitor-search-v2"><span aria-hidden="true">⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Buscar visitantes por nome, telefone ou e-mail" placeholder="Buscar por nome, telefone ou e-mail" /></label>
             <button type="button" className={filtersOpen ? "active" : ""} onClick={() => setFiltersOpen((current) => !current)}>☷ Filtros</button>
             <button type="button" className={columnsOpen ? "active" : ""} onClick={() => setColumnsOpen((current) => !current)}>▦ Colunas</button>
             <button type="button" onClick={() => setSortDirection((current) => current === "asc" ? "desc" : "asc")}>↕ Nome {sortDirection === "asc" ? "A–Z" : "Z–A"}</button>

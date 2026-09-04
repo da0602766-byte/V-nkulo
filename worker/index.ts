@@ -27,7 +27,7 @@ interface ExecutionContext {
 }
 
 const MAX_API_BODY_BYTES = 1024 * 1024;
-const MAX_UPLOAD_BODY_BYTES = 7 * 1024 * 1024;
+const MAX_UPLOAD_BODY_BYTES = 9 * 1024 * 1024;
 const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const OPTIMIZER_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 let nextOptimizerCheckAt = 0;
@@ -41,9 +41,14 @@ let nextOptimizerCheckAt = 0;
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+    const nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(18))));
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("Content-Security-Policy", contentSecurityPolicy(nonce));
+    requestHeaders.set("x-nonce", nonce);
+    request = new Request(request, { headers: requestHeaders });
     const blockedRequest = validateApiRequest(request, url);
     if (blockedRequest) {
-      return withSecurityHeaders(blockedRequest, url.pathname);
+      return withSecurityHeaders(blockedRequest, url.pathname, nonce);
     }
 
     try {
@@ -56,7 +61,7 @@ const worker = {
             return result.response();
           },
         }, allowedWidths);
-        return withSecurityHeaders(imageResponse, url.pathname);
+        return withSecurityHeaders(imageResponse, url.pathname, nonce);
       }
 
       if (
@@ -72,7 +77,7 @@ const worker = {
       const response = await runWithRuntimeEnv(env, () =>
         handler.fetch(request, env, ctx),
       );
-      return withSecurityHeaders(response, url.pathname);
+      return withSecurityHeaders(response, url.pathname, nonce);
     } catch {
       const fallback = url.pathname.startsWith("/api/")
         ? Response.json(
@@ -83,14 +88,14 @@ const worker = {
             status: 500,
             headers: { "Content-Type": "text/plain; charset=utf-8" },
           });
-      return withSecurityHeaders(fallback, url.pathname);
+      return withSecurityHeaders(fallback, url.pathname, nonce);
     }
   },
 };
 
 export default worker;
 
-function withSecurityHeaders(response: Response, pathname: string) {
+function withSecurityHeaders(response: Response, pathname: string, nonce: string) {
   const headers = new Headers(response.headers);
   headers.set("X-Content-Type-Options", "nosniff");
   headers.set("X-Frame-Options", "DENY");
@@ -104,7 +109,7 @@ function withSecurityHeaders(response: Response, pathname: string) {
   headers.set("X-Permitted-Cross-Domain-Policies", "none");
   headers.set(
     "Content-Security-Policy",
-    "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'",
+    contentSecurityPolicy(nonce),
   );
   headers.set(
     "Strict-Transport-Security",
@@ -126,6 +131,7 @@ function withSecurityHeaders(response: Response, pathname: string) {
   ) {
     headers.set("Cache-Control", "no-store");
   }
+  if ((headers.get("content-type") || "").includes("text/html")) headers.set("Cache-Control", "private, no-store");
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
@@ -166,4 +172,8 @@ function validateApiRequest(request: Request, url: URL) {
     );
   }
   return null;
+}
+
+function contentSecurityPolicy(nonce: string) {
+  return `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'nonce-${nonce}'; script-src-attr 'none'; worker-src 'self'; connect-src 'self'`;
 }
