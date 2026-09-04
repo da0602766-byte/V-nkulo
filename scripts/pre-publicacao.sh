@@ -69,13 +69,17 @@ set +e
 node_modules/.bin/eslint . --ignore-pattern dist --ignore-pattern .next \
   > "${trabalho}/lint.txt" 2>&1
 set -e
-resumo_lint="$(grep -oE '[0-9]+ (errors?|warnings?)' "${trabalho}/lint.txt" | tail -2 | paste -sd' e ' -)"
-erros_lint="$(grep -oE '([0-9]+) errors?' "${trabalho}/lint.txt" | tail -1 | grep -oE '[0-9]+' || echo 0)"
+# O eslint já imprime "(0 errors, 44 warnings)" na linha de resumo. Reconstruir
+# isso a partir dos números soltos foi o que produziu "0 errors 44 warnings":
+# `paste -sd' e '` consome a lista de delimitadores um caractere por vez, então
+# só o espaço era usado. Aproveitar a linha pronta evita o problema inteiro.
+resumo_lint="$(grep -oE '\([0-9]+ errors?, [0-9]+ warnings?\)' "${trabalho}/lint.txt" | tail -1 | tr -d '()')"
+erros_lint="$(printf '%s' "${resumo_lint}" | grep -oE '^[0-9]+' || echo 0)"
 if [[ "${erros_lint:-0}" -gt 0 ]]; then
-  reprovar "${resumo_lint:-erros de lint}"
-  grep -B 1 "error" "${trabalho}/lint.txt" | head -20 | sed 's/^/  /'
+  reprovar "${resumo_lint}"
+  grep -E '^\s+[0-9]+:[0-9]+\s+error' "${trabalho}/lint.txt" | head -20 | sed 's/^/  /'
 else
-  echo "  0 erros${resumo_lint:+ (${resumo_lint})}"
+  echo "  ${resumo_lint:-0 errors, 0 warnings}"
 fi
 
 # ── Build e artefato do Sites ───────────────────────────────────────────────
