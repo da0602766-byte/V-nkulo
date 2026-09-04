@@ -63,3 +63,46 @@ test("o cadastro público abre sessão em vez de devolver ao formulário de logi
   assert.doesNotMatch(portal, /setMode\("login"\);\s*\n\s*setMessage\(result\.message/);
   assert.match(portal, /result\.redirect \|\| "\/sem-comunidade"/);
 });
+
+test("toda ação com o Google termina em um aviso animado", async () => {
+  const [toast, css, portal, storage, appReturn] = await Promise.all([
+    read("app/components/GoogleStatusToast.tsx"),
+    read("app/globals.css"),
+    read("app/components/LoginPortal.tsx"),
+    read("app/components/StoragePrivacyWorkspace.tsx"),
+    read("app/components/GoogleAppReturn.tsx"),
+  ]);
+
+  // Os três estados e o tempo de saída de cada um.
+  assert.match(toast, /pending: 0,\s*\n\s*success: 5200,\s*\n\s*error: 0,/);
+  assert.match(toast, /role=\{variant === "error" \? "alert" : "status"\}/);
+
+  // As animações precisam existir de fato no CSS publicado.
+  for (const frames of [
+    "google-toast-in",
+    "google-toast-cycle",
+    "google-mark-pop",
+    "google-badge-pop",
+    "google-stroke-draw",
+    "google-ring-spin",
+    "google-shake",
+    "google-timer-drain",
+  ]) {
+    assert.match(css, new RegExp(`@keyframes ${frames}`), `falta @keyframes ${frames}`);
+  }
+  assert.match(css, /prefers-reduced-motion: reduce/);
+
+  // Pontos de disparo: login, cadastro e Drive.
+  assert.match(portal, /<GoogleStatusToast state=\{googleToast\}/);
+  assert.match(portal, /title: "Abrindo a Conta Google"/);
+  assert.match(portal, /title: "Conta criada"/);
+  assert.match(storage, /<GoogleStatusToast state=\{googleToast\}/);
+  assert.match(storage, /title: "Google Drive conectado"/);
+  assert.match(storage, /title: "Google Drive desconectado"/);
+  assert.match(storage, /title: "Não foi possível conectar o Drive"/);
+
+  // A tela de retorno do Android anima o próprio ícone em vez de repetir o texto.
+  assert.doesNotMatch(appReturn, /GoogleStatusToast/);
+  assert.match(appReturn, /google-return-mark/);
+  assert.match(css, /\.google-return-mark\.success path/);
+});

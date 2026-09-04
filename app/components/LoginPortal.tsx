@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import GoogleStatusToast, { type GoogleToastState } from "./GoogleStatusToast";
 import type { PilotSignupField } from "../lib/pilot-login-config";
 import Link from "./StableLink";
 
@@ -116,7 +117,14 @@ export default function LoginPortal({
   googleAvailable?: boolean;
 }) {
   const [mode, setMode] = useState<Mode>(initialMode);
-  const [message, setMessage] = useState(initialMessage);
+  const [message, setMessage] = useState("");
+  // O callback do Google e os motivos de sessão chegam em initialMessage. Antes
+  // viravam um parágrafo estático no meio do formulário e passavam despercebidos.
+  const [googleToast, setGoogleToast] = useState<GoogleToastState>(
+    initialMessage
+      ? { variant: "error", title: "Não foi possível entrar", detail: initialMessage }
+      : null,
+  );
   const [loading, setLoading] = useState(false);
   const [androidApp, setAndroidApp] = useState(false);
   const [googlePairing, setGooglePairing] = useState("");
@@ -178,7 +186,11 @@ export default function LoginPortal({
           window.sessionStorage.removeItem("vinkulo-google-pairing");
           setGooglePairing("");
           setLoading(false);
-          setMessage(body.error || "Não foi possível concluir o login com Google.");
+          setGoogleToast({
+            variant: "error",
+            title: "Não foi possível concluir o login",
+            detail: body.error || "O Google não confirmou a autorização.",
+          });
           return;
         }
       } catch {
@@ -231,7 +243,11 @@ export default function LoginPortal({
           ...data,
           aceiteTermos: data.aceiteTermos === "on",
         });
-        setMessage(result.message || "Conta criada. Abrindo sua conta…");
+        setGoogleToast({
+          variant: "success",
+          title: "Conta criada",
+          detail: result.message || "Escolha sua comunidade e solicite entrada. O vínculo depende de aprovação.",
+        });
         const target = String(result.redirect || "/sem-comunidade");
         navigating = true;
         window.setTimeout(() => {
@@ -243,7 +259,12 @@ export default function LoginPortal({
         }, 180);
       }
     } catch (error) {
-      setMessage((error as Error).message);
+      const detail = (error as Error).message;
+      if (mode === "cadastro") {
+        setGoogleToast({ variant: "error", title: "Não foi possível criar a conta", detail });
+      } else {
+        setMessage(detail);
+      }
     } finally {
       if (!navigating) setLoading(false);
     }
@@ -252,6 +273,7 @@ export default function LoginPortal({
   function changeMode(next: Mode) {
     setMode(next);
     setMessage("");
+    setGoogleToast(null);
   }
 
   function changeTheme(next: LoginTheme) {
@@ -261,12 +283,20 @@ export default function LoginPortal({
 
   async function startGoogleLogin() {
     setLoading(true);
-    setMessage("Abrindo a Conta Google com segurança…");
+    setGoogleToast({
+      variant: "pending",
+      title: "Abrindo a Conta Google",
+      detail: "Confirme o acesso na janela do Google.",
+    });
     if (!androidApp) {
       window.location.assign(`/api/auth/google/start?purpose=login&returnTo=${encodeURIComponent(returnTo || "/painel")}`);
       return;
     }
-    setMessage("Abra o Google no navegador. O Vínkulo concluirá o acesso automaticamente.");
+    setGoogleToast({
+      variant: "pending",
+      title: "Abra o Google no navegador",
+      detail: "O Vínkulo conclui o acesso assim que você autorizar.",
+    });
     try {
       const bytes = crypto.getRandomValues(new Uint8Array(32));
       const pairing = btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
@@ -285,7 +315,11 @@ export default function LoginPortal({
       window.location.href = body.authorizationUrl;
     } catch (error) {
       setLoading(false);
-      setMessage((error as Error).message);
+      setGoogleToast({
+        variant: "error",
+        title: "Não foi possível abrir o Google",
+        detail: (error as Error).message,
+      });
     }
   }
 
@@ -449,6 +483,8 @@ export default function LoginPortal({
       </section>
 
       <footer className="login-v2-footer">© {new Date().getFullYear()} {siteName} · <Link href="/privacidade">Política de Privacidade</Link> · <Link href="/termos">Termos de Uso</Link></footer>
+
+      <GoogleStatusToast state={googleToast} onDismiss={() => setGoogleToast(null)} />
     </main>
   );
 }
