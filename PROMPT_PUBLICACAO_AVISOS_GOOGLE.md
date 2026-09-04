@@ -19,21 +19,20 @@ desde a `0060_google_drive_privacy.sql`, que já está em produção.
 
 ## O que publicar
 
-Os dois commits à frente de `main`. O branch está **2 commits à frente e 0
-atrás**, sem conflito. Confira na fonte em vez de confiar nos números daqui:
+Tudo o que o branch tem à frente de `main`. Ele está **0 commits atrás**, sem
+conflito. A contagem muda a cada ajuste neste documento, então confira na fonte
+em vez de confiar num número aqui:
 
 ```
 git log --oneline --reverse origin/main..origin/claude/google-drive-nao-funciona-yybl7q
 git diff --shortstat origin/main...origin/claude/google-drive-nao-funciona-yybl7q
 ```
 
-Na última medição eram 2 commits, 12 arquivos, 628 linhas somadas e 38
-removidas.
-
 | # | Commit | O que entrega |
 | --- | --- | --- |
 | 1 | `da41aff` | Sessão sobrevive ao retorno do OAuth; conflito de `google_sub`; comprovação do Drive na tela de conta; sessão no cadastro |
 | 2 | `ec7d41d` | Avisos animados de todas as ações com o Google |
+| 3+ | `e86a168` e seguintes | Este documento, o registro na coordenação e o script de pré-publicação |
 
 ## O defeito e por que ele existia
 
@@ -101,13 +100,16 @@ formulário.
 - TypeScript: `tsc --noEmit` limpo.
 - Lint: 0 erros nos arquivos alterados; 2 avisos `@next/next/no-img-element`
   preexistentes em `LoginPortal.tsx`, não relacionados.
-- Suíte: **247 de 287**, com **as mesmas 40 falhas da baseline** medida em
-  `5b445e3` antes de qualquer alteração (241 de 281 lá). Nenhuma regressão; as
-  40 são históricas e dependem do build.
+- Build e artefato do Sites: **aprovados**.
+- Suíte com o build rodado: **286 de 287**. A única falha é
+  `banner público é exibido inteiro e apresentação respeita margens móveis`,
+  que falha igual na `main` sem esta entrega.
 - Novo `tests/v200-google-oauth-session-return.test.mjs`, 6 testes.
 
-**Não executei build nem artefato do Sites** — o ambiente desta sessão não os
-roda. Isso fica para você antes de publicar.
+**Correção de um número que circulou antes:** um relato anterior desta entrega
+citou "40 falhas históricas". Estava errado. Aqueles 39 testes a mais falhavam
+apenas porque a suíte tinha sido rodada sem `dist/` — eles leem o artefato do
+build. Com o build feito, passam. A falha real e preexistente é uma só.
 
 ## Um teste seu foi atualizado
 
@@ -124,7 +126,9 @@ erro. As outras asserções do arquivo não foram tocadas.
 2. Confira o diff contra `main`. Vale ler `app/lib/local-auth.ts` primeiro — a
    mudança de uma palavra (`Strict` → `Lax`) é a que resolve dois dos três
    sintomas.
-3. Rode build e artefato do Sites.
+3. Rode `scripts/pre-publicacao.sh`, que faz TypeScript, lint, build,
+   validação do artefato e a suíte comparada com
+   `tests/falhas-conhecidas.txt`. Ele sai com 1 se aparecer falha nova.
 4. Integre em `main` e publique pelo fluxo do `COORDENACAO_IA.md` — credencial
    temporária por comando, nunca gravada em arquivo, log, commit ou URL.
 5. Depois do push, `fetch` e confirme que `HEAD` e `origin/main` apontam para o
