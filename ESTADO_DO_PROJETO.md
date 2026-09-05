@@ -360,4 +360,5 @@
 - PWA instalada e APK deixaram de ser tratados como o mesmo ambiente; a PWA permanece no fluxo web e somente o APK usa o deep link Android.
 - Nenhuma migração nova e nenhuma alteração nos dados, papéis, permissões ou isolamento entre comunidades.
 - Validação: TypeScript sem erros; lint sem erros novos (44 avisos preexistentes); build e artefato Sites aprovados; **293/293 testes automatizados aprovados**.
-- Próximo passo: compilar o APK 1.4.0, instalar em aparelho físico e homologar login Google, cancelamento e conexão do Drive antes de qualquer publicação.
+- APK 1.4.0 compilado com sucesso pelo GitHub Actions e inspecionado: pacote íntegro, deep link `vinkulo://google-login-complete` e ponte `openGoogleAuth` presentes.
+- Próximo passo: publicar de forma coordenada a parte web autorizada, instalar o APK em aparelho físico e homologar login Google, cancelamento e conexão do Drive antes da mesclagem final.
