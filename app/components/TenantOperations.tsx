@@ -1209,8 +1209,8 @@ export function VisitorsWorkspace({
         <section id="visitor-registration-card" className="visitor-registration-dialog" role="dialog" aria-modal="true" aria-labelledby="visitor-registration-title">
           <header><div><p className="pilot-kicker">NOVO VISITANTE</p><h2 id="visitor-registration-title">Cadastrar visitante</h2><p>Preencha a ficha sem perder o contexto da lista.</p></div><button type="button" aria-label="Fechar cadastro" onClick={() => !saving && setRegistrationOpen(false)}>×</button></header>
           <form className="pilot-form visitor-registration" onSubmit={createVisitor} onInput={(event) => scheduleDuplicateCheck(event.currentTarget)}>
-            <section className="visitor-registration-section visitor-registration-form-section">
-              <header><span><b>1</b><strong>Informações pessoais</strong><small>Nome e formas de contato</small></span></header>
+            <details className="visitor-registration-section visitor-registration-form-section" open>
+              <summary><span><b>1</b><strong>Informações pessoais</strong><small>Nome e formas de contato</small></span><i aria-hidden="true">⌄</i></summary>
               <fieldset>
                 <legend>Dados pessoais</legend>
                 <label>Nome completo*<input name="nomeCompleto" required maxLength={120} /></label>
@@ -1220,7 +1220,7 @@ export function VisitorsWorkspace({
                 <label className="visitor-wide-field">Parente ou responsável<input name="parente" maxLength={120} placeholder="Nome do familiar ou responsável" /></label>
                 <label className="visitor-wide-field">Endereço<input name="endereco" maxLength={250} /></label>
               </fieldset>
-            </section>
+            </details>
             {(duplicateChecking || duplicateMatches.length > 0) && (
               <section className={`visitor-duplicate-check ${duplicateMatches.length ? "has-matches" : ""}`} aria-live="polite">
                 <header><strong>{duplicateChecking ? "Verificando fichas…" : "Possível cadastro duplicado"}</strong><small>Comparamos nome, e-mail, telefone e parente.</small></header>
@@ -1232,17 +1232,17 @@ export function VisitorsWorkspace({
                 ))}
               </section>
             )}
-            <section className="visitor-registration-section visitor-registration-form-section">
-              <header><span><b>2</b><strong>Conexão espiritual</strong><small>Batismo e formação</small></span></header>
+            <details className="visitor-registration-section visitor-registration-form-section">
+              <summary><span><b>2</b><strong>Conexão espiritual</strong><small>Batismo e formação</small></span><i aria-hidden="true">⌄</i></summary>
               <fieldset>
                 <legend>Informações espirituais</legend>
                 <label>Batismo<select name="batizado" defaultValue="NAO_INFORMADO"><option value="NAO_INFORMADO">Não informado</option><option value="SIM">Sim</option><option value="NAO">Não</option></select></label>
                 <label className="visitor-check"><input name="encontroComDeus" type="checkbox" />Já participou do Encontro com Deus</label>
                 <label className="visitor-check"><input name="cursoMembros" type="checkbox" />Já concluiu o curso de membros</label>
               </fieldset>
-            </section>
-            <section className="visitor-registration-section visitor-registration-form-section">
-              <header><span><b>3</b><strong>Vínculo com a igreja</strong><small>Célula, categoria e ministério</small></span></header>
+            </details>
+            <details className="visitor-registration-section visitor-registration-form-section">
+              <summary><span><b>3</b><strong>Vínculo com a igreja</strong><small>Célula, categoria e ministério</small></span><i aria-hidden="true">⌄</i></summary>
               <fieldset>
                 <legend>Conexão com a igreja</legend>
                 <label>Célula<select name="celulaId" defaultValue=""><option value="">Sem célula</option>{cells.map((cell) => <option key={cell.id} value={cell.id}>{cell.nome}</option>)}</select></label>
@@ -1250,16 +1250,16 @@ export function VisitorsWorkspace({
                 <label>Quem recebeu<input name="acompanhante" maxLength={120} /></label>
                 <label>Ministério de interesse<input name="ministerio" maxLength={120} /></label>
               </fieldset>
-            </section>
-            <section className="visitor-registration-section visitor-registration-form-section">
-              <header><span><b>4</b><strong>Finalização</strong><small>Entrada, status e observações</small></span></header>
+            </details>
+            <details className="visitor-registration-section visitor-registration-form-section">
+              <summary><span><b>4</b><strong>Finalização</strong><small>Entrada, status e observações</small></span><i aria-hidden="true">⌄</i></summary>
               <fieldset>
                 <legend>Observações e finalização</legend>
                 <label>Entrada<input name="dataEntrada" type="date" required defaultValue={hojeLocal()} /></label>
                 <label>Status<select name="status" defaultValue="NOVO"><option value="NOVO">Novo</option><option value="EM_CONTATO">Em contato</option><option value="EM_ACOMPANHAMENTO">Em acompanhamento</option><option value="INTEGRADO">Integrado</option></select></label>
                 <label className="visitor-wide-field">Observações<textarea name="observacoes" maxLength={1000} rows={3} /></label>
               </fieldset>
-            </section>
+            </details>
             <footer className="visitor-registration-actions"><p className="form-consequence-v5"><span aria-hidden="true">◉</span>Só o nome é obrigatório. O visitante entra no fio do dia na hora e abre um acompanhamento para o contato.</p><button type="button" onClick={() => setRegistrationOpen(false)} disabled={saving}>Cancelar</button><button disabled={saving}>{saving ? "Salvando…" : "Salvar visitante"}</button></footer>
           </form>
         </section>
@@ -1333,7 +1333,7 @@ export function VisitorsWorkspace({
         {/* Ferramentas de Relacionamento — complementam o funil acima com visão por pessoa */}
         <section style={{ padding: "24px", background: "var(--color-surface)", borderRadius: "8px", marginBottom: "24px" }} aria-labelledby="relacionamento-tools-title">
           <h2 id="relacionamento-tools-title" style={{ marginTop: 0, marginBottom: "16px", fontSize: "16px", fontWeight: "bold" }}>🛠️ Ferramentas de Relacionamento</h2>
-          <RelacionamentoTools visitantes={visitors} compacto={false} />
+          <RelacionamentoTools visitantes={visitors} compacto={false} onOpenVisitor={(visitorId) => void loadFollowups(visitorId)} />
         </section>
 
         <section className="visitor-sheet-v2" aria-labelledby="visitor-sheet-title">

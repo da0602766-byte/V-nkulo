@@ -8547,6 +8547,137 @@ html[data-pilot-theme="escuro"] .pilot-dashboard[data-community-palette] {
 }
 
 /* Relacionamento e Agenda — histórico individual sem competir com o funil. */
+.relacionamento-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin: 0 0 16px;
+  padding: 0 0 4px;
+  scrollbar-width: thin;
+}
+.relacionamento-tabs button {
+  min-height: 42px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--pilot-line);
+  border-radius: 10px;
+  background: var(--pilot-surface);
+  color: var(--pilot-text);
+  padding: 0 12px;
+  font: inherit;
+  font-weight: 800;
+}
+.relacionamento-tabs button.active {
+  border-color: color-mix(in srgb,var(--pilot-purple) 55%,var(--pilot-line));
+  background: color-mix(in srgb,var(--pilot-purple) 12%,var(--pilot-surface));
+  color: var(--pilot-purple);
+}
+.relacionamento-tabs b {
+  min-width: 24px;
+  min-height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--pilot-surface-2);
+  color: inherit;
+  font-size: var(--fs-2xs);
+}
+.relacionamento-panel {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+  border: 1px solid var(--pilot-line);
+  border-radius: 14px;
+  background: var(--pilot-surface-2);
+  padding: 14px;
+}
+.relacionamento-panel > header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.relacionamento-panel > header div { display: grid; gap: 4px; min-width: 0; }
+.relacionamento-panel > header strong { color: var(--pilot-text); font-size: var(--fs-sm); }
+.relacionamento-panel > header small { color: var(--pilot-muted); font-size: var(--fs-xs); }
+.relacionamento-panel > header b {
+  flex: none;
+  border-radius: 999px;
+  background: color-mix(in srgb,var(--rose) 14%,var(--pilot-surface));
+  color: var(--rose);
+  padding: 6px 10px;
+  font-size: var(--fs-2xs);
+}
+.relacionamento-people-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 8px;
+}
+.relacionamento-people-grid button,
+.relacionamento-engagement-card {
+  min-width: 0;
+  border: 1px solid var(--pilot-line);
+  border-radius: 10px;
+  background: var(--pilot-surface);
+  color: var(--pilot-text);
+  cursor: pointer;
+}
+.relacionamento-people-grid button {
+  display: grid;
+  grid-template-columns: 34px minmax(0,1fr);
+  gap: 2px 9px;
+  align-items: center;
+  padding: 10px;
+  text-align: left;
+}
+.relacionamento-people-grid button:hover,
+.relacionamento-engagement-card:hover {
+  border-color: color-mix(in srgb,var(--pilot-purple) 50%,var(--pilot-line));
+  background: color-mix(in srgb,var(--pilot-purple) 8%,var(--pilot-surface));
+}
+.relacionamento-people-grid button > span {
+  grid-row: 1 / 3;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: color-mix(in srgb,var(--pilot-purple) 12%,var(--pilot-surface-2));
+  color: var(--pilot-purple);
+  font-weight: 900;
+}
+.relacionamento-people-grid strong,
+.relacionamento-people-grid small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.relacionamento-people-grid small { color: var(--pilot-muted); font-size: var(--fs-2xs); }
+.relacionamento-person-link {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.relacionamento-person-link strong,
+.relacionamento-person-link span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.relacionamento-person-link span {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
 .relacionamento-history-picker {
   display: flex;
   align-items: end;
@@ -8575,6 +8706,10 @@ html[data-pilot-theme="escuro"] .pilot-dashboard[data-community-palette] {
 .relacionamento-history-state.is-error { color: var(--rose); }
 
 @media (max-width: 620px) {
+  .relacionamento-tabs { gap: 6px; margin-inline: -2px; }
+  .relacionamento-tabs button { padding-inline: 10px; }
+  .relacionamento-panel > header { display: grid; }
+  .relacionamento-people-grid { grid-template-columns: 1fr; }
   .relacionamento-history-picker { align-items: stretch; flex-direction: column; }
   .relacionamento-history-picker select { width: 100%; }
 }
