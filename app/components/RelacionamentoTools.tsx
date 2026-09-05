@@ -189,6 +189,8 @@ function ReguaAcompanhamento({ status }: { status: string }) {
  * FERRAMENTA 3: Cadência de Contato
  * Lista visitantes que precisam de contato
  */
+// Mantido para a versão compacta legada do módulo.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function CadenciaContato({ items, limite = 5 }: { items: CadenciaItem[]; limite?: number }) {
   const prioritarios = items.slice(0, limite);
 
@@ -624,6 +626,8 @@ function RegionalGrouping({ items }: { items: RegionalItem[] }) {
  * FERRAMENTA 7: Cadência Avançada
  * Recomendações inteligentes de contato
  */
+// Mantido para a versão compacta legada do módulo.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function CadenciaAvancada({ items, limite = 10 }: { items: CadenciaAvancadaItem[]; limite?: number }) {
   const prioritarios = items.slice(0, limite);
 
@@ -747,6 +751,7 @@ export function RelacionamentoTools({ visitantes = [], compacto = false }: Relac
   const [historicoCarregando, setHistoricoCarregando] = useState(false);
   const [historicoErro, setHistoricoErro] = useState("");
   const [selecionadoVisitanteId, setSelecionadoVisitanteId] = useState<number | null>(null);
+  const [busca, setBusca] = useState("");
   const visitanteHistoricoId = selecionadoVisitanteId ?? visitantes[0]?.id ?? null;
 
   useEffect(() => {
@@ -855,108 +860,80 @@ export function RelacionamentoTools({ visitantes = [], compacto = false }: Relac
     );
   }
 
-  // Versão completa
+  const termo = busca.trim().toLocaleLowerCase("pt-BR");
+  const engagementVisivel = engagement.filter((item) => !termo || item.nome_completo.toLocaleLowerCase("pt-BR").includes(termo));
+  const prioridades = (cadenciaAvancada.length ? cadenciaAvancada : cadencia.map((item) => ({
+    ...item,
+    categoria: null,
+    responsavel: null,
+    sugestao: item.prioridade === "urgente" ? "Faça um contato pessoal hoje e combine o próximo passo." : "Retome o vínculo e registre o retorno.",
+  }))).filter((item) => !termo || item.nome_completo.toLocaleLowerCase("pt-BR").includes(termo));
+  const visitantesHistorico = visitantes.filter((item) => !termo || item.nome_completo.toLocaleLowerCase("pt-BR").includes(termo));
+  const urgentes = prioridades.filter((item) => item.prioridade === "urgente").length;
+  const semContato = engagement.filter((item) => !item.ultimo_contato).length;
+  const media = engagement.length ? Math.round(engagement.reduce((sum, item) => sum + item.engagement_score, 0) / engagement.length) : 0;
+
   return (
-    <div className="relacionamento-tools">
+    <section className="relationship-command-center-v3" aria-labelledby="relacionamento-tools-title">
+      <header className="relationship-head-v3">
+        <div><p className="pilot-kicker">CENTRAL DE RELACIONAMENTO</p><h2 id="relacionamento-tools-title">Prioridades e próximos cuidados</h2><span>Encontre quem precisa de atenção, entenda o motivo e aja sem perder o histórico.</span></div>
+        <dl><div><dt>Urgentes</dt><dd>{urgentes}</dd></div><div><dt>Sem contato</dt><dd>{semContato}</dd></div><div><dt>Engajamento médio</dt><dd>{media}</dd></div></dl>
+      </header>
+      <label className="relationship-search-v3"><span aria-hidden="true">⌕</span><input type="search" value={busca} onChange={(event) => setBusca(event.target.value)} placeholder="Pesquisar pessoa, prioridade ou histórico" aria-label="Pesquisar na central de relacionamento" />{busca && <button type="button" onClick={() => setBusca("")} aria-label="Limpar pesquisa">×</button>}</label>
       {carregando ? (
-        <div style={{ padding: "24px", textAlign: "center", color: "var(--color-text-muted)" }}>
-          ⏳ Carregando ferramentas de relacionamento...
-        </div>
+        <div className="relationship-loading-v3"><span /><span /><span /><p>Organizando prioridades…</p></div>
       ) : (
         <>
-          {visitantes.length > 0 && (
-            <section className="relacionamento-history-picker" aria-labelledby="relacionamento-history-title">
+          <div className="relationship-priority-grid-v3">
+            <section className="relationship-priority-list-v3" aria-labelledby="relationship-priority-title-v3">
+              <header><div><p className="pilot-kicker">ORDEM DE CUIDADO</p><h3 id="relationship-priority-title-v3">Comece por estas pessoas</h3></div><span>{prioridades.length}</span></header>
               <div>
-                <strong id="relacionamento-history-title">Contatos e visitas</strong>
-                <small>Escolha uma pessoa para consultar o histórico individual.</small>
+                {prioridades.slice(0, 8).map((item) => <button type="button" key={item.id} data-priority={item.prioridade} onClick={() => setSelecionadoVisitanteId(item.id)}>
+                  <i aria-hidden="true" /><span><strong>{item.nome_completo}</strong><small>{item.dias_sem_contato} dias sem contato{item.responsavel ? ` · ${item.responsavel}` : ""}</small><em>{item.sugestao}</em></span><b>{item.prioridade}</b>
+                </button>)}
+                {!prioridades.length && <div className="relationship-empty-v3"><strong>Nenhuma prioridade encontrada</strong><p>{busca ? "Tente outro nome ou limpe a pesquisa." : "Os próximos cuidados aparecerão aqui conforme o histórico de contato."}</p></div>}
               </div>
-              <select
-                aria-label="Pessoa do histórico de relacionamento"
-                value={visitanteHistoricoId || ""}
-                onChange={(event) => setSelecionadoVisitanteId(Number(event.target.value) || null)}
-              >
-                {visitantes.map((visitor) => (
-                  <option key={visitor.id} value={visitor.id}>{visitor.nome_completo}</option>
-                ))}
-              </select>
+            </section>
+            <aside className="relationship-suggestions-v3" aria-labelledby="relationship-suggestions-title-v3">
+              <header><p className="pilot-kicker">SUGESTÕES</p><h3 id="relationship-suggestions-title-v3">Organização e cuidado</h3></header>
+              <ol>
+                <li data-tone={urgentes ? "urgent" : "calm"}><span>1</span><div><strong>{urgentes ? `Acolha ${urgentes} ${urgentes === 1 ? "pessoa urgente" : "pessoas urgentes"}` : "Prioridades em dia"}</strong><p>{urgentes ? "Contato pessoal hoje, com responsável e próximo passo definidos." : "Continue registrando cada retorno para manter a cadência saudável."}</p></div></li>
+                <li data-tone={semContato ? "attention" : "calm"}><span>2</span><div><strong>{semContato ? `${semContato} sem primeiro contato` : "Primeiro contato concluído"}</strong><p>{semContato ? "Distribua entre os responsáveis e evite abordagens duplicadas." : "As pessoas ativas já têm histórico de relacionamento."}</p></div></li>
+                <li><span>3</span><div><strong>Registre o próximo cuidado</strong><p>Depois da conversa, escolha uma data e deixe uma anotação com checklist.</p></div></li>
+              </ol>
+            </aside>
+          </div>
+
+          <section className="relationship-people-v3" aria-labelledby="relationship-people-title-v3">
+            <header><div><p className="pilot-kicker">VISÃO POR PESSOA</p><h3 id="relationship-people-title-v3">Engajamento e etapa</h3></div><span>{engagementVisivel.length} pessoas</span></header>
+            <div>
+              {engagementVisivel.slice(0, 12).map((item) => <button type="button" key={item.id} onClick={() => setSelecionadoVisitanteId(item.id)}>
+                <span className="relationship-person-avatar-v3">{item.nome_completo.slice(0, 1).toLocaleUpperCase("pt-BR")}</span>
+                <span><strong>{item.nome_completo}</strong><ReguaAcompanhamento status={item.status} /><small>{item.ultimo_contato ? `Último contato ${new Date(item.ultimo_contato).toLocaleDateString("pt-BR")}` : "Ainda sem contato"}</small></span>
+                <EngagementScoreBadge score={item.engagement_score} />
+              </button>)}
+              {!engagementVisivel.length && <div className="relationship-empty-v3"><strong>Nenhuma pessoa encontrada</strong><p>Ajuste a pesquisa para voltar à lista completa.</p></div>}
+            </div>
+          </section>
+
+          {visitantes.length > 0 && (
+            <section className="relationship-history-v3" aria-labelledby="relacionamento-history-title">
+              <header><div><p className="pilot-kicker">LINHA DO TEMPO</p><h3 id="relacionamento-history-title">Contatos e visitas</h3><small>Todo o histórico da pessoa, em ordem, para orientar o próximo cuidado.</small></div><select aria-label="Pessoa do histórico de relacionamento" value={visitanteHistoricoId || ""} onChange={(event) => setSelecionadoVisitanteId(Number(event.target.value) || null)}>{visitantesHistorico.map((visitor) => <option key={visitor.id} value={visitor.id}>{visitor.nome_completo}</option>)}</select></header>
+              <div className="relationship-history-columns-v3">
+                <section><header><strong>Contatos</strong><span>{contatos.length}</span></header>{visitanteHistoricoId && !historicoCarregando && !historicoErro && <ContactLogList items={contatos} />}</section>
+                <section><header><strong>Visitas</strong><span>{visitas.length}</span></header>{visitanteHistoricoId && !historicoCarregando && !historicoErro && <VisitaTrackingList items={visitas} />}</section>
+              </div>
+              {historicoCarregando && <p className="relacionamento-history-state">Carregando contatos e visitas…</p>}
+              {historicoErro && <p className="relacionamento-history-state is-error" role="alert">{historicoErro}</p>}
             </section>
           )}
 
-          {/* Seção de Engagement */}
-          {engagement.length > 0 && (
-            <div style={{ marginBottom: "24px" }}>
-              <h3 style={{ marginTop: 0, marginBottom: "12px", fontSize: "14px", fontWeight: "bold" }}>
-                ✨ Scores de Engajamento
-              </h3>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
-                  gap: "12px",
-                }}
-              >
-                {engagement.slice(0, 12).map((v) => (
-                  <div
-                    key={v.id}
-                    style={{
-                      padding: "12px",
-                      border: "1px solid var(--color-border)",
-                      borderRadius: "6px",
-                      background: "var(--color-surface)",
-                    }}
-                  >
-                    <div style={{ marginBottom: "8px" }}>
-                      <strong style={{ fontSize: "13px" }}>{v.nome_completo}</strong>
-                    </div>
-                    <EngagementScoreBadge score={v.engagement_score} />
-                    <ReguaAcompanhamento status={v.status} />
-                    <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "8px" }}>
-                      {v.ultimo_contato
-                        ? `Último contato: ${new Date(v.ultimo_contato).toLocaleDateString("pt-BR")}`
-                        : "Sem contatos"}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {(regional.length > 0 || carga.length > 0 || conflitos.length > 0) && <details className="relationship-insights-v3"><summary><span><strong>Indicadores complementares</strong><small>Carga dos responsáveis, regiões e cuidados com os dados</small></span><i aria-hidden="true">⌄</i></summary><div>{carga.length > 0 && <LoadMetrics items={carga} />}{regional.length > 0 && <RegionalGrouping items={regional} />}{conflitos.length > 0 && <ConflictDetection items={conflitos} />}</div></details>}
 
-          {/* Cadência */}
-          {cadencia.length > 0 && <CadenciaContato items={cadencia} limite={8} />}
-
-          {/* Cadência Avançada */}
-          {cadenciaAvancada.length > 0 && <CadenciaAvancada items={cadenciaAvancada} limite={10} />}
-
-          {/* Regional Grouping */}
-          {regional.length > 0 && <RegionalGrouping items={regional} />}
-
-          {/* Load Metrics */}
-          {carga.length > 0 && <LoadMetrics items={carga} />}
-
-          {/* Contact Logging */}
-          {visitanteHistoricoId && !historicoCarregando && !historicoErro && (
-            <ContactLogList items={contatos} />
-          )}
-
-          {/* Visita Tracking */}
-          {visitanteHistoricoId && !historicoCarregando && !historicoErro && (
-            <VisitaTrackingList items={visitas} />
-          )}
-          {historicoCarregando && <p className="relacionamento-history-state">Carregando contatos e visitas…</p>}
-          {historicoErro && <p className="relacionamento-history-state is-error" role="alert">{historicoErro}</p>}
-
-          {/* Conflitos */}
-          {conflitos.length > 0 && <ConflictDetection items={conflitos} />}
-
-          {/* Resumo */}
-          {engagement.length === 0 && cadencia.length === 0 && carga.length === 0 && conflitos.length === 0 && regional.length === 0 && cadenciaAvancada.length === 0 && contatos.length === 0 && visitas.length === 0 && (
-            <div style={{ padding: "24px", textAlign: "center", color: "var(--color-text-muted)" }}>
-              📊 Nenhum dado disponível no momento
-            </div>
-          )}
+          {engagement.length === 0 && cadencia.length === 0 && cadenciaAvancada.length === 0 && <div className="relationship-empty-v3"><strong>A central ainda não tem dados suficientes</strong><p>Cadastre visitantes e registre contatos para receber prioridades e sugestões.</p></div>}
         </>
       )}
-    </div>
+    </section>
   );
 }
 
