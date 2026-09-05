@@ -31830,6 +31830,7 @@ html[data-pilot-theme="claro"] .pilot-dashboard[data-ui-version="v2"] .pilot-mob
 .relationship-search-v3:focus-within { border-color:var(--pilot-primary); box-shadow:0 0 0 3px color-mix(in srgb,var(--pilot-primary) 12%,transparent); }
 .relationship-search-v3 input { width:100%; border:0; outline:0; background:transparent; color:var(--pilot-text); font:inherit; font-size:var(--fs-sm); }
 .relationship-search-v3 button { width:28px; height:28px; border:0; border-radius:7px; background:transparent; color:var(--pilot-muted); font-size:1rem; cursor:pointer; }
+.relationship-mobile-nav-v3 { display:none; }
 .relationship-loading-v3 { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; }
 .relationship-loading-v3 span { height:90px; border-radius:12px; background:linear-gradient(100deg,var(--pilot-surface-2),color-mix(in srgb,var(--pilot-primary) 8%,var(--pilot-surface-2)),var(--pilot-surface-2)); background-size:240% 100%; animation:relationship-shimmer-v3 1.5s linear infinite; }
 .relationship-loading-v3 p { grid-column:1/-1; margin:0; color:var(--pilot-muted); font-size:var(--fs-xs); text-align:center; }
@@ -31924,8 +31925,18 @@ html[data-pilot-theme="claro"] .pilot-dashboard[data-ui-version="v2"] .pilot-mob
   .relationship-head-v3 dl { grid-template-columns:repeat(3,minmax(0,1fr)); }
   .relationship-head-v3 dl div { padding:8px 5px; }
   .relationship-head-v3 dt { line-height:1.2; }
+  .relationship-mobile-nav-v3 { position:sticky; z-index:4; top:8px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px; border:1px solid var(--pilot-line); border-radius:12px; background:color-mix(in srgb,var(--pilot-surface) 94%,transparent); padding:5px; box-shadow:0 8px 24px rgba(0,0,0,.16); backdrop-filter:blur(12px); }
+  .relationship-mobile-nav-v3 button { min-width:0; min-height:52px; display:grid; grid-template-columns:auto auto; place-content:center; align-items:center; gap:2px 5px; border:0; border-radius:9px; background:transparent; color:var(--pilot-muted); font:inherit; font-size:var(--fs-xs); font-weight:750; cursor:pointer; }
+  .relationship-mobile-nav-v3 button > span { font-size:1rem; }
+  .relationship-mobile-nav-v3 button > b { min-width:19px; border-radius:999px; background:var(--pilot-surface-2); padding:2px 5px; color:inherit; font-family:var(--font-mono),monospace; font-size:var(--fs-2xs); }
+  .relationship-mobile-nav-v3 button.active { background:color-mix(in srgb,var(--pilot-primary) 14%,var(--pilot-surface-2)); color:var(--pilot-primary); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--pilot-primary) 34%,transparent); }
+  .relationship-command-center-v3[data-mobile-view="prioridades"] [data-mobile-panel]:not([data-mobile-panel="prioridades"]),
+  .relationship-command-center-v3[data-mobile-view="pessoas"] [data-mobile-panel]:not([data-mobile-panel="pessoas"]),
+  .relationship-command-center-v3[data-mobile-view="historico"] [data-mobile-panel]:not([data-mobile-panel="historico"]) { display:none; }
   .relationship-priority-list-v3 > div > button { grid-template-columns:9px minmax(0,1fr); }
   .relationship-priority-list-v3 button > b { grid-column:2; justify-self:start; }
+  .relationship-priority-list-v3 > div > button,.relationship-people-v3 > div > button { min-height:64px; touch-action:manipulation; }
+  .relationship-priority-list-v3 > div > button:active,.relationship-people-v3 > div > button:active { transform:scale(.985); border-color:var(--pilot-primary); }
   .relationship-history-v3 > header { align-items:stretch; flex-direction:column; }
   .relationship-history-v3 > header select { width:100%; min-width:0; }
 }

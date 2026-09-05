@@ -1344,7 +1344,7 @@ export function VisitorsWorkspace({
 
         {/* A central usa os mesmos dados do funil, mas organiza as decisões por
             prioridade, pessoa e próximo cuidado. */}
-        <RelacionamentoTools visitantes={visitors} compacto={false} />
+        <RelacionamentoTools visitantes={visitors} compacto={false} onAbrirVisitante={(visitorId) => void loadFollowups(visitorId)} />
 
         <section className="visitor-sheet-v2" aria-labelledby="visitor-sheet-title">
           <header className="visitor-sheet-head-v2">

@@ -92,6 +92,7 @@ type VisitaItem = {
 interface RelacionamentoToolsProps {
   visitantes?: Array<Pick<EngagementData, "id" | "nome_completo" | "status">>;
   compacto?: boolean;
+  onAbrirVisitante?: (visitanteId: number) => void;
 }
 
 // ============================================
@@ -738,7 +739,7 @@ function CadenciaAvancada({ items, limite = 10 }: { items: CadenciaAvancadaItem[
  * RelacionamentoTools
  * Componente integrado que exibe todas as ferramentas de relacionamento
  */
-export function RelacionamentoTools({ visitantes = [], compacto = false }: RelacionamentoToolsProps) {
+export function RelacionamentoTools({ visitantes = [], compacto = false, onAbrirVisitante }: RelacionamentoToolsProps) {
   const [engagement, setEngagement] = useState<EngagementData[]>([]);
   const [cadencia, setCadencia] = useState<CadenciaItem[]>([]);
   const [cadenciaAvancada, setCadenciaAvancada] = useState<CadenciaAvancadaItem[]>([]);
@@ -752,7 +753,13 @@ export function RelacionamentoTools({ visitantes = [], compacto = false }: Relac
   const [historicoErro, setHistoricoErro] = useState("");
   const [selecionadoVisitanteId, setSelecionadoVisitanteId] = useState<number | null>(null);
   const [busca, setBusca] = useState("");
+  const [mobileView, setMobileView] = useState<"prioridades" | "pessoas" | "historico">("prioridades");
   const visitanteHistoricoId = selecionadoVisitanteId ?? visitantes[0]?.id ?? null;
+
+  function abrirVisitante(visitanteId: number) {
+    setSelecionadoVisitanteId(visitanteId);
+    onAbrirVisitante?.(visitanteId);
+  }
 
   useEffect(() => {
     const carregarDados = async () => {
@@ -874,21 +881,26 @@ export function RelacionamentoTools({ visitantes = [], compacto = false }: Relac
   const media = engagement.length ? Math.round(engagement.reduce((sum, item) => sum + item.engagement_score, 0) / engagement.length) : 0;
 
   return (
-    <section className="relationship-command-center-v3" aria-labelledby="relacionamento-tools-title">
+    <section className="relationship-command-center-v3" aria-labelledby="relacionamento-tools-title" data-mobile-view={mobileView}>
       <header className="relationship-head-v3">
         <div><p className="pilot-kicker">CENTRAL DE RELACIONAMENTO</p><h2 id="relacionamento-tools-title">Prioridades e próximos cuidados</h2><span>Encontre quem precisa de atenção, entenda o motivo e aja sem perder o histórico.</span></div>
         <dl><div><dt>Urgentes</dt><dd>{urgentes}</dd></div><div><dt>Sem contato</dt><dd>{semContato}</dd></div><div><dt>Engajamento médio</dt><dd>{media}</dd></div></dl>
       </header>
       <label className="relationship-search-v3"><span aria-hidden="true">⌕</span><input type="search" value={busca} onChange={(event) => setBusca(event.target.value)} placeholder="Pesquisar pessoa, prioridade ou histórico" aria-label="Pesquisar na central de relacionamento" />{busca && <button type="button" onClick={() => setBusca("")} aria-label="Limpar pesquisa">×</button>}</label>
+      <nav className="relationship-mobile-nav-v3" aria-label="Áreas da central de relacionamento">
+        <button type="button" className={mobileView === "prioridades" ? "active" : ""} aria-pressed={mobileView === "prioridades"} onClick={() => setMobileView("prioridades")}><span aria-hidden="true">!</span>Prioridades<b>{prioridades.length}</b></button>
+        <button type="button" className={mobileView === "pessoas" ? "active" : ""} aria-pressed={mobileView === "pessoas"} onClick={() => setMobileView("pessoas")}><span aria-hidden="true">◎</span>Pessoas<b>{engagementVisivel.length}</b></button>
+        <button type="button" className={mobileView === "historico" ? "active" : ""} aria-pressed={mobileView === "historico"} onClick={() => setMobileView("historico")}><span aria-hidden="true">↻</span>Histórico</button>
+      </nav>
       {carregando ? (
         <div className="relationship-loading-v3"><span /><span /><span /><p>Organizando prioridades…</p></div>
       ) : (
         <>
-          <div className="relationship-priority-grid-v3">
+          <div className="relationship-priority-grid-v3" data-mobile-panel="prioridades">
             <section className="relationship-priority-list-v3" aria-labelledby="relationship-priority-title-v3">
               <header><div><p className="pilot-kicker">ORDEM DE CUIDADO</p><h3 id="relationship-priority-title-v3">Comece por estas pessoas</h3></div><span>{prioridades.length}</span></header>
               <div>
-                {prioridades.slice(0, 8).map((item) => <button type="button" key={item.id} data-priority={item.prioridade} onClick={() => setSelecionadoVisitanteId(item.id)}>
+                {prioridades.slice(0, 8).map((item) => <button type="button" key={item.id} data-priority={item.prioridade} aria-label={`Abrir ficha de ${item.nome_completo}`} onClick={() => abrirVisitante(item.id)}>
                   <i aria-hidden="true" /><span><strong>{item.nome_completo}</strong><small>{item.dias_sem_contato} dias sem contato{item.responsavel ? ` · ${item.responsavel}` : ""}</small><em>{item.sugestao}</em></span><b>{item.prioridade}</b>
                 </button>)}
                 {!prioridades.length && <div className="relationship-empty-v3"><strong>Nenhuma prioridade encontrada</strong><p>{busca ? "Tente outro nome ou limpe a pesquisa." : "Os próximos cuidados aparecerão aqui conforme o histórico de contato."}</p></div>}
@@ -904,10 +916,10 @@ export function RelacionamentoTools({ visitantes = [], compacto = false }: Relac
             </aside>
           </div>
 
-          <section className="relationship-people-v3" aria-labelledby="relationship-people-title-v3">
+          <section className="relationship-people-v3" aria-labelledby="relationship-people-title-v3" data-mobile-panel="pessoas">
             <header><div><p className="pilot-kicker">VISÃO POR PESSOA</p><h3 id="relationship-people-title-v3">Engajamento e etapa</h3></div><span>{engagementVisivel.length} pessoas</span></header>
             <div>
-              {engagementVisivel.slice(0, 12).map((item) => <button type="button" key={item.id} onClick={() => setSelecionadoVisitanteId(item.id)}>
+              {engagementVisivel.slice(0, 12).map((item) => <button type="button" key={item.id} aria-label={`Abrir ficha de ${item.nome_completo}`} onClick={() => abrirVisitante(item.id)}>
                 <span className="relationship-person-avatar-v3">{item.nome_completo.slice(0, 1).toLocaleUpperCase("pt-BR")}</span>
                 <span><strong>{item.nome_completo}</strong><ReguaAcompanhamento status={item.status} /><small>{item.ultimo_contato ? `Último contato ${new Date(item.ultimo_contato).toLocaleDateString("pt-BR")}` : "Ainda sem contato"}</small></span>
                 <EngagementScoreBadge score={item.engagement_score} />
@@ -917,7 +929,7 @@ export function RelacionamentoTools({ visitantes = [], compacto = false }: Relac
           </section>
 
           {visitantes.length > 0 && (
-            <section className="relationship-history-v3" aria-labelledby="relacionamento-history-title">
+            <section className="relationship-history-v3" aria-labelledby="relacionamento-history-title" data-mobile-panel="historico">
               <header><div><p className="pilot-kicker">LINHA DO TEMPO</p><h3 id="relacionamento-history-title">Contatos e visitas</h3><small>Todo o histórico da pessoa, em ordem, para orientar o próximo cuidado.</small></div><select aria-label="Pessoa do histórico de relacionamento" value={visitanteHistoricoId || ""} onChange={(event) => setSelecionadoVisitanteId(Number(event.target.value) || null)}>{visitantesHistorico.map((visitor) => <option key={visitor.id} value={visitor.id}>{visitor.nome_completo}</option>)}</select></header>
               <div className="relationship-history-columns-v3">
                 <section><header><strong>Contatos</strong><span>{contatos.length}</span></header>{visitanteHistoricoId && !historicoCarregando && !historicoErro && <ContactLogList items={contatos} />}</section>
@@ -928,7 +940,7 @@ export function RelacionamentoTools({ visitantes = [], compacto = false }: Relac
             </section>
           )}
 
-          {(regional.length > 0 || carga.length > 0 || conflitos.length > 0) && <details className="relationship-insights-v3"><summary><span><strong>Indicadores complementares</strong><small>Carga dos responsáveis, regiões e cuidados com os dados</small></span><i aria-hidden="true">⌄</i></summary><div>{carga.length > 0 && <LoadMetrics items={carga} />}{regional.length > 0 && <RegionalGrouping items={regional} />}{conflitos.length > 0 && <ConflictDetection items={conflitos} />}</div></details>}
+          {(regional.length > 0 || carga.length > 0 || conflitos.length > 0) && <details className="relationship-insights-v3" data-mobile-panel="historico"><summary><span><strong>Indicadores complementares</strong><small>Carga dos responsáveis, regiões e cuidados com os dados</small></span><i aria-hidden="true">⌄</i></summary><div>{carga.length > 0 && <LoadMetrics items={carga} />}{regional.length > 0 && <RegionalGrouping items={regional} />}{conflitos.length > 0 && <ConflictDetection items={conflitos} />}</div></details>}
 
           {engagement.length === 0 && cadencia.length === 0 && cadenciaAvancada.length === 0 && <div className="relationship-empty-v3"><strong>A central ainda não tem dados suficientes</strong><p>Cadastre visitantes e registre contatos para receber prioridades e sugestões.</p></div>}
         </>
