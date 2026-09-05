@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 // ============================================
 // TIPOS
@@ -92,10 +92,7 @@ type VisitaItem = {
 interface RelacionamentoToolsProps {
   visitantes?: Array<Pick<EngagementData, "id" | "nome_completo" | "status">>;
   compacto?: boolean;
-  onOpenVisitor?: (visitorId: number) => void;
 }
-
-type RelacionamentoTab = "pessoas" | "cadencia" | "historico" | "regioes" | "carga" | "conflitos";
 
 // ============================================
 // COMPONENTES INDIVIDUAIS
@@ -192,7 +189,7 @@ function ReguaAcompanhamento({ status }: { status: string }) {
  * FERRAMENTA 3: Cadência de Contato
  * Lista visitantes que precisam de contato
  */
-function CadenciaContato({ items, limite = 5, onOpenVisitor }: { items: CadenciaItem[]; limite?: number; onOpenVisitor?: (visitorId: number) => void }) {
+function CadenciaContato({ items, limite = 5 }: { items: CadenciaItem[]; limite?: number }) {
   const prioritarios = items.slice(0, limite);
 
   const corPrioridade = (prioridade: string) => {
@@ -238,10 +235,13 @@ function CadenciaContato({ items, limite = 5, onOpenVisitor }: { items: Cadencia
                 alignItems: "center",
               }}
             >
-              <button type="button" className="relacionamento-person-link" onClick={() => onOpenVisitor?.(item.id)}>
+              <span>
                 <strong>{item.nome_completo}</strong>
-                <span>{item.dias_sem_contato} dias sem contato</span>
-              </button>
+                <br />
+                <span style={{ color: "var(--color-text-muted)", fontSize: "12px" }}>
+                  {item.dias_sem_contato} dias sem contato
+                </span>
+              </span>
               <span
                 style={{
                   background: corPrioridade(item.prioridade),
@@ -624,7 +624,7 @@ function RegionalGrouping({ items }: { items: RegionalItem[] }) {
  * FERRAMENTA 7: Cadência Avançada
  * Recomendações inteligentes de contato
  */
-function CadenciaAvancada({ items, limite = 10, onOpenVisitor }: { items: CadenciaAvancadaItem[]; limite?: number; onOpenVisitor?: (visitorId: number) => void }) {
+function CadenciaAvancada({ items, limite = 10 }: { items: CadenciaAvancadaItem[]; limite?: number }) {
   const prioritarios = items.slice(0, limite);
 
   const corPrioridade = (prioridade: string) => {
@@ -690,14 +690,14 @@ function CadenciaAvancada({ items, limite = 10, onOpenVisitor }: { items: Cadenc
                   marginBottom: "6px",
                 }}
               >
-                <button type="button" className="relacionamento-person-link" onClick={() => onOpenVisitor?.(item.id)}>
+                <div>
                   <strong>{item.nome_completo}</strong>
                   {item.categoria && (
-                    <span>
+                    <div style={{ color: "var(--color-text-muted)", fontSize: "11px" }}>
                       {item.categoria}
-                    </span>
+                    </div>
                   )}
-                </button>
+                </div>
                 <span
                   style={{
                     background: corPrioridade(item.prioridade),
@@ -734,7 +734,7 @@ function CadenciaAvancada({ items, limite = 10, onOpenVisitor }: { items: Cadenc
  * RelacionamentoTools
  * Componente integrado que exibe todas as ferramentas de relacionamento
  */
-export function RelacionamentoTools({ visitantes = [], compacto = false, onOpenVisitor }: RelacionamentoToolsProps) {
+export function RelacionamentoTools({ visitantes = [], compacto = false }: RelacionamentoToolsProps) {
   const [engagement, setEngagement] = useState<EngagementData[]>([]);
   const [cadencia, setCadencia] = useState<CadenciaItem[]>([]);
   const [cadenciaAvancada, setCadenciaAvancada] = useState<CadenciaAvancadaItem[]>([]);
@@ -747,29 +747,7 @@ export function RelacionamentoTools({ visitantes = [], compacto = false, onOpenV
   const [historicoCarregando, setHistoricoCarregando] = useState(false);
   const [historicoErro, setHistoricoErro] = useState("");
   const [selecionadoVisitanteId, setSelecionadoVisitanteId] = useState<number | null>(null);
-  const [abaAtiva, setAbaAtiva] = useState<RelacionamentoTab>("pessoas");
   const visitanteHistoricoId = selecionadoVisitanteId ?? visitantes[0]?.id ?? null;
-  const visitanteHistoricoNome = visitantes.find((visitor) => visitor.id === visitanteHistoricoId)?.nome_completo || "Pessoa selecionada";
-  const pessoasRelacionamento = useMemo(() => {
-    const byId = new Map<number, EngagementData | Pick<EngagementData, "id" | "nome_completo" | "status">>();
-    for (const item of visitantes) byId.set(item.id, item);
-    for (const item of engagement) byId.set(item.id, item);
-    return [...byId.values()].sort((a, b) => a.nome_completo.localeCompare(b.nome_completo, "pt-BR"));
-  }, [engagement, visitantes]);
-  const pessoasAltoRisco = engagement.filter((item) => item.engagement_score < 40);
-  const relacaoTabs: Array<{ id: RelacionamentoTab; label: string; count: number }> = [
-    { id: "pessoas", label: "Pessoas", count: pessoasRelacionamento.length },
-    { id: "cadencia", label: "Ações", count: cadenciaAvancada.length || cadencia.length },
-    { id: "historico", label: "Histórico", count: contatos.length + visitas.length },
-    { id: "regioes", label: "Regiões", count: regional.length },
-    { id: "carga", label: "Responsáveis", count: carga.length },
-    { id: "conflitos", label: "Alertas", count: conflitos.length },
-  ];
-
-  function abrirPessoa(visitorId: number) {
-    setSelecionadoVisitanteId(visitorId);
-    onOpenVisitor?.(visitorId);
-  }
 
   useEffect(() => {
     const carregarDados = async () => {
@@ -886,50 +864,11 @@ export function RelacionamentoTools({ visitantes = [], compacto = false, onOpenV
         </div>
       ) : (
         <>
-          <nav className="relacionamento-tabs" aria-label="Categorias da central de relacionamento">
-            {relacaoTabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                className={abaAtiva === tab.id ? "active" : ""}
-                aria-current={abaAtiva === tab.id ? "page" : undefined}
-                onClick={() => setAbaAtiva(tab.id)}
-              >
-                <span>{tab.label}</span>
-                <b>{tab.count}</b>
-              </button>
-            ))}
-          </nav>
-
-          {abaAtiva === "pessoas" && (
-            <section className="relacionamento-panel" aria-label="Pessoas da central de relacionamento">
-              <header>
-                <div>
-                  <strong>Escolha uma pessoa</strong>
-                  <small>Abre a ficha para consultar e editar sem descer até o diretório.</small>
-                </div>
-                {pessoasAltoRisco.length > 0 && <b>{pessoasAltoRisco.length} em alto risco</b>}
-              </header>
-              <div className="relacionamento-people-grid">
-                {pessoasRelacionamento.map((visitor) => {
-                  const score = "engagement_score" in visitor ? visitor.engagement_score : null;
-                  return (
-                    <button key={visitor.id} type="button" onClick={() => abrirPessoa(visitor.id)}>
-                      <span>{visitor.nome_completo.slice(0, 1).toLocaleUpperCase("pt-BR")}</span>
-                      <strong>{visitor.nome_completo}</strong>
-                      <small>{score === null ? visitor.status : `${score}/100 · ${visitor.status}`}</small>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-
-          {abaAtiva === "historico" && visitantes.length > 0 && (
+          {visitantes.length > 0 && (
             <section className="relacionamento-history-picker" aria-labelledby="relacionamento-history-title">
               <div>
                 <strong id="relacionamento-history-title">Contatos e visitas</strong>
-                <small>{visitanteHistoricoNome}</small>
+                <small>Escolha uma pessoa para consultar o histórico individual.</small>
               </div>
               <select
                 aria-label="Pessoa do histórico de relacionamento"
@@ -944,7 +883,7 @@ export function RelacionamentoTools({ visitantes = [], compacto = false, onOpenV
           )}
 
           {/* Seção de Engagement */}
-          {abaAtiva === "pessoas" && engagement.length > 0 && (
+          {engagement.length > 0 && (
             <div style={{ marginBottom: "24px" }}>
               <h3 style={{ marginTop: 0, marginBottom: "12px", fontSize: "14px", fontWeight: "bold" }}>
                 ✨ Scores de Engajamento
@@ -957,17 +896,13 @@ export function RelacionamentoTools({ visitantes = [], compacto = false, onOpenV
                 }}
               >
                 {engagement.slice(0, 12).map((v) => (
-                  <button
-                    type="button"
+                  <div
                     key={v.id}
-                    onClick={() => abrirPessoa(v.id)}
-                    className="relacionamento-engagement-card"
                     style={{
                       padding: "12px",
                       border: "1px solid var(--color-border)",
                       borderRadius: "6px",
                       background: "var(--color-surface)",
-                      textAlign: "left",
                     }}
                   >
                     <div style={{ marginBottom: "8px" }}>
@@ -980,38 +915,38 @@ export function RelacionamentoTools({ visitantes = [], compacto = false, onOpenV
                         ? `Último contato: ${new Date(v.ultimo_contato).toLocaleDateString("pt-BR")}`
                         : "Sem contatos"}
                     </div>
-                  </button>
+                  </div>
                 ))}
               </div>
             </div>
           )}
 
           {/* Cadência */}
-          {abaAtiva === "cadencia" && cadencia.length > 0 && <CadenciaContato items={cadencia} limite={8} onOpenVisitor={abrirPessoa} />}
+          {cadencia.length > 0 && <CadenciaContato items={cadencia} limite={8} />}
 
           {/* Cadência Avançada */}
-          {abaAtiva === "cadencia" && cadenciaAvancada.length > 0 && <CadenciaAvancada items={cadenciaAvancada} limite={10} onOpenVisitor={abrirPessoa} />}
+          {cadenciaAvancada.length > 0 && <CadenciaAvancada items={cadenciaAvancada} limite={10} />}
 
           {/* Regional Grouping */}
-          {abaAtiva === "regioes" && regional.length > 0 && <RegionalGrouping items={regional} />}
+          {regional.length > 0 && <RegionalGrouping items={regional} />}
 
           {/* Load Metrics */}
-          {abaAtiva === "carga" && carga.length > 0 && <LoadMetrics items={carga} />}
+          {carga.length > 0 && <LoadMetrics items={carga} />}
 
           {/* Contact Logging */}
-          {abaAtiva === "historico" && visitanteHistoricoId && !historicoCarregando && !historicoErro && (
+          {visitanteHistoricoId && !historicoCarregando && !historicoErro && (
             <ContactLogList items={contatos} />
           )}
 
           {/* Visita Tracking */}
-          {abaAtiva === "historico" && visitanteHistoricoId && !historicoCarregando && !historicoErro && (
+          {visitanteHistoricoId && !historicoCarregando && !historicoErro && (
             <VisitaTrackingList items={visitas} />
           )}
-          {abaAtiva === "historico" && historicoCarregando && <p className="relacionamento-history-state">Carregando contatos e visitas…</p>}
-          {abaAtiva === "historico" && historicoErro && <p className="relacionamento-history-state is-error" role="alert">{historicoErro}</p>}
+          {historicoCarregando && <p className="relacionamento-history-state">Carregando contatos e visitas…</p>}
+          {historicoErro && <p className="relacionamento-history-state is-error" role="alert">{historicoErro}</p>}
 
           {/* Conflitos */}
-          {abaAtiva === "conflitos" && conflitos.length > 0 && <ConflictDetection items={conflitos} />}
+          {conflitos.length > 0 && <ConflictDetection items={conflitos} />}
 
           {/* Resumo */}
           {engagement.length === 0 && cadencia.length === 0 && carga.length === 0 && conflitos.length === 0 && regional.length === 0 && cadenciaAvancada.length === 0 && contatos.length === 0 && visitas.length === 0 && (

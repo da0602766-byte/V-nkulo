@@ -74,14 +74,6 @@ function formatarDiaLongo(valor: string) {
       });
 }
 
-function mensagemRegistroErro(error: unknown) {
-  const mensagem = error instanceof Error ? error.message : String(error || "");
-  if (/visitanteId|eventoId|is not defined|not defined/i.test(mensagem)) {
-    return "Não foi possível criar o post-it. Informe um título; visitante e evento são opcionais.";
-  }
-  return mensagem || "Não foi possível criar o post-it.";
-}
-
 export default function DayThreadWorkspace({
   permissions,
 }: {
@@ -212,7 +204,7 @@ export default function DayThreadWorkspace({
       setAviso(resultado.message || "Registro adicionado ao fio do dia.");
       recarregar();
     } catch (falha) {
-      setErro(mensagemRegistroErro(falha));
+      setErro((falha as Error).message);
     } finally {
       setSalvando(false);
     }
