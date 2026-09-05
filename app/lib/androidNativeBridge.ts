@@ -19,24 +19,25 @@ export type DeviceCalendarEvent = {
 export async function downloadFileForDevice(url: string, filename: string) {
   if (typeof window === "undefined") return false;
   const safeFilename = filename.replace(/[\\/:*?"<>|]+/g, "-").slice(0, 120) || "documento.pdf";
-  const nativeDownload = window.VinkuloAndroid?.downloadFile;
-  if (typeof nativeDownload === "function") {
-    try {
-      nativeDownload(new URL(url, window.location.origin).toString(), safeFilename);
-      return true;
-    } catch {
-      // Continua para o download web quando o bridge de uma versão antiga falhar.
-    }
+  const absoluteUrl = new URL(url, window.location.origin).toString();
+  const isInstalledAndroidApp = /Android/i.test(window.navigator.userAgent) && Boolean(window.VinkuloAndroid);
+
+  // Em versões já distribuídas do APK, o bridge de download não devolve um
+  // resultado confiável: a tela ficava em "Preparando" sem salvar o arquivo.
+  // A navegação para uma resposta attachment é tratada pelo DownloadManager
+  // do Android e mantém os cookies da sessão atual.
+  if (isInstalledAndroidApp) {
+    window.location.assign(absoluteUrl);
+    return true;
   }
 
-  const response = await fetch(url, { credentials: "include" });
+  const response = await fetch(absoluteUrl, { credentials: "include" });
   if (!response.ok) throw new Error("Não foi possível preparar o PDF para download.");
   const blob = await response.blob();
   const file = typeof File === "function"
     ? new File([blob], safeFilename, { type: blob.type || "application/pdf" })
     : null;
-  const isInstalledAndroidApp = /Android/i.test(window.navigator.userAgent) && Boolean(window.VinkuloAndroid);
-  if (file && isInstalledAndroidApp && navigator.share && navigator.canShare?.({ files: [file] })) {
+  if (file && /Android/i.test(window.navigator.userAgent) && navigator.share && navigator.canShare?.({ files: [file] })) {
     await navigator.share({ files: [file], title: safeFilename });
     return true;
   }
@@ -120,11 +121,23 @@ export function addCalendarEventForDevice(event: DeviceCalendarEvent) {
 
   if (/Android/i.test(window.navigator.userAgent)) {
     const fallbackUrl = calendarUrl.toString();
-    const intentQuery = calendarUrl.searchParams.toString();
+    const extras = [
+      "scheme=content",
+      "action=android.intent.action.INSERT",
+      "type=vnd.android.cursor.item/event",
+      `S.title=${encodeIntentValue(calendarEvent.title)}`,
+      `l.beginTime=${startsAt.getTime()}`,
+      `l.endTime=${endsAt.getTime()}`,
+      calendarEvent.location && `S.eventLocation=${encodeIntentValue(calendarEvent.location)}`,
+      calendarEvent.description && `S.description=${encodeIntentValue(calendarEvent.description)}`,
+      `S.browser_fallback_url=${encodeIntentValue(fallbackUrl)}`,
+      "end",
+    ].filter(Boolean).join(";");
+
+    // Sem package fixo: o aparelho pode usar Google Agenda, Calendário Samsung
+    // ou qualquer calendário compatível instalado pelo próprio usuário.
     window.location.href =
-      `intent://calendar.google.com/calendar/render?${intentQuery}` +
-      `#Intent;scheme=https;package=com.google.android.calendar;` +
-      `S.browser_fallback_url=${encodeURIComponent(fallbackUrl)};end`;
+      `intent://com.android.calendar/events#Intent;${extras}`;
     return true;
   }
 
@@ -135,4 +148,8 @@ export function addCalendarEventForDevice(event: DeviceCalendarEvent) {
 
 function toGoogleCalendarDate(value: Date) {
   return value.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+}
+
+function encodeIntentValue(value: string) {
+  return encodeURIComponent(value).replace(/%20/g, "%20");
 }
