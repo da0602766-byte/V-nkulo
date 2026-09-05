@@ -3,9 +3,18 @@ declare global {
     VinkuloAndroid?: {
       shareToWhatsApp?: (message: string) => void;
       downloadFile?: (url: string, filename: string) => void;
+      addCalendarEvent?: (eventJson: string) => void;
     };
   }
 }
+
+export type DeviceCalendarEvent = {
+  title: string;
+  startsAt: string;
+  endsAt: string;
+  location?: string;
+  description?: string;
+};
 
 export async function downloadFileForDevice(url: string, filename: string) {
   if (typeof window === "undefined") return false;
@@ -65,3 +74,65 @@ export function shareToWhatsAppApp(message: string) {
   return true;
 }
 
+export function addCalendarEventForDevice(event: DeviceCalendarEvent) {
+  if (typeof window === "undefined") return false;
+  const startsAt = new Date(event.startsAt);
+  const endsAt = new Date(event.endsAt);
+  if (
+    Number.isNaN(startsAt.getTime()) ||
+    Number.isNaN(endsAt.getTime()) ||
+    endsAt <= startsAt
+  ) {
+    throw new Error("O horário desta escala é inválido para o calendário.");
+  }
+
+  const calendarEvent = {
+    title: event.title.trim().slice(0, 180),
+    startsAt: startsAt.toISOString(),
+    endsAt: endsAt.toISOString(),
+    location: String(event.location || "").trim().slice(0, 300),
+    description: String(event.description || "").trim().slice(0, 3000),
+  };
+  const nativeCalendar = window.VinkuloAndroid?.addCalendarEvent;
+  if (typeof nativeCalendar === "function") {
+    try {
+      // A tela nativa de inclusão ainda exige a confirmação do usuário.
+      nativeCalendar(JSON.stringify(calendarEvent));
+      return true;
+    } catch {
+      // Continua para o Google Agenda quando uma versão antiga do APK falhar.
+    }
+  }
+
+  const calendarUrl = new URL("https://calendar.google.com/calendar/render");
+  calendarUrl.searchParams.set("action", "TEMPLATE");
+  calendarUrl.searchParams.set("text", calendarEvent.title);
+  calendarUrl.searchParams.set(
+    "dates",
+    `${toGoogleCalendarDate(startsAt)}/${toGoogleCalendarDate(endsAt)}`,
+  );
+  if (calendarEvent.location) {
+    calendarUrl.searchParams.set("location", calendarEvent.location);
+  }
+  if (calendarEvent.description) {
+    calendarUrl.searchParams.set("details", calendarEvent.description);
+  }
+
+  if (/Android/i.test(window.navigator.userAgent)) {
+    const fallbackUrl = calendarUrl.toString();
+    const intentQuery = calendarUrl.searchParams.toString();
+    window.location.href =
+      `intent://calendar.google.com/calendar/render?${intentQuery}` +
+      `#Intent;scheme=https;package=com.google.android.calendar;` +
+      `S.browser_fallback_url=${encodeURIComponent(fallbackUrl)};end`;
+    return true;
+  }
+
+  const opened = window.open(calendarUrl.toString(), "_blank", "noopener,noreferrer");
+  if (!opened) window.location.assign(calendarUrl.toString());
+  return true;
+}
+
+function toGoogleCalendarDate(value: Date) {
+  return value.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+}

@@ -12,7 +12,11 @@ import {
 import MinistriesWorkspace from "./MinistriesWorkspace";
 import NativeImageUpload from "./NativeImageUpload";
 import VerifiedOwnerName from "./VerifiedOwnerName";
-import { shareToWhatsAppApp } from "../lib/androidNativeBridge";
+import {
+  addCalendarEventForDevice,
+  downloadFileForDevice,
+  shareToWhatsAppApp,
+} from "../lib/androidNativeBridge";
 
 type Volunteer = {
   id: number;
@@ -766,6 +770,57 @@ export default function SecretaryMinisterialWorkspace({
     );
   }
 
+  async function publishSchedule(schedule: Schedule) {
+    if (
+      !window.confirm(
+        `Publicar a escala “${schedule.titulo}” e notificar os integrantes agora?`,
+      )
+    ) return;
+    await submit(
+      `publish-${schedule.id}`,
+      `/api/pilot/escalas/${schedule.id}`,
+      "PATCH",
+      { acao: "PUBLICAR" },
+      "Escala publicada e integrantes notificados.",
+    );
+  }
+
+  async function downloadSchedulePdf(schedule: Schedule) {
+    setBusy(`pdf-${schedule.id}`);
+    setError("");
+    try {
+      await downloadFileForDevice(
+        `/api/pilot/escalas/${schedule.id}/pdf?download=1`,
+        `escala-${schedule.titulo}.pdf`,
+      );
+      setFeedback("PDF preparado para este aparelho.");
+    } catch (cause) {
+      setError((cause as Error).message || "Não foi possível abrir o PDF.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  function addScheduleToCalendar(schedule: Schedule) {
+    setError("");
+    try {
+      addCalendarEventForDevice({
+        title: schedule.titulo,
+        startsAt: schedule.inicia_em,
+        endsAt: schedule.termina_em,
+        location: schedule.local,
+        description: [
+          `Ministério: ${schedule.ministerio_nome}`,
+          `Responsável: ${schedule.responsavel_nome || "Não definido"}`,
+          schedule.observacoes,
+        ].filter(Boolean).join("\n"),
+      });
+      setFeedback("Confirme no seu calendário para concluir a sincronização.");
+    } catch (cause) {
+      setError((cause as Error).message || "Não foi possível abrir o calendário.");
+    }
+  }
+
   async function archiveDiaconia() {
     if (!selectedMinistry) return;
     if (
@@ -1210,7 +1265,7 @@ export default function SecretaryMinisterialWorkspace({
                 </article>
                 <article className="secretary-card">
                   <header><div><p className="pilot-kicker">PRÓXIMA ESCALA</p><h2>Agenda da equipe</h2></div></header>
-                  {upcoming[0] ? <ScheduleCompact schedule={upcoming[0]} onShare={setShareSchedule} busy={busy} /> : <div className="secretary-card-empty"><strong>Nenhuma escala futura</strong><p>Crie uma escala e selecione os integrantes deste ministério.</p></div>}
+                  {upcoming[0] ? <ScheduleCompact schedule={upcoming[0]} onShare={setShareSchedule} onPdf={downloadSchedulePdf} onCalendar={addScheduleToCalendar} busy={busy} /> : <div className="secretary-card-empty"><strong>Nenhuma escala futura</strong><p>Crie uma escala e selecione os integrantes deste ministério.</p></div>}
                 </article>
                 <article className="secretary-card">
                   <header><div><p className="pilot-kicker">RESPONSABILIDADES</p><h2>Checklist em andamento</h2></div><span>{pendingChecklist.length}</span></header>
@@ -1593,8 +1648,13 @@ export default function SecretaryMinisterialWorkspace({
                       </form>
                     )}
                     <div className="secretary-schedule-actions">
-                      <a href={`/api/pilot/escalas/${schedule.id}/pdf?download=1`}>PDF</a>
-                      <a href={`/api/pilot/escalas/${schedule.id}/calendario`}>Calendário</a>
+                      {Boolean(schedule.can_manage) && schedule.status === "RASCUNHO" && (
+                        <button type="button" className="publish" onClick={() => void publishSchedule(schedule)} disabled={busy === `publish-${schedule.id}`}>
+                          {busy === `publish-${schedule.id}` ? "Publicando…" : "Publicar"}
+                        </button>
+                      )}
+                      <button type="button" onClick={() => void downloadSchedulePdf(schedule)} disabled={busy === `pdf-${schedule.id}`}>{busy === `pdf-${schedule.id}` ? "Preparando…" : "PDF"}</button>
+                      <button type="button" onClick={() => addScheduleToCalendar(schedule)}>Adicionar ao calendário</button>
                       <button type="button" onClick={() => setShareSchedule(schedule)} disabled={!schedule.can_manage || schedule.status !== "PUBLICADA" || busy === `share-${schedule.id}`}>Compartilhar</button>
                       {Boolean(schedule.can_delete) && (
                         <button
@@ -1653,9 +1713,9 @@ export default function SecretaryMinisterialWorkspace({
                   {ministrySchedules.map((schedule) => (
                     <article key={schedule.id}>
                       <div><strong>{schedule.titulo}</strong><span>{formatDate(schedule.inicia_em)} · {schedule.status}</span></div>
-                      <a href={`/api/pilot/escalas/${schedule.id}/pdf?download=1`}>Baixar PDF</a>
+                      <button type="button" onClick={() => void downloadSchedulePdf(schedule)} disabled={busy === `pdf-${schedule.id}`}>{busy === `pdf-${schedule.id}` ? "Preparando…" : "Baixar PDF"}</button>
                       <button type="button" onClick={() => downloadScheduleImage(schedule)}>Baixar imagem</button>
-                      <a href={`/api/pilot/escalas/${schedule.id}/calendario`}>Calendário</a>
+                      <button type="button" onClick={() => addScheduleToCalendar(schedule)}>Adicionar ao calendário</button>
                     </article>
                   ))}
                 </div>
@@ -1898,17 +1958,21 @@ function SummaryCard({
 function ScheduleCompact({
   schedule,
   onShare,
+  onPdf,
+  onCalendar,
   busy,
 }: {
   schedule: Schedule;
   onShare: (schedule: Schedule) => void;
+  onPdf: (schedule: Schedule) => Promise<void>;
+  onCalendar: (schedule: Schedule) => void;
   busy: string;
 }) {
   return (
     <div className="secretary-next-schedule">
       <time><strong>{formatDay(schedule.inicia_em)}</strong><span>{formatMonth(schedule.inicia_em)}</span></time>
       <div><strong>{schedule.titulo}</strong><span>{formatDate(schedule.inicia_em)} · {schedule.local || "Local não informado"}</span><small>{schedule.designacoes.length} integrantes · {schedule.repertorio.length} itens no repertório</small>{schedule.status === "AGENDADA" && schedule.publicar_em && <SchedulePublicationCountdown opensAt={schedule.publicar_em} />}</div>
-      <div className="secretary-card-actions"><a href={`/api/pilot/escalas/${schedule.id}/pdf?download=1`}>PDF</a>{schedule.can_manage && schedule.status === "PUBLICADA" && <button type="button" onClick={() => onShare(schedule)} disabled={busy === `share-${schedule.id}`}>Compartilhar</button>}</div>
+      <div className="secretary-card-actions"><button type="button" onClick={() => void onPdf(schedule)} disabled={busy === `pdf-${schedule.id}`}>{busy === `pdf-${schedule.id}` ? "Preparando…" : "PDF"}</button><button type="button" onClick={() => onCalendar(schedule)}>Calendário</button>{schedule.can_manage && schedule.status === "PUBLICADA" && <button type="button" onClick={() => onShare(schedule)} disabled={busy === `share-${schedule.id}`}>Compartilhar</button>}</div>
     </div>
   );
 }
@@ -2388,7 +2452,7 @@ function ShareDialogV2({
               {directRecipient?.telefone && <button type="button" onClick={() => void shareGeneratedMessage(directRecipient.nome)}>Enviar para contato</button>}
               <a href={`https://t.me/share/url?url=${encodeURIComponent(generatedAccesses[0]?.url || "")}&text=${encodeURIComponent(safeMessage)}`} target="_blank" rel="noreferrer">Telegram</a>
               <a href={`mailto:?subject=${encodeURIComponent(`Acesso temporário — ${schedule.titulo}`)}&body=${encodeURIComponent(safeMessage)}`}>E-mail</a>
-              <a href={`/api/pilot/escalas/${schedule.id}/pdf?download=1`}>Baixar PDF</a>
+              <button type="button" onClick={() => void downloadFileForDevice(`/api/pilot/escalas/${schedule.id}/pdf?download=1`, `escala-${schedule.titulo}.pdf`).catch((cause) => setShareStatus((cause as Error).message || "Não foi possível abrir o PDF."))}>Baixar PDF</button>
               <button type="button" onClick={() => downloadScheduleImage(schedule)}>Baixar imagem</button>
             </div>
             {shareStatus && <p className="secretary-share-status" role="status">{shareStatus}</p>}
