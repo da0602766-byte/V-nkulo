@@ -3,8 +3,33 @@ declare global {
     VinkuloAndroid?: {
       shareToWhatsApp?: (message: string) => void;
       downloadFile?: (url: string, filename: string) => void;
+      openGoogleAuth?: (authorizationUrl: string) => void;
     };
   }
+}
+
+export function isVinkuloAndroidApp() {
+  return typeof window !== "undefined" && Boolean(window.VinkuloAndroid);
+}
+
+export function createGooglePairingSecret() {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+export function openGoogleAuthorizationInApp(authorizationUrl: string) {
+  if (typeof window === "undefined") return false;
+  const openGoogleAuth = window.VinkuloAndroid?.openGoogleAuth;
+  if (typeof openGoogleAuth !== "function") return false;
+  const target = new URL(authorizationUrl);
+  if (target.protocol !== "https:" || target.hostname !== "accounts.google.com") {
+    throw new Error("O endereço de autorização do Google não é válido.");
+  }
+  openGoogleAuth(target.toString());
+  return true;
 }
 
 export async function downloadFileForDevice(url: string, filename: string) {
@@ -64,4 +89,3 @@ export function shareToWhatsAppApp(message: string) {
     : fallback;
   return true;
 }
-

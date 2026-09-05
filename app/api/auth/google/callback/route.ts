@@ -101,6 +101,12 @@ export async function GET(request: Request) {
       if (Number(handoff!.requested_user_id) !== state.userId) {
         throw new Error("A Conta Google não corresponde à solicitação iniciada no aplicativo.");
       }
+      const requestedUser = await getD1().prepare(
+        "SELECT email FROM usuarios WHERE id = ? AND ativo = 1 LIMIT 1",
+      ).bind(state.userId).first<{ email: string }>();
+      if (!requestedUser || normalizeEmail(requestedUser.email) !== normalizeEmail(identity.email)) {
+        throw new Error("Conecte ao Drive a mesma Conta Google usada no e-mail do seu cadastro.");
+      }
     } else {
       const sessionUser = await getSessionUser();
       if (!sessionUser || Number(sessionUser.id) !== state.userId) throw new Error("Sua sessão mudou durante a autorização. Entre novamente.");
@@ -155,8 +161,10 @@ function randomGoogleOnlyPassword() {
 }
 
 function nativeReturn(origin: string, message = "") {
-  const target = new URL("/login/google-concluido", origin);
-  if (message) target.searchParams.set("erro", message);
+  const fallback = new URL("/login/google-concluido", origin);
+  if (message) fallback.searchParams.set("erro", message);
+  const query = message ? `?erro=${encodeURIComponent(message)}` : "";
+  const target = `intent://google-login-complete${query}#Intent;scheme=vinkulo;package=com.vinkulo.app;S.browser_fallback_url=${encodeURIComponent(fallback.toString())};end`;
   return mutableRedirect(target);
 }
 
