@@ -2786,6 +2786,40 @@ export const layoutsInterfaceHistorico = sqliteTable(
   ],
 );
 
+// Protótipos exclusivos do proprietário. Não compartilham o armazenamento de
+// layouts reais para impedir que um experimento altere uma tela em produção.
+export const laboratorioExperimentos = sqliteTable(
+  "laboratorio_experimentos",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    autorId: integer("autor_id").notNull().references(() => usuarios.id, { onDelete: "restrict" }),
+    nome: text("nome").notNull(),
+    descricao: text("descricao").notNull().default(""),
+    status: text("status").notNull().default("ATIVO"),
+    dispositivoPrincipal: text("dispositivo_principal").notNull().default("DESKTOP"),
+    documento: text("documento").notNull().default("{}"),
+    css: text("css").notNull().default(""),
+    versao: integer("versao").notNull().default(1),
+    criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+    atualizadoEm: text("atualizado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [index("laboratorio_experimentos_status_idx").on(table.status, table.atualizadoEm)],
+);
+
+export const laboratorioVersoes = sqliteTable(
+  "laboratorio_versoes",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    experimentoId: integer("experimento_id").notNull().references(() => laboratorioExperimentos.id, { onDelete: "cascade" }),
+    autorId: integer("autor_id").notNull().references(() => usuarios.id, { onDelete: "restrict" }),
+    rotulo: text("rotulo").notNull(),
+    documento: text("documento").notNull(),
+    css: text("css").notNull().default(""),
+    criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [index("laboratorio_versoes_experimento_idx").on(table.experimentoId, table.id)],
+);
+
 export const feedbackPlataforma = sqliteTable(
   "feedback_plataforma",
   {
