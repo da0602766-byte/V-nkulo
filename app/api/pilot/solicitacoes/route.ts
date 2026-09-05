@@ -25,7 +25,7 @@ export async function GET() {
     return Response.json({ error: "Ação não permitida." }, { status: 403 });
   }
   const canManage = access.context.permissions.some((permission) =>
-    ["pastoral.panel.view", "community.settings.manage", "platform.admin.view"].includes(
+    ["pastoral.panel.view", "community.settings.manage", "platform.admin.view", "community.admin.view", "requests.manage"].includes(
       permission,
     ),
   );
@@ -35,7 +35,21 @@ export async function GET() {
     .prepare(
       `SELECT s.id, s.tipo, s.titulo, s.descricao, s.visibilidade, s.status,
         s.criado_em, s.atualizado_em, s.solicitante_id,
-        u.nome AS solicitante_nome,
+        CASE WHEN s.solicitante_id = ? THEN 1 ELSE 0 END AS is_mine,
+        s.preferencia_contato, s.disponibilidade, s.data_preferencial, s.contato_autorizado,
+        u.nome AS solicitante_nome, COALESCE(u.foto_perfil, '') AS solicitante_foto,
+        COALESCE(uc.papel, 'MEMBRO') AS solicitante_papel,
+        ri.id AS repositorio_item_id, ri.status AS operacional_status,
+        COALESCE(ri.prioridade, 'NORMAL') AS prioridade,
+        ri.responsavel_usuario_id, COALESCE(responsavel.nome, '') AS responsavel_nome,
+        ri.responsavel_atribuido_em, ri.primeiro_contato_em,
+        ri.proximo_retorno_em, ri.visita_agendada_em, ri.finalizado_em,
+        COALESCE(ri.mensagem_atendimento, '') AS mensagem_atendimento,
+        COALESCE(ri.resultado, '') AS resultado,
+        COALESCE((SELECT e.mensagem FROM solicitacao_eventos e
+          WHERE e.solicitacao_id = s.id AND e.comunidade_id = s.comunidade_id
+            AND e.visivel_membro = 1
+          ORDER BY e.id DESC LIMIT 1), '') AS ultima_atualizacao,
         COALESCE((SELECT group_concat(
           CASE sp.tipo
             WHEN 'USUARIO' THEN 'Pessoa: ' || COALESCE(pessoa.nome, sp.referencia_texto)
@@ -50,6 +64,11 @@ export async function GET() {
         ), '') AS publico_resumo
        FROM solicitacoes_comunidade s
        JOIN usuarios u ON u.id = s.solicitante_id
+       LEFT JOIN usuario_comunidades uc ON uc.usuario_id = s.solicitante_id
+         AND uc.comunidade_id = s.comunidade_id AND uc.status = 'ATIVO'
+       LEFT JOIN solicitacao_repositorio_itens ri
+         ON ri.solicitacao_id = s.id AND ri.comunidade_id = s.comunidade_id
+       LEFT JOIN usuarios responsavel ON responsavel.id = ri.responsavel_usuario_id
        WHERE s.comunidade_id = ?
          AND (
            s.solicitante_id = ?
@@ -69,6 +88,7 @@ export async function GET() {
        LIMIT 150`,
     )
     .bind(
+      access.user.id,
       access.context.comunidadeId,
       access.user.id,
       access.user.id,
@@ -128,11 +148,15 @@ export async function POST(request: Request) {
   const titulo = clean(body.titulo, 120);
   const descricao = clean(body.descricao, 2000);
   const visibilidade = clean(body.visibilidade, 30).toUpperCase() || "PRIVADA";
+  const contactPreference = clean(body.preferenciaContato, 30).toUpperCase();
+  const availability = clean(body.disponibilidade, 240);
+  const preferredDate = normalizeOptionalDateTime(body.dataPreferencial);
+  const contactAuthorized = body.contatoAutorizado === true;
   const hasExplicitAudience = Array.isArray(body.audience) && body.audience.length > 0;
   const audience = hasExplicitAudience
     ? parseAudience(body.audience)
     : { value: [] as AudienceTarget[] };
-  if (!TYPES.has(tipo) || !VISIBILITIES.has(visibilidade) || "error" in audience) {
+  if (!TYPES.has(tipo) || !VISIBILITIES.has(visibilidade) || "error" in audience || preferredDate === undefined || (contactPreference && !["WHATSAPP", "TELEFONE", "SISTEMA"].includes(contactPreference))) {
     return Response.json(
       { error: "Tipo, visibilidade ou público autorizado inválido." },
       { status: 400 },
@@ -146,7 +170,7 @@ export async function POST(request: Request) {
   }
   const db = getD1();
   const canBroadcast = access.context.permissions.some((permission) =>
-    ["pastoral.panel.view", "community.settings.manage", "platform.admin.view"].includes(permission),
+    ["pastoral.panel.view", "community.settings.manage", "platform.admin.view", "community.admin.view", "requests.manage"].includes(permission),
   );
   const resolved = hasExplicitAudience
     ? await resolveAudience({
@@ -171,8 +195,9 @@ export async function POST(request: Request) {
   const result = await db
     .prepare(
       `INSERT INTO solicitacoes_comunidade
-       (comunidade_id, solicitante_id, tipo, titulo, descricao, visibilidade)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+       (comunidade_id, solicitante_id, tipo, titulo, descricao, visibilidade,
+        preferencia_contato, disponibilidade, data_preferencial, contato_autorizado)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       access.context.comunidadeId,
@@ -181,16 +206,27 @@ export async function POST(request: Request) {
       titulo,
       descricao,
       visibilidade,
+      contactPreference,
+      availability,
+      preferredDate,
+      contactAuthorized ? 1 : 0,
     )
     .run();
   const id = Number(result.meta.last_row_id);
+  let repositoryId = 0;
   if (tipo === "ORACAO" || tipo === "VISITA") {
-    await routeRequestToRepository(db, {
+    repositoryId = await routeRequestToRepository(db, {
       communityId: access.context.comunidadeId,
       requestId: id,
       requestType: tipo,
       forwardedBy: access.user.id,
     });
+    const careRecipients = await resolveRepositoryRecipients(
+      db,
+      access.context.comunidadeId,
+      repositoryId,
+    );
+    for (const recipient of careRecipients) resolved.userIds.add(recipient);
   }
   for (const target of audience.value) {
     await db
@@ -211,6 +247,19 @@ export async function POST(request: Request) {
       )
       .bind(id, access.context.comunidadeId, userId)
       .run();
+  }
+  if (repositoryId) {
+    const repositoryItem = await db.prepare(
+      `SELECT id FROM solicitacao_repositorio_itens
+       WHERE repositorio_id = ? AND comunidade_id = ? AND solicitacao_id = ? LIMIT 1`,
+    ).bind(repositoryId, access.context.comunidadeId, id).first<{ id: number }>();
+    if (repositoryItem) {
+      await db.prepare(
+        `INSERT INTO solicitacao_eventos
+         (comunidade_id, item_id, solicitacao_id, tipo, mensagem, visivel_membro, criado_por)
+         VALUES (?, ?, ?, 'PEDIDO_RECEBIDO', 'Pedido recebido pela comunidade.', 1, ?)`,
+      ).bind(access.context.comunidadeId, repositoryItem.id, id, access.user.id).run();
+    }
   }
   await Promise.all(
     [...resolved.userIds]
@@ -251,13 +300,21 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   const access = await requireTenantPermission("dashboard.view");
   if ("error" in access) return access.error;
+  const body = await safeJson(request);
+  if (!body) return Response.json({ error: "Dados inválidos." }, { status: 400 });
+  const action = clean(body.action, 40).toUpperCase();
+  if (action === "CONFIRMAR_ORACAO_ATENDIDA") {
+    if (access.context.communityAccess === "FEED_ONLY") {
+      return Response.json({ error: "Ação não permitida." }, { status: 403 });
+    }
+    return confirmAnsweredPrayer(access, body);
+  }
   const canManage = access.context.permissions.some((permission) =>
-    ["pastoral.panel.view", "community.settings.manage", "platform.admin.view"].includes(permission),
+    ["pastoral.panel.view", "community.settings.manage", "platform.admin.view", "community.admin.view", "requests.manage"].includes(permission),
   );
   if (!canManage || access.context.communityAccess === "FEED_ONLY") {
     return Response.json({ error: "Ação não permitida." }, { status: 403 });
   }
-  const body = (await request.json()) as Record<string, unknown>;
   const id = Number(body.id);
   const status = clean(body.status, 30).toUpperCase();
   if (!Number.isInteger(id) || id <= 0 || !STATUSES.has(status)) {
@@ -313,8 +370,70 @@ export async function PATCH(request: Request) {
   return Response.json({ ok: true });
 }
 
+async function confirmAnsweredPrayer(
+  access: Exclude<Awaited<ReturnType<typeof requireTenantPermission>>, { error: Response }>,
+  body: Record<string, unknown>,
+) {
+  const requestId = Number(body.id);
+  const testimony = clean(body.testemunho, 2000);
+  const permission = clean(body.testemunhoPermissao, 30).toUpperCase();
+  if (!Number.isInteger(requestId) || requestId <= 0 || (testimony && !["PERMITIR", "NAO_PERMITIR"].includes(permission))) {
+    return Response.json({ error: "Confirmação inválida." }, { status: 400 });
+  }
+  const db = getD1();
+  const item = await db.prepare(
+    `SELECT ri.id, ri.responsavel_usuario_id, s.titulo
+     FROM solicitacoes_comunidade s
+     JOIN solicitacao_repositorio_itens ri
+       ON ri.solicitacao_id = s.id AND ri.comunidade_id = s.comunidade_id
+     JOIN solicitacao_repositorios r
+       ON r.id = ri.repositorio_id AND r.comunidade_id = ri.comunidade_id
+     WHERE s.id = ? AND s.comunidade_id = ? AND s.solicitante_id = ?
+       AND s.tipo = 'ORACAO' AND r.tipo = 'ORACAO' LIMIT 1`,
+  ).bind(requestId, access.context.comunidadeId, access.user.id).first<{
+    id: number; responsavel_usuario_id: number | null; titulo: string;
+  }>();
+  if (!item) return Response.json({ error: "Pedido de oração não encontrado." }, { status: 404 });
+  await db.prepare(
+    `UPDATE solicitacao_repositorio_itens SET status = 'ORACAO_ATENDIDA',
+       testemunho = CASE WHEN ? = '' THEN testemunho ELSE ? END,
+       testemunho_compartilhavel = CASE WHEN ? = '' THEN testemunho_compartilhavel ELSE ? END,
+       finalizado_em = COALESCE(finalizado_em, CURRENT_TIMESTAMP), atualizado_em = CURRENT_TIMESTAMP
+     WHERE id = ? AND comunidade_id = ?`,
+  ).bind(testimony, testimony, testimony, permission === "PERMITIR" ? 1 : 0, item.id, access.context.comunidadeId).run();
+  await db.prepare(
+    `UPDATE solicitacoes_comunidade SET status = 'CONCLUIDA', atualizado_em = CURRENT_TIMESTAMP
+     WHERE id = ? AND comunidade_id = ? AND solicitante_id = ?`,
+  ).bind(requestId, access.context.comunidadeId, access.user.id).run();
+  await db.prepare(
+    `INSERT INTO solicitacao_eventos
+     (comunidade_id, item_id, solicitacao_id, tipo, mensagem, visivel_membro, criado_por)
+     VALUES (?, ?, ?, 'ORACAO_ATENDIDA', 'O membro confirmou que a oração foi atendida.', 1, ?)`,
+  ).bind(access.context.comunidadeId, item.id, requestId, access.user.id).run();
+  if (item.responsavel_usuario_id && Number(item.responsavel_usuario_id) !== Number(access.user.id)) {
+    await notifyUser(db, {
+      userId: Number(item.responsavel_usuario_id),
+      title: "Oração atendida",
+      message: `A pessoa confirmou uma resposta no pedido “${item.titulo}”.`,
+      entityId: requestId,
+      area: "SOLICITACOES",
+      destination: "/painel?view=solicitacoes",
+      createdBy: access.user.email,
+    });
+  }
+  await recordTenantAudit(db, access.context, access.user.id, "ORACAO_ATENDIDA_CONFIRMADA_PELO_MEMBRO", "SUCESSO", { solicitacaoId: requestId });
+  return Response.json({ ok: true });
+}
+
 function clean(value: unknown, length: number) {
   return String(value ?? "").trim().slice(0, length);
+}
+
+function normalizeOptionalDateTime(value: unknown) {
+  const raw = clean(value, 40);
+  if (!raw) return null;
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
 }
 
 async function cleanupCompletedRequests(db: ReturnType<typeof getD1>, communityId: number) {
@@ -460,6 +579,29 @@ async function resolveLegacyAudience({
     .all<{ id: number }>();
   for (const manager of managers.results) userIds.add(Number(manager.id));
   return { userIds } as const;
+}
+
+async function resolveRepositoryRecipients(
+  db: ReturnType<typeof getD1>,
+  communityId: number,
+  repositoryId: number,
+) {
+  const recipients = await db.prepare(
+    `SELECT DISTINCT u.id
+     FROM usuarios u
+     JOIN usuario_comunidades uc ON uc.usuario_id = u.id
+       AND uc.comunidade_id = ? AND uc.status = 'ATIVO'
+     LEFT JOIN oficiais_comunidade oc ON oc.usuario_comunidade_id = uc.id
+     JOIN solicitacao_repositorios r ON r.id = ? AND r.comunidade_id = uc.comunidade_id
+     LEFT JOIN ministerios_comunidade m ON m.id = r.ministerio_id
+       AND m.comunidade_id = r.comunidade_id
+     WHERE u.ativo = 1 AND (
+       uc.papel IN ('PASTOR', 'ADMIN_COMUNIDADE')
+       OR m.responsavel_usuario_id = u.id
+       OR instr(',' || COALESCE(oc.permissoes, '') || ',', ',requests.manage,') > 0
+     )`,
+  ).bind(communityId, repositoryId).all<{ id: number }>();
+  return recipients.results.map((recipient) => Number(recipient.id));
 }
 
 async function safeJson(request: Request) {

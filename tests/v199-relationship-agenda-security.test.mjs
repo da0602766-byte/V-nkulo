@@ -29,6 +29,8 @@ test("relacionamento separa leitura e escrita e valida o visitante no tenant", a
   assert.match(route, /export async function DELETE[\s\S]*requireTenantPermission\("followups\.manage"\)/);
   assert.match(route, /visitorBelongsToCommunity\(db, comunidadeId, visitanteId\)/);
   assert.match(route, /WHERE id = \? AND comunidade_id = \? AND ativo = 1/);
+  assert.ok((route.match(/escopo_confirmado = 1/g) || []).length >= 10, "todas as visões devem usar apenas cadastros confirmados");
+  assert.match(route, /v\.ativo = 1 AND v\.escopo_confirmado = 1/);
   assert.match(route, /ultimo_contato IS NULL[\s\S]*'-30 days'[\s\S]*'-7 days'/);
   assert.doesNotMatch(route, /v\.ultimo_contato, v\.proximo_contato/);
   assert.match(route, /FROM acompanhamentos a/);
@@ -53,10 +55,11 @@ test("refinamentos de agenda isolam respostas, indisponibilidade e metas", async
 });
 
 test("interface mostra históricos individuais e conecta Fio com Agenda", async () => {
-  const [tools, agenda, thread] = await Promise.all([
+  const [tools, agenda, thread, notes] = await Promise.all([
     source("app/components/RelacionamentoTools.tsx"),
     source("app/components/AgendaCalendar.tsx"),
     source("app/components/DayThreadWorkspace.tsx"),
+    source("app/components/CareNotesBoard.tsx"),
   ]);
 
   assert.match(tools, /Pessoa do histórico de relacionamento/);
@@ -66,6 +69,11 @@ test("interface mostra históricos individuais e conecta Fio com Agenda", async 
   assert.match(tools, /Nenhuma visita registrada/);
   assert.match(agenda, /href="\/painel\?view=fio"/);
   assert.match(thread, /href="\/painel\?view=eventos"/);
+  assert.match(notes, /visitanteId: visitorId/);
+  assert.match(notes, /eventoId: eventId/);
+  assert.match(notes, /Vincular visitante <small>opcional<\/small>/);
+  assert.match(tools, /relationship-insight-card-v4/);
+  assert.match(tools, /Somente pessoas confirmadas/);
 });
 
 test("arquivos grandes permanecem texto íntegro e com tamanho esperado", async () => {

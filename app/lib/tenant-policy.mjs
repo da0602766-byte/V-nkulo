@@ -216,6 +216,7 @@ export const OFFICIAL_PERMISSION_CATALOG = Object.freeze([
   "parking.reserve",
   "parking.report",
   "feed.publish",
+  "requests.manage",
 ]);
 
 export function normalizeOfficialPermissions(value) {
