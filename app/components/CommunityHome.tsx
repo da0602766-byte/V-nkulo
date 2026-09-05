@@ -2,6 +2,7 @@
 
 import Link from "./StableLink";
 import {
+  type CSSProperties,
   FormEvent,
   useCallback,
   useEffect,
@@ -732,7 +733,12 @@ export default function CommunityHome({
           ) : posts.length ? (
             <div className="community-feed-list">
               {posts.map((post) => (
-                <article key={post.id} id={`publicacao-${post.id}`} className="community-feed-entry">
+                <article
+                  key={post.id}
+                  id={`publicacao-${post.id}`}
+                  className={`community-feed-entry ${post.imagem_url ? "has-smart-image-tone" : ""}`}
+                  style={post.imagem_url ? { "--smart-card-image": `url("${post.imagem_thumbnail_url || post.imagem_url}")` } as CSSProperties : undefined}
+                >
                   <header>
                     <span className="community-feed-avatar">
                       {post.autor_foto ? <img loading="lazy" src={post.autor_foto} alt="" /> : getInitials(post.autor_nome || communityName)}
@@ -1126,9 +1132,9 @@ export default function CommunityHome({
           <section className="home-needs-you">
             <header><div><p className="pilot-kicker">PRECISA DE VOCÊ</p><strong>Pendências</strong></div><span>{pendingSchedules}</span></header>
             {pendingSchedules ? (
-              <div><strong>{pendingSchedules === 1 ? "Uma escala aguarda resposta" : `${pendingSchedules} escalas aguardam resposta`}</strong><p>Confirme sua presença ou avise a liderança com antecedência.</p><Link href="/painel?view=ministerios">Ver todas as escalas</Link></div>
+              <Link className="home-rail-card-link" href="/painel?view=ministerios"><strong>{pendingSchedules === 1 ? "Uma escala aguarda resposta" : `${pendingSchedules} escalas aguardam resposta`}</strong><p>Confirme sua presença ou avise a liderança com antecedência.</p><span>Ver todas as escalas →</span></Link>
             ) : (
-              <div className="home-rail-empty"><strong>Nada pendente agora</strong><p>Quando uma ação depender de você, ela aparecerá aqui.</p><Link href="/painel?view=ministerios">Ver ministérios</Link></div>
+              <Link className="home-rail-empty home-rail-card-link" href="/painel?view=ministerios"><strong>Nada pendente agora</strong><p>Quando uma ação depender de você, ela aparecerá aqui.</p><span>Ver ministérios →</span></Link>
             )}
           </section>
           <section>
@@ -1138,7 +1144,7 @@ export default function CommunityHome({
             </header>
             {upcomingEvents.length ? (
               upcomingEvents.map((item) => (
-                <article className="home-event-item" key={item.id}>
+                <Link className="home-event-item home-rail-card-link" href={`/painel?view=eventos&evento=${item.id}`} key={item.id} aria-label={`Abrir evento ${item.titulo}`}>
                   <time dateTime={item.inicia_em}>
                     <strong>{formatDay(item.inicia_em)}</strong>
                     <span>{formatMonth(item.inicia_em)}</span>
@@ -1147,7 +1153,8 @@ export default function CommunityHome({
                     <strong>{item.titulo}</strong>
                     <small>{item.local || "Local a confirmar"}</small>
                   </div>
-                </article>
+                  <span className="home-event-open" aria-hidden="true">›</span>
+                </Link>
               ))
             ) : (
               <p className="home-rail-empty">Nenhum evento publicado.</p>

@@ -11,6 +11,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { RelacionamentoTools } from "./RelacionamentoTools";
+import CareNotesBoard from "./CareNotesBoard";
 
 type Visitor = {
   id: number;
@@ -203,6 +204,7 @@ export function VisitorsWorkspace({
   const categoryDragTimerRef = useRef<number | null>(null);
   const duplicateTimerRef = useRef<number | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  const linkedVisitorOpenedRef = useRef(false);
   const categoryDragRef = useRef<{
     active: boolean;
     categoryId: number;
@@ -354,6 +356,14 @@ export function VisitorsWorkspace({
     }, 0);
     return () => window.clearTimeout(timer);
   }, [loadCategories, loadCells]);
+
+  useEffect(() => {
+    if (linkedVisitorOpenedRef.current || !visitors.length) return;
+    const requestedId = Number(new URLSearchParams(window.location.search).get("visitante"));
+    if (!requestedId || !visitors.some((visitor) => visitor.id === requestedId)) return;
+    linkedVisitorOpenedRef.current = true;
+    void loadFollowups(requestedId);
+  }, [visitors]);
 
   useEffect(() => {
     if (!settingsOpen) return;
@@ -1330,11 +1340,11 @@ export function VisitorsWorkspace({
           </section>
         </div>
 
-        {/* Ferramentas de Relacionamento — complementam o funil acima com visão por pessoa */}
-        <section style={{ padding: "24px", background: "var(--color-surface)", borderRadius: "8px", marginBottom: "24px" }} aria-labelledby="relacionamento-tools-title">
-          <h2 id="relacionamento-tools-title" style={{ marginTop: 0, marginBottom: "16px", fontSize: "16px", fontWeight: "bold" }}>🛠️ Ferramentas de Relacionamento</h2>
-          <RelacionamentoTools visitantes={visitors} compacto={false} />
-        </section>
+        <CareNotesBoard />
+
+        {/* A central usa os mesmos dados do funil, mas organiza as decisões por
+            prioridade, pessoa e próximo cuidado. */}
+        <RelacionamentoTools visitantes={visitors} compacto={false} onAbrirVisitante={(visitorId) => void loadFollowups(visitorId)} />
 
         <section className="visitor-sheet-v2" aria-labelledby="visitor-sheet-title">
           <header className="visitor-sheet-head-v2">

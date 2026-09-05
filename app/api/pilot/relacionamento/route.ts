@@ -137,6 +137,14 @@ export async function GET(request: Request) {
 
   const db = getD1();
 
+  if (
+    (ferramenta === "contatos" || ferramenta === "visitas")
+    && visitanteId
+    && !(await visitorBelongsToCommunity(db, comunidadeId, visitanteId))
+  ) {
+    return Response.json({ error: "Visitante não encontrado." }, { status: 404 });
+  }
+
   // ============================================
   // CONTACT LOGGING - Histórico de contatos
   // ============================================
@@ -223,7 +231,7 @@ export async function GET(request: Request) {
               v.encontro_com_deus, v.curso_membros,
               v.categoria_id, v.ministerio
          FROM visitantes v
-         WHERE v.comunidade_id = ? AND v.id = ?
+         WHERE v.comunidade_id = ? AND v.id = ? AND v.ativo = 1 AND v.escopo_confirmado = 1
          LIMIT 1`
       : `SELECT v.id, v.nome_completo, v.status,
               (SELECT MAX(a.criado_em) FROM acompanhamentos a
@@ -236,7 +244,7 @@ export async function GET(request: Request) {
               v.encontro_com_deus, v.curso_membros,
               v.categoria_id, v.ministerio
          FROM visitantes v
-         WHERE v.comunidade_id = ? AND v.ativo = 1
+         WHERE v.comunidade_id = ? AND v.ativo = 1 AND v.escopo_confirmado = 1
          ORDER BY v.nome_completo ASC
          LIMIT 200`;
 
@@ -290,7 +298,7 @@ export async function GET(request: Request) {
                  ORDER BY a.id DESC
                  LIMIT 1) AS proximo_contato
          FROM visitantes v
-         WHERE v.comunidade_id = ? AND v.ativo = 1
+         WHERE v.comunidade_id = ? AND v.ativo = 1 AND v.escopo_confirmado = 1
          ORDER BY
            CASE
              WHEN ultimo_contato IS NULL THEN 0
@@ -353,7 +361,7 @@ export async function GET(request: Request) {
            SUM(CASE WHEN v.status = 'EM_ACOMPANHAMENTO' THEN 1 ELSE 0 END) as em_acompanhamento,
            SUM(CASE WHEN v.status = 'INTEGRADO' THEN 1 ELSE 0 END) as integrados
          FROM visitantes v
-         WHERE v.comunidade_id = ? AND v.ativo = 1
+         WHERE v.comunidade_id = ? AND v.ativo = 1 AND v.escopo_confirmado = 1
          GROUP BY v.criado_por
          ORDER BY total_visitantes DESC`
       )
@@ -399,7 +407,7 @@ export async function GET(request: Request) {
            SUM(CASE WHEN v.status = 'NOVO' THEN 1 ELSE 0 END) as novos,
            SUM(CASE WHEN v.status = 'INTEGRADO' THEN 1 ELSE 0 END) as integrados
          FROM celulas c
-         LEFT JOIN visitantes v ON v.celula_id = c.id AND v.comunidade_id = ? AND v.ativo = 1
+         LEFT JOIN visitantes v ON v.celula_id = c.id AND v.comunidade_id = ? AND v.ativo = 1 AND v.escopo_confirmado = 1
          WHERE c.comunidade_id = ? AND c.ativo = 1
          GROUP BY c.id, c.nome
          ORDER BY total_visitantes DESC`
@@ -437,7 +445,7 @@ export async function GET(request: Request) {
          FROM visitantes v
          LEFT JOIN visitante_categorias c
            ON c.id = v.categoria_id AND c.comunidade_id = v.comunidade_id
-         WHERE v.comunidade_id = ? AND v.ativo = 1
+         WHERE v.comunidade_id = ? AND v.ativo = 1 AND v.escopo_confirmado = 1
          ORDER BY
            CASE
              WHEN ultimo_contato IS NULL THEN 0
@@ -514,7 +522,7 @@ export async function GET(request: Request) {
       .prepare(
         `SELECT telefone, COUNT(*) as total, GROUP_CONCAT(id) as ids
          FROM visitantes
-         WHERE comunidade_id = ? AND telefone IS NOT NULL AND telefone != ''
+         WHERE comunidade_id = ? AND ativo = 1 AND escopo_confirmado = 1 AND telefone IS NOT NULL AND telefone != ''
          GROUP BY telefone
          HAVING COUNT(*) > 1`
       )
@@ -536,7 +544,7 @@ export async function GET(request: Request) {
       .prepare(
         `SELECT email, COUNT(*) as total, GROUP_CONCAT(id) as ids
          FROM visitantes
-         WHERE comunidade_id = ? AND email IS NOT NULL AND email != ''
+         WHERE comunidade_id = ? AND ativo = 1 AND escopo_confirmado = 1 AND email IS NOT NULL AND email != ''
          GROUP BY email
          HAVING COUNT(*) > 1`
       )
@@ -559,7 +567,7 @@ export async function GET(request: Request) {
         `SELECT id, nome_completo
          FROM visitantes
          WHERE comunidade_id = ? AND status = 'INTEGRADO'
-           AND ativo = 1
+           AND ativo = 1 AND escopo_confirmado = 1
            AND NOT EXISTS (
              SELECT 1 FROM acompanhamentos a
              WHERE a.visitante_id = visitantes.id
@@ -790,7 +798,7 @@ async function visitorBelongsToCommunity(
   visitorId: number,
 ) {
   const visitor = await db
-    .prepare("SELECT id FROM visitantes WHERE id = ? AND comunidade_id = ? AND ativo = 1 LIMIT 1")
+    .prepare("SELECT id FROM visitantes WHERE id = ? AND comunidade_id = ? AND ativo = 1 AND escopo_confirmado = 1 LIMIT 1")
     .bind(visitorId, communityId)
     .first<{ id: number }>();
   return Boolean(visitor);
