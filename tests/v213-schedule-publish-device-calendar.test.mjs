@@ -20,18 +20,23 @@ test("rascunho de escala possui publicação explícita, validada e auditada", a
   assert.match(route, /ESCALA_V213_PUBLICADA/);
 });
 
-test("PDF de escala usa download compatível com o APK", async () => {
-  const workspace = await read("app/components/SecretaryMinisterialWorkspace.tsx");
+test("PDF de escala inicia o download direto no APK", async () => {
+  const [workspace, bridge] = await Promise.all([
+    read("app/components/SecretaryMinisterialWorkspace.tsx"),
+    read("app/lib/androidNativeBridge.ts"),
+  ]);
 
   assert.match(workspace, /downloadFileForDevice\(/);
   assert.match(workspace, /`\/api\/pilot\/escalas\/\$\{schedule\.id\}\/pdf\?download=1`/);
+  assert.match(workspace, /Download do PDF iniciado/);
+  assert.match(bridge, /window\.location\.assign\(absoluteUrl\)/);
   assert.doesNotMatch(
     workspace,
     /<a href=\{`\/api\/pilot\/escalas\/\$\{schedule\.id\}\/pdf/,
   );
 });
 
-test("calendário da escala abre inclusão autorizada no aparelho", async () => {
+test("calendário da escala abre inclusão autorizada no calendário disponível no aparelho", async () => {
   const [workspace, bridge] = await Promise.all([
     read("app/components/SecretaryMinisterialWorkspace.tsx"),
     read("app/lib/androidNativeBridge.ts"),
@@ -41,6 +46,8 @@ test("calendário da escala abre inclusão autorizada no aparelho", async () => 
   assert.match(workspace, /Adicionar ao calendário/);
   assert.match(bridge, /addCalendarEvent\?: \(eventJson: string\)/);
   assert.match(bridge, /calendar\.google\.com\/calendar\/render/);
-  assert.match(bridge, /package=com\.google\.android\.calendar/);
+  assert.match(bridge, /action=android\.intent\.action\.INSERT/);
+  assert.match(bridge, /intent:\/\/com\.android\.calendar\/events/);
+  assert.doesNotMatch(bridge, /package=com\.google\.android\.calendar/);
   assert.match(bridge, /action", "TEMPLATE"/);
 });

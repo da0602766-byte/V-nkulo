@@ -32215,6 +32215,64 @@ html[data-pilot-theme="escuro"] .request-care-status.tone-blue { background:#173
 .home-event-item.home-rail-card-link { grid-template-columns:48px minmax(0,1fr) 18px; align-items:center; gap:10px; text-align:left; }
 .home-event-open { color:var(--pilot-primary); font-size:1.25rem; }
 
+/* Início no celular — escalas, pendências e agenda ficam em blocos próprios,
+   sem o cartão único alto e centralizado que escondia a hierarquia das ações. */
+.pilot-dashboard[data-ui-version="v2"] .community-home-rail {
+  text-align:left;
+}
+.pilot-dashboard[data-ui-version="v2"] .community-home-rail > section > header {
+  justify-content:space-between;
+  text-align:left;
+}
+
+@media (max-width: 820px) {
+  .pilot-dashboard[data-ui-version="v2"] .community-home-rail {
+    display:grid;
+    gap:12px;
+    padding:0 14px 18px !important;
+    background:transparent !important;
+  }
+  .pilot-dashboard[data-ui-version="v2"] .community-home-rail > section,
+  .pilot-dashboard[data-ui-version="v2"] .community-home-rail > .community-my-schedules {
+    display:grid !important;
+    gap:13px;
+    margin:0 !important;
+    border:1px solid var(--pilot-line) !important;
+    border-radius:18px !important;
+    background:var(--pilot-surface) !important;
+    padding:16px !important;
+    box-shadow:none !important;
+  }
+  .pilot-dashboard[data-ui-version="v2"] .community-home-rail > section > header {
+    min-height:0;
+    margin:0 !important;
+    padding:0 0 11px !important;
+    border-bottom:1px solid var(--pilot-line) !important;
+  }
+  .pilot-dashboard[data-ui-version="v2"] .community-home-rail > section h2,
+  .pilot-dashboard[data-ui-version="v2"] .community-home-rail > section header strong {
+    font-size:var(--fs-lg);
+  }
+  .pilot-dashboard[data-ui-version="v2"] .community-my-schedules .community-schedule-list > article {
+    gap:12px;
+    border-radius:14px;
+    background:var(--pilot-surface-2);
+  }
+  .pilot-dashboard[data-ui-version="v2"] .community-my-schedules .community-schedule-actions {
+    grid-template-columns:1fr;
+  }
+  .pilot-dashboard[data-ui-version="v2"] .community-my-schedules .community-schedule-actions button {
+    min-height:46px;
+  }
+  .pilot-dashboard[data-ui-version="v2"] .home-needs-you .home-rail-card-link {
+    gap:6px;
+    padding:0;
+  }
+  .pilot-dashboard[data-ui-version="v2"] .home-event-item.home-rail-card-link {
+    padding:0;
+  }
+}
+
 @keyframes relationship-priority-pulse-v3 { 70% { box-shadow:0 0 0 7px rgba(230,77,104,0); } 100% { box-shadow:0 0 0 0 rgba(230,77,104,0); } }
 @keyframes relationship-priority-breathe-v3 { 0%,100% { transform:scale(.9); opacity:.72; } 50% { transform:scale(1.18); opacity:1; } }
 @keyframes relationship-shimmer-v3 { to { background-position:-240% 0; } }

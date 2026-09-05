@@ -793,7 +793,7 @@ export default function SecretaryMinisterialWorkspace({
         `/api/pilot/escalas/${schedule.id}/pdf?download=1`,
         `escala-${schedule.titulo}.pdf`,
       );
-      setFeedback("PDF preparado para este aparelho.");
+      setFeedback("Download do PDF iniciado.");
     } catch (cause) {
       setError((cause as Error).message || "Não foi possível abrir o PDF.");
     } finally {
@@ -815,7 +815,7 @@ export default function SecretaryMinisterialWorkspace({
           schedule.observacoes,
         ].filter(Boolean).join("\n"),
       });
-      setFeedback("Confirme no seu calendário para concluir a sincronização.");
+      setFeedback("Escolha o seu calendário e confirme o evento para concluir a sincronização.");
     } catch (cause) {
       setError((cause as Error).message || "Não foi possível abrir o calendário.");
     }
