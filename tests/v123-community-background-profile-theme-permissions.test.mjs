@@ -27,7 +27,7 @@ test("banner público é exibido inteiro e apresentação respeita margens móve
   ]);
   const v123 = styles.slice(styles.indexOf("/* V123"));
 
-  assert.match(page, /community\.bannerUrl && \([\s\S]*?<img src=\{community\.bannerUrl\}/);
+  assert.match(page, /community\.bannerUrl && \([\s\S]*?<img[^>]*src=\{community\.bannerUrl\}/);
   assert.match(v123, /\.community-profile-cover\.has-image img \{[\s\S]*?object-fit:contain;/);
   assert.match(v123, /\.community-profile-information \{[\s\S]*?width:100%;[\s\S]*?padding:15px;/);
   assert.match(v123, /\.community-profile-information > p,[\s\S]*?overflow-wrap:anywhere;/);

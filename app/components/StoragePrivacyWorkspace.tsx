@@ -2,6 +2,11 @@
 
 import { useEffect, useState } from "react";
 import GoogleStatusToast, { type GoogleToastState } from "./GoogleStatusToast";
+import {
+  createGooglePairingSecret,
+  isVinkuloAndroidApp,
+  openGoogleAuthorizationInApp,
+} from "../lib/androidNativeBridge";
 
 type StorageData = {
   googleAvailable: boolean;
@@ -25,6 +30,8 @@ export default function StoragePrivacyWorkspace() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [googleToast, setGoogleToast] = useState<GoogleToastState>(null);
+  const [androidApp, setAndroidApp] = useState(false);
+  const [googlePairing, setGooglePairing] = useState("");
 
   async function load() {
     const response = await fetch("/api/storage/preferences", { cache: "no-store" });
@@ -55,6 +62,116 @@ export default function StoragePrivacyWorkspace() {
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const insideAndroidApp = isVinkuloAndroidApp();
+      setAndroidApp(insideAndroidApp);
+      if (insideAndroidApp) {
+        setGooglePairing(window.sessionStorage.getItem("vinkulo-google-drive-pairing") || "");
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!androidApp || !googlePairing) return;
+    let stopped = false;
+    let timer = 0;
+    const poll = async () => {
+      try {
+        const response = await fetch("/api/auth/google/native/complete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pairing: googlePairing }),
+          credentials: "same-origin",
+        });
+        const body = await response.json() as { status?: string; error?: string };
+        if (body.status === "complete") {
+          stopped = true;
+          window.sessionStorage.removeItem("vinkulo-google-drive-pairing");
+          setGooglePairing("");
+          setBusy(false);
+          await load();
+          setGoogleToast({
+            variant: "success",
+            title: "Google Drive conectado",
+            detail: "A autorização foi concluída e você voltou ao aplicativo.",
+          });
+          return;
+        }
+        if (body.status === "failed" || body.status === "expired" || body.status === "invalid") {
+          stopped = true;
+          window.sessionStorage.removeItem("vinkulo-google-drive-pairing");
+          setGooglePairing("");
+          setBusy(false);
+          setGoogleToast({
+            variant: "error",
+            title: "Não foi possível conectar o Drive",
+            detail: body.error || "O Google não confirmou a autorização.",
+          });
+          return;
+        }
+      } catch {
+        // Mantém a espera durante a troca entre a aba segura do Google e o aplicativo.
+      }
+      if (!stopped) timer = window.setTimeout(() => void poll(), 1500);
+    };
+    const resumeFromGoogle = () => {
+      window.clearTimeout(timer);
+      void poll();
+    };
+    window.addEventListener("vinkulo:google-return", resumeFromGoogle);
+    void poll();
+    return () => {
+      stopped = true;
+      window.clearTimeout(timer);
+      window.removeEventListener("vinkulo:google-return", resumeFromGoogle);
+    };
+  }, [androidApp, googlePairing]);
+
+  async function connectGoogleDrive() {
+    setBusy(true);
+    setMessage("");
+    setGoogleToast({
+      variant: "pending",
+      title: "Abrindo a Conta Google",
+      detail: androidApp
+        ? "Autorize o Drive na aba segura. O Vínkulo voltará automaticamente."
+        : "Autorize o acesso ao Drive na janela do Google.",
+    });
+    if (!androidApp) {
+      window.location.assign("/api/auth/google/start?purpose=drive&returnTo=%2Fpainel%3Fview%3Dconta");
+      return;
+    }
+    try {
+      const pairing = createGooglePairingSecret();
+      const query = new URLSearchParams({
+        purpose: "drive",
+        returnTo: "/painel?view=conta",
+        channel: "android",
+        pairing,
+        format: "json",
+      });
+      const response = await fetch(`/api/auth/google/start?${query}`, { credentials: "same-origin" });
+      const body = await response.json() as { authorizationUrl?: string; error?: string };
+      if (!response.ok || !body.authorizationUrl) {
+        throw new Error(body.error || "Não foi possível abrir o Google.");
+      }
+      window.sessionStorage.setItem("vinkulo-google-drive-pairing", pairing);
+      setGooglePairing(pairing);
+      if (!openGoogleAuthorizationInApp(body.authorizationUrl)) {
+        window.location.assign(body.authorizationUrl);
+      }
+    } catch (error) {
+      setBusy(false);
+      setGoogleToast({
+        variant: "error",
+        title: "Não foi possível abrir o Google",
+        detail: (error as Error).message,
+      });
+    }
+  }
 
   async function savePreference(next: Partial<{
     provider: "LOCAL" | "GOOGLE_DRIVE";
@@ -206,15 +323,12 @@ export default function StoragePrivacyWorkspace() {
         {!data.googleAvailable ? (
           <p role="status">A integração está pronta, mas o proprietário ainda precisa ativar as credenciais Google.</p>
         ) : !driveConnected ? (
-          <a
+          <button
+            type="button"
             className="storage-connect-google"
-            href="/api/auth/google/start?purpose=drive&returnTo=%2Fpainel%3Fview%3Dconta"
-            onClick={() => setGoogleToast({
-              variant: "pending",
-              title: "Abrindo a Conta Google",
-              detail: "Autorize o acesso ao Drive na janela do Google.",
-            })}
-          >Conectar Google Drive</a>
+            disabled={busy}
+            onClick={() => void connectGoogleDrive()}
+          >{googlePairing ? "Aguardando o Google…" : "Conectar Google Drive"}</button>
         ) : (
           <button type="button" disabled={busy} onClick={() => void disconnect()}>Desconectar Drive</button>
         )}

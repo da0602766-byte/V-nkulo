@@ -3,7 +3,7 @@
 ## Identificação
 
 - **Versão-base:** V4.9.0, com Conta Google, Google Drive/local e política de conteúdo sem cópia persistente na plataforma concluídos em 31/08/2026.
-- **Data da última análise:** 31/08/2026.
+- **Data da última análise:** 05/09/2026.
 - **Estado deste documento:** vigente. Decisões históricas incompatíveis foram removidas deste arquivo.
 - **Publicação automática do Site:** autorizada pelo proprietário para grupos completos que tenham build, testes e evidências aprovados; uma etapa com falha não pode ser publicada.
 - **Regra global:** toda evolução funcional vale para comunidades existentes e futuras, exceto quando o proprietário solicitar explicitamente uma exceção.
@@ -349,3 +349,15 @@
 - Homologação visual final em aparelhos físicos continua recomendada após cada publicação relevante.
 - V8.2.2: corrigido o modo claro da página pública individual de comunidade, incluindo banner, cartões, textos e menu da conta.
 - V8.2.3: corrigidas as cores do cabeçalho e do menu da conta nos temas claro, escuro e automático; removido o cartão pessoal da abertura da comunidade.
+
+## Candidato Android 1.4.0 — retorno do Google ao aplicativo (05/09/2026)
+
+- Branch isolada: `fix/google-return-android-app`; nenhuma publicação ou mesclagem realizada.
+- O APK registra `vinkulo://google-login-complete` e reutiliza a Activity existente para devolver o usuário ao Vínkulo.
+- Login Google e conexão do Drive usam um pareamento temporário; cookies do navegador e da WebView não são compartilhados.
+- A autorização do Google abre em Custom Tab segura sobre o aplicativo, conforme a restrição do provedor contra OAuth em WebView incorporada, e fecha ao retornar ao app.
+- A conexão nativa do Drive continua exigindo a mesma Conta Google usada no e-mail do cadastro.
+- PWA instalada e APK deixaram de ser tratados como o mesmo ambiente; a PWA permanece no fluxo web e somente o APK usa o deep link Android.
+- Nenhuma migração nova e nenhuma alteração nos dados, papéis, permissões ou isolamento entre comunidades.
+- Validação: TypeScript sem erros; lint sem erros novos (44 avisos preexistentes); build e artefato Sites aprovados; **293/293 testes automatizados aprovados**.
+- Próximo passo: compilar o APK 1.4.0, instalar em aparelho físico e homologar login Google, cancelamento e conexão do Drive antes de qualquer publicação.

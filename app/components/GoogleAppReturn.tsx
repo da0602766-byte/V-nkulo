@@ -29,8 +29,8 @@ export default function GoogleAppReturn({ error = "" }: { error?: string }) {
               : <path d="M5 12.8 10 17.6 19 7.2" />}
           </svg>
         </span>
-        <h1>{error ? "Não foi possível concluir" : "Login concluído"}</h1>
-        <p>{error || "Sua conta foi confirmada. O Vínkulo receberá o acesso automaticamente."}</p>
+        <h1>{error ? "Não foi possível concluir" : "Autorização concluída"}</h1>
+        <p>{error || "Sua Conta Google foi confirmada. O Vínkulo receberá o acesso automaticamente."}</p>
         {!error && intentUrl && <a href={intentUrl}>Voltar ao aplicativo</a>}
         {error && <a href="/login">Tentar novamente</a>}
         <small>Você pode fechar esta aba depois que o aplicativo abrir.</small>
