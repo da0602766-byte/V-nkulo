@@ -68,8 +68,8 @@ export default function CareNotesBoard({ compact = false }: { compact?: boolean 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           titulo: data.get("titulo"), texto: data.get("texto"), cor: data.get("cor"),
-          visitanteId, visitanteNome: visitor?.nome_completo || "",
-          eventoId, eventoTitulo: linkedEvent?.titulo || "", checklist,
+          visitanteId: visitorId, visitanteNome: visitor?.nome_completo || "",
+          eventoId: eventId, eventoTitulo: linkedEvent?.titulo || "", checklist,
         }),
       });
       const payload = await response.json() as { anotacao?: CareNote; error?: string };
@@ -106,15 +106,15 @@ export default function CareNotesBoard({ compact = false }: { compact?: boolean 
   return (
     <section className={`care-notes-board ${compact ? "is-compact" : ""}`} aria-labelledby={compact ? "care-notes-title-compact" : "care-notes-title"}>
       <header>
-        <div><span aria-hidden="true">▰</span><div><p className="pilot-kicker">POST-ITS</p><h2 id={compact ? "care-notes-title-compact" : "care-notes-title"}>Minhas anotações de cuidado</h2><small>Privadas para você · com checklist e vínculos</small></div></div>
+        <div><span aria-hidden="true">▰</span><div><p className="pilot-kicker">POST-ITS</p><h2 id={compact ? "care-notes-title-compact" : "care-notes-title"}>Minhas anotações de cuidado</h2><small>Privadas para você · vínculos opcionais</small></div></div>
         <button type="button" onClick={() => setComposerOpen((open) => !open)} aria-expanded={composerOpen}>{composerOpen ? "Fechar" : "＋ Novo post-it"}</button>
       </header>
       {composerOpen && <form className="care-note-composer" onSubmit={createNote}>
         <label>Título<input name="titulo" maxLength={100} required placeholder="Ex.: Ligar para a família Oliveira" /></label>
         <label>Cor<select name="cor" defaultValue="amarelo"><option value="amarelo">Amarelo</option><option value="rosa">Rosa</option><option value="azul">Azul</option><option value="verde">Verde</option></select></label>
         <label className="wide">Anotação<textarea name="texto" rows={3} maxLength={1200} placeholder="Contexto que você quer lembrar…" /></label>
-        <label>Vincular visitante<select name="visitanteId" defaultValue=""><option value="">Nenhum visitante</option>{visitors.map((item) => <option value={item.id} key={item.id}>{item.nome_completo}</option>)}</select></label>
-        <label>Vincular evento<select name="eventoId" defaultValue=""><option value="">Nenhum evento</option>{events.map((item) => <option value={item.id} key={item.id}>{item.titulo}</option>)}</select></label>
+        <label>Vincular visitante <small>opcional</small><select name="visitanteId" defaultValue=""><option value="">Sem vínculo</option>{visitors.map((item) => <option value={item.id} key={item.id}>{item.nome_completo}</option>)}</select></label>
+        <label>Vincular evento <small>opcional</small><select name="eventoId" defaultValue=""><option value="">Sem vínculo</option>{events.map((item) => <option value={item.id} key={item.id}>{item.titulo}</option>)}</select></label>
         <label className="wide">Checklist <small>uma tarefa por linha</small><textarea name="checklist" rows={3} maxLength={1800} placeholder={"Enviar mensagem\nConfirmar presença\nRegistrar retorno"} /></label>
         <footer><span>O post-it ficará disponível em Visitantes e no Fio do dia.</span><button disabled={saving}>{saving ? "Salvando…" : "Criar post-it"}</button></footer>
       </form>}
@@ -129,7 +129,7 @@ export default function CareNotesBoard({ compact = false }: { compact?: boolean 
             {note.checklist.length > 0 && <div className="care-note-checklist">{note.checklist.map((item) => <label className={item.concluido ? "done" : ""} key={item.id}><input type="checkbox" checked={item.concluido} onChange={() => void updateNote({ ...note, checklist: note.checklist.map((entry) => entry.id === item.id ? { ...entry, concluido: !entry.concluido } : entry) })} /><span>{item.texto}</span></label>)}</div>}
           </article>;
         })}
-        {!loading && !notes.length && <div className="care-notes-empty"><span aria-hidden="true">▱</span><strong>Nenhum post-it ainda</strong><p>Crie uma lembrança, relacione uma pessoa ou evento e acompanhe as tarefas.</p></div>}
+        {!loading && !notes.length && <div className="care-notes-empty"><span aria-hidden="true">▱</span><strong>Nenhum post-it ainda</strong><p>Crie uma lembrança livre ou, se desejar, relacione uma pessoa ou evento.</p></div>}
         {loading && <div className="care-notes-empty"><strong>Organizando suas anotações…</strong></div>}
       </div>
       {compact && notes.length > visibleNotes.length && <Link className="care-notes-more" href="/painel?view=visitantes">Ver todos os {notes.length} post-its em Visitantes →</Link>}

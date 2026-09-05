@@ -273,53 +273,21 @@ function CadenciaContato({ items, limite = 5 }: { items: CadenciaItem[]; limite?
  */
 function LoadMetrics({ items }: { items: LoadMetricItem[] }) {
   if (items.length === 0) return null;
+  const total = items.reduce((sum, item) => sum + item.total_visitantes, 0);
 
   return (
-    <div
-      style={{
-        padding: "16px",
-        border: "1px solid var(--color-border)",
-        borderRadius: "8px",
-        marginTop: "16px",
-      }}
-    >
-      <h3 style={{ marginTop: 0, marginBottom: "12px", fontSize: "14px", fontWeight: "bold" }}>
-        📊 Distribuição de Carga
-      </h3>
-      <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-        {items.map((item, index) => (
-          <div key={index}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
-              <span style={{ fontSize: "13px", fontWeight: "bold" }}>{item.responsavel}</span>
-              <span style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>
-                {item.total_visitantes} visitantes
-              </span>
-            </div>
-            <div
-              style={{
-                background: "var(--color-border)",
-                borderRadius: "4px",
-                height: "8px",
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  background: "linear-gradient(90deg, #3b82f6, #10b981)",
-                  height: "100%",
-                  width: `${Math.min(item.carga_percentual, 100)}%`,
-                  transition: "width 200ms",
-                }}
-              />
-            </div>
-            <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "2px" }}>
-              Novos: {item.visitantes_novos} | Acompanhando: {item.em_acompanhamento} | Integrados:{" "}
-              {item.integrados}
-            </div>
-          </div>
+    <section className="relationship-insight-card-v4 is-load">
+      <header><div><p className="pilot-kicker">RESPONSÁVEIS</p><h3>Distribuição do cuidado</h3></div><strong>{total}<small> pessoas</small></strong></header>
+      <div className="relationship-load-list-v4">
+        {items.map((item) => (
+          <article key={item.responsavel}>
+            <header><strong>{item.responsavel}</strong><span>{item.total_visitantes}</span></header>
+            <progress max="100" value={Math.min(item.carga_percentual, 100)} aria-label={`${item.responsavel}: ${item.total_visitantes} pessoas`} />
+            <dl><div><dt>Novos</dt><dd>{item.visitantes_novos}</dd></div><div><dt>Em cuidado</dt><dd>{item.em_acompanhamento}</dd></div><div><dt>Integrados</dt><dd>{item.integrados}</dd></div></dl>
+          </article>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -330,64 +298,15 @@ function LoadMetrics({ items }: { items: LoadMetricItem[] }) {
 function ConflictDetection({ items }: { items: ConflictItem[] }) {
   if (items.length === 0) return null;
 
-  const corSeveridade = (severidade: string) => {
-    switch (severidade) {
-      case "crítico":
-        return "#ef4444";
-      case "aviso":
-        return "#f59e0b";
-      default:
-        return "#3b82f6";
-    }
-  };
-
-  const iconSeveridade = (severidade: string) => {
-    switch (severidade) {
-      case "crítico":
-        return "🚨";
-      case "aviso":
-        return "⚠️";
-      default:
-        return "ℹ️";
-    }
-  };
-
   return (
-    <div
-      style={{
-        padding: "16px",
-        border: "1px solid var(--color-border)",
-        borderRadius: "8px",
-        marginTop: "16px",
-      }}
-    >
-      <h3 style={{ marginTop: 0, marginBottom: "12px", fontSize: "14px", fontWeight: "bold" }}>
-        🔍 Detecção de Conflitos ({items.length})
-      </h3>
-      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+    <section className="relationship-insight-card-v4 is-alerts">
+      <header><div><p className="pilot-kicker">QUALIDADE DOS DADOS</p><h3>Pontos para revisar</h3></div><strong>{items.length}<small> alertas</small></strong></header>
+      <div className="relationship-alert-list-v4">
         {items.map((item, index) => (
-          <div
-            key={index}
-            style={{
-              padding: "8px 12px",
-              background: corSeveridade(item.severidade) + "15",
-              border: `2px solid ${corSeveridade(item.severidade)}`,
-              borderRadius: "4px",
-              fontSize: "12px",
-            }}
-          >
-            <div style={{ display: "flex", gap: "8px", alignItems: "flex-start", marginBottom: "4px" }}>
-              <span>{iconSeveridade(item.severidade)}</span>
-              <div>
-                <strong>{item.descricao}</strong>
-                <br />
-                <span style={{ color: "var(--color-text-muted)" }}>💡 {item.sugestao}</span>
-              </div>
-            </div>
-          </div>
+          <article key={`${item.tipo}-${index}`} data-severity={item.severidade}><span aria-hidden="true" /><div><strong>{item.descricao}</strong><p>{item.sugestao}</p></div></article>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -560,66 +479,20 @@ function VisitaTrackingList({ items }: { items: VisitaItem[] }) {
  */
 function RegionalGrouping({ items }: { items: RegionalItem[] }) {
   if (items.length === 0) return null;
-
-  const maxVisitantes = Math.max(...items.map((i) => i.total_visitantes), 1);
+  const populated = items.filter((item) => item.total_visitantes > 0);
+  const emptyCount = items.length - populated.length;
 
   return (
-    <div
-      style={{
-        padding: "16px",
-        border: "1px solid var(--color-border)",
-        borderRadius: "8px",
-        marginTop: "16px",
-      }}
-    >
-      <h3 style={{ marginTop: 0, marginBottom: "12px", fontSize: "14px", fontWeight: "bold" }}>
-        🗺️ Agrupamento Regional ({items.length} célula(s))
-      </h3>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-          gap: "12px",
-        }}
-      >
-        {items.map((item) => (
-          <div
-            key={item.id}
-            style={{
-              padding: "12px",
-              border: "1px solid var(--color-border)",
-              borderRadius: "6px",
-              background: "var(--color-surface)",
-            }}
-          >
-            <div style={{ marginBottom: "8px" }}>
-              <strong style={{ fontSize: "13px" }}>{item.nome}</strong>
-            </div>
-            <div
-              style={{
-                background: "var(--color-border)",
-                borderRadius: "4px",
-                height: "6px",
-                marginBottom: "8px",
-              }}
-            >
-              <div
-                style={{
-                  background: "linear-gradient(90deg, #3b82f6, #10b981)",
-                  height: "100%",
-                  width: `${(item.total_visitantes / maxVisitantes) * 100}%`,
-                }}
-              />
-            </div>
-            <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>
-              <div>👥 {item.total_visitantes} visitante(s)</div>
-              <div>🆕 {item.novos} novo(s)</div>
-              <div>✓ {item.integrados} integrado(s)</div>
-            </div>
-          </div>
+    <section className="relationship-insight-card-v4 is-regional">
+      <header><div><p className="pilot-kicker">CÉLULAS</p><h3>Onde estão as pessoas</h3></div><strong>{populated.length}<small> ativas</small></strong></header>
+      <div className="relationship-region-grid-v4">
+        {populated.map((item) => (
+          <article key={item.id}><header><strong>{item.nome}</strong><span>{item.total_visitantes} {item.total_visitantes === 1 ? "pessoa" : "pessoas"}</span></header><dl><div><dt>Novos</dt><dd>{item.novos}</dd></div><div><dt>Integrados</dt><dd>{item.integrados}</dd></div><div><dt>Em cuidado</dt><dd>{Math.max(0, item.total_visitantes - item.integrados)}</dd></div></dl></article>
         ))}
+        {!populated.length && <p className="relationship-insight-empty-v4">Nenhuma pessoa confirmada está vinculada a uma célula.</p>}
       </div>
-    </div>
+      {emptyCount > 0 && <footer>{emptyCount} {emptyCount === 1 ? "célula sem pessoas foi ocultada" : "células sem pessoas foram ocultadas"} desta visão.</footer>}
+    </section>
   );
 }
 
@@ -940,7 +813,7 @@ export function RelacionamentoTools({ visitantes = [], compacto = false, onAbrir
             </section>
           )}
 
-          {(regional.length > 0 || carga.length > 0 || conflitos.length > 0) && <details className="relationship-insights-v3" data-mobile-panel="historico"><summary><span><strong>Indicadores complementares</strong><small>Carga dos responsáveis, regiões e cuidados com os dados</small></span><i aria-hidden="true">⌄</i></summary><div>{carga.length > 0 && <LoadMetrics items={carga} />}{regional.length > 0 && <RegionalGrouping items={regional} />}{conflitos.length > 0 && <ConflictDetection items={conflitos} />}</div></details>}
+          {(regional.length > 0 || carga.length > 0 || conflitos.length > 0) && <details className="relationship-insights-v3" data-mobile-panel="historico"><summary><span><strong>Indicadores complementares</strong><small>Somente pessoas confirmadas · responsáveis, células e dados para revisar</small></span><i aria-hidden="true">⌄</i></summary><div>{carga.length > 0 && <LoadMetrics items={carga} />}{regional.length > 0 && <RegionalGrouping items={regional} />}{conflitos.length > 0 && <ConflictDetection items={conflitos} />}</div></details>}
 
           {engagement.length === 0 && cadencia.length === 0 && cadenciaAvancada.length === 0 && <div className="relationship-empty-v3"><strong>A central ainda não tem dados suficientes</strong><p>Cadastre visitantes e registre contatos para receber prioridades e sugestões.</p></div>}
         </>
