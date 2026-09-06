@@ -2,7 +2,7 @@
 
 Aplicativo Android conectado à plataforma oficial do Vínkulo.
 
-Versão atual: **1.5.0** (`versionCode 6`).
+Versão atual: **1.5.1** (`versionCode 7`).
 
 ## Login e Google Drive
 

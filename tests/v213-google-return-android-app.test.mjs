@@ -55,18 +55,18 @@ test("callback nativo volta direto ao app e preserva a conferência do e-mail", 
   assert.match(callback, /mesma Conta Google usada no e-mail do seu cadastro/);
 });
 
-test("APK de produção avança para a versão 1.5.0 com assinatura estável", async () => {
+test("APK de produção avança para a versão 1.5.1 com assinatura estável", async () => {
   const [gradle, workflow] = await Promise.all([
     read("Vinkulo-Android/app/build.gradle.kts"),
     read(".github/workflows/build-vinkulo-apk.yml"),
   ]);
-  assert.match(gradle, /versionCode = 6/);
-  assert.match(gradle, /versionName = "1\.5\.0"/);
+  assert.match(gradle, /versionCode = 7/);
+  assert.match(gradle, /versionName = "1\.5\.1"/);
   assert.match(gradle, /signingConfigs/);
   assert.match(gradle, /VINKULO_SIGNING_STORE_FILE/);
   assert.match(gradle, /keyAlias = "vinkulo-release"/);
   assert.match(gradle, /androidx\.browser:browser:1\.8\.0/);
   assert.match(workflow, /ANDROID_SIGNING_KEYSTORE_BASE64/);
   assert.match(workflow, /gradle assembleRelease/);
-  assert.match(workflow, /Vinkulo-Android-1\.5\.0-producao/);
+  assert.match(workflow, /Vinkulo-Android-1\.5\.1-producao/);
 });

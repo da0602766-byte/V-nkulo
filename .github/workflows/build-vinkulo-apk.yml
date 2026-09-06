@@ -41,6 +41,6 @@ jobs:
         run: gradle assembleRelease
       - uses: actions/upload-artifact@v4
         with:
-          name: Vinkulo-Android-1.5.0-producao
+          name: Vinkulo-Android-1.5.1-producao
           path: Vinkulo-Android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error

@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { showUnreadDeviceNotifications } from "../lib/device-notification-sync";
 
 type Notification = {
   id: number;
@@ -21,7 +22,6 @@ type NotificationConfig = { escalas: boolean; eventos: boolean; pedidos: boolean
 type NotificationCategory = keyof NotificationConfig;
 export type NotificationUnreadSummary = Record<NotificationCategory, number> & { total: number };
 const DEFAULT_CONFIG: NotificationConfig = { escalas: true, eventos: true, pedidos: true, mensagens: true, sistema: true };
-const DEVICE_NOTIFICATION_STORAGE_KEY = "vinkulo-device-notifications-v1";
 
 export default function PilotNotificationCenter({
   onUnreadChange,
@@ -53,7 +53,6 @@ export default function PilotNotificationCenter({
   }, []);
   const requestRef = useRef<AbortController | null>(null);
   const permissionRef = useRef<"unsupported" | NotificationPermission>("unsupported");
-  const shownDeviceNotificationIds = useRef<Set<number> | null>(null);
   const unread = items.filter((item) => !item.read).length;
   const unreadSummary = useMemo<NotificationUnreadSummary>(() => {
     const summary: NotificationUnreadSummary = {
@@ -76,35 +75,10 @@ export default function PilotNotificationCenter({
     onUnreadChange?.(unreadSummary);
   }, [onUnreadChange, unreadSummary]);
 
-  const showUnreadOnDevice = useCallback(async (nextItems: Notification[]) => {
-    if (permissionRef.current !== "granted" || !("serviceWorker" in navigator)) return;
-    if (!shownDeviceNotificationIds.current) {
-      shownDeviceNotificationIds.current = readShownDeviceNotificationIds();
-    }
-    const shownIds = shownDeviceNotificationIds.current;
-    const pending = nextItems
-      .filter((item) => !item.read && !shownIds.has(item.id))
-      .slice(0, 5);
-    if (!pending.length) return;
-
-    const registration = await navigator.serviceWorker.ready;
-    for (const item of pending) {
-      const options = {
-        body: item.message,
-        icon: "/vinkulo-app-icon-192.png",
-        badge: "/vinkulo-app-icon-192.png",
-        tag: `vinkulo-notification-${item.id}`,
-        renotify: true,
-        data: {
-          notificationId: item.id,
-          url: isSafeInternalDestination(item.destination) ? item.destination : "/painel",
-        },
-      } as NotificationOptions & { renotify: boolean };
-      await registration.showNotification(item.title || "Vínkulo", options);
-      shownIds.add(item.id);
-    }
-    persistShownDeviceNotificationIds(shownIds);
-  }, []);
+  const showUnreadOnDevice = useCallback(
+    (nextItems: Notification[]) => showUnreadDeviceNotifications(nextItems),
+    [],
+  );
 
   const load = useCallback(async () => {
     requestRef.current?.abort();
@@ -382,26 +356,6 @@ export default function PilotNotificationCenter({
       )}
     </div>
   );
-}
-
-function readShownDeviceNotificationIds() {
-  try {
-    const value = JSON.parse(window.localStorage.getItem(DEVICE_NOTIFICATION_STORAGE_KEY) || "[]");
-    return new Set<number>(Array.isArray(value) ? value.filter((id) => Number.isInteger(id)).slice(-300) : []);
-  } catch {
-    return new Set<number>();
-  }
-}
-
-function persistShownDeviceNotificationIds(ids: Set<number>) {
-  try {
-    window.localStorage.setItem(
-      DEVICE_NOTIFICATION_STORAGE_KEY,
-      JSON.stringify(Array.from(ids).slice(-300)),
-    );
-  } catch {
-    // O armazenamento pode estar bloqueado; a notificação continua funcional.
-  }
 }
 
 function isSafeInternalDestination(value: string) {

@@ -12,6 +12,11 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.graphics.Insets;
+import android.view.View;
+import android.view.WindowInsets;
 import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
@@ -41,16 +46,26 @@ public class MainActivity extends Activity {
     private static final int NOTIFICATION_PERMISSION = 403;
     private static final String NOTIFICATION_CHANNEL = "vinkulo_alertas";
     private static final String EXTRA_NOTIFICATION_URL = "vinkulo_notification_url";
+    private static final long NOTIFICATION_REFRESH_INTERVAL_MS = 20_000L;
 
     private WebView webView;
     private ValueCallback<Uri[]> fileCallback;
     private final ArrayDeque<PermissionRequest> pendingMediaRequests = new ArrayDeque<>();
     private boolean awaitingMediaPermissionResult;
+    private final Handler notificationRefreshHandler = new Handler(Looper.getMainLooper());
+    private final Runnable notificationRefresh = new Runnable() {
+        @Override
+        public void run() {
+            dispatchNotificationRefresh();
+            notificationRefreshHandler.postDelayed(this, NOTIFICATION_REFRESH_INTERVAL_MS);
+        }
+    };
 
     @Override
     public void onCreate(Bundle state) {
         super.onCreate(state);
         setContentView(R.layout.activity_main);
+        applySafeSystemInsets();
         webView = findViewById(R.id.webview);
 
         WebSettings settings = webView.getSettings();
@@ -107,6 +122,57 @@ public class MainActivity extends Activity {
             handleNotificationTap(getIntent());
         }
         handleGoogleReturn(getIntent());
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        notificationRefreshHandler.removeCallbacks(notificationRefresh);
+        notificationRefreshHandler.post(notificationRefresh);
+    }
+
+    @Override
+    protected void onStop() {
+        notificationRefreshHandler.removeCallbacks(notificationRefresh);
+        super.onStop();
+    }
+
+    private void applySafeSystemInsets() {
+        View root = findViewById(R.id.app_root);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            getWindow().setDecorFitsSystemWindows(false);
+        }
+        root.setOnApplyWindowInsetsListener((view, windowInsets) -> {
+            int left;
+            int top;
+            int right;
+            int bottom;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                Insets safeInsets = windowInsets.getInsets(
+                        WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+                left = safeInsets.left;
+                top = safeInsets.top;
+                right = safeInsets.right;
+                bottom = safeInsets.bottom;
+            } else {
+                left = windowInsets.getSystemWindowInsetLeft();
+                top = windowInsets.getSystemWindowInsetTop();
+                right = windowInsets.getSystemWindowInsetRight();
+                bottom = windowInsets.getSystemWindowInsetBottom();
+            }
+            view.setPadding(left, top, right, bottom);
+            return Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                    ? WindowInsets.CONSUMED
+                    : windowInsets.consumeSystemWindowInsets();
+        });
+        root.requestApplyInsets();
+    }
+
+    private void dispatchNotificationRefresh() {
+        if (webView == null) return;
+        webView.post(() -> webView.evaluateJavascript(
+                "window.dispatchEvent(new Event('vinkulo:native-notification-refresh'))",
+                null));
     }
 
     @Override
