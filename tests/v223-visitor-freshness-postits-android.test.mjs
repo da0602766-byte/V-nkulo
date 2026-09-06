@@ -33,16 +33,18 @@ test("post-its ficam em uma coluna lateral compacta com cartões quadrados", asy
 });
 
 test("APK usa a ponte nativa e mantém Service Worker como fallback do navegador", async () => {
-  const [center, bridge] = await Promise.all([
+  const [center, bridge, deviceSync] = await Promise.all([
     read("app/components/PilotNotificationCenter.tsx"),
     read("app/lib/androidNativeBridge.ts"),
+    read("app/lib/device-notification-sync.ts"),
   ]);
 
   assert.match(bridge, /showNotification\?:/);
   assert.match(bridge, /isNativeNotificationBridgeAvailable/);
   assert.match(bridge, /export function showDeviceNotification/);
-  assert.match(center, /nativeBridge && showDeviceNotification/);
-  assert.match(center, /registration\.showNotification/);
+  assert.match(center, /showUnreadDeviceNotifications/);
+  assert.match(deviceSync, /nativeBridge && showDeviceNotification/);
+  assert.match(deviceSync, /registration\.showNotification/);
   assert.match(center, /vinkulo:notification-open/);
   assert.match(center, /isSafeInternalDestination\(destination\)/);
 });

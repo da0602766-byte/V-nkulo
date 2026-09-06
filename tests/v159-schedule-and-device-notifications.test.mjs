@@ -15,14 +15,17 @@ test("schedule creation stays open when the user touches outside", async () => {
 });
 
 test("every unread purple notice is forwarded once to the Android tray", async () => {
-  const [center, serviceWorker] = await Promise.all([
+  const [center, deviceSync, nativeSync, serviceWorker] = await Promise.all([
     read("app/components/PilotNotificationCenter.tsx"),
+    read("app/lib/device-notification-sync.ts"),
+    read("app/components/NativeNotificationSync.tsx"),
     read("public/sw.js"),
   ]);
   assert.match(center, /showUnreadOnDevice/);
-  assert.match(center, /DEVICE_NOTIFICATION_STORAGE_KEY/);
-  assert.match(center, /filter\(\(item\) => !item\.read && !shownIds\.has\(item\.id\)\)/);
-  assert.match(center, /registration\.showNotification/);
+  assert.match(deviceSync, /DEVICE_NOTIFICATION_STORAGE_KEY/);
+  assert.match(deviceSync, /filter\(\(item\) => !item\.read && !shownNotificationIds!\.has\(item\.id\)\)/);
+  assert.match(deviceSync, /registration\.showNotification/);
+  assert.match(nativeSync, /vinkulo:native-notification-refresh/);
   assert.match(center, /await load\(\);/);
   assert.match(center, /adote:refresh-notifications/);
   assert.match(serviceWorker, /vinkulo-shell-v4/);
