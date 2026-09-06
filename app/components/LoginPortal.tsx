@@ -3,6 +3,10 @@
 import { FormEvent, useEffect, useState } from "react";
 import GoogleStatusToast, { type GoogleToastState } from "./GoogleStatusToast";
 import type { PilotSignupField } from "../lib/pilot-login-config";
+import {
+  createGooglePairingSecret,
+  openGoogleAuthorizationInApp,
+} from "../lib/androidNativeBridge";
 import Link from "./StableLink";
 
 type LoginConfig = {
@@ -53,13 +57,6 @@ type Maintenance = {
 
 type Mode = "login" | "esqueci" | "cadastro";
 type LoginTheme = "auto" | "claro" | "escuro";
-
-function isInstalledVinkuloApp() {
-  return Boolean(window.VinkuloAndroid) ||
-    ["standalone", "fullscreen", "minimal-ui"].some((mode) => window.matchMedia(`(display-mode: ${mode})`).matches) ||
-    (window.navigator as Navigator & { standalone?: boolean }).standalone === true ||
-    document.referrer.startsWith("android-app://");
-}
 
 async function submit(url: string, payload: Record<string, unknown>) {
   const controller = new AbortController();
@@ -146,7 +143,7 @@ export default function LoginPortal({
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      const insideAndroidApp = isInstalledVinkuloApp();
+      const insideAndroidApp = Boolean(window.VinkuloAndroid);
       setAndroidApp(insideAndroidApp);
       if (insideAndroidApp) {
         setGooglePairing(window.sessionStorage.getItem("vinkulo-google-pairing") || "");
@@ -198,10 +195,16 @@ export default function LoginPortal({
       }
       if (!stopped) timer = window.setTimeout(() => void poll(), 1500);
     };
+    const resumeFromGoogle = () => {
+      window.clearTimeout(timer);
+      void poll();
+    };
+    window.addEventListener("vinkulo:google-return", resumeFromGoogle);
     void poll();
     return () => {
       stopped = true;
       window.clearTimeout(timer);
+      window.removeEventListener("vinkulo:google-return", resumeFromGoogle);
     };
   }, [androidApp, googlePairing, returnTo]);
 
@@ -298,8 +301,7 @@ export default function LoginPortal({
       detail: "O Vínkulo conclui o acesso assim que você autorizar.",
     });
     try {
-      const bytes = crypto.getRandomValues(new Uint8Array(32));
-      const pairing = btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+      const pairing = createGooglePairingSecret();
       const query = new URLSearchParams({
         purpose: "login",
         returnTo: returnTo || "/painel",
@@ -312,7 +314,9 @@ export default function LoginPortal({
       if (!response.ok || !body.authorizationUrl) throw new Error(body.error || "Não foi possível abrir o Google.");
       window.sessionStorage.setItem("vinkulo-google-pairing", pairing);
       setGooglePairing(pairing);
-      window.location.href = body.authorizationUrl;
+      if (!openGoogleAuthorizationInApp(body.authorizationUrl)) {
+        window.location.assign(body.authorizationUrl);
+      }
     } catch (error) {
       setLoading(false);
       setGoogleToast({

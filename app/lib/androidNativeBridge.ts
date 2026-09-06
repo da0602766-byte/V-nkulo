@@ -3,9 +3,35 @@ declare global {
     VinkuloAndroid?: {
       shareToWhatsApp?: (message: string) => void;
       downloadFile?: (url: string, filename: string) => void;
+      openGoogleAuth?: (authorizationUrl: string) => void;
       addCalendarEvent?: (eventJson: string) => void;
+      showNotification?: (title: string, body: string, tag: string, url: string) => void;
     };
   }
+}
+
+export function isVinkuloAndroidApp() {
+  return typeof window !== "undefined" && Boolean(window.VinkuloAndroid);
+}
+
+export function createGooglePairingSecret() {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+export function openGoogleAuthorizationInApp(authorizationUrl: string) {
+  if (typeof window === "undefined") return false;
+  const openGoogleAuth = window.VinkuloAndroid?.openGoogleAuth;
+  if (typeof openGoogleAuth !== "function") return false;
+  const target = new URL(authorizationUrl);
+  if (target.protocol !== "https:" || target.hostname !== "accounts.google.com") {
+    throw new Error("O endereço de autorização do Google não é válido.");
+  }
+  openGoogleAuth(target.toString());
+  return true;
 }
 
 export type DeviceCalendarEvent = {
@@ -15,6 +41,32 @@ export type DeviceCalendarEvent = {
   location?: string;
   description?: string;
 };
+
+export type DeviceNotification = {
+  title: string;
+  body: string;
+  tag: string;
+  url: string;
+};
+
+export function isNativeNotificationBridgeAvailable() {
+  return typeof window !== "undefined" && typeof window.VinkuloAndroid?.showNotification === "function";
+}
+
+export function showDeviceNotification(notification: DeviceNotification) {
+  if (!isNativeNotificationBridgeAvailable()) return false;
+  try {
+    window.VinkuloAndroid!.showNotification!(
+      notification.title.trim().slice(0, 160) || "Vínkulo",
+      notification.body.trim().slice(0, 1200),
+      notification.tag.trim().slice(0, 160),
+      notification.url,
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export async function downloadFileForDevice(url: string, filename: string) {
   if (typeof window === "undefined") return false;
@@ -74,7 +126,6 @@ export function shareToWhatsAppApp(message: string) {
     : fallback;
   return true;
 }
-
 export function addCalendarEventForDevice(event: DeviceCalendarEvent) {
   if (typeof window === "undefined") return false;
   const startsAt = new Date(event.startsAt);

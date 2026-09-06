@@ -101,8 +101,10 @@ test("login Google entrega a sessão de volta ao APK sem compartilhar cookies co
   assert.match(completion, /attachSessionCookie/);
   assert.match(completion, /consumeGoogleNativeHandoff/);
   assert.match(login, /window\.VinkuloAndroid/);
-  assert.match(login, /display-mode/);
-  assert.match(login, /android-app:\/\//);
+  // PWA instalada não possui o bridge nem o intent-filter do APK. Tratá-la
+  // como app Android deixava o usuário preso no fallback do navegador.
+  assert.doesNotMatch(login, /display-mode/);
+  assert.doesNotMatch(login, /android-app:\/\//);
   assert.match(login, /vinkulo-google-pairing/);
   assert.match(migration, /google_native_handoffs/);
   assert.match(returnPage, /package=com\.vinkulo\.app/);

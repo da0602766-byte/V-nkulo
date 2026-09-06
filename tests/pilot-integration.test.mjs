@@ -3177,6 +3177,15 @@ test("feed interno, solicitação de entrada, retenção e estatísticas usam re
     senha: "Pastor123",
     memberships: [{ comunidadeId: 1, papel: "PASTOR" }],
   });
+  const ownerWithoutMembershipId = await createPilotUser(database, {
+    nome: "Proprietário sem vínculo duplicado",
+    email: "owner.join-request@example.test",
+    senha: "OwnerRequest123",
+    memberships: [],
+  });
+  database
+    .prepare("UPDATE comunidades SET proprietario_usuario_id = ? WHERE id = 1")
+    .run(ownerWithoutMembershipId);
   await createPilotUser(database, {
     nome: "Admin Sul Fictício",
     email: "admin.sul.feed@example.test",
@@ -3203,6 +3212,12 @@ test("feed interno, solicitação de entrada, retenção e estatísticas usam re
     env,
     "pastor.feed@example.test",
     "Pastor123",
+  );
+  const ownerWithoutMembershipCookie = await login(
+    worker,
+    env,
+    "owner.join-request@example.test",
+    "OwnerRequest123",
   );
   const southCookie = await login(
     worker,
@@ -3314,6 +3329,18 @@ test("feed interno, solicitação de entrada, retenção e estatísticas usam re
     pastorNotifications.notifications[0].message,
     /Pessoa Solicitante Fictícia/,
   );
+
+  const ownerNotificationsResponse = await worker.fetch(
+    new Request("http://localhost/api/pilot/notificacoes", {
+      headers: { cookie: ownerWithoutMembershipCookie },
+    }),
+    env,
+    context,
+  );
+  assert.equal(ownerNotificationsResponse.status, 200);
+  const ownerNotifications = await ownerNotificationsResponse.json();
+  assert.equal(ownerNotifications.unread, 1);
+  assert.match(ownerNotifications.notifications[0].title, /solicitação de entrada/i);
 
   const southNotificationsResponse = await worker.fetch(
     new Request("http://localhost/api/pilot/notificacoes", {
