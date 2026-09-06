@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -39,6 +40,7 @@ public class MainActivity extends Activity {
     private static final int CAMERA_PERMISSION = 402;
     private static final int NOTIFICATION_PERMISSION = 403;
     private static final String NOTIFICATION_CHANNEL = "vinkulo_alertas";
+    private static final String EXTRA_NOTIFICATION_URL = "vinkulo_notification_url";
 
     private WebView webView;
     private ValueCallback<Uri[]> fileCallback;
@@ -97,7 +99,13 @@ public class MainActivity extends Activity {
 
         createNotificationChannel();
         requestStartupPermissions();
-        if (state == null) webView.loadUrl(APP_URL); else webView.restoreState(state);
+        if (state == null) {
+            String coldStartPath = notificationPathFromIntent(getIntent());
+            webView.loadUrl(coldStartPath != null ? APP_URL + coldStartPath : APP_URL);
+        } else {
+            webView.restoreState(state);
+            handleNotificationTap(getIntent());
+        }
         handleGoogleReturn(getIntent());
     }
 
@@ -106,6 +114,7 @@ public class MainActivity extends Activity {
         super.onNewIntent(intent);
         setIntent(intent);
         handleGoogleReturn(intent);
+        handleNotificationTap(intent);
     }
 
     private final class VinkuloBridge {
@@ -119,6 +128,15 @@ public class MainActivity extends Activity {
         public void openGoogleAuth(String authorizationUrl) {
             if (!isTrustedWebPage()) return;
             runOnUiThread(() -> openGoogleAuthorization(authorizationUrl));
+        }
+
+        // O WebView do Android não entrega notificações de página (Notification/
+        // Push API) na bandeja do sistema. Esta ponte deixa o próprio app nativo,
+        // que já tem o canal e a permissão POST_NOTIFICATIONS, postar o alerta.
+        @JavascriptInterface
+        public void showNotification(String title, String body, String tag, String url) {
+            if (!isTrustedWebPage()) return;
+            runOnUiThread(() -> postNativeNotification(title, body, tag, url));
         }
     }
 
@@ -152,6 +170,72 @@ public class MainActivity extends Activity {
             webView.post(() -> webView.evaluateJavascript(
                     "window.dispatchEvent(new Event('vinkulo:google-return'))", null));
         }
+    }
+
+    private void postNativeNotification(String title, String body, String tag, String url) {
+        if (Build.VERSION.SDK_INT >= 33 &&
+                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return;
+
+        int notificationId = notificationIdForTag(tag);
+        Intent tapIntent = new Intent(this, MainActivity.class);
+        tapIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        String path = notificationPathFromValue(url);
+        if (path != null) tapIntent.putExtra(EXTRA_NOTIFICATION_URL, path);
+        PendingIntent pendingIntent = PendingIntent.getActivity(
+                this, notificationId, tapIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+        String safeBody = body == null ? "" : body;
+        Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                ? new Notification.Builder(this, NOTIFICATION_CHANNEL)
+                : new Notification.Builder(this);
+        Notification notification = builder
+                .setSmallIcon(R.drawable.ic_launcher)
+                .setContentTitle(title == null || title.trim().isEmpty() ? "Vínkulo" : title)
+                .setContentText(safeBody)
+                .setStyle(new Notification.BigTextStyle().bigText(safeBody))
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent)
+                .build();
+        ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).notify(notificationId, notification);
+    }
+
+    private int notificationIdForTag(String tag) {
+        return tag == null || tag.isEmpty() ? 1200 : 1200 + Math.floorMod(tag.hashCode(), 100000);
+    }
+
+    private void handleNotificationTap(Intent intent) {
+        String path = notificationPathFromIntent(intent);
+        if (path == null || webView == null) return;
+        webView.post(() -> webView.evaluateJavascript(
+                "window.dispatchEvent(new CustomEvent('vinkulo:notification-open', { detail: "
+                        + toJsStringLiteral(path) + " }))",
+                null));
+    }
+
+    private String notificationPathFromIntent(Intent intent) {
+        return intent == null ? null : notificationPathFromValue(intent.getStringExtra(EXTRA_NOTIFICATION_URL));
+    }
+
+    private String notificationPathFromValue(String value) {
+        return value != null && isSafeNotificationPath(value) ? value : null;
+    }
+
+    private boolean isSafeNotificationPath(String value) {
+        return value.startsWith("/painel?") || value.startsWith("/comunidades") || value.startsWith("/proprietario");
+    }
+
+    private static String toJsStringLiteral(String value) {
+        StringBuilder out = new StringBuilder("'");
+        String safe = value == null ? "" : value;
+        for (int i = 0; i < safe.length(); i++) {
+            char c = safe.charAt(i);
+            if (c == '\\' || c == '\'') out.append('\\');
+            if (c == '\n') { out.append("\\n"); continue; }
+            if (c == '\r') { out.append("\\r"); continue; }
+            out.append(c);
+        }
+        return out.append('\'').toString();
     }
 
     private boolean handleNavigation(Uri uri) {
