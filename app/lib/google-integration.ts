@@ -36,6 +36,7 @@ export async function createGoogleAuthorization(
   origin: string,
   state: Omit<OAuthState, "nonce" | "expiresAt">,
 ) {
+  assertSecureOrigin(origin);
   const env = requireGoogleConfig();
   const nonce = randomToken(24);
   const signedState = await signState({
@@ -72,6 +73,7 @@ export async function readGoogleState(value: string): Promise<OAuthState | null>
 }
 
 export async function exchangeGoogleCode(code: string, origin: string) {
+  assertSecureOrigin(origin);
   const env = requireGoogleConfig();
   const response = await fetch(GOOGLE_TOKEN_ENDPOINT, {
     method: "POST",
@@ -379,6 +381,23 @@ export async function readStorageReference(token: string) {
   return scope && Number.isInteger(ownerId) && ownerId > 0 && fileId
     ? { scope, ownerId, fileId }
     : null;
+}
+
+// O OAuth do Google exige um redirect_uri que ele mesmo já valida contra o
+// que está cadastrado no Console — mas aceitar http:// aqui abriria margem
+// para reaproveitar o fluxo num host não seguro. Só localhost foge da regra,
+// porque é onde o desenvolvimento local roda sem HTTPS.
+function assertSecureOrigin(origin: string) {
+  let parsed: URL;
+  try {
+    parsed = new URL(origin);
+  } catch {
+    throw new Error("Origem da requisição inválida para autenticação Google.");
+  }
+  const isLocalhost = ["localhost", "127.0.0.1", "::1"].includes(parsed.hostname);
+  if (parsed.protocol !== "https:" && !isLocalhost) {
+    throw new Error("A autenticação com o Google exige uma conexão segura (HTTPS).");
+  }
 }
 
 function requireGoogleConfig() {

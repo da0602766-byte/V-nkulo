@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import CareNotesBoard from "./CareNotesBoard";
 
 // O fio reúne o que já aconteceu e o que ainda vai acontecer no dia, numa
 // ordem só. O que o sistema não capta sozinho entra como registro manual.
@@ -481,6 +482,7 @@ export default function DayThreadWorkspace({
             ));
           })()}
         </section>
+        <CareNotesBoard compact />
       </aside>
       </div>
     </section>

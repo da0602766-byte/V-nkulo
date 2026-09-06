@@ -10,6 +10,7 @@ import PlatformControlsWorkspace from "./PlatformControlsWorkspace";
 import EditorialAutomationWorkspace from "./EditorialAutomationWorkspace";
 import StatisticsWorkspace from "./StatisticsWorkspace";
 import PlatformOptimizerWorkspace from "./PlatformOptimizerWorkspace";
+import OwnerLaboratoryWorkspace from "./OwnerLaboratoryWorkspace";
 import Link from "./StableLink";
 import ThemeControl from "./ThemeControl";
 import {
@@ -41,7 +42,8 @@ type OwnerTab =
   | "editorial"
   | "statistics"
   | "optimization"
-  | "controls";
+  | "controls"
+  | "laboratory";
 type OwnerGridPreset = "2x2" | "2x4" | "4x2" | "4x4";
 type OwnerMetricKey =
   | "comunidades_ativas"
@@ -61,6 +63,7 @@ const TABS: { id: OwnerTab; label: string; icon: string }[] = [
   { id: "editorial", label: "IA Editorial", icon: "✦" },
   { id: "statistics", label: "Estatísticas", icon: "▥" },
   { id: "optimization", label: "Otimização", icon: "↻" },
+  { id: "laboratory", label: "Laboratório", icon: "◈" },
   { id: "controls", label: "Configurações", icon: "⚙" },
 ];
 
@@ -463,6 +466,7 @@ export default function OwnerWorkspace({
               <section className="owner-recent-grid"><div><header><h2>Comunidades recentes</h2><button type="button" onClick={() => setTab("communities")}>Ver todas</button></header>{data.communities.slice(0, 5).map((item) => <button key={Number(item.id)} onClick={() => void openCommunity(Number(item.id))}><OwnerAvatar image={communityLogo(item)} name={String(item.nome)} /><div><strong>{String(item.nome)}</strong><small>{String(item.cidade_publica || "Localização não informada")}</small></div><em>Abrir →</em></button>)}</div><div><header><h2>Atividade auditada</h2><button type="button" onClick={() => setTab("audit")}>Ver auditoria</button></header>{data.audit.slice(0, 6).map((item) => <article key={Number(item.id)}><span>✓</span><div><strong>{humanize(String(item.evento))}</strong><small>{String(item.usuario_nome || "Sistema")} · {formatDate(String(item.criado_em))}</small></div></article>)}</div></section>
             </>
           )}
+          {tab === "laboratory" && <OwnerLaboratoryWorkspace />}
 
           {tab === "requests" && data && (
             <section className="owner-request-board">
@@ -796,6 +800,7 @@ function tabDescription(tab: OwnerTab) {
     editorial: "Revise e programe conteúdos da plataforma fora do contexto comunitário.",
     statistics: "Consulte indicadores globais sem expor ferramentas da plataforma nos menus comunitários.",
     optimization: "Diagnostique e execute retenções seguras sem remover dados ativos.",
+    laboratory: "Crie e valide protótipos isolados, sem modificar páginas ou dados reais.",
     controls: "Configure identidade, módulos e regras globais da plataforma.",
   }[tab];
 }

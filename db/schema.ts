@@ -2091,6 +2091,12 @@ export const solicitacoesComunidade = sqliteTable(
     descricao: text("descricao").notNull(),
     visibilidade: text("visibilidade").notNull().default("GESTORES"),
     status: text("status").notNull().default("ABERTA"),
+    preferenciaContato: text("preferencia_contato").notNull().default(""),
+    disponibilidade: text("disponibilidade").notNull().default(""),
+    dataPreferencial: text("data_preferencial"),
+    contatoAutorizado: integer("contato_autorizado", { mode: "boolean" })
+      .notNull()
+      .default(false),
     criadoEm: text("criado_em")
       .notNull()
       .default(sql`CURRENT_TIMESTAMP`),
@@ -2269,6 +2275,12 @@ export const solicitacaoRepositorioItens = sqliteTable(
     responsavelUsuarioId: integer("responsavel_usuario_id").references(() => usuarios.id, {
       onDelete: "set null",
     }),
+    prioridade: text("prioridade").notNull().default("NORMAL"),
+    responsavelAtribuidoEm: text("responsavel_atribuido_em"),
+    primeiroContatoEm: text("primeiro_contato_em"),
+    proximoRetornoEm: text("proximo_retorno_em"),
+    visitaAgendadaEm: text("visita_agendada_em"),
+    resultado: text("resultado").notNull().default(""),
     mensagemAtendimento: text("mensagem_atendimento").notNull().default(""),
     testemunho: text("testemunho").notNull().default(""),
     testemunhoCompartilhavel: integer("testemunho_compartilhavel").notNull().default(-1),
@@ -2292,6 +2304,49 @@ export const solicitacaoRepositorioItens = sqliteTable(
     index("solicitacao_repositorio_itens_finalizado_idx").on(
       table.comunidadeId,
       table.finalizadoEm,
+    ),
+    index("solicitacao_repositorio_itens_retorno_idx").on(
+      table.comunidadeId,
+      table.proximoRetornoEm,
+      table.status,
+    ),
+  ],
+);
+
+export const solicitacaoEventos = sqliteTable(
+  "solicitacao_eventos",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    comunidadeId: integer("comunidade_id")
+      .notNull()
+      .references(() => comunidades.id, { onDelete: "cascade" }),
+    itemId: integer("item_id")
+      .notNull()
+      .references(() => solicitacaoRepositorioItens.id, { onDelete: "cascade" }),
+    solicitacaoId: integer("solicitacao_id")
+      .notNull()
+      .references(() => solicitacoesComunidade.id, { onDelete: "cascade" }),
+    tipo: text("tipo").notNull(),
+    mensagem: text("mensagem").notNull().default(""),
+    visivelMembro: integer("visivel_membro", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    criadoPor: integer("criado_por").references(() => usuarios.id, {
+      onDelete: "set null",
+    }),
+    criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("solicitacao_eventos_item_idx").on(
+      table.comunidadeId,
+      table.itemId,
+      table.criadoEm,
+    ),
+    index("solicitacao_eventos_solicitacao_idx").on(
+      table.comunidadeId,
+      table.solicitacaoId,
+      table.visivelMembro,
+      table.criadoEm,
     ),
   ],
 );
@@ -2729,6 +2784,40 @@ export const layoutsInterfaceHistorico = sqliteTable(
       table.id,
     ),
   ],
+);
+
+// Protótipos exclusivos do proprietário. Não compartilham o armazenamento de
+// layouts reais para impedir que um experimento altere uma tela em produção.
+export const laboratorioExperimentos = sqliteTable(
+  "laboratorio_experimentos",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    autorId: integer("autor_id").notNull().references(() => usuarios.id, { onDelete: "restrict" }),
+    nome: text("nome").notNull(),
+    descricao: text("descricao").notNull().default(""),
+    status: text("status").notNull().default("ATIVO"),
+    dispositivoPrincipal: text("dispositivo_principal").notNull().default("DESKTOP"),
+    documento: text("documento").notNull().default("{}"),
+    css: text("css").notNull().default(""),
+    versao: integer("versao").notNull().default(1),
+    criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+    atualizadoEm: text("atualizado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [index("laboratorio_experimentos_status_idx").on(table.status, table.atualizadoEm)],
+);
+
+export const laboratorioVersoes = sqliteTable(
+  "laboratorio_versoes",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    experimentoId: integer("experimento_id").notNull().references(() => laboratorioExperimentos.id, { onDelete: "cascade" }),
+    autorId: integer("autor_id").notNull().references(() => usuarios.id, { onDelete: "restrict" }),
+    rotulo: text("rotulo").notNull(),
+    documento: text("documento").notNull(),
+    css: text("css").notNull().default(""),
+    criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [index("laboratorio_versoes_experimento_idx").on(table.experimentoId, table.id)],
 );
 
 export const feedbackPlataforma = sqliteTable(

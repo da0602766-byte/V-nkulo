@@ -322,6 +322,86 @@ export async function PATCH(request: Request, context: Context) {
     );
   }
 
+  if (action === "PUBLICAR") {
+    if (schedule.status !== "RASCUNHO") {
+      return Response.json(
+        { error: "Somente escalas em rascunho podem ser publicadas por esta ação." },
+        { status: 409 },
+      );
+    }
+    if (!schedule.responsavel_usuario_id) {
+      return Response.json(
+        { error: "Defina um responsável antes de publicar a escala." },
+        { status: 400 },
+      );
+    }
+    const responsible = await db
+      .prepare(
+        `SELECT id FROM ministerio_voluntarios
+         WHERE comunidade_id = ? AND ministerio_id = ?
+           AND usuario_id = ? AND ativo = 1`,
+      )
+      .bind(
+        access.context.comunidadeId,
+        schedule.ministerio_id,
+        schedule.responsavel_usuario_id,
+      )
+      .first<{ id: number }>();
+    if (!responsible) {
+      return Response.json(
+        { error: "O responsável precisa continuar ativo neste ministério." },
+        { status: 409 },
+      );
+    }
+    const recipients = await db
+      .prepare(
+        `SELECT DISTINCT usuario_id FROM escala_designacoes
+         WHERE escala_id = ? AND comunidade_id = ? AND ativo = 1`,
+      )
+      .bind(id, access.context.comunidadeId)
+      .all<{ usuario_id: number }>();
+    if (!recipients.results.length) {
+      return Response.json(
+        { error: "Adicione pelo menos um integrante antes de publicar a escala." },
+        { status: 400 },
+      );
+    }
+    const updated = await db
+      .prepare(
+        `UPDATE escalas_ministerio
+         SET status = 'PUBLICADA', publicar_em = NULL, atualizado_por = ?,
+           atualizado_em = CURRENT_TIMESTAMP
+         WHERE id = ? AND comunidade_id = ? AND status = 'RASCUNHO'`,
+      )
+      .bind(access.user.id, id, access.context.comunidadeId)
+      .run();
+    if (!Number(updated.meta.changes)) {
+      return Response.json(
+        { error: "A escala foi alterada enquanto você publicava. Atualize a página." },
+        { status: 409 },
+      );
+    }
+    await Promise.all(
+      recipients.results.map((recipient) =>
+        notifyUser(db, {
+          userId: Number(recipient.usuario_id),
+          title: "Nova escala ministerial",
+          message: `Você foi escalado para “${schedule.titulo}”.`,
+          entityId: id,
+          area: "ESCALAS",
+          destination: "/painel?view=ministerios",
+          createdBy: String(access.user.id),
+        }),
+      ),
+    );
+    await audit("ESCALA_V213_PUBLICADA", {
+      escalaId: id,
+      ministerioId: schedule.ministerio_id,
+      destinatarios: recipients.results.length,
+    });
+    return Response.json({ ok: true, status: "PUBLICADA" });
+  }
+
   if (action === "DEFINIR_STATUS_DESIGNACAO") {
     const assignmentId = Number(payload.designacaoId);
     const status = String(payload.status || "").trim().toUpperCase();

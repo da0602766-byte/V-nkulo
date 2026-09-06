@@ -31,6 +31,10 @@ export async function GET() {
     googleAvailable: googleIntegrationAvailable(),
     google: connection ? {
       email: connection.google_email,
+      // 'linked' é a identidade Google usada para entrar; 'connected'
+      // continua significando Drive autorizado, como antes — mantido para
+      // não quebrar quem já lê este campo.
+      linked: true,
       connected: Boolean(connection.drive_enabled && !connection.revoked_at),
       scopes: connection.scopes,
       connectedAt: connection.connected_at,

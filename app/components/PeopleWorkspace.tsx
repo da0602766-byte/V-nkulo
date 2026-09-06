@@ -66,6 +66,7 @@ const PERMISSION_LABELS: Record<string, string> = {
   "parking.view": "Consultar estacionamento",
   "parking.report": "Registrar ocorrências",
   "feed.publish": "Publicar no feed",
+  "requests.manage": "Atender pedidos da comunidade",
 };
 
 const TITLES = [
@@ -87,10 +88,10 @@ const HIERARCHY_PERMISSION_PRESETS: Record<string, string[]> = {
   "LÍDER": ["visitors.view", "visitors.create", "visitors.edit", "followups.view", "followups.manage", "cells.view", "events.view", "ministries.view", "schedules.view", "feed.publish"],
   "DIÁCONO": ["visitors.view", "followups.view", "events.view", "ministries.view", "schedules.view", "parking.view", "parking.report"],
   "DIACONISA": ["visitors.view", "followups.view", "events.view", "ministries.view", "schedules.view", "parking.view", "parking.report"],
-  "PRESBÍTERO": ["visitors.view", "visitors.create", "visitors.edit", "followups.view", "followups.manage", "cells.view", "events.view", "events.manage", "ministries.view", "schedules.view", "schedules.manage", "feed.publish"],
-  "PRESBÍTERA": ["visitors.view", "visitors.create", "visitors.edit", "followups.view", "followups.manage", "cells.view", "events.view", "events.manage", "ministries.view", "schedules.view", "schedules.manage", "feed.publish"],
-  "PASTOR": ["visitors.view", "visitors.create", "visitors.edit", "followups.view", "followups.manage", "cells.view", "events.view", "events.manage", "ministries.view", "schedules.view", "schedules.manage", "parking.view", "feed.publish"],
-  "PASTORA": ["visitors.view", "visitors.create", "visitors.edit", "followups.view", "followups.manage", "cells.view", "events.view", "events.manage", "ministries.view", "schedules.view", "schedules.manage", "parking.view", "feed.publish"],
+  "PRESBÍTERO": ["visitors.view", "visitors.create", "visitors.edit", "followups.view", "followups.manage", "cells.view", "events.view", "events.manage", "ministries.view", "schedules.view", "schedules.manage", "feed.publish", "requests.manage"],
+  "PRESBÍTERA": ["visitors.view", "visitors.create", "visitors.edit", "followups.view", "followups.manage", "cells.view", "events.view", "events.manage", "ministries.view", "schedules.view", "schedules.manage", "feed.publish", "requests.manage"],
+  "PASTOR": ["visitors.view", "visitors.create", "visitors.edit", "followups.view", "followups.manage", "cells.view", "events.view", "events.manage", "ministries.view", "schedules.view", "schedules.manage", "parking.view", "feed.publish", "requests.manage"],
+  "PASTORA": ["visitors.view", "visitors.create", "visitors.edit", "followups.view", "followups.manage", "cells.view", "events.view", "events.manage", "ministries.view", "schedules.view", "schedules.manage", "parking.view", "feed.publish", "requests.manage"],
 };
 
 export default function PeopleWorkspace({

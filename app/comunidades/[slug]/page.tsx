@@ -59,7 +59,7 @@ export default async function PublicCommunityPage({
           aria-label={community.bannerUrl ? `Capa da comunidade ${community.nome}` : `Identidade da comunidade ${community.nome}`}
         >
           {community.bannerUrl && (
-            <img loading="lazy" src={community.bannerUrl} alt="" />
+            <img src={community.bannerUrl} loading="lazy" alt="" />
           )}
         </div>
         <div className="community-profile-identity-v120">

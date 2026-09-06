@@ -5,6 +5,7 @@
 - **Versão-base:** V4.9.0, com Conta Google, Google Drive/local e política de conteúdo sem cópia persistente na plataforma concluídos em 31/08/2026.
 - **Data da última análise:** 05/09/2026.
 - **Estado deste documento:** vigente. Decisões históricas incompatíveis foram removidas deste arquivo.
+- **Bloco autorizado para publicação:** Pedidos V213 foi integrado sobre a versão 217, preservando as evoluções já publicadas de relacionamento e atendimento.
 - **Publicação automática do Site:** autorizada pelo proprietário para grupos completos que tenham build, testes e evidências aprovados; uma etapa com falha não pode ser publicada.
 - **Regra global:** toda evolução funcional vale para comunidades existentes e futuras, exceto quando o proprietário solicitar explicitamente uma exceção.
 
@@ -124,6 +125,8 @@
 - Conversas privadas criptografadas no Drive comunitário, com migração segura do histórico.
 - Comentários públicos persistentes para usuários ativos, com opção de ocultar o perfil.
 - Perfil pessoal reorganizado em seções legíveis e recolhíveis, com campos complementares e controles de privacidade preservados.
+- Pedidos com espaço acolhedor do membro, criação de oração/visita, histórico próprio, status legíveis e painel operacional separado por permissão.
+- Atendimento de pedidos com pesquisa, filtros, prioridade, responsável, retorno, agenda de visita, histórico, notas internas e atualizações visíveis ao membro.
 
 ## Funcionalidades somente visuais ou preparatórias
 
@@ -178,6 +181,16 @@
 - Rotas antigas que gravavam imagens embutidas no banco foram bloqueadas e passaram a reutilizar o fluxo Drive/local.
 - Banco V4.9.0: migration `0060_google_drive_privacy.sql` acrescenta conexões Google, preferências, pastas pessoais/comunitárias e ponteiros de conversa.
 - Validação V4.9.0: TypeScript com zero erros, build e artefato Sites aprovados e **222/222 testes automatizados aprovados**.
+
+## Bloco de publicação — Pedidos V213
+
+- A aba Pedidos foi reconstruída em React/Next.js com base no protótipo visual, reutilizando as APIs, os repositórios e as tabelas de solicitações já existentes.
+- O membro ganhou acesso a “Meus pedidos”, dados opcionais de visita, confirmação de oração atendida e atualizações do atendimento sem exposição de notas internas.
+- Oficiais autorizados ganharam painel operacional com pesquisa, filtros, lista móvel própria, responsáveis, prioridade, retornos, agenda de visita, histórico e notas internas.
+- A permissão explícita `requests.manage` foi adicionada ao catálogo e aos presets pastorais, sem conceder operação automaticamente a todo Líder.
+- A migration `0067_request_care_operations.sql` complementa os registros existentes e cria apenas a linha do tempo de atendimento `solicitacao_eventos`; dados atuais e retenção de 30 dias foram preservados.
+- Validação integrada: TypeScript e lint sem erros, build de produção aprovado, testes direcionados aprovados e suíte completa com **289/289 testes**.
+- A publicação foi autorizada expressamente pelo proprietário em 05/09/2026; a integração conserva as alterações da versão 217 e mantém autenticação, permissões, dados e isolamento entre comunidades.
 
 - Redesign visual V4.8.0: a aplicação passou a usar os tokens violeta, superfícies claras e modo escuro definidos no elemento `<html>`, sem inverter cores e sem substituir a autorização existente.
 - Bricolage Grotesque, Instrument Sans e IBM Plex Mono foram carregadas com `next/font`; títulos e textos fortes declaram a cor de leitura explicitamente nos dois temas.
