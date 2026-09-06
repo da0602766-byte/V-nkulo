@@ -18,9 +18,18 @@ O Google abre em uma aba segura sobre o aplicativo, como exigido pelo provedor. 
 
 O botão do WhatsApp usa uma ponte nativa protegida pelo domínio oficial do Vínkulo. No aplicativo Android, ele abre diretamente a escolha de conversa ou grupo no WhatsApp ou WhatsApp Business.
 
-## Gerar o APK
+## Gerar o APK de produção
 
-Abra o projeto no Android Studio e use **Build > Build APK(s)**. O fluxo do GitHub Actions também gera `app-debug.apk` para validação em cada pull request que altera o aplicativo.
+O aplicativo de produção usa uma chave PKCS#12 estável com alias `vinkulo-release`.
+O GitHub Actions recebe a chave exclusivamente pelos segredos
+`ANDROID_SIGNING_KEYSTORE_BASE64` e `ANDROID_SIGNING_PASSWORD`, executa
+`assembleRelease` e entrega `app-release.apk`. A chave, a senha e seus backups
+nunca devem ser adicionados ao repositório.
+
+A versão 1.3.0 pública usava um certificado de depuração. Por isso, a primeira
+instalação da versão 1.5.0 de produção exige remover a versão anterior uma única
+vez. Depois dessa troca, as próximas versões assinadas pela mesma chave poderão
+ser instaladas como atualização normal.
 
 ## Endereço conectado
 

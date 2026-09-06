@@ -26,10 +26,21 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.10.2"
-      - name: Compilar APK de teste
-        run: gradle assembleDebug
+      - name: Preparar chave estável de produção
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_SIGNING_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_SIGNING_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE_BASE64"
+          test -n "$STORE_PASSWORD"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/vinkulo-release.p12"
+      - name: Compilar APK de produção
+        env:
+          VINKULO_SIGNING_STORE_FILE: ${{ runner.temp }}/vinkulo-release.p12
+          VINKULO_SIGNING_PASSWORD: ${{ secrets.ANDROID_SIGNING_PASSWORD }}
+        run: gradle assembleRelease
       - uses: actions/upload-artifact@v4
         with:
-          name: Vinkulo-Android-1.5.0-teste
-          path: Vinkulo-Android/app/build/outputs/apk/debug/app-debug.apk
+          name: Vinkulo-Android-1.5.0-producao
+          path: Vinkulo-Android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
