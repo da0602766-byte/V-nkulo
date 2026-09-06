@@ -30,6 +30,6 @@ jobs:
         run: gradle assembleDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: Vinkulo-Android-1.4.0-teste
+          name: Vinkulo-Android-1.5.0-teste
           path: Vinkulo-Android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
