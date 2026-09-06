@@ -13,7 +13,7 @@ import CommunityAdminWorkspace, {
   type CommunityManagementView,
 } from "./CommunityAdminWorkspace";
 import CommunityHome from "./CommunityHome";
-import GlobalVisualEditor from "./GlobalVisualEditor";
+import GlobalVisualEditor from "./GlobalVisualEditorLazy";
 import PilotNotificationCenter, {
   type NotificationUnreadSummary,
 } from "./PilotNotificationCenter";

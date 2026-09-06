@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DragEvent } from "react";
 import type { PilotFeatureState } from "../lib/pilot-data";
-import GlobalVisualEditor from "./GlobalVisualEditor";
+import GlobalVisualEditor from "./GlobalVisualEditorLazy";
 import PilotNotificationCenter from "./PilotNotificationCenter";
 import VerifiedOwnerName from "./VerifiedOwnerName";
 import PlatformControlsWorkspace from "./PlatformControlsWorkspace";

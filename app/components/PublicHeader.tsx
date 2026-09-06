@@ -1,6 +1,6 @@
 import Link from "./StableLink";
 import { getSessionUser } from "../lib/local-auth";
-import GlobalVisualEditor from "./GlobalVisualEditor";
+import GlobalVisualEditor from "./GlobalVisualEditorLazy";
 import ThemeControl from "./ThemeControl";
 import { getPlatformBranding } from "../lib/platform-branding";
 import PublicIcon from "./PublicIcon";

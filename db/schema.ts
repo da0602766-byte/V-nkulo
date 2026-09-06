@@ -832,6 +832,10 @@ export const usuarioComunidades = sqliteTable(
       table.usuarioId,
       table.comunidadeId,
     ),
+    index("usuario_comunidades_comunidade_status_idx").on(
+      table.comunidadeId,
+      table.status,
+    ),
   ],
 );
 

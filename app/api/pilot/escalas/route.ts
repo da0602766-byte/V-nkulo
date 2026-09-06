@@ -347,44 +347,66 @@ async function createSchedule(request: Request) {
     usuarioId: number;
     funcao: string;
   }> = [];
-  for (const assignment of parsed.designacoes) {
-    const volunteer = await db
+  // As duas checagens abaixo (integrante pertence ao ministério / pertence à
+  // equipe) são buscas por igualdade sem nenhuma dependência de ordem entre
+  // designações, então saem do loop e viram uma consulta única por lote em
+  // vez de 1-2 consultas por integrante escalado. Capacidade e conflito de
+  // horário continuam avaliados por integrante: dependem de agregados e de
+  // `hasScheduleConflict`, compartilhada com outras rotas (edição de escala,
+  // substituição, acesso temporário), então não foram tocadas aqui.
+  const voluntarioIds = Array.from(
+    new Set(parsed.designacoes.map((assignment) => assignment.voluntarioId)),
+  );
+  const volunteersById = new Map<
+    number,
+    { id: number; usuario_id: number; funcao: string; limite_escalas: number }
+  >();
+  const teamMemberVoluntarioIds = new Set<number>();
+  if (voluntarioIds.length > 0) {
+    const placeholders = voluntarioIds.map(() => "?").join(", ");
+    const volunteersResult = await db
       .prepare(
         `SELECT id, usuario_id, funcao, limite_escalas FROM ministerio_voluntarios
-         WHERE id = ? AND ministerio_id = ? AND comunidade_id = ? AND ativo = 1`,
+         WHERE ministerio_id = ? AND comunidade_id = ? AND ativo = 1
+           AND id IN (${placeholders})`,
       )
-      .bind(
-        assignment.voluntarioId,
-        parsed.ministerioId,
-        access.context.comunidadeId,
-      )
-      .first<{ id: number; usuario_id: number; funcao: string; limite_escalas: number }>();
+      .bind(parsed.ministerioId, access.context.comunidadeId, ...voluntarioIds)
+      .all<{ id: number; usuario_id: number; funcao: string; limite_escalas: number }>();
+    for (const volunteer of volunteersResult.results) {
+      volunteersById.set(Number(volunteer.id), volunteer);
+    }
+    if (parsed.equipeId) {
+      const teamResult = await db
+        .prepare(
+          `SELECT voluntario_id FROM ministerio_equipe_membros
+           WHERE equipe_id = ? AND ministerio_id = ? AND comunidade_id = ?
+             AND voluntario_id IN (${placeholders})`,
+        )
+        .bind(
+          parsed.equipeId,
+          parsed.ministerioId,
+          access.context.comunidadeId,
+          ...voluntarioIds,
+        )
+        .all<{ voluntario_id: number }>();
+      for (const row of teamResult.results) {
+        teamMemberVoluntarioIds.add(Number(row.voluntario_id));
+      }
+    }
+  }
+  for (const assignment of parsed.designacoes) {
+    const volunteer = volunteersById.get(assignment.voluntarioId);
     if (!volunteer) {
       return Response.json(
         { error: "Um integrante selecionado não pertence ao ministério." },
         { status: 400 },
       );
     }
-    if (parsed.equipeId) {
-      const teamMember = await db
-        .prepare(
-          `SELECT id FROM ministerio_equipe_membros
-           WHERE equipe_id = ? AND ministerio_id = ? AND comunidade_id = ?
-             AND voluntario_id = ?`,
-        )
-        .bind(
-          parsed.equipeId,
-          parsed.ministerioId,
-          access.context.comunidadeId,
-          volunteer.id,
-        )
-        .first<{ id: number }>();
-      if (!teamMember) {
-        return Response.json(
-          { error: "Todos os integrantes da escala devem pertencer à equipe selecionada." },
-          { status: 400 },
-        );
-      }
+    if (parsed.equipeId && !teamMemberVoluntarioIds.has(volunteer.id)) {
+      return Response.json(
+        { error: "Todos os integrantes da escala devem pertencer à equipe selecionada." },
+        { status: 400 },
+      );
     }
     const capacity = await db
       .prepare(

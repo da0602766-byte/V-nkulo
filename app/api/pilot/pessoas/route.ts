@@ -6,6 +6,10 @@ import { notifyUser } from "../../../lib/pilot-notifications";
 import { recordTenantAudit } from "../../../lib/tenant-audit";
 import { requireTenantPermission } from "../../../lib/tenant";
 
+// Trava de segurança: acima disso a lista deixa de vir inteira (ver uso
+// abaixo). Nenhuma comunidade real hoje chega perto deste número.
+const PEOPLE_SAFETY_LIMIT = 2000;
+
 export async function GET() {
   const access = await requireTenantPermission("dashboard.view");
   if ("error" in access) return access.error;
@@ -86,7 +90,11 @@ export async function GET() {
     );
   }
 
-  const result = await db
+  // Busca e paginação continuam no navegador (ver PeopleWorkspace), então a
+  // lista precisa vir inteira. O LIMIT abaixo é só uma trava de segurança
+  // para não devolver uma comunidade inteira sem limite algum caso ela cresça
+  // muito além do uso típico; PEOPLE_SAFETY_LIMIT+1 permite detectar corte.
+  const rows = await db
     .prepare(
       `SELECT uc.id AS membership_id, u.id AS usuario_id, u.nome, u.email,
         u.criado_em AS owner_criado_em,
@@ -101,14 +109,20 @@ export async function GET() {
        LEFT JOIN oficiais_comunidade oc
          ON oc.usuario_comunidade_id = uc.id
        WHERE uc.comunidade_id = ? AND u.ativo = 1
-       ORDER BY oficial DESC, u.nome ASC, uc.id ASC`,
+       ORDER BY oficial DESC, u.nome ASC, uc.id ASC
+       LIMIT ?`,
     )
-    .bind(access.context.comunidadeId)
+    .bind(access.context.comunidadeId, PEOPLE_SAFETY_LIMIT + 1)
     .all<Record<string, unknown>>();
+  const truncated = rows.results.length > PEOPLE_SAFETY_LIMIT;
+  const people = truncated
+    ? rows.results.slice(0, PEOPLE_SAFETY_LIMIT)
+    : rows.results;
   return Response.json(
     {
       me: verifiedMe,
-      people: result.results.map(withOwnerVerification),
+      people: people.map(withOwnerVerification),
+      peopleTruncated: truncated,
       canViewPeople: true,
       canManage: access.context.permissions.includes("officials.manage"),
       canDeleteGlobal,
