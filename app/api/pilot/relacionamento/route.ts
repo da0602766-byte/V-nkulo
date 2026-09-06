@@ -31,6 +31,7 @@ type CadenciaItem = {
   nome_completo: string;
   ultimo_contato: string | null;
   dias_sem_contato: number;
+  sem_primeiro_contato: boolean;
   prioridade: "urgente" | "alta" | "normal" | "baixa";
   proximo_contato: string | null;
 };
@@ -51,6 +52,19 @@ type ConflictItem = {
   visitante_ids: number[];
   sugestao: string;
 };
+
+function diasDesde(value: string | null, agora: Date) {
+  if (!value) return 0;
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? `${value}T00:00:00-03:00`
+    : value;
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) return 0;
+  return Math.max(
+    0,
+    Math.floor((agora.getTime() - date.getTime()) / (1000 * 60 * 60 * 24)),
+  );
+}
 
 /**
  * Calcula o Engagement Score de um visitante (0-100)
@@ -285,7 +299,7 @@ export async function GET(request: Request) {
   if (ferramenta === "todas" || ferramenta === "cadencia") {
     const result = await db
       .prepare(
-        `SELECT v.id, v.nome_completo,
+        `SELECT v.id, v.nome_completo, v.data_entrada,
                 (SELECT MAX(a.criado_em) FROM acompanhamentos a
                  WHERE a.visitante_id = v.id AND a.comunidade_id = v.comunidade_id
                    AND a.escopo_confirmado = 1) AS ultimo_contato,
@@ -313,6 +327,7 @@ export async function GET(request: Request) {
       .all<{
         id: number;
         nome_completo: string;
+        data_entrada: string;
         ultimo_contato: string | null;
         proximo_contato: string | null;
       }>();
@@ -321,9 +336,11 @@ export async function GET(request: Request) {
       const agora = new Date();
       const cadencia: CadenciaItem[] = (result.results || []).map((v) => {
         const ultimo = v.ultimo_contato ? new Date(v.ultimo_contato) : null;
-        const diasSemContato = ultimo
-          ? Math.floor((agora.getTime() - ultimo.getTime()) / (1000 * 60 * 60 * 24))
-          : 999;
+        const semPrimeiroContato = !ultimo;
+        const diasSemContato = diasDesde(
+          semPrimeiroContato ? v.data_entrada : v.ultimo_contato,
+          agora,
+        );
 
         let prioridade: "urgente" | "alta" | "normal" | "baixa";
         if (diasSemContato > 60) prioridade = "urgente";
@@ -336,6 +353,7 @@ export async function GET(request: Request) {
           nome_completo: v.nome_completo,
           ultimo_contato: v.ultimo_contato,
           dias_sem_contato: diasSemContato,
+          sem_primeiro_contato: semPrimeiroContato,
           prioridade,
           proximo_contato: v.proximo_contato,
         };
@@ -436,7 +454,7 @@ export async function GET(request: Request) {
     const result = await db
       .prepare(
         `SELECT
-           v.id, v.nome_completo,
+           v.id, v.nome_completo, v.data_entrada,
            (SELECT MAX(a.criado_em) FROM acompanhamentos a
             WHERE a.visitante_id = v.id AND a.comunidade_id = v.comunidade_id
               AND a.escopo_confirmado = 1) AS ultimo_contato,
@@ -461,6 +479,7 @@ export async function GET(request: Request) {
       .all<{
         id: number;
         nome_completo: string;
+        data_entrada: string;
         ultimo_contato: string | null;
         responsavel: string | null;
         categoria: string | null;
@@ -471,22 +490,33 @@ export async function GET(request: Request) {
       const agora = new Date();
       const cadenciaAvancada = (result.results || []).map((v) => {
         const ultimo = v.ultimo_contato ? new Date(v.ultimo_contato) : null;
-        const diasSemContato = ultimo
-          ? Math.floor((agora.getTime() - ultimo.getTime()) / (1000 * 60 * 60 * 24))
-          : 999;
+        const semPrimeiroContato = !ultimo;
+        const diasSemContato = diasDesde(
+          semPrimeiroContato ? v.data_entrada : v.ultimo_contato,
+          agora,
+        );
 
         let prioridade: "urgente" | "alta" | "normal" | "baixa";
         let sugestao: string;
 
-        if (diasSemContato > 60) {
+        if (semPrimeiroContato && diasSemContato <= 7) {
+          prioridade = "baixa";
+          sugestao = "Novo cadastro — faça o primeiro contato com carinho";
+        } else if (diasSemContato > 60) {
           prioridade = "urgente";
-          sugestao = "Contato urgente — mais de 2 meses sem comunicação";
+          sugestao = semPrimeiroContato
+            ? "Primeiro contato atrasado — acolha e defina um responsável"
+            : "Contato urgente — mais de 2 meses sem comunicação";
         } else if (diasSemContato > 30) {
           prioridade = "alta";
-          sugestao = "Contato necessário — considere uma ligação ou visita";
+          sugestao = semPrimeiroContato
+            ? "Primeiro contato pendente — organize o acolhimento"
+            : "Contato necessário — considere uma ligação ou visita";
         } else if (diasSemContato > 7) {
           prioridade = "normal";
-          sugestao = "Contato agendado — envie mensagem ou confirme presença";
+          sugestao = semPrimeiroContato
+            ? "Primeiro contato pendente — envie uma mensagem de boas-vindas"
+            : "Contato agendado — envie mensagem ou confirme presença";
         } else {
           prioridade = "baixa";
           sugestao = "Contato recente — mantenha comunicação";
@@ -497,6 +527,7 @@ export async function GET(request: Request) {
           nome_completo: v.nome_completo,
           ultimo_contato: v.ultimo_contato,
           dias_sem_contato: diasSemContato,
+          sem_primeiro_contato: semPrimeiroContato,
           categoria: v.categoria,
           responsavel: v.responsavel,
           prioridade,

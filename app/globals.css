@@ -32097,6 +32097,18 @@ html[data-pilot-theme="escuro"] .request-care-status.tone-blue { background:#173
 .care-notes-board.is-compact .care-note-composer footer { align-items:stretch; flex-direction:column; }
 .care-notes-board.is-compact .care-notes-grid { grid-template-columns:1fr; }
 .care-notes-board.is-compact .care-note { padding:12px; }
+.visitor-care-workspace-v3 { min-width:0; display:grid; grid-template-columns:minmax(0,1fr) minmax(250px,300px); gap:14px; align-items:start; }
+.visitor-care-workspace-v3 > * { min-width:0; }
+.care-notes-board.is-side { position:sticky; top:76px; gap:11px; border-radius:14px; padding:13px; }
+.care-notes-board.is-side > header { align-items:flex-start; flex-direction:column; }
+.care-notes-board.is-side > header > div > span { width:34px; height:34px; }
+.care-notes-board.is-side > header h2 { font-size:var(--fs-md); }
+.care-notes-board.is-side > header > button { width:100%; }
+.care-notes-board.is-side .care-note-composer { grid-template-columns:1fr; }
+.care-notes-board.is-side .care-note-composer :is(.wide,footer) { grid-column:1; }
+.care-notes-board.is-side .care-note-composer footer { align-items:stretch; flex-direction:column; }
+.care-notes-board.is-side .care-notes-grid { grid-template-columns:1fr; }
+.care-notes-board.is-side .care-note { aspect-ratio:1; min-height:220px; max-height:300px; padding:12px; overflow-y:auto; }
 
 /* Visitantes — central de relacionamento legível e orientada a decisões. */
 .relationship-command-center-v3 { min-width:0; display:grid; gap:16px; border:1px solid var(--pilot-line); border-radius:18px; background:var(--pilot-surface); padding:20px; }
@@ -32278,6 +32290,10 @@ html[data-pilot-theme="escuro"] .request-care-status.tone-blue { background:#173
 @keyframes relationship-shimmer-v3 { to { background-position:-240% 0; } }
 
 @media (max-width:900px) {
+  .visitor-care-workspace-v3 { grid-template-columns:1fr; }
+  .care-notes-board.is-side { position:static; }
+  .care-notes-board.is-side .care-notes-grid { display:flex; overflow-x:auto; scroll-snap-type:x proximity; padding-bottom:4px; }
+  .care-notes-board.is-side .care-note { flex:0 0 min(240px,82vw); min-height:220px; scroll-snap-align:start; }
   .relationship-head-v3 { grid-template-columns:1fr; align-items:start; }
   .relationship-head-v3 dl { width:100%; }
   .relationship-priority-grid-v3 { grid-template-columns:1fr; }

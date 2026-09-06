@@ -2,6 +2,10 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import {
+  isNativeNotificationBridgeAvailable,
+  showDeviceNotification,
+} from "../lib/androidNativeBridge";
 
 type Notification = {
   id: number;
@@ -77,7 +81,8 @@ export default function PilotNotificationCenter({
   }, [onUnreadChange, unreadSummary]);
 
   const showUnreadOnDevice = useCallback(async (nextItems: Notification[]) => {
-    if (permissionRef.current !== "granted" || !("serviceWorker" in navigator)) return;
+    const nativeBridge = isNativeNotificationBridgeAvailable();
+    if (!nativeBridge && (permissionRef.current !== "granted" || !("serviceWorker" in navigator))) return;
     if (!shownDeviceNotificationIds.current) {
       shownDeviceNotificationIds.current = readShownDeviceNotificationIds();
     }
@@ -87,8 +92,11 @@ export default function PilotNotificationCenter({
       .slice(0, 5);
     if (!pending.length) return;
 
-    const registration = await navigator.serviceWorker.ready;
+    const registration = nativeBridge ? null : await navigator.serviceWorker.ready;
     for (const item of pending) {
+      const destination = isSafeInternalDestination(item.destination)
+        ? item.destination
+        : "/painel";
       const options = {
         body: item.message,
         icon: "/vinkulo-app-icon-192.png",
@@ -97,10 +105,19 @@ export default function PilotNotificationCenter({
         renotify: true,
         data: {
           notificationId: item.id,
-          url: isSafeInternalDestination(item.destination) ? item.destination : "/painel",
+          url: destination,
         },
       } as NotificationOptions & { renotify: boolean };
-      await registration.showNotification(item.title || "Vínkulo", options);
+      const shownNatively = nativeBridge && showDeviceNotification({
+        title: item.title || "Vínkulo",
+        body: item.message,
+        tag: `vinkulo-notification-${item.id}`,
+        url: destination,
+      });
+      if (!shownNatively && registration) {
+        await registration.showNotification(item.title || "Vínkulo", options);
+      }
+      if (!shownNatively && !registration) continue;
       shownIds.add(item.id);
     }
     persistShownDeviceNotificationIds(shownIds);
@@ -141,6 +158,11 @@ export default function PilotNotificationCenter({
 
   useEffect(() => {
     const initial = window.setTimeout(() => {
+      if (isNativeNotificationBridgeAvailable()) {
+        permissionRef.current = "granted";
+        setDevicePermission("granted");
+        return;
+      }
       if (!("Notification" in window) || !("serviceWorker" in navigator)) {
         permissionRef.current = "unsupported";
         setDevicePermission("unsupported");
@@ -165,15 +187,23 @@ export default function PilotNotificationCenter({
       setOpen(true);
       void load();
     };
+    const openFromDeviceNotification = (event: Event) => {
+      const destination = (event as CustomEvent<unknown>).detail;
+      if (typeof destination === "string" && isSafeInternalDestination(destination)) {
+        window.location.assign(destination);
+      }
+    };
     document.addEventListener("visibilitychange", refreshWhenVisible);
     window.addEventListener("adote:refresh-notifications", refreshAfterAppAction);
     window.addEventListener("vinkulo:open-notifications", openFromNavigation);
+    window.addEventListener("vinkulo:notification-open", openFromDeviceNotification);
     return () => {
       window.clearTimeout(initial);
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
       window.removeEventListener("adote:refresh-notifications", refreshAfterAppAction);
       window.removeEventListener("vinkulo:open-notifications", openFromNavigation);
+      window.removeEventListener("vinkulo:notification-open", openFromDeviceNotification);
       requestRef.current?.abort();
     };
   }, [load]);
@@ -219,6 +249,18 @@ export default function PilotNotificationCenter({
   }
 
   const enableDeviceNotifications = useCallback(async () => {
+    if (isNativeNotificationBridgeAvailable()) {
+      permissionRef.current = "granted";
+      setDevicePermission("granted");
+      showDeviceNotification({
+        title: "Notificações ativadas",
+        body: "Os avisos do Vínkulo poderão aparecer na bandeja deste celular.",
+        tag: "vinkulo-notifications-enabled",
+        url: "/painel",
+      });
+      await load();
+      return;
+    }
     if (!("Notification" in window) || !("serviceWorker" in navigator)) {
       setDevicePermission("unsupported");
       return;

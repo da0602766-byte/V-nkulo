@@ -25,6 +25,7 @@ type CadenciaItem = {
   nome_completo: string;
   ultimo_contato: string | null;
   dias_sem_contato: number;
+  sem_primeiro_contato: boolean;
   prioridade: "urgente" | "alta" | "normal" | "baixa";
   proximo_contato: string | null;
 };
@@ -59,6 +60,7 @@ type CadenciaAvancadaItem = {
   nome_completo: string;
   ultimo_contato: string | null;
   dias_sem_contato: number;
+  sem_primeiro_contato: boolean;
   categoria: string | null;
   responsavel: string | null;
   prioridade: "urgente" | "alta" | "normal" | "baixa";
@@ -88,6 +90,19 @@ type VisitaItem = {
   responsavel_nome: string | null;
   notas: string;
 };
+
+function rotuloTempoSemContato(item: {
+  dias_sem_contato: number;
+  sem_primeiro_contato?: boolean;
+}) {
+  const dias = Math.max(0, Number(item.dias_sem_contato) || 0);
+  if (item.sem_primeiro_contato) {
+    if (dias === 0) return "Cadastrado hoje · primeiro contato pendente";
+    return `Cadastrado há ${dias} ${dias === 1 ? "dia" : "dias"} · primeiro contato pendente`;
+  }
+  if (dias === 0) return "Contato realizado hoje";
+  return `${dias} ${dias === 1 ? "dia" : "dias"} sem contato`;
+}
 
 interface RelacionamentoToolsProps {
   visitantes?: Array<Pick<EngagementData, "id" | "nome_completo" | "status">>;
@@ -242,7 +257,7 @@ function CadenciaContato({ items, limite = 5 }: { items: CadenciaItem[]; limite?
                 <strong>{item.nome_completo}</strong>
                 <br />
                 <span style={{ color: "var(--color-text-muted)", fontSize: "12px" }}>
-                  {item.dias_sem_contato} dias sem contato
+                  {rotuloTempoSemContato(item)}
                 </span>
               </span>
               <span
@@ -592,7 +607,7 @@ function CadenciaAvancada({ items, limite = 10 }: { items: CadenciaAvancadaItem[
                 </span>
               </div>
               <div style={{ color: "var(--color-text-muted)", fontSize: "11px", marginBottom: "4px" }}>
-                {item.dias_sem_contato} dias sem contato
+                {rotuloTempoSemContato(item)}
                 {item.responsavel && ` · Responsável: ${item.responsavel}`}
               </div>
               {item.sugestao && (
@@ -774,7 +789,7 @@ export function RelacionamentoTools({ visitantes = [], compacto = false, onAbrir
               <header><div><p className="pilot-kicker">ORDEM DE CUIDADO</p><h3 id="relationship-priority-title-v3">Comece por estas pessoas</h3></div><span>{prioridades.length}</span></header>
               <div>
                 {prioridades.slice(0, 8).map((item) => <button type="button" key={item.id} data-priority={item.prioridade} aria-label={`Abrir ficha de ${item.nome_completo}`} onClick={() => abrirVisitante(item.id)}>
-                  <i aria-hidden="true" /><span><strong>{item.nome_completo}</strong><small>{item.dias_sem_contato} dias sem contato{item.responsavel ? ` · ${item.responsavel}` : ""}</small><em>{item.sugestao}</em></span><b>{item.prioridade}</b>
+                  <i aria-hidden="true" /><span><strong>{item.nome_completo}</strong><small>{rotuloTempoSemContato(item)}{item.responsavel ? ` · ${item.responsavel}` : ""}</small><em>{item.sugestao}</em></span><b>{item.prioridade}</b>
                 </button>)}
                 {!prioridades.length && <div className="relationship-empty-v3"><strong>Nenhuma prioridade encontrada</strong><p>{busca ? "Tente outro nome ou limpe a pesquisa." : "Os próximos cuidados aparecerão aqui conforme o histórico de contato."}</p></div>}
               </div>
