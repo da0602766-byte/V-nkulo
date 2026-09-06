@@ -96,10 +96,10 @@ export default function MobileAppInstall() {
       <div className="mobile-app-install__icon" aria-hidden="true">✦</div>
       <div>
         <strong>Use o Vínkulo como aplicativo</strong>
-        <p>{androidDevice ? "Android 1.3.0 com compartilhamento direto no WhatsApp." : "Abra mais rápido pelo ícone na tela do seu celular."}</p>
+        <p>{androidDevice ? "Android 1.5.0 de produção, com notificações nativas e compartilhamento direto no WhatsApp." : "Abra mais rápido pelo ícone na tela do seu celular."}</p>
       </div>
       {androidDevice ? (
-        <a className="mobile-app-install__download" href="/downloads/VINKULO_ANDROID_1.3.0.apk" download>
+        <a className="mobile-app-install__download" href="/downloads/VINKULO_ANDROID_1.5.0.apk" download>
           Baixar APK
         </a>
       ) : (
