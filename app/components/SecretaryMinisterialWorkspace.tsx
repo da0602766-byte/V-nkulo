@@ -122,6 +122,7 @@ type Schedule = {
   responsavel_nome: string | null;
   repertorio: string[];
   links_recursos: SecretaryLink[];
+  campos_respostas?: Record<string, unknown>;
   can_manage: number;
   can_delete: number;
   designacoes: Assignment[];
@@ -227,6 +228,7 @@ export default function SecretaryMinisterialWorkspace({
   const [scheduleCreatorOpen, setScheduleCreatorOpen] = useState(false);
   const [checklistDraft, setChecklistDraft] = useState<ChecklistDraft[]>([]);
   const [shareSchedule, setShareSchedule] = useState<Schedule | null>(null);
+  const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [refreshingLeaders, setRefreshingLeaders] = useState(false);
   const [teamColor, setTeamColor] = useState("#7157e8");
@@ -674,6 +676,43 @@ export default function SecretaryMinisterialWorkspace({
       setScheduleEndsAt("");
       setScheduleCreatorOpen(false);
     }
+  }
+
+  async function updateSchedule(
+    schedule: Schedule,
+    event: FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+    const body = formBody(event.currentTarget);
+    const repertorio = String(body.repertorio || "")
+      .split("\n")
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const updated = await submit(
+      `editing-schedule-${schedule.id}`,
+      `/api/pilot/escalas/${schedule.id}`,
+      "PATCH",
+      {
+        acao: "ATUALIZAR",
+        ministerioId: schedule.ministerio_id,
+        equipeId: Number(body.equipeId) || null,
+        titulo: body.titulo,
+        iniciaEm: body.iniciaEm,
+        terminaEm: body.terminaEm,
+        local: body.local,
+        status: schedule.status,
+        publicarEm: schedule.publicar_em,
+        observacoes: body.observacoes,
+        responsavelUsuarioId: Number(body.responsavelUsuarioId) || null,
+        repertorio,
+        links: schedule.links_recursos,
+        designacoes: [],
+        checklist: [],
+        camposRespostas: schedule.campos_respostas || {},
+      },
+      "Escala atualizada com segurança.",
+    );
+    if (updated) setEditingSchedule(null);
   }
 
   async function createTeam(event: FormEvent<HTMLFormElement>) {
@@ -1786,7 +1825,12 @@ export default function SecretaryMinisterialWorkspace({
                       )}
                       <button type="button" onClick={() => void downloadSchedulePdf(schedule)} disabled={busy === `pdf-${schedule.id}`}>{busy === `pdf-${schedule.id}` ? "Preparando…" : "PDF"}</button>
                       <button type="button" onClick={() => addScheduleToCalendar(schedule)}>Adicionar ao calendário</button>
-                      <button type="button" onClick={() => setShareSchedule(schedule)} disabled={!schedule.can_manage || schedule.status !== "PUBLICADA" || busy === `share-${schedule.id}`}>Compartilhar</button>
+                      <button type="button" className="share" onClick={() => setShareSchedule(schedule)} disabled={!schedule.can_manage || schedule.status !== "PUBLICADA" || busy === `share-${schedule.id}`}>Compartilhar</button>
+                      {Boolean(schedule.can_manage) && ["RASCUNHO", "AGENDADA", "PUBLICADA"].includes(schedule.status) && (
+                        <button type="button" className="edit" onClick={() => setEditingSchedule(schedule)}>
+                          Editar escala
+                        </button>
+                      )}
                       {Boolean(schedule.can_delete) && (
                         <button
                           type="button"
@@ -1828,6 +1872,17 @@ export default function SecretaryMinisterialWorkspace({
                 {!ministryChecklist.length && <div className="secretary-card-empty"><strong>Nenhum checklist disponível</strong><p>As responsabilidades surgem automaticamente quando uma escala é criada.</p></div>}
               </div>
             </section>
+          )}
+
+          {editingSchedule && (
+            <EditScheduleDialog
+              schedule={editingSchedule}
+              ministry={selectedMinistry}
+              teams={teams}
+              busy={busy === `editing-schedule-${editingSchedule.id}`}
+              onClose={() => setEditingSchedule(null)}
+              onSubmit={updateSchedule}
+            />
           )}
 
           {tab === "relatorios" && (
@@ -2170,6 +2225,67 @@ function ScheduleRepertoire({ schedule }: { schedule: Schedule }) {
         )}
       </div>
     </section>
+  );
+}
+
+function EditScheduleDialog({
+  schedule,
+  ministry,
+  teams,
+  busy,
+  onClose,
+  onSubmit,
+}: {
+  schedule: Schedule;
+  ministry: Ministry;
+  teams: MinistryTeam[];
+  busy: boolean;
+  onClose: () => void;
+  onSubmit: (schedule: Schedule, event: FormEvent<HTMLFormElement>) => void;
+}) {
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
+  return (
+    <div className="secretary-dialog-backdrop" role="presentation" onMouseDown={onClose}>
+      <section
+        className="secretary-share-dialog secretary-edit-schedule-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="edit-schedule-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <header>
+          <div>
+            <p className="pilot-kicker">GERENCIAR ESCALA</p>
+            <h2 id="edit-schedule-title">Editar escala</h2>
+          </div>
+          <button type="button" aria-label="Fechar editor" onClick={onClose}>×</button>
+        </header>
+        <p>Atualize as informações principais sem alterar as confirmações dos integrantes.</p>
+        <form className="secretary-form secretary-edit-schedule-form" onSubmit={(event) => onSubmit(schedule, event)}>
+          <div className="secretary-form-grid">
+            <label className="span-2">Título<input name="titulo" required maxLength={140} defaultValue={schedule.titulo} /></label>
+            <label>Equipe<select name="equipeId" defaultValue={schedule.equipe_id || ""}><option value="">Seleção livre</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.nome}</option>)}</select></label>
+            <label>Responsável<select name="responsavelUsuarioId" defaultValue={schedule.responsavel_usuario_id || ""}><option value="">Não definido</option>{ministry.voluntarios.map((volunteer) => <option key={volunteer.id} value={volunteer.usuario_id}>{volunteer.nome}</option>)}</select></label>
+            <label>Início<input name="iniciaEm" type="datetime-local" required defaultValue={toLocalDateTimeInput(schedule.inicia_em)} /></label>
+            <label>Término<input name="terminaEm" type="datetime-local" required defaultValue={toLocalDateTimeInput(schedule.termina_em)} /></label>
+            <label className="span-2">Local<input name="local" maxLength={180} defaultValue={schedule.local} /></label>
+            <label className="span-2">Repertório<textarea name="repertorio" rows={5} maxLength={8000} defaultValue={schedule.repertorio.join("\n")} /></label>
+            <label className="span-2">Observações<textarea name="observacoes" rows={4} maxLength={1200} defaultValue={schedule.observacoes} /></label>
+          </div>
+          <footer className="secretary-edit-schedule-footer">
+            <button type="button" className="secondary" onClick={onClose}>Cancelar</button>
+            <button type="submit" disabled={busy}>{busy ? "Salvando…" : "Salvar alterações"}</button>
+          </footer>
+        </form>
+      </section>
+    </div>
   );
 }
 
