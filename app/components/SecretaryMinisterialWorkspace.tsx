@@ -2109,12 +2109,14 @@ function LinkBuilder({ links, setLinks, libraryItems, onUseSaved, onRemoveSaved,
             <div className="ministry-library-entry" key={item.id}>
               <div className={`ministry-library-row${openItemId === item.id ? " is-open" : ""}`}>
                 {renamingId === item.id ? <input className="ministry-library-rename" autoFocus defaultValue={item.titulo} maxLength={120} aria-label="Novo nome do item" onBlur={(event) => { onRenameItem(item, event.target.value); setRenamingId(null); }} onKeyDown={(event) => { if (event.key === "Enter") { onRenameItem(item, event.currentTarget.value); setRenamingId(null); } if (event.key === "Escape") setRenamingId(null); }} /> : <button type="button" className="ministry-library-name" onClick={() => setOpenItemId((current) => current === item.id ? null : item.id)} aria-expanded={openItemId === item.id}>{item.titulo}</button>}
-                <div className="ministry-library-icons">
-                  {item.links.map((link) => <button key={link.id} type="button" className={`platform-icon ${LINK_ICONS[link.tipo]?.classe || "lk"}`} title={`Usar ${linkTypeLabel(link.tipo)}`} onClick={() => onUseSaved(link)}><PlatformIcon tipo={link.tipo} /><span className="sr-only">{linkTypeLabel(link.tipo)}</span></button>)}
-                  <button type="button" className="platform-icon add" title="Adicionar outro link a este item" onClick={() => { setItemTitle(item.titulo); setLinks((current) => [...current, { id: crypto.randomUUID(), tipo: "YOUTUBE", titulo: item.titulo, url: "" }]); }}>+</button>
+                <div className="ministry-library-actions">
+                  <div className="ministry-library-icons">
+                    {item.links.map((link) => <button key={link.id} type="button" className={`platform-icon ${LINK_ICONS[link.tipo]?.classe || "lk"}`} title={`Usar ${linkTypeLabel(link.tipo)}`} onClick={() => onUseSaved(link)}><PlatformIcon tipo={link.tipo} /><span className="sr-only">{linkTypeLabel(link.tipo)}</span></button>)}
+                    <button type="button" className="platform-icon add" title="Adicionar outro link a este item" onClick={() => { setItemTitle(item.titulo); setLinks((current) => [...current, { id: crypto.randomUUID(), tipo: "YOUTUBE", titulo: item.titulo, url: "" }]); }}>+</button>
+                  </div>
+                  <button type="button" className="ministry-library-rename-action" title="Renomear item" onClick={() => setRenamingId(item.id)}>✎</button>
+                  <button type="button" className="ministry-library-delete" title="Excluir item" disabled={busy === `removing-library-item-${item.id}`} onClick={() => onRemoveItem(item)}>×</button>
                 </div>
-                <button type="button" className="ministry-library-rename-action" title="Renomear item" onClick={() => setRenamingId(item.id)}>✎</button>
-                <button type="button" className="ministry-library-delete" title="Excluir item" disabled={busy === `removing-library-item-${item.id}`} onClick={() => onRemoveItem(item)}>×</button>
               </div>
               {openItemId === item.id && <div className="ministry-library-detail">{item.links.map((link) => <div key={link.id}><span className={`platform-icon ${LINK_ICONS[link.tipo]?.classe || "lk"} static`}><PlatformIcon tipo={link.tipo} /></span><small>{link.url}</small><button type="button" onClick={() => onUseSaved(link)}>Usar</button><button type="button" className="danger" disabled={busy === `removing-reusable-link-${link.id}`} onClick={() => onRemoveSaved(link)}>Remover</button></div>)}{!item.links.length && <p>Este item ainda não tem links salvos.</p>}</div>}
             </div>

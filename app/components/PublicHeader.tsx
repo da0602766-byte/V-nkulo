@@ -5,6 +5,7 @@ import ThemeControl from "./ThemeControl";
 import { getPlatformBranding } from "../lib/platform-branding";
 import PublicIcon from "./PublicIcon";
 import CloseDetailsOnOutside from "./CloseDetailsOnOutside";
+import CloseDetailsBackdrop from "./CloseDetailsBackdrop";
 
 export default async function PublicHeader({
   editorScreen = "public:geral",
@@ -83,6 +84,7 @@ export default async function PublicHeader({
                 </span>
                 <span className="public-account-chevron" aria-hidden="true">⌄</span>
               </summary>
+              <CloseDetailsBackdrop className="public-account-backdrop" label="Fechar menu da conta" />
               <div className="public-account-popover">
                 <header>
                   <span className="public-account-avatar">

@@ -14,6 +14,7 @@ export default function ThemeControl({
   storageId?: string;
 }) {
   const [theme, setTheme] = useState<Theme>("AUTO");
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const individualKey = themeStorageKey(storageId);
 
   useEffect(() => {
@@ -36,28 +37,28 @@ export default function ThemeControl({
     return () => media.removeEventListener("change", syncAutomaticTheme);
   }, [theme]);
 
-  function update(next: Theme) {
+  function update(next: Theme, origin?: HTMLElement | null) {
     setTheme(next);
     window.localStorage.setItem("vinkulo-theme", next);
     if (individualKey) window.localStorage.setItem(individualKey, next);
-    applyTheme(next);
+    animateThemeChange(next, origin).finally(() => setIsTransitioning(false));
+    setIsTransitioning(true);
   }
 
-  const activeTheme = THEMES.find((item) => item.value === theme) || THEMES[2];
-
   if (cycle) {
-    const nextTheme = THEMES[(THEMES.findIndex((item) => item.value === theme) + 1) % THEMES.length];
+    const isDark = currentThemeIsDark(theme);
+    const nextTheme = isDark ? THEMES[0] : THEMES[1];
     return (
-      <div className={`theme-control theme-control-cycle ${compact ? "compact" : ""}`}>
+      <div className={`theme-control theme-control-cycle ${compact ? "compact" : ""}${isTransitioning ? " is-transitioning" : ""}`}>
         <button
           type="button"
           className="active"
-          aria-label={`${activeTheme.label}. Mudar para ${nextTheme.label}`}
-          title={`${activeTheme.label} · mudar para ${nextTheme.label}`}
-          onClick={() => update(nextTheme.value)}
+          aria-label={`${isDark ? "Tema escuro" : "Tema claro"}. Mudar para ${nextTheme.label}`}
+          title={`${isDark ? "Tema escuro" : "Tema claro"} · mudar para ${nextTheme.label}`}
+          onClick={(event) => update(nextTheme.value, event.currentTarget)}
         >
-          <span aria-hidden="true">{activeTheme.icon}</span>
-          <small>{activeTheme.label}</small>
+          <span className="theme-control-glyph" aria-hidden="true"><ThemeGlyph theme={isDark ? "ESCURO" : "CLARO"} /></span>
+          <small>{isDark ? "Tema escuro" : "Tema claro"}</small>
         </button>
       </div>
     );
@@ -77,9 +78,9 @@ export default function ThemeControl({
           aria-label={item.label}
           aria-pressed={theme === item.value}
           title={item.label}
-          onClick={() => update(item.value)}
+          onClick={(event) => update(item.value, event.currentTarget)}
         >
-          <span aria-hidden="true">{item.icon}</span>
+          <span className="theme-control-glyph" aria-hidden="true"><ThemeGlyph theme={item.value} /></span>
           <small>{item.label}</small>
         </button>
       ))}
@@ -87,11 +88,21 @@ export default function ThemeControl({
   );
 }
 
-const THEMES: { value: Theme; label: string; icon: string }[] = [
-  { value: "CLARO", label: "Tema claro", icon: "☀" },
-  { value: "ESCURO", label: "Tema escuro", icon: "◐" },
-  { value: "AUTO", label: "Tema automático", icon: "A" },
+const THEMES: { value: Theme; label: string }[] = [
+  { value: "CLARO", label: "Tema claro" },
+  { value: "ESCURO", label: "Tema escuro" },
+  { value: "AUTO", label: "Tema automático" },
 ];
+
+function ThemeGlyph({ theme }: { theme: Theme }) {
+  if (theme === "CLARO") {
+    return <svg viewBox="0 0 24 24"><circle className="theme-sun-core" cx="12" cy="12" r="3.5" /><path d="M12 2.5v2M12 19.5v2M4.5 12h-2M21.5 12h-2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4" /></svg>;
+  }
+  if (theme === "ESCURO") {
+    return <svg viewBox="0 0 24 24"><path d="M19.6 15.2A8 8 0 0 1 8.8 4.4 8.2 8.2 0 1 0 19.6 15.2Z" /></svg>;
+  }
+  return <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" /><path className="theme-auto-half" d="M12 4a8 8 0 0 1 0 16Z" /></svg>;
+}
 
 function normalizeTheme(value: string | null): Theme {
   return value === "CLARO" || value === "ESCURO" ? value : "AUTO";
@@ -100,6 +111,66 @@ function normalizeTheme(value: string | null): Theme {
 function themeStorageKey(storageId: string) {
   const normalized = storageId.trim().toLowerCase();
   return normalized ? `vinkulo:theme:${normalized}` : "";
+}
+
+function currentThemeIsDark(theme: Theme) {
+  if (theme === "ESCURO") return true;
+  if (theme === "CLARO") return false;
+  if (typeof window === "undefined") return false;
+  return document.documentElement.dataset.theme === "dark" ||
+    window.matchMedia("(prefers-color-scheme: dark)").matches;
+}
+
+type ThemeTransition = {
+  ready: Promise<void>;
+  finished: Promise<void>;
+};
+
+type ThemeTransitionDocument = Document & {
+  startViewTransition?: (callback: () => void) => ThemeTransition;
+};
+
+async function animateThemeChange(theme: Theme, origin?: HTMLElement | null) {
+  const transitionDocument = document as ThemeTransitionDocument;
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!origin || reducedMotion || !transitionDocument.startViewTransition) {
+    applyTheme(theme);
+    return;
+  }
+
+  const bounds = origin.getBoundingClientRect();
+  const x = bounds.left + bounds.width / 2;
+  const y = bounds.top + bounds.height / 2;
+  const radius = Math.hypot(
+    Math.max(x, window.innerWidth - x),
+    Math.max(y, window.innerHeight - y),
+  );
+  document.documentElement.classList.add("vinkulo-theme-transitioning");
+  const transition = transitionDocument.startViewTransition(() => applyTheme(theme));
+
+  try {
+    await transition.ready;
+    const animation = document.documentElement.animate(
+      {
+        clipPath: [
+          `circle(0px at ${x}px ${y}px)`,
+          `circle(${radius}px at ${x}px ${y}px)`,
+        ],
+      },
+      {
+        duration: 720,
+        easing: "cubic-bezier(.22,.72,.18,1)",
+        fill: "both",
+        pseudoElement: "::view-transition-new(root)",
+      } as KeyframeAnimationOptions & { pseudoElement: string },
+    );
+    await animation.finished;
+  } catch {
+    applyTheme(theme);
+  } finally {
+    await transition.finished.catch(() => undefined);
+    document.documentElement.classList.remove("vinkulo-theme-transitioning");
+  }
 }
 
 function applyTheme(theme: Theme) {
