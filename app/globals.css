@@ -32332,3 +32332,71 @@ html[data-pilot-theme="escuro"] .request-care-status.tone-blue { background:#173
   .relationship-priority-list-v3 button > i,.relationship-loading-v3 span { animation:none!important; }
   .relationship-priority-list-v3 > div > button,.home-rail-card-link { transition:none; }
 }
+
+/* V225 — coluna inicial organizada, com respiro e linhas clicáveis legíveis. */
+.pilot-dashboard[data-ui-version="v2"] .community-home-rail{
+  border:1px solid var(--pilot-line)!important;
+  border-radius:20px;
+  background:var(--pilot-surface)!important;
+  padding:0!important;
+  overflow:hidden;
+}
+.pilot-dashboard[data-ui-version="v2"] .community-home-rail>section,
+.pilot-dashboard[data-ui-version="v2"] .community-home-rail>.community-my-schedules{
+  display:grid!important;
+  gap:13px;
+  padding:18px!important;
+}
+.pilot-dashboard[data-ui-version="v2"] .community-home-rail>section>header{
+  width:100%;
+  min-width:0;
+  align-items:flex-start;
+  gap:12px;
+}
+.pilot-dashboard[data-ui-version="v2"] .community-home-rail>section>header>div{min-width:0}
+.pilot-dashboard[data-ui-version="v2"] .community-home-rail>section>header .pilot-kicker{margin-bottom:5px;line-height:1.35}
+.pilot-dashboard[data-ui-version="v2"] .community-home-rail>section>header>span{flex:0 0 auto;margin-left:auto}
+.pilot-dashboard[data-ui-version="v2"] .home-needs-you .home-rail-card-link{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  gap:5px!important;
+  width:100%;
+  padding:11px 12px!important;
+  border-radius:12px;
+  background:var(--pilot-surface-2);
+  text-align:left;
+}
+.pilot-dashboard[data-ui-version="v2"] .home-needs-you .home-rail-card-link>strong,
+.pilot-dashboard[data-ui-version="v2"] .home-needs-you .home-rail-card-link>p,
+.pilot-dashboard[data-ui-version="v2"] .home-needs-you .home-rail-card-link>span{
+  grid-column:1!important;
+  width:auto;
+  min-width:0;
+}
+.pilot-dashboard[data-ui-version="v2"] .home-needs-you .home-rail-card-link>p{
+  margin:0!important;
+  color:var(--pilot-muted);
+  font-size:var(--fs-xs);
+  line-height:1.45;
+}
+.pilot-dashboard[data-ui-version="v2"] .home-needs-you .home-rail-card-link>span{margin-top:3px}
+.pilot-dashboard[data-ui-version="v2"] .home-event-item.home-rail-card-link{
+  width:100%;
+  padding:10px!important;
+  border-radius:12px;
+  background:var(--pilot-surface-2);
+}
+@media(max-width:820px){
+  .pilot-dashboard[data-ui-version="v2"] .community-home-rail{
+    width:calc(100% - 28px);
+    margin-inline:14px;
+    border:0!important;
+    border-radius:0;
+    background:transparent!important;
+    overflow:visible;
+  }
+  .pilot-dashboard[data-ui-version="v2"] .community-home-rail>section,
+  .pilot-dashboard[data-ui-version="v2"] .community-home-rail>.community-my-schedules{
+    padding:16px!important;
+  }
+}

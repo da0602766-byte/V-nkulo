@@ -85,6 +85,11 @@ type ReusableSecretaryLink = Omit<SecretaryLink, "id"> & {
   id: number;
   ministerio_id: number;
 };
+type ReusableSecretaryLinkGroup = {
+  key: string;
+  titulo: string;
+  links: ReusableSecretaryLink[];
+};
 function blankSecretaryLink(): SecretaryLink {
   return {
     id: "draft-resource-1",
@@ -410,6 +415,25 @@ export default function SecretaryMinisterialWorkspace({
     () => reusableLinks.filter((item) => item.ministerio_id === selectedMinistryId),
     [reusableLinks, selectedMinistryId],
   );
+  const previousChecklistTemplate = useMemo(() => {
+    const schedulesByDate = [...ministrySchedules].sort(
+      (left, right) => Date.parse(right.inicia_em) - Date.parse(left.inicia_em),
+    );
+    for (const schedule of schedulesByDate) {
+      const items = ministryChecklist.filter((item) => item.escala_id === schedule.id);
+      if (!items.length) continue;
+      return items.map((item) => {
+        const assignment = schedule.designacoes.find(
+          (candidate) => candidate.id === item.designacao_id,
+        );
+        return {
+          tarefa: item.tarefa,
+          voluntarioId: assignment ? String(assignment.voluntario_id) : "",
+        };
+      });
+    }
+    return [];
+  }, [ministryChecklist, ministrySchedules]);
   const canManage = Boolean(selectedMinistry?.can_manage);
   const upcoming = ministrySchedules.filter(
     (item) => item.status !== "CANCELADA" && Date.parse(item.termina_em) >= renderedAt,
@@ -905,21 +929,43 @@ export default function SecretaryMinisterialWorkspace({
     );
   }
 
-  async function removeReusableLink(link: ReusableSecretaryLink) {
-    if (!window.confirm(`Remover “${link.titulo}” da biblioteca deste ministério?`)) return;
-    await submit(
-      `removing-reusable-link-${link.id}`,
-      "/api/pilot/ministerios/recursos",
-      "POST",
-      { acao: "EXCLUIR_LINK_REUTILIZAVEL", id: link.id },
-      "Link removido da biblioteca.",
-    );
+  async function removeReusableLinkGroup(group: ReusableSecretaryLinkGroup) {
+    if (!window.confirm(`Remover “${group.titulo}” e seus ${group.links.length} link(s) da biblioteca?`)) return;
+    setBusy(`removing-reusable-group-${group.key}`);
+    setError("");
+    setFeedback("");
+    try {
+      for (const link of group.links) {
+        const response = await fetch("/api/pilot/ministerios/recursos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ acao: "EXCLUIR_LINK_REUTILIZAVEL", id: link.id }),
+        });
+        const result = await readJson<{ error?: string }>(response);
+        if (!response.ok) throw new Error(result.error || "Não foi possível remover o recurso.");
+      }
+      setFeedback("Recurso removido da biblioteca.");
+      await loadData(true);
+    } catch (cause) {
+      setError((cause as Error).message);
+    } finally {
+      setBusy("");
+    }
   }
 
-  function useReusableLink(link: ReusableSecretaryLink) {
-    setLinks((current) => current.some((item) => item.url === link.url)
-      ? current
-      : [...current, { id: crypto.randomUUID(), tipo: link.tipo, titulo: link.titulo, url: link.url }]);
+  function useReusableLinkGroup(group: ReusableSecretaryLinkGroup) {
+    setLinks((current) => {
+      const currentUrls = new Set(current.map((item) => item.url));
+      const additions = group.links
+        .filter((link) => !currentUrls.has(link.url))
+        .map((link) => ({
+          id: crypto.randomUUID(),
+          tipo: link.tipo,
+          titulo: group.titulo,
+          url: link.url,
+        }));
+      return [...current, ...additions];
+    });
   }
 
   async function submit(
@@ -1508,14 +1554,31 @@ export default function SecretaryMinisterialWorkspace({
                       <summary><span>3</span><div><h3>Repertório e materiais</h3><p>Reaproveite links já salvos neste ministério.</p></div><i aria-hidden="true">⌄</i></summary>
                       <div className="secretary-fold-content">
                         <label>Repertório<textarea name="repertorio" rows={6} maxLength={8000} placeholder={"Música ou conteúdo 1\nMúsica ou conteúdo 2"} /></label>
-                        <LinkBuilder links={links} setLinks={setLinks} savedLinks={savedMinistryLinks} onUseSaved={useReusableLink} onRemoveSaved={(link) => void removeReusableLink(link)} onSaveCurrent={() => void saveReusableLinks()} busy={busy} />
+                        <LinkBuilder links={links} setLinks={setLinks} savedLinks={savedMinistryLinks} onUseSaved={useReusableLinkGroup} onRemoveSaved={(group) => void removeReusableLinkGroup(group)} onSaveCurrent={() => void saveReusableLinks()} busy={busy} />
                       </div>
                     </details>
                     <details className="secretary-fold-section">
                       <summary><span>4</span><div><h3>Checklist de responsabilidades</h3><p>Defina a tarefa e a pessoa responsável.</p></div><i aria-hidden="true">⌄</i></summary>
                       <div className="secretary-fold-content secretary-checklist-builder">
+                        <div className="secretary-checklist-tools">
+                          <p>Comece do zero ou reaproveite as tarefas da escala mais recente.</p>
+                          <button
+                            type="button"
+                            disabled={!previousChecklistTemplate.length}
+                            onClick={() => {
+                              setChecklistDraft(previousChecklistTemplate.map((item) => ({
+                                id: crypto.randomUUID(),
+                                tarefa: item.tarefa,
+                                voluntarioId: scheduleCandidates.some((candidate) => String(candidate.id) === item.voluntarioId)
+                                  ? item.voluntarioId
+                                  : "",
+                              })));
+                              setFeedback("Checklist anterior aplicado. Revise os responsáveis antes de salvar.");
+                            }}
+                          >Usar checklist anterior</button>
+                        </div>
                         {checklistDraft.map((item) => (
-                          <div key={item.id}>
+                          <div className="secretary-checklist-draft" key={item.id}>
                             <input aria-label="Tarefa" value={item.tarefa} onChange={(event) => setChecklistDraft((current) => current.map((draft) => draft.id === item.id ? { ...draft, tarefa: event.target.value } : draft))} placeholder="Ex.: Testar microfones" maxLength={180} />
                             <select aria-label="Responsável" value={item.voluntarioId} onChange={(event) => setChecklistDraft((current) => current.map((draft) => draft.id === item.id ? { ...draft, voluntarioId: event.target.value } : draft))}>
                               <option value="">Equipe</option>
@@ -1989,39 +2052,55 @@ function LinkBuilder({
   links: SecretaryLink[];
   setLinks: React.Dispatch<React.SetStateAction<SecretaryLink[]>>;
   savedLinks: ReusableSecretaryLink[];
-  onUseSaved: (link: ReusableSecretaryLink) => void;
-  onRemoveSaved: (link: ReusableSecretaryLink) => void;
+  onUseSaved: (group: ReusableSecretaryLinkGroup) => void;
+  onRemoveSaved: (group: ReusableSecretaryLinkGroup) => void;
   onSaveCurrent: () => void;
   busy: string;
 }) {
+  const savedGroups = useMemo(() => {
+    const groups = new Map<string, ReusableSecretaryLinkGroup>();
+    for (const link of savedLinks) {
+      const key = link.titulo.trim().toLocaleLowerCase("pt-BR");
+      const current = groups.get(key);
+      if (current) current.links.push(link);
+      else groups.set(key, { key: `${key}-${link.id}`, titulo: link.titulo.trim(), links: [link] });
+    }
+    return [...groups.values()];
+  }, [savedLinks]);
+
   return (
     <div className="secretary-link-builder">
       <section className="secretary-saved-links" aria-label="Biblioteca de links do ministério">
-        <header><div><strong>Biblioteca do ministério</strong><small>Links disponíveis para as próximas escalas.</small></div><span>{savedLinks.length}</span></header>
+        <header><div><strong>Biblioteca do ministério</strong><small>Cada item pode reunir YouTube, cifra e outros links.</small></div><span>{savedGroups.length}</span></header>
         <div>
-          {savedLinks.map((item) => (
-            <article key={item.id}>
-              <div><strong>{item.titulo}</strong><small>{linkTypeLabel(item.tipo)}</small></div>
-              <button type="button" onClick={() => onUseSaved(item)}>Usar</button>
-              <button type="button" className="danger" disabled={busy === `removing-reusable-link-${item.id}`} onClick={() => onRemoveSaved(item)}>Excluir</button>
+          {savedGroups.map((group) => (
+            <article key={group.key}>
+              <div><strong>{group.titulo}</strong><span className="secretary-saved-link-chips">{group.links.map((item) => <small key={item.id}>{linkTypeLabel(item.tipo)}</small>)}</span></div>
+              <div className="secretary-saved-link-actions">
+                <button type="button" onClick={() => onUseSaved(group)}>Usar</button>
+                <button type="button" className="danger" disabled={busy === `removing-reusable-group-${group.key}`} onClick={() => onRemoveSaved(group)}>Excluir</button>
+              </div>
             </article>
           ))}
-          {!savedLinks.length && <p>Nenhum link salvo neste ministério.</p>}
+          {!savedGroups.length && <p>Nenhum recurso salvo neste ministério.</p>}
         </div>
       </section>
       {links.map((item) => (
-        <div key={item.id}>
+        <div className="secretary-link-draft" key={item.id}>
           <select value={item.tipo} onChange={(event) => setLinks((current) => current.map((link) => link.id === item.id ? { ...link, tipo: event.target.value as SecretaryLink["tipo"] } : link))}>
             <option value="YOUTUBE">YouTube</option><option value="SPOTIFY">Spotify</option><option value="CIFRA_CLUB">Cifra Club</option><option value="GOOGLE_DRIVE">Google Drive</option><option value="PERSONALIZADO">Personalizado</option>
           </select>
           <input value={item.titulo} onChange={(event) => setLinks((current) => current.map((link) => link.id === item.id ? { ...link, titulo: event.target.value } : link))} placeholder="Título do recurso" maxLength={100} />
           <input value={item.url} onChange={(event) => setLinks((current) => current.map((link) => link.id === item.id ? { ...link, url: event.target.value } : link))} placeholder="https://…" type="url" />
-          <button type="button" aria-label="Remover link" onClick={() => setLinks((current) => current.filter((link) => link.id !== item.id))}>×</button>
+          <div className="secretary-link-draft-actions">
+            <button type="button" aria-label={`Adicionar outro link para ${item.titulo || "este recurso"}`} onClick={() => setLinks((current) => [...current, { id: crypto.randomUUID(), tipo: "YOUTUBE", titulo: item.titulo, url: "" }])}>＋ link</button>
+            <button type="button" aria-label="Remover link" onClick={() => setLinks((current) => current.filter((link) => link.id !== item.id))}>×</button>
+          </div>
         </div>
       ))}
       <div className="secretary-link-actions">
-        <button type="button" onClick={() => setLinks((current) => [...current, { id: crypto.randomUUID(), tipo: "YOUTUBE", titulo: "", url: "" }])}>+ Adicionar Cifra, YouTube ou outro link</button>
-        <button type="button" disabled={busy === "saving-reusable-links" || !links.some((item) => item.titulo.trim() && item.url.trim())} onClick={onSaveCurrent}>{busy === "saving-reusable-links" ? "Salvando…" : "Salvar para próximas escalas"}</button>
+        <button type="button" onClick={() => setLinks((current) => [...current, { id: crypto.randomUUID(), tipo: "YOUTUBE", titulo: "", url: "" }])}>+ Nova música ou recurso</button>
+        <button type="button" disabled={busy === "saving-reusable-links" || !links.some((item) => item.titulo.trim() && item.url.trim())} onClick={onSaveCurrent}>{busy === "saving-reusable-links" ? "Salvando…" : "Salvar na biblioteca"}</button>
       </div>
     </div>
   );
