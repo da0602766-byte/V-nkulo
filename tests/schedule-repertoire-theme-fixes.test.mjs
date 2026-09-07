@@ -53,8 +53,12 @@ test("menu público usa superfície opaca e ícones vetoriais", () => {
 
 test("resumo das músicas selecionadas exibe títulos, plataformas e remoção", () => {
   const workspace = read("app/components/SecretaryMinisterialWorkspace.tsx");
+  const css = read("app/secretary.css");
   assert.match(workspace, /const selectedItems = useMemo/);
   assert.match(workspace, /Músicas selecionadas para a escala/);
   assert.match(workspace, /Links incluídos na escala/);
   assert.match(workspace, /Remover \$\{item\.titulo\} da seleção/);
+  assert.match(workspace, /<section className="secretary-selected-repertoire"/);
+  assert.match(css, /\.secretary-selected-repertoire li\{[^}]*grid-template-columns:minmax\(0,1fr\) 28px/);
+  assert.match(css, /\.secretary-selected-repertoire li>div\{[^}]*grid-template-columns:minmax\(0,1fr\) auto/);
 });

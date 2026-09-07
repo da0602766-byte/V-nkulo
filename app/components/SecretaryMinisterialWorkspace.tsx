@@ -2229,7 +2229,7 @@ function LinkBuilder({ links, setLinks, libraryItems, selectedItemIds, onToggleI
         </div>
       </section>
       {selectedItemIds.length > 0 && (
-        <div className="secretary-selected-repertoire" role="status" aria-live="polite">
+        <section className="secretary-selected-repertoire" aria-live="polite">
           <header>
             <strong>{selectedItemIds.length} música(s) selecionada(s)</strong>
             <span>Links incluídos na escala</span>
@@ -2255,7 +2255,7 @@ function LinkBuilder({ links, setLinks, libraryItems, selectedItemIds, onToggleI
               </li>
             ))}
           </ul>
-        </div>
+        </section>
       )}
       {links.map((item) => <div className="secretary-link-draft" key={item.id}><select value={item.tipo} onChange={(event) => setLinks((current) => current.map((link) => link.id === item.id ? { ...link, tipo: event.target.value as SecretaryLink["tipo"] } : link))}><option value="YOUTUBE">YouTube</option><option value="SPOTIFY">Spotify</option><option value="CIFRA_CLUB">Cifra Club</option><option value="GOOGLE_DRIVE">Google Drive</option><option value="PERSONALIZADO">Personalizado</option></select><input value={item.titulo} onChange={(event) => setLinks((current) => current.map((link) => link.id === item.id ? { ...link, titulo: event.target.value } : link))} placeholder="Título do recurso" maxLength={100} /><input value={item.url} onChange={(event) => setLinks((current) => current.map((link) => link.id === item.id ? { ...link, url: event.target.value } : link))} placeholder="https://…" type="url" /><div className="secretary-link-draft-actions"><button type="button" aria-label={`Adicionar outro link para ${item.titulo || "este recurso"}`} onClick={() => setLinks((current) => [...current, { id: crypto.randomUUID(), tipo: "YOUTUBE", titulo: item.titulo, url: "" }])}>＋ link</button><button type="button" aria-label="Remover link" onClick={() => setLinks((current) => current.filter((link) => link.id !== item.id))}>×</button></div></div>)}
       <div className="secretary-link-actions"><button type="button" onClick={() => setLinks((current) => [...current, { id: crypto.randomUUID(), tipo: "YOUTUBE", titulo: "", url: "" }])}>+ Nova música ou recurso</button><div className="secretary-library-save"><input value={itemTitle} onChange={(event) => setItemTitle(event.target.value)} placeholder="Nome do item na biblioteca (ex.: Mil Graus)" maxLength={120} aria-label="Nome do item na biblioteca" /><button type="button" disabled={busy === "saving-reusable-links" || !links.some((item) => item.titulo.trim() && item.url.trim())} onClick={() => { onSaveCurrent(itemTitle); setItemTitle(""); }}>{busy === "saving-reusable-links" ? "Salvando…" : "Salvar na biblioteca"}</button></div></div>
