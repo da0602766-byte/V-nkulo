@@ -4,6 +4,12 @@ declare global {
       shareToWhatsApp?: (message: string) => void;
       downloadFile?: (url: string, filename: string) => void;
       addCalendarEvent?: (eventJson: string) => void;
+      showNotification?: (
+        title: string,
+        body: string,
+        tag: string,
+        url: string,
+      ) => void;
     };
   }
 }
@@ -15,6 +21,35 @@ export type DeviceCalendarEvent = {
   location?: string;
   description?: string;
 };
+
+export type DeviceNotification = {
+  title: string;
+  body: string;
+  tag: string;
+  url: string;
+};
+
+export function isNativeNotificationBridgeAvailable() {
+  return (
+    typeof window !== "undefined" &&
+    typeof window.VinkuloAndroid?.showNotification === "function"
+  );
+}
+
+export function showDeviceNotification(notification: DeviceNotification) {
+  if (!isNativeNotificationBridgeAvailable()) return false;
+  try {
+    window.VinkuloAndroid!.showNotification!(
+      notification.title.trim().slice(0, 160) || "Vínkulo",
+      notification.body.trim().slice(0, 1200),
+      notification.tag.trim().slice(0, 160),
+      notification.url,
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export async function downloadFileForDevice(url: string, filename: string) {
   if (typeof window === "undefined") return false;

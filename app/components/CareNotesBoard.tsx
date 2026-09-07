@@ -19,7 +19,13 @@ type CareNote = {
 };
 type Option = { id: number; nome?: string; nome_completo?: string; titulo?: string; inicia_em?: string };
 
-export default function CareNotesBoard({ compact = false }: { compact?: boolean }) {
+export default function CareNotesBoard({
+  compact = false,
+  side = false,
+}: {
+  compact?: boolean;
+  side?: boolean;
+}) {
   const [notes, setNotes] = useState<CareNote[]>([]);
   const [events, setEvents] = useState<Option[]>([]);
   const [visitors, setVisitors] = useState<Option[]>([]);
@@ -104,7 +110,7 @@ export default function CareNotesBoard({ compact = false }: { compact?: boolean 
   }
 
   return (
-    <section className={`care-notes-board ${compact ? "is-compact" : ""}`} aria-labelledby={compact ? "care-notes-title-compact" : "care-notes-title"}>
+    <section className={`care-notes-board ${compact ? "is-compact" : ""} ${side ? "is-side" : ""}`} aria-labelledby={compact ? "care-notes-title-compact" : "care-notes-title"}>
       <header>
         <div><span aria-hidden="true">▰</span><div><p className="pilot-kicker">POST-ITS</p><h2 id={compact ? "care-notes-title-compact" : "care-notes-title"}>Minhas anotações de cuidado</h2><small>Privadas para você · vínculos opcionais</small></div></div>
         <button type="button" onClick={() => setComposerOpen((open) => !open)} aria-expanded={composerOpen}>{composerOpen ? "Fechar" : "＋ Novo post-it"}</button>

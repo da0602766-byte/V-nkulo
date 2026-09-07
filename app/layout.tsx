@@ -11,6 +11,7 @@ import SmartScrollHeader from "./components/SmartScrollHeader";
 import MobileAppInstall from "./components/MobileAppInstall";
 import GlobalFeedbackLauncher from "./components/GlobalFeedbackLauncher";
 import SystemExperienceController from "./components/SystemExperienceController";
+import NativeNotificationSync from "./components/NativeNotificationSync";
 
 const instrumentSans = Instrument_Sans({
   variable: "--font-body",
@@ -88,6 +89,7 @@ export default function RootLayout({
         <SmartScrollHeader />
         <div id="main-content">{children}</div>
         <SystemExperienceController />
+        <NativeNotificationSync />
         <GlobalFeedbackLauncher />
         <MobileAppInstall />
       </body>

@@ -7,6 +7,10 @@ import { recordPromotionNotice } from "../../../lib/recepcao";
 import { recordTenantAudit } from "../../../lib/tenant-audit";
 import { requireTenantPermission } from "../../../lib/tenant";
 
+// Trava de segurança para evitar respostas sem limite em comunidades muito
+// maiores que o uso atual. O item adicional permite informar quando houve corte.
+const PEOPLE_SAFETY_LIMIT = 2000;
+
 export async function GET() {
   const access = await requireTenantPermission("dashboard.view");
   if ("error" in access) return access.error;
@@ -87,7 +91,7 @@ export async function GET() {
     );
   }
 
-  const result = await db
+  const rows = await db
     .prepare(
       `SELECT uc.id AS membership_id, u.id AS usuario_id, u.nome, u.email,
         u.criado_em AS owner_criado_em,
@@ -102,14 +106,20 @@ export async function GET() {
        LEFT JOIN oficiais_comunidade oc
          ON oc.usuario_comunidade_id = uc.id
        WHERE uc.comunidade_id = ? AND u.ativo = 1
-       ORDER BY oficial DESC, u.nome ASC, uc.id ASC`,
+       ORDER BY oficial DESC, u.nome ASC, uc.id ASC
+       LIMIT ?`,
     )
-    .bind(access.context.comunidadeId)
+    .bind(access.context.comunidadeId, PEOPLE_SAFETY_LIMIT + 1)
     .all<Record<string, unknown>>();
+  const peopleTruncated = rows.results.length > PEOPLE_SAFETY_LIMIT;
+  const people = peopleTruncated
+    ? rows.results.slice(0, PEOPLE_SAFETY_LIMIT)
+    : rows.results;
   return Response.json(
     {
       me: verifiedMe,
-      people: result.results.map(withOwnerVerification),
+      people: people.map(withOwnerVerification),
+      peopleTruncated,
       canViewPeople: true,
       canManage: access.context.permissions.includes("officials.manage"),
       canDeleteGlobal,

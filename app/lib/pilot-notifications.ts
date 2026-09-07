@@ -39,12 +39,21 @@ export async function notifyCommunityManagers(
   const recipients = await db
     .prepare(
       `SELECT DISTINCT u.id
-      FROM usuarios u
-      JOIN usuario_comunidades uc ON uc.usuario_id = u.id
-      WHERE uc.comunidade_id = ?
-        AND uc.status = 'ATIVO'
-        AND u.ativo = 1
-        AND (u.perfil = 'ADMIN' OR uc.papel IN ('PASTOR', 'ADMIN_COMUNIDADE'))`,
+      FROM comunidades c
+      JOIN usuarios u ON u.ativo = 1
+      WHERE c.id = ?
+        AND c.status = 'ATIVA'
+        AND (
+          u.id = c.proprietario_usuario_id
+          OR EXISTS (
+            SELECT 1
+            FROM usuario_comunidades uc
+            WHERE uc.usuario_id = u.id
+              AND uc.comunidade_id = c.id
+              AND uc.status = 'ATIVO'
+              AND (u.perfil = 'ADMIN' OR uc.papel IN ('PASTOR', 'ADMIN_COMUNIDADE'))
+          )
+        )`,
     )
     .bind(input.communityId)
     .all<{ id: number }>();
@@ -55,6 +64,7 @@ export async function notifyCommunityManagers(
         title: "Nova solicitação de entrada",
         message: `${input.applicantName} solicitou entrada em ${input.communityName}.`,
         entityId: input.requestId,
+        area: "SOLICITACOES",
         destination: "/painel?view=comunidade",
         createdBy: input.createdBy,
       }),
