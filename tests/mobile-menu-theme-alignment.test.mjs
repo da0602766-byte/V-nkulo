@@ -27,9 +27,9 @@ test("ícones da biblioteca ministerial formam um grupo centralizado no celular"
 
   assert.match(workspace, /className="ministry-library-actions"/);
   assert.match(css, /\.ministry-library-actions\{display:flex;align-items:center;justify-content:center/);
-  assert.match(css, /\.ministry-library-actions\{width:100%;margin-left:0;justify-content:center\}/);
+  assert.match(css, /\.secretary-link-builder \.ministry-library-actions\{width:100%;max-width:100%;margin-left:0;justify-content:center/);
   assert.match(css, /\.platform-icon\{[^}]*display:inline-flex;align-items:center;justify-content:center/);
-  assert.match(css, /\.platform-icon>svg\{[^}]*display:block;flex:0 0 16px;margin:0/);
+  assert.match(css, /\.secretary-link-builder \.platform-icon\{[^}]*min-height:28px;padding:0/);
 });
 
 test("troca de tema evita captura da tela e mantém só a resposta curta do ícone", async () => {
