@@ -2194,6 +2194,10 @@ function LinkBuilder({ links, setLinks, libraryItems, selectedItemIds, onToggleI
     const term = search.trim().toLowerCase();
     return term ? libraryItems.filter((item) => item.titulo.toLowerCase().includes(term) || item.links.some((link) => link.url.toLowerCase().includes(term))) : libraryItems;
   }, [libraryItems, search]);
+  const selectedItems = useMemo(
+    () => libraryItems.filter((item) => selectedItemIds.includes(item.id)),
+    [libraryItems, selectedItemIds],
+  );
 
   return (
     <div className="secretary-link-builder">
@@ -2226,8 +2230,31 @@ function LinkBuilder({ links, setLinks, libraryItems, selectedItemIds, onToggleI
       </section>
       {selectedItemIds.length > 0 && (
         <div className="secretary-selected-repertoire" role="status" aria-live="polite">
-          <strong>{selectedItemIds.length} música(s) selecionada(s)</strong>
-          <span>Os links serão anexados de forma compacta à música na escala.</span>
+          <header>
+            <strong>{selectedItemIds.length} música(s) selecionada(s)</strong>
+            <span>Links incluídos na escala</span>
+          </header>
+          <ul aria-label="Músicas selecionadas para a escala">
+            {selectedItems.map((item) => (
+              <li key={item.id}>
+                <div>
+                  <strong>{item.titulo}</strong>
+                  <span className="secretary-selected-repertoire-links" aria-label={`Links de ${item.titulo}`}>
+                    {item.links.map((link) => (
+                      <span key={link.id} className={`platform-icon ${LINK_ICONS[link.tipo]?.classe || "lk"} static`} title={linkTypeLabel(link.tipo)}>
+                        <PlatformIcon tipo={link.tipo} />
+                        <span className="sr-only">{linkTypeLabel(link.tipo)}</span>
+                      </span>
+                    ))}
+                    {!item.links.length && <small>Sem link</small>}
+                  </span>
+                </div>
+                <button type="button" onClick={() => onToggleItem(item)} aria-label={`Remover ${item.titulo} da seleção`} title="Remover da seleção">
+                  <LibraryActionIcon name="remove" />
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       {links.map((item) => <div className="secretary-link-draft" key={item.id}><select value={item.tipo} onChange={(event) => setLinks((current) => current.map((link) => link.id === item.id ? { ...link, tipo: event.target.value as SecretaryLink["tipo"] } : link))}><option value="YOUTUBE">YouTube</option><option value="SPOTIFY">Spotify</option><option value="CIFRA_CLUB">Cifra Club</option><option value="GOOGLE_DRIVE">Google Drive</option><option value="PERSONALIZADO">Personalizado</option></select><input value={item.titulo} onChange={(event) => setLinks((current) => current.map((link) => link.id === item.id ? { ...link, titulo: event.target.value } : link))} placeholder="Título do recurso" maxLength={100} /><input value={item.url} onChange={(event) => setLinks((current) => current.map((link) => link.id === item.id ? { ...link, url: event.target.value } : link))} placeholder="https://…" type="url" /><div className="secretary-link-draft-actions"><button type="button" aria-label={`Adicionar outro link para ${item.titulo || "este recurso"}`} onClick={() => setLinks((current) => [...current, { id: crypto.randomUUID(), tipo: "YOUTUBE", titulo: item.titulo, url: "" }])}>＋ link</button><button type="button" aria-label="Remover link" onClick={() => setLinks((current) => current.filter((link) => link.id !== item.id))}>×</button></div></div>)}

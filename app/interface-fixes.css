@@ -2,7 +2,7 @@
 .theme-control-glyph svg { width:18px; height:18px; display:block; overflow:visible; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
 .theme-control-glyph .theme-sun-core { fill:currentColor; stroke:currentColor; }
 .theme-control-glyph .theme-auto-half { fill:currentColor; stroke:none; }
-.theme-control.is-transitioning .theme-control-glyph { animation:vinkulo-theme-glyph-switch .38s cubic-bezier(.2,.78,.2,1); }
+.theme-control.is-transitioning .theme-control-glyph { animation:vinkulo-theme-glyph-switch .18s ease-out; }
 .theme-control button:disabled { cursor:wait; }
 
 @keyframes vinkulo-theme-glyph-switch {
@@ -12,20 +12,40 @@
   100% { opacity:1; transform:rotate(0) scale(1); }
 }
 
-::view-transition-old(root),::view-transition-new(root) { animation:none; mix-blend-mode:normal; }
-html.vinkulo-theme-transitioning::view-transition-old(root) { z-index:1; }
-html.vinkulo-theme-transitioning::view-transition-new(root) { z-index:2; }
-html.vinkulo-theme-transitioning { pointer-events:none; }
-
 .public-account-backdrop { display:none; }
 .public-account-menu:not([open])>.public-account-backdrop { display:none; }
+.social-public-header.reception-header {
+  --reception-surface:#fff;
+  --reception-surface-soft:#eef1f7;
+  --reception-text:#11182a;
+  --reception-muted:#657087;
+  --reception-line:#dfe4ee;
+  background-color:var(--reception-surface)!important;
+  background-image:none!important;
+  color:var(--reception-text)!important;
+  -webkit-backdrop-filter:none;
+  backdrop-filter:none;
+}
+html:is([data-theme="dark"],[data-pilot-theme="escuro"]) .social-public-header.reception-header {
+  --reception-surface:#101827;
+  --reception-surface-soft:#172235;
+  --reception-text:#f2f5fb;
+  --reception-muted:#a0acc0;
+  --reception-line:#28354a;
+  color-scheme:dark;
+}
+html:is([data-theme="light"],[data-pilot-theme="claro"]) .social-public-header.reception-header { color-scheme:light; }
 .social-public-header.reception-header .public-account-popover {
   opacity:1;
   background-color:var(--reception-surface,#fff)!important;
   background-image:none!important;
+  color:var(--reception-text,#11182a)!important;
   -webkit-backdrop-filter:none;
   backdrop-filter:none;
 }
+.social-public-header.reception-header .public-account-popover>a,
+.social-public-header.reception-header .public-account-popover>header strong { color:var(--reception-text,#11182a)!important; }
+.social-public-header.reception-header .public-account-popover>header small { color:var(--reception-muted,#657087)!important; }
 
 @keyframes public-account-sheet-in {
   from { opacity:0; transform:translateY(-8px) scale(.985); }
