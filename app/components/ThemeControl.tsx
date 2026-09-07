@@ -38,14 +38,14 @@ export default function ThemeControl({
     return () => media.removeEventListener("change", syncAutomaticTheme);
   }, [theme]);
 
-  function update(next: Theme, origin?: HTMLElement | null) {
+  function update(next: Theme) {
     if (transitionInProgress.current) return;
     transitionInProgress.current = true;
     setIsTransitioning(true);
     setTheme(next);
     window.localStorage.setItem("vinkulo-theme", next);
     if (individualKey) window.localStorage.setItem(individualKey, next);
-    animateThemeChange(next, origin).finally(() => {
+    animateThemeChange(next).finally(() => {
       transitionInProgress.current = false;
       setIsTransitioning(false);
     });
@@ -62,7 +62,7 @@ export default function ThemeControl({
           aria-label={`${isDark ? "Tema escuro" : "Tema claro"}. Mudar para ${nextTheme.label}`}
           title={`${isDark ? "Tema escuro" : "Tema claro"} · mudar para ${nextTheme.label}`}
           disabled={isTransitioning}
-          onClick={(event) => update(nextTheme.value, event.currentTarget)}
+          onClick={() => update(nextTheme.value)}
         >
           <span className="theme-control-glyph" aria-hidden="true"><ThemeGlyph theme={isDark ? "ESCURO" : "CLARO"} /></span>
           <small>{isDark ? "Tema escuro" : "Tema claro"}</small>
@@ -86,7 +86,7 @@ export default function ThemeControl({
           aria-pressed={theme === item.value}
           title={item.label}
           disabled={isTransitioning}
-          onClick={(event) => update(item.value, event.currentTarget)}
+          onClick={() => update(item.value)}
         >
           <span className="theme-control-glyph" aria-hidden="true"><ThemeGlyph theme={item.value} /></span>
           <small>{item.label}</small>
@@ -129,63 +129,10 @@ function currentThemeIsDark(theme: Theme) {
     window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
-type ThemeTransition = {
-  ready: Promise<void>;
-  finished: Promise<void>;
-};
-
-type ThemeTransitionDocument = Document & {
-  startViewTransition?: (callback: () => void) => ThemeTransition;
-};
-
-async function animateThemeChange(theme: Theme, origin?: HTMLElement | null) {
-  const transitionDocument = document as ThemeTransitionDocument;
-  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (!origin || reducedMotion || !transitionDocument.startViewTransition) {
-    applyTheme(theme);
-    return;
-  }
-
-  const bounds = origin.getBoundingClientRect();
-  const x = bounds.left + bounds.width / 2;
-  const y = bounds.top + bounds.height / 2;
-  const radius = Math.hypot(
-    Math.max(x, window.innerWidth - x),
-    Math.max(y, window.innerHeight - y),
-  );
-  document.documentElement.classList.add("vinkulo-theme-transitioning");
-  let transition: ThemeTransition;
-  try {
-    transition = transitionDocument.startViewTransition(() => applyTheme(theme));
-  } catch {
-    document.documentElement.classList.remove("vinkulo-theme-transitioning");
-    applyTheme(theme);
-    return;
-  }
-
-  try {
-    await transition.ready;
-    const animation = document.documentElement.animate(
-      {
-        clipPath: [
-          `circle(0px at ${x}px ${y}px)`,
-          `circle(${radius}px at ${x}px ${y}px)`,
-        ],
-      },
-      {
-        duration: 380,
-        easing: "cubic-bezier(.2,.78,.2,1)",
-        fill: "both",
-        pseudoElement: "::view-transition-new(root)",
-      } as KeyframeAnimationOptions & { pseudoElement: string },
-    );
-    await animation.finished;
-  } catch {
-    applyTheme(theme);
-  } finally {
-    await transition.finished.catch(() => undefined);
-    document.documentElement.classList.remove("vinkulo-theme-transitioning");
-  }
+async function animateThemeChange(theme: Theme) {
+  applyTheme(theme);
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  await new Promise<void>((resolve) => window.setTimeout(resolve, 180));
 }
 
 function applyTheme(theme: Theme) {

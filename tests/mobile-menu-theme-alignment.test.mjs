@@ -28,19 +28,19 @@ test("ícones da biblioteca ministerial formam um grupo centralizado no celular"
   assert.match(workspace, /className="ministry-library-actions"/);
   assert.match(css, /\.ministry-library-actions\{display:flex;align-items:center;justify-content:center/);
   assert.match(css, /\.ministry-library-actions\{width:100%;margin-left:0;justify-content:center\}/);
-  assert.match(css, /\.platform-icon\{[\s\S]*?display:grid;place-items:center/);
+  assert.match(css, /\.platform-icon\{[^}]*display:inline-flex;align-items:center;justify-content:center/);
+  assert.match(css, /\.platform-icon>svg\{[^}]*display:block;flex:0 0 16px;margin:0/);
 });
 
-test("troca de tema usa revelação circular e respeita movimento reduzido", async () => {
+test("troca de tema evita captura da tela e mantém só a resposta curta do ícone", async () => {
   const [control, css] = await Promise.all([
     source("app/components/ThemeControl.tsx"),
     Promise.all([source("app/globals.css"), source("app/interface-fixes.css")]).then((parts) => parts.join("\n")),
   ]);
 
-  assert.match(control, /startViewTransition/);
-  assert.match(control, /circle\(0px at \$\{x\}px \$\{y\}px\)/);
-  assert.match(control, /pseudoElement: "::view-transition-new\(root\)"/);
+  assert.doesNotMatch(control, /startViewTransition/);
+  assert.match(control, /setTimeout\(resolve, 180\)/);
   assert.match(control, /prefers-reduced-motion: reduce/);
-  assert.match(css, /::view-transition-old\(root\),::view-transition-new\(root\)/);
   assert.match(css, /@keyframes vinkulo-theme-glyph-switch/);
+  assert.match(css, /animation:vinkulo-theme-glyph-switch \.18s ease-out/);
 });

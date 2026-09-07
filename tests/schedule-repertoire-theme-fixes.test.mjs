@@ -31,19 +31,30 @@ test("link compartilhado exibe os links compactos dentro de cada música", () =>
   assert.match(sharedPage, /target="_blank"/);
 });
 
-test("troca de tema curta bloqueia animações simultâneas", () => {
+test("troca de tema é imediata e bloqueia apenas toques simultâneos", () => {
   const control = read("app/components/ThemeControl.tsx");
   assert.match(control, /transitionInProgress/);
   assert.match(control, /disabled=\{isTransitioning\}/);
-  assert.match(control, /duration: 380/);
+  assert.match(control, /applyTheme\(theme\)/);
+  assert.match(control, /setTimeout\(resolve, 180\)/);
+  assert.doesNotMatch(control, /startViewTransition/);
 });
 
 test("menu público usa superfície opaca e ícones vetoriais", () => {
   const globalCss = `${read("app/globals.css")}\n${read("app/interface-fixes.css")}`;
   const workspace = read("app/components/SecretaryMinisterialWorkspace.tsx");
   assert.match(globalCss, /background-color:var\(--reception-surface,#fff\)!important/);
+  assert.match(globalCss, /color:var\(--reception-text,#11182a\)!important/);
   assert.match(globalCss, /backdrop-filter:none/);
   assert.match(workspace, /function LibraryActionIcon/);
   assert.match(workspace, /name="edit"/);
   assert.match(workspace, /name="remove"/);
+});
+
+test("resumo das músicas selecionadas exibe títulos, plataformas e remoção", () => {
+  const workspace = read("app/components/SecretaryMinisterialWorkspace.tsx");
+  assert.match(workspace, /const selectedItems = useMemo/);
+  assert.match(workspace, /Músicas selecionadas para a escala/);
+  assert.match(workspace, /Links incluídos na escala/);
+  assert.match(workspace, /Remover \$\{item\.titulo\} da seleção/);
 });
