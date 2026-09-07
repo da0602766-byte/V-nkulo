@@ -6,6 +6,7 @@ import {
 } from "next/font/google";
 import "./globals.css";
 import "./secretary.css";
+import "./recepcao.css";
 import SmartScrollHeader from "./components/SmartScrollHeader";
 import MobileAppInstall from "./components/MobileAppInstall";
 import GlobalFeedbackLauncher from "./components/GlobalFeedbackLauncher";

@@ -3,6 +3,7 @@ import { OFFICIAL_PERMISSION_CATALOG } from "../../../lib/tenant-policy.mjs";
 import { parseOfficialUpdate } from "../../../lib/people-validation";
 import { isSystemOwnerAccount } from "../../../lib/local-auth";
 import { notifyUser } from "../../../lib/pilot-notifications";
+import { recordPromotionNotice } from "../../../lib/recepcao";
 import { recordTenantAudit } from "../../../lib/tenant-audit";
 import { requireTenantPermission } from "../../../lib/tenant";
 
@@ -492,6 +493,15 @@ export async function PATCH(request: Request) {
         )
         .bind(parsed.data.membershipId);
   await db.batch([membershipUpdate, officialUpdate]);
+  await recordPromotionNotice(db, {
+    comunidadeId: access.context.comunidadeId,
+    usuarioId: Number(target.usuario_id),
+    escopo: "COMUNIDADE",
+    contexto: access.context.comunidadeNome,
+    papelAnterior: String(target.papel || ""),
+    papelNovo: parsed.data.papel,
+    promovidoPor: access.user.id,
+  });
   await recordTenantAudit(
     db,
     access.context,

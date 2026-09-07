@@ -123,7 +123,7 @@ export async function GET() {
     .all<Row>();
   const reusableLinks = await db
     .prepare(
-      `SELECT l.id, l.ministerio_id, l.tipo, l.titulo, l.url
+      `SELECT l.id, l.ministerio_id, l.item_id, l.tipo, l.titulo, l.url
        FROM ministerio_links_reutilizaveis l
        JOIN ministerios_comunidade m
          ON m.id = l.ministerio_id
@@ -149,6 +149,44 @@ export async function GET() {
       access.user.id,
     )
     .all<Row>();
+  const libraryItems = await db
+    .prepare(
+      `SELECT b.id, b.ministerio_id, b.titulo, b.atualizado_em
+       FROM ministerio_biblioteca_itens b
+       JOIN ministerios_comunidade m
+         ON m.id = b.ministerio_id
+        AND m.comunidade_id = b.comunidade_id
+       WHERE b.comunidade_id = ? AND b.ativo = 1
+         AND (
+           ? = 1
+           OR m.responsavel_usuario_id = ?
+           OR EXISTS (
+             SELECT 1 FROM ministerio_voluntarios lead
+             WHERE lead.ministerio_id = b.ministerio_id
+               AND lead.comunidade_id = b.comunidade_id
+               AND lead.usuario_id = ?
+               AND lead.papel = 'LIDER' AND lead.ativo = 1
+           )
+         )
+       ORDER BY b.titulo COLLATE NOCASE ASC`,
+    )
+    .bind(
+      access.context.comunidadeId,
+      globalManager ? 1 : 0,
+      access.user.id,
+      access.user.id,
+    )
+    .all<Row>();
+  // Cada item da biblioteca reúne os links da mesma música ou material, para
+  // que a lista mostre apenas o nome e os ícones das plataformas.
+  const linksByItem = new Map<number, Row[]>();
+  for (const link of reusableLinks.results) {
+    const itemId = Number(link.item_id);
+    if (!Number.isInteger(itemId) || itemId <= 0) continue;
+    const bucket = linksByItem.get(itemId);
+    if (bucket) bucket.push(link);
+    else linksByItem.set(itemId, [link]);
+  }
   return Response.json(
     {
       funcoes: functions.results,
@@ -159,6 +197,10 @@ export async function GET() {
       })),
       checklist: checklist.results,
       linksReutilizaveis: reusableLinks.results,
+      bibliotecaItens: libraryItems.results.map((item) => ({
+        ...item,
+        links: linksByItem.get(Number(item.id)) || [],
+      })),
     },
     { headers: { "Cache-Control": "no-store" } },
   );
@@ -196,13 +238,33 @@ export async function POST(request: Request) {
     ) {
       return Response.json({ error: "Ação não permitida." }, { status: 403 });
     }
+    // O item é o agrupador da biblioteca (ex.: a música). Sem um nome
+    // explícito, usamos o título do primeiro link para manter compatibilidade
+    // com as bibliotecas salvas antes do agrupamento.
+    const itemTitle =
+      cleanLibraryTitle(payload.item) || parsed.value[0]?.titulo || "";
+    if (!itemTitle) {
+      return Response.json(
+        { error: "Informe o nome do item da biblioteca." },
+        { status: 400 },
+      );
+    }
+    const itemId = await ensureLibraryItem(
+      db,
+      access.context.comunidadeId,
+      ministryId,
+      itemTitle,
+      access.user.id,
+    );
     for (const link of parsed.value) {
       await db
         .prepare(
           `INSERT INTO ministerio_links_reutilizaveis
-           (comunidade_id, ministerio_id, tipo, titulo, url, ativo, criado_por)
-           VALUES (?, ?, ?, ?, ?, 1, ?)
+           (comunidade_id, ministerio_id, item_id, tipo, titulo, url, ativo,
+            criado_por)
+           VALUES (?, ?, ?, ?, ?, ?, 1, ?)
            ON CONFLICT(ministerio_id, url) DO UPDATE SET
+             item_id = excluded.item_id,
              tipo = excluded.tipo,
              titulo = excluded.titulo,
              ativo = 1,
@@ -211,6 +273,7 @@ export async function POST(request: Request) {
         .bind(
           access.context.comunidadeId,
           ministryId,
+          itemId,
           link.tipo,
           link.titulo,
           link.url,
@@ -220,9 +283,98 @@ export async function POST(request: Request) {
     }
     await audit("MINISTERIO_LINKS_REUTILIZAVEIS_SALVOS", {
       ministerioId: ministryId,
+      itemId,
       quantidade: parsed.value.length,
     });
-    return Response.json({ ok: true, quantidade: parsed.value.length });
+    return Response.json({ ok: true, itemId, quantidade: parsed.value.length });
+  }
+
+  if (action === "RENOMEAR_ITEM_BIBLIOTECA") {
+    const id = positiveInteger(payload.id);
+    const titulo = cleanLibraryTitle(payload.titulo);
+    if (!id || !titulo) {
+      return Response.json(
+        { error: "Informe o item e o novo nome." },
+        { status: 400 },
+      );
+    }
+    const row = await db
+      .prepare(
+        `SELECT ministerio_id FROM ministerio_biblioteca_itens
+         WHERE id = ? AND comunidade_id = ? AND ativo = 1`,
+      )
+      .bind(id, access.context.comunidadeId)
+      .first<{ ministerio_id: number }>();
+    if (
+      !row ||
+      !(await canManageMinistry(
+        db,
+        access.context,
+        access.user.id,
+        Number(row.ministerio_id),
+      ))
+    ) {
+      return Response.json({ error: "Ação não permitida." }, { status: 403 });
+    }
+    await db
+      .prepare(
+        `UPDATE ministerio_biblioteca_itens
+         SET titulo = ?, atualizado_em = CURRENT_TIMESTAMP
+         WHERE id = ? AND comunidade_id = ?`,
+      )
+      .bind(titulo, id, access.context.comunidadeId)
+      .run();
+    await audit("MINISTERIO_BIBLIOTECA_ITEM_RENOMEADO", {
+      ministerioId: Number(row.ministerio_id),
+      itemId: id,
+    });
+    return Response.json({ ok: true });
+  }
+
+  if (action === "EXCLUIR_ITEM_BIBLIOTECA") {
+    const id = positiveInteger(payload.id);
+    if (!id) {
+      return Response.json({ error: "Item inválido." }, { status: 400 });
+    }
+    const row = await db
+      .prepare(
+        `SELECT ministerio_id FROM ministerio_biblioteca_itens
+         WHERE id = ? AND comunidade_id = ? AND ativo = 1`,
+      )
+      .bind(id, access.context.comunidadeId)
+      .first<{ ministerio_id: number }>();
+    if (
+      !row ||
+      !(await canManageMinistry(
+        db,
+        access.context,
+        access.user.id,
+        Number(row.ministerio_id),
+      ))
+    ) {
+      return Response.json({ error: "Ação não permitida." }, { status: 403 });
+    }
+    await db.batch([
+      db
+        .prepare(
+          `UPDATE ministerio_links_reutilizaveis
+           SET ativo = 0, atualizado_em = CURRENT_TIMESTAMP
+           WHERE item_id = ? AND comunidade_id = ?`,
+        )
+        .bind(id, access.context.comunidadeId),
+      db
+        .prepare(
+          `UPDATE ministerio_biblioteca_itens
+           SET ativo = 0, atualizado_em = CURRENT_TIMESTAMP
+           WHERE id = ? AND comunidade_id = ?`,
+        )
+        .bind(id, access.context.comunidadeId),
+    ]);
+    await audit("MINISTERIO_BIBLIOTECA_ITEM_EXCLUIDO", {
+      ministerioId: Number(row.ministerio_id),
+      itemId: id,
+    });
+    return Response.json({ ok: true });
   }
 
   if (action === "EXCLUIR_LINK_REUTILIZAVEL") {
@@ -676,4 +828,39 @@ function parseList(value: unknown) {
 function positiveInteger(value: unknown) {
   const number = Number(value);
   return Number.isInteger(number) && number > 0 ? number : null;
+}
+
+function cleanLibraryTitle(value: unknown) {
+  return String(value ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
+}
+
+async function ensureLibraryItem(
+  db: ReturnType<typeof getD1>,
+  comunidadeId: number,
+  ministerioId: number,
+  titulo: string,
+  usuarioId: number,
+) {
+  const existing = await db
+    .prepare(
+      `SELECT id FROM ministerio_biblioteca_itens
+       WHERE comunidade_id = ? AND ministerio_id = ? AND ativo = 1
+         AND titulo = ? COLLATE NOCASE
+       LIMIT 1`,
+    )
+    .bind(comunidadeId, ministerioId, titulo)
+    .first<{ id: number }>();
+  if (existing) return Number(existing.id);
+  const created = await db
+    .prepare(
+      `INSERT INTO ministerio_biblioteca_itens
+       (comunidade_id, ministerio_id, titulo, ativo, criado_por)
+       VALUES (?, ?, ?, 1, ?)`,
+    )
+    .bind(comunidadeId, ministerioId, titulo, usuarioId)
+    .run();
+  return Number(created.meta.last_row_id);
 }

@@ -61,7 +61,7 @@ test("criação de escala compacta etapas e sugere disponibilidade real da equip
   assert.match(workspace, /Conflito de horário/);
   assert.match(workspace, /Sugerido para esta data/);
   assert.match(workspace, /Selecionar sugestões disponíveis/);
-  assert.match(workspace, /Salvar para próximas escalas/);
+  assert.match(workspace, /Salvar na biblioteca/);
   assert.match(workspace, /useState<SecretaryLink\[\]>\(\[blankSecretaryLink\(\)\]\)/);
   assert.match(workspace, /Adicionar Cifra, YouTube ou outro link/);
   assert.match(workspace, /<option value="YOUTUBE">YouTube<\/option><option value="SPOTIFY">Spotify<\/option><option value="CIFRA_CLUB">Cifra Club<\/option><option value="GOOGLE_DRIVE">Google Drive<\/option><option value="PERSONALIZADO">Personalizado<\/option>/);

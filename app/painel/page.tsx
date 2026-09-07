@@ -1,5 +1,11 @@
 import { redirect } from "next/navigation";
 import PilotDashboard from "../components/PilotDashboard";
+import RecepcaoAvisos from "../components/RecepcaoAvisos";
+import { getD1 } from "../../db";
+import {
+  getIntroductionState,
+  getPendingPromotionNotice,
+} from "../lib/recepcao";
 import {
   getParkingModuleState,
   getPilotFeatureState,
@@ -47,25 +53,41 @@ export default async function PilotPanelPage({
   if (!tenant.context) redirect("/sem-comunidade");
   const requestedView = (await searchParams).view || "inicio";
   const initialView = VALID_VIEWS.has(requestedView) ? requestedView : "inicio";
-  const [feed, features, parkingEnabled, communityTheme] = await Promise.all([
-    getPilotFeed(tenant.context.comunidadeId),
-    getPilotFeatureState(tenant.context.comunidadeId),
-    getParkingModuleState(tenant.context.comunidadeId),
-    getCommunityTheme(tenant.context.comunidadeId),
-  ]);
+  const db = getD1();
+  const [feed, features, parkingEnabled, communityTheme, promocao, introducao] =
+    await Promise.all([
+      getPilotFeed(tenant.context.comunidadeId),
+      getPilotFeatureState(tenant.context.comunidadeId),
+      getParkingModuleState(tenant.context.comunidadeId),
+      getCommunityTheme(tenant.context.comunidadeId),
+      getPendingPromotionNotice(
+        db,
+        tenant.context.comunidadeId,
+        session.user.id,
+      ),
+      getIntroductionState(db, session.user.id, tenant.context.comunidadeId),
+    ]);
   return (
-    <PilotDashboard
-      active={tenant.context}
-      memberships={tenant.memberships}
-      feed={feed}
-      features={features}
-      parkingEnabled={parkingEnabled}
-      userName={session.user.nome}
-      userEmail={session.user.email}
-      userPhotoUrl={session.user.foto_perfil || ""}
-      systemOwner={Boolean(session.user.system_owner)}
-      initialView={initialView}
-      communityTheme={communityTheme}
-    />
+    <>
+      <PilotDashboard
+        active={tenant.context}
+        memberships={tenant.memberships}
+        feed={feed}
+        features={features}
+        parkingEnabled={parkingEnabled}
+        userName={session.user.nome}
+        userEmail={session.user.email}
+        userPhotoUrl={session.user.foto_perfil || ""}
+        systemOwner={Boolean(session.user.system_owner)}
+        initialView={initialView}
+        communityTheme={communityTheme}
+      />
+      <RecepcaoAvisos
+        promocao={promocao}
+        introducao={introducao}
+        communityName={tenant.context.comunidadeNome}
+        userName={session.user.nome}
+      />
+    </>
   );
 }

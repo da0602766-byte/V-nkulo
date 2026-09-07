@@ -9,6 +9,7 @@ import {
   parseMinistryPayload,
   parseVolunteerPayload,
 } from "../../../../lib/ministry-validation";
+import { recordPromotionNotice } from "../../../../lib/recepcao";
 import { recordTenantAudit } from "../../../../lib/tenant-audit";
 import { requireTenantPermission } from "../../../../lib/tenant";
 
@@ -228,6 +229,15 @@ export async function PATCH(request: Request, context: Context) {
         )
         .run();
       if (parsed.responsavelUsuarioId) {
+        // O papel anterior precisa ser lido antes do upsert: é ele que diz se
+        // esta troca de responsável é uma promoção de verdade.
+        const previousRole = await db
+          .prepare(
+            `SELECT papel FROM ministerio_voluntarios
+             WHERE ministerio_id = ? AND usuario_id = ? AND comunidade_id = ?`,
+          )
+          .bind(id, parsed.responsavelUsuarioId, access.context.comunidadeId)
+          .first<{ papel: string }>();
         await db
           .prepare(
             `INSERT INTO ministerio_voluntarios
@@ -244,6 +254,15 @@ export async function PATCH(request: Request, context: Context) {
             parsed.responsavelUsuarioId,
           )
           .run();
+        await recordPromotionNotice(db, {
+          comunidadeId: access.context.comunidadeId,
+          usuarioId: parsed.responsavelUsuarioId,
+          escopo: "MINISTERIO",
+          contexto: parsed.nome,
+          papelAnterior: String(previousRole?.papel || "MEMBRO"),
+          papelNovo: "LIDER",
+          promovidoPor: access.user.id,
+        });
       }
     } catch (error) {
       if (String(error).includes("UNIQUE")) {

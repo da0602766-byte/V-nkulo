@@ -1,6 +1,7 @@
 import { getD1 } from "../../../../db";
 import { hasGlobalMinistryManagement } from "../../../lib/ministry-access";
 import { parseMinistryPayload } from "../../../lib/ministry-validation";
+import { recordPromotionNotice } from "../../../lib/recepcao";
 import { recordTenantAudit } from "../../../lib/tenant-audit";
 import { requireTenantPermission } from "../../../lib/tenant";
 
@@ -294,6 +295,15 @@ export async function POST(request: Request) {
         parsed.responsavelUsuarioId,
       )
       .run();
+    await recordPromotionNotice(db, {
+      comunidadeId: access.context.comunidadeId,
+      usuarioId: parsed.responsavelUsuarioId,
+      escopo: "MINISTERIO",
+      contexto: parsed.nome,
+      papelAnterior: "MEMBRO",
+      papelNovo: "LIDER",
+      promovidoPor: access.user.id,
+    });
     if (parsed.categoria === "ESTACIONAMENTO") {
       const rules = JSON.stringify({ responsavelUsuarioId: parsed.responsavelUsuarioId, instrucoes: "Operação vinculada ao ministério de Estacionamento." });
       await db.prepare(`INSERT INTO estacionamento_configuracoes

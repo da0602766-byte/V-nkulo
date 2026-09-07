@@ -5,17 +5,19 @@ import test from "node:test";
 const source = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
 test("recepção pública usa cabeçalho compacto, conta e ícones responsivos", async () => {
-  const [page, header, mobile, icons, styles] = await Promise.all([
+  const [page, experience, header, mobile, icons, styles] = await Promise.all([
     source("app/page.tsx"),
+    source("app/components/ReceptionExperience.tsx"),
     source("app/components/PublicHeader.tsx"),
     source("app/components/PublicMobileNav.tsx"),
     source("app/components/PublicIcon.tsx"),
     source("app/globals.css"),
   ]);
 
-  assert.match(page, /landing-status-badge/);
-  assert.match(page, /VISUAL DEMONSTRATIVO/);
-  assert.match(page, /id="recursos"/);
+  assert.match(page, /className="vinkulo-reception"/);
+  assert.match(experience, /className="rc-kicker"/);
+  assert.match(experience, /className="rc-stack"/);
+  assert.match(experience, /id="recursos"/);
   assert.match(header, /public-search-menu/);
   assert.match(header, /public-account-menu/);
   assert.match(header, /Sair da plataforma/);

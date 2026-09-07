@@ -268,7 +268,7 @@ test("páginas, temas e responsividade do VÍNKULO permanecem explícitos", asyn
     readFile(new URL("../app/components/LoginCustomizationWorkspace.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(home, /VÍNKULO/);
-  assert.match(home, /A plataforma completa/i);
+  assert.match(home, /vinkulo-reception/);
   assert.match(home, /Cada nova comunidade passa por análise do proprietário/i);
   assert.match(privacy, /Política de Privacidade/);
   assert.match(terms, /Termos de Uso/);
@@ -321,7 +321,7 @@ test("páginas, temas e responsividade do VÍNKULO permanecem explícitos", asyn
   assert.match(loginWorkspace, /Cartão centralizado — padrão V2/);
   assert.match(styles, /\.login-shell\.login-shell-v2/);
   assert.match(styles, /\.login-v2-benefits/);
-  assert.match(home, /O QUE É CONFERIDO/);
+  assert.match(home, /O que é conferido/);
   assert.match(visualEditor, /EDITOR_UI_STORAGE_KEY/);
   assert.match(visualEditor, /setPointerCapture/);
   assert.match(visualEditor, /aria-label="Minimizar editor"/);

@@ -1685,6 +1685,7 @@ export const ministerioLinksReutilizaveis = sqliteTable(
     ministerioId: integer("ministerio_id")
       .notNull()
       .references(() => ministeriosComunidade.id, { onDelete: "cascade" }),
+    itemId: integer("item_id"),
     tipo: text("tipo").notNull(),
     titulo: text("titulo").notNull(),
     url: text("url").notNull(),
@@ -1704,6 +1705,86 @@ export const ministerioLinksReutilizaveis = sqliteTable(
       table.comunidadeId,
       table.ministerioId,
       table.ativo,
+    ),
+  ],
+);
+
+export const ministerioBibliotecaItens = sqliteTable(
+  "ministerio_biblioteca_itens",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    comunidadeId: integer("comunidade_id")
+      .notNull()
+      .references(() => comunidades.id, { onDelete: "cascade" }),
+    ministerioId: integer("ministerio_id")
+      .notNull()
+      .references(() => ministeriosComunidade.id, { onDelete: "cascade" }),
+    titulo: text("titulo").notNull(),
+    ativo: integer("ativo", { mode: "boolean" }).notNull().default(true),
+    criadoPor: integer("criado_por").references(() => usuarios.id, {
+      onDelete: "set null",
+    }),
+    criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+    atualizadoEm: text("atualizado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("ministerio_biblioteca_itens_idx").on(
+      table.comunidadeId,
+      table.ministerioId,
+      table.ativo,
+    ),
+  ],
+);
+
+export const avisosPromocao = sqliteTable(
+  "avisos_promocao",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    comunidadeId: integer("comunidade_id")
+      .notNull()
+      .references(() => comunidades.id, { onDelete: "cascade" }),
+    usuarioId: integer("usuario_id")
+      .notNull()
+      .references(() => usuarios.id, { onDelete: "cascade" }),
+    escopo: text("escopo").notNull().default("COMUNIDADE"),
+    contexto: text("contexto").notNull().default(""),
+    papelAnterior: text("papel_anterior").notNull().default(""),
+    papelNovo: text("papel_novo").notNull(),
+    titulo: text("titulo").notNull().default(""),
+    destaques: text("destaques").notNull().default("[]"),
+    promovidoPor: integer("promovido_por").references(() => usuarios.id, {
+      onDelete: "set null",
+    }),
+    criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+    vistoEm: text("visto_em"),
+  },
+  (table) => [
+    index("avisos_promocao_pendentes_idx").on(
+      table.usuarioId,
+      table.comunidadeId,
+      table.vistoEm,
+    ),
+  ],
+);
+
+export const usuarioIntroducoes = sqliteTable(
+  "usuario_introducoes",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    usuarioId: integer("usuario_id")
+      .notNull()
+      .references(() => usuarios.id, { onDelete: "cascade" }),
+    comunidadeId: integer("comunidade_id").notNull().default(0),
+    tipo: text("tipo").notNull(),
+    status: text("status").notNull().default("CONCLUIDA"),
+    etapa: integer("etapa").notNull().default(0),
+    registradoEm: text("registrado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("usuario_introducoes_unique").on(
+      table.usuarioId,
+      table.tipo,
+      table.comunidadeId,
     ),
   ],
 );
