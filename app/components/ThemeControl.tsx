@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Theme = "CLARO" | "ESCURO" | "AUTO";
 
@@ -15,6 +15,7 @@ export default function ThemeControl({
 }) {
   const [theme, setTheme] = useState<Theme>("AUTO");
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const transitionInProgress = useRef(false);
   const individualKey = themeStorageKey(storageId);
 
   useEffect(() => {
@@ -38,11 +39,16 @@ export default function ThemeControl({
   }, [theme]);
 
   function update(next: Theme, origin?: HTMLElement | null) {
+    if (transitionInProgress.current) return;
+    transitionInProgress.current = true;
+    setIsTransitioning(true);
     setTheme(next);
     window.localStorage.setItem("vinkulo-theme", next);
     if (individualKey) window.localStorage.setItem(individualKey, next);
-    animateThemeChange(next, origin).finally(() => setIsTransitioning(false));
-    setIsTransitioning(true);
+    animateThemeChange(next, origin).finally(() => {
+      transitionInProgress.current = false;
+      setIsTransitioning(false);
+    });
   }
 
   if (cycle) {
@@ -55,6 +61,7 @@ export default function ThemeControl({
           className="active"
           aria-label={`${isDark ? "Tema escuro" : "Tema claro"}. Mudar para ${nextTheme.label}`}
           title={`${isDark ? "Tema escuro" : "Tema claro"} · mudar para ${nextTheme.label}`}
+          disabled={isTransitioning}
           onClick={(event) => update(nextTheme.value, event.currentTarget)}
         >
           <span className="theme-control-glyph" aria-hidden="true"><ThemeGlyph theme={isDark ? "ESCURO" : "CLARO"} /></span>
@@ -78,6 +85,7 @@ export default function ThemeControl({
           aria-label={item.label}
           aria-pressed={theme === item.value}
           title={item.label}
+          disabled={isTransitioning}
           onClick={(event) => update(item.value, event.currentTarget)}
         >
           <span className="theme-control-glyph" aria-hidden="true"><ThemeGlyph theme={item.value} /></span>
@@ -146,7 +154,14 @@ async function animateThemeChange(theme: Theme, origin?: HTMLElement | null) {
     Math.max(y, window.innerHeight - y),
   );
   document.documentElement.classList.add("vinkulo-theme-transitioning");
-  const transition = transitionDocument.startViewTransition(() => applyTheme(theme));
+  let transition: ThemeTransition;
+  try {
+    transition = transitionDocument.startViewTransition(() => applyTheme(theme));
+  } catch {
+    document.documentElement.classList.remove("vinkulo-theme-transitioning");
+    applyTheme(theme);
+    return;
+  }
 
   try {
     await transition.ready;
@@ -158,8 +173,8 @@ async function animateThemeChange(theme: Theme, origin?: HTMLElement | null) {
         ],
       },
       {
-        duration: 720,
-        easing: "cubic-bezier(.22,.72,.18,1)",
+        duration: 380,
+        easing: "cubic-bezier(.2,.78,.2,1)",
         fill: "both",
         pseudoElement: "::view-transition-new(root)",
       } as KeyframeAnimationOptions & { pseudoElement: string },

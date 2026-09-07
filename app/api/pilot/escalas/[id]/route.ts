@@ -381,7 +381,7 @@ export async function PATCH(request: Request, context: Context) {
         { status: 409 },
       );
     }
-    await Promise.all(
+    const notificationResults = await Promise.allSettled(
       recipients.results.map((recipient) =>
         notifyUser(db, {
           userId: Number(recipient.usuario_id),
@@ -394,11 +394,14 @@ export async function PATCH(request: Request, context: Context) {
         }),
       ),
     );
+    if (notificationResults.some((item) => item.status === "rejected")) {
+      console.error(`Escala ${id} publicada, mas uma ou mais notificações falharam.`);
+    }
     await audit("ESCALA_V213_PUBLICADA", {
       escalaId: id,
       ministerioId: schedule.ministerio_id,
       destinatarios: recipients.results.length,
-    });
+    }).catch((auditError) => console.error(`Escala ${id} publicada sem registro de auditoria:`, auditError));
     return Response.json({ ok: true, status: "PUBLICADA" });
   }
 

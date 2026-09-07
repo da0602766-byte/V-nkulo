@@ -13,6 +13,10 @@ import MinistriesWorkspace from "./MinistriesWorkspace";
 import NativeImageUpload from "./NativeImageUpload";
 import VerifiedOwnerName from "./VerifiedOwnerName";
 import {
+  groupScheduleResources,
+  mergeScheduleResourceLinks,
+} from "../lib/schedule-resources";
+import {
   addCalendarEventForDevice,
   downloadFileForDevice,
   shareToWhatsAppApp,
@@ -217,6 +221,7 @@ export default function SecretaryMinisterialWorkspace({
   const [expandedTeamId, setExpandedTeamId] = useState<number | null>(null);
   const [links, setLinks] = useState<SecretaryLink[]>([blankSecretaryLink()]);
   const [libraryItems, setLibraryItems] = useState<SecretaryLibraryItem[]>([]);
+  const [selectedLibraryItemIds, setSelectedLibraryItemIds] = useState<number[]>([]);
   const [scheduleStartsAt, setScheduleStartsAt] = useState("");
   const [scheduleEndsAt, setScheduleEndsAt] = useState("");
   const [scheduleCreatorOpen, setScheduleCreatorOpen] = useState(false);
@@ -417,6 +422,10 @@ export default function SecretaryMinisterialWorkspace({
     () => libraryItems.filter((item) => item.ministerio_id === selectedMinistryId),
     [libraryItems, selectedMinistryId],
   );
+  const selectedLibraryItems = useMemo(
+    () => ministryLibrary.filter((item) => selectedLibraryItemIds.includes(item.id)),
+    [ministryLibrary, selectedLibraryItemIds],
+  );
   const previousChecklistTemplate = useMemo(() => {
     const schedulesByDate = [...ministrySchedules].sort(
       (left, right) => Date.parse(right.inicia_em) - Date.parse(left.inicia_em),
@@ -461,6 +470,7 @@ export default function SecretaryMinisterialWorkspace({
     setSelectedMinistryId(ministry.id);
     setExpandedTeamId(null);
     setLinks([blankSecretaryLink()]);
+    setSelectedLibraryItemIds([]);
     setScheduleCreatorOpen(false);
     setTab(ministry.can_manage ? "painel" : "escalas");
     setError("");
@@ -477,6 +487,7 @@ export default function SecretaryMinisterialWorkspace({
     );
     setSelectedMinistryId(null);
     setLinks([blankSecretaryLink()]);
+    setSelectedLibraryItemIds([]);
     setTeams([]);
     setSelectedTeamId(null);
     setExpandedTeamId(null);
@@ -608,10 +619,26 @@ export default function SecretaryMinisterialWorkspace({
       setError("Etapa 5 — escolha um horário futuro para publicar a escala.");
       return;
     }
-    const repertorio = String(body.repertorio || "")
+    const typedRepertoire = String(body.repertorio || "")
       .split("\n")
       .map((item) => item.trim())
       .filter(Boolean);
+    const repertorio = [...new Set([
+      ...typedRepertoire,
+      ...selectedLibraryItems.map((item) => item.titulo.trim()),
+    ])];
+    const selectedLinks = selectedLibraryItems.flatMap((item) =>
+      item.links.map((link) => ({
+        id: String(link.id),
+        tipo: link.tipo,
+        titulo: item.titulo,
+        url: link.url,
+      })),
+    );
+    const scheduleLinks = mergeScheduleResourceLinks(
+      selectedLinks,
+      links.filter((item) => item.titulo.trim() && item.url.trim()),
+    ) as SecretaryLink[];
     const created = await submit(
       "creating-schedule",
       "/api/pilot/escalas",
@@ -622,7 +649,7 @@ export default function SecretaryMinisterialWorkspace({
         equipeId: selectedTeamId,
         designacoes: assignments,
         repertorio,
-        links: links.filter((item) => item.titulo && item.url),
+        links: scheduleLinks,
         checklist: checklistDraft
           .filter((item) => item.tarefa.trim())
           .map((item) => ({
@@ -641,6 +668,7 @@ export default function SecretaryMinisterialWorkspace({
       setSelectedVolunteers([]);
       setSelectedTeamId(null);
       setLinks([blankSecretaryLink()]);
+      setSelectedLibraryItemIds([]);
       setChecklistDraft([]);
       setScheduleStartsAt("");
       setScheduleEndsAt("");
@@ -975,6 +1003,17 @@ export default function SecretaryMinisterialWorkspace({
     setLinks((current) => current.some((item) => item.url === link.url)
       ? current
       : [...current, { id: crypto.randomUUID(), tipo: link.tipo, titulo: link.titulo, url: link.url }]);
+  }
+
+  function toggleLibraryItem(item: SecretaryLibraryItem) {
+    const selected = selectedLibraryItemIds.includes(item.id);
+    setSelectedLibraryItemIds((current) => selected
+      ? current.filter((id) => id !== item.id)
+      : [...current, item.id]);
+    setError("");
+    setFeedback(selected
+      ? `“${item.titulo}” removida do repertório.`
+      : `✓ “${item.titulo}” selecionada para o repertório com ${item.links.length} link(s).`);
   }
 
   async function submit(
@@ -1567,6 +1606,8 @@ export default function SecretaryMinisterialWorkspace({
                           links={links}
                           setLinks={setLinks}
                           libraryItems={ministryLibrary}
+                          selectedItemIds={selectedLibraryItemIds}
+                          onToggleItem={toggleLibraryItem}
                           onUseSaved={useReusableLink}
                           onRemoveSaved={(link) => void removeReusableLink(link)}
                           onRenameItem={(item, titulo) => void renameLibraryItem(item, titulo)}
@@ -1641,6 +1682,7 @@ export default function SecretaryMinisterialWorkspace({
                       <div><small>Repertório</small><strong>{schedule.repertorio.length} itens</strong></div>
                       <div><small>Checklist</small><strong>{checklist.filter((item) => item.escala_id === schedule.id).length} tarefas</strong></div>
                     </div>
+                    <ScheduleRepertoire schedule={schedule} />
                     <div className="secretary-assignment-status-list">
                       {schedule.designacoes.map((assignment) => (
                         <article key={assignment.id} data-status={assignment.status.toLowerCase()}>
@@ -2076,13 +2118,67 @@ const LINK_ICONS: Record<SecretaryLink["tipo"], { classe: string; caminho: React
 
 function PlatformIcon({ tipo }: { tipo: SecretaryLink["tipo"] }) {
   const icon = LINK_ICONS[tipo] || LINK_ICONS.PERSONALIZADO;
-  return <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">{icon.caminho}</svg>;
+  return <svg viewBox="0 0 24 24" fill="currentColor" focusable="false" aria-hidden="true">{icon.caminho}</svg>;
 }
 
-function LinkBuilder({ links, setLinks, libraryItems, onUseSaved, onRemoveSaved, onRenameItem, onRemoveItem, onSaveCurrent, busy }: {
+function LibraryActionIcon({ name }: { name: "add" | "check" | "edit" | "remove" }) {
+  if (name === "add") {
+    return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>;
+  }
+  if (name === "check") {
+    return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.2 4.2L19 7" /></svg>;
+  }
+  if (name === "edit") {
+    return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.6-10.6a2.1 2.1 0 0 0-3-3L5.2 16 4 20Z" /><path d="m14.5 6.7 2.8 2.8" /></svg>;
+  }
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>;
+}
+
+function ScheduleRepertoire({ schedule }: { schedule: Schedule }) {
+  const resources = groupScheduleResources(schedule.repertorio, schedule.links_recursos);
+  if (!resources.groups.length && !resources.unmatched.length) return null;
+  return (
+    <section className="secretary-schedule-repertoire" aria-label="Repertório e links da escala">
+      <header><strong>Repertório</strong><span>{schedule.repertorio.length} música(s)</span></header>
+      <div>
+        {resources.groups.map((group) => (
+          <article key={group.title}>
+            <strong>{group.title}</strong>
+            <div className="secretary-resource-links">
+              {group.links.map((link) => (
+                <a key={link.id} href={link.url} target="_blank" rel="noreferrer" title={`${linkTypeLabel(link.tipo as SecretaryLink["tipo"])} · ${group.title}`}>
+                  <span className={`platform-icon ${LINK_ICONS[link.tipo as SecretaryLink["tipo"]]?.classe || "lk"} static`}><PlatformIcon tipo={link.tipo as SecretaryLink["tipo"]} /></span>
+                  <span>{linkTypeLabel(link.tipo as SecretaryLink["tipo"])}</span>
+                </a>
+              ))}
+              {!group.links.length && <small>Sem link anexado</small>}
+            </div>
+          </article>
+        ))}
+        {resources.unmatched.length > 0 && (
+          <article>
+            <strong>Outros materiais</strong>
+            <div className="secretary-resource-links">
+              {resources.unmatched.map((link) => (
+                <a key={link.id} href={link.url} target="_blank" rel="noreferrer">
+                  <span className={`platform-icon ${LINK_ICONS[link.tipo as SecretaryLink["tipo"]]?.classe || "lk"} static`}><PlatformIcon tipo={link.tipo as SecretaryLink["tipo"]} /></span>
+                  <span>{link.titulo || linkTypeLabel(link.tipo as SecretaryLink["tipo"])}</span>
+                </a>
+              ))}
+            </div>
+          </article>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function LinkBuilder({ links, setLinks, libraryItems, selectedItemIds, onToggleItem, onUseSaved, onRemoveSaved, onRenameItem, onRemoveItem, onSaveCurrent, busy }: {
   links: SecretaryLink[];
   setLinks: React.Dispatch<React.SetStateAction<SecretaryLink[]>>;
   libraryItems: SecretaryLibraryItem[];
+  selectedItemIds: number[];
+  onToggleItem: (item: SecretaryLibraryItem) => void;
   onUseSaved: (link: ReusableSecretaryLink) => void;
   onRemoveSaved: (link: ReusableSecretaryLink) => void;
   onRenameItem: (item: SecretaryLibraryItem, titulo: string) => void;
@@ -2105,26 +2201,35 @@ function LinkBuilder({ links, setLinks, libraryItems, onUseSaved, onRemoveSaved,
         <header><div><strong>Biblioteca do ministério</strong><small>Cada item reúne todos os links da mesma música ou material.</small></div><span>{libraryItems.length}</span></header>
         {libraryItems.length > 0 && <div className="ministry-library-search"><span aria-hidden="true">⌕</span><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar música ou material…" aria-label="Buscar na biblioteca do ministério" /></div>}
         <div className="ministry-library-list">
-          {filteredItems.map((item) => (
-            <div className="ministry-library-entry" key={item.id}>
-              <div className={`ministry-library-row${openItemId === item.id ? " is-open" : ""}`}>
+          {filteredItems.map((item) => {
+            const selected = selectedItemIds.includes(item.id);
+            return (
+            <div className={`ministry-library-entry${selected ? " is-selected" : ""}`} key={item.id}>
+              <div className={`ministry-library-row${openItemId === item.id ? " is-open" : ""}${selected ? " is-selected" : ""}`}>
                 {renamingId === item.id ? <input className="ministry-library-rename" autoFocus defaultValue={item.titulo} maxLength={120} aria-label="Novo nome do item" onBlur={(event) => { onRenameItem(item, event.target.value); setRenamingId(null); }} onKeyDown={(event) => { if (event.key === "Enter") { onRenameItem(item, event.currentTarget.value); setRenamingId(null); } if (event.key === "Escape") setRenamingId(null); }} /> : <button type="button" className="ministry-library-name" onClick={() => setOpenItemId((current) => current === item.id ? null : item.id)} aria-expanded={openItemId === item.id}>{item.titulo}</button>}
                 <div className="ministry-library-actions">
                   <div className="ministry-library-icons">
                     {item.links.map((link) => <button key={link.id} type="button" className={`platform-icon ${LINK_ICONS[link.tipo]?.classe || "lk"}`} title={`Usar ${linkTypeLabel(link.tipo)}`} onClick={() => onUseSaved(link)}><PlatformIcon tipo={link.tipo} /><span className="sr-only">{linkTypeLabel(link.tipo)}</span></button>)}
-                    <button type="button" className="platform-icon add" title="Adicionar outro link a este item" onClick={() => { setItemTitle(item.titulo); setLinks((current) => [...current, { id: crypto.randomUUID(), tipo: "YOUTUBE", titulo: item.titulo, url: "" }]); }}>+</button>
+                    <button type="button" className="platform-icon add" title="Adicionar outro link a este item" onClick={() => { setItemTitle(item.titulo); setLinks((current) => [...current, { id: crypto.randomUUID(), tipo: "YOUTUBE", titulo: item.titulo, url: "" }]); }}><LibraryActionIcon name="add" /></button>
                   </div>
-                  <button type="button" className="ministry-library-rename-action" title="Renomear item" onClick={() => setRenamingId(item.id)}>✎</button>
-                  <button type="button" className="ministry-library-delete" title="Excluir item" disabled={busy === `removing-library-item-${item.id}`} onClick={() => onRemoveItem(item)}>×</button>
+                  <button type="button" className={`ministry-library-select${selected ? " selected" : ""}`} aria-pressed={selected} onClick={() => onToggleItem(item)}><LibraryActionIcon name="check" /><span>{selected ? "Selecionada" : "Selecionar"}</span></button>
+                  <button type="button" className="ministry-library-rename-action" title="Renomear item" aria-label={`Renomear ${item.titulo}`} onClick={() => setRenamingId(item.id)}><LibraryActionIcon name="edit" /></button>
+                  <button type="button" className="ministry-library-delete" title="Excluir item" aria-label={`Excluir ${item.titulo}`} disabled={busy === `removing-library-item-${item.id}`} onClick={() => onRemoveItem(item)}><LibraryActionIcon name="remove" /></button>
                 </div>
               </div>
               {openItemId === item.id && <div className="ministry-library-detail">{item.links.map((link) => <div key={link.id}><span className={`platform-icon ${LINK_ICONS[link.tipo]?.classe || "lk"} static`}><PlatformIcon tipo={link.tipo} /></span><small>{link.url}</small><button type="button" onClick={() => onUseSaved(link)}>Usar</button><button type="button" className="danger" disabled={busy === `removing-reusable-link-${link.id}`} onClick={() => onRemoveSaved(link)}>Remover</button></div>)}{!item.links.length && <p>Este item ainda não tem links salvos.</p>}</div>}
             </div>
-          ))}
+          );})}
           {!libraryItems.length && <p className="ministry-library-empty">Nenhum item salvo neste ministério.</p>}
           {Boolean(libraryItems.length) && !filteredItems.length && <p className="ministry-library-empty">Nenhum item encontrado para “{search}”.</p>}
         </div>
       </section>
+      {selectedItemIds.length > 0 && (
+        <div className="secretary-selected-repertoire" role="status" aria-live="polite">
+          <strong>{selectedItemIds.length} música(s) selecionada(s)</strong>
+          <span>Os links serão anexados de forma compacta à música na escala.</span>
+        </div>
+      )}
       {links.map((item) => <div className="secretary-link-draft" key={item.id}><select value={item.tipo} onChange={(event) => setLinks((current) => current.map((link) => link.id === item.id ? { ...link, tipo: event.target.value as SecretaryLink["tipo"] } : link))}><option value="YOUTUBE">YouTube</option><option value="SPOTIFY">Spotify</option><option value="CIFRA_CLUB">Cifra Club</option><option value="GOOGLE_DRIVE">Google Drive</option><option value="PERSONALIZADO">Personalizado</option></select><input value={item.titulo} onChange={(event) => setLinks((current) => current.map((link) => link.id === item.id ? { ...link, titulo: event.target.value } : link))} placeholder="Título do recurso" maxLength={100} /><input value={item.url} onChange={(event) => setLinks((current) => current.map((link) => link.id === item.id ? { ...link, url: event.target.value } : link))} placeholder="https://…" type="url" /><div className="secretary-link-draft-actions"><button type="button" aria-label={`Adicionar outro link para ${item.titulo || "este recurso"}`} onClick={() => setLinks((current) => [...current, { id: crypto.randomUUID(), tipo: "YOUTUBE", titulo: item.titulo, url: "" }])}>＋ link</button><button type="button" aria-label="Remover link" onClick={() => setLinks((current) => current.filter((link) => link.id !== item.id))}>×</button></div></div>)}
       <div className="secretary-link-actions"><button type="button" onClick={() => setLinks((current) => [...current, { id: crypto.randomUUID(), tipo: "YOUTUBE", titulo: "", url: "" }])}>+ Nova música ou recurso</button><div className="secretary-library-save"><input value={itemTitle} onChange={(event) => setItemTitle(event.target.value)} placeholder="Nome do item na biblioteca (ex.: Mil Graus)" maxLength={120} aria-label="Nome do item na biblioteca" /><button type="button" disabled={busy === "saving-reusable-links" || !links.some((item) => item.titulo.trim() && item.url.trim())} onClick={() => { onSaveCurrent(itemTitle); setItemTitle(""); }}>{busy === "saving-reusable-links" ? "Salvando…" : "Salvar na biblioteca"}</button></div></div>
     </div>

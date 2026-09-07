@@ -15079,11 +15079,6 @@ html[data-pilot-theme="escuro"] .pilot-dashboard[data-community-palette] {
   cursor:pointer;
 }
 .theme-control button>span { font-size:var(--fs-md); font-weight:900; line-height:1; }
-.theme-control-glyph { width:18px; height:18px; display:grid; place-items:center; transform-origin:center; }
-.theme-control-glyph svg { width:18px; height:18px; display:block; overflow:visible; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
-.theme-control-glyph .theme-sun-core { fill:currentColor; stroke:currentColor; }
-.theme-control-glyph .theme-auto-half { fill:currentColor; stroke:none; }
-.theme-control.is-transitioning .theme-control-glyph { animation:vinkulo-theme-glyph-switch .72s cubic-bezier(.22,.72,.18,1); }
 .theme-control button>small {
   position:absolute;
   width:1px;
@@ -15100,18 +15095,6 @@ html[data-pilot-theme="escuro"] .pilot-dashboard[data-community-palette] {
 .theme-control button:focus-visible {
   outline:2px solid var(--pilot-purple);
   outline-offset:2px;
-}
-@keyframes vinkulo-theme-glyph-switch {
-  0% { opacity:1; transform:rotate(0) scale(1); }
-  42% { opacity:0; transform:rotate(95deg) scale(.55); }
-  58% { opacity:0; transform:rotate(-75deg) scale(.55); }
-  100% { opacity:1; transform:rotate(0) scale(1); }
-}
-::view-transition-old(root),::view-transition-new(root) { animation:none; mix-blend-mode:normal; }
-html.vinkulo-theme-transitioning::view-transition-old(root) { z-index:1; }
-html.vinkulo-theme-transitioning::view-transition-new(root) { z-index:2; }
-@media(prefers-reduced-motion:reduce) {
-  .theme-control.is-transitioning .theme-control-glyph { animation:none; }
 }
 .social-public-header { display:grid; grid-template-columns:auto minmax(240px,480px) auto auto; }
 .social-public-header .theme-control { border-color:#e8e2d8; background:#faf9f6; }
@@ -28731,40 +28714,6 @@ html[data-pilot-theme="escuro"] .owner-feedback-detail>aside { border-color:#4f4
   .social-public-header.reception-header .public-account-menu>summary { width:36px; min-width:36px; height:36px; padding:0; }
   .social-public-header.reception-header .public-account-copy,
   .social-public-header.reception-header .public-account-chevron { display:none; }
-  .social-public-header.reception-header .public-account-menu[open] { position:static; }
-  .social-public-header.reception-header .public-account-menu[open]>.public-account-backdrop {
-    display:block;
-    position:fixed;
-    z-index:198;
-    inset:calc(58px + env(safe-area-inset-top)) 0 0;
-    border:0;
-    background:rgba(4,9,18,.42);
-    padding:0;
-    backdrop-filter:blur(3px);
-    cursor:default;
-  }
-  .social-public-header.reception-header .public-account-menu[open]>summary { position:relative; z-index:201; }
-  .social-public-header.reception-header .public-account-popover {
-    position:fixed;
-    z-index:200;
-    top:calc(66px + env(safe-area-inset-top));
-    right:10px;
-    left:10px;
-    width:auto;
-    max-height:calc(100dvh - 82px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-    display:grid;
-    overflow:auto;
-    border-color:var(--reception-line);
-    background:var(--reception-surface);
-    color:var(--reception-text);
-    padding:9px;
-    box-shadow:0 28px 80px rgba(2,7,16,.42);
-    isolation:isolate;
-    overscroll-behavior:contain;
-    animation:public-account-sheet-in .2s ease-out;
-  }
-  .social-public-header.reception-header .public-account-popover>header { padding:10px 9px 14px; }
-  .social-public-header.reception-header .public-account-popover>a { min-height:46px; font-size:.76rem; }
   .social-public-header.reception-header .theme-control-cycle { width:36px; min-width:36px; padding:2px; }
   .social-public-header.reception-header .theme-control-cycle button { width:30px; height:30px; }
   .social-public-header.reception-header .public-search-menu .public-global-search { position:fixed; z-index:190; top:calc(60px + env(safe-area-inset-top)); left:10px; width:calc(100vw - 20px); }
@@ -28779,15 +28728,6 @@ html[data-pilot-theme="escuro"] .owner-feedback-detail>aside { border-color:#4f4
   .landing-features article>button { padding:18px; }
   .parking-map-panel:has(.parking-free-position-canvas) { inset:8px 8px calc(76px + env(safe-area-inset-bottom)); }
   .parking-map section>div.parking-free-position-canvas { height:220px; overflow:auto; }
-}
-.public-account-backdrop { display:none; }
-.public-account-menu:not([open])>.public-account-backdrop { display:none; }
-@keyframes public-account-sheet-in {
-  from { opacity:0; transform:translateY(-8px) scale(.985); }
-  to { opacity:1; transform:none; }
-}
-@media(prefers-reduced-motion:reduce) {
-  .social-public-header.reception-header .public-account-popover { animation:none; }
 }
 
 /* Preferências individuais: tema compacto e lupa lado a lado no menu da conta. */

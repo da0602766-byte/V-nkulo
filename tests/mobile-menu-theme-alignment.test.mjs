@@ -8,7 +8,7 @@ const source = (path) => readFile(new URL(path, root), "utf8");
 test("menu público móvel abre em camada legível acima da recepção", async () => {
   const [header, css] = await Promise.all([
     source("app/components/PublicHeader.tsx"),
-    source("app/globals.css"),
+    Promise.all([source("app/globals.css"), source("app/interface-fixes.css")]).then((parts) => parts.join("\n")),
   ]);
 
   assert.match(header, /className="public-account-menu"/);
@@ -34,7 +34,7 @@ test("ícones da biblioteca ministerial formam um grupo centralizado no celular"
 test("troca de tema usa revelação circular e respeita movimento reduzido", async () => {
   const [control, css] = await Promise.all([
     source("app/components/ThemeControl.tsx"),
-    source("app/globals.css"),
+    Promise.all([source("app/globals.css"), source("app/interface-fixes.css")]).then((parts) => parts.join("\n")),
   ]);
 
   assert.match(control, /startViewTransition/);
