@@ -7,10 +7,12 @@ const secretaryCss = readFileSync("app/secretary.css", "utf8");
 const globals = readFileSync("app/globals.css", "utf8");
 
 test("a biblioteca agrupa vários links no mesmo recurso", () => {
-  assert.match(secretary, /ReusableSecretaryLinkGroup/);
-  assert.match(secretary, /savedGroups\.map/);
-  assert.match(secretary, /group\.links\.map/);
-  assert.match(secretary, /Adicionar outro link para/);
+  assert.match(secretary, /SecretaryLibraryItem/);
+  assert.match(secretary, /libraryItems\.filter/);
+  assert.match(secretary, /item\.links\.map/);
+  assert.match(secretary, /Adicionar outro link a este item/);
+  assert.match(secretary, /selectedLibraryItemIds/);
+  assert.match(secretary, /Selecionada/);
   assert.match(secretary, /Salvar na biblioteca/);
   assert.match(secretaryCss, /secretary-saved-link-chips/);
 });

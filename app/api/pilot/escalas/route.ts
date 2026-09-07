@@ -508,58 +508,74 @@ async function createSchedule(request: Request) {
     .run();
   const scheduleId = Number(result.meta.last_row_id);
   const assignmentIds = new Map<number, number>();
-  for (const assignment of validatedAssignments) {
-    const assignmentResult = await db
-      .prepare(
-        `INSERT INTO escala_designacoes
-         (comunidade_id, escala_id, voluntario_id, usuario_id, funcao, status, ativo)
-         VALUES (?, ?, ?, ?, ?, 'PENDENTE', 1)`,
-      )
-      .bind(
-        access.context.comunidadeId,
-        scheduleId,
+  const notificationRecipients: number[] = [];
+  try {
+    for (const assignment of validatedAssignments) {
+      const assignmentResult = await db
+        .prepare(
+          `INSERT INTO escala_designacoes
+           (comunidade_id, escala_id, voluntario_id, usuario_id, funcao, status, ativo)
+           VALUES (?, ?, ?, ?, ?, 'PENDENTE', 1)`,
+        )
+        .bind(
+          access.context.comunidadeId,
+          scheduleId,
+          assignment.id,
+          assignment.usuarioId,
+          assignment.funcao,
+        )
+        .run();
+      assignmentIds.set(
         assignment.id,
-        assignment.usuarioId,
-        assignment.funcao,
-      )
-      .run();
-    assignmentIds.set(
-      assignment.id,
-      Number(assignmentResult.meta.last_row_id),
-    );
-    if (parsed.status === "PUBLICADA") {
-      await notifyUser(db, {
-        userId: assignment.usuarioId,
+        Number(assignmentResult.meta.last_row_id),
+      );
+      notificationRecipients.push(assignment.usuarioId);
+    }
+    const effectiveChecklist = [
+      ...checklist.map((tarefa) => ({ tarefa, voluntarioId: null })),
+      ...parsed.checklist,
+    ];
+    for (const task of effectiveChecklist) {
+      await db
+        .prepare(
+          `INSERT INTO ministerio_checklist_itens
+           (comunidade_id, escala_id, designacao_id, tarefa, atualizado_por)
+           VALUES (?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          access.context.comunidadeId,
+          scheduleId,
+          task.voluntarioId
+            ? assignmentIds.get(task.voluntarioId) || null
+            : null,
+          task.tarefa,
+          access.user.id,
+        )
+        .run();
+    }
+  } catch (error) {
+    await db.batch([
+      db.prepare("DELETE FROM ministerio_checklist_itens WHERE escala_id = ? AND comunidade_id = ?").bind(scheduleId, access.context.comunidadeId),
+      db.prepare("DELETE FROM escala_designacoes WHERE escala_id = ? AND comunidade_id = ?").bind(scheduleId, access.context.comunidadeId),
+      db.prepare("DELETE FROM escalas_ministerio WHERE id = ? AND comunidade_id = ?").bind(scheduleId, access.context.comunidadeId),
+    ]).catch((cleanupError) => console.error("Falha ao limpar escala incompleta:", cleanupError));
+    throw error;
+  }
+  if (parsed.status === "PUBLICADA") {
+    const notificationResults = await Promise.allSettled(
+      notificationRecipients.map((userId) => notifyUser(db, {
+        userId,
         title: "Nova escala ministerial",
         message: `Você foi escalado para “${parsed.titulo}”.`,
         entityId: scheduleId,
         area: "ESCALAS",
         destination: "/painel?view=ministerios",
         createdBy: String(access.user.id),
-      });
+      })),
+    );
+    if (notificationResults.some((item) => item.status === "rejected")) {
+      console.error(`Escala ${scheduleId} publicada, mas uma ou mais notificações falharam.`);
     }
-  }
-  const effectiveChecklist = [
-    ...checklist.map((tarefa) => ({ tarefa, voluntarioId: null })),
-    ...parsed.checklist,
-  ];
-  for (const task of effectiveChecklist) {
-    await db
-      .prepare(
-        `INSERT INTO ministerio_checklist_itens
-         (comunidade_id, escala_id, designacao_id, tarefa, atualizado_por)
-         VALUES (?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        access.context.comunidadeId,
-        scheduleId,
-        task.voluntarioId
-          ? assignmentIds.get(task.voluntarioId) || null
-          : null,
-        task.tarefa,
-        access.user.id,
-      )
-      .run();
   }
   await recordTenantAudit(
     db,
@@ -578,7 +594,7 @@ async function createSchedule(request: Request) {
       repertorioItens: parsed.repertorio.length,
       links: parsed.links.length,
     },
-  );
+  ).catch((auditError) => console.error(`Escala ${scheduleId} salva sem registro de auditoria:`, auditError));
   return Response.json({ id: scheduleId }, { status: 201 });
 }
 
@@ -598,7 +614,7 @@ async function publishDueSchedules(db: D1Database, communityId: number) {
       `SELECT DISTINCT usuario_id FROM escala_designacoes
        WHERE escala_id=? AND comunidade_id=? AND ativo=1`,
     ).bind(schedule.id,communityId).all<{ usuario_id: number }>();
-    await Promise.all(recipients.results.map((recipient) => notifyUser(db, {
+    const notificationResults = await Promise.allSettled(recipients.results.map((recipient) => notifyUser(db, {
       userId: Number(recipient.usuario_id),
       title: "Nova escala ministerial",
       message: `Você foi escalado para “${schedule.titulo}”.`,
@@ -607,6 +623,9 @@ async function publishDueSchedules(db: D1Database, communityId: number) {
       destination: "/painel?view=ministerios",
       createdBy: "publicacao-agendada",
     })));
+    if (notificationResults.some((item) => item.status === "rejected")) {
+      console.error(`Escala agendada ${schedule.id} publicada, mas uma ou mais notificações falharam.`);
+    }
   }
 }
 

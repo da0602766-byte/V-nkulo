@@ -3,6 +3,7 @@ import { getD1 } from "../../../db";
 import SharedScheduleAccessGate from "../../components/SharedScheduleAccessGate";
 import SharedSchedulePendingState from "../../components/SharedSchedulePendingState";
 import { getSecretaryScheduleDetail } from "../../lib/secretary-schedule";
+import { groupScheduleResources } from "../../lib/schedule-resources";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -47,6 +48,10 @@ export default async function SharedSchedulePage({
   }
   const schedule = await getSecretaryScheduleDetail(db, Number(row.id));
   if (!schedule) notFound();
+  const scheduleResources = groupScheduleResources(
+    schedule.repertorio,
+    schedule.links_recursos,
+  );
   return (
     <SharedScheduleAccessGate
       opensAt={new Date(accessWindow.opensAt).toISOString()}
@@ -86,9 +91,24 @@ export default async function SharedSchedulePage({
           </section>
           <section>
             <p className="pilot-kicker">REPERTÓRIO</p>
-            <h2>Conteúdo preparado</h2>
-            {schedule.repertorio.length ? (
-              <ol>{schedule.repertorio.map((item) => <li key={item}>{item}</li>)}</ol>
+            <h2>Músicas e materiais</h2>
+            {scheduleResources.groups.length ? (
+              <ol className="shared-secretary-repertoire">
+                {scheduleResources.groups.map((group) => (
+                  <li key={group.title}>
+                    <strong>{group.title}</strong>
+                    {group.links.length > 0 && (
+                      <div className="shared-secretary-sublinks">
+                        {group.links.map((link) => (
+                          <a key={link.id} href={link.url} target="_blank" rel="noreferrer">
+                            {linkTypeLabel(link.tipo)}
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ol>
             ) : <p>Nenhum item informado.</p>}
           </section>
           <section>
@@ -103,17 +123,17 @@ export default async function SharedSchedulePage({
               ))}
             </ul>
           </section>
-          <section>
+          {scheduleResources.unmatched.length > 0 && <section>
             <p className="pilot-kicker">LINKS</p>
-            <h2>Materiais e recursos</h2>
+            <h2>Outros materiais</h2>
             <div className="shared-secretary-links">
-              {schedule.links_recursos.map((item) => (
+              {scheduleResources.unmatched.map((item) => (
                 <a key={item.id} href={item.url} target="_blank" rel="noreferrer">
-                  {item.titulo}<span>{item.tipo.replaceAll("_", " ")}</span>
+                  {item.titulo}<span>{linkTypeLabel(item.tipo)}</span>
                 </a>
               ))}
             </div>
-          </section>
+          </section>}
         </div>
         <footer>Visualização somente leitura · nenhum dado de contato é exibido.</footer>
       </main>
@@ -173,5 +193,17 @@ function statusLabel(value: unknown) {
       FEITO: "Feito",
       NAO_FEITO: "Não feito",
     }[String(value || "")] || String(value || "")
+  );
+}
+
+function linkTypeLabel(value: string) {
+  return (
+    {
+      YOUTUBE: "YouTube",
+      SPOTIFY: "Spotify",
+      CIFRA_CLUB: "Cifra Club",
+      GOOGLE_DRIVE: "Google Drive",
+      PERSONALIZADO: "Abrir link",
+    }[value] || value.replaceAll("_", " ")
   );
 }

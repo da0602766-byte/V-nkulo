@@ -5,6 +5,7 @@ import {
   Instrument_Sans,
 } from "next/font/google";
 import "./globals.css";
+import "./interface-fixes.css";
 import "./secretary.css";
 import "./recepcao.css";
 import SmartScrollHeader from "./components/SmartScrollHeader";
