@@ -63,6 +63,11 @@ export async function GET(request: Request) {
     Number.isInteger(requestedScheduleSize) && requestedScheduleSize > 0
       ? Math.min(requestedScheduleSize, SCHEDULE_MAX_PAGE_SIZE)
       : SCHEDULE_PAGE_SIZE;
+  // A Central mostra só as escalas em que a pessoa tem participação pendente, e
+  // mostrava quatro depois de baixar o teto inteiro. Com o filtro no SQL ela
+  // pede exatamente o que exibe.
+  const onlyMyPending =
+    scheduleAddress.searchParams.get("filtro") === "minhas-pendentes";
   const globalManager = hasGlobalMinistryManagement(access.context);
   const visibilitySql = `(
     ? = 1
@@ -144,6 +149,21 @@ export async function GET(request: Request) {
       WHERE s.comunidade_id = ? AND s.status != 'ARQUIVADA' AND ${visibilitySql}
         AND (
           ? = 0
+          OR (
+            s.status IN ('PUBLICADA', 'AGUARDANDO_CHECKLIST')
+            AND datetime(s.termina_em) >= datetime('now')
+            AND EXISTS (
+              SELECT 1 FROM escala_designacoes pendente
+              WHERE pendente.escala_id = s.id
+                AND pendente.comunidade_id = s.comunidade_id
+                AND pendente.usuario_id = ?
+                AND pendente.status = 'PENDENTE'
+                AND pendente.ativo = 1
+            )
+          )
+        )
+        AND (
+          ? = 0
           OR s.inicia_em > ?
           OR (s.inicia_em = ? AND s.id > ?)
         )
@@ -163,6 +183,8 @@ export async function GET(request: Request) {
       access.user.id,
       access.user.id,
       access.user.id,
+      access.user.id,
+      onlyMyPending ? 1 : 0,
       access.user.id,
       scheduleCursor ? 1 : 0,
       scheduleCursor?.inicio ?? "",

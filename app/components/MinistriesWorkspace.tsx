@@ -158,6 +158,12 @@ export default function MinistriesWorkspace({
   const [availableUsers, setAvailableUsers] = useState<AvailableUser[]>([]);
   const [canCreate, setCanCreate] = useState(false);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
+  // Acima do tamanho do lote as escalas seguintes simplesmente não chegavam, e
+  // a tela não tinha como saber que faltava algo. O cursor deixa isso visível e
+  // permite trazer o resto sem perder os filtros, que operam sobre tudo o que
+  // já está carregado.
+  const [schedulesCursor, setSchedulesCursor] = useState<string | null>(null);
+  const [loadingSchedules, setLoadingSchedules] = useState(false);
   const [scheduleVolunteers, setScheduleVolunteers] = useState<
     ScheduleVolunteer[]
   >([]);
@@ -198,6 +204,7 @@ export default function MinistriesWorkspace({
       const schedulesPayload = (await schedulesResponse.json()) as {
         escalas?: Schedule[];
         voluntarios?: ScheduleVolunteer[];
+        nextCursor?: string | null;
         error?: string;
       };
       const resourcesPayload = (await resourcesResponse.json()) as {
@@ -226,6 +233,7 @@ export default function MinistriesWorkspace({
       setAvailableUsers(ministriesPayload.availableUsers || []);
       setCanCreate(Boolean(ministriesPayload.canCreate));
       setSchedules(schedulesPayload.escalas || []);
+      setSchedulesCursor(schedulesPayload.nextCursor || null);
       setScheduleVolunteers(schedulesPayload.voluntarios || []);
       setFunctions(resourcesPayload.funcoes || []);
       setTemplates(resourcesPayload.modelos || []);
@@ -241,6 +249,30 @@ export default function MinistriesWorkspace({
     const timer = window.setTimeout(() => void loadData(), 0);
     return () => window.clearTimeout(timer);
   }, [loadData]);
+
+  const loadMoreSchedules = useCallback(async () => {
+    if (!schedulesCursor) return;
+    setLoadingSchedules(true);
+    try {
+      const address = new URL("/api/pilot/escalas", window.location.origin);
+      address.searchParams.set("cursor", schedulesCursor);
+      const response = await fetch(address, { cache: "no-store" });
+      const payload = (await response.json()) as {
+        escalas?: Schedule[];
+        nextCursor?: string | null;
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(payload.error || "Não foi possível carregar mais escalas.");
+      }
+      setSchedules((current) => [...current, ...(payload.escalas || [])]);
+      setSchedulesCursor(payload.nextCursor || null);
+    } catch (loadError) {
+      setError((loadError as Error).message);
+    } finally {
+      setLoadingSchedules(false);
+    }
+  }, [schedulesCursor]);
 
   const manageableMinistries = useMemo(
     () =>
@@ -1323,6 +1355,19 @@ export default function MinistriesWorkspace({
             </div>
           )}
         </>
+      )}
+
+      {!loading && schedulesCursor && (
+        <div className="schedule-load-more">
+          <button
+            type="button"
+            className="event-inline-action"
+            disabled={loadingSchedules}
+            onClick={() => void loadMoreSchedules()}
+          >
+            {loadingSchedules ? "Carregando escalas…" : "Carregar mais escalas"}
+          </button>
+        </div>
       )}
     </section>
   );

@@ -5437,3 +5437,110 @@ test("solicitações paginam por cursor respeitando o agrupamento por status", a
 
   database.close();
 });
+
+// A Central mostra no máximo quatro escalas com participação pendente, e antes
+// baixava o lote inteiro para descartar o resto no navegador. O filtro precisa
+// resolver isso no SQL sem afrouxar visibilidade: escala de outra pessoa, já
+// respondida ou encerrada não pode entrar.
+test("filtro minhas-pendentes devolve só escalas com resposta pendente da pessoa", async () => {
+  const { database, d1 } = await createPilotD1();
+  const pastorId = await createPilotUser(database, {
+    nome: "Pastor Filtro Pendentes",
+    email: "pastor.filtro@example.test",
+    senha: "Pastor123",
+    memberships: [{ comunidadeId: 1, papel: "PASTOR" }],
+  });
+  const outroId = await createPilotUser(database, {
+    nome: "Outro Filtro Pendentes",
+    email: "outro.filtro@example.test",
+    senha: "Outro123",
+    memberships: [{ comunidadeId: 1, papel: "MEMBRO" }],
+  });
+
+  const ministerioId = database
+    .prepare(
+      `INSERT INTO ministerios_comunidade
+        (comunidade_id, nome, categoria, status, responsavel_usuario_id)
+       VALUES (1, 'Ministerio Filtro', 'GERAL', 'ATIVO', ?) RETURNING id`,
+    )
+    .get(pastorId).id;
+  const voluntario = (usuarioId) =>
+    database
+      .prepare(
+        `INSERT INTO ministerio_voluntarios
+          (comunidade_id, ministerio_id, usuario_id, funcao, papel, ativo)
+         VALUES (1, ?, ?, 'Apoio', 'VOLUNTARIO', 1) RETURNING id`,
+      )
+      .get(ministerioId, usuarioId).id;
+  const meuVoluntario = voluntario(pastorId);
+  const outroVoluntario = voluntario(outroId);
+
+  const criarEscala = (titulo, inicio, fim, status) =>
+    database
+      .prepare(
+        `INSERT INTO escalas_ministerio
+          (comunidade_id, ministerio_id, titulo, inicia_em, termina_em,
+           status, responsavel_usuario_id, criado_por)
+         VALUES (1, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+      )
+      .get(ministerioId, titulo, inicio, fim, status, pastorId, pastorId).id;
+  const designar = (escalaId, volId, usuarioId, status) =>
+    database
+      .prepare(
+        `INSERT INTO escala_designacoes
+          (comunidade_id, escala_id, voluntario_id, usuario_id, funcao, status, ativo)
+         VALUES (1, ?, ?, ?, 'Apoio', ?, 1)`,
+      )
+      .run(escalaId, volId, usuarioId, status);
+
+  // Única que deve aparecer: futura, publicada, minha e pendente.
+  const esperada = criarEscala("Pendente Minha", "2027-05-01 09:00:00", "2027-05-01 11:00:00", "PUBLICADA");
+  designar(esperada, meuVoluntario, pastorId, "PENDENTE");
+
+  // Já respondida por mim.
+  const confirmada = criarEscala("Confirmada Minha", "2027-05-02 09:00:00", "2027-05-02 11:00:00", "PUBLICADA");
+  designar(confirmada, meuVoluntario, pastorId, "CONFIRMADA");
+
+  // Pendente, mas de outra pessoa.
+  const deOutro = criarEscala("Pendente De Outro", "2027-05-03 09:00:00", "2027-05-03 11:00:00", "PUBLICADA");
+  designar(deOutro, outroVoluntario, outroId, "PENDENTE");
+
+  // Pendente minha, porém já encerrada.
+  const passada = criarEscala("Pendente Encerrada", "2020-01-01 09:00:00", "2020-01-01 11:00:00", "PUBLICADA");
+  designar(passada, meuVoluntario, pastorId, "PENDENTE");
+
+  // Pendente minha, mas ainda em rascunho.
+  const rascunho = criarEscala("Pendente Rascunho", "2027-05-04 09:00:00", "2027-05-04 11:00:00", "RASCUNHO");
+  designar(rascunho, meuVoluntario, pastorId, "PENDENTE");
+
+  const worker = await loadWorker();
+  const env = createEnv(d1);
+  const cookie = await login(worker, env, "pastor.filtro@example.test", "Pastor123");
+
+  const response = await worker.fetch(
+    new Request("http://localhost/api/pilot/escalas?filtro=minhas-pendentes&limite=4", {
+      headers: { cookie },
+    }),
+    env,
+    context,
+  );
+  assert.equal(response.status, 200);
+  const filtrado = await response.json();
+  assert.deepEqual(
+    filtrado.escalas.map((escala) => escala.titulo),
+    ["Pendente Minha"],
+  );
+
+  // Sem o filtro, o pastor continua enxergando as demais: o filtro reduz o que
+  // é pedido, não o que a pessoa tem direito de ver.
+  const semFiltro = await worker.fetch(
+    new Request("http://localhost/api/pilot/escalas", { headers: { cookie } }),
+    env,
+    context,
+  );
+  const completo = await semFiltro.json();
+  assert.ok(completo.escalas.length > filtrado.escalas.length);
+  assert.ok(completo.escalas.some((escala) => escala.titulo === "Pendente De Outro"));
+
+  database.close();
+});

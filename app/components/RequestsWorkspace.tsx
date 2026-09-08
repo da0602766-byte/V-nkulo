@@ -74,6 +74,11 @@ const EMPTY_CENTRAL: CentralData = {
 
 export default function RequestsWorkspace({ communityName }: { communityName: string }) {
   const [items, setItems] = useState<CommunityRequest[]>([]);
+  // Acima do tamanho do lote as solicitações seguintes não chegavam, sem a tela
+  // ter como saber. Os filtros e contadores desta tela operam sobre a lista
+  // inteira carregada, então o cursor traz o resto em vez de reduzir o lote.
+  const [requestsCursor, setRequestsCursor] = useState<string | null>(null);
+  const [loadingMoreRequests, setLoadingMoreRequests] = useState(false);
   const [central, setCentral] = useState<CentralData>(EMPTY_CENTRAL);
   const [canManage, setCanManage] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -119,11 +124,12 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
         fetch("/api/pilot/solicitacoes", { cache: "no-store" }),
         fetch("/api/pilot/solicitacoes/central", { cache: "no-store" }),
       ]);
-      const requestsPayload = await requestsResponse.json() as { solicitacoes?: CommunityRequest[]; canManage?: boolean; audienceOptions?: AudienceOptions; error?: string };
+      const requestsPayload = await requestsResponse.json() as { solicitacoes?: CommunityRequest[]; nextCursor?: string | null; canManage?: boolean; audienceOptions?: AudienceOptions; error?: string };
       const centralPayload = await centralResponse.json() as CentralData & { error?: string };
       if (!requestsResponse.ok) throw new Error(requestsPayload.error || "Não foi possível carregar os pedidos. Tente novamente.");
       if (!centralResponse.ok) throw new Error(centralPayload.error || "Não foi possível carregar os pedidos. Tente novamente.");
       setItems(requestsPayload.solicitacoes || []);
+      setRequestsCursor(requestsPayload.nextCursor || null);
       setCanManage(Boolean(requestsPayload.canManage));
       setAudienceOptions(requestsPayload.audienceOptions || { usuarios: [], ministerios: [], papeis: [], allowAllMembers: false });
       setCentral(centralPayload);
@@ -137,6 +143,21 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
   }, []);
 
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
+
+  const loadMoreRequests = useCallback(async () => {
+    if (!requestsCursor) return;
+    setLoadingMoreRequests(true);
+    try {
+      const address = new URL("/api/pilot/solicitacoes", window.location.origin);
+      address.searchParams.set("cursor", requestsCursor);
+      const response = await fetch(address, { cache: "no-store" });
+      const payload = await response.json() as { solicitacoes?: CommunityRequest[]; nextCursor?: string | null; error?: string };
+      if (!response.ok) throw new Error(payload.error || "Não foi possível carregar mais pedidos.");
+      setItems((current) => [...current, ...(payload.solicitacoes || [])]);
+      setRequestsCursor(payload.nextCursor || null);
+    } catch (caught) { setError((caught as Error).message); }
+    finally { setLoadingMoreRequests(false); }
+  }, [requestsCursor]);
   useEffect(() => {
     const open = () => { setMode("member"); openCreate("ORACAO"); };
     window.addEventListener("vinkulo:new-request", open);
@@ -343,6 +364,14 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
       {advancedOpen && <section className="request-advanced-filters" aria-label="Filtros avançados"><label>Status<select value={advancedStatus} onChange={(event) => setAdvancedStatus(event.target.value)}><option value="">Todos</option>{allOperationalStatuses.map((status) => <option key={status} value={status}>{statusLabel({ status } as OperationalRow)}</option>)}</select></label><label>Responsável<select value={advancedOwner} onChange={(event) => setAdvancedOwner(event.target.value)}><option value="">Todos</option>{central.assignees.map((person) => <option key={person.id} value={person.id}>{person.nome}</option>)}</select></label><label>Recebidos desde<input type="date" value={advancedPeriod} onChange={(event) => setAdvancedPeriod(event.target.value)} /></label><label className="request-filter-check"><input type="checkbox" checked={onlyUnassigned} onChange={(event) => setOnlyUnassigned(event.target.checked)} />Sem responsável</label><button type="button" onClick={() => { setAdvancedStatus(""); setAdvancedOwner(""); setAdvancedPeriod(""); setOnlyUnassigned(false); }}>Limpar filtros</button></section>}
 
       {filteredRows.length ? <><div className="request-operations-table" role="region" aria-label="Pedidos para atendimento"><table><thead><tr><th>Pessoa</th><th>Categoria</th><th>Responsável</th><th>Data</th><th>Status</th><th>Observação</th><th><span className="sr-only">Ações</span></th></tr></thead><tbody>{filteredRows.map((row) => <tr key={row.key} className={row.priority === "URGENTE" ? "urgent" : ""} onClick={() => openOperationalDetail(row)}><td><Avatar name={row.person} photo={row.photo} /><span><strong>{row.person}</strong><small>{roleLabel(row.role)}</small></span></td><td>{requestType(row.category)}</td><td>{row.owner || <em>Sem responsável</em>}</td><td>{formatDate(row.date)}</td><td><StatusChip label={statusLabel(row)} tone={statusTone(row.status, row.priority, row.overdue)} />{row.overdue && <small className="request-overdue">Retorno atrasado</small>}</td><td>{row.note || row.description}</td><td><button type="button" aria-label={`Abrir pedido de ${row.person}`} onClick={(event) => { event.stopPropagation(); openOperationalDetail(row); }}>•••</button></td></tr>)}</tbody></table></div><div className="request-mobile-list">{filteredRows.map((row) => <button type="button" key={row.key} onClick={() => openOperationalDetail(row)}><Avatar name={row.person} photo={row.photo} /><div><strong>{row.person}</strong><small>{requestType(row.category)} · {row.owner || "Sem responsável"}</small><p>{row.title}</p></div><StatusChip label={row.overdue ? "Retorno atrasado" : statusLabel(row)} tone={statusTone(row.status, row.priority, row.overdue)} /><time>{shortDate(row.date)}</time></button>)}</div></> : <div className="request-empty-operations"><RequestIcon type="search" /><strong>Nenhuma solicitação encontrada com esses filtros.</strong><button type="button" onClick={() => { setSearch(""); setQuickFilter("TODOS"); setAdvancedStatus(""); setAdvancedOwner(""); setAdvancedPeriod(""); setOnlyUnassigned(false); }}>Limpar busca e filtros</button></div>}
+      {requestsCursor && (
+        <div className="request-load-more">
+          <button type="button" disabled={loadingMoreRequests} onClick={() => void loadMoreRequests()}>
+            {loadingMoreRequests ? "Carregando pedidos…" : "Carregar mais pedidos"}
+          </button>
+          <small>Os filtros acima consideram tudo o que já foi carregado.</small>
+        </div>
+      )}
 
       {central.canManageRepositories && central.repositories.some((repository) => repository.status === "SUGERIDO") && <details className="request-repository-settings"><summary>Configurar repositórios de oração e visita</summary><div>{central.repositories.filter((repository) => repository.status === "SUGERIDO").map((repository) => <article key={repository.id}><span className="request-repository-icon"><RequestIcon type={repository.tipo === "ORACAO" ? "prayer" : "people"} /></span><div><strong>{repository.nome}</strong><small>Escolha um ministério responsável, se necessário.</small></div><select value={repositoryMinistries[repository.id] || ""} onChange={(event) => setRepositoryMinistries((current) => ({ ...current, [repository.id]: event.target.value }))}><option value="">Sem ministério definido</option>{central.ministries.map((ministry) => <option key={ministry.id} value={ministry.id}>{ministry.nome}</option>)}</select><button type="button" disabled={busy === `repository-${repository.id}`} onClick={() => void requestAction(`repository-${repository.id}`, "/api/pilot/solicitacoes/central", { action: "CONFIRMAR_REPOSITORIO", repositoryId: repository.id, ministryId: Number(repositoryMinistries[repository.id]) || null }, `${repository.nome} criado com sucesso.`)}>Confirmar criação</button></article>)}</div></details>}
       {canManage && <p className="request-retention-note">Pedidos concluídos permanecem disponíveis por 30 dias antes da limpeza automática.</p>}
