@@ -5,9 +5,7 @@
 # scripts/pre-publicacao.sh faz. Sem o build, 39 testes falham por falta do
 # artefato e não por defeito — não os adicione aqui.
 #
-# Medido com build em 5b445e3 (main): 286 passam, 1 falha.
+# Medido com build em 51543b7 (main): 317 passam, 0 falham.
 #
 # Se um nome novo aparecer, é regressão e precisa ser investigada antes de
 # publicar. Se um daqui voltar a passar, remova a linha.
-
-banner público é exibido inteiro e apresentação respeita margens móveis
