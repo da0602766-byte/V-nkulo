@@ -2723,13 +2723,66 @@ test("ministérios e escalas respeitam liderança, tenant e conflitos de horári
       )
       .run(ministry.id, leaderId).lastInsertRowid,
   );
-  database
-    .prepare(
-      `INSERT INTO ministerio_equipe_membros
-       (comunidade_id, ministerio_id, equipe_id, voluntario_id)
-       VALUES (1, ?, ?, ?)`,
-    )
-    .run(ministry.id, teamId, volunteerRow.id);
+  const invalidTeamMembersResponse = await worker.fetch(
+    new Request(
+      `http://localhost/api/pilot/ministerios/equipes/${teamId}`,
+      {
+        method: "PATCH",
+        headers: {
+          cookie: leaderCookie,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          acao: "DEFINIR_MEMBROS",
+          voluntarioIds: [volunteerRow.id, 999999],
+        }),
+      },
+    ),
+    env,
+    context,
+  );
+  assert.equal(invalidTeamMembersResponse.status, 400);
+  assert.equal(
+    (await invalidTeamMembersResponse.json()).error,
+    "Um integrante selecionado não pertence ao ministério.",
+  );
+  assert.equal(
+    database
+      .prepare(
+        `SELECT COUNT(*) AS total FROM ministerio_equipe_membros WHERE equipe_id = ?`,
+      )
+      .get(teamId).total,
+    0,
+  );
+
+  const defineTeamMembersResponse = await worker.fetch(
+    new Request(
+      `http://localhost/api/pilot/ministerios/equipes/${teamId}`,
+      {
+        method: "PATCH",
+        headers: {
+          cookie: leaderCookie,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          acao: "DEFINIR_MEMBROS",
+          voluntarioIds: [volunteerRow.id],
+        }),
+      },
+    ),
+    env,
+    context,
+  );
+  assert.equal(defineTeamMembersResponse.status, 200);
+  assert.deepEqual(
+    database
+      .prepare(
+        `SELECT voluntario_id FROM ministerio_equipe_membros WHERE equipe_id = ?`,
+      )
+      .all(teamId)
+      .map((row) => row.voluntario_id),
+    [volunteerRow.id],
+  );
   const createTeamScheduleResponse = await worker.fetch(
     new Request("http://localhost/api/pilot/escalas", {
       method: "POST",

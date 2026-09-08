@@ -22,45 +22,51 @@ export async function PATCH(request: Request, context: Context) {
     const ids = Array.isArray(body.voluntarioIds)
       ? [...new Set(body.voluntarioIds.map(positiveInteger).filter(Boolean) as number[])].slice(0, 100)
       : [];
-    for (const volunteerId of ids) {
-      const volunteer = await db
+    if (ids.length > 0) {
+      const placeholders = ids.map(() => "?").join(", ");
+      const validVolunteers = await db
         .prepare(
           `SELECT id FROM ministerio_voluntarios
-           WHERE id = ? AND comunidade_id = ? AND ministerio_id = ? AND ativo = 1`,
+           WHERE comunidade_id = ? AND ministerio_id = ? AND ativo = 1
+             AND id IN (${placeholders})`,
         )
-        .bind(volunteerId, access.context.comunidadeId, team.ministerio_id)
-        .first<{ id: number }>();
-      if (!volunteer) return badRequest("Um integrante selecionado não pertence ao ministério.");
-      const count = await db
+        .bind(access.context.comunidadeId, team.ministerio_id, ...ids)
+        .all<{ id: number }>();
+      if (validVolunteers.results.length !== ids.length) {
+        return badRequest("Um integrante selecionado não pertence ao ministério.");
+      }
+      const counts = await db
         .prepare(
-          `SELECT COUNT(*) AS total FROM ministerio_equipe_membros mem
+          `SELECT mem.voluntario_id AS voluntario_id, COUNT(*) AS total
+           FROM ministerio_equipe_membros mem
            JOIN ministerio_equipes me ON me.id = mem.equipe_id AND me.ativa = 1
            WHERE mem.comunidade_id = ? AND mem.ministerio_id = ?
-             AND mem.voluntario_id = ? AND mem.equipe_id != ?`,
+             AND mem.equipe_id != ? AND mem.voluntario_id IN (${placeholders})
+           GROUP BY mem.voluntario_id`,
         )
-        .bind(access.context.comunidadeId, team.ministerio_id, volunteerId, id)
-        .first<{ total: number }>();
-      if (Number(count?.total || 0) >= 3) {
+        .bind(access.context.comunidadeId, team.ministerio_id, id, ...ids)
+        .all<{ voluntario_id: number; total: number }>();
+      const overLimit = counts.results.some((row) => Number(row.total || 0) >= 3);
+      if (overLimit) {
         return Response.json({ error: "Cada integrante pode participar de no máximo três equipes neste ministério." }, { status: 409 });
       }
     }
-    await db
+    const deleteStatement = db
       .prepare(
         `DELETE FROM ministerio_equipe_membros
          WHERE equipe_id = ? AND comunidade_id = ? AND ministerio_id = ?`,
       )
-      .bind(id, access.context.comunidadeId, team.ministerio_id)
-      .run();
-    for (const volunteerId of ids) {
-      await db
+      .bind(id, access.context.comunidadeId, team.ministerio_id);
+    const insertStatements = ids.map((volunteerId) =>
+      db
         .prepare(
           `INSERT INTO ministerio_equipe_membros
            (comunidade_id, ministerio_id, equipe_id, voluntario_id)
            VALUES (?, ?, ?, ?)`,
         )
-        .bind(access.context.comunidadeId, team.ministerio_id, id, volunteerId)
-        .run();
-    }
+        .bind(access.context.comunidadeId, team.ministerio_id, id, volunteerId),
+    );
+    await db.batch([deleteStatement, ...insertStatements]);
     await recordTenantAudit(db, access.context, access.user.id, "EQUIPE_MINISTERIAL_MEMBROS_ATUALIZADOS", "SUCESSO", { ministerioId: team.ministerio_id, equipeId: id, total: ids.length });
     return Response.json({ ok: true });
   }
