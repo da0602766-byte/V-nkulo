@@ -2243,6 +2243,17 @@ function EditScheduleDialog({
   onClose: () => void;
   onSubmit: (schedule: Schedule, event: FormEvent<HTMLFormElement>) => void;
 }) {
+  const [repertoireValue, setRepertoireValue] = useState(
+    schedule.repertorio.join("\n"),
+  );
+  const repertoirePreview = useMemo(
+    () => repertoireValue
+      .split("\n")
+      .map((item) => item.trim())
+      .filter(Boolean),
+    [repertoireValue],
+  );
+
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -2267,8 +2278,16 @@ function EditScheduleDialog({
           </div>
           <button type="button" aria-label="Fechar editor" onClick={onClose}>×</button>
         </header>
-        <p>Atualize as informações principais sem alterar as confirmações dos integrantes.</p>
+        <p>Atualize as informações principais e revise o repertório sem alterar as confirmações dos integrantes.</p>
         <form className="secretary-form secretary-edit-schedule-form" onSubmit={(event) => onSubmit(schedule, event)}>
+          <div className="secretary-edit-repertoire-preview">
+            <div>
+              <strong>Repertório atual</strong>
+              <small>A prévia muda enquanto você ajusta os itens abaixo.</small>
+            </div>
+            <ScheduleRepertoire schedule={{ ...schedule, repertorio: repertoirePreview }} />
+            {!repertoirePreview.length && <p>Nenhum item no repertório.</p>}
+          </div>
           <div className="secretary-form-grid">
             <label className="span-2">Título<input name="titulo" required maxLength={140} defaultValue={schedule.titulo} /></label>
             <label>Equipe<select name="equipeId" defaultValue={schedule.equipe_id || ""}><option value="">Seleção livre</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.nome}</option>)}</select></label>
@@ -2276,7 +2295,7 @@ function EditScheduleDialog({
             <label>Início<input name="iniciaEm" type="datetime-local" required defaultValue={toLocalDateTimeInput(schedule.inicia_em)} /></label>
             <label>Término<input name="terminaEm" type="datetime-local" required defaultValue={toLocalDateTimeInput(schedule.termina_em)} /></label>
             <label className="span-2">Local<input name="local" maxLength={180} defaultValue={schedule.local} /></label>
-            <label className="span-2">Repertório<textarea name="repertorio" rows={5} maxLength={8000} defaultValue={schedule.repertorio.join("\n")} /></label>
+            <label className="span-2">Ajustar repertório<textarea name="repertorio" rows={5} maxLength={8000} value={repertoireValue} onChange={(event) => setRepertoireValue(event.target.value)} placeholder={"Uma música ou conteúdo por linha"} /></label>
             <label className="span-2">Observações<textarea name="observacoes" rows={4} maxLength={1200} defaultValue={schedule.observacoes} /></label>
           </div>
           <footer className="secretary-edit-schedule-footer">
@@ -2400,6 +2419,9 @@ function MinistryAccessHistory({ schedules }: { schedules: Schedule[] }) {
   }>>([]);
   const [loading, setLoading] = useState(true);
   const [workingEntryId, setWorkingEntryId] = useState<number | null>(null);
+  const [retentionDays, setRetentionDays] = useState(30);
+  const [savingRetention, setSavingRetention] = useState(false);
+  const [retentionFeedback, setRetentionFeedback] = useState("");
   const [error, setError] = useState("");
   const load = useCallback(async () => {
     setLoading(true);
@@ -2410,16 +2432,20 @@ function MinistryAccessHistory({ schedules }: { schedules: Schedule[] }) {
           const response = await fetch(`/api/pilot/escalas/${schedule.id}/acessos`, {
             cache: "no-store",
           });
-          const payload = await readJson<{ acessos?: TemporaryAccessSummary[]; error?: string }>(response);
+          const payload = await readJson<{ acessos?: TemporaryAccessSummary[]; retencaoDias?: number; error?: string }>(response);
           if (!response.ok) throw new Error(payload.error || "Não foi possível carregar o histórico.");
-          return (payload.acessos || []).map((entry) => ({
-            ...entry,
-            scheduleId: schedule.id,
-            scheduleTitle: schedule.titulo,
-          }));
+          return {
+            retentionDays: payload.retencaoDias || 30,
+            entries: (payload.acessos || []).map((entry) => ({
+              ...entry,
+              scheduleId: schedule.id,
+              scheduleTitle: schedule.titulo,
+            })),
+          };
         }),
       );
-      setEntries(results.flat().sort((left, right) => right.id - left.id));
+      setRetentionDays(results[0]?.retentionDays || 30);
+      setEntries(results.flatMap((result) => result.entries).sort((left, right) => right.id - left.id));
     } catch (cause) {
       setError((cause as Error).message);
     } finally {
@@ -2431,6 +2457,35 @@ function MinistryAccessHistory({ schedules }: { schedules: Schedule[] }) {
     const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
   }, [load]);
+
+  async function saveRetention(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const schedule = manageableSchedules[0];
+    if (!schedule) return;
+    setSavingRetention(true);
+    setRetentionFeedback("");
+    setError("");
+    try {
+      const response = await fetch(`/api/pilot/escalas/${schedule.id}/acessos`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ retencaoDias: retentionDays }),
+      });
+      const payload = await readJson<{ retencaoDias?: number; excluidos?: number; error?: string }>(response);
+      if (!response.ok) throw new Error(payload.error || "Não foi possível salvar o prazo de retenção.");
+      setRetentionDays(payload.retencaoDias || retentionDays);
+      setRetentionFeedback(
+        payload.excluidos
+          ? `${payload.excluidos} registro(s) antigo(s) foram excluídos.`
+          : "Prazo salvo. A limpeza será aplicada automaticamente.",
+      );
+      await load();
+    } catch (cause) {
+      setError((cause as Error).message);
+    } finally {
+      setSavingRetention(false);
+    }
+  }
 
   async function cancel(entry: (typeof entries)[number]) {
     if (!window.confirm(`Cancelar o acesso de ${entry.beneficiarioNome}?`)) return;
@@ -2486,8 +2541,16 @@ function MinistryAccessHistory({ schedules }: { schedules: Schedule[] }) {
     <section className="secretary-card secretary-access-history-page">
       <header>
         <div><p className="pilot-kicker">HISTÓRICO DO MINISTÉRIO</p><h2>Acessos temporários</h2><p>Registros em texto, separados do fluxo de compartilhamento.</p></div>
-        <button type="button" onClick={() => void load()} disabled={loading}>{loading ? "Atualizando…" : "Atualizar histórico"}</button>
+        <div className="secretary-history-controls">
+          <form className="secretary-history-retention" onSubmit={saveRetention}>
+            <label>Excluir registros encerrados após<input type="number" min="1" max="30" step="1" value={retentionDays} onChange={(event) => setRetentionDays(Math.min(30, Math.max(1, Number(event.target.value) || 1)))} aria-label="Dias para exclusão automática do histórico" /><span>dias</span></label>
+            <button disabled={savingRetention || !manageableSchedules.length}>{savingRetention ? "Salvando…" : "Salvar prazo"}</button>
+          </form>
+          <button type="button" onClick={() => void load()} disabled={loading}>{loading ? "Atualizando…" : "Atualizar histórico"}</button>
+        </div>
       </header>
+      <p className="secretary-history-retention-note">O prazo pode ser de 1 a 30 dias. Acessos ativos nunca entram na exclusão automática.</p>
+      {retentionFeedback && <p className="secretary-share-status" role="status">{retentionFeedback}</p>}
       {error && <p className="secretary-share-error" role="alert">{error}</p>}
       <div className="secretary-access-history-text">
         {entries.map((entry) => (

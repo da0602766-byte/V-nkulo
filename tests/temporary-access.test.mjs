@@ -608,6 +608,52 @@ test("acesso temporário valida pessoa, comunidade, recurso, horário, cancelame
   );
   assert.equal(deletedToken.response.status, 404);
 
+  const insertRetentionRecord = database.prepare(
+    `INSERT INTO acessos_temporarios
+     (comunidade_id, escala_id, designacao_id, beneficiario_usuario_id,
+      recurso, token_hash, token_hint, inicia_em, termina_em, status,
+      autorizado_por, criado_por, cancelado_em, criado_em, atualizado_em)
+     VALUES (1, ?, ?, ?, 'ESCALA_LEITURA', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  );
+  const oldTimestamp = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString();
+  const recentTimestamp = new Date().toISOString();
+  const oldHistoryId = Number(insertRetentionRecord.run(
+    scheduleId, designationId, beneficiaryId, "retention-old", "old",
+    activeStarts, scheduleEnds, "CANCELADO", leaderId, leaderId,
+    oldTimestamp, oldTimestamp, oldTimestamp,
+  ).lastInsertRowid);
+  const recentHistoryId = Number(insertRetentionRecord.run(
+    scheduleId, designationId, beneficiaryId, "retention-recent", "recent",
+    activeStarts, scheduleEnds, "CANCELADO", leaderId, leaderId,
+    recentTimestamp, recentTimestamp, recentTimestamp,
+  ).lastInsertRowid);
+  const activeHistoryId = Number(insertRetentionRecord.run(
+    scheduleId, designationId, beneficiaryId, "retention-active", "active",
+    activeStarts, scheduleEnds, "ATIVO", leaderId, leaderId,
+    null, oldTimestamp, oldTimestamp,
+  ).lastInsertRowid);
+  const invalidRetention = await jsonRequest(
+    worker,
+    env,
+    `/api/pilot/escalas/${scheduleId}/acessos`,
+    { method: "PATCH", cookie: leaderCookie, body: { retencaoDias: 31 } },
+  );
+  assert.equal(invalidRetention.response.status, 400);
+  const savedRetention = await jsonRequest(
+    worker,
+    env,
+    `/api/pilot/escalas/${scheduleId}/acessos`,
+    { method: "PATCH", cookie: leaderCookie, body: { retencaoDias: 30 } },
+  );
+  assert.equal(savedRetention.response.status, 200, JSON.stringify(savedRetention.body));
+  assert.equal(savedRetention.body.retencaoDias, 30);
+  assert.equal(
+    database.prepare("SELECT id FROM acessos_temporarios WHERE id = ?").get(oldHistoryId),
+    undefined,
+  );
+  assert.ok(database.prepare("SELECT id FROM acessos_temporarios WHERE id = ?").get(recentHistoryId));
+  assert.ok(database.prepare("SELECT id FROM acessos_temporarios WHERE id = ?").get(activeHistoryId));
+
   const scaleCancelledAccess = await createAccess(worker, env, leaderCookie, scheduleId, {
     designacaoId: designationId,
     recurso: "ESCALA_LEITURA",
