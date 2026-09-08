@@ -178,7 +178,7 @@ function PersonalizationControls({
       <div className="account-surface-preferences">
         <label>
           <span>Intensidade do vidro <b>{glassOpacity}%</b></span>
-          <input type="range" min="45" max="88" step="1" value={glassOpacity} onChange={(event) => onGlassOpacityChange(Number(event.target.value))} />
+          <input type="range" min="55" max="88" step="1" value={glassOpacity} onChange={(event) => onGlassOpacityChange(Number(event.target.value))} />
         </label>
         <label className="account-data-saver">
           <input type="checkbox" checked={dataSaver} onChange={(event) => onDataSaverChange(event.target.checked)} />
@@ -273,7 +273,7 @@ export default function PilotDashboard({
           setFontScale(Math.min(MAX_FONT_SCALE, Math.max(MIN_FONT_SCALE, Math.round(saved * 100) / 100)));
         }
         const savedGlass = Number(window.localStorage.getItem("vinkulo:glass-opacity"));
-        if (Number.isFinite(savedGlass) && savedGlass >= 45 && savedGlass <= 88) setGlassOpacity(savedGlass);
+        if (Number.isFinite(savedGlass) && savedGlass >= 55 && savedGlass <= 88) setGlassOpacity(savedGlass);
         setDataSaver(window.localStorage.getItem("vinkulo:data-saver") === "true");
       } catch {
         // Mantém o tamanho padrão quando a preferência local não está disponível.
