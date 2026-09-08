@@ -500,9 +500,10 @@ test("padrão global evita divergência, dá acesso total ao proprietário e res
 });
 
 test("conversas ficam no perfil, isolam comunidade e respeitam membro versus oficial", async () => {
-  const [chatApi, chatUi, presenceApi, notificationApi, notificationUi, dashboard] = await Promise.all([
+  const [chatApi, chatUi, presenceUi, presenceApi, notificationApi, notificationUi, dashboard] = await Promise.all([
     readFile(new URL("../app/api/pilot/chat/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/components/PrivateChatWorkspace.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/CommunityPresencePanel.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/pilot/presenca/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/pilot/notificacoes/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/components/PilotNotificationCenter.tsx", import.meta.url), "utf8"),
@@ -518,6 +519,8 @@ test("conversas ficam no perfil, isolam comunidade e respeitam membro versus ofi
   assert.match(chatApi, /Membros conversam somente com membros/);
   assert.match(chatUi, /Escreva uma mensagem privada…/);
   assert.match(chatUi, /<form onSubmit=\{send\}/);
+  assert.match(presenceUi, /Mensagem/);
+  assert.match(presenceUi, /Biografia/);
   assert.match(presenceApi, /json_extract\(u\.cadastro_dados/);
   assert.match(presenceApi, /canMessage/);
   assert.match(notificationApi, /normalizeDestination/);
@@ -555,6 +558,45 @@ test("módulos legados de comunidade única continuam desligados", async () => {
     /if\s*\(!PILOT_CONFIG\.legacyModulesEnabled\)/,
     "requireApiPermission precisa continuar bloqueando os módulos legados antes de checar perfil ou permissão",
   );
+});
+
+// O painel de presença passou meses existindo sem nenhuma página que o
+// renderizasse: a rota estava viva e testada, e a tela não aparecia para
+// ninguém. Auditoria de 08/09/2026. Este teste trava o elo que faltava — não
+// basta o componente existir e a rota responder, alguma tela alcançável
+// precisa montá-lo, e o pedido de conversa precisa cair no chat que existe
+// hoje em vez de abrir uma segunda tela própria.
+test("painel de presença está montado numa tela alcançável e usa o chat vivo", async () => {
+  const [panel, home, dashboard, chat] = await Promise.all([
+    readFile(new URL("../app/components/CommunityPresencePanel.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/CommunityHome.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/PilotDashboard.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/PrivateChatWorkspace.tsx", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(
+    home,
+    /import CommunityPresencePanel from "\.\/CommunityPresencePanel"/,
+    "CommunityHome precisa importar o painel de presença",
+  );
+  assert.match(
+    home,
+    /<CommunityPresencePanel \/>/,
+    "o painel precisa continuar renderizado: rota viva sem tela foi exatamente o defeito encontrado na auditoria",
+  );
+  // A trilha lateral só existe fora do acesso somente-feed, que é a mesma
+  // regra que `/api/pilot/presenca` aplica no servidor (403 para FEED_ONLY).
+  assert.match(home, /\{!readOnlyFeed && <aside className="community-home-rail">/);
+
+  assert.match(panel, /new CustomEvent\("vinkulo:open-chat"/);
+  assert.doesNotMatch(
+    panel,
+    /PrivateChatDialog/,
+    "o diálogo antigo de conversa foi removido; o painel deve pedir o chat vivo por evento",
+  );
+  assert.match(dashboard, /window\.addEventListener\("vinkulo:open-chat"/);
+  assert.match(dashboard, /initialTargetUserId=\{chatTargetUserId\}/);
+  assert.match(chat, /initialTargetUserId/);
 });
 
 // As rotas `/api/teens*` foram removidas em 08/09/2026: consultavam nome, data

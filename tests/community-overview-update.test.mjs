@@ -22,16 +22,17 @@ test("visão geral privada integra perfil, logout e resposta persistente de esca
 });
 
 test("proprietário verificado aparece nas superfícies pessoais e de conteúdo", async () => {
-  const [badge, dashboard, home, people, comments, owner] = await Promise.all([
+  const [badge, dashboard, home, people, presence, comments, owner] = await Promise.all([
     source("app/components/VerifiedOwnerName.tsx"),
     source("app/components/PilotDashboard.tsx"),
     source("app/components/CommunityHome.tsx"),
     source("app/components/PeopleWorkspace.tsx"),
+    source("app/components/CommunityPresencePanel.tsx"),
     source("app/components/CommunityPostInteractions.tsx"),
     source("app/components/OwnerWorkspace.tsx"),
   ]);
   assert.match(badge, /Proprietário verificado/);
-  for (const file of [dashboard, home, people, comments, owner]) {
+  for (const file of [dashboard, home, people, presence, comments, owner]) {
     assert.match(file, /VerifiedOwnerName/);
   }
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "./StableLink";
+import CommunityPresencePanel from "./CommunityPresencePanel";
 import {
   type CSSProperties,
   FormEvent,
@@ -1160,6 +1161,8 @@ export default function CommunityHome({
               <p className="home-rail-empty">Nenhum evento publicado.</p>
             )}
           </section>
+
+          <CommunityPresencePanel />
         </aside>}
       </div>
     </section>

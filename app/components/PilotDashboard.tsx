@@ -248,6 +248,7 @@ export default function PilotDashboard({
       sistema: 0,
     });
   const [messageCenterOpen, setMessageCenterOpen] = useState(false);
+  const [chatTargetUserId, setChatTargetUserId] = useState<number | null>(null);
 
   useEffect(() => {
     const initial = window.setTimeout(() => {
@@ -629,6 +630,25 @@ export default function PilotDashboard({
     };
   }, [active.isOwner, allowedMenu]);
 
+  // O painel de presença ("Quem está online") pede a conversa por evento em vez
+  // de abrir uma segunda tela de chat: no celular vai para a aba Mensagens, no
+  // desktop abre o popover. Quem pode falar com quem continua sendo decidido em
+  // /api/pilot/chat.
+  useEffect(() => {
+    if (active.communityAccess === "FEED_ONLY") return;
+    const handleOpenChat = (event: Event) => {
+      const userId = Number(
+        (event as CustomEvent<{ userId?: number }>).detail?.userId || 0,
+      );
+      if (userId <= 0) return;
+      setChatTargetUserId(userId);
+      if (window.matchMedia("(max-width: 760px)").matches) openView("mensagens");
+      else setMessageCenterOpen(true);
+    };
+    window.addEventListener("vinkulo:open-chat", handleOpenChat);
+    return () => window.removeEventListener("vinkulo:open-chat", handleOpenChat);
+  }, [active.communityAccess]);
+
   const accessDeniedView =
     view !== "inicio" &&
     view !== "conta" &&
@@ -898,7 +918,7 @@ export default function PilotDashboard({
         <div className="pilot-message-popover-backdrop" role="presentation" onMouseDown={() => setMessageCenterOpen(false)}>
           <section className="pilot-message-popover" role="dialog" aria-modal="false" aria-label="Conversas" onMouseDown={(event) => event.stopPropagation()}>
             <header><div><p className="pilot-kicker">MENSAGENS</p><h2>Conversas</h2></div><button type="button" onClick={() => setMessageCenterOpen(false)} aria-label="Fechar mensagens">×</button></header>
-            <PrivateChatWorkspace />
+            <PrivateChatWorkspace initialTargetUserId={chatTargetUserId} />
           </section>
         </div>
       )}
@@ -1158,7 +1178,7 @@ export default function PilotDashboard({
           {visibleView === "solicitacoes" && (
             <RequestsWorkspace communityName={active.comunidadeNome} />
           )}
-          {visibleView === "mensagens" && <PrivateChatWorkspace />}
+          {visibleView === "mensagens" && <PrivateChatWorkspace initialTargetUserId={chatTargetUserId} />}
           {visibleView === "celulas" && (
             <CellsWorkspace
               permissions={active.permissions}
