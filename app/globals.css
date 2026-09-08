@@ -22891,6 +22891,11 @@ html[data-pilot-theme="escuro"] .owner-audit-retention { border-color:#4f4482; b
 .platform-optimizer-safety div { display:grid; gap:3px; }
 .platform-optimizer-safety strong { font-size:.83rem; }
 .platform-optimizer-safety p { margin:0; color:var(--pilot-muted); font-size:.75rem; line-height:1.5; }
+.platform-optimizer-alert { display:flex; align-items:flex-start; gap:11px; padding:14px 16px; border:1px solid color-mix(in srgb,#d9534f 35%,var(--pilot-line)); border-radius:16px; background:color-mix(in srgb,#d9534f 8%,var(--pilot-surface)); }
+.platform-optimizer-alert>span { flex:0 0 auto; width:28px; height:28px; display:grid; place-items:center; border-radius:9px; background:#d9534f; color:#fff; font-weight:900; }
+.platform-optimizer-alert div { display:grid; gap:3px; }
+.platform-optimizer-alert strong { font-size:.83rem; color:var(--pilot-text); }
+.platform-optimizer-alert p { margin:0; color:var(--pilot-muted); font-size:.75rem; line-height:1.5; }
 
 @media (max-width:900px) {
   .platform-optimizer-layout { grid-template-columns:1fr; }
