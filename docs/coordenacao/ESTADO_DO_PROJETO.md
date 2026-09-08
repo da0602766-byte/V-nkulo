@@ -286,7 +286,7 @@
 - `app/components/SecretaryMinisterialWorkspace.tsx`.
 - `app/lib/tenant.ts`, `app/lib/tenant-policy.mjs`, `app/components/PilotDashboard.tsx`, `app/components/PilotNotificationCenter.tsx`, `app/components/OwnerWorkspace.tsx`, `app/components/EditorialAutomationWorkspace.tsx` e `app/painel/page.tsx`.
 - `tests/pilot-integration.test.mjs`, `tests/pilot-security.test.mjs`, `tests/v97-owner-access-flow.test.mjs` e `tests/v109-community-management.test.mjs`.
-- `RELATORIO_OTIMIZACAO_GLOBAL_SEGURA_2026-08-13.md`.
+- `docs/relatorios/RELATORIO_OTIMIZACAO_GLOBAL_SEGURA_2026-08-13.md`.
 - `app/lib/platform-optimizer.ts`, `app/api/proprietario/otimizacao/route.ts`, `app/components/PlatformOptimizerWorkspace.tsx`, `worker/index.ts` e `tests/v117-platform-optimizer.test.mjs`.
 - `app/components/TenantOperations.tsx`, `app/globals.css`, APIs de visitantes/categorias, `app/lib/visitor-category-rules.ts`, `db/schema.ts`, `drizzle/0047_quick_ego.sql` e `tests/v118-visitors-inline-age-migration.test.mjs`.
 - `app/components/NativeImageUpload.tsx` (modo de prévia específico para banners ministeriais).

@@ -1,7 +1,7 @@
 # Migrações — convenção e estado atual
 
 O ambiente hospedado aplica as migrações presentes nesta pasta (ver
-`README.md` e `GUIA_PASSO_A_PASSO.md` na raiz). Antes de adicionar uma
+`README.md` na raiz e `docs/guias/GUIA_PASSO_A_PASSO.md`). Antes de adicionar uma
 migração nova, leia isto.
 
 ## Próximo número livre
@@ -13,7 +13,7 @@ um número já usado, mesmo que o arquivo tenha sido escrito à mão.
 
 Já aconteceu mais de uma vez (times/agentes diferentes trabalhando em
 paralelo escolhem o mesmo número). A convenção adotada, registrada em
-`PROMPT_PUBLICACAO_RELACIONAMENTO_AGENDA.md`:
+`docs/prompts/PROMPT_PUBLICACAO_RELACIONAMENTO_AGENDA.md`:
 
 > **Renumere a migração que chega depois — nunca a que já foi publicada.**
 > Se você não sabe qual das duas já foi aplicada em produção, não renomeie
@@ -24,8 +24,8 @@ paralelo escolhem o mesmo número). A convenção adotada, registrada em
 Dois pares de arquivos compartilham número. Os dois lados de cada par
 parecem já estar aplicados em produção (as duas features de cada par estão
 documentadas como publicadas e funcionando — Fio do dia versão 194 em
-`COORDENACAO_IA.md`, integração Google Drive V4.9.0 em
-`ESTADO_DO_PROJETO.md`), então **não renomeie nenhum dos quatro** sem
+`docs/coordenacao/COORDENACAO_IA.md`, integração Google Drive V4.9.0 em
+`docs/coordenacao/ESTADO_DO_PROJETO.md`), então **não renomeie nenhum dos quatro** sem
 confirmar primeiro no banco de produção (tabela de migrações aplicadas) —
 renomear um arquivo já aplicado pode fazer o ambiente hospedado tentar
 rodá-lo de novo.

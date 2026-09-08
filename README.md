@@ -31,7 +31,7 @@ comunidades e ministérios.
 - Publicações editoriais automáticas obedecem às políticas e autorizações registradas.
 - Conteúdo novo não é persistido no bucket ou incorporado ao banco; o armazenamento da plataforma fica restrito a referências, preferências e metadados.
 
-O estado técnico e as limitações atuais estão em `ESTADO_DO_PROJETO.md`.
+O estado técnico e as limitações atuais estão em `docs/coordenacao/ESTADO_DO_PROJETO.md`.
 
 ## Tecnologias
 
@@ -48,3 +48,8 @@ npm run dev
 ```
 
 O ambiente hospedado aplica as migrações presentes em `drizzle/` e fornece o banco conectado.
+
+## Documentação
+
+Prompts de publicação, guias, relatórios e o estado do projeto estão
+organizados em [`docs/`](docs/README.md).
