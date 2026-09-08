@@ -123,6 +123,16 @@ export default function PlatformOptimizerWorkspace() {
 
       {message ? <p className="platform-optimizer-feedback" role="status">{message}</p> : null}
 
+      {lastRunFailed(status) ? (
+        <section className="platform-optimizer-alert" role="alert">
+          <span aria-hidden="true">!</span>
+          <div>
+            <strong>A manutenção automática falhou em {formatDate(status?.config.lastErrorAt)}</strong>
+            <p>Nenhum dado foi alterado. O sistema tenta novamente em até 1 hora, mas você também pode executar manualmente agora.</p>
+          </div>
+        </section>
+      ) : null}
+
       <section className="platform-optimizer-summary" aria-label="Resumo da manutenção">
         <div><small>Itens prontos</small><strong>{pendingTotal}</strong><span>Nenhum dado ativo nesta contagem</span></div>
         <div><small>Última execução</small><strong>{formatDate(status?.config.lastRunAt)}</strong><span>{lastExecutionLabel(status)}</span></div>
@@ -186,6 +196,16 @@ function formatDate(value?: string | null) {
   } catch {
     return value;
   }
+}
+
+function lastRunFailed(status: OptimizerStatus | null) {
+  const errorAt = status?.config.lastErrorAt;
+  if (!errorAt) return false;
+  const successAt = status?.config.lastRunAt;
+  // Só é considerado "falhando agora" quando ninguém conseguiu concluir a
+  // manutenção depois do último erro registrado; uma execução bem-sucedida
+  // mais recente que o erro antigo não deve reacender o alerta.
+  return !successAt || new Date(errorAt).getTime() > new Date(successAt).getTime();
 }
 
 function lastExecutionLabel(status: OptimizerStatus | null) {
