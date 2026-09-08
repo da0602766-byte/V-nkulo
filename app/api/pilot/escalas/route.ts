@@ -24,6 +24,10 @@ type AssignmentRow = Record<string, unknown> & { escala_id: number };
 const SCHEDULE_PAGE_SIZE = 150;
 const SCHEDULE_MAX_PAGE_SIZE = 200;
 
+// Blocos da busca de designações. O D1 limita os parâmetros por consulta, e o
+// `IN (...)` cresce com o tamanho do lote de escalas.
+const ASSIGNMENT_ID_CHUNK = 90;
+
 // O cursor guarda o par (inicia_em, id), que é a ordenação da consulta.
 type ScheduleCursor = { inicio: string; id: number };
 
@@ -214,27 +218,32 @@ export async function GET(request: Request) {
   // no SQL o que era descarte em memória. As escalas do lote já passaram pela
   // regra de visibilidade, então a repetição dela aqui deixa de ser necessária;
   // o filtro por comunidade continua, como segunda barreira.
-  const assignmentPlaceholders = loadedScheduleIds.map(() => "?").join(", ");
-  const assignmentsResult = loadedScheduleIds.length
-    ? await db
-        .prepare(
-          `SELECT d.id, d.escala_id, d.voluntario_id, d.usuario_id,
-            u.nome, u.telefone, u.foto_perfil, u.email AS owner_email,
-            u.criado_em AS owner_criado_em, d.funcao, d.status,
-            CASE WHEN d.usuario_id = ? THEN 1 ELSE 0 END AS is_mine
-          FROM escala_designacoes d
-          JOIN usuarios u ON u.id = d.usuario_id
-          WHERE d.comunidade_id = ? AND d.ativo = 1
-            AND d.escala_id IN (${assignmentPlaceholders})
-          ORDER BY u.nome ASC`,
-        )
-        .bind(
-          access.user.id,
-          access.context.comunidadeId,
-          ...loadedScheduleIds,
-        )
-        .all<AssignmentRow>()
-    : { results: [] as AssignmentRow[] };
+  // A busca é fatiada porque o número de marcadores `?` cresce com o tamanho do
+  // lote: 150 escalas gerariam 152 parâmetros numa consulta só, acima do limite
+  // de parâmetros por consulta que o D1 impõe. O projeto já trata esse limite
+  // com cortes em 100 noutros pontos. Blocos de 90 deixam margem para os dois
+  // parâmetros fixos. Cada bloco continua filtrando por comunidade.
+  const assignmentRows: AssignmentRow[] = [];
+  for (let inicio = 0; inicio < loadedScheduleIds.length; inicio += ASSIGNMENT_ID_CHUNK) {
+    const bloco = loadedScheduleIds.slice(inicio, inicio + ASSIGNMENT_ID_CHUNK);
+    const marcadores = bloco.map(() => "?").join(", ");
+    const parcial = await db
+      .prepare(
+        `SELECT d.id, d.escala_id, d.voluntario_id, d.usuario_id,
+          u.nome, u.telefone, u.foto_perfil, u.email AS owner_email,
+          u.criado_em AS owner_criado_em, d.funcao, d.status,
+          CASE WHEN d.usuario_id = ? THEN 1 ELSE 0 END AS is_mine
+        FROM escala_designacoes d
+        JOIN usuarios u ON u.id = d.usuario_id
+        WHERE d.comunidade_id = ? AND d.ativo = 1
+          AND d.escala_id IN (${marcadores})
+        ORDER BY u.nome ASC`,
+      )
+      .bind(access.user.id, access.context.comunidadeId, ...bloco)
+      .all<AssignmentRow>();
+    assignmentRows.push(...parcial.results);
+  }
+  const assignmentsResult = { results: assignmentRows };
   const manageableScheduleIds = new Set(
     schedulesResult.results
       .filter((schedule) => Boolean(schedule.can_manage))

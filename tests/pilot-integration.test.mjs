@@ -5641,3 +5641,95 @@ test("notificações paginam por cursor e contam não lidas fora do lote", async
 
   database.close();
 });
+
+// A busca de designações monta um `IN (...)` com um marcador por escala do
+// lote. Com o lote padrão de 150 isso passaria de 150 parâmetros numa consulta
+// só, acima do limite que o D1 impõe por consulta — o projeto já corta em 100
+// noutros pontos pelo mesmo motivo. Por isso a busca é fatiada em blocos de 90.
+//
+// O teste anterior usava lote de 5 e nunca cruzava essa fronteira; o SQLite do
+// ambiente de teste aceita muito mais parâmetros que o D1, então a falha
+// passaria despercebida aqui e apareceria só em produção. Este cenário usa
+// escalas suficientes para exigir mais de um bloco.
+test("designações de um lote grande atravessam a fatia sem perder ninguém", async () => {
+  const { database, d1 } = await createPilotD1();
+  const pastorId = await createPilotUser(database, {
+    nome: "Pastor Fatia",
+    email: "pastor.fatia@example.test",
+    senha: "Pastor123",
+    memberships: [{ comunidadeId: 1, papel: "PASTOR" }],
+  });
+  const ministerioId = database
+    .prepare(
+      `INSERT INTO ministerios_comunidade
+        (comunidade_id, nome, categoria, status, responsavel_usuario_id)
+       VALUES (1, 'Ministerio Fatia', 'GERAL', 'ATIVO', ?) RETURNING id`,
+    )
+    .get(pastorId).id;
+  const voluntarioId = database
+    .prepare(
+      `INSERT INTO ministerio_voluntarios
+        (comunidade_id, ministerio_id, usuario_id, funcao, papel, ativo)
+       VALUES (1, ?, ?, 'Apoio', 'VOLUNTARIO', 1) RETURNING id`,
+    )
+    .get(ministerioId, pastorId).id;
+
+  // 100 escalas, cada uma com uma designação: acima dos 90 de um bloco.
+  const TOTAL = 100;
+  const escalaIds = [];
+  for (let indice = 0; indice < TOTAL; indice += 1) {
+    const dia = new Date(Date.UTC(2028, 0, 1 + indice)).toISOString().slice(0, 10);
+    const escalaId = database
+      .prepare(
+        `INSERT INTO escalas_ministerio
+          (comunidade_id, ministerio_id, titulo, inicia_em, termina_em,
+           status, responsavel_usuario_id, criado_por)
+         VALUES (1, ?, ?, ?, ?, 'PUBLICADA', ?, ?) RETURNING id`,
+      )
+      .get(ministerioId, `Escala Fatia ${indice}`, `${dia} 09:00:00`, `${dia} 11:00:00`, pastorId, pastorId).id;
+    escalaIds.push(escalaId);
+    database
+      .prepare(
+        `INSERT INTO escala_designacoes
+          (comunidade_id, escala_id, voluntario_id, usuario_id, funcao, status, ativo)
+         VALUES (1, ?, ?, ?, 'Apoio', 'CONFIRMADA', 1)`,
+      )
+      .run(escalaId, voluntarioId, pastorId);
+  }
+
+  const worker = await loadWorker();
+  const env = createEnv(d1);
+  const cookie = await login(worker, env, "pastor.fatia@example.test", "Pastor123");
+
+  const response = await worker.fetch(
+    new Request(`http://localhost/api/pilot/escalas?limite=${TOTAL}`, {
+      headers: { cookie },
+    }),
+    env,
+    context,
+  );
+  assert.equal(response.status, 200);
+  const dados = await response.json();
+
+  assert.equal(dados.escalas.length, TOTAL, "o lote precisa cruzar mais de um bloco");
+
+  // Cada escala do lote precisa ter trazido a sua designação: se a fatia
+  // perdesse um bloco, as escalas depois da 90 viriam sem ninguém.
+  const semDesignacao = dados.escalas.filter((e) => !e.designacoes.length);
+  assert.deepEqual(
+    semDesignacao.map((e) => e.titulo),
+    [],
+    "escalas sem designação indicam bloco perdido na fatia",
+  );
+
+  const total = dados.escalas.reduce((soma, e) => soma + e.designacoes.length, 0);
+  assert.equal(total, TOTAL);
+
+  // Isolamento continua valendo em todos os blocos.
+  assert.ok(
+    dados.escalas.every((e) => e.designacoes.every((d) => Number(d.escala_id) === Number(e.id))),
+    "designação atribuída à escala errada",
+  );
+
+  database.close();
+});
