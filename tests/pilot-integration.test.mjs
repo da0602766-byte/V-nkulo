@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFile } from "node:fs/promises";
 import {
   createPilotD1,
   createPilotUser,
 } from "./helpers/sqlite-d1.mjs";
+
+const readSource = (path) =>
+  readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
 const context = {
   waitUntil() {},
@@ -5541,6 +5545,99 @@ test("filtro minhas-pendentes devolve só escalas com resposta pendente da pesso
   const completo = await semFiltro.json();
   assert.ok(completo.escalas.length > filtrado.escalas.length);
   assert.ok(completo.escalas.some((escala) => escala.titulo === "Pendente De Outro"));
+
+  database.close();
+});
+
+// A migração do chat para o Drive lia UM lote de mensagens e em seguida apagava
+// a conversa inteira do banco: acima do tamanho do lote, o que não tinha subido
+// era apagado junto e se perdia. O laço agora avança por lotes e cada lote só é
+// apagado depois de subir. Este teste lê o código porque a migração depende do
+// Google Drive, que não existe no ambiente de teste — o que dá para garantir
+// aqui é que a exclusão não volte a ser indiscriminada.
+test("migração do chat para o Drive não apaga mensagem que não subiu", async () => {
+  const chat = await readSource("app/api/pilot/chat/route.ts");
+
+  assert.doesNotMatch(
+    chat,
+    /DELETE FROM mensagens_privadas WHERE conversa_id = \?"\)/,
+    "a exclusão não pode voltar a apagar a conversa inteira: acima do lote isso perdia mensagens que nunca subiram",
+  );
+  assert.match(
+    chat,
+    /DELETE FROM mensagens_privadas\s*\n\s*WHERE conversa_id = \? AND id IN \(/,
+    "só os ids efetivamente enviados ao Drive podem ser apagados",
+  );
+  // O laço precisa avançar: sem o `mp.id > ?` o lote seguinte repetiria o
+  // primeiro e a migração nunca terminaria.
+  assert.match(chat, /WHERE mp\.conversa_id = \? AND mp\.id > \?/);
+  assert.match(chat, /legacyMessages\(conversationId, lastMigratedId\)/);
+});
+
+// Notificações contavam as não lidas sobre o lote carregado, então quem tivesse
+// mais não lidas que o tamanho do lote via um número menor que o real.
+test("notificações paginam por cursor e contam não lidas fora do lote", async () => {
+  const { database, d1 } = await createPilotD1();
+  const usuarioId = await createPilotUser(database, {
+    nome: "Membro Notificacoes",
+    email: "membro.notif@example.test",
+    senha: "Membro123",
+    memberships: [{ comunidadeId: 1, papel: "MEMBRO" }],
+  });
+
+  // 80 não lidas: mais que o lote padrão de 60.
+  const TOTAL = 80;
+  for (let indice = 0; indice < TOTAL; indice += 1) {
+    database
+      .prepare(
+        `INSERT INTO notificacoes_sistema
+          (usuario_id, comunidade_id, tipo, titulo, mensagem, area, destino_rota,
+           criado_por, criado_em)
+         VALUES (?, 1, 'SISTEMA', ?, 'Mensagem', 'SISTEMA', '/painel', ?, ?)`,
+      )
+      .run(
+        usuarioId,
+        `Notificacao ${String(indice).padStart(3, "0")}`,
+        usuarioId,
+        `2027-01-01 00:${String(indice % 60).padStart(2, "0")}:00`,
+      );
+  }
+
+  const worker = await loadWorker();
+  const env = createEnv(d1);
+  const cookie = await login(worker, env, "membro.notif@example.test", "Membro123");
+
+  async function pedirLote(cursor) {
+    const address = new URL("http://localhost/api/pilot/notificacoes");
+    if (cursor) address.searchParams.set("cursor", cursor);
+    const response = await worker.fetch(
+      new Request(address, { headers: { cookie } }),
+      env,
+      context,
+    );
+    assert.equal(response.status, 200);
+    return response.json();
+  }
+
+  const primeiro = await pedirLote(null);
+  assert.equal(primeiro.notifications.length, 60);
+  assert.ok(primeiro.nextCursor, "deve haver lote seguinte");
+  // O contador descreve todas as não lidas, não só as do lote.
+  assert.equal(primeiro.unread, TOTAL);
+
+  const vistos = [];
+  let cursor = null;
+  let lotes = 0;
+  do {
+    const lote = await pedirLote(cursor);
+    for (const item of lote.notifications) vistos.push(item.id);
+    cursor = lote.nextCursor;
+    lotes += 1;
+    assert.ok(lotes <= 10, "paginação não terminou");
+  } while (cursor);
+
+  assert.equal(vistos.length, TOTAL, "a paginação precisa alcançar todas");
+  assert.equal(new Set(vistos).size, TOTAL, "nenhuma repetida");
 
   database.close();
 });

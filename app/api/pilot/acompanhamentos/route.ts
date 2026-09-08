@@ -13,6 +13,15 @@ export async function GET(request: Request) {
   if (!Number.isInteger(visitorId) || visitorId <= 0) {
     return Response.json({ error: "Visitante inválido." }, { status: 400 });
   }
+  // Histórico por visitante: antes eram 50 fixos, sem forma de ver os
+  // anteriores. O cursor é o id do último item, já que a ordem é por id.
+  const followUpParams = new URL(request.url).searchParams;
+  const rawCursor = Number(followUpParams.get("cursor") || 0);
+  const followUpCursor =
+    Number.isInteger(rawCursor) && rawCursor > 0 ? rawCursor : 0;
+  const rawSize = Number(followUpParams.get("limite") || 0);
+  const followUpPageSize =
+    Number.isInteger(rawSize) && rawSize > 0 ? Math.min(rawSize, 100) : 50;
   const result = await getD1()
     .prepare(
       `SELECT a.id, a.visitante_id, a.tipo, a.resultado, a.descricao,
@@ -26,13 +35,28 @@ export async function GET(request: Request) {
       WHERE a.visitante_id = ?
         AND a.comunidade_id = ?
         AND a.escopo_confirmado = 1
+        AND (? = 0 OR a.id < ?)
       ORDER BY a.id DESC
-      LIMIT 50`,
+      LIMIT ?`,
     )
-    .bind(visitorId, access.context.comunidadeId)
-    .all();
+    .bind(
+      visitorId,
+      access.context.comunidadeId,
+      followUpCursor > 0 ? 1 : 0,
+      followUpCursor,
+      followUpPageSize + 1,
+    )
+    .all<{ id: number }>();
+  const hasMoreFollowUps = result.results.length > followUpPageSize;
+  if (hasMoreFollowUps) result.results.length = followUpPageSize;
+  const lastFollowUp = result.results[result.results.length - 1];
   return Response.json(
-    { acompanhamentos: result.results },
+    {
+      acompanhamentos: result.results,
+      // O histórico desce por id, então o cursor é o id do último item do lote.
+      nextCursor:
+        hasMoreFollowUps && lastFollowUp ? Number(lastFollowUp.id) : null,
+    },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

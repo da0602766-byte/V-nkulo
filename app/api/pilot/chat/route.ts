@@ -268,27 +268,47 @@ async function ensureDriveConversation(access: ValidAccess, conversationId: numb
   const accessToken = await getDriveAccessToken(row.proprietario_usuario_id);
   if (row.drive_file_id) return { accessToken, folderId: row.drive_file_id };
   const folderId = await createDriveFolder(accessToken, `Conversa ${conversationId}`, row.pasta_conversas_id);
-  const legacy = await legacyMessages(conversationId);
-  for (const message of legacy) {
-    const encrypted = await encryptDrivePayload(message);
-    await uploadDriveFile(accessToken, {
-      name: `mensagem-${message.id}.vinkulo`,
-      type: "application/vnd.vinkulo.encrypted+json",
-      bytes: encrypted,
-      parentId: folderId,
-      properties: { type: "chat-message", conversationId: String(conversationId), messageId: String(message.id) },
-    });
+  // A migração lia um único lote de mensagens e em seguida apagava a conversa
+  // inteira do banco: acima do tamanho do lote, o que não tinha subido era
+  // apagado junto e se perdia. Agora o laço avança por lotes e cada lote só é
+  // apagado depois de ter subido, então uma falha no meio deixa o que restou
+  // intacto para a próxima tentativa.
+  let lastMigratedId = 0;
+  for (;;) {
+    const batch = await legacyMessages(conversationId, lastMigratedId);
+    if (!batch.length) break;
+    const migratedIds: number[] = [];
+    for (const message of batch) {
+      const encrypted = await encryptDrivePayload(message);
+      await uploadDriveFile(accessToken, {
+        name: `mensagem-${message.id}.vinkulo`,
+        type: "application/vnd.vinkulo.encrypted+json",
+        bytes: encrypted,
+        parentId: folderId,
+        properties: { type: "chat-message", conversationId: String(conversationId), messageId: String(message.id) },
+      });
+      migratedIds.push(Number(message.id));
+      lastMigratedId = Math.max(lastMigratedId, Number(message.id));
+    }
+    const placeholders = migratedIds.map(() => "?").join(", ");
+    await db
+      .prepare(
+        `DELETE FROM mensagens_privadas
+         WHERE conversa_id = ? AND id IN (${placeholders})`,
+      )
+      .bind(conversationId, ...migratedIds)
+      .run();
   }
-  await db.batch([
-    db.prepare("DELETE FROM mensagens_privadas WHERE conversa_id = ?").bind(conversationId),
-    db.prepare(
+  await db
+    .prepare(
       "UPDATE conversas_privadas SET drive_file_id = ?, storage_provider = 'GOOGLE_DRIVE', atualizado_em = CURRENT_TIMESTAMP WHERE id = ?",
-    ).bind(folderId, conversationId),
-  ]);
+    )
+    .bind(folderId, conversationId)
+    .run();
   return { accessToken, folderId };
 }
 
-async function legacyMessages(conversationId: number) {
+async function legacyMessages(conversationId: number, afterId = 0) {
   const result = await getD1().prepare(
     `SELECT mp.id, mp.remetente_id, mp.mensagem, mp.lida_em, mp.criado_em,
       u.nome AS remetente_nome,
@@ -308,8 +328,9 @@ async function legacyMessages(conversationId: number) {
      JOIN conversas_privadas c ON c.id = mp.conversa_id
      JOIN usuarios u ON u.id = mp.remetente_id
      JOIN usuario_comunidades uc ON uc.usuario_id = u.id AND uc.comunidade_id = c.comunidade_id
-     WHERE mp.conversa_id = ? ORDER BY mp.id ASC LIMIT 500`,
-  ).bind(conversationId).all<DriveMessage>();
+     WHERE mp.conversa_id = ? AND mp.id > ?
+     ORDER BY mp.id ASC LIMIT 500`,
+  ).bind(conversationId, afterId).all<DriveMessage>();
   return result.results;
 }
 
