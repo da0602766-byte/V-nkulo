@@ -366,3 +366,40 @@ test("biblioteca agrupa links por item, renomeia e exclui em bloco", async () =>
   );
   database.close();
 });
+
+// QA responsivo de 08/09/2026 (Etapa 13), medido em navegador a 360, 390, 412,
+// 768 e 1366px: os pontos do carrossel de depoimentos são botões de 9x9px,
+// muito abaixo do alvo de toque mínimo de 44px, e no celular era preciso mirar.
+//
+// A área clicável foi estendida por ::after, mas a largura ficou limitada aos
+// 8px do espaçamento — 4px de cada lado. A primeira tentativa usou 44px de
+// largura e o navegador mostrou que os alvos de pontos vizinhos passavam a se
+// sobrepor, fazendo o ponto errado receber o clique. Um alvo largo demais aqui
+// é pior que um alvo pequeno.
+test("os pontos do carrossel têm alvo de toque ampliado sem invadir o vizinho", async () => {
+  const css = await readFile(
+    new URL("../app/recepcao.css", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    css,
+    /\.rc-testimonial-dots button \{[^}]*position: relative/,
+    "o botão precisa ser o contexto de posicionamento do alvo estendido",
+  );
+  assert.match(
+    css,
+    /\.rc-testimonial-dots button::after \{[^}]*height: 44px/,
+    "a altura do alvo deve alcançar os 44px: acima e abaixo não há vizinho",
+  );
+  assert.match(
+    css,
+    /\.rc-testimonial-dots button::after \{[^}]*width: calc\(100% \+ 8px\)/,
+    "a largura do alvo só pode crescer o espaçamento entre os pontos; mais que isso faz o vizinho roubar o clique",
+  );
+  assert.doesNotMatch(
+    css,
+    /\.rc-testimonial-dots button::after \{[^}]*width: 44px/,
+    "44px de largura sobre pontos a 17px de distância sobrepõe alvos vizinhos",
+  );
+});
