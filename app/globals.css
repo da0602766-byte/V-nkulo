@@ -8467,7 +8467,22 @@ td small {
   --pilot-surface: #fbfbfa;
   --pilot-surface-2: #e9ecef;
   --pilot-text: #1b2430;
-  --pilot-muted: #687380;
+  /* Escurecido de #687380 no mesmo QA: o valor anterior ficava entre 4,07 e
+     4,35:1 conforme a superfície, todos abaixo dos 4,5:1 exigidos. #5f6975 dá
+     de 4,67 a 5,39:1 nas quatro superfícies claras em uso e continua bem
+     distinto do texto principal (2,81:1 entre os dois), preservando a
+     hierarquia visual. No tema escuro o cinza já passava com folga. */
+  --pilot-muted: #5f6975;
+  /* QA de acessibilidade de 08/09/2026 (Etapa 14), medido em navegador.
+     Estas duas cores precisam de valor por tema: uma só não serve os dois. O
+     vermelho de antes (#dc4f68) dava 3,78:1 sobre a superfície clara — abaixo
+     dos 4,5:1 do WCAG AA para texto normal — e 4,54:1 sobre a escura. Escurecer
+     para acertar o claro apenas inverteu o problema, medido e confirmado, então
+     cada tema fica com o seu valor. Mesmo caso do verde de presença.
+     `--pilot-danger` já era usado em várias regras sem nunca ter sido definido:
+     elas ficavam sem cor e herdavam a do pai. */
+  --pilot-danger: #c6475e;
+  --pilot-success: #238258;
   --pilot-line: #d6dbe0;
   --pilot-navy: #080b10;
   /* Acento do painel — cobre, o mesmo da superfície pública.
@@ -8489,6 +8504,8 @@ html[data-pilot-theme="escuro"] {
   --pilot-surface-2: #1e232a;
   --pilot-text: #edf1f5;
   --pilot-muted: #98a3b0;
+  --pilot-danger: #dc4f68;
+  --pilot-success: #2a9c6a;
   --pilot-line: #2e353e;
   --pilot-purple: #d9784c;
   --pilot-blue: #4d9fff;
@@ -8534,6 +8551,8 @@ html[data-pilot-theme="escuro"] .pilot-dashboard[data-community-palette] {
     --pilot-surface-2: #1e232a;
     --pilot-text: #edf1f5;
     --pilot-muted: #98a3b0;
+    --pilot-danger: #dc4f68;
+    --pilot-success: #2a9c6a;
     --pilot-line: #2e353e;
     --pilot-purple: #d9784c;
     --pilot-blue: #4d9fff;
@@ -12899,7 +12918,7 @@ html[data-pilot-theme="escuro"] .pilot-dashboard[data-community-palette] {
 }
 .social-feed-card>header>div>span {
   margin-top:3px;
-  color:#8d887f;
+  color:#706c65;
   font-size:var(--fs-xs);
 }
 .social-post-category {
@@ -12973,7 +12992,7 @@ html[data-pilot-theme="escuro"] .pilot-dashboard[data-community-palette] {
   gap:15px;
   padding:13px 19px;
   border-top:1px solid #eee8dd;
-  color:#8d887f;
+  color:#706c65;
   font-size:var(--fs-xs);
 }
 .social-feed-card>footer a { color:#9b671f; font-weight:850; text-decoration:none; }
@@ -13041,7 +13060,7 @@ html[data-pilot-theme="escuro"] .pilot-dashboard[data-community-palette] {
 }
 .public-comments-list article time {
   margin-left:auto;
-  color:#8d887f;
+  color:#706c65;
   font-size:var(--fs-2xs);
 }
 .public-comments-list article p {
@@ -13054,7 +13073,7 @@ html[data-pilot-theme="escuro"] .pilot-dashboard[data-community-palette] {
 .superadmin-profile-detail {
   display:block;
   margin-top:4px;
-  color:#8d887f;
+  color:#706c65;
   font-size:var(--fs-2xs);
 }
 .comments-message {
@@ -13178,8 +13197,12 @@ html[data-pilot-theme="escuro"] .pilot-dashboard[data-community-palette] {
 .public-rail-list>a>div strong,
 .public-rail-list>a>div small { display:block; }
 .public-rail-list>a>div strong { font-size:var(--fs-sm); }
-.public-rail-list>a>div small { margin-top:4px; color:#8d887f; font-size:var(--fs-2xs); }
-.public-rail-empty,.home-rail-empty { color:#8d887f; font-size:var(--fs-sm); line-height:1.55; }
+.public-rail-list>a>div small { margin-top:4px; color:#706c65; font-size:var(--fs-2xs); }
+/* QA de acessibilidade de 08/09/2026 (Etapa 14): este cinza era #8d887f e
+   dava 3,40:1 sobre a superfície clara, abaixo dos 4,5:1 do WCAG AA. #706c65
+   dá 4,68:1 no pior caso das superfícies em uso, mantendo o mesmo matiz
+   quente. Trocado nas oito regras que o usavam. */
+.public-rail-empty,.home-rail-empty { color:#706c65; font-size:var(--fs-sm); line-height:1.55; }
 .public-community-mini-list { display:grid; }
 .public-community-mini-list>a {
   display:grid;
@@ -13205,7 +13228,7 @@ html[data-pilot-theme="escuro"] .pilot-dashboard[data-community-palette] {
 .public-community-mini-list strong,
 .public-community-mini-list small { display:block; }
 .public-community-mini-list strong { font-size:var(--fs-xs); }
-.public-community-mini-list small { margin-top:3px; color:#8d887f; font-size:var(--fs-2xs); }
+.public-community-mini-list small { margin-top:3px; color:#706c65; font-size:var(--fs-2xs); }
 .public-privacy-card>span { color:#a76f20; font-size:var(--fs-4xl); }
 .public-privacy-card>strong { display:block; margin:12px 0 6px; font-size:var(--fs-md); }
 .public-privacy-card>p { margin:0 0 12px; color:#746f65; font-size:var(--fs-xs); line-height:1.55; }
@@ -13219,7 +13242,7 @@ html[data-pilot-theme="escuro"] .pilot-dashboard[data-community-palette] {
   margin:auto;
   padding:25px 0 38px;
   border-top:1px solid #e8e2d8;
-  color:#8d887f;
+  color:#706c65;
   font-size:var(--fs-xs);
 }
 .social-public-footer>div { display:flex; flex-wrap:wrap; gap:16px; }
@@ -14216,7 +14239,7 @@ html[data-pilot-theme="escuro"] .pilot-dashboard[data-community-palette] {
   padding:6px 9px;
   border-radius:999px;
   background:color-mix(in srgb,#35cc8a 13%,var(--pilot-surface));
-  color:#2a9c6a;
+  color:var(--pilot-success);
   font-size:var(--fs-2xs);
   font-weight:900;
 }
@@ -14286,7 +14309,7 @@ html[data-pilot-theme="escuro"] .pilot-dashboard[data-community-palette] {
   font-weight:800;
   white-space:nowrap;
 }
-.presence-list .presence-person>em.online { color:#2a9c6a; }
+.presence-list .presence-person>em.online { color:var(--pilot-success); }
 .presence-profile-popover { position:relative; z-index:8; display:grid; gap:12px; margin-top:10px; padding:14px; border:1px solid var(--pilot-line); border-radius:15px; background:var(--pilot-surface-2); color:var(--pilot-text); box-shadow:0 18px 45px rgb(10 20 35 / .16); }
 .presence-profile-popover>header { display:flex; align-items:start; justify-content:space-between; gap:10px; }
 .presence-profile-popover>header>div { display:grid; gap:3px; }
@@ -20985,7 +21008,12 @@ html[data-pilot-theme="escuro"] .owner-grid-toolbar button { border-color: #3140
 .pilot-user-popover > header small { overflow: hidden; color: var(--pilot-muted); font-size: var(--fs-2xs); text-overflow: ellipsis; white-space: nowrap; }
 .pilot-user-popover > :is(a,button) { min-height: 42px; display: flex; align-items: center; border: 0; border-radius: 11px; background: transparent; color: var(--pilot-text); padding: 0 12px; font: inherit; font-size: var(--fs-xs); font-weight: 800; text-align: left; text-decoration: none; cursor: pointer; }
 .pilot-user-popover > :is(a,button):hover { background: var(--pilot-surface-2); }
-.pilot-user-popover > .danger { color: #dc4f68; }
+/* QA de acessibilidade de 08/09/2026 (Etapa 14), medido em navegador: o
+   vermelho anterior (#dc4f68) dava 3,78:1 sobre a superfície clara, abaixo do
+   mínimo de 4,5:1 do WCAG AA para texto normal. var(--pilot-danger) dá 4,54:1 mantendo o
+   mesmo matiz. O verde de presença mudou de #2a9c6a (3,34:1) para var(--pilot-success)
+   (4,59:1) pela mesma razão. No tema escuro os dois já passavam. */
+.pilot-user-popover > .danger { color: var(--pilot-danger); }
 
 .community-home-command {
   position: relative;
@@ -21010,7 +21038,7 @@ html[data-pilot-theme="escuro"] .owner-grid-toolbar button { border-color: #3140
 .community-home-account > div .verified-owner-name { font-size: var(--fs-xs); font-weight: 900; }
 .community-home-account > div small { color: var(--pilot-muted); font-size: var(--fs-2xs); }
 .community-home-account > :is(button,a) { min-height: 34px; border: 1px solid var(--pilot-line); border-radius: 10px; background: var(--pilot-surface); color: var(--pilot-text); padding: 0 10px; font: inherit; font-size: var(--fs-2xs); font-weight: 850; text-decoration: none; cursor: pointer; }
-.community-home-account > a { display: flex; align-items: center; color: #dc4f68; }
+.community-home-account > a { display: flex; align-items: center; color: var(--pilot-danger); }
 .community-home-actions { grid-column: 1/-1; display: flex; gap: 9px; }
 .community-home-actions a { min-height: 42px; display: inline-flex; align-items: center; border: 1px solid var(--pilot-line); border-radius: 12px; background: var(--pilot-surface-2); color: var(--pilot-purple); padding: 0 16px; font-size: var(--fs-xs); font-weight: 850; text-decoration: none; }
 .community-home-kpis { grid-column: 1/-1; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; }
@@ -21054,7 +21082,7 @@ html[data-pilot-theme="escuro"] .owner-grid-toolbar button { border-color: #3140
 .community-substitute-actions button.secondary { border: 1px solid var(--pilot-line); background: var(--pilot-surface); color: var(--pilot-text); }
 .community-schedule-state { max-width: 120px; border-radius: 999px; background: var(--pilot-surface); color: var(--pilot-muted); padding: 7px 9px; font-size: var(--fs-2xs); font-weight: 900; text-align: center; }
 .community-schedule-state.confirmada { background: color-mix(in srgb,#22a06b 12%,var(--pilot-surface)); color: #168158; }
-.community-schedule-state.indisponivel,.community-schedule-state.ausente { background: color-mix(in srgb,#dc4f68 10%,var(--pilot-surface)); color: #c33c55; }
+.community-schedule-state.indisponivel,.community-schedule-state.ausente { background: color-mix(in srgb,var(--pilot-danger) 10%,var(--pilot-surface)); color: #c33c55; }
 .community-schedule-empty { min-height: 84px; display: flex; align-items: center; justify-content: center; gap: 12px; border: 1px dashed var(--pilot-line); border-radius: 15px; color: var(--pilot-muted); text-align: left; }
 .community-schedule-empty > span { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 12px; background: color-mix(in srgb,#22a06b 12%,var(--pilot-surface)); color: #168158; font-weight: 900; }
 .community-schedule-empty strong { color: var(--pilot-text); font-size: var(--fs-xs); }
@@ -21757,7 +21785,7 @@ html[data-pilot-theme="claro"] .social-public-community .community-public-avatar
 .pilot-mobile-nav .mobile-profile-initials { overflow: hidden; }
 .pilot-mobile-nav .mobile-profile-initials img { width: 100%; height: 100%; display: block; object-fit: cover; }
 .pilot-access-denied-inline { min-height: min(560px,65dvh); display: grid; grid-template-columns: 64px minmax(0,620px); align-content: center; justify-content: center; gap: 18px; }
-.pilot-access-denied-inline > span { width: 64px; height: 64px; display: grid; place-items: center; border-radius: 20px; background: color-mix(in srgb,#dc4f68 12%,var(--pilot-surface)); color: #c43b55; font-size: 1.6rem; }
+.pilot-access-denied-inline > span { width: 64px; height: 64px; display: grid; place-items: center; border-radius: 20px; background: color-mix(in srgb,var(--pilot-danger) 12%,var(--pilot-surface)); color: #c43b55; font-size: 1.6rem; }
 .pilot-access-denied-inline h1 { margin: 4px 0 9px; font-size: clamp(2rem,6vw,3.6rem); line-height: 1; letter-spacing: -.045em; }
 .pilot-access-denied-inline p:not(.pilot-kicker) { color: var(--pilot-muted); line-height: 1.6; }
 .pilot-access-denied-inline button { min-height: 44px; border: 0; border-radius: 12px; background: var(--pilot-gradient); color: #fff; padding: 0 15px; font-weight: 850; cursor: pointer; }
@@ -29596,7 +29624,7 @@ body {
 .agenda-camada.camada-pessoal.active span { background:#3fc9b0; }
 .agenda-novo { margin-left:auto; min-height:36px; padding:0 14px; border:0; border-radius:9px; background:var(--pilot-primary); color:#fff; font-size:var(--fs-xs); font-weight:800; cursor:pointer; }
 
-.agenda-erro { margin:0; border:1px solid color-mix(in srgb,#dc4f68 40%,var(--pilot-line)); border-radius:10px; background:color-mix(in srgb,#dc4f68 10%,var(--pilot-surface)); color:#dc4f68; padding:10px 12px; font-size:var(--fs-xs); }
+.agenda-erro { margin:0; border:1px solid color-mix(in srgb,var(--pilot-danger) 40%,var(--pilot-line)); border-radius:10px; background:color-mix(in srgb,var(--pilot-danger) 10%,var(--pilot-surface)); color:var(--pilot-danger); padding:10px 12px; font-size:var(--fs-xs); }
 
 .agenda-form { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; border:1px solid var(--pilot-line); border-radius:12px; background:var(--pilot-surface-2); padding:14px; }
 .agenda-form label { display:grid; gap:5px; color:var(--pilot-muted); font-size:var(--fs-2xs); font-weight:700; }
