@@ -7,11 +7,38 @@ import { recordPromotionNotice } from "../../../lib/recepcao";
 import { recordTenantAudit } from "../../../lib/tenant-audit";
 import { requireTenantPermission } from "../../../lib/tenant";
 
-// Trava de segurança para evitar respostas sem limite em comunidades muito
-// maiores que o uso atual. O item adicional permite informar quando houve corte.
-const PEOPLE_SAFETY_LIMIT = 2000;
+// Lote pedido a cada carregamento. A lista antes baixava até 2.000 pessoas de
+// uma vez e paginava no navegador; agora o corte é por cursor no servidor, e a
+// tela pede o próximo lote conforme a pessoa avança.
+const PEOPLE_PAGE_SIZE = 30;
+const PEOPLE_MAX_PAGE_SIZE = 50;
 
-export async function GET() {
+// O cursor carrega o par (nome, membership_id), que é exatamente a ordenação
+// usada na consulta. Guardar a posição em vez de um deslocamento evita pular ou
+// repetir alguém quando um cadastro entra ou sai entre dois lotes.
+type PeopleCursor = { nome: string; id: number };
+
+function encodePeopleCursor(cursor: PeopleCursor) {
+  return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
+}
+
+function decodePeopleCursor(value: string | null): PeopleCursor | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(value, "base64url").toString("utf8"),
+    ) as Partial<PeopleCursor>;
+    const id = Number(parsed.id);
+    if (typeof parsed.nome !== "string" || !Number.isInteger(id) || id <= 0) {
+      return null;
+    }
+    return { nome: parsed.nome, id };
+  } catch {
+    return null;
+  }
+}
+
+export async function GET(request: Request) {
   const access = await requireTenantPermission("dashboard.view");
   if ("error" in access) return access.error;
   const canDeleteGlobal = access.user.system_owner === true;
@@ -81,6 +108,8 @@ export async function GET() {
       {
         me: verifiedMe,
         people: [],
+        nextCursor: null,
+        counts: { membros: 0, oficiais: 0, oficiaisSemTitulo: 0 },
         canViewPeople: false,
         canManage: false,
         canDeleteGlobal,
@@ -91,35 +120,106 @@ export async function GET() {
     );
   }
 
-  const rows = await db
-    .prepare(
-      `SELECT uc.id AS membership_id, u.id AS usuario_id, u.nome, u.email,
-        u.criado_em AS owner_criado_em,
-        u.telefone, u.foto_perfil, uc.papel,
-        CASE WHEN oc.id IS NULL THEN 0 ELSE 1 END AS oficial,
-        COALESCE(oc.titulo, '') AS titulo_oficial,
-        COALESCE(oc.permissoes, '') AS permissoes,
-        uc.status, uc.criado_em,
-        COALESCE(oc.atualizado_em, uc.criado_em) AS atualizado_em
-       FROM usuario_comunidades uc
-       JOIN usuarios u ON u.id = uc.usuario_id
-       LEFT JOIN oficiais_comunidade oc
-         ON oc.usuario_comunidade_id = uc.id
-       WHERE uc.comunidade_id = ? AND u.ativo = 1
-       ORDER BY oficial DESC, u.nome ASC, uc.id ASC
-       LIMIT ?`,
-    )
-    .bind(access.context.comunidadeId, PEOPLE_SAFETY_LIMIT + 1)
-    .all<Record<string, unknown>>();
-  const peopleTruncated = rows.results.length > PEOPLE_SAFETY_LIMIT;
-  const people = peopleTruncated
-    ? rows.results.slice(0, PEOPLE_SAFETY_LIMIT)
-    : rows.results;
+  // A busca e a separação entre membros e oficiais saíram do navegador para o
+  // SQL: filtrar depois de baixar só funcionava porque a lista inteira vinha
+  // junto, que é justamente o que a paginação evita.
+  const address = new URL(request.url);
+  const search = (address.searchParams.get("busca") || "").trim().slice(0, 80);
+  const officialsOnly = address.searchParams.get("aba") === "oficiais" ? 1 : 0;
+  const cursor = decodePeopleCursor(address.searchParams.get("cursor"));
+  const requestedSize = Number(address.searchParams.get("limite") || 0);
+  const pageSize =
+    Number.isInteger(requestedSize) && requestedSize > 0
+      ? Math.min(requestedSize, PEOPLE_MAX_PAGE_SIZE)
+      : PEOPLE_PAGE_SIZE;
+  const searchTerm = `%${search.replaceAll("%", "").replaceAll("_", "")}%`;
+
+  const [rows, totals] = await Promise.all([
+    db
+      .prepare(
+        `SELECT uc.id AS membership_id, u.id AS usuario_id, u.nome, u.email,
+          u.criado_em AS owner_criado_em,
+          u.telefone, u.foto_perfil, uc.papel,
+          CASE WHEN oc.id IS NULL THEN 0 ELSE 1 END AS oficial,
+          COALESCE(oc.titulo, '') AS titulo_oficial,
+          COALESCE(oc.permissoes, '') AS permissoes,
+          uc.status, uc.criado_em,
+          COALESCE(oc.atualizado_em, uc.criado_em) AS atualizado_em
+         FROM usuario_comunidades uc
+         JOIN usuarios u ON u.id = uc.usuario_id
+         LEFT JOIN oficiais_comunidade oc
+           ON oc.usuario_comunidade_id = uc.id
+         WHERE uc.comunidade_id = ? AND u.ativo = 1
+           AND (CASE WHEN oc.id IS NULL THEN 0 ELSE 1 END) = ?
+           AND (
+             ? = ''
+             OR u.nome LIKE ?
+             OR u.email LIKE ?
+             OR COALESCE(u.telefone, '') LIKE ?
+           )
+           AND (
+             ? = 0
+             OR u.nome > ?
+             OR (u.nome = ? AND uc.id > ?)
+           )
+         ORDER BY u.nome ASC, uc.id ASC
+         LIMIT ?`,
+      )
+      .bind(
+        access.context.comunidadeId,
+        officialsOnly,
+        search,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        cursor ? 1 : 0,
+        cursor?.nome ?? "",
+        cursor?.nome ?? "",
+        cursor?.id ?? 0,
+        pageSize + 1,
+      )
+      .all<Record<string, unknown>>(),
+    // Os cartões do topo mostram o total da comunidade, não o do lote
+    // carregado, então a contagem é feita no banco e não sobre as linhas
+    // devolvidas.
+    db
+      .prepare(
+        `SELECT
+          SUM(CASE WHEN oc.id IS NULL THEN 1 ELSE 0 END) AS membros,
+          SUM(CASE WHEN oc.id IS NULL THEN 0 ELSE 1 END) AS oficiais,
+          SUM(CASE WHEN oc.id IS NOT NULL AND COALESCE(oc.titulo, '') = ''
+                THEN 1 ELSE 0 END) AS oficiais_sem_titulo
+         FROM usuario_comunidades uc
+         JOIN usuarios u ON u.id = uc.usuario_id
+         LEFT JOIN oficiais_comunidade oc
+           ON oc.usuario_comunidade_id = uc.id
+         WHERE uc.comunidade_id = ? AND u.ativo = 1`,
+      )
+      .bind(access.context.comunidadeId)
+      .first<{ membros: number; oficiais: number; oficiais_sem_titulo: number }>(),
+  ]);
+
+  const hasMore = rows.results.length > pageSize;
+  const people = hasMore ? rows.results.slice(0, pageSize) : rows.results;
+  const last = people[people.length - 1];
+  const nextCursor =
+    hasMore && last
+      ? encodePeopleCursor({
+          nome: String(last.nome ?? ""),
+          id: Number(last.membership_id),
+        })
+      : null;
+
   return Response.json(
     {
       me: verifiedMe,
       people: people.map(withOwnerVerification),
-      peopleTruncated,
+      nextCursor,
+      counts: {
+        membros: Number(totals?.membros || 0),
+        oficiais: Number(totals?.oficiais || 0),
+        oficiaisSemTitulo: Number(totals?.oficiais_sem_titulo || 0),
+      },
       canViewPeople: true,
       canManage: access.context.permissions.includes("officials.manage"),
       canDeleteGlobal,

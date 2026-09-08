@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import VerifiedOwnerName from "./VerifiedOwnerName";
 
 type Person = {
@@ -33,9 +33,19 @@ type Me = {
   owner_verified?: number;
 };
 
+type PeopleCounts = {
+  membros: number;
+  oficiais: number;
+  oficiaisSemTitulo: number;
+};
+
 type PeopleResponse = {
   me: Me | null;
   people: Person[];
+  // Posição do último item do lote. Nulo quando não há mais ninguém depois.
+  nextCursor?: string | null;
+  // Totais da comunidade inteira, não do lote carregado.
+  counts?: PeopleCounts;
   canViewPeople: boolean;
   canManage: boolean;
   canDeleteGlobal?: boolean;
@@ -113,7 +123,7 @@ export default function PeopleWorkspace({
   const [message, setMessage] = useState("");
   const [tab, setTab] = useState<"membros" | "oficiais">("membros");
   const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [editing, setEditing] = useState<Person | null>(null);
   const [permissionDraft, setPermissionDraft] = useState<string[]>([]);
   const [presetTitle, setPresetTitle] = useState("LÍDER");
@@ -121,45 +131,51 @@ export default function PeopleWorkspace({
   const [removeConfirmation, setRemoveConfirmation] = useState("");
   const [removalIssue, setRemovalIssue] = useState<{ message: string; blockers: RemovalBlocker[] } | null>(null);
 
-  const load = useCallback(async (quiet = false) => {
-    if (!quiet) setLoading(true);
-    setError("");
-    try {
-      const response = await fetch("/api/pilot/pessoas", { cache: "no-store" });
-      const result = (await response.json()) as PeopleResponse;
-      if (!response.ok) {
-        throw new Error(result.error || "Não foi possível carregar as pessoas.");
+  // `cursor` vazio recomeça a lista (troca de aba, nova busca, recarga depois de
+  // uma alteração); com cursor, o lote novo é anexado ao que já está na tela.
+  const load = useCallback(
+    async (options: { quiet?: boolean; cursor?: string | null } = {}) => {
+      const { quiet = false, cursor = null } = options;
+      if (cursor) setLoadingMore(true);
+      else if (!quiet) setLoading(true);
+      setError("");
+      try {
+        const address = new URL("/api/pilot/pessoas", window.location.origin);
+        address.searchParams.set("aba", tab);
+        const term = search.trim();
+        if (term) address.searchParams.set("busca", term);
+        if (cursor) address.searchParams.set("cursor", cursor);
+        const response = await fetch(address, { cache: "no-store" });
+        const result = (await response.json()) as PeopleResponse;
+        if (!response.ok) {
+          throw new Error(result.error || "Não foi possível carregar as pessoas.");
+        }
+        setData((current) =>
+          cursor
+            ? { ...result, people: [...current.people, ...result.people] }
+            : result,
+        );
+      } catch (loadError) {
+        setError((loadError as Error).message);
+      } finally {
+        setLoadingMore(false);
+        if (!quiet) setLoading(false);
       }
-      setData(result);
-    } catch (loadError) {
-      setError((loadError as Error).message);
-    } finally {
-      if (!quiet) setLoading(false);
-    }
-  }, []);
+    },
+    [search, tab],
+  );
 
+  // A busca agora roda no banco, então cada tecla viraria uma consulta; o
+  // intervalo abaixo espera a digitação parar antes de recomeçar a lista.
   useEffect(() => {
-    const timer = window.setTimeout(() => void load(), 0);
+    const timer = window.setTimeout(() => void load(), search ? 300 : 0);
     return () => window.clearTimeout(timer);
-  }, [load]);
+  }, [load, search]);
 
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return data.people.filter((person) => {
-      if (tab === "oficiais" && !person.oficial) return false;
-      if (tab === "membros" && person.oficial) return false;
-      return (
-        !term ||
-        person.nome.toLowerCase().includes(term) ||
-        person.email.toLowerCase().includes(term) ||
-        String(person.telefone || "").includes(term)
-      );
-    });
-  }, [data.people, search, tab]);
-  const pageSize = 8;
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const currentPage = Math.min(page, totalPages);
-  const pagedPeople = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  // A aba e a busca são resolvidas no servidor, então o que chega já é o
+  // resultado filtrado: filtrar de novo aqui esconderia gente do lote seguinte.
+  const filtered = data.people;
+  const pagedPeople = filtered;
 
   async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -178,7 +194,7 @@ export default function PeopleWorkspace({
         throw new Error(result.error || "Não foi possível atualizar o perfil.");
       }
       setMessage("Seu perfil foi atualizado.");
-      await load(true);
+      await load({ quiet: true });
     } catch (saveError) {
       setError((saveError as Error).message);
     } finally {
@@ -211,7 +227,7 @@ export default function PeopleWorkspace({
       }
       setEditing(null);
       setMessage("Função e permissões atualizadas com auditoria.");
-      await load(true);
+      await load({ quiet: true });
     } catch (saveError) {
       setError((saveError as Error).message);
     } finally {
@@ -281,8 +297,11 @@ export default function PeopleWorkspace({
     );
   }
 
-  const officials = data.people.filter((person) => Boolean(person.oficial));
-  const members = data.people.length - officials.length;
+  // Os cartões do topo mostram a comunidade inteira. Contar sobre `data.people`
+  // passou a estar errado quando a lista virou paginada: ali só existe o lote
+  // já carregado da aba aberta.
+  const totals = data.counts || { membros: 0, oficiais: 0, oficiaisSemTitulo: 0 };
+  const members = totals.membros;
   return (
     <section className="people-workspace">
       <header className="workspace-heading people-heading">
@@ -322,15 +341,13 @@ export default function PeopleWorkspace({
         </article>
         <article>
           <span>✦</span>
-          <div><small>Oficiais</small><strong>{officials.length}</strong></div>
+          <div><small>Oficiais</small><strong>{totals.oficiais}</strong></div>
         </article>
         <article>
           <span>◇</span>
           <div>
             <small>Sem responsável</small>
-            <strong>
-              {officials.filter((person) => !person.titulo_oficial).length}
-            </strong>
+            <strong>{totals.oficiaisSemTitulo}</strong>
           </div>
         </article>
       </div>
@@ -346,16 +363,16 @@ export default function PeopleWorkspace({
           <button
             type="button"
             className={tab === "membros" ? "active" : ""}
-            onClick={() => { setTab("membros"); setPage(1); }}
+            onClick={() => setTab("membros")}
           >
             Membros <span>{members}</span>
           </button>
           <button
             type="button"
             className={tab === "oficiais" ? "active" : ""}
-            onClick={() => { setTab("oficiais"); setPage(1); }}
+            onClick={() => setTab("oficiais")}
           >
-            Oficiais <span>{officials.length}</span>
+            Oficiais <span>{totals.oficiais}</span>
           </button>
         </div>
         <label>
@@ -363,7 +380,7 @@ export default function PeopleWorkspace({
           <input
             type="search"
             value={search}
-            onChange={(event) => { setSearch(event.target.value); setPage(1); }}
+            onChange={(event) => setSearch(event.target.value)}
             placeholder="Buscar por nome, e-mail ou telefone"
           />
         </label>
@@ -417,15 +434,22 @@ export default function PeopleWorkspace({
         )}
       </div>
 
-      {filtered.length > pageSize && (
+      {(data.nextCursor || filtered.length > 0) && (
         <nav className="people-pagination" aria-label="Paginação de pessoas">
-          <button type="button" disabled={currentPage === 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>
-            ← Anterior
-          </button>
-          <span>Página {currentPage} de {totalPages} · {filtered.length} pessoas</span>
-          <button type="button" disabled={currentPage === totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>
-            Próxima →
-          </button>
+          <span>
+            {filtered.length} {filtered.length === 1 ? "pessoa carregada" : "pessoas carregadas"}
+            {" · "}
+            {tab === "oficiais" ? totals.oficiais : totals.membros} nesta aba
+          </span>
+          {data.nextCursor && (
+            <button
+              type="button"
+              disabled={loadingMore}
+              onClick={() => void load({ cursor: data.nextCursor, quiet: true })}
+            >
+              {loadingMore ? "Carregando…" : "Carregar mais"}
+            </button>
+          )}
         </nav>
       )}
 

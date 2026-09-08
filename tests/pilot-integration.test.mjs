@@ -5086,3 +5086,136 @@ test("oração e solicitações persistem, notificam gestores e respeitam a comu
   );
   database.close();
 });
+
+// A lista de pessoas baixava até 2.000 registros de uma vez e paginava,
+// buscava e separava membros de oficiais dentro do navegador. Este teste cobre
+// a troca para paginação por cursor no servidor: o corte precisa entregar todo
+// mundo exatamente uma vez, sem pular nem repetir, e busca, aba e isolamento
+// por comunidade precisam continuar valendo no SQL.
+test("lista de pessoas pagina por cursor sem perder busca, aba nem isolamento", async () => {
+  const { database, d1 } = await createPilotD1();
+  const pastorId = await createPilotUser(database, {
+    nome: "Aaa Pastor Paginacao",
+    email: "pastor.paginacao@example.test",
+    senha: "Pastor123",
+    memberships: [{ comunidadeId: 1, papel: "PASTOR" }],
+  });
+  assert.ok(pastorId > 0);
+
+  // 70 membros forçam pelo menos três lotes de 30.
+  const criados = [];
+  for (let indice = 0; indice < 70; indice += 1) {
+    const ordem = String(indice).padStart(3, "0");
+    criados.push(`Membro Paginado ${ordem}`);
+    await createPilotUser(database, {
+      nome: `Membro Paginado ${ordem}`,
+      email: `membro.paginado.${ordem}@example.test`,
+      senha: "Membro123",
+      memberships: [{ comunidadeId: 1, papel: "MEMBRO" }],
+    });
+  }
+  await createPilotUser(database, {
+    nome: "Membro Paginado 999 Outra Comunidade",
+    email: "membro.paginado.sul@example.test",
+    senha: "Membro123",
+    memberships: [{ comunidadeId: 2, papel: "MEMBRO" }],
+  });
+
+  const worker = await loadWorker();
+  const env = createEnv(d1);
+  const cookie = await login(
+    worker,
+    env,
+    "pastor.paginacao@example.test",
+    "Pastor123",
+  );
+
+  async function pedirLote(parametros) {
+    const address = new URL("http://localhost/api/pilot/pessoas");
+    for (const [chave, valor] of Object.entries(parametros)) {
+      if (valor) address.searchParams.set(chave, valor);
+    }
+    const response = await worker.fetch(
+      new Request(address, { headers: { cookie } }),
+      env,
+      context,
+    );
+    assert.equal(response.status, 200);
+    return response.json();
+  }
+
+  // Os totais esperados vêm do próprio banco: a comunidade de teste já nasce com
+  // gente, então fixar número na mão tornaria o teste frágil sem cobrir mais.
+  const esperado = database
+    .prepare(
+      `SELECT
+        SUM(CASE WHEN oc.id IS NULL THEN 1 ELSE 0 END) AS membros,
+        SUM(CASE WHEN oc.id IS NULL THEN 0 ELSE 1 END) AS oficiais
+       FROM usuario_comunidades uc
+       JOIN usuarios u ON u.id = uc.usuario_id
+       LEFT JOIN oficiais_comunidade oc ON oc.usuario_comunidade_id = uc.id
+       WHERE uc.comunidade_id = 1 AND u.ativo = 1`,
+    )
+    .get();
+  assert.ok(esperado.membros > 70, "o cenário precisa de mais de dois lotes");
+
+  // Primeiro lote: tamanho limitado e cursor para continuar.
+  const primeiro = await pedirLote({ aba: "membros" });
+  assert.equal(primeiro.people.length, 30);
+  assert.ok(primeiro.nextCursor, "o primeiro lote precisa devolver cursor");
+
+  // Os contadores do topo descrevem a comunidade inteira, não o lote.
+  assert.equal(primeiro.counts.membros, esperado.membros);
+  assert.equal(primeiro.counts.oficiais, esperado.oficiais);
+
+  // Percorrer até o fim não pode pular nem repetir ninguém.
+  const nomes = [];
+  let cursor = null;
+  let lotes = 0;
+  do {
+    const lote = await pedirLote({ aba: "membros", cursor });
+    for (const person of lote.people) nomes.push(person.nome);
+    cursor = lote.nextCursor;
+    lotes += 1;
+    assert.ok(lotes <= 20, "paginação não terminou: possível cursor parado");
+  } while (cursor);
+
+  assert.ok(lotes >= 3, "o cenário precisa exercitar mais de dois lotes");
+  assert.equal(nomes.length, esperado.membros);
+  assert.equal(
+    new Set(nomes).size,
+    esperado.membros,
+    "nenhum nome pode se repetir entre lotes",
+  );
+  // Todos os 70 criados aparecem, cada um uma única vez.
+  for (const nome of criados) {
+    assert.equal(
+      nomes.filter((item) => item === nome).length,
+      1,
+      `${nome} deveria aparecer exatamente uma vez na paginação`,
+    );
+  }
+
+  // Isolamento: quem é de outra comunidade não aparece em lote nenhum.
+  assert.ok(nomes.every((nome) => !nome.includes("Outra Comunidade")));
+
+  // A aba separa membros de oficiais no SQL.
+  const oficiais = await pedirLote({ aba: "oficiais" });
+  assert.equal(oficiais.people.length, esperado.oficiais);
+  assert.ok(oficiais.people.every((person) => person.oficial === 1));
+
+  // A busca roda no banco e continua limitada à comunidade ativa.
+  const busca = await pedirLote({ aba: "membros", busca: "Paginado 01" });
+  assert.equal(busca.people.length, 10);
+  assert.ok(busca.people.every((person) => person.nome.includes("Paginado 01")));
+
+  const buscaVazia = await pedirLote({ aba: "membros", busca: "Outra Comunidade" });
+  assert.equal(buscaVazia.people.length, 0);
+
+  // Cursor corrompido não pode virar erro nem vazar a lista inteira: cai no
+  // comportamento de primeira página.
+  const cursorInvalido = await pedirLote({ aba: "membros", cursor: "nao-e-um-cursor" });
+  assert.equal(cursorInvalido.people.length, 30);
+
+  database.close();
+});
