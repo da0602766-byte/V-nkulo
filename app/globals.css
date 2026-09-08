@@ -20658,7 +20658,7 @@ html[data-pilot-theme="escuro"] :is(.account-profile-workspace .workspace-headin
 .community-theme-identity { grid-column: 1/-1; }
 .community-profile-fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
 .community-profile-fields .composer-wide { grid-column: 1/-1; }
-.community-theme-editor :is(input,textarea) { min-height: 42px; padding: 10px 11px; border-radius: 11px; }
+.community-theme-editor :is(input,textarea,select) { min-height: 42px; padding: 10px 11px; border-radius: 11px; }
 .community-theme-editor textarea { resize: vertical; }
 .community-palette-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
 .community-palette-grid > button { min-width: 0; padding: 9px; border-radius: 12px; }
@@ -20667,6 +20667,17 @@ html[data-pilot-theme="escuro"] :is(.account-profile-workspace .workspace-headin
 .community-theme-footer { grid-column: 1/-1; display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
 .community-theme-footer .operations-feedback { margin-right: auto; }
 .community-theme-footer > button { min-height: 44px; border: 0; border-radius: 12px; background: var(--pilot-gradient); color: #fff; padding: 0 18px; font-weight: 850; }
+
+.owner-appearance-workspace { display: grid; gap: 14px; }
+.owner-appearance-workspace .community-theme-block { grid-column: 1/-1; }
+.owner-appearance-scope-options { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+.owner-appearance-scope-options > button { min-width: 0; text-align: left; display: grid; gap: 4px; padding: 13px; border: 1px solid var(--pilot-line); border-radius: 13px; background: var(--pilot-surface); cursor: pointer; }
+.owner-appearance-scope-options > button strong { font-size: .84rem; }
+.owner-appearance-scope-options > button small { color: var(--pilot-muted); font-size: .68rem; line-height: 1.4; }
+.owner-appearance-scope-options > button.active { border-color: var(--pilot-primary); background: color-mix(in srgb,var(--pilot-primary) 10%,var(--pilot-surface)); }
+@media (max-width: 720px) {
+  .owner-appearance-scope-options { grid-template-columns: 1fr; }
+}
 
 .owner-grid-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 12px; padding: 12px 14px; border: 1px solid #dfe5ef; border-radius: 15px; background: #fff; }
 .owner-grid-toolbar > div:first-child { display: grid; gap: 2px; }

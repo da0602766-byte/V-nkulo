@@ -147,17 +147,28 @@ export async function POST(request: Request) {
   const personal = purpose === "profile-photo" || isPlatformAsset;
   let driveOwnerId = user.id;
   let folderId = "";
+  // O proprietário do sistema pode editar a imagem de qualquer comunidade a
+  // partir da Central de Aparência, sem precisar trocar de comunidade ativa.
+  // Ele já tem acesso OWNER a todas, então reaproveitar `resourceId` como o
+  // identificador da comunidade-alvo é seguro e não abre acesso a mais ninguém.
+  const targetCommunityId =
+    isCommunityAsset &&
+    user.system_owner === true &&
+    Number.isInteger(resourceId) &&
+    resourceId > 0
+      ? resourceId
+      : context?.comunidadeId;
   if (personal) {
     const accessToken = await getDriveAccessToken(user.id);
     folderId = (await ensurePersonalDriveStorage(user.id, accessToken)).mediaFolderId;
   } else {
-    if (!context) {
+    if (!targetCommunityId) {
       return Response.json({ error: "Selecione uma comunidade para guardar esta imagem." }, { status: 409 });
     }
     const storage = await getD1().prepare(
       `SELECT proprietario_usuario_id, pasta_midias_id
        FROM community_drive_storage WHERE comunidade_id = ? LIMIT 1`,
-    ).bind(context.comunidadeId).first<{ proprietario_usuario_id: number; pasta_midias_id: string }>();
+    ).bind(targetCommunityId).first<{ proprietario_usuario_id: number; pasta_midias_id: string }>();
     if (!storage) {
       return Response.json(
         { error: "A administração ainda precisa ativar a pasta Google Drive desta comunidade." },
@@ -177,7 +188,7 @@ export async function POST(request: Request) {
       properties: {
         purpose,
         uploadedBy: String(user.id),
-        communityId: String(context?.comunidadeId || 0),
+        communityId: String(targetCommunityId || 0),
       },
     });
     const scope = personal && purpose === "profile-photo" ? "profile" : "public";
