@@ -27,14 +27,13 @@ test("Conta Google usa OAuth real e cria cadastro neutro sem acesso comunitário
 });
 
 test("fotos pessoais ficam no Drive e anexos de publicação usam o bucket compartilhado", async () => {
-  const [upload, localMedia, serviceWorker, feedback, publicRegistration, notice, modules] = await Promise.all([
+  const [upload, localMedia, serviceWorker, feedback, publicRegistration, notice] = await Promise.all([
     read("app/api/pilot/uploads/route.ts"),
     read("app/lib/local-media.ts"),
     read("public/sw.js"),
     read("app/api/feedback/route.ts"),
     read("app/api/public/cadastro-membro/[token]/route.ts"),
     read("app/lib/notice-image.ts"),
-    read("app/api/modulos/route.ts"),
   ]);
   assert.match(upload, /uploadDriveFile/);
   assert.match(upload, /purpose === "post-image"[\s\S]*bucket\.put/);
@@ -46,7 +45,9 @@ test("fotos pessoais ficam no Drive e anexos de publicação usam o bucket compa
   assert.doesNotMatch(feedback, /bucket\.put/);
   assert.doesNotMatch(publicRegistration, /bucket\.put/);
   assert.doesNotMatch(notice, /base64/);
-  assert.match(modules, /Vínkulo não guarda arquivos no banco/);
+  // A recusa de imagem em base64 era conferida também em `/api/modulos`, rota
+  // legada removida em 08/09/2026. A garantia de que nada é gravado no banco
+  // continua coberta pelas asserções acima, sobre o caminho vivo de upload.
 });
 
 test("chat grava conteúdo criptografado no Drive e remove o legado só após copiar", async () => {

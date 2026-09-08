@@ -3,7 +3,15 @@
 Classificação exigida antes de remover ou reescrever qualquer coisa. O documento
 existe para o proprietário decidir com dado na mão.
 
-> **Estado em 08/09/2026 — Classes A e C executadas.** O proprietário aprovou a
+> **Estado em 08/09/2026 — Classes A, B e C executadas, com uma exceção.**
+> Da Classe B saíram 17 rotas (louvor, avisos, módulos, registros, blocos de
+> texto, mensagens de exibição, configurações e relatório PDF) mais
+> `app/lib/data.ts` e `app/lib/notice-interactions.ts`. **`/api/cultos*` e
+> `app/lib/cultos.ts` ficaram**: o proprietário confirmou que a funcionalidade
+> ainda serve, e não existe equivalente no piloto. Continuam atrás do
+> interruptor de módulos legados e entram na fila de reescrita multi-tenant.
+>
+> **Estado anterior — Classes A e C executadas.** O proprietário aprovou a
 > remoção. Saíram as 19 rotas da Classe A, as 3 da Classe C (`/api/teens*`) e 11
 > componentes órfãos. **A Classe B continua no repositório**, aguardando a
 > confirmação pedida no item 2 da Recomendação. Duas correções durante a
@@ -74,13 +82,27 @@ camada multi-tenant.
 
 ### Classe B — funcionalidade aposentada ou absorvida, sem equivalente direto (23 rotas)
 
+> **Verificado e decidido em 08/09/2026.** A checagem pedida antes de remover
+> confirmou que nenhuma tela chama essas rotas, que remover rota não apaga nada
+> do banco (as tabelas e linhas continuam no D1, apenas sem caminho pelo
+> aplicativo) e que a tabela `configuracoes`, embora compartilhada com o piloto,
+> não tem colisão de chaves: o piloto grava e lê `schedule_share_access:*` por
+> conta própria, enquanto a rota legada mexia em `tema`, `abas`, `site`,
+> `login`, `manutencao`, `ordem_menu`, `textos`, `layout_abas`, `abas_ocultas` e
+> `hierarquias`. Dois achados durante a verificação: o modo de manutenção já
+> estava morto antes desta limpeza (`app/api/status/route.ts` e
+> `app/login/page.tsx` fixam `ativa: false`, e `getMaintenanceState` só é
+> chamado dentro de `requireApiPermission`), e `app/lib/data.ts` não era
+> importado por nenhum arquivo do projeto. **Saíram 17 rotas; `/api/cultos*`
+> ficou por decisão do proprietário.**
+
 Precisam de confirmação do proprietário de que a funcionalidade foi mesmo
 aposentada antes de sumir do repositório.
 
 | Rota legada | Situação |
 | --- | --- |
 | `/api/louvor`, `/api/louvor/[id]`, `/api/louvor/[id]/pdf` | Louvor virou um ministério comum; escalas e PDF hoje em `/api/pilot/escalas/[id]/pdf` |
-| `/api/cultos`, `/api/cultos/[id]`, `/api/cultos/[id]/lancamentos`, `/api/cultos/[id]/lancamentos/[entryId]`, `/api/cultos/pdf` | Registro de rotinas de culto; sem equivalente no piloto |
+| `/api/cultos`, `/api/cultos/[id]`, `/api/cultos/[id]/lancamentos`, `/api/cultos/[id]/lancamentos/[entryId]`, `/api/cultos/pdf` | **MANTIDAS.** Registro de rotinas de culto; sem equivalente no piloto. O proprietário confirmou em 08/09/2026 que a funcionalidade ainda serve, então as 5 rotas e `app/lib/cultos.ts` continuam no repositório, atrás do interruptor de módulos legados, aguardando reescrita com isolamento por `comunidade_id`. |
 | `/api/avisos`, `/api/avisos/[id]`, `/api/avisos/[id]/interacoes`, `/api/avisos/[id]/comentarios/[commentId]` | Avisos foram absorvidos pelo feed interno e por `avisos_promocao` da recepção |
 | `/api/modulos`, `/api/modulos/[id]`, `/api/registros`, `/api/registros/[id]`, `/api/blocos-texto`, `/api/blocos-texto/[id]` | Abas e campos personalizados do sistema antigo; sem equivalente |
 | `/api/mensagens`, `/api/mensagens/[id]`, `/api/configuracoes` | Mensagens programadas de exibição e configuração global antiga |
