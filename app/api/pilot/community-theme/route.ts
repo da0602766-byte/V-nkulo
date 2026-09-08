@@ -1,9 +1,9 @@
 import { getD1 } from "../../../../db";
 import {
-  getCommunityTheme,
   parseCommunityTheme,
   type CommunityTheme,
 } from "../../../lib/community-theme";
+import { getCommunityTheme } from "../../../lib/community-theme-storage";
 import { recordTenantAudit } from "../../../lib/tenant-audit";
 import { requireTenantPermission } from "../../../lib/tenant";
 

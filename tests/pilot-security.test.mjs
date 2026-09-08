@@ -529,3 +529,49 @@ test("conversas ficam no perfil, isolam comunidade e respeitam membro versus ofi
   assert.doesNotMatch(dashboard, /label: "Mensagens"/);
   assert.doesNotMatch(chatApi, /chat.*public/i);
 });
+
+// Trava deliberada: as rotas legadas em `app/api/*` (fora de `app/api/pilot/*`)
+// usam o sistema de permissão de comunidade única, anterior à reforma
+// multi-tenant, e não filtram por `comunidade_id`. Hoje elas ficam inacessíveis
+// porque `requireApiPermission` checa `PILOT_CONFIG.legacyModulesEnabled` antes
+// de qualquer outra coisa. Esse teste existe para que religar a flag deixe de
+// ser uma mudança silenciosa: quem reativar precisa antes reescrever as rotas
+// com isolamento por comunidade e então atualizar este teste conscientemente.
+// O valor da flag já era coberto pelo teste do gate do piloto; o que falta lá
+// (e é o ponto deste teste) é garantir que a checagem continue existindo
+// dentro de `requireApiPermission` — flag falsa não protege nada se alguém
+// remover o `if` do caminho de código.
+// Ver a linha de 2026-09-08 em docs/coordenacao/COORDENACAO_IA.md.
+test("módulos legados de comunidade única continuam desligados", async () => {
+  const [config, access] = await Promise.all([
+    readFile(new URL("../app/lib/pilot-config.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/lib/access.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(
+    config,
+    /legacyModulesEnabled:\s*false/,
+    "PILOT_CONFIG.legacyModulesEnabled precisa continuar false até as rotas legadas isolarem por comunidade_id",
+  );
+  assert.match(
+    access,
+    /if\s*\(!PILOT_CONFIG\.legacyModulesEnabled\)/,
+    "requireApiPermission precisa continuar bloqueando os módulos legados antes de checar perfil ou permissão",
+  );
+});
+
+test("rota legada de menores permanece sem exposição entre comunidades", async () => {
+  const teens = await readFile(
+    new URL("../app/api/teens/route.ts", import.meta.url),
+    "utf8",
+  );
+
+  // A rota consulta menores sem filtro de `comunidade_id`; enquanto for assim,
+  // ela só pode existir atrás do bloqueio de módulos legados.
+  const usesLegacyGuard = /requireApiPermission/.test(teens);
+  const isolatesByCommunity = /comunidade_id/.test(teens);
+  assert.ok(
+    usesLegacyGuard || isolatesByCommunity,
+    "/api/teens expõe dados de menores: precisa do bloqueio legado ou de isolamento explícito por comunidade_id",
+  );
+});

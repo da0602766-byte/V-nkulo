@@ -9,9 +9,7 @@ import {
   getCommunityPalette,
   type CommunityTheme,
 } from "../lib/community-theme";
-import CommunityAdminWorkspace, {
-  type CommunityManagementView,
-} from "./CommunityAdminWorkspace";
+import type { CommunityManagementView } from "./CommunityAdminWorkspace";
 import CommunityHome from "./CommunityHome";
 import GlobalVisualEditor from "./GlobalVisualEditorLazy";
 import PilotNotificationCenter, {
@@ -22,12 +20,13 @@ import WorkspaceErrorBoundary from "./WorkspaceErrorBoundary";
 import VerifiedOwnerName from "./VerifiedOwnerName";
 import TemporaryAccessWatcher from "./TemporaryAccessWatcher";
 import CloseDetailsOnOutside from "./CloseDetailsOnOutside";
-import EditorialSidebarSchedule from "./EditorialSidebarSchedule";
 
 const moduleLoading = () => <section className="workspace-module-loading" aria-busy="true" role="status"><span className="pilot-loading-spinner" aria-hidden="true" /><strong>Carregando esta área…</strong><small>Somente o necessário para esta tela está sendo preparado.</small></section>;
 const AccountProfileWorkspace = dynamic(() => import("./AccountProfileWorkspace"), { loading: moduleLoading });
+const CommunityAdminWorkspace = dynamic(() => import("./CommunityAdminWorkspace"), { loading: moduleLoading });
 const CommunityLifecycleWorkspace = dynamic(() => import("./CommunityLifecycleWorkspace"), { loading: moduleLoading });
 const DayThreadWorkspace = dynamic(() => import("./DayThreadWorkspace"), { loading: moduleLoading });
+const EditorialSidebarSchedule = dynamic(() => import("./EditorialSidebarSchedule"), { loading: () => null });
 const EventsWorkspace = dynamic(() => import("./EventsWorkspace"), { loading: moduleLoading });
 const LeadershipWorkspace = dynamic(() => import("./LeadershipWorkspace"), { loading: moduleLoading });
 const NetworkWorkspace = dynamic(() => import("./NetworkWorkspace"), { loading: moduleLoading });

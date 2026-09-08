@@ -21,14 +21,14 @@ paralelo escolhem o mesmo número). A convenção adotada, registrada em
 
 ## Duplicatas conhecidas (históricas — não mexer)
 
-Dois pares de arquivos compartilham número. Os dois lados de cada par
+Três pares de arquivos compartilham número. Os dois lados de cada par
 parecem já estar aplicados em produção (as duas features de cada par estão
 documentadas como publicadas e funcionando — Fio do dia versão 194 em
 `docs/coordenacao/COORDENACAO_IA.md`, integração Google Drive V4.9.0 em
-`docs/coordenacao/ESTADO_DO_PROJETO.md`), então **não renomeie nenhum dos quatro** sem
-confirmar primeiro no banco de produção (tabela de migrações aplicadas) —
-renomear um arquivo já aplicado pode fazer o ambiente hospedado tentar
-rodá-lo de novo.
+`docs/coordenacao/ESTADO_DO_PROJETO.md`, e o par `0069` nas versões 222 e
+226/227), então **não renomeie nenhum dos seis** sem confirmar primeiro no
+banco de produção (tabela de migrações aplicadas) — renomear um arquivo já
+aplicado pode fazer o ambiente hospedado tentar rodá-lo de novo.
 
 | Número | Arquivos | Tabelas afetadas (não se sobrepõem) |
 | --- | --- | --- |
@@ -43,9 +43,16 @@ A dupla `0069` foi encontrada em auditoria de 08/09/2026 (commits `7082fb7`,
 2026-09-06, e `32a76a2`, 2026-09-07). Ambos os arquivos usam
 `CREATE TABLE IF NOT EXISTS` / `CREATE INDEX IF NOT EXISTS` sobre objetos
 que não se sobrepõem, então rodar os dois sob o mesmo número não arrisca
-dado nenhum — é só inconsistência de numeração. Como o par mais antigo,
-**não renomeie sem confirmar no banco de produção qual já rodou**; o
-próximo número livre para trabalho novo continua sendo `0070`.
+dado nenhum — é só inconsistência de numeração.
+
+**Os dois lados já estão aplicados em produção**, pelo que está registrado
+em `docs/coordenacao/COORDENACAO_IA.md`: o índice saiu na versão 222 do
+Sites e a recepção/biblioteca na 226/227, com a observação explícita de que
+a "migração 0069 foi aplicada antes do código". Ou seja, este par entra na
+mesma categoria dos pares `0053` e `0060`: **não renomeie nenhum dos dois**,
+porque renomear um arquivo já aplicado pode fazer o ambiente hospedado
+tentar rodá-lo de novo. O próximo número livre para trabalho novo continua
+sendo `0070`.
 
 ## Sobre `drizzle/meta/` (journal e snapshots)
 
