@@ -407,3 +407,72 @@ test("migração operacional preserva e coloca dados legados em quarentena", asy
   assert.deepEqual(database.prepare("PRAGMA foreign_key_check").all(), []);
   database.close();
 });
+
+// Colisões de numeração já aconteceram três vezes: agentes diferentes
+// trabalhando em paralelo escolhem o mesmo número. Os três pares abaixo já
+// foram aplicados em produção (0053 e 0060 conforme docs/coordenacao, 0069 nas
+// versões 222 e 226/227), então renomear qualquer um deles faria o ambiente
+// hospedado tentar rodá-lo de novo — por isso ficam registrados aqui como
+// exceções históricas, e não corrigidos. O que este teste impede é a
+// **repetição**: qualquer número duplicado novo falha a suíte na hora, antes de
+// virar mais uma exceção permanente. Ver drizzle/README.md.
+const DUPLICATAS_HISTORICAS = new Set(["0053", "0060", "0069"]);
+
+test("numeração de migrações não ganha colisões novas", async () => {
+  const migrationDirectory = new URL("../drizzle/", import.meta.url);
+  const arquivos = (await readdir(migrationDirectory))
+    .filter((name) => /^\d{4}_.+\.sql$/.test(name))
+    .sort();
+
+  const porNumero = new Map();
+  for (const arquivo of arquivos) {
+    const numero = arquivo.slice(0, 4);
+    porNumero.set(numero, [...(porNumero.get(numero) || []), arquivo]);
+  }
+
+  const colisoes = [...porNumero.entries()].filter(([, lista]) => lista.length > 1);
+  const novas = colisoes.filter(([numero]) => !DUPLICATAS_HISTORICAS.has(numero));
+  assert.deepEqual(
+    novas,
+    [],
+    `Colisão nova de numeração em drizzle/: ${novas
+      .map(([numero, lista]) => `${numero} -> ${lista.join(", ")}`)
+      .join("; ")}. Renumere a migração que chegou depois (ver drizzle/README.md) antes de publicar.`,
+  );
+
+  // As exceções listadas precisam existir de fato: se um par histórico for
+  // resolvido algum dia, a entrada correspondente deve sair desta lista em vez
+  // de continuar dando cobertura silenciosa a um número livre.
+  const numerosDuplicados = new Set(colisoes.map(([numero]) => numero));
+  for (const historica of DUPLICATAS_HISTORICAS) {
+    assert.ok(
+      numerosDuplicados.has(historica),
+      `A duplicata histórica ${historica} não existe mais em drizzle/; remova-a de DUPLICATAS_HISTORICAS.`,
+    );
+  }
+
+  // O próximo número livre documentado no README precisa continuar livre.
+  const readme = await readFile(new URL("README.md", migrationDirectory), "utf8");
+  const proximo = readme.match(/## Próximo número livre\s+\*\*`(\d{4})`\*\*/)?.[1];
+  assert.ok(proximo, "drizzle/README.md precisa declarar o próximo número livre.");
+  assert.ok(
+    !porNumero.has(proximo),
+    `drizzle/README.md aponta ${proximo} como livre, mas já existe migração com esse número: ${(porNumero.get(proximo) || []).join(", ")}.`,
+  );
+});
+
+test("as duas migrações 0069 convivem sem quebrar o banco", async () => {
+  // Prova empírica de que a colisão é só de numeração: as duas rodam na mesma
+  // base, na ordem alfabética que o ambiente hospedado usa, e o schema final
+  // continua íntegro com as duas estruturas presentes.
+  const database = await createMigratedDatabase();
+  const indice = database
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = ?")
+    .get("usuario_comunidades_comunidade_status_idx");
+  const tabela = database
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
+    .get("avisos_promocao");
+  assert.ok(indice, "o índice da 0069_usuario_comunidades_status_idx precisa existir");
+  assert.ok(tabela, "a tabela da 0069_recepcao_avisos_biblioteca precisa existir");
+  assert.deepEqual(database.prepare("PRAGMA foreign_key_check").all(), []);
+});
