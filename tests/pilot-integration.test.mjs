@@ -5219,3 +5219,221 @@ test("lista de pessoas pagina por cursor sem perder busca, aba nem isolamento", 
 
   database.close();
 });
+
+// Escalas tinha dois problemas: teto de 150 sem forma de pedir as seguintes, e
+// uma consulta de designações SEM LIMITE, que trazia as designações de todas as
+// escalas visíveis para o JavaScript descartar quase tudo em seguida. Este
+// teste cobre a paginação por cursor e exige que as designações venham
+// restritas às escalas do lote.
+test("escalas paginam por cursor e trazem só as designações do lote", async () => {
+  const { database, d1 } = await createPilotD1();
+  const pastorId = await createPilotUser(database, {
+    nome: "Pastor Escalas Cursor",
+    email: "pastor.escalas.cursor@example.test",
+    senha: "Pastor123",
+    memberships: [{ comunidadeId: 1, papel: "PASTOR" }],
+  });
+
+  const ministerioId = database
+    .prepare(
+      `INSERT INTO ministerios_comunidade
+        (comunidade_id, nome, categoria, status, responsavel_usuario_id)
+       VALUES (1, 'Ministerio Cursor', 'GERAL', 'ATIVO', ?)
+       RETURNING id`,
+    )
+    .get(pastorId).id;
+
+  // 12 escalas em datas crescentes garantem mais de um lote quando pedimos 5.
+  const escalaIds = [];
+  for (let indice = 0; indice < 12; indice += 1) {
+    const dia = String(indice + 1).padStart(2, "0");
+    escalaIds.push(
+      database
+        .prepare(
+          `INSERT INTO escalas_ministerio
+            (comunidade_id, ministerio_id, titulo, inicia_em, termina_em,
+             status, responsavel_usuario_id, criado_por)
+           VALUES (1, ?, ?, ?, ?, 'PUBLICADA', ?, ?)
+           RETURNING id`,
+        )
+        .get(
+          ministerioId,
+          `Escala Cursor ${dia}`,
+          `2027-03-${dia} 09:00:00`,
+          `2027-03-${dia} 11:00:00`,
+          pastorId,
+          pastorId,
+        ).id,
+    );
+  }
+
+  const voluntarioId = database
+    .prepare(
+      `INSERT INTO ministerio_voluntarios
+        (comunidade_id, ministerio_id, usuario_id, funcao, papel, ativo)
+       VALUES (1, ?, ?, 'Apoio', 'VOLUNTARIO', 1)
+       RETURNING id`,
+    )
+    .get(ministerioId, pastorId).id;
+
+  // Uma designação em cada escala: se a rota voltar a buscar tudo, o lote de 5
+  // traria as 12.
+  for (const escalaId of escalaIds) {
+    database
+      .prepare(
+        `INSERT INTO escala_designacoes
+          (comunidade_id, escala_id, voluntario_id, usuario_id, funcao, status, ativo)
+         VALUES (1, ?, ?, ?, 'Apoio', 'CONFIRMADA', 1)`,
+      )
+      .run(escalaId, voluntarioId, pastorId);
+  }
+
+  const worker = await loadWorker();
+  const env = createEnv(d1);
+  const cookie = await login(
+    worker,
+    env,
+    "pastor.escalas.cursor@example.test",
+    "Pastor123",
+  );
+
+  async function pedirLote(cursor) {
+    const address = new URL("http://localhost/api/pilot/escalas");
+    address.searchParams.set("limite", "5");
+    if (cursor) address.searchParams.set("cursor", cursor);
+    const response = await worker.fetch(
+      new Request(address, { headers: { cookie } }),
+      env,
+      context,
+    );
+    assert.equal(response.status, 200);
+    return response.json();
+  }
+
+  const primeiro = await pedirLote(null);
+  assert.equal(primeiro.escalas.length, 5);
+  assert.ok(primeiro.nextCursor, "o primeiro lote precisa devolver cursor");
+
+  // As designações precisam pertencer só às escalas entregues neste lote.
+  const idsDoLote = new Set(primeiro.escalas.map((escala) => Number(escala.id)));
+  const designacoes = primeiro.escalas.flatMap((escala) => escala.designacoes);
+  assert.ok(designacoes.length > 0, "o cenário precisa ter designações");
+  assert.equal(designacoes.length, 5, "só as designações das 5 escalas do lote");
+  assert.ok(
+    primeiro.escalas.every((escala) =>
+      escala.designacoes.every((d) => idsDoLote.has(Number(d.escala_id))),
+    ),
+  );
+
+  // Percorrer tudo: nenhuma escala pode ser pulada nem repetida.
+  const vistos = [];
+  let cursor = null;
+  let lotes = 0;
+  do {
+    const lote = await pedirLote(cursor);
+    for (const escala of lote.escalas) vistos.push(Number(escala.id));
+    cursor = lote.nextCursor;
+    lotes += 1;
+    assert.ok(lotes <= 10, "paginação não terminou: possível cursor parado");
+  } while (cursor);
+
+  assert.equal(new Set(vistos).size, vistos.length, "nenhuma escala repetida");
+  for (const escalaId of escalaIds) {
+    assert.ok(vistos.includes(escalaId), `escala ${escalaId} sumiu da paginação`);
+  }
+
+  // Cursor corrompido cai no primeiro lote em vez de erro ou lista inteira.
+  const invalido = await pedirLote("nao-e-um-cursor");
+  assert.equal(invalido.escalas.length, 5);
+
+  database.close();
+});
+
+// Solicitações também paginam por cursor. A ordenação agrupa por status antes
+// de descer por id, então o cursor carrega o par (grupo, id): um cursor só com
+// id pularia solicitações ao trocar de grupo.
+test("solicitações paginam por cursor respeitando o agrupamento por status", async () => {
+  const { database, d1 } = await createPilotD1();
+  const pastorId = await createPilotUser(database, {
+    nome: "Pastor Solicitacoes Cursor",
+    email: "pastor.solic.cursor@example.test",
+    senha: "Pastor123",
+    memberships: [{ comunidadeId: 1, papel: "PASTOR" }],
+  });
+
+  // Status misturados de propósito, para o cursor precisar atravessar grupos.
+  const status = ["ABERTA", "CONCLUIDA", "EM_ANALISE"];
+  const criadas = [];
+  for (let indice = 0; indice < 12; indice += 1) {
+    criadas.push(
+      database
+        .prepare(
+          `INSERT INTO solicitacoes_comunidade
+            (comunidade_id, solicitante_id, tipo, titulo, descricao,
+             status, visibilidade)
+           VALUES (1, ?, 'ORACAO', ?, 'Descricao', ?, 'PASTORAL')
+           RETURNING id`,
+        )
+        .get(pastorId, `Solicitacao Cursor ${indice}`, status[indice % 3]).id,
+    );
+  }
+
+  const worker = await loadWorker();
+  const env = createEnv(d1);
+  const cookie = await login(
+    worker,
+    env,
+    "pastor.solic.cursor@example.test",
+    "Pastor123",
+  );
+
+  async function pedirLote(cursor) {
+    const address = new URL("http://localhost/api/pilot/solicitacoes");
+    address.searchParams.set("limite", "4");
+    if (cursor) address.searchParams.set("cursor", cursor);
+    const response = await worker.fetch(
+      new Request(address, { headers: { cookie } }),
+      env,
+      context,
+    );
+    assert.equal(response.status, 200);
+    return response.json();
+  }
+
+  const primeiro = await pedirLote(null);
+  assert.equal(primeiro.solicitacoes.length, 4);
+  assert.ok(primeiro.nextCursor);
+
+  const vistos = [];
+  const ordemStatus = [];
+  let cursor = null;
+  let lotes = 0;
+  do {
+    const lote = await pedirLote(cursor);
+    for (const item of lote.solicitacoes) {
+      vistos.push(Number(item.id));
+      ordemStatus.push(item.status);
+    }
+    cursor = lote.nextCursor;
+    lotes += 1;
+    assert.ok(lotes <= 10, "paginação não terminou: possível cursor parado");
+  } while (cursor);
+
+  assert.equal(new Set(vistos).size, vistos.length, "nenhuma repetida");
+  for (const id of criadas) {
+    assert.ok(vistos.includes(id), `solicitação ${id} sumiu da paginação`);
+  }
+
+  // O agrupamento por status precisa sobreviver à paginação: abertas primeiro,
+  // depois em análise, depois o resto.
+  const grupo = (valor) =>
+    valor === "ABERTA" ? 0 : valor === "EM_ANALISE" ? 1 : 2;
+  for (let indice = 1; indice < ordemStatus.length; indice += 1) {
+    assert.ok(
+      grupo(ordemStatus[indice]) >= grupo(ordemStatus[indice - 1]),
+      "a paginação embaralhou o agrupamento por status",
+    );
+  }
+
+  database.close();
+});

@@ -18,11 +18,51 @@ import { listScheduleSubstitutionCandidatesBatch } from "../../../lib/schedule-s
 type ScheduleRow = Record<string, unknown> & { id: number };
 type AssignmentRow = Record<string, unknown> & { escala_id: number };
 
-export async function GET() {
+// Lote pedido a cada carregamento. O teto anterior era 150 escalas de uma vez,
+// sem forma de pedir as seguintes: passado esse número, as mais distantes
+// simplesmente não apareciam.
+const SCHEDULE_PAGE_SIZE = 150;
+const SCHEDULE_MAX_PAGE_SIZE = 200;
+
+// O cursor guarda o par (inicia_em, id), que é a ordenação da consulta.
+type ScheduleCursor = { inicio: string; id: number };
+
+function encodeScheduleCursor(cursor: ScheduleCursor) {
+  return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
+}
+
+function decodeScheduleCursor(value: string | null): ScheduleCursor | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(value, "base64url").toString("utf8"),
+    ) as Partial<ScheduleCursor>;
+    const id = Number(parsed.id);
+    if (typeof parsed.inicio !== "string" || !Number.isInteger(id) || id <= 0) {
+      return null;
+    }
+    return { inicio: parsed.inicio, id };
+  } catch {
+    return null;
+  }
+}
+
+export async function GET(request: Request) {
   const access = await requireTenantPermission("schedules.view");
   if ("error" in access) return access.error;
   const db = getD1();
   await publishDueSchedules(db, access.context.comunidadeId);
+  const scheduleAddress = new URL(request.url);
+  const scheduleCursor = decodeScheduleCursor(
+    scheduleAddress.searchParams.get("cursor"),
+  );
+  const requestedScheduleSize = Number(
+    scheduleAddress.searchParams.get("limite") || 0,
+  );
+  const pageSize =
+    Number.isInteger(requestedScheduleSize) && requestedScheduleSize > 0
+      ? Math.min(requestedScheduleSize, SCHEDULE_MAX_PAGE_SIZE)
+      : SCHEDULE_PAGE_SIZE;
   const globalManager = hasGlobalMinistryManagement(access.context);
   const visibilitySql = `(
     ? = 1
@@ -102,8 +142,13 @@ export async function GET() {
        AND equipe.ministerio_id = s.ministerio_id
       LEFT JOIN usuarios responsavel ON responsavel.id = s.responsavel_usuario_id
       WHERE s.comunidade_id = ? AND s.status != 'ARQUIVADA' AND ${visibilitySql}
+        AND (
+          ? = 0
+          OR s.inicia_em > ?
+          OR (s.inicia_em = ? AND s.id > ?)
+        )
       ORDER BY s.inicia_em ASC, s.id ASC
-      LIMIT 150`,
+      LIMIT ?`,
     )
     .bind(
       globalManager ? 1 : 0,
@@ -119,32 +164,55 @@ export async function GET() {
       access.user.id,
       access.user.id,
       access.user.id,
+      scheduleCursor ? 1 : 0,
+      scheduleCursor?.inicio ?? "",
+      scheduleCursor?.inicio ?? "",
+      scheduleCursor?.id ?? 0,
+      pageSize + 1,
     )
     .all<ScheduleRow>();
-  const assignmentsResult = await db
-    .prepare(
-      `SELECT d.id, d.escala_id, d.voluntario_id, d.usuario_id,
-        u.nome, u.telefone, u.foto_perfil, u.email AS owner_email,
-        u.criado_em AS owner_criado_em, d.funcao, d.status,
-        CASE WHEN d.usuario_id = ? THEN 1 ELSE 0 END AS is_mine
-      FROM escala_designacoes d
-      JOIN escalas_ministerio s
-        ON s.id = d.escala_id
-       AND s.comunidade_id = d.comunidade_id
-      JOIN usuarios u ON u.id = d.usuario_id
-      WHERE d.comunidade_id = ? AND d.ativo = 1 AND ${visibilitySql}
-      ORDER BY u.nome ASC`,
-    )
-    .bind(
-      access.user.id,
-      access.context.comunidadeId,
-      globalManager ? 1 : 0,
-      access.user.id,
-      access.user.id,
-      access.user.id,
-      access.user.id,
-    )
-    .all<AssignmentRow>();
+
+  const hasMoreSchedules = schedulesResult.results.length > pageSize;
+  if (hasMoreSchedules) schedulesResult.results.length = pageSize;
+  const lastSchedule =
+    schedulesResult.results[schedulesResult.results.length - 1];
+  const nextScheduleCursor =
+    hasMoreSchedules && lastSchedule
+      ? encodeScheduleCursor({
+          inicio: String(lastSchedule.inicia_em ?? ""),
+          id: Number(lastSchedule.id),
+        })
+      : null;
+  const loadedScheduleIds = schedulesResult.results.map((schedule) =>
+    Number(schedule.id),
+  );
+  // Esta consulta não tinha limite nenhum: trazia as designações de todas as
+  // escalas visíveis da comunidade e o JavaScript logo abaixo descartava as que
+  // não pertenciam às escalas carregadas. Buscar só as escalas do lote resolve
+  // no SQL o que era descarte em memória. As escalas do lote já passaram pela
+  // regra de visibilidade, então a repetição dela aqui deixa de ser necessária;
+  // o filtro por comunidade continua, como segunda barreira.
+  const assignmentPlaceholders = loadedScheduleIds.map(() => "?").join(", ");
+  const assignmentsResult = loadedScheduleIds.length
+    ? await db
+        .prepare(
+          `SELECT d.id, d.escala_id, d.voluntario_id, d.usuario_id,
+            u.nome, u.telefone, u.foto_perfil, u.email AS owner_email,
+            u.criado_em AS owner_criado_em, d.funcao, d.status,
+            CASE WHEN d.usuario_id = ? THEN 1 ELSE 0 END AS is_mine
+          FROM escala_designacoes d
+          JOIN usuarios u ON u.id = d.usuario_id
+          WHERE d.comunidade_id = ? AND d.ativo = 1
+            AND d.escala_id IN (${assignmentPlaceholders})
+          ORDER BY u.nome ASC`,
+        )
+        .bind(
+          access.user.id,
+          access.context.comunidadeId,
+          ...loadedScheduleIds,
+        )
+        .all<AssignmentRow>()
+    : { results: [] as AssignmentRow[] };
   const manageableScheduleIds = new Set(
     schedulesResult.results
       .filter((schedule) => Boolean(schedule.can_manage))
@@ -248,6 +316,8 @@ export async function GET() {
         ...volunteer,
         dias_disponiveis: parseDays(volunteer.dias_disponiveis),
       })),
+      // Nulo quando o lote alcançou a última escala visível.
+      nextCursor: nextScheduleCursor,
     },
     { headers: { "Cache-Control": "no-store" } },
   );
