@@ -621,3 +621,43 @@ test("rota legada de menores não volta ao repositório", async () => {
     );
   }
 });
+
+// Hidratação (Etapa 7 do script de otimização, 08/09/2026).
+//
+// `new Date()` ou `Date.now()` no corpo da renderização de um componente de
+// cliente produz valores diferentes no servidor e no cliente — na virada do dia
+// ou do minuto, a hidratação quebra e o React descarta a árvore inteira. O
+// projeto já tinha adotado o padrão certo em `DayThreadWorkspace`: a hora vem
+// de estado, acertada num efeito. Este teste estende a mesma exigência aos dois
+// componentes onde o padrão faltava.
+test("componentes com relógio tiram a hora de estado, não da renderização", async () => {
+  const [agenda, ministerios, precedente] = await Promise.all([
+    readFile(new URL("../app/components/AgendaCalendar.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/MinistriesWorkspace.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/DayThreadWorkspace.tsx", import.meta.url), "utf8"),
+  ]);
+
+  // O precedente precisa continuar existindo: é dele que a regra vem.
+  assert.match(precedente, /const \[agora, setAgora\] = useState\(0\)/);
+
+  // AgendaCalendar: "hoje" sai de estado, e o cálculo direto não volta.
+  assert.match(agenda, /const \[hojeChave, setHojeChave\] = useState\(""\)/);
+  assert.doesNotMatch(
+    agenda,
+    /const hojeChave = chaveDia\(new Date\(\)\)/,
+    "calcular o dia de hoje durante a renderização quebra a hidratação na virada do dia",
+  );
+
+  // MinistriesWorkspace: a semana parte de uma âncora em estado e é memoizada,
+  // em vez de refazer sete varreduras da lista a cada renderização.
+  assert.match(ministerios, /const \[semanaAncora, setSemanaAncora\] = useState\(0\)/);
+  assert.match(ministerios, /const week = useMemo\(/);
+  assert.doesNotMatch(
+    ministerios,
+    /const week = Array\.from\(\{ length: 7 \}, \(_, index\) => \{\s*\n\s*const date = new Date\(\);/,
+    "montar a semana a partir de new Date() na renderização quebra a hidratação e refaz o cálculo a cada render",
+  );
+  // A faixa da semana precisa manter as sete células antes do relógio acertar,
+  // senão a altura vai a zero e o conteúdo abaixo salta.
+  assert.match(ministerios, /reserva-\$\{index\}/);
+});

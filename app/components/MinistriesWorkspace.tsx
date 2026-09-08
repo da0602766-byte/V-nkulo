@@ -1382,17 +1382,34 @@ function TeamOverview({
   users: AvailableUser[];
   ministries: Ministry[];
 }) {
-  const week = Array.from({ length: 7 }, (_, index) => {
-    const date = new Date();
-    date.setHours(12, 0, 0, 0);
-    date.setDate(date.getDate() - date.getDay() + index);
-    const count = schedules.filter(
-      (schedule) =>
-        new Date(schedule.inicia_em).toLocaleDateString("pt-BR") ===
-        date.toLocaleDateString("pt-BR"),
-    ).length;
-    return { date, count };
-  });
+  // A semana partia de `new Date()` no corpo da renderização: servidor e
+  // cliente calculariam dias diferentes na virada, quebrando a hidratação, e o
+  // arranjo era refeito a cada renderização junto com sete varreduras da lista
+  // de escalas. Agora a âncora vem de estado e o cálculo é memoizado.
+  const [semanaAncora, setSemanaAncora] = useState(0);
+  useEffect(() => {
+    const acertar = () => setSemanaAncora(Date.now());
+    const primeiro = window.setTimeout(acertar, 0);
+    const relogio = window.setInterval(acertar, 60000);
+    return () => {
+      window.clearTimeout(primeiro);
+      window.clearInterval(relogio);
+    };
+  }, []);
+  const week = useMemo(() => {
+    if (!semanaAncora) return [];
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(semanaAncora);
+      date.setHours(12, 0, 0, 0);
+      date.setDate(date.getDate() - date.getDay() + index);
+      const rotulo = date.toLocaleDateString("pt-BR");
+      const count = schedules.filter(
+        (schedule) =>
+          new Date(schedule.inicia_em).toLocaleDateString("pt-BR") === rotulo,
+      ).length;
+      return { date, count };
+    });
+  }, [schedules, semanaAncora]);
   return (
     <div className="team-overview">
       <div className="team-metrics">
@@ -1425,17 +1442,28 @@ function TeamOverview({
         </article>
       </div>
       <div className="schedule-week" aria-label="Resumo da semana">
-        {week.map(({ date, count }) => (
-          <div className={count ? "has-service" : ""} key={date.toISOString()}>
-            <span>
-              {new Intl.DateTimeFormat("pt-BR", { weekday: "short" })
-                .format(date)
-                .replace(".", "")}
-            </span>
-            <b>{date.getDate()}</b>
-            <small>{count} escala{count === 1 ? "" : "s"}</small>
-          </div>
-        ))}
+        {/* Enquanto o cliente não acerta o relógio, as sete células vão vazias
+            em vez de a faixa sumir: sem elas a altura iria a zero e o conteúdo
+            abaixo saltaria ao aparecer. */}
+        {week.length
+          ? week.map(({ date, count }) => (
+              <div className={count ? "has-service" : ""} key={date.toISOString()}>
+                <span>
+                  {new Intl.DateTimeFormat("pt-BR", { weekday: "short" })
+                    .format(date)
+                    .replace(".", "")}
+                </span>
+                <b>{date.getDate()}</b>
+                <small>{count} escala{count === 1 ? "" : "s"}</small>
+              </div>
+            ))
+          : Array.from({ length: 7 }, (_, index) => (
+              <div key={`reserva-${index}`} aria-hidden="true">
+                <span>&nbsp;</span>
+                <b>&nbsp;</b>
+                <small>&nbsp;</small>
+              </div>
+            ))}
       </div>
     </div>
   );
