@@ -11,6 +11,7 @@ import EditorialAutomationWorkspace from "./EditorialAutomationWorkspace";
 import StatisticsWorkspace from "./StatisticsWorkspace";
 import PlatformOptimizerWorkspace from "./PlatformOptimizerWorkspace";
 import OwnerLaboratoryWorkspace from "./OwnerLaboratoryWorkspace";
+import OwnerAppearanceWorkspace from "./OwnerAppearanceWorkspace";
 import Link from "./StableLink";
 import ThemeControl from "./ThemeControl";
 import {
@@ -42,6 +43,7 @@ type OwnerTab =
   | "editorial"
   | "statistics"
   | "optimization"
+  | "appearance"
   | "controls"
   | "laboratory";
 type OwnerGridPreset = "2x2" | "2x4" | "4x2" | "4x4";
@@ -63,6 +65,7 @@ const TABS: { id: OwnerTab; label: string; icon: string }[] = [
   { id: "editorial", label: "IA Editorial", icon: "✦" },
   { id: "statistics", label: "Estatísticas", icon: "▥" },
   { id: "optimization", label: "Otimização", icon: "↻" },
+  { id: "appearance", label: "Aparência", icon: "◐" },
   { id: "laboratory", label: "Laboratório", icon: "◈" },
   { id: "controls", label: "Configurações", icon: "⚙" },
 ];
@@ -552,6 +555,7 @@ export default function OwnerWorkspace({
           {tab === "editorial" && <EditorialAutomationWorkspace />}
           {tab === "statistics" && <StatisticsWorkspace />}
           {tab === "optimization" && <PlatformOptimizerWorkspace />}
+          {tab === "appearance" && <OwnerAppearanceWorkspace />}
           {tab === "controls" && <PlatformControlsWorkspace features={features} currentCommunityId={currentCommunityId} />}
         </section>
       </div>
@@ -800,6 +804,7 @@ function tabDescription(tab: OwnerTab) {
     editorial: "Revise e programe conteúdos da plataforma fora do contexto comunitário.",
     statistics: "Consulte indicadores globais sem expor ferramentas da plataforma nos menus comunitários.",
     optimization: "Diagnostique e execute retenções seguras sem remover dados ativos.",
+    appearance: "Aplique paleta, logotipo, banner e papel de parede a uma comunidade ou a todas de uma vez.",
     laboratory: "Crie e valide protótipos isolados, sem modificar páginas ou dados reais.",
     controls: "Configure identidade, módulos e regras globais da plataforma.",
   }[tab];
