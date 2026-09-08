@@ -9,10 +9,16 @@ export async function POST(request: Request, context: Context) {
   if (!Number.isInteger(id) || id <= 0 || !nome || !contato) return Response.json({ error:"Informe nome e contato." }, { status:400 });
   const db = getD1(); const cell = await db.prepare(`SELECT id, comunidade_id FROM celulas WHERE id = ? AND ativo = 1 AND escopo_confirmado = 1`).bind(id).first<{id:number;comunidade_id:number}>();
   if (!cell) return Response.json({ error:"Célula indisponível." }, { status:404 });
-  if (user) {
-    const duplicate = await db.prepare(`SELECT id FROM celula_solicitacoes WHERE celula_id = ? AND usuario_id = ? AND status = 'PENDENTE' LIMIT 1`).bind(id, user.id).first();
-    if (duplicate) return Response.json({ error:"Você já possui uma solicitação pendente para esta célula." }, { status:409 });
-  }
+  // Verificado mesmo sem sessão: sem isto, qualquer visitante anônimo podia
+  // enviar a mesma solicitação sem parar e encher a fila de pendências do
+  // líder com lixo, já que o formulário não exige login.
+  const duplicate = await db.prepare(
+    `SELECT id FROM celula_solicitacoes
+     WHERE celula_id = ? AND status = 'PENDENTE'
+       AND (usuario_id = ? OR (usuario_id IS NULL AND contato = ?))
+     LIMIT 1`,
+  ).bind(id, user?.id || 0, contato).first();
+  if (duplicate) return Response.json({ error:"Já existe uma solicitação pendente para esta célula com este contato." }, { status:409 });
   await db.prepare(`INSERT INTO celula_solicitacoes (comunidade_id, celula_id, usuario_id, nome, contato, mensagem) VALUES (?, ?, ?, ?, ?, ?)`)
     .bind(cell.comunidade_id, id, user?.id || null, nome, contato, mensagem).run();
   return Response.json({ ok:true }, { status:201 });
