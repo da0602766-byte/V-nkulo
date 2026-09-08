@@ -105,7 +105,7 @@ set -e
 
 grep "^not ok" "${trabalho}/testes.txt" \
   | sed -E 's/^not ok [0-9]+ - //' | sort > "${trabalho}/falhas.txt" || true
-grep -vE '^\s*(#|$)' "${conhecidas}" | sort > "${trabalho}/conhecidas.txt"
+grep -vE '^\s*(#|$)' "${conhecidas}" | sort > "${trabalho}/conhecidas.txt" || true
 
 passaram="$(grep -cE '^ok [0-9]+ - ' "${trabalho}/testes.txt" || true)"
 total_falhas="$(wc -l < "${trabalho}/falhas.txt" | tr -d ' ')"
