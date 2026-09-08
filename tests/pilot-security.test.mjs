@@ -500,10 +500,9 @@ test("padrão global evita divergência, dá acesso total ao proprietário e res
 });
 
 test("conversas ficam no perfil, isolam comunidade e respeitam membro versus oficial", async () => {
-  const [chatApi, chatUi, presenceUi, presenceApi, notificationApi, notificationUi, dashboard] = await Promise.all([
+  const [chatApi, chatUi, presenceApi, notificationApi, notificationUi, dashboard] = await Promise.all([
     readFile(new URL("../app/api/pilot/chat/route.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/components/PrivateChatDialog.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/components/CommunityPresencePanel.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/PrivateChatWorkspace.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/pilot/presenca/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/pilot/notificacoes/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/components/PilotNotificationCenter.tsx", import.meta.url), "utf8"),
@@ -517,10 +516,8 @@ test("conversas ficam no perfil, isolam comunidade e respeitam membro versus ofi
   assert.doesNotMatch(chatApi, /createSystemNotification/);
   assert.match(chatApi, /communicationGroup/);
   assert.match(chatApi, /Membros conversam somente com membros/);
-  assert.match(chatUi, /CONVERSA PRIVADA/);
-  assert.match(chatUi, /type="submit"/);
-  assert.match(presenceUi, /Mensagem/);
-  assert.match(presenceUi, /Biografia/);
+  assert.match(chatUi, /Escreva uma mensagem privada…/);
+  assert.match(chatUi, /<form onSubmit=\{send\}/);
   assert.match(presenceApi, /json_extract\(u\.cadastro_dados/);
   assert.match(presenceApi, /canMessage/);
   assert.match(notificationApi, /normalizeDestination/);
@@ -560,18 +557,25 @@ test("módulos legados de comunidade única continuam desligados", async () => {
   );
 });
 
-test("rota legada de menores permanece sem exposição entre comunidades", async () => {
-  const teens = await readFile(
-    new URL("../app/api/teens/route.ts", import.meta.url),
-    "utf8",
-  );
-
-  // A rota consulta menores sem filtro de `comunidade_id`; enquanto for assim,
-  // ela só pode existir atrás do bloqueio de módulos legados.
-  const usesLegacyGuard = /requireApiPermission/.test(teens);
-  const isolatesByCommunity = /comunidade_id/.test(teens);
-  assert.ok(
-    usesLegacyGuard || isolatesByCommunity,
-    "/api/teens expõe dados de menores: precisa do bloqueio legado ou de isolamento explícito por comunidade_id",
-  );
+// As rotas `/api/teens*` foram removidas em 08/09/2026: consultavam nome, data
+// de nascimento, nome dos pais e telefone de menores varrendo a tabela
+// `usuarios` inteira, sem nenhum filtro de `comunidade_id`. A trava anterior
+// exigia que elas ficassem atrás do bloqueio de módulos legados; agora que os
+// arquivos não existem, a trava passa a vigiar a ausência — restaurar aquele
+// código como estava reintroduz o vazamento entre comunidades. Quando a Área
+// Kids/Eventos for desenhada, ela precisa nascer com isolamento por comunidade
+// e este teste ser atualizado conscientemente.
+// Ver docs/relatorios/AUDITORIA_ENDPOINTS_LEGADOS_2026-09-08.md (Classe C).
+test("rota legada de menores não volta ao repositório", async () => {
+  for (const route of [
+    "../app/api/teens/route.ts",
+    "../app/api/teens/acompanhamentos/route.ts",
+    "../app/api/teens/acompanhamentos/[id]/route.ts",
+  ]) {
+    await assert.rejects(
+      readFile(new URL(route, import.meta.url), "utf8"),
+      { code: "ENOENT" },
+      `${route} voltou ao repositório: essa rota lê dados de menores sem filtro de comunidade_id e não pode ser restaurada como estava`,
+    );
+  }
 });

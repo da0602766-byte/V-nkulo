@@ -27,13 +27,12 @@ test("Conta Google usa OAuth real e cria cadastro neutro sem acesso comunitário
 });
 
 test("fotos pessoais ficam no Drive e anexos de publicação usam o bucket compartilhado", async () => {
-  const [upload, localMedia, serviceWorker, feedback, publicRegistration, legacyProfile, notice, modules] = await Promise.all([
+  const [upload, localMedia, serviceWorker, feedback, publicRegistration, notice, modules] = await Promise.all([
     read("app/api/pilot/uploads/route.ts"),
     read("app/lib/local-media.ts"),
     read("public/sw.js"),
     read("app/api/feedback/route.ts"),
     read("app/api/public/cadastro-membro/[token]/route.ts"),
-    read("app/api/perfil/route.ts"),
     read("app/lib/notice-image.ts"),
     read("app/api/modulos/route.ts"),
   ]);
@@ -46,7 +45,6 @@ test("fotos pessoais ficam no Drive e anexos de publicação usam o bucket compa
   assert.match(feedback, /feedback-evidence/);
   assert.doesNotMatch(feedback, /bucket\.put/);
   assert.doesNotMatch(publicRegistration, /bucket\.put/);
-  assert.doesNotMatch(legacyProfile, /startsWith\("data:image\/"\)/);
   assert.doesNotMatch(notice, /base64/);
   assert.match(modules, /Vínkulo não guarda arquivos no banco/);
 });

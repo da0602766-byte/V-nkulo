@@ -1,8 +1,18 @@
 # Auditoria dos endpoints legados de comunidade única — 08/09/2026
 
-Classificação exigida antes de remover ou reescrever qualquer coisa. **Nenhum
-arquivo foi removido nesta auditoria.** O documento existe para o proprietário
-decidir com dado na mão.
+Classificação exigida antes de remover ou reescrever qualquer coisa. O documento
+existe para o proprietário decidir com dado na mão.
+
+> **Estado em 08/09/2026 — Classes A e C executadas.** O proprietário aprovou a
+> remoção. Saíram as 19 rotas da Classe A, as 3 da Classe C (`/api/teens*`) e 11
+> componentes órfãos. **A Classe B continua no repositório**, aguardando a
+> confirmação pedida no item 2 da Recomendação. Duas correções durante a
+> execução: `PrivateChatWorkspace.tsx` e `app/api/conta/perfil/route.ts` foram
+> apagados por engano e restaurados no mesmo trabalho — o primeiro é a aba
+> Mensagens do painel (carregado via `dynamic()`, o que escapou da varredura
+> inicial de referências) e o segundo nunca esteve nesta auditoria. A trava de
+> `/api/teens` em `tests/pilot-security.test.mjs` foi reescrita para vigiar a
+> ausência dos arquivos em vez do conteúdo deles.
 
 ## Resumo
 
@@ -111,7 +121,17 @@ testado, e não aparece para ninguém.
 
 Isso não é código morto para apagar — é uma decisão pendente: religar a
 interface (recuperando a funcionalidade) ou aposentar rota, painel e teste
-juntos. `PrivateChatDialog.tsx`, também órfão, é caso diferente: foi
+juntos.
+
+> **Atualização 08/09/2026:** `CommunityPresencePanel.tsx` entrou na lista
+> aprovada de remoção e foi apagado. A rota `/api/pilot/presenca` **continua no
+> repositório, testada e sem nenhum consumidor**. A decisão segue pendente, só
+> que agora religar o painel significa reescrever a interface, não apenas
+> importá-la de volta (o código antigo está no histórico do git). Se a decisão
+> for aposentar, saem juntos a rota e o teste `presença comunitária isola
+> tenants...` em `tests/pilot-integration.test.mjs`.
+
+`PrivateChatDialog.tsx`, também órfão, é caso diferente: foi
 substituído pelo popover de mensagens que o `PilotDashboard` implementa
 diretamente (`pilot-message-popover`). A troca custou o minimizar/maximizar da
 janela antiga, que o popover atual não tem.

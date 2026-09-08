@@ -1578,8 +1578,22 @@ test("sessão, tenant e gates críticos são validados no backend", async () => 
   assert.match(northHtml, /Bem-vindo ao ambiente Norte/);
   assert.doesNotMatch(northHtml, /Bem-vindo ao ambiente Sul/);
 
-  const legacyResponse = await worker.fetch(
+  // `/api/visitantes` era a rota legada de comunidade única; foi removida em
+  // 08/09/2026 (já existia `/api/pilot/visitantes`), então hoje o esperado é
+  // 404 — ela não pode reaparecer.
+  const removedLegacyResponse = await worker.fetch(
     new Request("http://localhost/api/visitantes", {
+      headers: { cookie: sessionCookie },
+    }),
+    env,
+    context,
+  );
+  assert.equal(removedLegacyResponse.status, 404);
+
+  // As rotas legadas que sobraram (Classe B da auditoria) continuam existindo e
+  // precisam continuar barradas pelo interruptor de módulos legados.
+  const legacyResponse = await worker.fetch(
+    new Request("http://localhost/api/cultos", {
       headers: { cookie: sessionCookie },
     }),
     env,
