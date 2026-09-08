@@ -13,7 +13,7 @@ marcado como `[a definir]`.
 
 `adote-gestao.da0602766.chatgpt.site` (origem única identificada no
 código-fonte, em `app/compartilhar/publicacao/[id]/page.tsx` e no
-`GOOGLE_DRIVE_SETUP.md` já existente no repositório).
+`docs/guias/GOOGLE_DRIVE_SETUP.md` já existente no repositório).
 
 Se houver um domínio próprio (`vinkulo.com`, `vinkulo.app` ou similar)
 planejado além deste, ele precisa ser adicionado nas mesmas telas do
@@ -164,7 +164,7 @@ OAuth"):
    de terceiros (CASA)** — só a revisão padrão do próprio Google, que pode
    levar alguns dias.
 5. Se o Google pedir o vídeo de demonstração, use o roteiro em
-   `GOOGLE_OAUTH_VIDEO_VERIFICACAO.md`.
+   `docs/guias/GOOGLE_OAUTH_VIDEO_VERIFICACAO.md`.
 
 ## 17. O que ainda precisa de ação manual (só você pode fazer)
 

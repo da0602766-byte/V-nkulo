@@ -44,7 +44,7 @@ depois de `90eeffe` é só documentação.
 | # | Commit | O que entrega |
 | --- | --- | --- |
 | 1 | `90bdb09` | Cache de fontes geradas localmente (`.vinext`) |
-| 2 | `b1f001d` | `REFORMA_VISUAL_V5.md` — a especificação |
+| 2 | `b1f001d` | `docs/coordenacao/REFORMA_VISUAL_V5.md` — a especificação |
 | 3 | `095fbdf` | Bloco 1: paletas colapsadas num acento de cobre |
 | 4 | `79c8fbc` | Bloco 2: ícones em SVG, itens duplicados do menu desfeitos |
 | 5 | `f0eda8d` | Bloco 3: Fio do dia como página própria |
@@ -115,15 +115,15 @@ Agora usa `hojeLocal()`.
 ## Passos
 
 1. `git fetch origin claude/system-preview-last-commit-dsr0q4`
-2. Confira o diff contra `main` e o `REFORMA_VISUAL_V5.md` (as seções 7.1, 7.2
+2. Confira o diff contra `main` e o `docs/coordenacao/REFORMA_VISUAL_V5.md` (as seções 7.1, 7.2
    e 7.3 contam o que deu errado e por quê).
 3. Aplique `drizzle/0060_fio_registros.sql` no banco de produção.
 4. Integre em `main` e publique no Sites pelo fluxo do
-   `COORDENACAO_IA.md` — credencial temporária por comando, nunca gravada em
+   `docs/coordenacao/COORDENACAO_IA.md` — credencial temporária por comando, nunca gravada em
    arquivo, log, commit ou URL.
 5. Depois do push, `fetch` e confirme que `HEAD` e `origin/main` apontam para o
    mesmo commit antes de declarar concluído.
-6. Registre a versão publicada na linha do Claude em `COORDENACAO_IA.md`.
+6. Registre a versão publicada na linha do Claude em `docs/coordenacao/COORDENACAO_IA.md`.
 
 ## Verificação depois de publicar
 

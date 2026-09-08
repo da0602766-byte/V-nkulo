@@ -82,7 +82,7 @@ dependendo de aprovação**. Então a conta segue nascendo com perfil `LEITURA`,
 intencional afirmado nos seus testes. O que mudou foi só abrir a sessão; nada
 no modelo de acesso.
 
-## Sobre a sua reserva no COORDENACAO_IA.md
+## Sobre a sua reserva no `docs/coordenacao/COORDENACAO_IA.md`
 
 A sua tarefa de 31/08 reservava `app/components/LoginPortal.tsx`,
 `app/api/auth/google/start/route.ts` e `app/api/auth/google/callback/route.ts`,
@@ -129,11 +129,11 @@ erro. As outras asserções do arquivo não foram tocadas.
 3. Rode `scripts/pre-publicacao.sh`, que faz TypeScript, lint, build,
    validação do artefato e a suíte comparada com
    `tests/falhas-conhecidas.txt`. Ele sai com 1 se aparecer falha nova.
-4. Integre em `main` e publique pelo fluxo do `COORDENACAO_IA.md` — credencial
+4. Integre em `main` e publique pelo fluxo do `docs/coordenacao/COORDENACAO_IA.md` — credencial
    temporária por comando, nunca gravada em arquivo, log, commit ou URL.
 5. Depois do push, `fetch` e confirme que `HEAD` e `origin/main` apontam para o
    mesmo commit antes de declarar concluído.
-6. Registre a versão publicada na linha do Claude em `COORDENACAO_IA.md`.
+6. Registre a versão publicada na linha do Claude em `docs/coordenacao/COORDENACAO_IA.md`.
 
 ## Verificação depois de publicar
 
@@ -161,6 +161,6 @@ desta entrega nem coisa que a publicação resolva.
 
 Para uso contínuo é preciso publicar o app em produção e passar pela
 verificação do Google, porque `drive.file` é escopo sensível. O
-`GOOGLE_DRIVE_SETUP.md` recebeu nesta entrega a seção 2.1 com esse caminho e
+`docs/guias/GOOGLE_DRIVE_SETUP.md` recebeu nesta entrega a seção 2.1 com esse caminho e
 com o passo de usuários de teste, que faltava no guia e era o motivo do
 `Erro 403: access_denied` que bloqueava até a conta proprietária.

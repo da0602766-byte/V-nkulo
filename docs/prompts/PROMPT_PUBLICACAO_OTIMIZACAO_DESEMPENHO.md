@@ -7,7 +7,7 @@ o repositório do Sites, preserve todas as mudanças posteriores já publicadas.
 ## Entregas empilhadas
 
 A origem desta entrega também carrega a preparação de login Google/Drive já
-descrita em `PROMPT_PUBLICACAO_GOOGLE_OAUTH.md`. Ela não deve ser duplicada nem
+descrita em `docs/prompts/PROMPT_PUBLICACAO_GOOGLE_OAUTH.md`. Ela não deve ser duplicada nem
 revertida durante a integração.
 
 ## Migração aditiva

@@ -86,7 +86,7 @@ pergunte ao Douglas antes de preencher:
    Douglas sabemos em qual dos dois o app está hoje. O login funcionar não
    decide isso sozinho (pode ser Testing com o e-mail dele na lista de
    test users). O checklist completo para publicar está em
-   `GOOGLE_OAUTH_VERIFICACAO.md`, seção 16-18.
+   `docs/guias/GOOGLE_OAUTH_VERIFICACAO.md`, seção 16-18.
 
 ## O que conferir depois de publicar
 

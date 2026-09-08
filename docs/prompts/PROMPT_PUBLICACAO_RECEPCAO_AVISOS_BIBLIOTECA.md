@@ -158,11 +158,11 @@ Nada aqui depende deles, mas dois tocam arquivos em comum:
    `drizzle/0069_recepcao_avisos_biblioteca.sql` inteiro antes de aplicar.
 3. **Aplique a migração no banco de produção** (renumerando se `0069` já estiver
    ocupado).
-4. Integre em `main` e publique pelo fluxo do `COORDENACAO_IA.md` — credencial
+4. Integre em `main` e publique pelo fluxo do `docs/coordenacao/COORDENACAO_IA.md` — credencial
    temporária por comando, nunca gravada em arquivo, log, commit ou URL.
 5. Depois do push, `fetch` e confirme que `HEAD` e `origin/main` apontam para o
    mesmo commit antes de declarar concluído.
-6. Registre a versão publicada na linha correspondente do `COORDENACAO_IA.md`.
+6. Registre a versão publicada na linha correspondente do `docs/coordenacao/COORDENACAO_IA.md`.
 
 ## Verificação depois de publicar
 
