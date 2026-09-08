@@ -31062,8 +31062,8 @@ html[data-theme="dark"] .pilot-dashboard[data-ui-version="v2"] :is(
 /* V198 — paleta real por comunidade, navegação segura e anexos sob demanda. */
 .pilot-dashboard[data-ui-version="v2"][data-community-palette] {
   --bg: var(--community-light-bg);
-  --surface: var(--community-light-surface);
-  --violet-soft: var(--community-light-surface-2);
+  --surface: color-mix(in srgb, var(--community-light-surface) calc(var(--vinkulo-glass-alpha) * 100%), transparent);
+  --violet-soft: color-mix(in srgb, var(--community-light-surface-2) calc(var(--vinkulo-glass-alpha) * 100%), transparent);
   --ink: var(--community-light-text);
   --muted: var(--community-light-muted);
   --line: var(--community-light-line);
@@ -31071,8 +31071,8 @@ html[data-theme="dark"] .pilot-dashboard[data-ui-version="v2"] :is(
   --violet-deep: var(--community-light-secondary);
   --green: var(--community-light-accent);
   --pilot-bg: var(--community-light-bg);
-  --pilot-surface: var(--community-light-surface);
-  --pilot-surface-2: var(--community-light-surface-2);
+  --pilot-surface: var(--surface);
+  --pilot-surface-2: var(--violet-soft);
   --pilot-text: var(--community-light-text);
   --pilot-muted: var(--community-light-muted);
   --pilot-line: var(--community-light-line);
@@ -31084,8 +31084,8 @@ html[data-theme="dark"] .pilot-dashboard[data-ui-version="v2"] :is(
   --pilot-gradient: linear-gradient(135deg, var(--community-light-primary), var(--community-light-accent));
   --pilot-shadow: var(--community-light-shadow);
   --v2-bg: var(--community-light-bg);
-  --v2-surface: var(--community-light-surface);
-  --v2-surface-subtle: var(--community-light-surface-2);
+  --v2-surface: var(--surface);
+  --v2-surface-subtle: var(--violet-soft);
   --v2-line: var(--community-light-line);
   --v2-border: var(--community-light-line);
   --v2-ink: var(--community-light-text);
@@ -31102,8 +31102,8 @@ html[data-theme="dark"] .pilot-dashboard[data-ui-version="v2"] :is(
 
 html[data-theme="dark"] .pilot-dashboard[data-ui-version="v2"][data-community-palette] {
   --bg: var(--community-dark-bg);
-  --surface: var(--community-dark-surface);
-  --violet-soft: var(--community-dark-surface-2);
+  --surface: color-mix(in srgb, var(--community-dark-surface) calc(var(--vinkulo-glass-alpha) * 100%), transparent);
+  --violet-soft: color-mix(in srgb, var(--community-dark-surface-2) calc(var(--vinkulo-glass-alpha) * 100%), transparent);
   --ink: var(--community-dark-text);
   --muted: var(--community-dark-muted);
   --line: var(--community-dark-line);
@@ -31111,8 +31111,8 @@ html[data-theme="dark"] .pilot-dashboard[data-ui-version="v2"][data-community-pa
   --violet-deep: var(--community-dark-secondary);
   --green: var(--community-dark-accent);
   --pilot-bg: var(--community-dark-bg);
-  --pilot-surface: var(--community-dark-surface);
-  --pilot-surface-2: var(--community-dark-surface-2);
+  --pilot-surface: var(--surface);
+  --pilot-surface-2: var(--violet-soft);
   --pilot-text: var(--community-dark-text);
   --pilot-muted: var(--community-dark-muted);
   --pilot-line: var(--community-dark-line);
@@ -31124,8 +31124,8 @@ html[data-theme="dark"] .pilot-dashboard[data-ui-version="v2"][data-community-pa
   --pilot-gradient: linear-gradient(135deg, var(--community-dark-primary), var(--community-dark-accent));
   --pilot-shadow: var(--community-dark-shadow);
   --v2-bg: var(--community-dark-bg);
-  --v2-surface: var(--community-dark-surface);
-  --v2-surface-subtle: var(--community-dark-surface-2);
+  --v2-surface: var(--surface);
+  --v2-surface-subtle: var(--violet-soft);
   --v2-line: var(--community-dark-line);
   --v2-border: var(--community-dark-line);
   --v2-ink: var(--community-dark-text);

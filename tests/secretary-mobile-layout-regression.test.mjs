@@ -21,7 +21,7 @@ test("editar escala fica na área de ações e respeita permissão de gerenciame
   assert.match(workspace, /function EditScheduleDialog/);
   assert.match(workspace, /acao: "ATUALIZAR"/);
   assert.match(workspace, /camposRespostas: schedule\.campos_respostas \|\| \{\}/);
-  assert.match(workspace, /Atualize as informações principais sem alterar as confirmações dos integrantes/);
+  assert.match(workspace, /Atualize as informações principais e revise o repertório sem alterar as confirmações dos integrantes/);
 });
 
 test("as cinco ações móveis mantêm linhas completas e previsíveis", () => {

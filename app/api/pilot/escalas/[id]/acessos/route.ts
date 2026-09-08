@@ -12,6 +12,68 @@ import {
 
 type Context = { params: Promise<{ id: string }> };
 
+const DEFAULT_HISTORY_RETENTION_DAYS = 30;
+const MIN_HISTORY_RETENTION_DAYS = 1;
+const MAX_HISTORY_RETENTION_DAYS = 30;
+
+function historyRetentionKey(communityId: number, ministryId: number) {
+  return `temporary_access_history_retention:${communityId}:${ministryId}`;
+}
+
+async function getScheduleMinistryId(
+  db: ReturnType<typeof getD1>,
+  communityId: number,
+  scheduleId: number,
+) {
+  const schedule = await db
+    .prepare(
+      `SELECT ministerio_id FROM escalas_ministerio
+       WHERE id = ? AND comunidade_id = ? LIMIT 1`,
+    )
+    .bind(scheduleId, communityId)
+    .first<{ ministerio_id: number }>();
+  return schedule ? Number(schedule.ministerio_id) : null;
+}
+
+async function getHistoryRetentionDays(
+  db: ReturnType<typeof getD1>,
+  communityId: number,
+  ministryId: number,
+) {
+  const row = await db
+    .prepare("SELECT valor FROM configuracoes WHERE chave = ? LIMIT 1")
+    .bind(historyRetentionKey(communityId, ministryId))
+    .first<{ valor: string }>();
+  const days = Number(row?.valor);
+  return Number.isInteger(days) &&
+    days >= MIN_HISTORY_RETENTION_DAYS &&
+    days <= MAX_HISTORY_RETENTION_DAYS
+    ? days
+    : DEFAULT_HISTORY_RETENTION_DAYS;
+}
+
+async function cleanupTemporaryAccessHistory(
+  db: ReturnType<typeof getD1>,
+  communityId: number,
+  ministryId: number,
+  retentionDays: number,
+) {
+  return db
+    .prepare(
+      `DELETE FROM acessos_temporarios
+       WHERE comunidade_id = ?
+         AND escala_id IN (
+           SELECT id FROM escalas_ministerio
+           WHERE comunidade_id = ? AND ministerio_id = ?
+         )
+         AND status IN ('EXPIRADO','CANCELADO','NEGADO')
+         AND datetime(COALESCE(cancelado_em, negado_em, expirado_em, termina_em, atualizado_em, criado_em))
+           < datetime('now', ?)`,
+    )
+    .bind(communityId, communityId, ministryId, `-${retentionDays} days`)
+    .run();
+}
+
 export async function GET(_request: Request, context: Context) {
   const access = await requireTenantPermission("schedules.view");
   if ("error" in access) return access.error;
@@ -33,6 +95,25 @@ export async function GET(_request: Request, context: Context) {
       { status: 403 },
     );
   }
+  const ministryId = await getScheduleMinistryId(
+    db,
+    access.context.comunidadeId,
+    scheduleId,
+  );
+  if (!ministryId) {
+    return Response.json({ error: "Escala não encontrada." }, { status: 404 });
+  }
+  const retentionDays = await getHistoryRetentionDays(
+    db,
+    access.context.comunidadeId,
+    ministryId,
+  );
+  await cleanupTemporaryAccessHistory(
+    db,
+    access.context.comunidadeId,
+    ministryId,
+    retentionDays,
+  );
   const rows = await db
     .prepare(
       `SELECT id FROM acessos_temporarios
@@ -48,6 +129,7 @@ export async function GET(_request: Request, context: Context) {
   ).filter(Boolean);
   return Response.json(
     {
+      retencaoDias: retentionDays,
       acessos: grants.map((grant) => ({
         id: grant!.id,
         designacaoId: grant!.designacao_id,
@@ -66,6 +148,66 @@ export async function GET(_request: Request, context: Context) {
         criadoEm: grant!.criado_em,
       })),
     },
+    { headers: { "Cache-Control": "no-store" } },
+  );
+}
+
+export async function PATCH(request: Request, context: Context) {
+  const access = await requireTenantPermission("schedules.view");
+  if ("error" in access) return access.error;
+  const scheduleId = Number((await context.params).id);
+  const body = await safeJson(request);
+  const retentionDays = Number(body?.retencaoDias);
+  if (
+    !Number.isInteger(scheduleId) ||
+    scheduleId <= 0 ||
+    !Number.isInteger(retentionDays) ||
+    retentionDays < MIN_HISTORY_RETENTION_DAYS ||
+    retentionDays > MAX_HISTORY_RETENTION_DAYS
+  ) {
+    return Response.json(
+      { error: "Escolha uma retenção entre 1 e 30 dias." },
+      { status: 400 },
+    );
+  }
+  const db = getD1();
+  if (!(await canManageSchedule(db, access.context, access.user.id, scheduleId))) {
+    return Response.json(
+      { error: "Você não administra esta escala." },
+      { status: 403 },
+    );
+  }
+  const ministryId = await getScheduleMinistryId(
+    db,
+    access.context.comunidadeId,
+    scheduleId,
+  );
+  if (!ministryId) {
+    return Response.json({ error: "Escala não encontrada." }, { status: 404 });
+  }
+  await db
+    .prepare(
+      `INSERT INTO configuracoes (chave, valor, atualizado_por, atualizado_em)
+       VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+       ON CONFLICT(chave) DO UPDATE SET
+         valor = excluded.valor,
+         atualizado_por = excluded.atualizado_por,
+         atualizado_em = CURRENT_TIMESTAMP`,
+    )
+    .bind(
+      historyRetentionKey(access.context.comunidadeId, ministryId),
+      String(retentionDays),
+      String(access.user.id),
+    )
+    .run();
+  const cleanup = await cleanupTemporaryAccessHistory(
+    db,
+    access.context.comunidadeId,
+    ministryId,
+    retentionDays,
+  );
+  return Response.json(
+    { ok: true, retencaoDias: retentionDays, excluidos: Number(cleanup.meta.changes || 0) },
     { headers: { "Cache-Control": "no-store" } },
   );
 }
