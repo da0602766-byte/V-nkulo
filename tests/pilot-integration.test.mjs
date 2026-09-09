@@ -5442,6 +5442,69 @@ test("solicitações paginam por cursor respeitando o agrupamento por status", a
   database.close();
 });
 
+// Os contadores de solicitações gerais (aconselhamento, apoio, ministério,
+// outro — a segunda fonte da aba Pedidos, fora do repositório de oração e
+// visita) precisam representar a fila inteira visível à pessoa, não o lote
+// que o cursor devolveu, e nunca podem enxergar outra comunidade.
+test("contadores de solicitações gerais representam a fila inteira, não o lote, e isolam a comunidade", async () => {
+  const { database, d1 } = await createPilotD1();
+  const pastorId = await createPilotUser(database, {
+    nome: "Pastor Contadores Gerais",
+    email: "pastor.contadores.gerais@example.test",
+    senha: "Pastor123",
+    memberships: [{ comunidadeId: 1, papel: "PASTOR" }],
+  });
+  const outroComunidadeId = await createPilotUser(database, {
+    nome: "Pastor Sul Contadores Gerais",
+    email: "pastor.sul.contadores.gerais@example.test",
+    senha: "Pastor123",
+    memberships: [{ comunidadeId: 2, papel: "PASTOR" }],
+  });
+
+  const TOTAL = 9; // maior que o lote pedido (4), para provar que o contador não é o tamanho do lote
+  const status = ["ABERTA", "EM_ANALISE", "CONCLUIDA"];
+  for (let indice = 0; indice < TOTAL; indice += 1) {
+    database
+      .prepare(
+        `INSERT INTO solicitacoes_comunidade
+          (comunidade_id, solicitante_id, tipo, titulo, descricao, status, visibilidade)
+         VALUES (1, ?, 'APOIO', ?, 'Descricao geral', ?, 'PASTORAL')`,
+      )
+      .run(pastorId, `Apoio geral ${indice}`, status[indice % 3]);
+  }
+  // Mesmo cenário na outra comunidade: se o contador vazasse comunidade, o
+  // total do Norte incluiria estes também.
+  database
+    .prepare(
+      `INSERT INTO solicitacoes_comunidade
+        (comunidade_id, solicitante_id, tipo, titulo, descricao, status, visibilidade)
+       VALUES (2, ?, 'APOIO', 'Apoio da outra comunidade', 'Descricao', 'ABERTA', 'PASTORAL')`,
+    )
+    .run(outroComunidadeId);
+
+  const worker = await loadWorker();
+  const env = createEnv(d1);
+  const cookie = await login(worker, env, "pastor.contadores.gerais@example.test", "Pastor123");
+
+  const address = new URL("http://localhost/api/pilot/solicitacoes");
+  address.searchParams.set("limite", "4");
+  const response = await worker.fetch(new Request(address, { headers: { cookie } }), env, context);
+  assert.equal(response.status, 200);
+  const dados = await response.json();
+
+  assert.equal(dados.solicitacoes.length, 4, "o lote pedido continua pequeno");
+  assert.equal(dados.contadoresGerais.total, TOTAL, "o contador precisa ser o total real, não o lote");
+  assert.equal(dados.contadoresGerais.abertos, TOTAL - Math.floor(TOTAL / 3), "conta tudo que não está concluído");
+  assert.equal(
+    dados.contadoresGerais.acompanhamento,
+    Math.floor(TOTAL / 3),
+    "conta as em análise mesmo fora do lote carregado",
+  );
+  assert.equal(dados.contadoresGerais.concluidos, Math.floor(TOTAL / 3));
+
+  database.close();
+});
+
 // A Central mostra no máximo quatro escalas com participação pendente, e antes
 // baixava o lote inteiro para descartar o resto no navegador. O filtro precisa
 // resolver isso no SQL sem afrouxar visibilidade: escala de outra pessoa, já
@@ -5730,6 +5793,279 @@ test("designações de um lote grande atravessam a fatia sem perder ninguém", a
     dados.escalas.every((e) => e.designacoes.every((d) => Number(d.escala_id) === Number(e.id))),
     "designação atribuída à escala errada",
   );
+
+  database.close();
+});
+
+// A Central de Oração/Visita tinha `LIMIT 250` fixo nos itens (e `LIMIT 1200`
+// nos eventos) sem forma de pedir o restante: acima disso, itens antigos
+// simplesmente não apareciam, e busca/filtros só enxergavam o lote já
+// carregado. Este teste cobre a paginação por cursor real, a busca e os
+// filtros resolvidos no SQL sobre a fila inteira, e os contadores agregados
+// (não calculados sobre o lote).
+test("Central de oração/visita pagina por cursor, busca e filtra a fila inteira e conta o total real", async () => {
+  const { database, d1 } = await createPilotD1();
+  const pastorId = await createPilotUser(database, {
+    nome: "Pastor Central Escala",
+    email: "pastor.central.escala@example.test",
+    senha: "Pastor123",
+    memberships: [{ comunidadeId: 1, papel: "PASTOR" }],
+  });
+  const genericoId = await createPilotUser(database, {
+    nome: "Membro Genérico Central",
+    email: "generico.central.escala@example.test",
+    senha: "Membro123",
+    memberships: [{ comunidadeId: 1, papel: "MEMBRO" }],
+  });
+  const alvoId = await createPilotUser(database, {
+    nome: "Fulano Buscável Central",
+    email: "alvo.central.escala@example.test",
+    senha: "Membro123",
+    memberships: [{ comunidadeId: 1, papel: "MEMBRO" }],
+  });
+
+  const repositorioId = database
+    .prepare(
+      `INSERT INTO solicitacao_repositorios (comunidade_id, tipo, nome, status)
+       VALUES (1, 'ORACAO', 'Repositório de orações', 'ATIVO')
+       RETURNING id`,
+    )
+    .get().id;
+
+  function inserirItem({ solicitanteId, titulo, status = "ABERTO", responsavelUsuarioId = null }) {
+    const solicitacaoId = database
+      .prepare(
+        `INSERT INTO solicitacoes_comunidade
+          (comunidade_id, solicitante_id, tipo, titulo, descricao, status, visibilidade)
+         VALUES (1, ?, 'ORACAO', ?, 'Descrição de teste para a Central.', 'ABERTA', 'PASTORAL')
+         RETURNING id`,
+      )
+      .get(solicitanteId, titulo).id;
+    database
+      .prepare(
+        `INSERT INTO solicitacao_repositorio_itens
+          (repositorio_id, comunidade_id, solicitacao_id, status, responsavel_usuario_id)
+         VALUES (?, 1, ?, ?, ?)`,
+      )
+      .run(repositorioId, solicitacaoId, status, responsavelUsuarioId);
+    return solicitacaoId;
+  }
+
+  // Inserido primeiro (menor id) para cair fora da primeira página sob a
+  // ordenação padrão (aberto/normal desce por id): só a busca ou o filtro de
+  // status devem conseguir achá-lo sem percorrer as páginas manualmente.
+  const alvoSolicitacaoId = inserirItem({
+    solicitanteId: alvoId,
+    titulo: "Pedido do Fulano Buscável",
+    status: "AGUARDANDO_RETORNO",
+  });
+  database
+    .prepare("UPDATE solicitacoes_comunidade SET criado_em = '2020-01-01 00:00:00' WHERE id = ?")
+    .run(alvoSolicitacaoId);
+
+  const TOTAL_FILLER = 45;
+  const criadosIds = [];
+  for (let indice = 0; indice < TOTAL_FILLER; indice += 1) {
+    criadosIds.push(
+      inserirItem({ solicitanteId: genericoId, titulo: `Pedido genérico ${indice}` }),
+    );
+  }
+  const comResponsavelSolicitacaoId = inserirItem({
+    solicitanteId: genericoId,
+    titulo: "Pedido já com responsável",
+    responsavelUsuarioId: pastorId,
+  });
+  const TOTAL = TOTAL_FILLER + 2; // alvo + com responsável + genéricos
+
+  const worker = await loadWorker();
+  const env = createEnv(d1);
+  const cookie = await login(
+    worker,
+    env,
+    "pastor.central.escala@example.test",
+    "Pastor123",
+  );
+
+  async function pedirCentral(parametros) {
+    const address = new URL("http://localhost/api/pilot/solicitacoes/central");
+    for (const [chave, valor] of Object.entries(parametros || {})) {
+      if (valor) address.searchParams.set(chave, valor);
+    }
+    const response = await worker.fetch(
+      new Request(address, { headers: { cookie } }),
+      env,
+      context,
+    );
+    assert.equal(response.status, 200);
+    return response.json();
+  }
+  function itensDoLote(pagina) {
+    return pagina.repositories.flatMap((repositorio) => repositorio.items);
+  }
+
+  // Os contadores representam a fila inteira, não o lote — mesmo pedindo um
+  // lote pequeno.
+  const primeiro = await pedirCentral({ limite: "20" });
+  assert.equal(itensDoLote(primeiro).length, 20);
+  assert.ok(primeiro.nextCursor, "o primeiro lote precisa devolver cursor");
+  assert.equal(primeiro.contadores.total, TOTAL);
+  assert.equal(primeiro.contadores.abertos, TOTAL);
+  assert.equal(primeiro.contadores.oracoes, TOTAL);
+  assert.equal(primeiro.contadores.visitas, 0);
+
+  // Percorrer tudo: nenhum item pode ser pulado nem repetido.
+  const vistos = [];
+  let cursor = null;
+  let lotes = 0;
+  do {
+    const lote = await pedirCentral({ limite: "20", cursor });
+    for (const item of itensDoLote(lote)) vistos.push(Number(item.id));
+    cursor = lote.nextCursor;
+    lotes += 1;
+    assert.ok(lotes <= 10, "paginação não terminou: possível cursor parado");
+  } while (cursor);
+  assert.equal(vistos.length, TOTAL);
+  assert.equal(new Set(vistos).size, TOTAL, "nenhum item de oração/visita pode se repetir entre lotes");
+  assert.ok(lotes >= 3, "o cenário precisa exercitar mais de duas páginas");
+
+  // Cursor corrompido cai na primeira página em vez de erro ou lista inteira.
+  const cursorInvalido = await pedirCentral({ limite: "20", cursor: "nao-e-um-cursor" });
+  assert.equal(itensDoLote(cursorInvalido).length, 20);
+
+  // A busca roda no SQL e encontra o alvo mesmo estando fora da primeira
+  // página, sem precisar carregar os lotes anteriores manualmente.
+  const busca = await pedirCentral({ busca: "Buscável" });
+  const achadosBusca = itensDoLote(busca);
+  assert.equal(achadosBusca.length, 1);
+  assert.equal(achadosBusca[0].solicitante_nome, "Fulano Buscável Central");
+
+  // O filtro de status (via `estado=RETORNO`) também acha o alvo sem precisar
+  // de busca textual.
+  const retorno = await pedirCentral({ estado: "RETORNO" });
+  const achadosRetorno = itensDoLote(retorno);
+  assert.equal(achadosRetorno.length, 1);
+  assert.equal(achadosRetorno[0].item_status, "AGUARDANDO_RETORNO");
+
+  // Responsável e "sem responsável" também são resolvidos no SQL.
+  const comResponsavel = await pedirCentral({ responsavel: String(pastorId) });
+  assert.equal(itensDoLote(comResponsavel).length, 1);
+  assert.equal(Number(itensDoLote(comResponsavel)[0].solicitacao_id), comResponsavelSolicitacaoId);
+
+  const semResponsavel = await pedirCentral({ semResponsavel: "1", limite: "100" });
+  assert.equal(itensDoLote(semResponsavel).length, TOTAL - 1);
+  assert.ok(itensDoLote(semResponsavel).every((item) => !item.responsavel_usuario_id));
+
+  // Período: o alvo foi criado em 2020 de propósito; filtrar "desde hoje"
+  // precisa excluí-lo mesmo quando a busca também bateria com o nome dele —
+  // prova que os filtros se combinam em AND, não em OR.
+  const hoje = new Date().toISOString().slice(0, 10);
+  const desde = await pedirCentral({ busca: "Buscável", desde: hoje });
+  assert.equal(itensDoLote(desde).length, 0);
+  // Mas os contadores da fila inteira continuam contando o alvo — eles
+  // representam o total real, não o resultado do filtro atual.
+  assert.equal(desde.contadores.total, TOTAL);
+
+  database.close();
+});
+
+// Um membro comum (sem liderar ministério nem permissão de gestão) nunca pode
+// enxergar a fila operacional através de busca ou filtro, e a busca de uma
+// comunidade nunca pode alcançar itens de outra — mesmo com título idêntico.
+test("Central de oração/visita isola comunidades e nunca amplia o acesso do membro comum via busca ou filtro", async () => {
+  const { database, d1 } = await createPilotD1();
+  await createPilotUser(database, {
+    nome: "Pastor Central Norte",
+    email: "pastor.central.norte@example.test",
+    senha: "Pastor123",
+    memberships: [{ comunidadeId: 1, papel: "PASTOR" }],
+  });
+  const membroNorteId = await createPilotUser(database, {
+    nome: "Membro Comum Central Norte",
+    email: "membro.central.norte@example.test",
+    senha: "Membro123",
+    memberships: [{ comunidadeId: 1, papel: "MEMBRO" }],
+  });
+  await createPilotUser(database, {
+    nome: "Pastor Central Sul",
+    email: "pastor.central.sul@example.test",
+    senha: "Pastor123",
+    memberships: [{ comunidadeId: 2, papel: "PASTOR" }],
+  });
+  const membroSulId = await createPilotUser(database, {
+    nome: "Membro Central Sul",
+    email: "membro.central.sul@example.test",
+    senha: "Membro123",
+    memberships: [{ comunidadeId: 2, papel: "MEMBRO" }],
+  });
+
+  function repositorio(comunidadeId) {
+    return database
+      .prepare(
+        `INSERT INTO solicitacao_repositorios (comunidade_id, tipo, nome, status)
+         VALUES (?, 'ORACAO', 'Repositório de orações', 'ATIVO')
+         RETURNING id`,
+      )
+      .get(comunidadeId).id;
+  }
+  function inserirItem(comunidadeId, repositorioId, solicitanteId, titulo) {
+    const solicitacaoId = database
+      .prepare(
+        `INSERT INTO solicitacoes_comunidade
+          (comunidade_id, solicitante_id, tipo, titulo, descricao, status, visibilidade)
+         VALUES (?, ?, 'ORACAO', ?, 'Descrição idêntica entre comunidades.', 'ABERTA', 'PASTORAL')
+         RETURNING id`,
+      )
+      .get(comunidadeId, solicitanteId, titulo).id;
+    database
+      .prepare(
+        `INSERT INTO solicitacao_repositorio_itens (repositorio_id, comunidade_id, solicitacao_id)
+         VALUES (?, ?, ?)`,
+      )
+      .run(repositorioId, comunidadeId, solicitacaoId);
+  }
+
+  const repoNorte = repositorio(1);
+  const repoSul = repositorio(2);
+  // Título idêntico nas duas comunidades: se o isolamento vazasse, a busca do
+  // Norte encontraria também o pedido do Sul.
+  inserirItem(1, repoNorte, membroNorteId, "Pedido Isolamento Central Alpha");
+  inserirItem(2, repoSul, membroSulId, "Pedido Isolamento Central Alpha");
+
+  const worker = await loadWorker();
+  const env = createEnv(d1);
+  const pastorNorteCookie = await login(worker, env, "pastor.central.norte@example.test", "Pastor123");
+  const membroNorteCookie = await login(worker, env, "membro.central.norte@example.test", "Membro123");
+
+  async function pedirCentral(cookie, parametros) {
+    const address = new URL("http://localhost/api/pilot/solicitacoes/central");
+    for (const [chave, valor] of Object.entries(parametros || {})) {
+      if (valor) address.searchParams.set(chave, valor);
+    }
+    const response = await worker.fetch(
+      new Request(address, { headers: { cookie } }),
+      env,
+      context,
+    );
+    assert.equal(response.status, 200);
+    return response.json();
+  }
+  function itensDoLote(pagina) {
+    return pagina.repositories.flatMap((repositorio) => repositorio.items);
+  }
+
+  const buscaNorte = await pedirCentral(pastorNorteCookie, { busca: "Isolamento Central Alpha" });
+  const achadosNorte = itensDoLote(buscaNorte);
+  assert.equal(achadosNorte.length, 1, "a busca do Norte não pode trazer o pedido do Sul");
+  assert.equal(achadosNorte[0].solicitante_nome, "Membro Comum Central Norte");
+  assert.equal(buscaNorte.contadores.total, 1, "o contador do Norte não pode incluir a fila do Sul");
+
+  // Um membro comum (sem papel de gestão nem ministério sob responsabilidade)
+  // não vê a fila operacional mesmo usando busca ou filtro — nem os cartões
+  // devem contar algo para ele.
+  const buscaMembro = await pedirCentral(membroNorteCookie, { busca: "Isolamento", estado: "PENDENTES" });
+  assert.equal(buscaMembro.canManageRepositories, false);
+  assert.equal(itensDoLote(buscaMembro).length, 0, "busca não pode ampliar o acesso do membro comum");
+  assert.equal(buscaMembro.contadores.total, 0, "contadores não podem revelar a fila para o membro comum");
 
   database.close();
 });
