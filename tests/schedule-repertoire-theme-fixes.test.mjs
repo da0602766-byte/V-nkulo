@@ -31,6 +31,20 @@ test("link compartilhado exibe os links compactos dentro de cada música", () =>
   assert.match(sharedPage, /target="_blank"/);
 });
 
+test("modo leitura pessoal exibe repertório e links e a marca volta à plataforma", () => {
+  const temporaryPage = read("app/acesso/[token]/page.tsx");
+  const sharedPage = read("app/escala/[token]/page.tsx");
+  const accessGate = read("app/components/SharedScheduleAccessGate.tsx");
+  const pendingState = read("app/components/SharedSchedulePendingState.tsx");
+  assert.match(temporaryPage, /groupScheduleResources/);
+  assert.match(temporaryPage, /shared-secretary-repertoire/);
+  assert.match(temporaryPage, /shared-secretary-sublinks/);
+  assert.match(temporaryPage, /shared-secretary-links/);
+  for (const source of [temporaryPage, sharedPage, accessGate, pendingState]) {
+    assert.match(source, /href="\/" aria-label="Entrar na plataforma"/);
+  }
+});
+
 test("troca de tema é imediata e bloqueia apenas toques simultâneos", () => {
   const control = read("app/components/ThemeControl.tsx");
   assert.match(control, /transitionInProgress/);

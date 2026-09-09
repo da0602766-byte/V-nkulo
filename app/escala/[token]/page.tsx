@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getD1 } from "../../../db";
 import SharedScheduleAccessGate from "../../components/SharedScheduleAccessGate";
@@ -59,7 +60,7 @@ export default async function SharedSchedulePage({
     >
       <main className="shared-secretary-page" id="conteudo-escala">
         <header>
-          <span className="shared-secretary-brand">V+</span>
+          <Link className="shared-secretary-brand" href="/" aria-label="Entrar na plataforma">V+</Link>
           <div>
             <p>VÍNKULO · SECRETARIA MINISTERIAL</p>
             <strong>Escala compartilhada</strong>
@@ -145,7 +146,7 @@ function SharedAccessState({ title, detail }: { title: string; detail: string })
   return (
     <main className="shared-secretary-page shared-secretary-access-state">
       <section>
-        <span className="shared-secretary-brand">V+</span>
+        <Link className="shared-secretary-brand" href="/" aria-label="Entrar na plataforma">V+</Link>
         <p>VÍNKULO · ACESSO TEMPORÁRIO</p>
         <h1>{title}</h1>
         <p>{detail}</p>

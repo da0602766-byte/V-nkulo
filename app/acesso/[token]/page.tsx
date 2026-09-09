@@ -1,9 +1,11 @@
 import { cookies } from "next/headers";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getD1 } from "../../../db";
 import TemporaryAccessFlow from "../../components/TemporaryAccessFlow";
 import TemporaryScheduleBoundary from "../../components/TemporaryScheduleBoundary";
 import { getSessionUser } from "../../lib/local-auth";
+import { groupScheduleResources } from "../../lib/schedule-resources";
 import { getSecretaryScheduleDetail } from "../../lib/secretary-schedule";
 import { listTenantMemberships } from "../../lib/tenant";
 import {
@@ -82,11 +84,15 @@ export default async function TemporaryAccessPage({
     }
     const schedule = await getSecretaryScheduleDetail(db, grant.escala_id);
     if (!schedule) notFound();
+    const scheduleResources = groupScheduleResources(
+      schedule.repertorio,
+      schedule.links_recursos,
+    );
     return (
       <TemporaryScheduleBoundary token={token}>
         <main className="shared-secretary-page" id="conteudo-escala">
           <header>
-            <span className="shared-secretary-brand">V+</span>
+            <Link className="shared-secretary-brand" href="/" aria-label="Entrar na plataforma">V+</Link>
             <div>
               <p>VÍNKULO · ACESSO TEMPORÁRIO</p>
               <strong>{temporaryResourceLabel(grant.recurso)}</strong>
@@ -117,6 +123,28 @@ export default async function TemporaryAccessPage({
               </ul>
             </section>
             <section>
+              <p className="pilot-kicker">REPERTÓRIO</p>
+              <h2>Músicas e materiais</h2>
+              {scheduleResources.groups.length ? (
+                <ol className="shared-secretary-repertoire">
+                  {scheduleResources.groups.map((group) => (
+                    <li key={group.title}>
+                      <strong>{group.title}</strong>
+                      {group.links.length > 0 && (
+                        <div className="shared-secretary-sublinks">
+                          {group.links.map((link) => (
+                            <a key={link.id} href={link.url} target="_blank" rel="noreferrer">
+                              {linkTypeLabel(link.tipo)}
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              ) : <p>Nenhum item informado.</p>}
+            </section>
+            <section>
               <p className="pilot-kicker">CHECKLIST</p>
               <h2>Responsabilidades</h2>
               <ul>
@@ -128,6 +156,17 @@ export default async function TemporaryAccessPage({
                 ))}
               </ul>
             </section>
+            {scheduleResources.unmatched.length > 0 && <section>
+              <p className="pilot-kicker">LINKS</p>
+              <h2>Outros materiais</h2>
+              <div className="shared-secretary-links">
+                {scheduleResources.unmatched.map((item) => (
+                  <a key={item.id} href={item.url} target="_blank" rel="noreferrer">
+                    {item.titulo}<span>{linkTypeLabel(item.tipo)}</span>
+                  </a>
+                ))}
+              </div>
+            </section>}
           </div>
           <footer>
             Acesso pessoal, temporário e somente leitura · expira em {formatDate(grant.termina_em)}
@@ -174,5 +213,17 @@ function statusLabel(value: unknown) {
       FEITO: "Feito",
       NAO_FEITO: "Não feito",
     }[String(value || "")] || String(value || "")
+  );
+}
+
+function linkTypeLabel(value: string) {
+  return (
+    {
+      YOUTUBE: "YouTube",
+      SPOTIFY: "Spotify",
+      CIFRA_CLUB: "Cifra Club",
+      GOOGLE_DRIVE: "Google Drive",
+      PERSONALIZADO: "Abrir link",
+    }[value] || value.replaceAll("_", " ")
   );
 }

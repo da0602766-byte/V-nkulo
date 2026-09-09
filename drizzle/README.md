@@ -6,8 +6,14 @@ migração nova, leia isto.
 
 ## Próximo número livre
 
-**`0070`**. Use o próximo inteiro disponível a partir daí — não reaproveite
+**`0071`**. Use o próximo inteiro disponível a partir daí — não reaproveite
 um número já usado, mesmo que o arquivo tenha sido escrito à mão.
+
+`0070_chat_system_retention.sql` reconstrói `conversas_privadas` (troca o
+ciclo mensal `ciclo_mes` pelo semanal `ciclo_semana` e remove `drive_file_id`
+e `storage_provider`, que só existiam para o chat espelhar conteúdo no
+Google Drive) e adiciona `entregue_em` em `mensagens_privadas` para o status
+de entrega. Ver app/lib/chat-retention.ts.
 
 ## Se dois números colidirem
 

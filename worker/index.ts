@@ -4,6 +4,7 @@ import handler from "vinext/server/app-router-entry";
 import { runWithRuntimeEnv } from "../db/runtime-env";
 import type { R2BucketBinding } from "../db/runtime-env";
 import { runPlatformOptimizationIfDue } from "../app/lib/platform-optimizer";
+import { purgeExpiredPrivateMessagesIfDue } from "../app/lib/chat-retention";
 
 interface Env {
   ASSETS: Fetcher;
@@ -68,6 +69,13 @@ const worker = {
           runPlatformOptimizationIfDue(env.DB).catch(() => undefined),
         );
       }
+      // Limpeza semanal das mensagens privadas: não é opcional (ver
+      // app/lib/chat-retention.ts), então roda fora do otimizador
+      // configurável acima e em toda requisição (a própria função se
+      // limita a checar o banco uma vez a cada poucos minutos).
+      ctx.waitUntil(
+        purgeExpiredPrivateMessagesIfDue(env.DB).catch(() => undefined),
+      );
 
       const response = await runWithRuntimeEnv(env, () =>
         handler.fetch(request, env, ctx),

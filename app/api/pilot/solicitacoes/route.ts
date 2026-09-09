@@ -54,6 +54,143 @@ function decodeRequestCursor(value: string | null): RequestCursor | null {
 const REQUEST_GROUP_SQL =
   "CASE s.status WHEN 'ABERTA' THEN 0 WHEN 'EM_ANALISE' THEN 1 ELSE 2 END";
 
+// A busca e as abas rápidas do painel de Atendimento (Orações, Urgentes,
+// Aguardando retorno…) filtravam só o que já tinha sido carregado no
+// navegador: um pedido procurado que estivesse além do primeiro lote
+// simplesmente não aparecia. Este tipo/mapa espelha o mesmo desenho de
+// app/api/pilot/solicitacoes/central/route.ts para os pedidos gerais (oração
+// e visita têm sua própria fila e ficam de fora daqui, ver ?operacional=1).
+type OperationalFilters = {
+  search: string; category: string; status: string;
+  responsavelId: number; since: string; unassignedOnly: boolean;
+};
+const OPERATIONAL_CATEGORIES = new Set([
+  "TODOS", "ORACAO", "VISITA", "URGENTES", "PENDENTES", "ACOMPANHAMENTO", "RETORNO", "CONCLUIDOS",
+]);
+function parseOperationalFilters(address: URL): OperationalFilters {
+  const categoryRaw = (address.searchParams.get("categoria") || "TODOS").toUpperCase();
+  const responsavelId = Number(address.searchParams.get("responsavelId") || 0);
+  return {
+    search: (address.searchParams.get("busca") || "").trim().slice(0, 80),
+    category: OPERATIONAL_CATEGORIES.has(categoryRaw) ? categoryRaw : "TODOS",
+    status: (address.searchParams.get("status") || "").trim().slice(0, 30).toUpperCase(),
+    responsavelId: Number.isInteger(responsavelId) && responsavelId > 0 ? responsavelId : 0,
+    since: (address.searchParams.get("desde") || "").trim().slice(0, 10),
+    unassignedOnly: address.searchParams.get("semResponsavel") === "1",
+  };
+}
+// Um pedido geral nunca é oração/visita, então nunca é urgente (só itens de
+// repositório recebem prioridade) nem entra em "Aguardando retorno" (só
+// visitas atrasadas usam esse status) — essas abas ficam de fora aqui e são
+// cobertas inteiramente pela Central.
+const GENERAL_CATEGORY_SQL: Record<string, string> = {
+  TODOS: "1 = 1",
+  ORACAO: "0 = 1",
+  VISITA: "0 = 1",
+  URGENTES: "0 = 1",
+  PENDENTES: "s.status != 'CONCLUIDA'",
+  ACOMPANHAMENTO: "s.status = 'EM_ANALISE'",
+  RETORNO: "0 = 1",
+  CONCLUIDOS: "s.status = 'CONCLUIDA'",
+};
+
+type TenantAccess = Exclude<Awaited<ReturnType<typeof requireTenantPermission>>, { error: Response }>;
+
+// Só alimenta o painel de Atendimento (ver operationalRows em
+// RequestsWorkspace.tsx) — nunca a lista "Meus pedidos" do membro, que
+// continua vindo do caminho normal abaixo, sem filtro nenhum. Por isso fica
+// numa função à parte em vez de ramificar a consulta principal: um bug aqui
+// não pode vazar para o que o membro vê da própria fila.
+async function loadOperationalGeneralList(db: ReturnType<typeof getD1>, access: TenantAccess, canManage: boolean, address: URL) {
+  const cursor = decodeRequestCursor(address.searchParams.get("cursor"));
+  const requestedSize = Number(address.searchParams.get("limite") || 0);
+  const pageSize = Number.isInteger(requestedSize) && requestedSize > 0
+    ? Math.min(requestedSize, REQUEST_MAX_PAGE_SIZE)
+    : REQUEST_PAGE_SIZE;
+  const filters = parseOperationalFilters(address);
+  const searchTerm = `%${filters.search.replaceAll("%", "").replaceAll("_", "")}%`;
+  const result = await db.prepare(
+    `SELECT s.id, s.tipo, s.titulo, s.descricao, s.visibilidade, s.status,
+      s.criado_em, s.atualizado_em, s.solicitante_id,
+      CASE WHEN s.solicitante_id = ? THEN 1 ELSE 0 END AS is_mine,
+      s.preferencia_contato, s.disponibilidade, s.data_preferencial, s.contato_autorizado,
+      u.nome AS solicitante_nome, COALESCE(u.foto_perfil, '') AS solicitante_foto,
+      COALESCE(uc.papel, 'MEMBRO') AS solicitante_papel,
+      ri.id AS repositorio_item_id, ri.status AS operacional_status,
+      COALESCE(ri.prioridade, 'NORMAL') AS prioridade,
+      ri.responsavel_usuario_id, COALESCE(responsavel.nome, '') AS responsavel_nome,
+      ri.responsavel_atribuido_em, ri.primeiro_contato_em,
+      ri.proximo_retorno_em, ri.visita_agendada_em, ri.finalizado_em,
+      COALESCE(ri.mensagem_atendimento, '') AS mensagem_atendimento,
+      COALESCE(ri.resultado, '') AS resultado,
+      COALESCE((SELECT e.mensagem FROM solicitacao_eventos e
+        WHERE e.solicitacao_id = s.id AND e.comunidade_id = s.comunidade_id
+          AND e.visivel_membro = 1
+        ORDER BY e.id DESC LIMIT 1), '') AS ultima_atualizacao,
+      '' AS publico_resumo
+     FROM solicitacoes_comunidade s
+     JOIN usuarios u ON u.id = s.solicitante_id
+     LEFT JOIN usuario_comunidades uc ON uc.usuario_id = s.solicitante_id
+       AND uc.comunidade_id = s.comunidade_id AND uc.status = 'ATIVO'
+     LEFT JOIN solicitacao_repositorio_itens ri
+       ON ri.solicitacao_id = s.id AND ri.comunidade_id = s.comunidade_id
+     LEFT JOIN usuarios responsavel ON responsavel.id = ri.responsavel_usuario_id
+     WHERE s.comunidade_id = ? AND s.tipo NOT IN ('ORACAO', 'VISITA')
+       AND (
+         s.solicitante_id = ?
+         OR EXISTS (
+           SELECT 1 FROM solicitacao_destinatarios sd
+           WHERE sd.solicitacao_id = s.id AND sd.comunidade_id = s.comunidade_id
+             AND sd.usuario_id = ?
+         )
+         OR (? = 1 AND NOT EXISTS (
+           SELECT 1 FROM solicitacao_destinatarios legacy
+           WHERE legacy.solicitacao_id = s.id
+         ))
+       )
+       AND (${GENERAL_CATEGORY_SQL[filters.category]})
+       AND (? = '' OR u.nome LIKE ? OR s.titulo LIKE ? OR s.descricao LIKE ?
+         OR COALESCE(responsavel.nome, '') LIKE ? OR COALESCE(ri.mensagem_atendimento, '') LIKE ?
+         OR COALESCE(ri.resultado, '') LIKE ?)
+       AND (? = '' OR s.status = ?)
+       AND (? = 0 OR ri.responsavel_usuario_id = ?)
+       AND (? = '' OR datetime(s.criado_em) >= datetime(?))
+       AND (? = 0 OR ri.responsavel_usuario_id IS NULL)
+       AND (
+         ? = 0
+         OR ${REQUEST_GROUP_SQL} > ?
+         OR (${REQUEST_GROUP_SQL} = ? AND s.id < ?)
+       )
+     ORDER BY ${REQUEST_GROUP_SQL}, s.id DESC
+     LIMIT ?`,
+  ).bind(
+    access.user.id, access.context.comunidadeId,
+    access.user.id, access.user.id, canManage ? 1 : 0,
+    filters.search, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm,
+    filters.status, filters.status,
+    filters.responsavelId, filters.responsavelId,
+    filters.since, filters.since,
+    filters.unassignedOnly ? 1 : 0,
+    cursor ? 1 : 0, cursor?.grupo ?? 0, cursor?.grupo ?? 0, cursor?.id ?? 0,
+    pageSize + 1,
+  ).all<Record<string, unknown>>();
+
+  const hasMore = result.results.length > pageSize;
+  if (hasMore) result.results.length = pageSize;
+  const last = result.results[result.results.length - 1];
+  const nextCursor = hasMore && last
+    ? encodeRequestCursor({
+        grupo: last.status === "ABERTA" ? 0 : last.status === "EM_ANALISE" ? 1 : 2,
+        id: Number(last.id),
+      })
+    : null;
+
+  return Response.json(
+    { solicitacoes: result.results, nextCursor },
+    { headers: { "Cache-Control": "no-store" } },
+  );
+}
+
 export async function GET(request: Request) {
   const access = await requireTenantPermission("dashboard.view");
   if ("error" in access) return access.error;
@@ -66,8 +203,17 @@ export async function GET(request: Request) {
     ),
   );
   const db = getD1();
-  await cleanupCompletedRequests(db, access.context.comunidadeId);
   const requestAddress = new URL(request.url);
+
+  // O painel de Atendimento usa este mesmo endpoint em modo operacional: só
+  // pedidos gerais, com busca e abas aplicadas no SQL — ver
+  // loadOperationalGeneralList acima. A lista "Meus pedidos" do membro nunca
+  // passa por aqui e continua no caminho de baixo, sem esses filtros.
+  if (requestAddress.searchParams.get("operacional") === "1") {
+    return loadOperationalGeneralList(db, access, canManage, requestAddress);
+  }
+
+  await cleanupCompletedRequests(db, access.context.comunidadeId);
   const requestCursor = decodeRequestCursor(
     requestAddress.searchParams.get("cursor"),
   );
@@ -166,7 +312,13 @@ export async function GET(request: Request) {
           id: Number(lastRequest.id),
         })
       : null;
-  const [users, ministries] = await Promise.all([
+  // O cartão "Total em aberto" contava só o que já tinha carregado na tela,
+  // então uma comunidade com mais de um lote via um número menor que o real.
+  // Este COUNT ignora o LIMIT da paginação e cobre a fila inteira de pedidos
+  // gerais (oração e visita entram pelo repositório e têm suas próprias
+  // contagens na Central; um pedido geral nunca fica URGENTE hoje, pois só
+  // itens de repositório recebem prioridade).
+  const [users, ministries, generalMetrics] = await Promise.all([
     db.prepare(
       `SELECT u.id, u.nome, uc.papel
        FROM usuario_comunidades uc JOIN usuarios u ON u.id = uc.usuario_id
@@ -184,6 +336,29 @@ export async function GET(request: Request) {
          ))
        ORDER BY m.nome ASC`,
     ).bind(access.context.comunidadeId, canManage ? 1 : 0, access.user.id, access.user.id).all<Record<string, unknown>>(),
+    db.prepare(
+      `SELECT
+        COALESCE(SUM(CASE WHEN s.status != 'CONCLUIDA' THEN 1 ELSE 0 END), 0) AS aberto,
+        COALESCE(SUM(CASE WHEN s.status = 'CONCLUIDA' AND date(s.atualizado_em) = date('now') THEN 1 ELSE 0 END), 0) AS hoje,
+        COUNT(*) AS total,
+        COALESCE(SUM(CASE WHEN s.status = 'EM_ANALISE' THEN 1 ELSE 0 END), 0) AS em_analise,
+        COALESCE(SUM(CASE WHEN s.status = 'CONCLUIDA' THEN 1 ELSE 0 END), 0) AS concluidos
+       FROM solicitacoes_comunidade s
+       WHERE s.comunidade_id = ? AND s.tipo NOT IN ('ORACAO', 'VISITA')
+         AND (
+           s.solicitante_id = ?
+           OR EXISTS (
+             SELECT 1 FROM solicitacao_destinatarios sd
+             WHERE sd.solicitacao_id = s.id AND sd.comunidade_id = s.comunidade_id
+               AND sd.usuario_id = ?
+           )
+           OR (? = 1 AND NOT EXISTS (
+             SELECT 1 FROM solicitacao_destinatarios legacy
+             WHERE legacy.solicitacao_id = s.id
+           ))
+         )`,
+    ).bind(access.context.comunidadeId, access.user.id, access.user.id, canManage ? 1 : 0)
+      .first<{ aberto: number; hoje: number; total: number; em_analise: number; concluidos: number }>(),
   ]);
   await db
     .prepare(
@@ -198,6 +373,12 @@ export async function GET(request: Request) {
       // Nulo quando o lote alcançou a última solicitação visível.
       nextCursor: nextRequestCursor,
       canManage,
+      // Contagens da fila inteira de pedidos gerais, não só do lote carregado.
+      metrics: {
+        open: Number(generalMetrics?.aberto || 0), today: Number(generalMetrics?.hoje || 0),
+        total: Number(generalMetrics?.total || 0), inProgress: Number(generalMetrics?.em_analise || 0),
+        completed: Number(generalMetrics?.concluidos || 0),
+      },
       audienceOptions: {
         usuarios: users.results,
         ministerios: ministries.results,

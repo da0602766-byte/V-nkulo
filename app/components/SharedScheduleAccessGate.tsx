@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { type ReactNode, useState } from "react";
 
 export default function SharedScheduleAccessGate({
@@ -18,7 +19,7 @@ export default function SharedScheduleAccessGate({
   return (
     <main className="shared-secretary-page shared-secretary-access-gate">
       <section>
-        <span className="shared-secretary-brand" aria-hidden="true">V+</span>
+        <Link className="shared-secretary-brand" href="/" aria-label="Entrar na plataforma">V+</Link>
         <p className="pilot-kicker">ACESSO TEMPORÁRIO AUTORIZADO</p>
         <h1>Você recebeu acesso a esta escala.</h1>
         <p>

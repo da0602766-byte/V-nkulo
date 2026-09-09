@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 export default function SharedSchedulePendingState({
@@ -30,7 +31,7 @@ export default function SharedSchedulePendingState({
   return (
     <main className="shared-secretary-page shared-secretary-access-state shared-secretary-pending-state">
       <section>
-        <span className="shared-secretary-brand">V+</span>
+        <Link className="shared-secretary-brand" href="/" aria-label="Entrar na plataforma">V+</Link>
         <p>VÍNKULO · ACESSO TEMPORÁRIO</p>
         <h1>Acesso ainda não liberado</h1>
         <p>
