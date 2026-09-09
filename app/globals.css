@@ -32513,4 +32513,64 @@ html[data-pilot-theme="escuro"] .request-care-status.tone-blue { background:#173
   body:has(.pilot-workspace[data-fullscreen-view="mensagens"]) > .global-feedback-launcher {
     display: none;
   }
+
+  /* Conversa aberta é a tela inteira, como no WhatsApp: a navegação fixa do
+     rodapé e a barra do painel saem, e o cabeçalho da conversa (com a seta
+     de voltar) vira o topo da tela. Voltar para a lista traz as duas. */
+  body:has(.private-chat-shell.has-thread) .pilot-mobile-nav,
+  body:has(.private-chat-shell.has-thread) .pilot-topbar {
+    display: none !important;
+  }
+  .pilot-workspace[data-fullscreen-view="mensagens"] .private-chat-shell.has-thread {
+    --chat-top: calc(env(safe-area-inset-top) * var(--vinkulo-ui-scale-inverse, 1));
+    --chat-bottom: calc(env(safe-area-inset-bottom) * var(--vinkulo-ui-scale-inverse, 1));
+  }
+  .private-chat-shell.has-thread .private-chat-thread > header {
+    padding-top: max(12px, env(safe-area-inset-top));
+  }
+
+  /* Lista de contatos no formato dos apps de mensagem: foto grande, nome em
+     destaque e linha alta o suficiente para o polegar. */
+  .pilot-workspace[data-fullscreen-view="mensagens"] .private-chat-conversations button,
+  .pilot-workspace[data-fullscreen-view="mensagens"] .private-chat-people button {
+    grid-template-columns: 56px minmax(0, 1fr);
+    gap: 14px;
+    min-height: 76px;
+    padding: 10px 14px;
+    border-radius: 0;
+  }
+  .pilot-workspace[data-fullscreen-view="mensagens"] .private-chat-conversations,
+  .pilot-workspace[data-fullscreen-view="mensagens"] .private-chat-people {
+    gap: 0;
+    margin-top: 8px;
+  }
+  .pilot-workspace[data-fullscreen-view="mensagens"] .private-chat-sidebar { padding: 10px 0 0; }
+  .pilot-workspace[data-fullscreen-view="mensagens"] .private-chat-search { margin: 0 12px; }
+  .pilot-workspace[data-fullscreen-view="mensagens"] .private-chat-search input { min-height: 48px; border-radius: 999px; }
+  .pilot-workspace[data-fullscreen-view="mensagens"] .private-chat-people {
+    margin: 8px 0 0;
+    padding-top: 10px;
+  }
+  .pilot-workspace[data-fullscreen-view="mensagens"] .private-chat-people > strong { padding: 0 14px 4px; }
+  .pilot-workspace[data-fullscreen-view="mensagens"] .private-chat-avatar {
+    width: 56px;
+    height: 56px;
+    font-size: var(--fs-lg);
+  }
+  .pilot-workspace[data-fullscreen-view="mensagens"] .private-chat-avatar > i {
+    width: 14px;
+    height: 14px;
+    border-width: 3px;
+  }
+  .pilot-workspace[data-fullscreen-view="mensagens"] .private-chat-row-main { gap: 4px; }
+  .pilot-workspace[data-fullscreen-view="mensagens"] .private-chat-row-top > strong,
+  .pilot-workspace[data-fullscreen-view="mensagens"] .private-chat-people strong { font-size: var(--fs-xl); }
+  .pilot-workspace[data-fullscreen-view="mensagens"] .private-chat-row-bottom > p,
+  .pilot-workspace[data-fullscreen-view="mensagens"] .private-chat-people small { font-size: var(--fs-lg); }
+  .pilot-workspace[data-fullscreen-view="mensagens"] .private-chat-row-top > time { font-size: var(--fs-sm); }
+  .pilot-workspace[data-fullscreen-view="mensagens"] .private-chat-row-bottom > b {
+    min-width: 24px;
+    height: 24px;
+    font-size: var(--fs-xs);
+  }
 }
