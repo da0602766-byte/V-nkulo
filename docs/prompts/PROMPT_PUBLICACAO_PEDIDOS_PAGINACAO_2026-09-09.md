@@ -1,4 +1,18 @@
-# Prompt de publicação — para o Codex
+# Prompt de publicação — SUPERADO, NÃO USAR
+
+**Não copie nem envie este prompt.** O PR #12 foi fechado sem merge: o
+`main` já recebeu, por outra via (sincronização da linha do Sites, commit
+`2be49cf`), uma implementação equivalente e mais completa do mesmo problema
+(commits `496b438`, `62eae17`, `5c08893` — já com `?operacional=1` e
+paginação da fonte "solicitações gerais", que este trabalho ainda não tinha).
+Nenhum código desta branch foi publicado. Detalhes em
+`docs/coordenacao/COORDENACAO_IA.md` (linha de 2026-09-09) e no comentário de
+fechamento do PR #12.
+
+O conteúdo abaixo é mantido só como registro histórico do que foi
+investigado nesta rodada — não siga os passos de publicação.
+
+---
 
 Copie daqui para baixo.
 
