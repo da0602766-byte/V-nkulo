@@ -68,6 +68,7 @@ type ThreadItem =
       showAvatar: boolean;
       tight: boolean;
       fresh: boolean;
+      pulse: boolean;
       status?: TickStatus;
       onRetry?: () => void;
     };
@@ -107,7 +108,9 @@ export default function PrivateChatWorkspace({
   // O primeiro carregamento não anima nada: abrir a conversa não pode virar
   // uma cascata de bolhas.
   const [freshIds, setFreshIds] = useState<number[]>([]);
+  const [pulseIds, setPulseIds] = useState<number[]>([]);
   const seenIdsRef = useRef<Set<number> | null>(null);
+  const statusRef = useRef<Map<number, TickStatus | undefined> | null>(null);
   const openedTargetRef = useRef(0);
   const messagesRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
@@ -224,23 +227,40 @@ export default function PrivateChatWorkspace({
   useEffect(() => {
     stickToBottomRef.current = true;
     seenIdsRef.current = null;
+    statusRef.current = null;
     setFreshIds([]);
+    setPulseIds([]);
   }, [activeId]);
 
   useEffect(() => {
-    const known = seenIdsRef.current;
-    const ids = confirmed.map((message) => message.id);
-    if (!known) {
-      seenIdsRef.current = new Set(ids);
+    const currentUserId = workspace?.currentUserId || 0;
+    const statuses = new Map(
+      confirmed.map((message) => [message.id, messageStatus(message, currentUserId)]),
+    );
+    const knownIds = seenIdsRef.current;
+    const knownStatus = statusRef.current;
+    statusRef.current = statuses;
+    if (!knownIds) {
+      seenIdsRef.current = new Set(statuses.keys());
       return;
     }
-    const fresh = ids.filter((id) => !known.has(id));
-    if (!fresh.length) return;
-    for (const id of fresh) known.add(id);
+    const fresh = [...statuses.keys()].filter((id) => !knownIds.has(id));
+    for (const id of fresh) knownIds.add(id);
+    // O tique só pula quando o estado muda de fato (enviada → entregue →
+    // lida). Sem isso, abrir a conversa faria todos os tiques antigos
+    // pularem de uma vez, como se tudo tivesse acabado de acontecer.
+    const pulsed = [...statuses.entries()]
+      .filter(([id, status]) => knownStatus?.has(id) && knownStatus.get(id) !== status)
+      .map(([id]) => id);
+    if (!fresh.length && !pulsed.length) return;
     setFreshIds(fresh);
-    const timer = window.setTimeout(() => setFreshIds([]), 600);
+    setPulseIds(pulsed);
+    const timer = window.setTimeout(() => {
+      setFreshIds([]);
+      setPulseIds([]);
+    }, 600);
     return () => window.clearTimeout(timer);
-  }, [confirmed]);
+  }, [confirmed, workspace?.currentUserId]);
 
   useEffect(() => {
     const el = messagesRef.current;
@@ -390,9 +410,9 @@ export default function PrivateChatWorkspace({
   }, [workspace?.conversations, search]);
   const activeConversation = workspace?.conversations.find((item) => Number(item.id) === activeId);
   const threadItems = useMemo(
-    () => buildThreadItems(confirmed, pending, workspace?.currentUserId || 0, retryPending, freshIds),
+    () => buildThreadItems(confirmed, pending, workspace?.currentUserId || 0, retryPending, freshIds, pulseIds),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [confirmed, pending, workspace?.currentUserId, freshIds],
+    [confirmed, pending, workspace?.currentUserId, freshIds, pulseIds],
   );
   const purgeCountdown = useMemo(() => formatPurgeCountdown(workspace?.nextPurgeAt || null), [workspace?.nextPurgeAt]);
   const purgeShort = useMemo(() => formatPurgeShort(workspace?.nextPurgeAt || null), [workspace?.nextPurgeAt]);
@@ -517,7 +537,7 @@ export default function PrivateChatWorkspace({
                           <p>{item.text}</p>
                           <footer>
                             <time>{item.time}</time>
-                            <Tick key={item.status || "none"} status={item.status} />
+                            <Tick status={item.status} pulse={item.pulse} />
                           </footer>
                         </div>
                         {item.onRetry && (
@@ -574,13 +594,14 @@ function Avatar({
   );
 }
 
-function Tick({ status }: { status?: TickStatus }) {
+function Tick({ status, pulse = false }: { status?: TickStatus; pulse?: boolean }) {
   if (!status) return null;
-  if (status === "sending") return <span className="private-chat-tick pending" aria-label="Enviando">⋯</span>;
-  if (status === "failed") return <span className="private-chat-tick failed" aria-label="Falha ao enviar">!</span>;
-  if (status === "sent") return <span className="private-chat-tick" aria-label="Enviada">✓</span>;
-  if (status === "delivered") return <span className="private-chat-tick" aria-label="Entregue">✓✓</span>;
-  return <span className="private-chat-tick read" aria-label="Visualizada">✓✓</span>;
+  const base = `private-chat-tick${pulse ? " is-updated" : ""}`;
+  if (status === "sending") return <span className={`${base} pending`} aria-label="Enviando">⋯</span>;
+  if (status === "failed") return <span className={`${base} failed`} aria-label="Falha ao enviar">!</span>;
+  if (status === "sent") return <span className={base} aria-label="Enviada">✓</span>;
+  if (status === "delivered") return <span className={base} aria-label="Entregue">✓✓</span>;
+  return <span className={`${base} read`} aria-label="Visualizada">✓✓</span>;
 }
 
 function presenceLabel(conversation: Conversation) {
@@ -678,15 +699,26 @@ function formatPurgeShort(nextPurgeAt: string | null) {
   return `${day} às ${hour}`;
 }
 
+// Estado do tique de uma mensagem própria: lida > entregue > enviada. Nas
+// mensagens recebidas não há tique (quem recebeu não confirma para si).
+function messageStatus(message: Message, currentUserId: number): TickStatus | undefined {
+  if (Number(message.remetente_id) !== Number(currentUserId)) return undefined;
+  if (message.lida_em) return "read";
+  if (message.entregue_em) return "delivered";
+  return "sent";
+}
+
 function buildThreadItems(
   confirmed: Message[],
   pending: PendingMessage[],
   currentUserId: number,
   retry: (tempId: number) => void,
   freshIds: number[] = [],
+  pulseIds: number[] = [],
 ): ThreadItem[] {
   const fresh = new Set(freshIds);
-  type Normalized = { key: string; own: boolean; text: string; date: Date; senderId: number; status?: TickStatus; onRetry?: () => void; fresh: boolean };
+  const pulse = new Set(pulseIds);
+  type Normalized = { key: string; own: boolean; text: string; date: Date; senderId: number; status?: TickStatus; onRetry?: () => void; fresh: boolean; pulse: boolean };
   const normalized: Normalized[] = [
     ...confirmed.map((message): Normalized => ({
       key: `m${message.id}`,
@@ -694,10 +726,9 @@ function buildThreadItems(
       text: message.mensagem,
       date: parseServerDate(message.criado_em) || new Date(0),
       senderId: Number(message.remetente_id),
-      status: Number(message.remetente_id) === Number(currentUserId)
-        ? message.lida_em ? "read" : message.entregue_em ? "delivered" : "sent"
-        : undefined,
+      status: messageStatus(message, currentUserId),
       fresh: fresh.has(message.id),
+      pulse: pulse.has(message.id),
     })),
     ...pending.map((item): Normalized => ({
       key: `p${item.tempId}`,
@@ -708,6 +739,7 @@ function buildThreadItems(
       status: item.status,
       onRetry: item.status === "failed" ? () => retry(item.tempId) : undefined,
       fresh: true,
+      pulse: false,
     })),
   ];
 
@@ -734,6 +766,7 @@ function buildThreadItems(
       showAvatar: endsGroup,
       tight: !isNewGroup,
       fresh: item.fresh,
+      pulse: item.pulse,
       status: item.status,
       onRetry: item.onRetry,
     });

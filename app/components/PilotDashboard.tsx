@@ -243,7 +243,8 @@ export default function PilotDashboard({
   // conversa para saber *quem* escreveu, não só que o total subiu.
   const [incomingMessage, setIncomingMessage] = useState<IncomingMessage | null>(null);
   const [messagePulse, setMessagePulse] = useState(0);
-  const unreadByConversationRef = useRef<Map<number, number> | null>(null);
+  const unreadTotalRef = useRef(0);
+  const unreadByConversationRef = useRef<{ comunidadeId: number; porConversa: Map<number, number> } | null>(null);
   const [unreadNotifications, setUnreadNotifications] =
     useState<NotificationUnreadSummary>({
       total: 0,
@@ -585,10 +586,9 @@ export default function PilotDashboard({
           (soma, conversation) => soma + Number(conversation.nao_lidas || 0),
           0,
         );
-        setUnreadMessages((current) => {
-          if (total > current) setMessagePulse((pulse) => pulse + 1);
-          return total;
-        });
+        if (total > unreadTotalRef.current) setMessagePulse((pulse) => pulse + 1);
+        unreadTotalRef.current = total;
+        setUnreadMessages(total);
 
         // Compara com a leitura anterior para descobrir em qual conversa a
         // mensagem chegou. A primeira sincronização só marca o ponto de
@@ -600,8 +600,16 @@ export default function PilotDashboard({
             Number(conversation.nao_lidas || 0),
           ]),
         );
-        const previous = unreadByConversationRef.current;
-        unreadByConversationRef.current = snapshot;
+        // O retrato vale só para a comunidade em que foi tirado: ao trocar de
+        // comunidade as conversas são outras, e comparar as duas listas
+        // faria uma mensagem antiga passar por recém-chegada.
+        const stored = unreadByConversationRef.current;
+        const previous =
+          stored && stored.comunidadeId === active.comunidadeId ? stored.porConversa : null;
+        unreadByConversationRef.current = {
+          comunidadeId: active.comunidadeId,
+          porConversa: snapshot,
+        };
         if (!previous) return;
         // Quem está lendo as mensagens não precisa de aviso flutuante: a
         // própria lista já mostra a conversa subindo com o contador.

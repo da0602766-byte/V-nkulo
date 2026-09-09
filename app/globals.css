@@ -32601,7 +32601,13 @@ html[data-pilot-theme="escuro"] .request-care-status.tone-blue { background:#173
   0%, 100% { opacity: .4; }
   50% { opacity: 1; }
 }
-.private-chat-tick { display: inline-block; animation: private-chat-tick-pop .26s ease-out both; }
+/* O tique só reage quando entra com a bolha nova ou quando o estado muda
+   (enviada → entregue → lida). Animar em toda montagem faria a conversa
+   inteira piscar ao ser aberta. */
+.private-chat-tick { display: inline-block; }
+.private-chat-messages article.is-new .private-chat-tick,
+.private-chat-tick.is-updated { animation: private-chat-tick-pop .26s ease-out both; }
+.private-chat-messages article .private-chat-tick.pending,
 .private-chat-tick.pending { animation: private-chat-tick-waiting 1.1s ease-in-out infinite; }
 .private-chat-thread form button.ready:active { transform: scale(.92); }
 
@@ -32738,7 +32744,9 @@ html[data-pilot-theme="escuro"] .request-care-status.tone-blue { background:#173
 
 @media (prefers-reduced-motion: reduce) {
   .private-chat-messages article.is-new,
-  .private-chat-tick,
+  .private-chat-messages article.is-new .private-chat-tick,
+  .private-chat-tick.is-updated,
+  .private-chat-messages article .private-chat-tick.pending,
   .private-chat-tick.pending,
   .message-arrival-toast,
   .message-arrival-avatar,

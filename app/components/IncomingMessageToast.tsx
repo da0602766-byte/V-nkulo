@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 export type IncomingMessage = {
   // Muda a cada mensagem nova: serve de `key` para a animação recomeçar
@@ -24,10 +24,15 @@ export default function IncomingMessageToast({
   onOpen: (userId: number) => void;
   onDismiss: () => void;
 }) {
+  // O relógio conta a partir da mensagem, não da renderização: o painel
+  // recria `onDismiss` a cada render (sondagem, troca de tela), e depender
+  // dele reiniciaria os 6 segundos sem parar — o aviso nunca sairia.
+  const dismissRef = useRef(onDismiss);
+  dismissRef.current = onDismiss;
   useEffect(() => {
-    const timer = window.setTimeout(onDismiss, VISIBLE_MS);
+    const timer = window.setTimeout(() => dismissRef.current(), VISIBLE_MS);
     return () => window.clearTimeout(timer);
-  }, [message.key, onDismiss]);
+  }, [message.key]);
 
   return (
     <div className="message-arrival-toast" role="status" aria-live="polite">
