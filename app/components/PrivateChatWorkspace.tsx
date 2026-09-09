@@ -72,7 +72,7 @@ type ThreadItem =
     };
 
 const FALLBACK_RETENTION_NOTICE =
-  "Por privacidade, as mensagens desta semana são apagadas por completo toda segunda-feira, sem exceção.";
+  "Por privacidade, as mensagens desta semana são apagadas por completo na virada da semana, sem exceção.";
 const GROUP_GAP_MS = 3 * 60_000;
 const MESSAGE_POLL_MS = 3_000;
 const LIST_POLL_MS = 8_000;
@@ -374,7 +374,7 @@ export default function PrivateChatWorkspace({
   const purgeCountdown = useMemo(() => formatPurgeCountdown(workspace?.nextPurgeAt || null), [workspace?.nextPurgeAt]);
 
   return (
-    <section className="private-chat-shell">
+    <section className={`private-chat-shell ${activeId ? "has-thread" : ""}`}>
       <header className="workspace-heading private-chat-heading">
         <div>
           <p className="pilot-kicker">MENSAGENS</p>
@@ -616,15 +616,24 @@ function formatLastSeen(value: string | null) {
   return null;
 }
 
+// A virada da semana acontece em horário universal, então o dia e a hora
+// exibidos são sempre os do fuso de quem lê — daí mostrar data e hora
+// completas em vez de repetir um dia da semana que só vale em parte do mundo.
 function formatPurgeCountdown(nextPurgeAt: string | null) {
   if (!nextPurgeAt) return null;
   const date = new Date(nextPurgeAt);
   if (!Number.isFinite(date.getTime())) return null;
+  const when = new Intl.DateTimeFormat("pt-BR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
   const days = Math.round((date.getTime() - Date.now()) / 86_400_000);
-  if (days <= 0) return "hoje à meia-noite";
-  if (days === 1) return "amanhã à meia-noite";
-  const when = new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "numeric", month: "long" }).format(date);
-  return `em ${days} dias (${when})`;
+  if (days <= 0) return `hoje — ${when}`;
+  if (days === 1) return `amanhã — ${when}`;
+  return `em ${days} dias — ${when}`;
 }
 
 function buildThreadItems(

@@ -13608,8 +13608,11 @@ html[data-pilot-theme="escuro"] .pilot-dashboard[data-community-palette] {
 .private-chat-conversations strong, .private-chat-people strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:750; }
 .private-chat-conversations small, .private-chat-people small { color:var(--pilot-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--fs-xs); }
 
-.private-chat-row-main { min-width:0; display:grid; gap:2px; }
-.private-chat-row-top, .private-chat-row-bottom { display:flex; align-items:center; gap:8px; }
+/* A coluna implícita do grid nasce em max-content: sem o minmax(0,1fr) o
+   nome e a prévia da mensagem vazam para fora da barra lateral em vez de
+   virarem reticências, e o balão de não lidas fica cortado. */
+.private-chat-row-main { min-width:0; display:grid; grid-template-columns:minmax(0,1fr); gap:2px; }
+.private-chat-row-top, .private-chat-row-bottom { min-width:0; display:flex; align-items:center; gap:8px; }
 .private-chat-row-top > strong { flex:1; min-width:0; }
 .private-chat-row-top > time { flex:none; color:var(--pilot-muted); font-size:var(--fs-xs); }
 .private-chat-row-bottom > p { flex:1; min-width:0; margin:0; color:var(--pilot-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--fs-sm); }
@@ -13675,7 +13678,22 @@ html[data-pilot-theme="escuro"] .pilot-dashboard[data-community-palette] {
   .private-chat-thread > header > button { display:block; }
   .private-chat-messages { padding:14px 12px; }
   .private-chat-messages article { max-width:88%; }
-  .private-chat-thread > form { position:sticky; bottom:0; background:var(--pilot-surface); padding-bottom:max(14px,env(safe-area-inset-bottom)); }
+  /* Com a conversa aberta o celular vira tela cheia de chat: o título e o
+     aviso de limpeza ficam na lista (onde são vistos a cada entrada) e a
+     conversa ocupa a altura útil, como nos apps de mensagem. */
+  .private-chat-shell.has-thread .private-chat-heading,
+  .private-chat-shell.has-thread .private-chat-retention-banner { display:none; }
+  .private-chat-shell.has-thread .private-chat-layout,
+  .private-chat-shell.has-thread .private-chat-thread { min-height:calc(100dvh - 190px); }
+  /* O campo de escrita fecha o cartão da conversa em fluxo normal: o painel
+     já termina acima da barra de navegação fixa, e um `sticky` aqui subia o
+     campo para cima da última mensagem. */
+  .private-chat-thread > form {
+    position:static;
+    background:var(--pilot-surface);
+    border-radius:0 0 22px 22px;
+    padding-bottom:max(14px,env(safe-area-inset-bottom));
+  }
 }
 
 /* Bloco 13 — Pessoas, membros e permissões */

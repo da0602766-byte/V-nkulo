@@ -43,5 +43,8 @@ export function nextWeeklyPurgeAt(from: Date = new Date()) {
   return new Date(startOfToday + daysAhead * 86_400_000);
 }
 
+// O ciclo vira em horário universal, que cai em dias diferentes conforme o
+// fuso de quem lê. O texto fixo fala de "virada da semana" e quem mostra o
+// dia e a hora exatos é a interface, já no fuso do próprio usuário.
 export const CHAT_RETENTION_NOTICE =
-  "Por privacidade, o Vínkulo não guarda um histórico permanente de conversas: as mensagens desta semana são apagadas por completo toda segunda-feira à meia-noite, sem exceção. Guarde fora da plataforma o que precisar manter.";
+  "Por privacidade, o Vínkulo não guarda um histórico permanente de conversas: toda semana, na virada, as mensagens do período são apagadas por completo, sem exceção. Guarde fora da plataforma o que precisar manter.";
