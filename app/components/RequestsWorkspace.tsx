@@ -79,6 +79,11 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
   // inteira carregada, então o cursor traz o resto em vez de reduzir o lote.
   const [requestsCursor, setRequestsCursor] = useState<string | null>(null);
   const [loadingMoreRequests, setLoadingMoreRequests] = useState(false);
+  // Os itens de oração/visita do painel de atendimento vinham só da Central,
+  // que tinha um teto fixo sem cursor: pedidos além do lote sumiam da tela
+  // sem aviso. Agora ela também pagina, e este cursor busca o resto.
+  const [centralItemsCursor, setCentralItemsCursor] = useState<string | null>(null);
+  const [loadingMoreCentral, setLoadingMoreCentral] = useState(false);
   const [central, setCentral] = useState<CentralData>(EMPTY_CENTRAL);
   const [canManage, setCanManage] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -125,7 +130,7 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
         fetch("/api/pilot/solicitacoes/central", { cache: "no-store" }),
       ]);
       const requestsPayload = await requestsResponse.json() as { solicitacoes?: CommunityRequest[]; nextCursor?: string | null; canManage?: boolean; audienceOptions?: AudienceOptions; error?: string };
-      const centralPayload = await centralResponse.json() as CentralData & { error?: string };
+      const centralPayload = await centralResponse.json() as CentralData & { itemsNextCursor?: string | null; error?: string };
       if (!requestsResponse.ok) throw new Error(requestsPayload.error || "Não foi possível carregar os pedidos. Tente novamente.");
       if (!centralResponse.ok) throw new Error(centralPayload.error || "Não foi possível carregar os pedidos. Tente novamente.");
       setItems(requestsPayload.solicitacoes || []);
@@ -133,6 +138,7 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
       setCanManage(Boolean(requestsPayload.canManage));
       setAudienceOptions(requestsPayload.audienceOptions || { usuarios: [], ministerios: [], papeis: [], allowAllMembers: false });
       setCentral(centralPayload);
+      setCentralItemsCursor(centralPayload.itemsNextCursor || null);
       setRepositoryMinistries((current) => {
         const next = { ...current };
         for (const repository of centralPayload.repositories || []) if (repository.ministerio_id && !next[repository.id]) next[repository.id] = String(repository.ministerio_id);
@@ -158,6 +164,28 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
     } catch (caught) { setError((caught as Error).message); }
     finally { setLoadingMoreRequests(false); }
   }, [requestsCursor]);
+
+  const loadMoreCentral = useCallback(async () => {
+    if (!centralItemsCursor) return;
+    setLoadingMoreCentral(true);
+    try {
+      const address = new URL("/api/pilot/solicitacoes/central", window.location.origin);
+      address.searchParams.set("cursor", centralItemsCursor);
+      const response = await fetch(address, { cache: "no-store" });
+      const payload = await response.json() as { items?: RepositoryItem[]; nextCursor?: string | null; error?: string };
+      if (!response.ok) throw new Error(payload.error || "Não foi possível carregar mais atendimentos.");
+      const newItems = payload.items || [];
+      setCentral((current) => ({
+        ...current,
+        repositories: current.repositories.map((repository) => {
+          const additions = newItems.filter((item) => item.repositorio_id === repository.id);
+          return additions.length ? { ...repository, items: [...repository.items, ...additions] } : repository;
+        }),
+      }));
+      setCentralItemsCursor(payload.nextCursor || null);
+    } catch (caught) { setError((caught as Error).message); }
+    finally { setLoadingMoreCentral(false); }
+  }, [centralItemsCursor]);
   useEffect(() => {
     const open = () => { setMode("member"); openCreate("ORACAO"); };
     window.addEventListener("vinkulo:new-request", open);
@@ -364,11 +392,18 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
       {advancedOpen && <section className="request-advanced-filters" aria-label="Filtros avançados"><label>Status<select value={advancedStatus} onChange={(event) => setAdvancedStatus(event.target.value)}><option value="">Todos</option>{allOperationalStatuses.map((status) => <option key={status} value={status}>{statusLabel({ status } as OperationalRow)}</option>)}</select></label><label>Responsável<select value={advancedOwner} onChange={(event) => setAdvancedOwner(event.target.value)}><option value="">Todos</option>{central.assignees.map((person) => <option key={person.id} value={person.id}>{person.nome}</option>)}</select></label><label>Recebidos desde<input type="date" value={advancedPeriod} onChange={(event) => setAdvancedPeriod(event.target.value)} /></label><label className="request-filter-check"><input type="checkbox" checked={onlyUnassigned} onChange={(event) => setOnlyUnassigned(event.target.checked)} />Sem responsável</label><button type="button" onClick={() => { setAdvancedStatus(""); setAdvancedOwner(""); setAdvancedPeriod(""); setOnlyUnassigned(false); }}>Limpar filtros</button></section>}
 
       {filteredRows.length ? <><div className="request-operations-table" role="region" aria-label="Pedidos para atendimento"><table><thead><tr><th>Pessoa</th><th>Categoria</th><th>Responsável</th><th>Data</th><th>Status</th><th>Observação</th><th><span className="sr-only">Ações</span></th></tr></thead><tbody>{filteredRows.map((row) => <tr key={row.key} className={row.priority === "URGENTE" ? "urgent" : ""} onClick={() => openOperationalDetail(row)}><td><Avatar name={row.person} photo={row.photo} /><span><strong>{row.person}</strong><small>{roleLabel(row.role)}</small></span></td><td>{requestType(row.category)}</td><td>{row.owner || <em>Sem responsável</em>}</td><td>{formatDate(row.date)}</td><td><StatusChip label={statusLabel(row)} tone={statusTone(row.status, row.priority, row.overdue)} />{row.overdue && <small className="request-overdue">Retorno atrasado</small>}</td><td>{row.note || row.description}</td><td><button type="button" aria-label={`Abrir pedido de ${row.person}`} onClick={(event) => { event.stopPropagation(); openOperationalDetail(row); }}>•••</button></td></tr>)}</tbody></table></div><div className="request-mobile-list">{filteredRows.map((row) => <button type="button" key={row.key} onClick={() => openOperationalDetail(row)}><Avatar name={row.person} photo={row.photo} /><div><strong>{row.person}</strong><small>{requestType(row.category)} · {row.owner || "Sem responsável"}</small><p>{row.title}</p></div><StatusChip label={row.overdue ? "Retorno atrasado" : statusLabel(row)} tone={statusTone(row.status, row.priority, row.overdue)} /><time>{shortDate(row.date)}</time></button>)}</div></> : <div className="request-empty-operations"><RequestIcon type="search" /><strong>Nenhuma solicitação encontrada com esses filtros.</strong><button type="button" onClick={() => { setSearch(""); setQuickFilter("TODOS"); setAdvancedStatus(""); setAdvancedOwner(""); setAdvancedPeriod(""); setOnlyUnassigned(false); }}>Limpar busca e filtros</button></div>}
-      {requestsCursor && (
+      {(centralItemsCursor || requestsCursor) && (
         <div className="request-load-more">
-          <button type="button" disabled={loadingMoreRequests} onClick={() => void loadMoreRequests()}>
-            {loadingMoreRequests ? "Carregando pedidos…" : "Carregar mais pedidos"}
-          </button>
+          {centralItemsCursor && (
+            <button type="button" disabled={loadingMoreCentral} onClick={() => void loadMoreCentral()}>
+              {loadingMoreCentral ? "Carregando atendimentos…" : "Carregar mais orações e visitas"}
+            </button>
+          )}
+          {requestsCursor && (
+            <button type="button" disabled={loadingMoreRequests} onClick={() => void loadMoreRequests()}>
+              {loadingMoreRequests ? "Carregando pedidos…" : "Carregar mais pedidos"}
+            </button>
+          )}
           <small>Os filtros acima consideram tudo o que já foi carregado.</small>
         </div>
       )}

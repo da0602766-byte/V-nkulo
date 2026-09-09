@@ -5442,6 +5442,162 @@ test("solicitações paginam por cursor respeitando o agrupamento por status", a
   database.close();
 });
 
+// A Central de pedidos tinha um teto fixo de 250 itens de oração/visita sem
+// nenhum cursor: comunidades com mais atendimentos abertos que isso perdiam
+// os mais antigos da fila para sempre, sem qualquer aviso na tela. A
+// ordenação agrupa por pendência e depois por urgência antes de descer por
+// id, então o cursor precisa atravessar os quatro grupos sem pular nada.
+test("itens de oração e visita da Central paginam por cursor sem perder a fila", async () => {
+  const { database, d1 } = await createPilotD1();
+  await createPilotUser(database, {
+    nome: "Pastor Central Cursor",
+    email: "pastor.central.cursor@example.test",
+    senha: "Pastor123",
+    memberships: [{ comunidadeId: 1, papel: "PASTOR" }],
+  });
+  await createPilotUser(database, {
+    nome: "Membro Central Cursor",
+    email: "membro.central.cursor@example.test",
+    senha: "Pastor123",
+    memberships: [{ comunidadeId: 1, papel: "MEMBRO" }],
+  });
+
+  const worker = await loadWorker();
+  const env = createEnv(d1);
+  const pastorCookie = await login(worker, env, "pastor.central.cursor@example.test", "Pastor123");
+  const memberCookie = await login(worker, env, "membro.central.cursor@example.test", "Pastor123");
+
+  // Confirma o repositório de oração para não depender da sugestão automática.
+  const initial = await worker.fetch(
+    new Request("http://localhost/api/pilot/solicitacoes/central", { headers: { cookie: pastorCookie } }),
+    env, context,
+  );
+  const prayerRepository = (await initial.json()).repositories.find((item) => item.tipo === "ORACAO");
+  const confirm = await worker.fetch(
+    new Request("http://localhost/api/pilot/solicitacoes/central", {
+      method: "PATCH",
+      headers: { cookie: pastorCookie, "content-type": "application/json" },
+      body: JSON.stringify({ action: "CONFIRMAR_REPOSITORIO", repositoryId: prayerRepository.id }),
+    }),
+    env, context,
+  );
+  assert.equal(confirm.status, 200);
+
+  // Prioridade e finalização misturadas de propósito, para o cursor precisar
+  // atravessar os quatro grupos (aberto+urgente, aberto+normal, finalizado+
+  // urgente, finalizado+normal) sem pular nada.
+  const criados = [];
+  for (let indice = 0; indice < 14; indice += 1) {
+    const created = await worker.fetch(
+      new Request("http://localhost/api/pilot/solicitacoes", {
+        method: "POST",
+        headers: { cookie: memberCookie, "content-type": "application/json" },
+        body: JSON.stringify({
+          tipo: "ORACAO", titulo: `Oração Cursor ${indice}`,
+          descricao: "Pedido de oração para testar a paginação da Central.",
+          visibilidade: "PASTORAL",
+        }),
+      }),
+      env, context,
+    );
+    assert.equal(created.status, 201);
+    const requestId = Number((await created.json()).id);
+    criados.push(requestId);
+    const item = database
+      .prepare(
+        `SELECT id FROM solicitacao_repositorio_itens
+         WHERE comunidade_id = 1 AND solicitacao_id = ? LIMIT 1`,
+      )
+      .get(requestId);
+    if (indice % 3 === 0) {
+      database
+        .prepare("UPDATE solicitacao_repositorio_itens SET prioridade = 'URGENTE' WHERE id = ?")
+        .run(item.id);
+    }
+    if (indice >= 11) {
+      const finalize = await worker.fetch(
+        new Request("http://localhost/api/pilot/solicitacoes/central", {
+          method: "PATCH",
+          headers: { cookie: pastorCookie, "content-type": "application/json" },
+          body: JSON.stringify({ action: "ATUALIZAR_ITEM", itemId: item.id, status: "FINALIZADO" }),
+        }),
+        env, context,
+      );
+      assert.equal(finalize.status, 200);
+    }
+  }
+
+  async function pedirLote(cursor) {
+    const address = new URL("http://localhost/api/pilot/solicitacoes/central");
+    address.searchParams.set("limite", "4");
+    if (cursor) address.searchParams.set("cursor", cursor);
+    const response = await worker.fetch(
+      new Request(address, { headers: { cookie: pastorCookie } }),
+      env, context,
+    );
+    assert.equal(response.status, 200);
+    return response.json();
+  }
+
+  const primeiro = await pedirLote(null);
+  assert.equal(primeiro.repositories.length, 2, "o primeiro lote ainda traz a lista completa de repositórios");
+  const primeiroLoteItens = primeiro.repositories.flatMap((repository) => repository.items);
+  assert.equal(primeiroLoteItens.length, 4);
+  assert.ok(primeiro.itemsNextCursor);
+
+  async function pedirLoteDeItens(cursor) {
+    const address = new URL("http://localhost/api/pilot/solicitacoes/central");
+    address.searchParams.set("limite", "4");
+    address.searchParams.set("cursor", cursor);
+    const response = await worker.fetch(
+      new Request(address, { headers: { cookie: pastorCookie } }),
+      env, context,
+    );
+    assert.equal(response.status, 200);
+    return response.json();
+  }
+
+  const vistos = [...primeiroLoteItens.map((item) => Number(item.id))];
+  const ordem = primeiroLoteItens.map((item) => ({
+    finalizado: item.finalizado_em != null,
+    urgente: item.prioridade === "URGENTE",
+  }));
+  let cursor = primeiro.itemsNextCursor;
+  let lotes = 1;
+  while (cursor) {
+    const lote = await pedirLoteDeItens(cursor);
+    // Um "carregar mais" não deve devolver repositórios, ministérios ou
+    // responsáveis de novo: o painel já os tem desde o primeiro pedido.
+    assert.equal(lote.repositories, undefined);
+    assert.ok(Array.isArray(lote.items));
+    for (const item of lote.items) {
+      vistos.push(Number(item.id));
+      ordem.push({ finalizado: item.finalizado_em != null, urgente: item.prioridade === "URGENTE" });
+    }
+    cursor = lote.nextCursor;
+    lotes += 1;
+    assert.ok(lotes <= 10, "paginação não terminou: possível cursor parado");
+  }
+
+  assert.equal(new Set(vistos).size, vistos.length, "nenhum item repetido");
+  assert.equal(vistos.length, 14, "todos os 14 itens de oração precisam aparecer na paginação");
+
+  // O agrupamento (pendência, depois urgência) precisa sobreviver ao cursor:
+  // abertos antes de finalizados, e urgentes antes de normais dentro do grupo.
+  const grupo = (valor) => (valor.finalizado ? 2 : 0) + (valor.urgente ? 0 : 1);
+  for (let indice = 1; indice < ordem.length; indice += 1) {
+    assert.ok(
+      grupo(ordem[indice]) >= grupo(ordem[indice - 1]),
+      "a paginação embaralhou o agrupamento por pendência/urgência",
+    );
+  }
+
+  const cursorInvalido = await pedirLoteDeItens("nao-e-um-cursor");
+  assert.equal(cursorInvalido.items.length, 4, "cursor inválido deve recomeçar do início do lote");
+
+  database.close();
+});
+
 // A Central mostra no máximo quatro escalas com participação pendente, e antes
 // baixava o lote inteiro para descartar o resto no navegador. O filtro precisa
 // resolver isso no SQL sem afrouxar visibilidade: escala de outra pessoa, já

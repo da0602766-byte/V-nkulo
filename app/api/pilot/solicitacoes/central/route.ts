@@ -10,7 +10,111 @@ const VISIT_STATUSES = new Set(["ABERTO", "AGUARDANDO_CONTATO", "AGUARDANDO_RETO
 const FINAL_STATUSES = new Set(["FINALIZADO", "ORACAO_ATENDIDA", "VISITA_CONCLUIDA"]);
 const EVENT_TYPES = new Set(["NOTA_INTERNA", "ATUALIZACAO_MEMBRO", "TENTATIVA_CONTATO", "REGISTRO_VISITA"]);
 
-export async function GET() {
+// Os itens de repositório (oração/visita) tinham teto fixo de 250 sem cursor:
+// comunidades com mais pedidos abertos que isso perdiam os mais antigos da
+// fila para sempre, sem qualquer aviso na tela. Agora o mesmo desenho de
+// paginação por cursor da lista geral de solicitações cobre estes itens.
+const REPO_ITEMS_PAGE_SIZE = 250;
+const REPO_ITEMS_MAX_PAGE_SIZE = 300;
+
+// A ordenação agrupa por pendência (aberto antes de finalizado) e depois por
+// urgência, então o cursor carrega o par (grupo, id): grupo 0 = aberto e
+// urgente, 1 = aberto e normal, 2 = finalizado e urgente, 3 = finalizado e
+// normal. Um cursor só com id pularia itens ao trocar de grupo.
+type RepositoryItemsCursor = { grupo: number; id: number };
+
+function encodeItemsCursor(cursor: RepositoryItemsCursor) {
+  return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
+}
+
+function decodeItemsCursor(value: string | null): RepositoryItemsCursor | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as Partial<RepositoryItemsCursor>;
+    const grupo = Number(parsed.grupo);
+    const id = Number(parsed.id);
+    if (!Number.isInteger(grupo) || grupo < 0 || grupo > 3 || !Number.isInteger(id) || id <= 0) return null;
+    return { grupo, id };
+  } catch {
+    return null;
+  }
+}
+
+const REPO_ITEM_GROUP_SQL =
+  "((CASE WHEN ri.finalizado_em IS NULL THEN 0 ELSE 2 END) + (CASE WHEN ri.prioridade = 'URGENTE' THEN 0 ELSE 1 END))";
+
+async function loadRepositoryItemsPage(db: ReturnType<typeof getD1>, input: {
+  communityId: number; userId: number; canManageRepositories: boolean;
+  cursor: RepositoryItemsCursor | null; pageSize: number;
+}) {
+  const { communityId, userId, canManageRepositories, cursor, pageSize } = input;
+  const result = await db.prepare(
+    `SELECT ri.id, ri.repositorio_id, ri.status AS item_status,
+      s.id AS solicitacao_id, s.tipo, s.titulo, s.descricao,
+      s.status AS solicitacao_status, s.criado_em, s.atualizado_em,
+      s.preferencia_contato, s.disponibilidade, s.data_preferencial, s.contato_autorizado,
+      u.nome AS solicitante_nome, COALESCE(u.telefone, '') AS solicitante_telefone,
+      COALESCE(u.foto_perfil, '') AS solicitante_foto, COALESCE(uc.papel, 'MEMBRO') AS solicitante_papel,
+      ri.responsavel_usuario_id, COALESCE(responsavel.nome, '') AS responsavel_nome,
+      COALESCE(oc.titulo, ucResponsavel.papel, '') AS responsavel_funcao,
+      ri.responsavel_atribuido_em, ri.primeiro_contato_em,
+      ri.proximo_retorno_em, ri.visita_agendada_em,
+      COALESCE(ri.prioridade, 'NORMAL') AS prioridade, COALESCE(ri.resultado, '') AS resultado,
+      ri.mensagem_atendimento, ri.testemunho, ri.testemunho_compartilhavel,
+      ri.testemunho_publicado_em, ri.finalizado_em,
+      CASE WHEN ri.proximo_retorno_em IS NOT NULL AND ri.proximo_retorno_em < CURRENT_TIMESTAMP
+        AND ri.finalizado_em IS NULL THEN 1 ELSE 0 END AS retorno_atrasado
+     FROM solicitacao_repositorio_itens ri
+     JOIN solicitacao_repositorios r ON r.id = ri.repositorio_id AND r.comunidade_id = ri.comunidade_id
+     JOIN solicitacoes_comunidade s ON s.id = ri.solicitacao_id AND s.comunidade_id = ri.comunidade_id
+     JOIN usuarios u ON u.id = s.solicitante_id
+     LEFT JOIN usuario_comunidades uc ON uc.usuario_id = s.solicitante_id AND uc.comunidade_id = s.comunidade_id AND uc.status = 'ATIVO'
+     LEFT JOIN usuarios responsavel ON responsavel.id = ri.responsavel_usuario_id
+     LEFT JOIN usuario_comunidades ucResponsavel ON ucResponsavel.usuario_id = ri.responsavel_usuario_id
+       AND ucResponsavel.comunidade_id = ri.comunidade_id AND ucResponsavel.status = 'ATIVO'
+     LEFT JOIN oficiais_comunidade oc ON oc.usuario_comunidade_id = ucResponsavel.id
+     LEFT JOIN ministerios_comunidade m ON m.id = r.ministerio_id AND m.comunidade_id = r.comunidade_id
+     WHERE ri.comunidade_id = ? AND r.status = 'ATIVO' AND (? = 1 OR m.responsavel_usuario_id = ?)
+       AND (? = 0 OR ${REPO_ITEM_GROUP_SQL} > ? OR (${REPO_ITEM_GROUP_SQL} = ? AND ri.id < ?))
+     ORDER BY ${REPO_ITEM_GROUP_SQL}, ri.id DESC LIMIT ?`,
+  ).bind(
+    communityId, canManageRepositories ? 1 : 0, userId,
+    cursor ? 1 : 0, cursor?.grupo ?? 0, cursor?.grupo ?? 0, cursor?.id ?? 0,
+    pageSize + 1,
+  ).all<Record<string, unknown>>();
+
+  const hasMore = result.results.length > pageSize;
+  if (hasMore) result.results.length = pageSize;
+  const last = result.results[result.results.length - 1];
+  const nextCursor = hasMore && last
+    ? encodeItemsCursor({
+        grupo: (last.finalizado_em == null ? 0 : 2) + (last.prioridade === "URGENTE" ? 0 : 1),
+        id: Number(last.id),
+      })
+    : null;
+
+  const itemIds = result.results.map((item) => Number(item.id));
+  const events = itemIds.length
+    ? await db.prepare(
+        `SELECT e.id, e.item_id, e.tipo, e.mensagem, e.visivel_membro,
+          e.criado_em, COALESCE(u.nome, 'Sistema') AS autor_nome FROM solicitacao_eventos e
+         LEFT JOIN usuarios u ON u.id = e.criado_por
+         WHERE e.comunidade_id = ? AND e.item_id IN (${itemIds.map(() => "?").join(", ")})
+         ORDER BY e.id DESC`,
+      ).bind(communityId, ...itemIds).all<Record<string, unknown>>()
+    : { results: [] as Record<string, unknown>[] };
+  const eventsByItem = new Map<number, Record<string, unknown>[]>();
+  for (const event of events.results) {
+    const itemId = Number(event.item_id);
+    const collection = eventsByItem.get(itemId) || [];
+    collection.push(event);
+    eventsByItem.set(itemId, collection);
+  }
+  const items = result.results.map((item) => ({ ...item, eventos: eventsByItem.get(Number(item.id)) || [] }));
+  return { items, nextCursor };
+}
+
+export async function GET(request: Request) {
   const access = await requireTenantPermission("dashboard.view");
   if ("error" in access) return access.error;
   if (access.context.communityAccess === "FEED_ONLY") return Response.json({ error: "Ação não permitida." }, { status: 403 });
@@ -20,10 +124,26 @@ export async function GET() {
   const userId = access.user.id;
   const canManageRepositories = hasGlobalRepositoryAccess(access.context.permissions);
   const canConfigureWhatsapp = access.context.papel === "PASTOR";
+
+  const address = new URL(request.url);
+  const requestedItemsSize = Number(address.searchParams.get("limite") || 0);
+  const itemsPageSize = Number.isInteger(requestedItemsSize) && requestedItemsSize > 0
+    ? Math.min(requestedItemsSize, REPO_ITEMS_MAX_PAGE_SIZE)
+    : REPO_ITEMS_PAGE_SIZE;
+
+  // Um cursor pede só o próximo lote de itens de repositório: repositórios,
+  // ministérios, contatos e responsáveis não mudam a cada lote e já foram
+  // carregados no primeiro pedido, então este caminho fica bem mais leve.
+  if (address.searchParams.has("cursor")) {
+    const itemsCursor = decodeItemsCursor(address.searchParams.get("cursor"));
+    const page = await loadRepositoryItemsPage(db, { communityId, userId, canManageRepositories, cursor: itemsCursor, pageSize: itemsPageSize });
+    return Response.json(page, { headers: { "Cache-Control": "no-store" } });
+  }
+
   await cleanupFinishedRepositoryRequests(db, communityId);
   await ensureRequestRepositorySuggestions(db, communityId);
 
-  const [repositories, items, ministries, contacts, preference, currentUser, assignees, events] = await Promise.all([
+  const [repositories, itemsPage, ministries, contacts, preference, currentUser, assignees] = await Promise.all([
     db.prepare(
       `SELECT r.id, r.tipo, r.nome, r.status, r.ministerio_id,
         COALESCE(m.nome, '') AS ministerio_nome,
@@ -33,36 +153,7 @@ export async function GET() {
        WHERE r.comunidade_id = ? AND (? = 1 OR (r.status = 'ATIVO' AND m.responsavel_usuario_id = ?))
        ORDER BY CASE r.status WHEN 'SUGERIDO' THEN 0 ELSE 1 END, r.tipo`,
     ).bind(userId, communityId, canManageRepositories ? 1 : 0, userId).all<Record<string, unknown>>(),
-    db.prepare(
-      `SELECT ri.id, ri.repositorio_id, ri.status AS item_status,
-        s.id AS solicitacao_id, s.tipo, s.titulo, s.descricao,
-        s.status AS solicitacao_status, s.criado_em, s.atualizado_em,
-        s.preferencia_contato, s.disponibilidade, s.data_preferencial, s.contato_autorizado,
-        u.nome AS solicitante_nome, COALESCE(u.telefone, '') AS solicitante_telefone,
-        COALESCE(u.foto_perfil, '') AS solicitante_foto, COALESCE(uc.papel, 'MEMBRO') AS solicitante_papel,
-        ri.responsavel_usuario_id, COALESCE(responsavel.nome, '') AS responsavel_nome,
-        COALESCE(oc.titulo, ucResponsavel.papel, '') AS responsavel_funcao,
-        ri.responsavel_atribuido_em, ri.primeiro_contato_em,
-        ri.proximo_retorno_em, ri.visita_agendada_em,
-        COALESCE(ri.prioridade, 'NORMAL') AS prioridade, COALESCE(ri.resultado, '') AS resultado,
-        ri.mensagem_atendimento, ri.testemunho, ri.testemunho_compartilhavel,
-        ri.testemunho_publicado_em, ri.finalizado_em,
-        CASE WHEN ri.proximo_retorno_em IS NOT NULL AND ri.proximo_retorno_em < CURRENT_TIMESTAMP
-          AND ri.finalizado_em IS NULL THEN 1 ELSE 0 END AS retorno_atrasado
-       FROM solicitacao_repositorio_itens ri
-       JOIN solicitacao_repositorios r ON r.id = ri.repositorio_id AND r.comunidade_id = ri.comunidade_id
-       JOIN solicitacoes_comunidade s ON s.id = ri.solicitacao_id AND s.comunidade_id = ri.comunidade_id
-       JOIN usuarios u ON u.id = s.solicitante_id
-       LEFT JOIN usuario_comunidades uc ON uc.usuario_id = s.solicitante_id AND uc.comunidade_id = s.comunidade_id AND uc.status = 'ATIVO'
-       LEFT JOIN usuarios responsavel ON responsavel.id = ri.responsavel_usuario_id
-       LEFT JOIN usuario_comunidades ucResponsavel ON ucResponsavel.usuario_id = ri.responsavel_usuario_id
-         AND ucResponsavel.comunidade_id = ri.comunidade_id AND ucResponsavel.status = 'ATIVO'
-       LEFT JOIN oficiais_comunidade oc ON oc.usuario_comunidade_id = ucResponsavel.id
-       LEFT JOIN ministerios_comunidade m ON m.id = r.ministerio_id AND m.comunidade_id = r.comunidade_id
-       WHERE ri.comunidade_id = ? AND r.status = 'ATIVO' AND (? = 1 OR m.responsavel_usuario_id = ?)
-       ORDER BY CASE WHEN ri.finalizado_em IS NULL THEN 0 ELSE 1 END,
-         CASE WHEN ri.prioridade = 'URGENTE' THEN 0 ELSE 1 END, ri.id DESC LIMIT 250`,
-    ).bind(communityId, canManageRepositories ? 1 : 0, userId).all<Record<string, unknown>>(),
+    loadRepositoryItemsPage(db, { communityId, userId, canManageRepositories, cursor: null, pageSize: itemsPageSize }),
     canManageRepositories
       ? db.prepare("SELECT id, nome FROM ministerios_comunidade WHERE comunidade_id = ? AND status = 'ATIVO' ORDER BY nome ASC LIMIT 100")
           .bind(communityId).all<Record<string, unknown>>()
@@ -88,30 +179,13 @@ export async function GET() {
          OR instr(',' || COALESCE(oc.permissoes, '') || ',', ',requests.manage,') > 0)
        ORDER BY u.nome ASC LIMIT 150`,
     ).bind(communityId).all<Record<string, unknown>>(),
-    db.prepare(
-      `SELECT e.id, e.item_id, e.solicitacao_id, e.tipo, e.mensagem, e.visivel_membro,
-        e.criado_em, COALESCE(u.nome, 'Sistema') AS autor_nome FROM solicitacao_eventos e
-       JOIN solicitacao_repositorio_itens ri ON ri.id = e.item_id AND ri.comunidade_id = e.comunidade_id
-       JOIN solicitacao_repositorios r ON r.id = ri.repositorio_id AND r.comunidade_id = ri.comunidade_id
-       LEFT JOIN ministerios_comunidade m ON m.id = r.ministerio_id AND m.comunidade_id = r.comunidade_id
-       LEFT JOIN usuarios u ON u.id = e.criado_por
-       WHERE e.comunidade_id = ? AND (? = 1 OR m.responsavel_usuario_id = ?)
-       ORDER BY e.id DESC LIMIT 1200`,
-    ).bind(communityId, canManageRepositories ? 1 : 0, userId).all<Record<string, unknown>>(),
   ]);
 
-  const eventsByItem = new Map<number, Record<string, unknown>[]>();
-  for (const event of events.results) {
-    const itemId = Number(event.item_id);
-    const collection = eventsByItem.get(itemId) || [];
-    collection.push(event);
-    eventsByItem.set(itemId, collection);
-  }
   const itemsByRepository = new Map<number, Record<string, unknown>[]>();
-  for (const item of items.results) {
+  for (const item of itemsPage.items) {
     const repositoryId = Number(item.repositorio_id);
     const collection = itemsByRepository.get(repositoryId) || [];
-    collection.push({ ...item, eventos: eventsByItem.get(Number(item.id)) || [] });
+    collection.push(item);
     itemsByRepository.set(repositoryId, collection);
   }
 
@@ -126,6 +200,8 @@ export async function GET() {
     }),
     ministries: ministries.results,
     assignees: assignees.results,
+    // Nulo quando o lote de itens de repositório alcançou o último pendente.
+    itemsNextCursor: itemsPage.nextCursor,
     repositories: repositories.results.map((repository) => ({ ...repository, items: itemsByRepository.get(Number(repository.id)) || [] })),
   }, { headers: { "Cache-Control": "no-store" } });
 }
