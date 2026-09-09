@@ -115,6 +115,7 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
   const [opsGeneralCursor, setOpsGeneralCursor] = useState<string | null>(null);
   const [loadingMoreOpsGeneral, setLoadingMoreOpsGeneral] = useState(false);
   const [loadingOperationalRows, setLoadingOperationalRows] = useState(false);
+  const [lastOperationalRefresh, setLastOperationalRefresh] = useState<Date | null>(null);
   const [central, setCentral] = useState<CentralData>(EMPTY_CENTRAL);
   const [canManage, setCanManage] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -154,6 +155,7 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
   const [targetUser, setTargetUser] = useState("");
   const [repositoryMinistries, setRepositoryMinistries] = useState<Record<number, string>>({});
   const formRef = useRef<(HTMLFormElement & { open: boolean })>(null);
+  const operationalRefreshInFlight = useRef(false);
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -223,8 +225,10 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
   // Busca todo o primeiro lote (Central + pedidos gerais) sob os filtros
   // atuais e substitui o que estava carregado — chamado ao entrar no painel
   // de Atendimento e sempre que busca/aba/filtro avançado mudar.
-  const applyOperationalFilters = useCallback(async () => {
-    setLoadingOperationalRows(true);
+  const applyOperationalFilters = useCallback(async (quiet = false) => {
+    if (operationalRefreshInFlight.current) return;
+    operationalRefreshInFlight.current = true;
+    if (!quiet) setLoadingOperationalRows(true);
     try {
       const [centralResponse, generalResponse] = await Promise.all([
         fetch(buildOperationalAddress("/api/pilot/solicitacoes/central", operationalFilters), { cache: "no-store" }),
@@ -244,13 +248,36 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
       setCentralItemsCursor(centralPayload.nextCursor || null);
       setOpsGeneralItems(generalPayload.solicitacoes || []);
       setOpsGeneralCursor(generalPayload.nextCursor || null);
-    } catch (caught) { setError((caught as Error).message); }
-    finally { setLoadingOperationalRows(false); }
+      setLastOperationalRefresh(new Date());
+    } catch (caught) {
+      if (!quiet) setError((caught as Error).message);
+    } finally {
+      operationalRefreshInFlight.current = false;
+      if (!quiet) setLoadingOperationalRows(false);
+    }
   }, [operationalFilters]);
   useEffect(() => {
     if (mode !== "operations") return;
     const timer = window.setTimeout(() => void applyOperationalFilters(), 0);
     return () => window.clearTimeout(timer);
+  }, [mode, applyOperationalFilters]);
+
+  // A fila pode mudar porque outro oficial assumiu, concluiu ou registrou um
+  // retorno. Enquanto o painel está aberto, refazemos a consulta em segundo
+  // plano e também assim que a pessoa volta à aba, preservando os filtros.
+  useEffect(() => {
+    if (mode !== "operations") return;
+    const refresh = () => {
+      if (document.visibilityState === "visible") void applyOperationalFilters(true);
+    };
+    const interval = window.setInterval(refresh, 5_000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
   }, [mode, applyOperationalFilters]);
 
   const loadMoreCentral = useCallback(async () => {
@@ -512,6 +539,7 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
       {loadingOperationalRows && <small className="request-operations-loading" role="status">Atualizando…</small>}
       {advancedOpen && <section className="request-advanced-filters" aria-label="Filtros avançados"><label>Status<select value={advancedStatus} onChange={(event) => setAdvancedStatus(event.target.value)}><option value="">Todos</option>{allOperationalStatuses.map((status) => <option key={status} value={status}>{statusLabel({ status } as OperationalRow)}</option>)}</select></label><label>Responsável<select value={advancedOwner} onChange={(event) => setAdvancedOwner(event.target.value)}><option value="">Todos</option>{central.assignees.map((person) => <option key={person.id} value={person.id}>{person.nome}</option>)}</select></label><label>Recebidos desde<input type="date" value={advancedPeriod} onChange={(event) => setAdvancedPeriod(event.target.value)} /></label><label className="request-filter-check"><input type="checkbox" checked={onlyUnassigned} onChange={(event) => setOnlyUnassigned(event.target.checked)} />Sem responsável</label><button type="button" onClick={() => { setAdvancedStatus(""); setAdvancedOwner(""); setAdvancedPeriod(""); setOnlyUnassigned(false); }}>Limpar filtros</button></section>}
 
+      <div className="request-live-status" role="status"><i aria-hidden="true" />Atualização automática ativa{lastOperationalRefresh && <span>· atualizada às {lastOperationalRefresh.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>}</div>
       {operationalRows.length ? <><div className="request-operations-table" role="region" aria-label="Pedidos para atendimento"><table><thead><tr><th>Pessoa</th><th>Categoria</th><th>Responsável</th><th>Data</th><th>Status</th><th>Observação</th><th><span className="sr-only">Ações</span></th></tr></thead><tbody>{operationalRows.map((row) => <tr key={row.key} className={row.priority === "URGENTE" ? "urgent" : ""} onClick={() => openOperationalDetail(row)}><td><Avatar name={row.person} photo={row.photo} /><span><strong>{row.person}</strong><small>{roleLabel(row.role)}</small></span></td><td>{requestType(row.category)}</td><td>{row.owner || <em>Sem responsável</em>}</td><td>{formatDate(row.date)}</td><td><StatusChip label={statusLabel(row)} tone={statusTone(row.status, row.priority, row.overdue)} />{row.overdue && <small className="request-overdue">Retorno atrasado</small>}</td><td>{row.note || row.description}</td><td><button type="button" aria-label={`Abrir pedido de ${row.person}`} onClick={(event) => { event.stopPropagation(); openOperationalDetail(row); }}>•••</button></td></tr>)}</tbody></table></div><div className="request-mobile-list">{operationalRows.map((row) => <button type="button" key={row.key} onClick={() => openOperationalDetail(row)}><Avatar name={row.person} photo={row.photo} /><div><strong>{row.person}</strong><small>{requestType(row.category)} · {row.owner || "Sem responsável"}</small><p>{row.title}</p></div><StatusChip label={row.overdue ? "Retorno atrasado" : statusLabel(row)} tone={statusTone(row.status, row.priority, row.overdue)} /><time>{shortDate(row.date)}</time></button>)}</div></> : <div className="request-empty-operations"><RequestIcon type="search" /><strong>Nenhuma solicitação encontrada com esses filtros.</strong><button type="button" onClick={() => { setSearch(""); setDebouncedSearch(""); setQuickFilter("TODOS"); setAdvancedStatus(""); setAdvancedOwner(""); setAdvancedPeriod(""); setOnlyUnassigned(false); }}>Limpar busca e filtros</button></div>}
       {(centralItemsCursor || opsGeneralCursor) && (
         <div className="request-load-more">

@@ -74,7 +74,13 @@ const PERMISSION_LABELS: Record<string, string> = {
   "schedules.view": "Consultar escalas",
   "schedules.manage": "Gerenciar escalas",
   "parking.view": "Consultar estacionamento",
+  "parking.reserve": "Reservar estacionamento",
   "parking.report": "Registrar ocorrências",
+  "visitor.categories.manage": "Organizar categorias de visitantes",
+  "diaconia.view": "Consultar diaconia",
+  "diaconia.checklist.update": "Atualizar checklist da diaconia",
+  "diaconia.manage": "Gerenciar diaconia",
+  "diaconia.report": "Registrar relatório da diaconia",
   "feed.publish": "Publicar no feed",
   "requests.manage": "Atender pedidos da comunidade",
 };
@@ -92,6 +98,12 @@ const TITLES = [
   "PASTORA",
   "SECRETÁRIO",
   "SECRETÁRIA",
+  "COORDENADOR DE MINISTÉRIO",
+  "COORDENADORA DE MINISTÉRIO",
+  "SUPERVISOR DE CÉLULAS",
+  "SUPERVISORA DE CÉLULAS",
+  "GESTOR DE CUIDADO",
+  "GESTORA DE CUIDADO",
 ];
 
 const HIERARCHY_PERMISSION_PRESETS: Record<string, string[]> = {
@@ -102,7 +114,36 @@ const HIERARCHY_PERMISSION_PRESETS: Record<string, string[]> = {
   "PRESBÍTERA": ["visitors.view", "visitors.create", "visitors.edit", "followups.view", "followups.manage", "cells.view", "events.view", "events.manage", "ministries.view", "schedules.view", "schedules.manage", "feed.publish", "requests.manage"],
   "PASTOR": ["visitors.view", "visitors.create", "visitors.edit", "followups.view", "followups.manage", "cells.view", "events.view", "events.manage", "ministries.view", "schedules.view", "schedules.manage", "parking.view", "feed.publish", "requests.manage"],
   "PASTORA": ["visitors.view", "visitors.create", "visitors.edit", "followups.view", "followups.manage", "cells.view", "events.view", "events.manage", "ministries.view", "schedules.view", "schedules.manage", "parking.view", "feed.publish", "requests.manage"],
+  "COORDENADOR DE MINISTÉRIO": ["visitors.view", "followups.view", "cells.view", "events.view", "ministries.view", "schedules.view", "schedules.manage", "feed.publish"],
+  "COORDENADORA DE MINISTÉRIO": ["visitors.view", "followups.view", "cells.view", "events.view", "ministries.view", "schedules.view", "schedules.manage", "feed.publish"],
+  "SUPERVISOR DE CÉLULAS": ["visitors.view", "visitors.create", "visitors.edit", "followups.view", "followups.manage", "cells.view", "events.view", "ministries.view", "schedules.view"],
+  "SUPERVISORA DE CÉLULAS": ["visitors.view", "visitors.create", "visitors.edit", "followups.view", "followups.manage", "cells.view", "events.view", "ministries.view", "schedules.view"],
+  "GESTOR DE CUIDADO": ["visitors.view", "visitors.create", "visitors.edit", "followups.view", "followups.manage", "requests.manage"],
+  "GESTORA DE CUIDADO": ["visitors.view", "visitors.create", "visitors.edit", "followups.view", "followups.manage", "requests.manage"],
 };
+
+const HIERARCHY_MODEL_COPY: Record<string, string> = {
+  "LÍDER": "Acompanha pessoas, células, agenda e publicações locais.",
+  "DIÁCONO": "Serve nas rotinas de apoio, agenda e estacionamento.",
+  "DIACONISA": "Serve nas rotinas de apoio, agenda e estacionamento.",
+  "PRESBÍTERO": "Coordena cuidado, agenda, escalas e atendimento de pedidos.",
+  "PRESBÍTERA": "Coordena cuidado, agenda, escalas e atendimento de pedidos.",
+  "PASTOR": "Tem uma base ampla para cuidado pastoral e operação da comunidade.",
+  "PASTORA": "Tem uma base ampla para cuidado pastoral e operação da comunidade.",
+  "COORDENADOR DE MINISTÉRIO": "Organiza ministérios, escalas, eventos e comunicação da equipe.",
+  "COORDENADORA DE MINISTÉRIO": "Organiza ministérios, escalas, eventos e comunicação da equipe.",
+  "SUPERVISOR DE CÉLULAS": "Acompanha líderes, pessoas e o ritmo de cuidado das células.",
+  "SUPERVISORA DE CÉLULAS": "Acompanha líderes, pessoas e o ritmo de cuidado das células.",
+  "GESTOR DE CUIDADO": "Centraliza visitantes, acompanhamentos e pedidos de cuidado.",
+  "GESTORA DE CUIDADO": "Centraliza visitantes, acompanhamentos e pedidos de cuidado.",
+};
+
+const PERMISSION_GROUPS = [
+  { title: "Pessoas e cuidado", detail: "Visitantes, acompanhamentos e células.", permissions: ["visitors.view", "visitors.create", "visitors.edit", "visitor.categories.manage", "followups.view", "followups.manage", "cells.view", "requests.manage"] },
+  { title: "Agenda e equipes", detail: "Eventos, ministérios e escalas.", permissions: ["events.view", "events.manage", "ministries.view", "schedules.view", "schedules.manage"] },
+  { title: "Diaconia e apoio", detail: "Rotinas de serviço e relatórios.", permissions: ["diaconia.view", "diaconia.checklist.update", "diaconia.manage", "diaconia.report", "parking.view", "parking.reserve", "parking.report"] },
+  { title: "Comunicação", detail: "Publicações no mural da comunidade.", permissions: ["feed.publish"] },
+];
 
 export default function PeopleWorkspace({
   communityName,
@@ -127,6 +168,7 @@ export default function PeopleWorkspace({
   const [editing, setEditing] = useState<Person | null>(null);
   const [permissionDraft, setPermissionDraft] = useState<string[]>([]);
   const [presetTitle, setPresetTitle] = useState("LÍDER");
+  const [officialTitle, setOfficialTitle] = useState("LÍDER");
   const [removing, setRemoving] = useState<Person | null>(null);
   const [removeConfirmation, setRemoveConfirmation] = useState("");
   const [removalIssue, setRemovalIssue] = useState<{ message: string; blockers: RemovalBlocker[] } | null>(null);
@@ -176,6 +218,13 @@ export default function PeopleWorkspace({
   // resultado filtrado: filtrar de novo aqui esconderia gente do lote seguinte.
   const filtered = data.people;
   const pagedPeople = filtered;
+
+  function applyHierarchyModel(title: string) {
+    setPresetTitle(title);
+    setOfficialTitle(title);
+    setPermissionDraft((HIERARCHY_PERMISSION_PRESETS[title] || ["events.view", "ministries.view", "schedules.view"])
+      .filter((permission) => (data.permissionCatalog || []).includes(permission)));
+  }
 
   async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -410,7 +459,7 @@ export default function PeopleWorkspace({
             </div>
             <div className="people-card-actions">
               {data.canManage && (
-                <button type="button" onClick={() => { setEditing(person); setPermissionDraft(person.permissoes.split(",").filter(Boolean)); setPresetTitle(person.titulo_oficial || "LÍDER"); }}>
+                <button type="button" onClick={() => { const title = person.titulo_oficial || "LÍDER"; setEditing(person); setPermissionDraft(person.permissoes.split(",").filter(Boolean)); setPresetTitle(title); setOfficialTitle(title); }}>
                   Editar função
                 </button>
               )}
@@ -498,7 +547,8 @@ export default function PeopleWorkspace({
                   Título oficial
                   <select
                     name="titulo"
-                    defaultValue={editing.titulo_oficial || "LÍDER"}
+                    value={officialTitle}
+                    onChange={(event) => { setOfficialTitle(event.target.value); setPresetTitle(event.target.value); }}
                   >
                     {TITLES.map((title) => (
                       <option key={title}>{title}</option>
@@ -507,27 +557,27 @@ export default function PeopleWorkspace({
                 </label>
               </div>
               <section className="people-hierarchy-builder" aria-label="Modelo de permissões por hierarquia">
-                <div><strong>Modelo da hierarquia</strong><small>Use uma base pronta e ajuste cada permissão antes de salvar.</small></div>
+                <div><strong>Modelo de atuação</strong><small>Escolha uma hierarquia pronta; ela só preenche permissões que você já pode conceder.</small></div>
                 <select value={presetTitle} onChange={(event) => setPresetTitle(event.target.value)} aria-label="Hierarquia usada como modelo">
                   {TITLES.map((title) => <option key={title} value={title}>{title}</option>)}
                 </select>
-                <button type="button" onClick={() => setPermissionDraft((HIERARCHY_PERMISSION_PRESETS[presetTitle] || ["events.view", "ministries.view", "schedules.view"]).filter((permission) => (data.permissionCatalog || []).includes(permission)))}>Aplicar modelo</button>
+                <button type="button" onClick={() => applyHierarchyModel(presetTitle)}>Aplicar modelo</button>
+                <p>{HIERARCHY_MODEL_COPY[presetTitle] || "Base inicial para organizar a atuação desta pessoa."}</p>
               </section>
               <fieldset>
-                <legend>Permissões adicionais</legend>
-                <div className="people-permission-grid">
-                  {(data.permissionCatalog || []).map((permission) => (
-                    <label key={permission}>
-                      <input
-                        type="checkbox"
-                        name="permissions"
-                        value={permission}
-                        checked={permissionDraft.includes(permission)}
-                        onChange={(event) => setPermissionDraft((current) => event.target.checked ? [...new Set([...current, permission])] : current.filter((item) => item !== permission))}
-                      />
-                      <span>{PERMISSION_LABELS[permission] || permission}</span>
-                    </label>
-                  ))}
+                <legend>Permissões concedidas</legend>
+                <p className="people-permission-intro">A função no sistema define o teto de acesso. Ajuste abaixo apenas o que esta pessoa realmente precisa para servir.</p>
+                <div className="people-permission-groups">
+                  {PERMISSION_GROUPS.map((group) => {
+                    const permissions = group.permissions.filter((permission) => (data.permissionCatalog || []).includes(permission));
+                    if (!permissions.length) return null;
+                    return <section key={group.title} className="people-permission-group"><header><strong>{group.title}</strong><small>{group.detail}</small></header><div className="people-permission-grid">
+                      {permissions.map((permission) => <label key={permission}>
+                        <input type="checkbox" name="permissions" value={permission} checked={permissionDraft.includes(permission)} onChange={(event) => setPermissionDraft((current) => event.target.checked ? [...new Set([...current, permission])] : current.filter((item) => item !== permission))} />
+                        <span>{PERMISSION_LABELS[permission] || permission}</span>
+                      </label>)}
+                    </div></section>;
+                  })}
                 </div>
               </fieldset>
               <div className="people-form-actions">
