@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { MemberRegistrationFormData } from "../lib/member-registration";
+// O mesmo validador que a rota usa no servidor, para a pessoa saber do erro
+// enquanto digita em vez de descobrir só ao enviar o formulário inteiro.
+import { validateCpfCnpj } from "../lib/brazilian-validation";
 
 const DAYS = [
   ["DOM", "Domingo"], ["SEG", "Segunda"], ["TER", "Terça"],
@@ -52,6 +55,36 @@ export default function MemberRegistrationForm({
   const [submitted, setSubmitted] = useState(false);
   const [firstAccess, setFirstAccess] = useState<FirstAccess | null>(null);
   const [accessCopied, setAccessCopied] = useState(false);
+  // Endereço que o CEP devolveu, só para a pessoa conferir antes de enviar. Se
+  // o serviço estiver fora do ar o cadastro segue normalmente — o CEP digitado
+  // continua sendo o que vale.
+  const [endereco, setEndereco] = useState<string>("");
+  const [buscandoCep, setBuscandoCep] = useState(false);
+
+  const cpfInvalido = values.cpf.trim().length > 0 && !validateCpfCnpj(values.cpf);
+
+  async function buscarEndereco(cep: string) {
+    const numeros = cep.replace(/\D/g, "");
+    if (numeros.length !== 8) { setEndereco(""); return; }
+    setBuscandoCep(true);
+    try {
+      const resposta = await fetch(
+        `/api/public/cadastro-membro/${token}?cep=${numeros}`,
+        { cache: "no-store" },
+      );
+      const dados = await resposta.json() as {
+        endereco?: { logradouro: string; bairro: string; cidade: string; estado: string };
+        error?: string;
+      };
+      if (!resposta.ok || !dados.endereco) { setEndereco(""); return; }
+      const { logradouro, bairro, cidade, estado } = dados.endereco;
+      setEndereco([logradouro, bairro, [cidade, estado].filter(Boolean).join("/")].filter(Boolean).join(" · "));
+    } catch {
+      setEndereco("");
+    } finally {
+      setBuscandoCep(false);
+    }
+  }
   const [remaining, setRemaining] = useState(() => Math.max(0, Date.parse(registration.state === "AGUARDANDO" ? registration.opensAt : registration.closesAt) - registration.serverNow));
 
   const community = useMemo(
@@ -136,8 +169,8 @@ export default function MemberRegistrationForm({
             <div className="member-registration-photo member-registration-photo-private"><span aria-hidden="true">☁</span><strong>Foto após o primeiro acesso <small>A imagem será salva no seu Google Drive ou somente no aparelho; nunca no Vínkulo.</small></strong></div>
             <label>Nome completo*<input required minLength={5} maxLength={120} value={values.fullName} onChange={(event) => update("fullName", event.target.value)} autoComplete="name" /></label>
             <label>E-mail*<input required type="email" maxLength={180} value={values.email} onChange={(event) => update("email", event.target.value)} autoComplete="email" /></label>
-            <label>CPF <small>Opcional</small><input inputMode="numeric" maxLength={14} value={values.cpf} onChange={(event) => update("cpf", event.target.value)} /></label>
-            <label>CEP*<input required inputMode="numeric" pattern="[0-9. -]{8,10}" maxLength={10} value={values.cep} onChange={(event) => update("cep", event.target.value)} autoComplete="postal-code" /></label>
+            <label>CPF <small>Opcional</small><input inputMode="numeric" maxLength={14} value={values.cpf} onChange={(event) => update("cpf", event.target.value)} aria-invalid={cpfInvalido} aria-describedby={cpfInvalido ? "aviso-cpf" : undefined} />{cpfInvalido && <small id="aviso-cpf" className="member-registration-aviso" role="alert">Confira o CPF: os números não fecham.</small>}</label>
+            <label>CEP*<input required inputMode="numeric" pattern="[0-9. -]{8,10}" maxLength={10} value={values.cep} onChange={(event) => { update("cep", event.target.value); setEndereco(""); }} onBlur={(event) => void buscarEndereco(event.target.value)} autoComplete="postal-code" aria-describedby={endereco ? "endereco-cep" : undefined} />{buscandoCep && <small className="member-registration-aviso">Consultando o CEP…</small>}{endereco && <small id="endereco-cep" className="member-registration-endereco">{endereco}</small>}</label>
             <label>Data de nascimento*<input required type="date" max={new Date().toISOString().slice(0, 10)} value={values.birthDate} onChange={(event) => update("birthDate", event.target.value)} /></label>
             <label className="member-registration-consent member-registration-wide"><input required type="checkbox" checked={values.acceptedTerms} onChange={(event) => update("acceptedTerms", event.target.checked)} /><span>Concordo com os Termos de Uso e a Política de Privacidade.</span></label>
           </div></section>

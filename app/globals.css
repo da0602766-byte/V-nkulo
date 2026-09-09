@@ -20160,6 +20160,21 @@ html[data-pilot-theme="escuro"] :is(.account-profile-workspace .workspace-headin
   cursor: progress;
 }
 
+/* Retornos do cadastro público: aviso de CPF que não fecha e o endereço que o
+   CEP devolveu, para a pessoa conferir antes de enviar. */
+.member-registration-aviso {
+  display: block;
+  margin-top: 4px;
+  font-size: .74rem;
+  color: var(--pilot-danger);
+}
+.member-registration-endereco {
+  display: block;
+  margin-top: 4px;
+  font-size: .74rem;
+  color: var(--pilot-muted);
+}
+
 .people-pagination {
   display: flex;
   align-items: center;

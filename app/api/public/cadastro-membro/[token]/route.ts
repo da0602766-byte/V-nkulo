@@ -1,17 +1,64 @@
 import { getD1 } from "../../../../../db";
 import { getMemberRegistrationForm } from "../../../../lib/member-registration";
 import { createFirstAccessToken, generateTemporaryPassword, hashPassword } from "../../../../lib/local-auth";
+// O projeto já tinha um validador de CPF/CNPJ em app/lib; esta rota mantinha
+// uma cópia própria. Duas versões da mesma regra divergem com o tempo.
+import { validateCpfCnpj } from "../../../../lib/brazilian-validation";
 
 type Context = { params: Promise<{ token: string }> };
 const DAY_VALUES = new Set(["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"]);
 const PERIOD_VALUES = new Set(["MANHA", "TARDE", "NOITE", "FLEXIVEL"]);
 
-export async function GET(_request: Request, context: Context) {
+export async function GET(request: Request, context: Context) {
   const token = (await context.params).token;
   const form = await getMemberRegistrationForm(getD1(), token);
   if (!form) {
     return Response.json({ error: "Link de cadastro inválido." }, { status: 404 });
   }
+
+  // Busca de endereço pelo CEP, para o formulário confirmar o que a pessoa
+  // digitou em vez de guardar um número errado para sempre. Fica presa ao token
+  // do convite — que já foi validado acima — para a rota não virar um proxy
+  // aberto de consulta de CEP.
+  const cepPedido = new URL(request.url).searchParams.get("cep");
+  if (cepPedido !== null) {
+    const cep = digits(cepPedido).slice(0, 8);
+    if (cep.length !== 8) {
+      return Response.json({ error: "Informe os oito números do CEP." }, { status: 400 });
+    }
+    try {
+      const consulta = await fetch(`https://viacep.com.br/ws/${cep}/json/`, {
+        headers: { Accept: "application/json" },
+      });
+      if (!consulta.ok) {
+        return Response.json({ error: "CEP não encontrado." }, { status: 404 });
+      }
+      const dados = (await consulta.json()) as Record<string, unknown>;
+      if (dados.erro) {
+        return Response.json({ error: "CEP não encontrado." }, { status: 404 });
+      }
+      return Response.json(
+        {
+          endereco: {
+            cep,
+            logradouro: String(dados.logradouro || ""),
+            bairro: String(dados.bairro || ""),
+            cidade: String(dados.localidade || ""),
+            estado: String(dados.uf || ""),
+          },
+        },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    } catch {
+      // O serviço é gratuito e externo: se estiver fora do ar, o cadastro não
+      // pode travar por causa disso. A tela segue aceitando o CEP digitado.
+      return Response.json(
+        { error: "Não foi possível consultar o CEP agora.", indisponivel: true },
+        { status: 503 },
+      );
+    }
+  }
+
   return Response.json(form, { headers: { "Cache-Control": "no-store" } });
 }
 
@@ -73,7 +120,7 @@ export async function POST(request: Request, context: Context) {
       { status: 400 },
     );
   }
-  if (cpf && !validCpf(cpf)) {
+  if (cpf && !validateCpfCnpj(cpf)) {
     return Response.json({ error: "O CPF informado é inválido." }, { status: 400 });
   }
   if (functionId && !ministryFunction) {
@@ -204,14 +251,4 @@ function validBirthDate(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const date = new Date(`${value}T12:00:00Z`);
   return Number.isFinite(date.getTime()) && date.getTime() <= Date.now();
-}
-function validCpf(cpf: string) {
-  if (!/^\d{11}$/.test(cpf) || /^(\d)\1{10}$/.test(cpf)) return false;
-  const numbers = cpf.split("").map(Number);
-  for (let position = 9; position <= 10; position += 1) {
-    const sum = numbers.slice(0, position).reduce((total, digit, index) => total + digit * (position + 1 - index), 0);
-    const check = (sum * 10) % 11 % 10;
-    if (check !== numbers[position]) return false;
-  }
-  return true;
 }

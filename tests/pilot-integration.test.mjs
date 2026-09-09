@@ -5749,3 +5749,44 @@ test("designações de um lote grande atravessam a fatia sem perder ninguém", a
 
   database.close();
 });
+
+// O ViaCEP é gratuito e já estava integrado em `/api/pilot/validacoes`, mas
+// nenhuma tela chamava aquela rota. O cadastro público pede CEP obrigatório e
+// CPF, e não conferia nenhum dos dois na tela: a pessoa preenchia tudo e só
+// descobria o erro ao enviar, e um CEP digitado errado virava dado permanente.
+//
+// A consulta fica presa ao token do convite de propósito: sem isso a rota
+// pública viraria um proxy aberto de consulta de CEP para qualquer um.
+test("consulta de CEP do cadastro público exige token válido e não trava o cadastro", async () => {
+  const rota = await readSource("app/api/public/cadastro-membro/[token]/route.ts");
+  const formulario = await readSource("app/components/MemberRegistrationForm.tsx");
+
+  // A consulta só acontece depois de o token ter sido validado.
+  const posicaoToken = rota.indexOf("if (!form) {");
+  const posicaoConsulta = rota.indexOf("viacep.com.br");
+  assert.ok(posicaoToken > -1 && posicaoConsulta > -1);
+  assert.ok(
+    posicaoToken < posicaoConsulta,
+    "a consulta de CEP não pode acontecer antes de o token do convite ser validado",
+  );
+
+  // Serviço externo fora do ar não pode derrubar o cadastro.
+  assert.match(
+    rota,
+    /catch \{[\s\S]{0,400}indisponivel: true/,
+    "a falha do serviço externo precisa ser tratada: o cadastro não pode travar por causa dela",
+  );
+
+  // Uma única regra de CPF no projeto, não duas.
+  assert.match(rota, /import \{ validateCpfCnpj \}/);
+  assert.doesNotMatch(
+    rota,
+    /function validCpf\(/,
+    "a cópia local do validador de CPF saiu; duas versões da mesma regra divergem com o tempo",
+  );
+
+  // A tela avisa enquanto a pessoa digita, em vez de só ao enviar.
+  assert.match(formulario, /validateCpfCnpj/);
+  assert.match(formulario, /aria-invalid=\{cpfInvalido\}/);
+  assert.match(formulario, /onBlur=\{\(event\) => void buscarEndereco/);
+});
