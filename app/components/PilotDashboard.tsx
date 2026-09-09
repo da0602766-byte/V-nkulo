@@ -2,7 +2,7 @@
 
 import Link from "./StableLink";
 import dynamic from "next/dynamic";
-import { type CSSProperties, FormEvent, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { PilotFeatureState } from "../lib/pilot-data";
 import type { TenantContext, TenantMembership } from "../lib/tenant";
 import {
@@ -127,6 +127,26 @@ const ROLE_LABELS: Record<string, string> = {
 };
 const MIN_FONT_SCALE = 0.85;
 const MAX_FONT_SCALE = 1.25;
+const DEFAULT_MOBILE_SHORTCUTS: View[] = ["inicio", "eventos", "solicitacoes"];
+const MOBILE_SHORTCUT_LONG_PRESS_MS = 520;
+
+function normalizeMobileShortcuts(value: unknown, allowedViews: View[]) {
+  const allowed = new Set(allowedViews);
+  const saved = Array.isArray(value)
+    ? value.filter((item): item is View => typeof item === "string" && allowed.has(item as View))
+    : [];
+  const normalized: View[] = [];
+  for (const item of [...saved, ...DEFAULT_MOBILE_SHORTCUTS, ...allowedViews]) {
+    if (!allowed.has(item) || normalized.includes(item)) continue;
+    normalized.push(item);
+    if (normalized.length === 3) break;
+  }
+  for (const item of DEFAULT_MOBILE_SHORTCUTS) {
+    if (normalized.length === 3) break;
+    if (!normalized.includes(item)) normalized.push(item);
+  }
+  return normalized;
+}
 
 function MagnifierIcon({ operation }: { operation: "minus" | "plus" }) {
   return (
@@ -217,8 +237,14 @@ export default function PilotDashboard({
   const [view, setView] = useState<View>(initialView as View);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenu, setMobileMenu] = useState<
-    "menu" | "perfil" | "actions" | null
+    "menu" | "perfil" | "actions" | "shortcuts" | null
   >(null);
+  const [mobileShortcuts, setMobileShortcuts] = useState<View[]>(DEFAULT_MOBILE_SHORTCUTS);
+  const [mobileShortcutSlot, setMobileShortcutSlot] = useState<number | null>(null);
+  const [mobileShortcutReplacement, setMobileShortcutReplacement] = useState<View | null>(null);
+  const mobileShortcutPressTimer = useRef<number | null>(null);
+  const mobileShortcutLongPress = useRef(false);
+  const mobileShortcutsLoadedKey = useRef<string | null>(null);
   const [communitySearch, setCommunitySearch] = useState("");
   const [navigationSearch, setNavigationSearch] = useState("");
   const [navigationSearchOpen, setNavigationSearchOpen] = useState(false);
@@ -362,6 +388,42 @@ export default function PilotDashboard({
       ),
     [allowedMenu],
   );
+  const mobileShortcutStorageKey = useMemo(
+    () => `vinkulo:mobile-shortcuts:${userEmail.trim().toLowerCase()}:${active.comunidadeId}`,
+    [active.comunidadeId, userEmail],
+  );
+  const mobileShortcutItems = useMemo(
+    () => mobileShortcuts.map((id) => MENU.find((item) => item.id === id)).filter(Boolean) as typeof MENU,
+    [mobileShortcuts],
+  );
+
+  useEffect(() => {
+    mobileShortcutsLoadedKey.current = null;
+    const timer = window.setTimeout(() => {
+      let saved: unknown = null;
+      try {
+        saved = JSON.parse(window.localStorage.getItem(mobileShortcutStorageKey) || "null");
+      } catch {
+        // Usa os atalhos padrão quando a preferência local não pode ser lida.
+      }
+      mobileShortcutsLoadedKey.current = mobileShortcutStorageKey;
+      setMobileShortcuts(normalizeMobileShortcuts(saved, primaryMenu.map((item) => item.id)));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [mobileShortcutStorageKey, primaryMenu]);
+
+  useEffect(() => {
+    if (mobileShortcutsLoadedKey.current !== mobileShortcutStorageKey) return;
+    try {
+      window.localStorage.setItem(mobileShortcutStorageKey, JSON.stringify(mobileShortcuts));
+    } catch {
+      // A troca continua funcional durante a sessão quando o armazenamento falha.
+    }
+  }, [mobileShortcutStorageKey, mobileShortcuts]);
+
+  useEffect(() => () => {
+    if (mobileShortcutPressTimer.current !== null) window.clearTimeout(mobileShortcutPressTimer.current);
+  }, []);
   const sidebarGroups = useMemo(() => {
     const byId = new Map(allowedMenu.map((item) => [item.id, item]));
     const makeItem = (
@@ -433,7 +495,6 @@ export default function PilotDashboard({
     [allowedMenu],
   );
   const userInitials = getInitials(userName);
-  const eventViewAvailable = allowedMenu.some((item) => item.id === "eventos");
   const agendaAlerts = unreadNotifications.eventos + unreadNotifications.escalas;
   const menuAlerts = unreadNotifications.total + unreadMessages;
   const quickActions = useMemo(
@@ -702,6 +763,57 @@ export default function PilotDashboard({
       }),
     );
     window.setTimeout(() => setViewLoading(false), 280);
+  }
+
+  function cancelMobileShortcutPress() {
+    if (mobileShortcutPressTimer.current !== null) {
+      window.clearTimeout(mobileShortcutPressTimer.current);
+      mobileShortcutPressTimer.current = null;
+    }
+  }
+
+  function openMobileShortcutEditor(slot: number) {
+    cancelMobileShortcutPress();
+    const current = mobileShortcutItems[slot];
+    if (!current) return;
+    mobileShortcutLongPress.current = true;
+    setMobileShortcutSlot(slot);
+    setMobileShortcutReplacement(current.id);
+    setMobileMenu("shortcuts");
+  }
+
+  function beginMobileShortcutPress(slot: number) {
+    cancelMobileShortcutPress();
+    mobileShortcutLongPress.current = false;
+    mobileShortcutPressTimer.current = window.setTimeout(
+      () => openMobileShortcutEditor(slot),
+      MOBILE_SHORTCUT_LONG_PRESS_MS,
+    );
+  }
+
+  function openMobileShortcut(slot: number, item: (typeof MENU)[number]) {
+    cancelMobileShortcutPress();
+    if (mobileShortcutLongPress.current) {
+      mobileShortcutLongPress.current = false;
+      return;
+    }
+    if (allowedMenu.some((allowed) => allowed.id === item.id)) openView(item.id);
+    else setMobileMenu("menu");
+  }
+
+  function applyMobileShortcutReplacement() {
+    if (mobileShortcutSlot === null || !mobileShortcutReplacement) return;
+    setMobileShortcuts((current) => {
+      const next = [...current];
+      const previous = next[mobileShortcutSlot];
+      const duplicateSlot = next.indexOf(mobileShortcutReplacement);
+      if (duplicateSlot >= 0 && duplicateSlot !== mobileShortcutSlot) next[duplicateSlot] = previous;
+      next[mobileShortcutSlot] = mobileShortcutReplacement;
+      return next;
+    });
+    setMobileMenu(null);
+    setMobileShortcutSlot(null);
+    setMobileShortcutReplacement(null);
   }
 
   function runQuickAction(action: (typeof quickActions)[number]) {
@@ -1249,20 +1361,26 @@ export default function PilotDashboard({
         </section>
       </div>
       <nav className="pilot-mobile-nav" data-editor-key="barra-movel" aria-label="Navegação móvel do painel">
-        <button
-          type="button"
-          className={visibleView === "inicio" && !mobileMenu ? "active" : ""}
-          onClick={() => openView("inicio")}
-          aria-label="Início"
-        >
-          <span className="pilot-mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5v8a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5z"/><path d="M9.5 20v-6h5v6"/></svg></span>
-          <small className="pilot-mobile-label">Início</small>
-        </button>
-        <button type="button" className={visibleView === "eventos" && !mobileMenu ? "active" : ""} onClick={() => eventViewAvailable ? openView("eventos") : setMobileMenu("menu")} aria-label="Agenda">
-          <span className="pilot-mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="14" rx="2"/><path d="M8 3.5v4M16 3.5v4M4 10h16M8 14h3M14 14h2"/></svg></span>
-          <small className="pilot-mobile-label">Agenda</small>
-          {agendaAlerts > 0 && <b className="pilot-mobile-badge">{Math.min(agendaAlerts, 99)}</b>}
-        </button>
+        {mobileShortcutItems.slice(0, 2).map((item, slot) => (
+          <button
+            type="button"
+            key={`${slot}:${item.id}`}
+            className={visibleView === item.id && !mobileMenu ? "active" : ""}
+            onClick={() => openMobileShortcut(slot, item)}
+            onPointerDown={() => beginMobileShortcutPress(slot)}
+            onPointerUp={cancelMobileShortcutPress}
+            onPointerCancel={cancelMobileShortcutPress}
+            onPointerLeave={cancelMobileShortcutPress}
+            onContextMenu={(event) => { event.preventDefault(); openMobileShortcutEditor(slot); }}
+            aria-label={`${item.label}. Toque para abrir; pressione e segure para trocar.`}
+            title="Toque para abrir · segure para trocar"
+          >
+            <span className="pilot-mobile-nav-icon" aria-hidden="true"><MenuIcon id={item.id} /></span>
+            <small className="pilot-mobile-label">{item.label}</small>
+            {item.id === "eventos" && agendaAlerts > 0 && <b className="pilot-mobile-badge">{Math.min(agendaAlerts, 99)}</b>}
+            {item.id === "solicitacoes" && unreadNotifications.pedidos > 0 && <b className="pilot-mobile-badge">{Math.min(unreadNotifications.pedidos, 99)}</b>}
+          </button>
+        ))}
         <button
           className={`pilot-mobile-create-button ${mobileMenu === "actions" ? "active" : ""}`}
           type="button"
@@ -1275,11 +1393,29 @@ export default function PilotDashboard({
           <span className="pilot-mobile-create-icon" aria-hidden="true">+</span>
           <small className="pilot-mobile-label">Adicionar</small>
         </button>
-        <button type="button" className={visibleView === "solicitacoes" && !mobileMenu ? "active" : ""} onClick={() => openView("solicitacoes")} aria-label="Pedidos">
-          <span className="pilot-mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z"/></svg></span>
-          <small className="pilot-mobile-label">Pedidos</small>
-          {unreadNotifications.pedidos > 0 && <b className="pilot-mobile-badge">{Math.min(unreadNotifications.pedidos, 99)}</b>}
-        </button>
+        {mobileShortcutItems.slice(2, 3).map((item, relativeSlot) => {
+          const slot = relativeSlot + 2;
+          return (
+            <button
+              type="button"
+              key={`${slot}:${item.id}`}
+              className={visibleView === item.id && !mobileMenu ? "active" : ""}
+              onClick={() => openMobileShortcut(slot, item)}
+              onPointerDown={() => beginMobileShortcutPress(slot)}
+              onPointerUp={cancelMobileShortcutPress}
+              onPointerCancel={cancelMobileShortcutPress}
+              onPointerLeave={cancelMobileShortcutPress}
+              onContextMenu={(event) => { event.preventDefault(); openMobileShortcutEditor(slot); }}
+              aria-label={`${item.label}. Toque para abrir; pressione e segure para trocar.`}
+              title="Toque para abrir · segure para trocar"
+            >
+              <span className="pilot-mobile-nav-icon" aria-hidden="true"><MenuIcon id={item.id} /></span>
+              <small className="pilot-mobile-label">{item.label}</small>
+              {item.id === "eventos" && agendaAlerts > 0 && <b className="pilot-mobile-badge">{Math.min(agendaAlerts, 99)}</b>}
+              {item.id === "solicitacoes" && unreadNotifications.pedidos > 0 && <b className="pilot-mobile-badge">{Math.min(unreadNotifications.pedidos, 99)}</b>}
+            </button>
+          );
+        })}
         <button
           className={mobileMenu === "menu" ? "active" : ""}
           type="button"
@@ -1311,6 +1447,8 @@ export default function PilotDashboard({
                 ? "Menu geral"
                 : mobileMenu === "actions"
                   ? "Ações rápidas"
+                  : mobileMenu === "shortcuts"
+                    ? "Personalizar atalhos"
                   : "Perfil do usuário"
             }
             onMouseDown={(event) => event.stopPropagation()}
@@ -1322,6 +1460,8 @@ export default function PilotDashboard({
                     ? "NAVEGAÇÃO"
                     : mobileMenu === "actions"
                       ? "ATALHOS CONTEXTUAIS"
+                      : mobileMenu === "shortcuts"
+                        ? "PERSONALIZAÇÃO"
                       : "CONTA ATIVA"}
                 </p>
                 <h2>
@@ -1329,6 +1469,8 @@ export default function PilotDashboard({
                     ? "Menu geral"
                     : mobileMenu === "actions"
                       ? "O que deseja adicionar?"
+                      : mobileMenu === "shortcuts"
+                        ? "Substituir atalho"
                       : userName}
                 </h2>
               </div>
@@ -1434,6 +1576,43 @@ export default function PilotDashboard({
                     </div>
                   </button>
                 ))}
+              </div>
+            ) : mobileMenu === "shortcuts" && mobileShortcutSlot !== null ? (
+              <div className="pilot-mobile-shortcut-customizer">
+                <p>Escolha uma aba do menu para colocar no lugar de <strong>{mobileShortcutItems[mobileShortcutSlot]?.label}</strong>.</p>
+                <div className="pilot-mobile-shortcut-current" aria-label="Atalho atual">
+                  <span aria-hidden="true"><MenuIcon id={mobileShortcutItems[mobileShortcutSlot]?.id || "inicio"} /></span>
+                  <div><small>Atalho atual</small><strong>{mobileShortcutItems[mobileShortcutSlot]?.label}</strong></div>
+                  <b aria-hidden="true">→</b>
+                  <div><small>Novo atalho</small><strong>{MENU.find((item) => item.id === mobileShortcutReplacement)?.label || "Escolha abaixo"}</strong></div>
+                </div>
+                <div className="pilot-mobile-shortcut-options" role="listbox" aria-label="Abas disponíveis">
+                  {primaryMenu.map((item) => (
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={mobileShortcutReplacement === item.id}
+                      className={mobileShortcutReplacement === item.id ? "selected" : ""}
+                      key={item.id}
+                      onClick={() => setMobileShortcutReplacement(item.id)}
+                    >
+                      <span aria-hidden="true"><MenuIcon id={item.id} /></span>
+                      <strong>{item.label}</strong>
+                    </button>
+                  ))}
+                </div>
+                <div className="pilot-mobile-shortcut-actions">
+                  <button
+                    type="button"
+                    onClick={applyMobileShortcutReplacement}
+                    disabled={!mobileShortcutReplacement || mobileShortcutReplacement === mobileShortcutItems[mobileShortcutSlot]?.id}
+                  >
+                    {mobileShortcutReplacement && mobileShortcutReplacement !== mobileShortcutItems[mobileShortcutSlot]?.id
+                      ? `Trocar por ${MENU.find((item) => item.id === mobileShortcutReplacement)?.label}`
+                      : "Escolha um novo atalho"}
+                  </button>
+                  <button type="button" className="secondary" onClick={() => setMobileMenu(null)}>Cancelar</button>
+                </div>
               </div>
             ) : (
               <div className="pilot-mobile-profile">

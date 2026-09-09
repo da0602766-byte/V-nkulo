@@ -8,12 +8,12 @@ test("barra móvel mantém cinco posições e restaura o cadastro central", () =
   const dashboard = read("app/components/PilotDashboard.tsx");
   const mobileNav = dashboard.match(/<nav className="pilot-mobile-nav"[\s\S]*?<\/nav>/)?.[0] || "";
 
-  assert.equal((mobileNav.match(/<button/g) || []).length, 5);
+  assert.match(mobileNav, /mobileShortcutItems\.slice\(0, 2\)/);
+  assert.match(mobileNav, /mobileShortcutItems\.slice\(2, 3\)/);
   assert.match(mobileNav, /pilot-mobile-create-button/);
   assert.match(mobileNav, /aria-label="Adicionar ou cadastrar"/);
   assert.doesNotMatch(mobileNav, /aria-label="Comunidade"/);
-  assert.match(mobileNav, />Agenda</);
-  assert.match(mobileNav, />Pedidos</);
+  assert.match(dashboard, /DEFAULT_MOBILE_SHORTCUTS: View\[\] = \["inicio", "eventos", "solicitacoes"\]/);
   assert.match(mobileNav, />Menu</);
 });
 

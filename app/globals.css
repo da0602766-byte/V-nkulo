@@ -32471,8 +32471,9 @@ html[data-pilot-theme="escuro"] .request-care-status.tone-blue { background:#173
 }
 @media(max-width:820px){
   .pilot-dashboard[data-ui-version="v2"] .community-home-rail{
-    width:calc(100% - 28px);
-    margin-inline:14px;
+    box-sizing:border-box;
+    width:100%;
+    margin-inline:0;
     border:0!important;
     border-radius:0;
     background:transparent!important;
@@ -32482,4 +32483,106 @@ html[data-pilot-theme="escuro"] .request-care-status.tone-blue { background:#173
   .pilot-dashboard[data-ui-version="v2"] .community-home-rail>.community-my-schedules{
     padding:16px!important;
   }
+}
+
+/* Início V236 — coluna alinhada ao feed e atalhos móveis personalizáveis. */
+.pilot-mobile-shortcut-customizer {
+  display:grid;
+  gap:14px;
+}
+.pilot-mobile-shortcut-customizer > p {
+  margin:0;
+  color:var(--pilot-muted);
+  font-size:var(--fs-sm);
+  line-height:1.5;
+}
+.pilot-mobile-shortcut-customizer > p strong { color:var(--pilot-text); }
+.pilot-mobile-shortcut-current {
+  min-width:0;
+  display:grid;
+  grid-template-columns:42px minmax(0,1fr) auto minmax(0,1fr);
+  align-items:center;
+  gap:10px;
+  border:1px solid var(--pilot-line);
+  border-radius:14px;
+  background:var(--pilot-surface-2);
+  padding:11px;
+}
+.pilot-mobile-shortcut-current > span,
+.pilot-mobile-shortcut-options button > span {
+  display:grid;
+  place-items:center;
+  border-radius:11px;
+  color:var(--pilot-primary);
+}
+.pilot-mobile-shortcut-current > span { width:42px; height:42px; background:var(--pilot-surface); }
+.pilot-mobile-shortcut-current svg,
+.pilot-mobile-shortcut-options svg { width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.pilot-mobile-shortcut-current > div { min-width:0; display:grid; gap:2px; }
+.pilot-mobile-shortcut-current small { color:var(--pilot-muted); font-size:var(--fs-2xs); }
+.pilot-mobile-shortcut-current strong { overflow:hidden; color:var(--pilot-text); font-size:var(--fs-xs); text-overflow:ellipsis; white-space:nowrap; }
+.pilot-mobile-shortcut-current > b { color:var(--pilot-muted); font-size:var(--fs-lg); }
+.pilot-mobile-shortcut-options {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+  max-height:min(38dvh,330px);
+  overflow-y:auto;
+  overscroll-behavior:contain;
+}
+.pilot-mobile-shortcut-options button {
+  min-width:0;
+  min-height:62px;
+  display:grid;
+  grid-template-columns:34px minmax(0,1fr);
+  align-items:center;
+  gap:8px;
+  border:1px solid var(--pilot-line);
+  border-radius:12px;
+  background:var(--pilot-surface);
+  color:var(--pilot-text);
+  padding:8px;
+  font:inherit;
+  text-align:left;
+  cursor:pointer;
+}
+.pilot-mobile-shortcut-options button > span { width:34px; height:34px; background:var(--pilot-surface-2); }
+.pilot-mobile-shortcut-options button strong { min-width:0; overflow:hidden; font-size:var(--fs-xs); text-overflow:ellipsis; white-space:nowrap; }
+.pilot-mobile-shortcut-options button.selected { border-color:var(--pilot-primary); background:color-mix(in srgb,var(--pilot-primary) 10%,var(--pilot-surface)); box-shadow:inset 0 0 0 1px var(--pilot-primary); }
+.pilot-mobile-shortcut-actions { display:grid; gap:8px; }
+.pilot-mobile-shortcut-actions button {
+  min-height:46px;
+  border:1px solid var(--pilot-primary);
+  border-radius:12px;
+  background:var(--pilot-primary);
+  color:#fff;
+  padding:0 14px;
+  font:inherit;
+  font-size:var(--fs-sm);
+  font-weight:850;
+  cursor:pointer;
+}
+.pilot-mobile-shortcut-actions button:disabled { opacity:.55; cursor:not-allowed; }
+.pilot-mobile-shortcut-actions button.secondary { border-color:var(--pilot-line); background:transparent; color:var(--pilot-text); }
+
+@media(max-width:820px){
+  .pilot-dashboard[data-ui-version="v2"] .pilot-mobile-nav > button:not(.pilot-mobile-create-button) {
+    -webkit-touch-callout:none;
+    user-select:none;
+    touch-action:manipulation;
+  }
+  .pilot-dashboard[data-ui-version="v2"] .community-home-grid,
+  .pilot-dashboard[data-ui-version="v2"] .community-feed-panel,
+  .pilot-dashboard[data-ui-version="v2"] .community-home-rail {
+    box-sizing:border-box;
+    width:100%;
+    max-width:100%;
+    margin-inline:0!important;
+  }
+}
+
+@media(max-width:390px){
+  .pilot-mobile-shortcut-current { grid-template-columns:38px minmax(0,1fr) auto minmax(0,1fr); gap:7px; padding:9px; }
+  .pilot-mobile-shortcut-current > span { width:38px; height:38px; }
+  .pilot-mobile-shortcut-options { grid-template-columns:1fr; }
 }
