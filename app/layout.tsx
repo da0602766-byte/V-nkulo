@@ -14,6 +14,7 @@ import MobileAppInstall from "./components/MobileAppInstall";
 import GlobalFeedbackLauncher from "./components/GlobalFeedbackLauncher";
 import SystemExperienceController from "./components/SystemExperienceController";
 import NativeNotificationSync from "./components/NativeNotificationSync";
+import MobileQuickActionsEnhancer from "./components/MobileQuickActionsEnhancer";
 
 const instrumentSans = Instrument_Sans({
   variable: "--font-body",
@@ -90,6 +91,7 @@ export default function RootLayout({
         <a className="skip-to-content" href="#main-content">Pular para o conteúdo principal</a>
         <SmartScrollHeader />
         <div id="main-content">{children}</div>
+        <MobileQuickActionsEnhancer />
         <SystemExperienceController />
         <NativeNotificationSync />
         <GlobalFeedbackLauncher />
