@@ -47,7 +47,10 @@ type Repository = {
 };
 type PastorContact = { id: number; nome: string; foto: string; whatsappUrl: string };
 type Assignee = { id: number; nome: string; funcao: string };
-type RepositoryMetrics = { open: number; urgent: number; visits: number; today: number };
+type RepositoryMetrics = {
+  open: number; urgent: number; visits: number; today: number;
+  total: number; prayerTotal: number; visitTotal: number; inProgress: number; overdue: number; completed: number;
+};
 type CentralData = {
   canManageRepositories: boolean; canOperate: boolean;
   currentActor: { id: number; nome: string };
@@ -71,25 +74,47 @@ const EMPTY_CENTRAL: CentralData = {
   canManageRepositories: false, canOperate: false, currentActor: { id: 0, nome: "" },
   whatsappPreference: { canConfigure: false, enabled: false, hasPhone: false },
   pastoresContato: [], ministries: [], assignees: [], repositories: [],
-  itemsMetrics: { open: 0, urgent: 0, visits: 0, today: 0 },
+  itemsMetrics: { open: 0, urgent: 0, visits: 0, today: 0, total: 0, prayerTotal: 0, visitTotal: 0, inProgress: 0, overdue: 0, completed: 0 },
 };
+const EMPTY_REQUESTS_METRICS = { open: 0, today: 0, total: 0, inProgress: 0, completed: 0 };
+// Uma pessoa procurada além do primeiro lote de pedidos gerais/atendimentos
+// não aparecia: busca, abas e filtros avançados agora entram no SQL dos dois
+// endpoints (ver ?operacional=1 em solicitacoes e central), então este
+// helper monta o mesmo conjunto de parâmetros para os dois. As abas e o
+// endereço já vêm de app/api/pilot/solicitacoes(/central)/route.ts.
+function buildOperationalAddress(path: string, filters: Record<string, string>, cursor?: string | null) {
+  const address = new URL(path, window.location.origin);
+  address.searchParams.set("operacional", "1");
+  for (const [key, value] of Object.entries(filters)) address.searchParams.set(key, value);
+  if (cursor) address.searchParams.set("cursor", cursor);
+  return address;
+}
 
 export default function RequestsWorkspace({ communityName }: { communityName: string }) {
   const [items, setItems] = useState<CommunityRequest[]>([]);
-  // Acima do tamanho do lote as solicitações seguintes não chegavam, sem a tela
-  // ter como saber. Os filtros e contadores desta tela operam sobre a lista
-  // inteira carregada, então o cursor traz o resto em vez de reduzir o lote.
+  // Alimenta só "Meus pedidos" (todos os tipos, sem filtro) — o painel de
+  // Atendimento usa a fila à parte abaixo (opsGeneralItems), já filtrada
+  // pelo servidor. Acima do tamanho do lote as solicitações seguintes não
+  // chegavam, sem a tela ter como saber; o cursor traz o resto.
   const [requestsCursor, setRequestsCursor] = useState<string | null>(null);
   const [loadingMoreRequests, setLoadingMoreRequests] = useState(false);
-  // Contagem de pedidos gerais em aberto/concluídos hoje na fila inteira,
-  // não só no lote carregado — junto de central.itemsMetrics alimenta os
-  // cartões do painel (ver useMemo "metrics" abaixo).
-  const [requestsMetrics, setRequestsMetrics] = useState({ open: 0, today: 0 });
+  // Contagens da fila inteira de pedidos gerais (aberto/hoje/total/em
+  // acompanhamento/concluídos), não só no lote carregado — junto de
+  // central.itemsMetrics alimenta os cartões e as abas do painel (ver
+  // useMemo "metrics"/"tabCounts" abaixo).
+  const [requestsMetrics, setRequestsMetrics] = useState(EMPTY_REQUESTS_METRICS);
   // Os itens de oração/visita do painel de atendimento vinham só da Central,
   // que tinha um teto fixo sem cursor: pedidos além do lote sumiam da tela
   // sem aviso. Agora ela também pagina, e este cursor busca o resto.
   const [centralItemsCursor, setCentralItemsCursor] = useState<string | null>(null);
   const [loadingMoreCentral, setLoadingMoreCentral] = useState(false);
+  // Pedidos gerais do painel de Atendimento (?operacional=1): uma lista à
+  // parte de "items"/"myRequests", porque busca e abas filtram só esta fila
+  // — a lista "Meus pedidos" do membro precisa continuar sempre completa.
+  const [opsGeneralItems, setOpsGeneralItems] = useState<CommunityRequest[]>([]);
+  const [opsGeneralCursor, setOpsGeneralCursor] = useState<string | null>(null);
+  const [loadingMoreOpsGeneral, setLoadingMoreOpsGeneral] = useState(false);
+  const [loadingOperationalRows, setLoadingOperationalRows] = useState(false);
   const [central, setCentral] = useState<CentralData>(EMPTY_CENTRAL);
   const [canManage, setCanManage] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -107,6 +132,9 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
   const [pendingPastor, setPendingPastor] = useState<PastorContact | null>(null);
   const [selectedRow, setSelectedRow] = useState<OperationalRow | null>(null);
   const [search, setSearch] = useState("");
+  // A busca só dispara uma consulta ao servidor 300ms depois de a pessoa
+  // parar de digitar — sem isso, cada tecla pediria um novo lote filtrado.
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [quickFilter, setQuickFilter] = useState("TODOS");
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [advancedStatus, setAdvancedStatus] = useState("");
@@ -135,7 +163,7 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
         fetch("/api/pilot/solicitacoes", { cache: "no-store" }),
         fetch("/api/pilot/solicitacoes/central", { cache: "no-store" }),
       ]);
-      const requestsPayload = await requestsResponse.json() as { solicitacoes?: CommunityRequest[]; nextCursor?: string | null; canManage?: boolean; audienceOptions?: AudienceOptions; metrics?: { open: number; today: number }; error?: string };
+      const requestsPayload = await requestsResponse.json() as { solicitacoes?: CommunityRequest[]; nextCursor?: string | null; canManage?: boolean; audienceOptions?: AudienceOptions; metrics?: typeof EMPTY_REQUESTS_METRICS; error?: string };
       const centralPayload = await centralResponse.json() as CentralData & { itemsNextCursor?: string | null; error?: string };
       if (!requestsResponse.ok) throw new Error(requestsPayload.error || "Não foi possível carregar os pedidos. Tente novamente.");
       if (!centralResponse.ok) throw new Error(centralPayload.error || "Não foi possível carregar os pedidos. Tente novamente.");
@@ -143,7 +171,7 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
       setRequestsCursor(requestsPayload.nextCursor || null);
       setCanManage(Boolean(requestsPayload.canManage));
       setAudienceOptions(requestsPayload.audienceOptions || { usuarios: [], ministerios: [], papeis: [], allowAllMembers: false });
-      setRequestsMetrics(requestsPayload.metrics || { open: 0, today: 0 });
+      setRequestsMetrics(requestsPayload.metrics || EMPTY_REQUESTS_METRICS);
       setCentral(centralPayload);
       setCentralItemsCursor(centralPayload.itemsNextCursor || null);
       setRepositoryMinistries((current) => {
@@ -172,12 +200,64 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
     finally { setLoadingMoreRequests(false); }
   }, [requestsCursor]);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
+  // Parâmetros que a busca e as abas rápidas do painel de Atendimento mandam
+  // para os dois endpoints (?operacional=1 em central e em solicitacoes).
+  // Só entram no objeto os filtros ativos, então filtro nenhum = objeto
+  // vazio = mesmo resultado de não filtrar nada.
+  const operationalFilters = useMemo(() => {
+    const params: Record<string, string> = {};
+    if (debouncedSearch) params.busca = debouncedSearch;
+    if (quickFilter !== "TODOS") params.categoria = quickFilter;
+    if (advancedStatus) params.status = advancedStatus;
+    if (advancedOwner) params.responsavelId = advancedOwner;
+    if (advancedPeriod) params.desde = advancedPeriod;
+    if (onlyUnassigned) params.semResponsavel = "1";
+    return params;
+  }, [advancedOwner, advancedPeriod, advancedStatus, debouncedSearch, onlyUnassigned, quickFilter]);
+
+  // Busca todo o primeiro lote (Central + pedidos gerais) sob os filtros
+  // atuais e substitui o que estava carregado — chamado ao entrar no painel
+  // de Atendimento e sempre que busca/aba/filtro avançado mudar.
+  const applyOperationalFilters = useCallback(async () => {
+    setLoadingOperationalRows(true);
+    try {
+      const [centralResponse, generalResponse] = await Promise.all([
+        fetch(buildOperationalAddress("/api/pilot/solicitacoes/central", operationalFilters), { cache: "no-store" }),
+        fetch(buildOperationalAddress("/api/pilot/solicitacoes", operationalFilters), { cache: "no-store" }),
+      ]);
+      const centralPayload = await centralResponse.json() as { items?: RepositoryItem[]; nextCursor?: string | null; error?: string };
+      const generalPayload = await generalResponse.json() as { solicitacoes?: CommunityRequest[]; nextCursor?: string | null; error?: string };
+      if (!centralResponse.ok) throw new Error(centralPayload.error || "Não foi possível carregar os atendimentos.");
+      if (!generalResponse.ok) throw new Error(generalPayload.error || "Não foi possível carregar os pedidos.");
+      const centralItems = centralPayload.items || [];
+      setCentral((current) => ({
+        ...current,
+        repositories: current.repositories.map((repository) => ({
+          ...repository, items: centralItems.filter((item) => item.repositorio_id === repository.id),
+        })),
+      }));
+      setCentralItemsCursor(centralPayload.nextCursor || null);
+      setOpsGeneralItems(generalPayload.solicitacoes || []);
+      setOpsGeneralCursor(generalPayload.nextCursor || null);
+    } catch (caught) { setError((caught as Error).message); }
+    finally { setLoadingOperationalRows(false); }
+  }, [operationalFilters]);
+  useEffect(() => {
+    if (mode !== "operations") return;
+    const timer = window.setTimeout(() => void applyOperationalFilters(), 0);
+    return () => window.clearTimeout(timer);
+  }, [mode, applyOperationalFilters]);
+
   const loadMoreCentral = useCallback(async () => {
     if (!centralItemsCursor) return;
     setLoadingMoreCentral(true);
     try {
-      const address = new URL("/api/pilot/solicitacoes/central", window.location.origin);
-      address.searchParams.set("cursor", centralItemsCursor);
+      const address = buildOperationalAddress("/api/pilot/solicitacoes/central", operationalFilters, centralItemsCursor);
       const response = await fetch(address, { cache: "no-store" });
       const payload = await response.json() as { items?: RepositoryItem[]; nextCursor?: string | null; error?: string };
       if (!response.ok) throw new Error(payload.error || "Não foi possível carregar mais atendimentos.");
@@ -192,7 +272,21 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
       setCentralItemsCursor(payload.nextCursor || null);
     } catch (caught) { setError((caught as Error).message); }
     finally { setLoadingMoreCentral(false); }
-  }, [centralItemsCursor]);
+  }, [centralItemsCursor, operationalFilters]);
+
+  const loadMoreOpsGeneral = useCallback(async () => {
+    if (!opsGeneralCursor) return;
+    setLoadingMoreOpsGeneral(true);
+    try {
+      const address = buildOperationalAddress("/api/pilot/solicitacoes", operationalFilters, opsGeneralCursor);
+      const response = await fetch(address, { cache: "no-store" });
+      const payload = await response.json() as { solicitacoes?: CommunityRequest[]; nextCursor?: string | null; error?: string };
+      if (!response.ok) throw new Error(payload.error || "Não foi possível carregar mais pedidos.");
+      setOpsGeneralItems((current) => [...current, ...(payload.solicitacoes || [])]);
+      setOpsGeneralCursor(payload.nextCursor || null);
+    } catch (caught) { setError((caught as Error).message); }
+    finally { setLoadingMoreOpsGeneral(false); }
+  }, [opsGeneralCursor, operationalFilters]);
   useEffect(() => {
     const open = () => { setMode("member"); openCreate("ORACAO"); };
     window.addEventListener("vinkulo:new-request", open);
@@ -200,6 +294,11 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
   }, []);
 
   const myRequests = useMemo(() => items.filter((item) => Boolean(item.is_mine)), [items]);
+  // Fonte dos itens do painel de Atendimento: os dois lados (Central e
+  // pedidos gerais) já chegam filtrados pelo servidor sob busca/aba/filtro
+  // avançado atuais (ver applyOperationalFilters/loadMoreCentral/
+  // loadMoreOpsGeneral acima), então esta lista só combina e ordena — nada
+  // aqui filtra de novo o que o servidor já filtrou.
   const operationalRows = useMemo<OperationalRow[]>(() => {
     const repositoryRows = central.repositories.flatMap((repository) => repository.items.map((item) => ({
       key: `repository-${item.id}`, source: "repository" as const, requestId: item.solicitacao_id,
@@ -209,7 +308,7 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
       priority: item.prioridade, note: item.resultado || item.mensagem_atendimento,
       overdue: Boolean(item.retorno_atrasado), final: Boolean(item.finalizado_em), repositoryItem: item,
     })));
-    const generalRows = items.filter((item) => item.tipo !== "ORACAO" && item.tipo !== "VISITA").map((item) => ({
+    const generalRows = opsGeneralItems.map((item) => ({
       key: `general-${item.id}`, source: "general" as const, requestId: item.id, category: item.tipo,
       title: item.titulo, description: item.descricao, person: item.solicitante_nome,
       photo: item.solicitante_foto, role: item.solicitante_papel, owner: item.responsavel_nome,
@@ -222,33 +321,29 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
       if ((a.priority === "URGENTE") !== (b.priority === "URGENTE")) return a.priority === "URGENTE" ? -1 : 1;
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
-  }, [central.repositories, items]);
-  // Os quatro cartões do painel usam contagens vindas do servidor (fila
-  // inteira), não os itens já carregados na tela — senão, com mais de um
-  // lote, os números apareceriam menores que o real até "carregar mais".
-  // Pedido geral nunca é URGENTE nem "Visita" (isso é só de repositório).
+  }, [central.repositories, opsGeneralItems]);
+  // Os quatro cartões do painel e os números das abas usam contagens vindas
+  // do servidor (fila inteira), não os itens já carregados na tela — senão,
+  // com mais de um lote ou uma busca ativa, os números apareceriam menores
+  // que o real. Pedido geral nunca é URGENTE nem "Visita" (isso é só de
+  // repositório) nem "Aguardando retorno" (só visita atrasada usa esse
+  // status), então essas três abas ficam inteiramente com a Central.
   const metrics = useMemo(() => ({
     open: central.itemsMetrics.open + requestsMetrics.open,
     urgent: central.itemsMetrics.urgent,
     visits: central.itemsMetrics.visits,
     today: central.itemsMetrics.today + requestsMetrics.today,
   }), [central.itemsMetrics, requestsMetrics]);
-  const filteredRows = useMemo(() => operationalRows.filter((row) => {
-    const query = normalize(search);
-    if (query && !normalize([row.person, row.title, requestType(row.category), row.owner, row.note, statusLabel(row)].join(" ")).includes(query)) return false;
-    if (quickFilter === "ORACAO" && row.category !== "ORACAO") return false;
-    if (quickFilter === "VISITA" && row.category !== "VISITA") return false;
-    if (quickFilter === "URGENTES" && row.priority !== "URGENTE") return false;
-    if (quickFilter === "PENDENTES" && row.final) return false;
-    if (quickFilter === "ACOMPANHAMENTO" && !["EM_ANALISE", "EM_ACOMPANHAMENTO", "EM_ORACAO", "EM_PROCESSO"].includes(row.status)) return false;
-    if (quickFilter === "RETORNO" && !row.overdue && row.status !== "AGUARDANDO_RETORNO") return false;
-    if (quickFilter === "CONCLUIDOS" && !row.final) return false;
-    if (advancedStatus && row.status !== advancedStatus) return false;
-    if (advancedOwner && String(row.repositoryItem?.responsavel_usuario_id || "") !== advancedOwner) return false;
-    if (onlyUnassigned && row.owner) return false;
-    if (advancedPeriod && new Date(row.date) < new Date(`${advancedPeriod}T00:00:00`)) return false;
-    return true;
-  }), [advancedOwner, advancedPeriod, advancedStatus, onlyUnassigned, operationalRows, quickFilter, search]);
+  const tabCounts = useMemo(() => ({
+    TODOS: central.itemsMetrics.total + requestsMetrics.total,
+    ORACAO: central.itemsMetrics.prayerTotal,
+    VISITA: central.itemsMetrics.visitTotal,
+    URGENTES: metrics.urgent,
+    PENDENTES: metrics.open,
+    ACOMPANHAMENTO: central.itemsMetrics.inProgress + requestsMetrics.inProgress,
+    RETORNO: central.itemsMetrics.overdue,
+    CONCLUIDOS: central.itemsMetrics.completed + requestsMetrics.completed,
+  }), [central.itemsMetrics, metrics.open, metrics.urgent, requestsMetrics]);
 
   function openCreate(category: Exclude<RequestType, "INFORMACAO">) {
     setRequestCategory(category); setFormOpen(true); setError(""); setFeedback("");
@@ -294,7 +389,14 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
       const response = await fetch(endpoint, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const responsePayload = await response.json() as { error?: string };
       if (!response.ok) throw new Error(responsePayload.error || "Não foi possível concluir a ação.");
-      setFeedback(successMessage); await load(true); return true;
+      setFeedback(successMessage);
+      // Sequencial: load() reescreve central.repositories com o primeiro
+      // lote sem filtro; se isso corresse junto com o refetch filtrado, o
+      // resultado dependeria de qual dos dois terminasse por último. Rodar
+      // depois garante que a fila filtrada do painel de Atendimento vence.
+      await load(true);
+      if (mode === "operations") await applyOperationalFilters();
+      return true;
     } catch (caught) { setError((caught as Error).message); }
     finally { setBusy(""); }
     return false;
@@ -387,6 +489,13 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
 
       <section className="request-my-section" aria-labelledby="my-requests-title"><header><div><p className="pilot-kicker">ACOMPANHAMENTO</p><h2 id="my-requests-title">Meus pedidos</h2><p>Acompanhe por aqui suas solicitações.</p></div><span>{myRequests.length}</span></header>
         {myRequests.length ? <div className="request-my-list">{myRequests.map((item) => <button type="button" key={item.id} onClick={() => setMemberDetail(item)}><span className={`request-kind kind-${item.tipo.toLowerCase()}`}><RequestIcon type={item.tipo === "VISITA" ? "people" : "prayer"} /></span><div><strong>{item.titulo}</strong><small>{formatDate(item.criado_em)}</small></div><StatusChip label={memberStatusLabel(item)} tone={statusTone(item.operacional_status || item.status, item.prioridade)} /><b aria-hidden="true">›</b></button>)}</div> : <div className="request-empty-member"><RequestIcon type="heart" /><strong>Você ainda não possui pedidos.</strong><p>Quando precisar, este espaço estará aqui para acolher você.</p></div>}
+        {requestsCursor && (
+          <div className="request-load-more">
+            <button type="button" disabled={loadingMoreRequests} onClick={() => void loadMoreRequests()}>
+              {loadingMoreRequests ? "Carregando pedidos…" : "Carregar mais pedidos"}
+            </button>
+          </div>
+        )}
       </section>
 
       {(central.pastoresContato.length > 0 || central.whatsappPreference.canConfigure) && <section className="request-contact-panel"><div><p className="pilot-kicker">CONTATO PASTORAL</p><h2>Fale com um pastor</h2><p>O WhatsApp só abre depois da sua confirmação.</p></div>{central.pastoresContato.length > 0 && <div className="request-contact-strip">{central.pastoresContato.map((pastor) => <button key={pastor.id} type="button" onClick={() => setPendingPastor(pastor)}><Avatar name={pastor.nome} photo={pastor.foto} /><span>{pastor.nome}</span><small>WhatsApp</small></button>)}</div>}{central.whatsappPreference.canConfigure && <label className="request-whatsapp-toggle"><input type="checkbox" checked={central.whatsappPreference.enabled} disabled={busy === "whatsapp" || !central.whatsappPreference.hasPhone} onChange={(event) => void requestAction("whatsapp", "/api/pilot/solicitacoes/central", { action: "TOGGLE_WHATSAPP", enabled: event.target.checked }, event.target.checked ? "Seu WhatsApp agora está disponível aos membros ativos." : "Seu WhatsApp deixou de aparecer aos membros.")} /><span>Disponibilizar meu WhatsApp<small>{central.whatsappPreference.hasPhone ? "Você pode desativar quando quiser." : "Cadastre um telefone válido no perfil para ativar."}</small></span></label>}</section>}
@@ -394,28 +503,29 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
       <header className="request-operations-heading"><div><p className="pilot-kicker">PAINEL DOS OFICIAIS</p><h2>Painel de atendimento</h2><p>Organize, acompanhe e cuide de cada solicitação.</p></div><span>Acesso validado no servidor</span></header>
       <section className="request-dashboard" aria-label="Resumo operacional"><Metric icon="inbox" label="Total em aberto" value={metrics.open} tone="violet" /><Metric icon="alert" label="Urgentes" value={metrics.urgent} tone="rose" /><Metric icon="calendar" label="Visitas pendentes" value={metrics.visits} tone="blue" /><Metric icon="check" label="Atendidos hoje" value={metrics.today} tone="green" /></section>
       <nav className="request-category-tabs" aria-label="Filtros rápidos">{[
-        ["TODOS", "Todos", operationalRows.length], ["ORACAO", "Orações", operationalRows.filter((r) => r.category === "ORACAO").length],
-        ["VISITA", "Visitas", operationalRows.filter((r) => r.category === "VISITA").length], ["URGENTES", "Urgentes", metrics.urgent],
-        ["PENDENTES", "Pendentes", metrics.open], ["ACOMPANHAMENTO", "Em acompanhamento", operationalRows.filter((r) => ["EM_ANALISE", "EM_ACOMPANHAMENTO", "EM_ORACAO", "EM_PROCESSO"].includes(r.status)).length],
-        ["RETORNO", "Aguardando retorno", operationalRows.filter((r) => r.overdue || r.status === "AGUARDANDO_RETORNO").length], ["CONCLUIDOS", "Já atendidos", operationalRows.filter((r) => r.final).length],
+        ["TODOS", "Todos", tabCounts.TODOS], ["ORACAO", "Orações", tabCounts.ORACAO],
+        ["VISITA", "Visitas", tabCounts.VISITA], ["URGENTES", "Urgentes", tabCounts.URGENTES],
+        ["PENDENTES", "Pendentes", tabCounts.PENDENTES], ["ACOMPANHAMENTO", "Em acompanhamento", tabCounts.ACOMPANHAMENTO],
+        ["RETORNO", "Aguardando retorno", tabCounts.RETORNO], ["CONCLUIDOS", "Já atendidos", tabCounts.CONCLUIDOS],
       ].map(([value, label, count]) => <button key={String(value)} type="button" className={quickFilter === value ? "active" : ""} onClick={() => setQuickFilter(String(value))}>{label} <span>{count}</span></button>)}</nav>
       <div className="request-operations-toolbar"><label><RequestIcon type="search" /><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nome, pedido ou observação…" /></label><button type="button" aria-expanded={advancedOpen} onClick={() => setAdvancedOpen((value) => !value)}><RequestIcon type="filter" />Filtros</button></div>
+      {loadingOperationalRows && <small className="request-operations-loading" role="status">Atualizando…</small>}
       {advancedOpen && <section className="request-advanced-filters" aria-label="Filtros avançados"><label>Status<select value={advancedStatus} onChange={(event) => setAdvancedStatus(event.target.value)}><option value="">Todos</option>{allOperationalStatuses.map((status) => <option key={status} value={status}>{statusLabel({ status } as OperationalRow)}</option>)}</select></label><label>Responsável<select value={advancedOwner} onChange={(event) => setAdvancedOwner(event.target.value)}><option value="">Todos</option>{central.assignees.map((person) => <option key={person.id} value={person.id}>{person.nome}</option>)}</select></label><label>Recebidos desde<input type="date" value={advancedPeriod} onChange={(event) => setAdvancedPeriod(event.target.value)} /></label><label className="request-filter-check"><input type="checkbox" checked={onlyUnassigned} onChange={(event) => setOnlyUnassigned(event.target.checked)} />Sem responsável</label><button type="button" onClick={() => { setAdvancedStatus(""); setAdvancedOwner(""); setAdvancedPeriod(""); setOnlyUnassigned(false); }}>Limpar filtros</button></section>}
 
-      {filteredRows.length ? <><div className="request-operations-table" role="region" aria-label="Pedidos para atendimento"><table><thead><tr><th>Pessoa</th><th>Categoria</th><th>Responsável</th><th>Data</th><th>Status</th><th>Observação</th><th><span className="sr-only">Ações</span></th></tr></thead><tbody>{filteredRows.map((row) => <tr key={row.key} className={row.priority === "URGENTE" ? "urgent" : ""} onClick={() => openOperationalDetail(row)}><td><Avatar name={row.person} photo={row.photo} /><span><strong>{row.person}</strong><small>{roleLabel(row.role)}</small></span></td><td>{requestType(row.category)}</td><td>{row.owner || <em>Sem responsável</em>}</td><td>{formatDate(row.date)}</td><td><StatusChip label={statusLabel(row)} tone={statusTone(row.status, row.priority, row.overdue)} />{row.overdue && <small className="request-overdue">Retorno atrasado</small>}</td><td>{row.note || row.description}</td><td><button type="button" aria-label={`Abrir pedido de ${row.person}`} onClick={(event) => { event.stopPropagation(); openOperationalDetail(row); }}>•••</button></td></tr>)}</tbody></table></div><div className="request-mobile-list">{filteredRows.map((row) => <button type="button" key={row.key} onClick={() => openOperationalDetail(row)}><Avatar name={row.person} photo={row.photo} /><div><strong>{row.person}</strong><small>{requestType(row.category)} · {row.owner || "Sem responsável"}</small><p>{row.title}</p></div><StatusChip label={row.overdue ? "Retorno atrasado" : statusLabel(row)} tone={statusTone(row.status, row.priority, row.overdue)} /><time>{shortDate(row.date)}</time></button>)}</div></> : <div className="request-empty-operations"><RequestIcon type="search" /><strong>Nenhuma solicitação encontrada com esses filtros.</strong><button type="button" onClick={() => { setSearch(""); setQuickFilter("TODOS"); setAdvancedStatus(""); setAdvancedOwner(""); setAdvancedPeriod(""); setOnlyUnassigned(false); }}>Limpar busca e filtros</button></div>}
-      {(centralItemsCursor || requestsCursor) && (
+      {operationalRows.length ? <><div className="request-operations-table" role="region" aria-label="Pedidos para atendimento"><table><thead><tr><th>Pessoa</th><th>Categoria</th><th>Responsável</th><th>Data</th><th>Status</th><th>Observação</th><th><span className="sr-only">Ações</span></th></tr></thead><tbody>{operationalRows.map((row) => <tr key={row.key} className={row.priority === "URGENTE" ? "urgent" : ""} onClick={() => openOperationalDetail(row)}><td><Avatar name={row.person} photo={row.photo} /><span><strong>{row.person}</strong><small>{roleLabel(row.role)}</small></span></td><td>{requestType(row.category)}</td><td>{row.owner || <em>Sem responsável</em>}</td><td>{formatDate(row.date)}</td><td><StatusChip label={statusLabel(row)} tone={statusTone(row.status, row.priority, row.overdue)} />{row.overdue && <small className="request-overdue">Retorno atrasado</small>}</td><td>{row.note || row.description}</td><td><button type="button" aria-label={`Abrir pedido de ${row.person}`} onClick={(event) => { event.stopPropagation(); openOperationalDetail(row); }}>•••</button></td></tr>)}</tbody></table></div><div className="request-mobile-list">{operationalRows.map((row) => <button type="button" key={row.key} onClick={() => openOperationalDetail(row)}><Avatar name={row.person} photo={row.photo} /><div><strong>{row.person}</strong><small>{requestType(row.category)} · {row.owner || "Sem responsável"}</small><p>{row.title}</p></div><StatusChip label={row.overdue ? "Retorno atrasado" : statusLabel(row)} tone={statusTone(row.status, row.priority, row.overdue)} /><time>{shortDate(row.date)}</time></button>)}</div></> : <div className="request-empty-operations"><RequestIcon type="search" /><strong>Nenhuma solicitação encontrada com esses filtros.</strong><button type="button" onClick={() => { setSearch(""); setDebouncedSearch(""); setQuickFilter("TODOS"); setAdvancedStatus(""); setAdvancedOwner(""); setAdvancedPeriod(""); setOnlyUnassigned(false); }}>Limpar busca e filtros</button></div>}
+      {(centralItemsCursor || opsGeneralCursor) && (
         <div className="request-load-more">
           {centralItemsCursor && (
             <button type="button" disabled={loadingMoreCentral} onClick={() => void loadMoreCentral()}>
               {loadingMoreCentral ? "Carregando atendimentos…" : "Carregar mais orações e visitas"}
             </button>
           )}
-          {requestsCursor && (
-            <button type="button" disabled={loadingMoreRequests} onClick={() => void loadMoreRequests()}>
-              {loadingMoreRequests ? "Carregando pedidos…" : "Carregar mais pedidos"}
+          {opsGeneralCursor && (
+            <button type="button" disabled={loadingMoreOpsGeneral} onClick={() => void loadMoreOpsGeneral()}>
+              {loadingMoreOpsGeneral ? "Carregando pedidos…" : "Carregar mais pedidos"}
             </button>
           )}
-          <small>Os filtros acima consideram tudo o que já foi carregado.</small>
+          <small>Busca e filtros acima já alcançam pedidos além do que está carregado.</small>
         </div>
       )}
 

@@ -11,7 +11,11 @@ test("orações e visitas seguem direto aos repositórios", async () => {
     read("app/lib/request-repositories.ts"),
   ]);
   assert.match(component, /Envio direto ao repositório/);
-  assert.match(component, /item\.tipo !== "ORACAO" && item\.tipo !== "VISITA"/);
+  // O painel de Atendimento passou a pedir os pedidos gerais ao servidor já
+  // filtrados (?operacional=1, ver loadOperationalGeneralList); a garantia de
+  // que oração/visita nunca aparecem como pedido "geral" mora agora nessa
+  // consulta em vez de num filtro no navegador.
+  assert.match(requestApi, /s\.tipo NOT IN \('ORACAO', 'VISITA'\)/);
   assert.match(requestApi, /routeRequestToRepository/);
   assert.match(repositoryLib, /INSERT OR IGNORE INTO solicitacao_repositorio_itens/);
 });

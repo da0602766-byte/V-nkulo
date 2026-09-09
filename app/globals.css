@@ -31950,6 +31950,7 @@ html[data-pilot-theme="claro"] .pilot-dashboard[data-ui-version="v2"] .pilot-mob
 .request-care-v213 .request-category-tabs button { flex:none; min-height:38px; border:1px solid var(--pilot-line); border-radius:10px; background:var(--pilot-surface); color:var(--pilot-muted); padding:0 11px; font:inherit; font-size:.72rem; font-weight:800; cursor:pointer; }
 .request-care-v213 .request-category-tabs button.active { border-color:var(--request-violet); background:var(--request-violet); color:#fff; }
 .request-care-v213 .request-category-tabs span { margin-left:3px; opacity:.8; }
+.request-operations-loading { display:block; margin-top:-4px; color:var(--pilot-muted); font-size:.72rem; }
 .request-operations-toolbar { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; }
 .request-operations-toolbar>label { min-height:44px; display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; gap:9px; border:1px solid var(--pilot-line); border-radius:11px; background:var(--pilot-surface); padding:0 12px; color:var(--pilot-muted); }
 .request-operations-toolbar input { min-width:0; border:0; outline:0; background:transparent; color:var(--pilot-text); font:inherit; }

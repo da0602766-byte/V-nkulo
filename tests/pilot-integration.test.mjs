@@ -5714,6 +5714,212 @@ test("cartões do painel contam a fila inteira, não só o lote carregado", asyn
   database.close();
 });
 
+// Busca e abas rápidas do painel de Atendimento (Central) agora filtram no
+// SQL: uma pessoa procurada além do primeiro lote precisa aparecer mesmo
+// assim, e cada aba/filtro precisa restringir exatamente o esperado.
+test("busca, abas e filtros da Central alcançam além do primeiro lote", async () => {
+  const { database, d1 } = await createPilotD1();
+  await createPilotUser(database, {
+    nome: "Pastor Busca Central", email: "pastor.busca.central@example.test",
+    senha: "Pastor123", memberships: [{ comunidadeId: 1, papel: "PASTOR" }],
+  });
+  await createPilotUser(database, {
+    nome: "Maria Conforto", email: "maria.busca.central@example.test",
+    senha: "Pastor123", memberships: [{ comunidadeId: 1, papel: "MEMBRO" }],
+  });
+  await createPilotUser(database, {
+    nome: "João Saúde", email: "joao.busca.central@example.test",
+    senha: "Pastor123", memberships: [{ comunidadeId: 1, papel: "MEMBRO" }],
+  });
+
+  const worker = await loadWorker();
+  const env = createEnv(d1);
+  const pastorCookie = await login(worker, env, "pastor.busca.central@example.test", "Pastor123");
+  const mariaCookie = await login(worker, env, "maria.busca.central@example.test", "Pastor123");
+  const joaoCookie = await login(worker, env, "joao.busca.central@example.test", "Pastor123");
+
+  async function createRequest(cookie, tipo, titulo) {
+    const response = await worker.fetch(
+      new Request("http://localhost/api/pilot/solicitacoes", {
+        method: "POST", headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({ tipo, titulo, descricao: "Descrição de teste com detalhe suficiente.", visibilidade: "PASTORAL" }),
+      }),
+      env, context,
+    );
+    assert.equal(response.status, 201);
+    return Number((await response.json()).id);
+  }
+  function itemIdFor(requestId) {
+    return database
+      .prepare(`SELECT id FROM solicitacao_repositorio_itens WHERE comunidade_id = 1 AND solicitacao_id = ? LIMIT 1`)
+      .get(requestId).id;
+  }
+  async function fetchCentral(params) {
+    const address = new URL("http://localhost/api/pilot/solicitacoes/central");
+    for (const [key, value] of Object.entries(params)) address.searchParams.set(key, value);
+    const response = await worker.fetch(new Request(address, { headers: { cookie: pastorCookie } }), env, context);
+    assert.equal(response.status, 200);
+    return response.json();
+  }
+
+  const mariaPrayer = await createRequest(mariaCookie, "ORACAO", "Oração pela família");
+  const joaoPrayer = await createRequest(joaoCookie, "ORACAO", "Oração pelo trabalho");
+  const visitId = await createRequest(mariaCookie, "VISITA", "Visita pastoral");
+
+  // Busca por "maria" alcança quem pediu, mesmo sem o nome estar no título.
+  const busca = await fetchCentral({ busca: "maria" });
+  assert.deepEqual(
+    busca.items.map((item) => Number(item.solicitacao_id)).sort(),
+    [mariaPrayer, visitId].sort(),
+  );
+
+  // Aba "Visitas" só traz o repositório de visita.
+  const visitas = await fetchCentral({ categoria: "VISITA" });
+  assert.equal(visitas.items.length, 1);
+  assert.equal(Number(visitas.items[0].solicitacao_id), visitId);
+
+  // Aba "Orações" só traz o repositório de oração.
+  const oracoes = await fetchCentral({ categoria: "ORACAO" });
+  assert.deepEqual(oracoes.items.map((item) => Number(item.solicitacao_id)).sort(), [mariaPrayer, joaoPrayer].sort());
+
+  // Uma busca+aba+cursor precisa continuar filtrando em cada lote seguinte,
+  // não só no primeiro: pede as orações de uma em uma.
+  let cursor = null; const oracoesPaginadas = []; let lotes = 0;
+  do {
+    const lote = await fetchCentral(cursor ? { categoria: "ORACAO", limite: "1", cursor } : { categoria: "ORACAO", limite: "1" });
+    for (const item of lote.items) oracoesPaginadas.push(Number(item.solicitacao_id));
+    cursor = lote.nextCursor;
+    lotes += 1;
+    assert.ok(lotes <= 10, "paginação com filtro não terminou: possível cursor parado");
+  } while (cursor);
+  assert.deepEqual(oracoesPaginadas.sort(), [mariaPrayer, joaoPrayer].sort());
+
+  // Status: só a oração que foi movida para EM_ORACAO aparece no filtro.
+  const setStatus = await worker.fetch(
+    new Request("http://localhost/api/pilot/solicitacoes/central", {
+      method: "PATCH", headers: { cookie: pastorCookie, "content-type": "application/json" },
+      body: JSON.stringify({ action: "ATUALIZAR_ITEM", itemId: itemIdFor(mariaPrayer), status: "EM_ORACAO" }),
+    }),
+    env, context,
+  );
+  assert.equal(setStatus.status, 200);
+  const porStatus = await fetchCentral({ status: "EM_ORACAO" });
+  assert.equal(porStatus.items.length, 1);
+  assert.equal(Number(porStatus.items[0].solicitacao_id), mariaPrayer);
+
+  // Sem responsável: ATUALIZAR_ITEM já assumiu automaticamente o item da
+  // Maria para quem chamou a ação (o pastor), então só os outros dois ainda
+  // aparecem aqui; depois de assumir o do João também, só sobra a visita.
+  const semRespAntes = await fetchCentral({ semResponsavel: "1" });
+  assert.deepEqual(semRespAntes.items.map((item) => Number(item.solicitacao_id)).sort(), [joaoPrayer, visitId].sort());
+  const assumir = await worker.fetch(
+    new Request("http://localhost/api/pilot/solicitacoes/central", {
+      method: "PATCH", headers: { cookie: pastorCookie, "content-type": "application/json" },
+      body: JSON.stringify({ action: "ASSUMIR_ITEM", itemId: itemIdFor(joaoPrayer) }),
+    }),
+    env, context,
+  );
+  assert.equal(assumir.status, 200);
+  const semRespDepois = await fetchCentral({ semResponsavel: "1" });
+  assert.deepEqual(semRespDepois.items.map((item) => Number(item.solicitacao_id)), [visitId]);
+
+  // Uma data futura como "desde" não pode encontrar nada; ontem encontra tudo.
+  const futuro = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const ontem = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const semNadaNoFuturo = await fetchCentral({ desde: futuro });
+  assert.equal(semNadaNoFuturo.items.length, 0);
+  const tudoDesdeOntem = await fetchCentral({ desde: ontem });
+  assert.equal(tudoDesdeOntem.items.length, 3);
+
+  database.close();
+});
+
+// O painel de Atendimento também usa o endpoint de pedidos gerais em modo
+// operacional (?operacional=1): busca e abas filtram no SQL, oração/visita
+// nunca aparecem (ficam na Central), e a lista "Meus pedidos" do membro
+// continua vindo do caminho normal, sem essas restrições.
+test("modo operacional da lista geral filtra tipo, busca e aba sem afetar Meus pedidos", async () => {
+  const { database, d1 } = await createPilotD1();
+  const pastorId = await createPilotUser(database, {
+    nome: "Pastor Operacional Geral", email: "pastor.operacional.geral@example.test",
+    senha: "Pastor123", memberships: [{ comunidadeId: 1, papel: "PASTOR" }],
+  });
+  await createPilotUser(database, {
+    nome: "Membro Operacional Geral", email: "membro.operacional.geral@example.test",
+    senha: "Pastor123", memberships: [{ comunidadeId: 1, papel: "MEMBRO" }],
+  });
+
+  const worker = await loadWorker();
+  const env = createEnv(d1);
+  const pastorCookie = await login(worker, env, "pastor.operacional.geral@example.test", "Pastor123");
+  const memberCookie = await login(worker, env, "membro.operacional.geral@example.test", "Pastor123");
+
+  async function createRequest(tipo, titulo, extra = {}) {
+    const response = await worker.fetch(
+      new Request("http://localhost/api/pilot/solicitacoes", {
+        method: "POST", headers: { cookie: memberCookie, "content-type": "application/json" },
+        body: JSON.stringify({ tipo, titulo, descricao: "Descrição de teste com detalhe suficiente.", visibilidade: "PASTORAL", ...extra }),
+      }),
+      env, context,
+    );
+    assert.equal(response.status, 201);
+    return Number((await response.json()).id);
+  }
+
+  const prayerId = await createRequest("ORACAO", "Oração do membro");
+  const supportId = await createRequest("APOIO", "Apoio financeiro do membro", { audience: [{ type: "USUARIO", id: pastorId }] });
+  const counselId = await createRequest("ACONSELHAMENTO", "Aconselhamento pastoral", { audience: [{ type: "USUARIO", id: pastorId }] });
+  const conclude = await worker.fetch(
+    new Request("http://localhost/api/pilot/solicitacoes", {
+      method: "PATCH", headers: { cookie: pastorCookie, "content-type": "application/json" },
+      body: JSON.stringify({ id: supportId, status: "CONCLUIDA" }),
+    }),
+    env, context,
+  );
+  assert.equal(conclude.status, 200);
+
+  // Modo normal (Meus pedidos do membro): traz TODOS os tipos, sem filtro.
+  const normal = await worker.fetch(
+    new Request("http://localhost/api/pilot/solicitacoes", { headers: { cookie: memberCookie } }),
+    env, context,
+  );
+  const normalData = await normal.json();
+  assert.ok(normalData.solicitacoes.some((item) => Number(item.id) === prayerId), "Meus pedidos precisa incluir a oração");
+  assert.ok(normalData.solicitacoes.some((item) => Number(item.id) === supportId), "Meus pedidos precisa incluir o apoio");
+
+  // Modo operacional (pastor): nunca traz oração/visita, mesmo sendo destinatário.
+  const opsAddress = new URL("http://localhost/api/pilot/solicitacoes");
+  opsAddress.searchParams.set("operacional", "1");
+  const ops = await worker.fetch(new Request(opsAddress, { headers: { cookie: pastorCookie } }), env, context);
+  assert.equal(ops.status, 200);
+  const opsData = await ops.json();
+  assert.ok(!opsData.solicitacoes.some((item) => Number(item.id) === prayerId), "oração não pode aparecer no modo operacional");
+  assert.deepEqual(opsData.solicitacoes.map((item) => Number(item.id)).sort(), [supportId, counselId].sort());
+
+  // Busca por "financeiro" restringe ao pedido de apoio.
+  const opsBusca = new URL("http://localhost/api/pilot/solicitacoes");
+  opsBusca.searchParams.set("operacional", "1");
+  opsBusca.searchParams.set("busca", "financeiro");
+  const buscaResponse = await worker.fetch(new Request(opsBusca, { headers: { cookie: pastorCookie } }), env, context);
+  const buscaData = await buscaResponse.json();
+  assert.deepEqual(buscaData.solicitacoes.map((item) => Number(item.id)), [supportId]);
+
+  // Aba "Já atendidos" só traz o concluído; "Pendentes" só o que falta.
+  const opsConcluidos = new URL("http://localhost/api/pilot/solicitacoes");
+  opsConcluidos.searchParams.set("operacional", "1");
+  opsConcluidos.searchParams.set("categoria", "CONCLUIDOS");
+  const concluidosData = await (await worker.fetch(new Request(opsConcluidos, { headers: { cookie: pastorCookie } }), env, context)).json();
+  assert.deepEqual(concluidosData.solicitacoes.map((item) => Number(item.id)), [supportId]);
+
+  const opsPendentes = new URL("http://localhost/api/pilot/solicitacoes");
+  opsPendentes.searchParams.set("operacional", "1");
+  opsPendentes.searchParams.set("categoria", "PENDENTES");
+  const pendentesData = await (await worker.fetch(new Request(opsPendentes, { headers: { cookie: pastorCookie } }), env, context)).json();
+  assert.deepEqual(pendentesData.solicitacoes.map((item) => Number(item.id)), [counselId]);
+
+  database.close();
+});
+
 // A Central mostra no máximo quatro escalas com participação pendente, e antes
 // baixava o lote inteiro para descartar o resto no navegador. O filtro precisa
 // resolver isso no SQL sem afrouxar visibilidade: escala de outra pessoa, já

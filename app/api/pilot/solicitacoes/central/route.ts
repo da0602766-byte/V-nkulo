@@ -43,11 +43,52 @@ function decodeItemsCursor(value: string | null): RepositoryItemsCursor | null {
 const REPO_ITEM_GROUP_SQL =
   "((CASE WHEN ri.finalizado_em IS NULL THEN 0 ELSE 2 END) + (CASE WHEN ri.prioridade = 'URGENTE' THEN 0 ELSE 1 END))";
 
+// A busca e as abas rápidas (Orações, Urgentes, Aguardando retorno…) do painel
+// de Atendimento filtravam só o que já tinha sido carregado no navegador: uma
+// pessoa procurada que estivesse além do primeiro lote simplesmente não
+// aparecia. Agora o filtro entra no SQL, então a busca alcança a fila inteira.
+export type OperationalFilters = {
+  search: string; category: string; status: string;
+  responsavelId: number; since: string; unassignedOnly: boolean;
+};
+const OPERATIONAL_CATEGORIES = new Set([
+  "TODOS", "ORACAO", "VISITA", "URGENTES", "PENDENTES", "ACOMPANHAMENTO", "RETORNO", "CONCLUIDOS",
+]);
+export function parseOperationalFilters(address: URL): OperationalFilters {
+  const categoryRaw = (address.searchParams.get("categoria") || "TODOS").toUpperCase();
+  const responsavelId = Number(address.searchParams.get("responsavelId") || 0);
+  return {
+    search: (address.searchParams.get("busca") || "").trim().slice(0, 80),
+    category: OPERATIONAL_CATEGORIES.has(categoryRaw) ? categoryRaw : "TODOS",
+    status: (address.searchParams.get("status") || "").trim().slice(0, 30).toUpperCase(),
+    responsavelId: Number.isInteger(responsavelId) && responsavelId > 0 ? responsavelId : 0,
+    since: (address.searchParams.get("desde") || "").trim().slice(0, 10),
+    unassignedOnly: address.searchParams.get("semResponsavel") === "1",
+  };
+}
+function hasActiveFilters(filters: OperationalFilters) {
+  return Boolean(
+    filters.search || filters.category !== "TODOS" || filters.status ||
+    filters.responsavelId || filters.since || filters.unassignedOnly,
+  );
+}
+const REPO_CATEGORY_SQL: Record<string, string> = {
+  TODOS: "1 = 1",
+  ORACAO: "r.tipo = 'ORACAO'",
+  VISITA: "r.tipo = 'VISITA'",
+  URGENTES: "ri.finalizado_em IS NULL AND ri.prioridade = 'URGENTE'",
+  PENDENTES: "ri.finalizado_em IS NULL",
+  ACOMPANHAMENTO: "ri.status IN ('EM_ACOMPANHAMENTO', 'EM_ORACAO', 'EM_PROCESSO')",
+  RETORNO: "((ri.proximo_retorno_em IS NOT NULL AND ri.proximo_retorno_em < CURRENT_TIMESTAMP AND ri.finalizado_em IS NULL) OR ri.status = 'AGUARDANDO_RETORNO')",
+  CONCLUIDOS: "ri.finalizado_em IS NOT NULL",
+};
+
 async function loadRepositoryItemsPage(db: ReturnType<typeof getD1>, input: {
   communityId: number; userId: number; canManageRepositories: boolean;
-  cursor: RepositoryItemsCursor | null; pageSize: number;
+  cursor: RepositoryItemsCursor | null; pageSize: number; filters: OperationalFilters;
 }) {
-  const { communityId, userId, canManageRepositories, cursor, pageSize } = input;
+  const { communityId, userId, canManageRepositories, cursor, pageSize, filters } = input;
+  const searchTerm = `%${filters.search.replaceAll("%", "").replaceAll("_", "")}%`;
   const result = await db.prepare(
     `SELECT ri.id, ri.repositorio_id, ri.status AS item_status,
       s.id AS solicitacao_id, s.tipo, s.titulo, s.descricao,
@@ -75,10 +116,23 @@ async function loadRepositoryItemsPage(db: ReturnType<typeof getD1>, input: {
      LEFT JOIN oficiais_comunidade oc ON oc.usuario_comunidade_id = ucResponsavel.id
      LEFT JOIN ministerios_comunidade m ON m.id = r.ministerio_id AND m.comunidade_id = r.comunidade_id
      WHERE ri.comunidade_id = ? AND r.status = 'ATIVO' AND (? = 1 OR m.responsavel_usuario_id = ?)
+       AND (${REPO_CATEGORY_SQL[filters.category]})
+       AND (? = '' OR u.nome LIKE ? OR s.titulo LIKE ? OR s.descricao LIKE ?
+         OR COALESCE(responsavel.nome, '') LIKE ? OR COALESCE(ri.mensagem_atendimento, '') LIKE ?
+         OR COALESCE(ri.resultado, '') LIKE ?)
+       AND (? = '' OR ri.status = ?)
+       AND (? = 0 OR ri.responsavel_usuario_id = ?)
+       AND (? = '' OR datetime(s.criado_em) >= datetime(?))
+       AND (? = 0 OR ri.responsavel_usuario_id IS NULL)
        AND (? = 0 OR ${REPO_ITEM_GROUP_SQL} > ? OR (${REPO_ITEM_GROUP_SQL} = ? AND ri.id < ?))
      ORDER BY ${REPO_ITEM_GROUP_SQL}, ri.id DESC LIMIT ?`,
   ).bind(
     communityId, canManageRepositories ? 1 : 0, userId,
+    filters.search, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm,
+    filters.status, filters.status,
+    filters.responsavelId, filters.responsavelId,
+    filters.since, filters.since,
+    filters.unassignedOnly ? 1 : 0,
     cursor ? 1 : 0, cursor?.grupo ?? 0, cursor?.grupo ?? 0, cursor?.id ?? 0,
     pageSize + 1,
   ).all<Record<string, unknown>>();
@@ -115,9 +169,12 @@ async function loadRepositoryItemsPage(db: ReturnType<typeof getD1>, input: {
 }
 
 // Os cartões do painel (Total em aberto, Urgentes, Visitas pendentes,
-// Atendidos hoje) contavam só o que já tinha sido carregado no navegador,
+// Atendidos hoje) e os números ao lado de cada aba rápida (Orações, Em
+// acompanhamento…) contavam só o que já tinha sido carregado no navegador,
 // então uma comunidade com mais de um lote via números menores que o real.
-// Este COUNT agregado ignora o LIMIT da paginação e reflete a fila inteira.
+// Este COUNT agregado ignora o LIMIT da paginação e reflete a fila inteira —
+// e, como a lista de pessoas já faz, essas contagens ficam sempre totais,
+// sem levar em conta a busca ou a aba selecionada no momento.
 async function loadRepositoryItemsMetrics(db: ReturnType<typeof getD1>, input: {
   communityId: number; userId: number; canManageRepositories: boolean;
 }) {
@@ -126,16 +183,30 @@ async function loadRepositoryItemsMetrics(db: ReturnType<typeof getD1>, input: {
       COALESCE(SUM(CASE WHEN ri.finalizado_em IS NULL THEN 1 ELSE 0 END), 0) AS aberto,
       COALESCE(SUM(CASE WHEN ri.finalizado_em IS NULL AND ri.prioridade = 'URGENTE' THEN 1 ELSE 0 END), 0) AS urgente,
       COALESCE(SUM(CASE WHEN ri.finalizado_em IS NULL AND r.tipo = 'VISITA' THEN 1 ELSE 0 END), 0) AS visitas,
-      COALESCE(SUM(CASE WHEN ri.finalizado_em IS NOT NULL AND date(ri.finalizado_em) = date('now') THEN 1 ELSE 0 END), 0) AS hoje
+      COALESCE(SUM(CASE WHEN ri.finalizado_em IS NOT NULL AND date(ri.finalizado_em) = date('now') THEN 1 ELSE 0 END), 0) AS hoje,
+      COUNT(*) AS total,
+      COALESCE(SUM(CASE WHEN r.tipo = 'ORACAO' THEN 1 ELSE 0 END), 0) AS oracao_total,
+      COALESCE(SUM(CASE WHEN r.tipo = 'VISITA' THEN 1 ELSE 0 END), 0) AS visita_total,
+      COALESCE(SUM(CASE WHEN ri.status IN ('EM_ACOMPANHAMENTO', 'EM_ORACAO', 'EM_PROCESSO') THEN 1 ELSE 0 END), 0) AS em_acompanhamento,
+      COALESCE(SUM(CASE WHEN (ri.proximo_retorno_em IS NOT NULL AND ri.proximo_retorno_em < CURRENT_TIMESTAMP
+        AND ri.finalizado_em IS NULL) OR ri.status = 'AGUARDANDO_RETORNO' THEN 1 ELSE 0 END), 0) AS aguardando_retorno,
+      COALESCE(SUM(CASE WHEN ri.finalizado_em IS NOT NULL THEN 1 ELSE 0 END), 0) AS concluidos
      FROM solicitacao_repositorio_itens ri
      JOIN solicitacao_repositorios r ON r.id = ri.repositorio_id AND r.comunidade_id = ri.comunidade_id
      LEFT JOIN ministerios_comunidade m ON m.id = r.ministerio_id AND m.comunidade_id = r.comunidade_id
      WHERE ri.comunidade_id = ? AND r.status = 'ATIVO' AND (? = 1 OR m.responsavel_usuario_id = ?)`,
   ).bind(input.communityId, input.canManageRepositories ? 1 : 0, input.userId)
-    .first<{ aberto: number; urgente: number; visitas: number; hoje: number }>();
+    .first<{
+      aberto: number; urgente: number; visitas: number; hoje: number; total: number;
+      oracao_total: number; visita_total: number; em_acompanhamento: number;
+      aguardando_retorno: number; concluidos: number;
+    }>();
   return {
     open: Number(row?.aberto || 0), urgent: Number(row?.urgente || 0),
     visits: Number(row?.visitas || 0), today: Number(row?.hoje || 0),
+    total: Number(row?.total || 0), prayerTotal: Number(row?.oracao_total || 0),
+    visitTotal: Number(row?.visita_total || 0), inProgress: Number(row?.em_acompanhamento || 0),
+    overdue: Number(row?.aguardando_retorno || 0), completed: Number(row?.concluidos || 0),
   };
 }
 
@@ -155,13 +226,17 @@ export async function GET(request: Request) {
   const itemsPageSize = Number.isInteger(requestedItemsSize) && requestedItemsSize > 0
     ? Math.min(requestedItemsSize, REPO_ITEMS_MAX_PAGE_SIZE)
     : REPO_ITEMS_PAGE_SIZE;
+  const filters = parseOperationalFilters(address);
 
-  // Um cursor pede só o próximo lote de itens de repositório: repositórios,
-  // ministérios, contatos e responsáveis não mudam a cada lote e já foram
-  // carregados no primeiro pedido, então este caminho fica bem mais leve.
-  if (address.searchParams.has("cursor")) {
+  // Um cursor, qualquer filtro/busca ativo, ou o sinalizador explícito
+  // ?operacional=1 (usado pelo painel de Atendimento ao entrar nesse modo,
+  // mesmo sem filtro nenhum ainda) pedem só o próximo lote de itens de
+  // repositório: repositórios, ministérios, contatos e responsáveis não
+  // mudam a cada busca e já foram carregados no primeiro pedido sem filtro,
+  // então este caminho fica bem mais leve.
+  if (address.searchParams.has("cursor") || hasActiveFilters(filters) || address.searchParams.get("operacional") === "1") {
     const itemsCursor = decodeItemsCursor(address.searchParams.get("cursor"));
-    const page = await loadRepositoryItemsPage(db, { communityId, userId, canManageRepositories, cursor: itemsCursor, pageSize: itemsPageSize });
+    const page = await loadRepositoryItemsPage(db, { communityId, userId, canManageRepositories, cursor: itemsCursor, pageSize: itemsPageSize, filters });
     return Response.json(page, { headers: { "Cache-Control": "no-store" } });
   }
 
@@ -178,7 +253,7 @@ export async function GET(request: Request) {
        WHERE r.comunidade_id = ? AND (? = 1 OR (r.status = 'ATIVO' AND m.responsavel_usuario_id = ?))
        ORDER BY CASE r.status WHEN 'SUGERIDO' THEN 0 ELSE 1 END, r.tipo`,
     ).bind(userId, communityId, canManageRepositories ? 1 : 0, userId).all<Record<string, unknown>>(),
-    loadRepositoryItemsPage(db, { communityId, userId, canManageRepositories, cursor: null, pageSize: itemsPageSize }),
+    loadRepositoryItemsPage(db, { communityId, userId, canManageRepositories, cursor: null, pageSize: itemsPageSize, filters }),
     loadRepositoryItemsMetrics(db, { communityId, userId, canManageRepositories }),
     canManageRepositories
       ? db.prepare("SELECT id, nome FROM ministerios_comunidade WHERE comunidade_id = ? AND status = 'ATIVO' ORDER BY nome ASC LIMIT 100")
