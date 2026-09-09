@@ -1116,6 +1116,7 @@ export default function PilotDashboard({
               : ""
           }`}
           data-editor-key="conteudo-principal"
+          data-fullscreen-view={visibleView === "mensagens" ? "mensagens" : undefined}
         >
           {viewLoading && <div className="pilot-page-loading" role="status" aria-live="polite"><span className="pilot-loading-spinner" aria-hidden="true" />Carregando página…</div>}
           <WorkspaceErrorBoundary resetKey={`${active.comunidadeId}:${visibleView}`}>

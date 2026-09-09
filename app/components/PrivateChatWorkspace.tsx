@@ -372,6 +372,7 @@ export default function PrivateChatWorkspace({
     [confirmed, pending, workspace?.currentUserId],
   );
   const purgeCountdown = useMemo(() => formatPurgeCountdown(workspace?.nextPurgeAt || null), [workspace?.nextPurgeAt]);
+  const purgeShort = useMemo(() => formatPurgeShort(workspace?.nextPurgeAt || null), [workspace?.nextPurgeAt]);
 
   return (
     <section className={`private-chat-shell ${activeId ? "has-thread" : ""}`}>
@@ -384,9 +385,16 @@ export default function PrivateChatWorkspace({
       </header>
       <p className="private-chat-retention-banner" role="status">
         <span aria-hidden="true">🕓</span>
-        <span>
+        <span className="private-chat-retention-full">
           {workspace?.retentionNotice || FALLBACK_RETENTION_NOTICE}
           {purgeCountdown ? <strong> Próxima limpeza {purgeCountdown}.</strong> : null}
+        </span>
+        {/* No celular a tela é dos contatos: o aviso vira uma tarja de uma
+            linha, com o essencial — quando some e o que fazer antes disso. */}
+        <span className="private-chat-retention-short">
+          {purgeShort
+            ? <>Tudo é apagado <strong>{purgeShort}</strong> — salve o que precisar.</>
+            : "As mensagens são apagadas na virada da semana — salve o que precisar."}
         </span>
       </p>
       {error && <p className="pilot-form-message" role="alert">{error}</p>}
@@ -634,6 +642,16 @@ function formatPurgeCountdown(nextPurgeAt: string | null) {
   if (days <= 0) return `hoje — ${when}`;
   if (days === 1) return `amanhã — ${when}`;
   return `em ${days} dias — ${when}`;
+}
+
+// Versão curta do prazo para a tarja do celular: "domingo, 13/09 às 21:00".
+function formatPurgeShort(nextPurgeAt: string | null) {
+  if (!nextPurgeAt) return null;
+  const date = new Date(nextPurgeAt);
+  if (!Number.isFinite(date.getTime())) return null;
+  const day = new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit" }).format(date);
+  const hour = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(date);
+  return `${day} às ${hour}`;
 }
 
 function buildThreadItems(
