@@ -8,6 +8,7 @@ import "./globals.css";
 import "./interface-fixes.css";
 import "./secretary.css";
 import "./recepcao.css";
+import "./mobile-quick-actions.css";
 import SmartScrollHeader from "./components/SmartScrollHeader";
 import MobileAppInstall from "./components/MobileAppInstall";
 import GlobalFeedbackLauncher from "./components/GlobalFeedbackLauncher";
