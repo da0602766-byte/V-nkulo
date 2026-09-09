@@ -166,7 +166,13 @@ export async function GET(request: Request) {
           id: Number(lastRequest.id),
         })
       : null;
-  const [users, ministries] = await Promise.all([
+  // O cartão "Total em aberto" contava só o que já tinha carregado na tela,
+  // então uma comunidade com mais de um lote via um número menor que o real.
+  // Este COUNT ignora o LIMIT da paginação e cobre a fila inteira de pedidos
+  // gerais (oração e visita entram pelo repositório e têm suas próprias
+  // contagens na Central; um pedido geral nunca fica URGENTE hoje, pois só
+  // itens de repositório recebem prioridade).
+  const [users, ministries, generalMetrics] = await Promise.all([
     db.prepare(
       `SELECT u.id, u.nome, uc.papel
        FROM usuario_comunidades uc JOIN usuarios u ON u.id = uc.usuario_id
@@ -184,6 +190,26 @@ export async function GET(request: Request) {
          ))
        ORDER BY m.nome ASC`,
     ).bind(access.context.comunidadeId, canManage ? 1 : 0, access.user.id, access.user.id).all<Record<string, unknown>>(),
+    db.prepare(
+      `SELECT
+        COALESCE(SUM(CASE WHEN s.status != 'CONCLUIDA' THEN 1 ELSE 0 END), 0) AS aberto,
+        COALESCE(SUM(CASE WHEN s.status = 'CONCLUIDA' AND date(s.atualizado_em) = date('now') THEN 1 ELSE 0 END), 0) AS hoje
+       FROM solicitacoes_comunidade s
+       WHERE s.comunidade_id = ? AND s.tipo NOT IN ('ORACAO', 'VISITA')
+         AND (
+           s.solicitante_id = ?
+           OR EXISTS (
+             SELECT 1 FROM solicitacao_destinatarios sd
+             WHERE sd.solicitacao_id = s.id AND sd.comunidade_id = s.comunidade_id
+               AND sd.usuario_id = ?
+           )
+           OR (? = 1 AND NOT EXISTS (
+             SELECT 1 FROM solicitacao_destinatarios legacy
+             WHERE legacy.solicitacao_id = s.id
+           ))
+         )`,
+    ).bind(access.context.comunidadeId, access.user.id, access.user.id, canManage ? 1 : 0)
+      .first<{ aberto: number; hoje: number }>(),
   ]);
   await db
     .prepare(
@@ -198,6 +224,8 @@ export async function GET(request: Request) {
       // Nulo quando o lote alcançou a última solicitação visível.
       nextCursor: nextRequestCursor,
       canManage,
+      // Contagens da fila inteira de pedidos gerais, não só do lote carregado.
+      metrics: { open: Number(generalMetrics?.aberto || 0), today: Number(generalMetrics?.hoje || 0) },
       audienceOptions: {
         usuarios: users.results,
         ministerios: ministries.results,

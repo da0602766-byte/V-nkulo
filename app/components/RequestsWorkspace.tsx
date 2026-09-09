@@ -47,12 +47,13 @@ type Repository = {
 };
 type PastorContact = { id: number; nome: string; foto: string; whatsappUrl: string };
 type Assignee = { id: number; nome: string; funcao: string };
+type RepositoryMetrics = { open: number; urgent: number; visits: number; today: number };
 type CentralData = {
   canManageRepositories: boolean; canOperate: boolean;
   currentActor: { id: number; nome: string };
   whatsappPreference: { canConfigure: boolean; enabled: boolean; hasPhone: boolean };
   pastoresContato: PastorContact[]; ministries: Array<{ id: number; nome: string }>;
-  assignees: Assignee[]; repositories: Repository[];
+  assignees: Assignee[]; repositories: Repository[]; itemsMetrics: RepositoryMetrics;
 };
 type OperationalRow = {
   key: string; source: "repository" | "general"; requestId: number; category: RequestType;
@@ -70,6 +71,7 @@ const EMPTY_CENTRAL: CentralData = {
   canManageRepositories: false, canOperate: false, currentActor: { id: 0, nome: "" },
   whatsappPreference: { canConfigure: false, enabled: false, hasPhone: false },
   pastoresContato: [], ministries: [], assignees: [], repositories: [],
+  itemsMetrics: { open: 0, urgent: 0, visits: 0, today: 0 },
 };
 
 export default function RequestsWorkspace({ communityName }: { communityName: string }) {
@@ -79,6 +81,10 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
   // inteira carregada, então o cursor traz o resto em vez de reduzir o lote.
   const [requestsCursor, setRequestsCursor] = useState<string | null>(null);
   const [loadingMoreRequests, setLoadingMoreRequests] = useState(false);
+  // Contagem de pedidos gerais em aberto/concluídos hoje na fila inteira,
+  // não só no lote carregado — junto de central.itemsMetrics alimenta os
+  // cartões do painel (ver useMemo "metrics" abaixo).
+  const [requestsMetrics, setRequestsMetrics] = useState({ open: 0, today: 0 });
   // Os itens de oração/visita do painel de atendimento vinham só da Central,
   // que tinha um teto fixo sem cursor: pedidos além do lote sumiam da tela
   // sem aviso. Agora ela também pagina, e este cursor busca o resto.
@@ -129,7 +135,7 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
         fetch("/api/pilot/solicitacoes", { cache: "no-store" }),
         fetch("/api/pilot/solicitacoes/central", { cache: "no-store" }),
       ]);
-      const requestsPayload = await requestsResponse.json() as { solicitacoes?: CommunityRequest[]; nextCursor?: string | null; canManage?: boolean; audienceOptions?: AudienceOptions; error?: string };
+      const requestsPayload = await requestsResponse.json() as { solicitacoes?: CommunityRequest[]; nextCursor?: string | null; canManage?: boolean; audienceOptions?: AudienceOptions; metrics?: { open: number; today: number }; error?: string };
       const centralPayload = await centralResponse.json() as CentralData & { itemsNextCursor?: string | null; error?: string };
       if (!requestsResponse.ok) throw new Error(requestsPayload.error || "Não foi possível carregar os pedidos. Tente novamente.");
       if (!centralResponse.ok) throw new Error(centralPayload.error || "Não foi possível carregar os pedidos. Tente novamente.");
@@ -137,6 +143,7 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
       setRequestsCursor(requestsPayload.nextCursor || null);
       setCanManage(Boolean(requestsPayload.canManage));
       setAudienceOptions(requestsPayload.audienceOptions || { usuarios: [], ministerios: [], papeis: [], allowAllMembers: false });
+      setRequestsMetrics(requestsPayload.metrics || { open: 0, today: 0 });
       setCentral(centralPayload);
       setCentralItemsCursor(centralPayload.itemsNextCursor || null);
       setRepositoryMinistries((current) => {
@@ -216,12 +223,16 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
   }, [central.repositories, items]);
+  // Os quatro cartões do painel usam contagens vindas do servidor (fila
+  // inteira), não os itens já carregados na tela — senão, com mais de um
+  // lote, os números apareceriam menores que o real até "carregar mais".
+  // Pedido geral nunca é URGENTE nem "Visita" (isso é só de repositório).
   const metrics = useMemo(() => ({
-    open: operationalRows.filter((item) => !item.final).length,
-    urgent: operationalRows.filter((item) => !item.final && item.priority === "URGENTE").length,
-    visits: operationalRows.filter((item) => item.category === "VISITA" && !item.final).length,
-    today: operationalRows.filter((item) => item.final && isToday(item.repositoryItem?.finalizado_em || item.generalItem?.atualizado_em || "")).length,
-  }), [operationalRows]);
+    open: central.itemsMetrics.open + requestsMetrics.open,
+    urgent: central.itemsMetrics.urgent,
+    visits: central.itemsMetrics.visits,
+    today: central.itemsMetrics.today + requestsMetrics.today,
+  }), [central.itemsMetrics, requestsMetrics]);
   const filteredRows = useMemo(() => operationalRows.filter((row) => {
     const query = normalize(search);
     if (query && !normalize([row.person, row.title, requestType(row.category), row.owner, row.note, statusLabel(row)].join(" ")).includes(query)) return false;
@@ -438,7 +449,6 @@ function roleLabel(value: string) { return ({ MEMBRO: "Membro", LIDER: "Líder",
 function requestType(value: RequestType) { return ({ ORACAO: "Oração", VISITA: "Visita", ACONSELHAMENTO: "Aconselhamento", APOIO: "Apoio", MINISTERIO: "Ministério", OUTRO: "Outro", INFORMACAO: "Informação" } as Record<RequestType, string>)[value]; }
 function formatDate(value: string) { if (!value) return "—"; return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value)); }
 function shortDate(value: string) { return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short" }).format(new Date(value)); }
-function isToday(value: string) { if (!value) return false; const date = new Date(value); const today = new Date(); return date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth() && date.getDate() === today.getDate(); }
 function toLocalInput(value: string | null) { if (!value) return ""; const date = new Date(value); const offset = date.getTimezoneOffset() * 60000; return new Date(date.getTime() - offset).toISOString().slice(0, 16); }
 function memberStatusLabel(item: CommunityRequest) { const status = item.operacional_status || item.status; return ({ ABERTA: "Recebido", ABERTO: "Recebido", EM_ANALISE: "Em acompanhamento", EM_ORACAO: "Em oração", EM_ACOMPANHAMENTO: "Em acompanhamento", AGUARDANDO_CONTATO: "Visita sendo organizada", AGUARDANDO_RETORNO: "Aguardando retorno", EM_PROCESSO: "Visita sendo organizada", VISITA_AGENDADA: "Visita agendada", VISITA_REALIZADA: "Visita realizada", CONCLUIDA: "Concluído", FINALIZADO: "Concluído", ORACAO_ATENDIDA: "Oração atendida", VISITA_CONCLUIDA: "Visita concluída", NOVA_VISITA: "Nova visita solicitada" } as Record<string, string>)[status] || "Recebido"; }
 function statusLabel(row: Pick<OperationalRow, "status" | "category" | "overdue">) { if (row.overdue) return "Aguardando retorno"; return ({ ABERTA: "Novo pedido", ABERTO: "Aguardando responsável", EM_ANALISE: "Em análise", EM_ORACAO: "Em oração", EM_ACOMPANHAMENTO: "Em acompanhamento", AGUARDANDO_CONTATO: "Aguardando contato", AGUARDANDO_RETORNO: row.category === "VISITA" ? "Visitante aguardando retorno" : "Aguardando retorno", EM_PROCESSO: "Visita sendo organizada", VISITA_AGENDADA: "Visita agendada", VISITA_REALIZADA: "Visita realizada", CONCLUIDA: "Já atendido", FINALIZADO: "Finalizado", ORACAO_ATENDIDA: "Oração atendida", VISITA_CONCLUIDA: "Visita concluída", NOVA_VISITA: "Solicita nova visita" } as Record<string, string>)[row.status] || row.status; }

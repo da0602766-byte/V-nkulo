@@ -5598,6 +5598,122 @@ test("itens de oração e visita da Central paginam por cursor sem perder a fila
   database.close();
 });
 
+// Os quatro cartões do painel (Total em aberto, Urgentes, Visitas pendentes,
+// Atendidos hoje) eram contados no navegador em cima só do que já tinha sido
+// carregado: com mais de um lote, o número na tela ficava menor que o real.
+// As contagens agora vêm prontas do servidor, cobrindo a fila inteira mesmo
+// quando a página carregada é bem menor que o total.
+test("cartões do painel contam a fila inteira, não só o lote carregado", async () => {
+  const { database, d1 } = await createPilotD1();
+  const pastorId = await createPilotUser(database, {
+    nome: "Pastor Métricas Central",
+    email: "pastor.metricas.central@example.test",
+    senha: "Pastor123",
+    memberships: [{ comunidadeId: 1, papel: "PASTOR" }],
+  });
+  await createPilotUser(database, {
+    nome: "Membro Métricas Central",
+    email: "membro.metricas.central@example.test",
+    senha: "Pastor123",
+    memberships: [{ comunidadeId: 1, papel: "MEMBRO" }],
+  });
+
+  const worker = await loadWorker();
+  const env = createEnv(d1);
+  const pastorCookie = await login(worker, env, "pastor.metricas.central@example.test", "Pastor123");
+  const memberCookie = await login(worker, env, "membro.metricas.central@example.test", "Pastor123");
+
+  async function createRequest(cookie, tipo, extra = {}) {
+    const response = await worker.fetch(
+      new Request("http://localhost/api/pilot/solicitacoes", {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({
+          tipo, titulo: `${tipo} métricas`,
+          descricao: "Pedido de teste com descrição longa o bastante.",
+          visibilidade: "PASTORAL", ...extra,
+        }),
+      }),
+      env, context,
+    );
+    assert.equal(response.status, 201);
+    return Number((await response.json()).id);
+  }
+  function itemIdFor(requestId) {
+    return database
+      .prepare(`SELECT id FROM solicitacao_repositorio_itens WHERE comunidade_id = 1 AND solicitacao_id = ? LIMIT 1`)
+      .get(requestId).id;
+  }
+
+  // 6 orações (o POST já encaminha automaticamente ao repositório).
+  const prayerIds = [];
+  for (let indice = 0; indice < 6; indice += 1) prayerIds.push(await createRequest(memberCookie, "ORACAO"));
+  // 2 visitas, as duas em aberto.
+  for (let indice = 0; indice < 2; indice += 1) await createRequest(memberCookie, "VISITA");
+  // 3 pedidos gerais (não vão a repositório), endereçados ao pastor.
+  const generalIds = [];
+  for (let indice = 0; indice < 3; indice += 1) {
+    generalIds.push(await createRequest(memberCookie, "APOIO", { audience: [{ type: "USUARIO", id: pastorId }] }));
+  }
+
+  // Duas orações urgentes e uma finalizada hoje.
+  database.prepare("UPDATE solicitacao_repositorio_itens SET prioridade = 'URGENTE' WHERE id = ?").run(itemIdFor(prayerIds[0]));
+  database.prepare("UPDATE solicitacao_repositorio_itens SET prioridade = 'URGENTE' WHERE id = ?").run(itemIdFor(prayerIds[1]));
+  const finalize = await worker.fetch(
+    new Request("http://localhost/api/pilot/solicitacoes/central", {
+      method: "PATCH",
+      headers: { cookie: pastorCookie, "content-type": "application/json" },
+      body: JSON.stringify({ action: "ATUALIZAR_ITEM", itemId: itemIdFor(prayerIds[2]), status: "FINALIZADO" }),
+    }),
+    env, context,
+  );
+  assert.equal(finalize.status, 200);
+
+  // Um pedido geral concluído hoje.
+  const concludeGeneral = await worker.fetch(
+    new Request("http://localhost/api/pilot/solicitacoes", {
+      method: "PATCH",
+      headers: { cookie: pastorCookie, "content-type": "application/json" },
+      body: JSON.stringify({ id: generalIds[0], status: "CONCLUIDA" }),
+    }),
+    env, context,
+  );
+  assert.equal(concludeGeneral.status, 200);
+
+  // Pede a Central com um lote minúsculo: a página carregada precisa ficar
+  // bem menor que o total de itens pendentes, provando que a contagem não
+  // depende de quantos itens vieram nesta resposta.
+  const centralAddress = new URL("http://localhost/api/pilot/solicitacoes/central");
+  centralAddress.searchParams.set("limite", "2");
+  const centralResponse = await worker.fetch(
+    new Request(centralAddress, { headers: { cookie: pastorCookie } }),
+    env, context,
+  );
+  assert.equal(centralResponse.status, 200);
+  const centralData = await centralResponse.json();
+  const loadedItems = centralData.repositories.flatMap((repository) => repository.items).length;
+  assert.equal(loadedItems, 2, "o primeiro lote precisa respeitar o limite pedido");
+  assert.equal(centralData.itemsMetrics.open, 7, "5 orações abertas + 2 visitas abertas");
+  assert.equal(centralData.itemsMetrics.urgent, 2);
+  assert.equal(centralData.itemsMetrics.visits, 2);
+  assert.equal(centralData.itemsMetrics.today, 1);
+
+  // Pede a lista geral também com um lote pequeno: mesma garantia.
+  const requestsAddress = new URL("http://localhost/api/pilot/solicitacoes");
+  requestsAddress.searchParams.set("limite", "1");
+  const requestsResponse = await worker.fetch(
+    new Request(requestsAddress, { headers: { cookie: pastorCookie } }),
+    env, context,
+  );
+  assert.equal(requestsResponse.status, 200);
+  const requestsData = await requestsResponse.json();
+  assert.ok(requestsData.solicitacoes.length < generalIds.length + prayerIds.length + 2, "o lote carregado precisa ser menor que o total de pedidos");
+  assert.equal(requestsData.metrics.open, 2, "3 pedidos gerais menos 1 concluído");
+  assert.equal(requestsData.metrics.today, 1);
+
+  database.close();
+});
+
 // A Central mostra no máximo quatro escalas com participação pendente, e antes
 // baixava o lote inteiro para descartar o resto no navegador. O filtro precisa
 // resolver isso no SQL sem afrouxar visibilidade: escala de outra pessoa, já

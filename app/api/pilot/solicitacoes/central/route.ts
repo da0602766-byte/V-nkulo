@@ -114,6 +114,31 @@ async function loadRepositoryItemsPage(db: ReturnType<typeof getD1>, input: {
   return { items, nextCursor };
 }
 
+// Os cartões do painel (Total em aberto, Urgentes, Visitas pendentes,
+// Atendidos hoje) contavam só o que já tinha sido carregado no navegador,
+// então uma comunidade com mais de um lote via números menores que o real.
+// Este COUNT agregado ignora o LIMIT da paginação e reflete a fila inteira.
+async function loadRepositoryItemsMetrics(db: ReturnType<typeof getD1>, input: {
+  communityId: number; userId: number; canManageRepositories: boolean;
+}) {
+  const row = await db.prepare(
+    `SELECT
+      COALESCE(SUM(CASE WHEN ri.finalizado_em IS NULL THEN 1 ELSE 0 END), 0) AS aberto,
+      COALESCE(SUM(CASE WHEN ri.finalizado_em IS NULL AND ri.prioridade = 'URGENTE' THEN 1 ELSE 0 END), 0) AS urgente,
+      COALESCE(SUM(CASE WHEN ri.finalizado_em IS NULL AND r.tipo = 'VISITA' THEN 1 ELSE 0 END), 0) AS visitas,
+      COALESCE(SUM(CASE WHEN ri.finalizado_em IS NOT NULL AND date(ri.finalizado_em) = date('now') THEN 1 ELSE 0 END), 0) AS hoje
+     FROM solicitacao_repositorio_itens ri
+     JOIN solicitacao_repositorios r ON r.id = ri.repositorio_id AND r.comunidade_id = ri.comunidade_id
+     LEFT JOIN ministerios_comunidade m ON m.id = r.ministerio_id AND m.comunidade_id = r.comunidade_id
+     WHERE ri.comunidade_id = ? AND r.status = 'ATIVO' AND (? = 1 OR m.responsavel_usuario_id = ?)`,
+  ).bind(input.communityId, input.canManageRepositories ? 1 : 0, input.userId)
+    .first<{ aberto: number; urgente: number; visitas: number; hoje: number }>();
+  return {
+    open: Number(row?.aberto || 0), urgent: Number(row?.urgente || 0),
+    visits: Number(row?.visitas || 0), today: Number(row?.hoje || 0),
+  };
+}
+
 export async function GET(request: Request) {
   const access = await requireTenantPermission("dashboard.view");
   if ("error" in access) return access.error;
@@ -143,7 +168,7 @@ export async function GET(request: Request) {
   await cleanupFinishedRepositoryRequests(db, communityId);
   await ensureRequestRepositorySuggestions(db, communityId);
 
-  const [repositories, itemsPage, ministries, contacts, preference, currentUser, assignees] = await Promise.all([
+  const [repositories, itemsPage, itemsMetrics, ministries, contacts, preference, currentUser, assignees] = await Promise.all([
     db.prepare(
       `SELECT r.id, r.tipo, r.nome, r.status, r.ministerio_id,
         COALESCE(m.nome, '') AS ministerio_nome,
@@ -154,6 +179,7 @@ export async function GET(request: Request) {
        ORDER BY CASE r.status WHEN 'SUGERIDO' THEN 0 ELSE 1 END, r.tipo`,
     ).bind(userId, communityId, canManageRepositories ? 1 : 0, userId).all<Record<string, unknown>>(),
     loadRepositoryItemsPage(db, { communityId, userId, canManageRepositories, cursor: null, pageSize: itemsPageSize }),
+    loadRepositoryItemsMetrics(db, { communityId, userId, canManageRepositories }),
     canManageRepositories
       ? db.prepare("SELECT id, nome FROM ministerios_comunidade WHERE comunidade_id = ? AND status = 'ATIVO' ORDER BY nome ASC LIMIT 100")
           .bind(communityId).all<Record<string, unknown>>()
@@ -202,6 +228,8 @@ export async function GET(request: Request) {
     assignees: assignees.results,
     // Nulo quando o lote de itens de repositório alcançou o último pendente.
     itemsNextCursor: itemsPage.nextCursor,
+    // Contagens da fila inteira de oração/visita, não só do lote carregado.
+    itemsMetrics,
     repositories: repositories.results.map((repository) => ({ ...repository, items: itemsByRepository.get(Number(repository.id)) || [] })),
   }, { headers: { "Cache-Control": "no-store" } });
 }
