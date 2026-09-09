@@ -166,7 +166,7 @@ export async function GET(request: Request) {
           id: Number(lastRequest.id),
         })
       : null;
-  const [users, ministries] = await Promise.all([
+  const [users, ministries, contadoresGerais] = await Promise.all([
     db.prepare(
       `SELECT u.id, u.nome, uc.papel
        FROM usuario_comunidades uc JOIN usuarios u ON u.id = uc.usuario_id
@@ -184,6 +184,37 @@ export async function GET(request: Request) {
          ))
        ORDER BY m.nome ASC`,
     ).bind(access.context.comunidadeId, canManage ? 1 : 0, access.user.id, access.user.id).all<Record<string, unknown>>(),
+    // A Central de Oração/Visita tem sua própria agregação; esta cobre a outra
+    // fonte da tela (solicitações gerais: aconselhamento, apoio, ministério,
+    // outro), com a mesma visibilidade da listagem, para os cartões e as abas
+    // representarem a fila inteira, não só o lote carregado.
+    db.prepare(
+      `SELECT
+        COUNT(*) AS total,
+        COALESCE(SUM(CASE WHEN s.status != 'CONCLUIDA' THEN 1 ELSE 0 END), 0) AS abertos,
+        COALESCE(SUM(CASE WHEN s.status = 'EM_ANALISE' THEN 1 ELSE 0 END), 0) AS acompanhamento,
+        COALESCE(SUM(CASE WHEN s.status = 'CONCLUIDA' THEN 1 ELSE 0 END), 0) AS concluidos,
+        COALESCE(SUM(CASE WHEN s.status = 'CONCLUIDA' AND date(s.atualizado_em) = date('now') THEN 1 ELSE 0 END), 0) AS atendidos_hoje
+       FROM solicitacoes_comunidade s
+       WHERE s.comunidade_id = ? AND s.tipo NOT IN ('ORACAO', 'VISITA')
+         AND (
+           s.solicitante_id = ?
+           OR EXISTS (
+             SELECT 1 FROM solicitacao_destinatarios sd
+             WHERE sd.solicitacao_id = s.id AND sd.comunidade_id = s.comunidade_id
+               AND sd.usuario_id = ?
+           )
+           OR (? = 1 AND NOT EXISTS (
+             SELECT 1 FROM solicitacao_destinatarios legacy
+             WHERE legacy.solicitacao_id = s.id
+           ))
+         )`,
+    ).bind(
+      access.context.comunidadeId,
+      access.user.id,
+      access.user.id,
+      canManage ? 1 : 0,
+    ).first<Record<string, number>>(),
   ]);
   await db
     .prepare(
@@ -198,6 +229,13 @@ export async function GET(request: Request) {
       // Nulo quando o lote alcançou a última solicitação visível.
       nextCursor: nextRequestCursor,
       canManage,
+      contadoresGerais: {
+        total: Number(contadoresGerais?.total || 0),
+        abertos: Number(contadoresGerais?.abertos || 0),
+        acompanhamento: Number(contadoresGerais?.acompanhamento || 0),
+        concluidos: Number(contadoresGerais?.concluidos || 0),
+        atendidosHoje: Number(contadoresGerais?.atendidos_hoje || 0),
+      },
       audienceOptions: {
         usuarios: users.results,
         ministerios: ministries.results,
