@@ -16,12 +16,46 @@ type NotificationRow = {
   lida: number;
 };
 
-export async function GET() {
+// Lote das notificações. Antes eram 60 fixas, sem forma de ver as anteriores.
+const NOTIFICATION_PAGE_SIZE = 60;
+const NOTIFICATION_MAX_PAGE_SIZE = 100;
+
+// A lista desce por (criado_em, id), então o cursor carrega esse par.
+type NotificationCursor = { criadoEm: string; id: number };
+
+function encodeNotificationCursor(cursor: NotificationCursor) {
+  return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
+}
+
+function decodeNotificationCursor(value: string | null): NotificationCursor | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(value, "base64url").toString("utf8"),
+    ) as Partial<NotificationCursor>;
+    const id = Number(parsed.id);
+    if (typeof parsed.criadoEm !== "string" || !Number.isInteger(id) || id <= 0) {
+      return null;
+    }
+    return { criadoEm: parsed.criadoEm, id };
+  } catch {
+    return null;
+  }
+}
+
+export async function GET(request: Request) {
   const user = await getSessionUser();
   if (!user || !user.ativo) {
     return Response.json({ error: "Faça login para continuar." }, { status: 401 });
   }
   const db = getD1();
+  const address = new URL(request.url);
+  const cursor = decodeNotificationCursor(address.searchParams.get("cursor"));
+  const requestedSize = Number(address.searchParams.get("limite") || 0);
+  const pageSize =
+    Number.isInteger(requestedSize) && requestedSize > 0
+      ? Math.min(requestedSize, NOTIFICATION_MAX_PAGE_SIZE)
+      : NOTIFICATION_PAGE_SIZE;
   const result = await db
     .prepare(
       `SELECT n.id, n.tipo, n.titulo, n.mensagem, n.area, n.entidade_id,
@@ -33,8 +67,47 @@ export async function GET() {
       LEFT JOIN notificacoes_lidas nl
         ON nl.notificacao_id = n.id AND nl.usuario_id = ?
       WHERE n.usuario_id = ? AND n.area <> 'CHAT'
+        AND (
+          ? = 0
+          OR n.criado_em < ?
+          OR (n.criado_em = ? AND n.id < ?)
+        )
       ORDER BY n.criado_em DESC, n.id DESC
-      LIMIT 60`,
+      LIMIT ?`,
+    )
+    .bind(
+      user.id,
+      user.id,
+      cursor ? 1 : 0,
+      cursor?.criadoEm ?? "",
+      cursor?.criadoEm ?? "",
+      cursor?.id ?? 0,
+      pageSize + 1,
+    )
+    .all<NotificationRow>();
+
+  const hasMore = result.results.length > pageSize;
+  if (hasMore) result.results.length = pageSize;
+  const lastNotification = result.results[result.results.length - 1];
+  const nextCursor =
+    hasMore && lastNotification
+      ? encodeNotificationCursor({
+          criadoEm: String(lastNotification.criado_em ?? ""),
+          id: Number(lastNotification.id),
+        })
+      : null;
+
+  // O contador de não lidas era calculado sobre o lote carregado, então quem
+  // tivesse mais não lidas que o tamanho do lote via um número menor que o real.
+  // Esta consulta traz só as colunas que a regra de categoria usa, e a contagem
+  // reaproveita a mesma função, para não existirem duas versões da regra.
+  const unreadRows = await db
+    .prepare(
+      `SELECT n.id, n.tipo, n.area, n.titulo
+       FROM notificacoes_sistema n
+       LEFT JOIN notificacoes_lidas nl
+         ON nl.notificacao_id = n.id AND nl.usuario_id = ?
+       WHERE n.usuario_id = ? AND n.area <> 'CHAT' AND nl.id IS NULL`,
     )
     .bind(user.id, user.id)
     .all<NotificationRow>();
@@ -59,7 +132,10 @@ export async function GET() {
   })).filter((item) => config[item.category]);
   return Response.json({
     notifications,
-    unread: notifications.filter((item) => !item.read).length,
+    nextCursor,
+    unread: unreadRows.results.filter(
+      (item) => config[notificationCategory(item)],
+    ).length,
     canConfigure: Boolean(owner),
     config,
   });

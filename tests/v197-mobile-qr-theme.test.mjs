@@ -53,12 +53,14 @@ test("QR apresenta resultado detalhado e histórico removível", async () => {
 });
 
 test("PDF preserva personalização e usa download compatível com aplicativo", async () => {
-  const [composer, bridge] = await Promise.all([
-    read("app/components/PdfComposer.tsx"),
+  // `PdfComposer` foi removido em 08/09/2026 junto com os módulos legados; o
+  // download de PDF vivo hoje sai da escala ministerial.
+  const [secretary, bridge] = await Promise.all([
+    read("app/components/SecretaryMinisterialWorkspace.tsx"),
     read("app/lib/androidNativeBridge.ts"),
   ]);
-  assert.match(composer, /downloadFileForDevice\(downloadUrl, filename\)/);
-  assert.match(composer, /titulo: title, nota: note/);
+  assert.match(secretary, /downloadFileForDevice\(/);
+  assert.match(secretary, /\/api\/pilot\/escalas\/\$\{schedule\.id\}\/pdf\?download=1/);
   assert.match(bridge, /downloadFile\?: \(url: string, filename: string\)/);
   assert.match(bridge, /navigator\.canShare\?\.\(\{ files: \[file\] \}\)/);
 });

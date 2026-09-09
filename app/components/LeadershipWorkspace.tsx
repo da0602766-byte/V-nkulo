@@ -89,7 +89,11 @@ export default function LeadershipWorkspace({
     try {
       const [leadershipResponse, peopleResponse, dashboardResponse] = await Promise.all([
         fetch("/api/pilot/leadership", { cache: "no-store" }),
-        fetch("/api/pilot/pessoas", { cache: "no-store" }),
+        // A lista aqui é o conjunto de quem pode ser promovido a líder, então
+        // precisa estar completa: um membro fora dela simplesmente não pode ser
+        // escolhido. Como /api/pilot/pessoas passou a responder por lotes, o
+        // primeiro lote vem aqui e os seguintes logo abaixo, pelo cursor.
+        fetch("/api/pilot/pessoas?aba=membros&limite=50", { cache: "no-store" }),
         mode === "pastoral"
           ? fetch("/api/pilot/pastoral-dashboard", { cache: "no-store" })
           : Promise.resolve(null),
@@ -102,7 +106,24 @@ export default function LeadershipWorkspace({
       setLeaders(leadership.leaders || []);
       setHistory(leadership.history || []);
       setCanManage(Boolean(leadership.canManage && peopleData.canManage));
-      if (peopleResponse.ok) setPeople(peopleData.people || []);
+      if (peopleResponse.ok) {
+        const todos = [...(peopleData.people || [])];
+        // Percorre o restante dos lotes. O teto de voltas evita laço infinito
+        // caso um cursor pare de avançar.
+        let cursor = (peopleData as { nextCursor?: string | null }).nextCursor;
+        for (let volta = 0; cursor && volta < 60; volta += 1) {
+          const address = new URL("/api/pilot/pessoas", window.location.origin);
+          address.searchParams.set("aba", "membros");
+          address.searchParams.set("limite", "50");
+          address.searchParams.set("cursor", cursor);
+          const seguinte = await fetch(address, { cache: "no-store" });
+          if (!seguinte.ok) break;
+          const lote = await responseJson(seguinte) as { people?: Person[]; nextCursor?: string | null };
+          todos.push(...(lote.people || []));
+          cursor = lote.nextCursor;
+        }
+        setPeople(todos);
+      }
       if (dashboardResponse) {
         const dashboardData = await responseJson(dashboardResponse) as PastoralDashboard & { error?: string };
         if (!dashboardResponse.ok) throw new Error(dashboardData.error || "Falha ao carregar indicadores pastorais.");

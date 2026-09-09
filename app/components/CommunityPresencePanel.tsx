@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import PrivateChatDialog from "./PrivateChatDialog";
 import VerifiedOwnerName from "./VerifiedOwnerName";
 
 type PresencePerson = {
@@ -34,14 +33,6 @@ export default function CommunityPresencePanel() {
   const [error, setError] = useState("");
   const [selectedPerson, setSelectedPerson] = useState<PresencePerson | null>(null);
   const [showBiography, setShowBiography] = useState(false);
-  const [chatTarget, setChatTarget] = useState<number | null>(null);
-  const [chatConversation, setChatConversation] = useState<number | null>(() => {
-    if (typeof window === "undefined") return null;
-    const conversation = Number(
-      new URL(window.location.href).searchParams.get("chat") || 0,
-    );
-    return conversation > 0 ? conversation : null;
-  });
   const [currentUserId, setCurrentUserId] = useState(0);
 
   const applyResult = useCallback((result: PresenceResponse) => {
@@ -103,6 +94,17 @@ export default function CommunityPresencePanel() {
     } finally {
       setUpdatingPrivacy(false);
     }
+  }
+
+  // O diálogo próprio de conversa saiu com os módulos legados em 08/09/2026. A
+  // conversa viva hoje é o popover de mensagens do PilotDashboard, que renderiza
+  // PrivateChatWorkspace; o painel pede a abertura por evento para não duplicar
+  // uma segunda tela de chat.
+  function openChatWith(person: PresencePerson) {
+    window.dispatchEvent(
+      new CustomEvent("vinkulo:open-chat", { detail: { userId: person.userId } }),
+    );
+    setSelectedPerson(null);
   }
 
   const visiblePeople = useMemo(
@@ -202,10 +204,7 @@ export default function CommunityPresencePanel() {
             <button
               type="button"
               disabled={!selectedPerson.canMessage}
-              onClick={() => {
-                setChatTarget(selectedPerson.userId);
-                setSelectedPerson(null);
-              }}
+              onClick={() => openChatWith(selectedPerson)}
             >
               Mensagem
             </button>
@@ -226,19 +225,6 @@ export default function CommunityPresencePanel() {
             </p>
           )}
         </div>
-      )}
-      {(chatTarget || chatConversation) && (
-        <PrivateChatDialog
-          targetUserId={chatTarget}
-          conversationId={chatConversation}
-          onClose={() => {
-            setChatTarget(null);
-            setChatConversation(null);
-            const address = new URL(window.location.href);
-            address.searchParams.delete("chat");
-            window.history.replaceState(window.history.state, "", address);
-          }}
-        />
       )}
     </section>
   );

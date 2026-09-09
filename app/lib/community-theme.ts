@@ -1,4 +1,3 @@
-import { getD1 } from "../../db";
 
 export type CommunityPaletteId =
   | "CLASSICO"
@@ -349,20 +348,4 @@ export function parseCommunityTheme(
     bannerUrl: assetUrl(source?.bannerUrl),
     wallpaperUrl: assetUrl(source?.wallpaperUrl),
   };
-}
-
-export async function getCommunityTheme(communityId: number) {
-  try {
-    const row = await getD1()
-      .prepare("SELECT valor FROM configuracoes WHERE chave = ? LIMIT 1")
-      .bind(`community_theme:${communityId}`)
-      .first<{ valor: string }>();
-    return parseCommunityTheme(
-      row?.valor
-        ? (JSON.parse(row.valor) as Partial<CommunityTheme>)
-        : DEFAULT_COMMUNITY_THEME,
-    );
-  } catch {
-    return DEFAULT_COMMUNITY_THEME;
-  }
 }

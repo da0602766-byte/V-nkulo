@@ -13,7 +13,7 @@ import {
 } from "../lib/pilot-data";
 import { getSessionState } from "../lib/local-auth";
 import { getActiveTenantContext } from "../lib/tenant";
-import { getCommunityTheme } from "../lib/community-theme";
+import { getCommunityTheme } from "../lib/community-theme-storage";
 
 export const dynamic = "force-dynamic";
 

@@ -172,7 +172,15 @@
 .rc-testimonial footer b { display: block; font-size: 13.5px; color: #fff; }
 .rc-testimonial footer span { font-size: 12px; color: var(--rc-muted); }
 .rc-testimonial-dots { display: flex; gap: 8px; margin-top: 20px; }
-.rc-testimonial-dots button { width: 9px; height: 9px; padding: 0; border: none; border-radius: 50%; background: var(--rc-line); cursor: pointer; transition: width .25s, background .25s; }
+/* O ponto continua com 9px por desenho, mas 9px é metade do alvo de toque
+   mínimo: no celular era preciso mirar. O ::after estende só a área clicável,
+   sem alterar o que se vê nem ocupar espaço no fluxo.
+   A altura vai a 44px porque acima e abaixo não há vizinho. A largura cresce
+   apenas os 8px do espaçamento (4px de cada lado): um alvo de 44px de largura
+   sobre pontos a 17px de distância faz os vizinhos se sobreporem, e aí o ponto
+   errado recebe o clique — testado, acontecia. */
+.rc-testimonial-dots button { position: relative; width: 9px; height: 9px; padding: 0; border: none; border-radius: 50%; background: var(--rc-line); cursor: pointer; transition: width .25s, background .25s; }
+.rc-testimonial-dots button::after { content: ""; position: absolute; top: 50%; left: 50%; width: calc(100% + 8px); height: 44px; transform: translate(-50%, -50%); }
 .rc-testimonial-dots button[aria-selected="true"] { width: 26px; border-radius: 100px; background: linear-gradient(120deg, var(--rc-cyan), var(--rc-violet)); }
 
 /* Faixa de comunidades */

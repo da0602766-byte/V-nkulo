@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFile } from "node:fs/promises";
 import {
   createPilotD1,
   createPilotUser,
 } from "./helpers/sqlite-d1.mjs";
+
+const readSource = (path) =>
+  readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
 const context = {
   waitUntil() {},
@@ -1578,8 +1582,22 @@ test("sessão, tenant e gates críticos são validados no backend", async () => 
   assert.match(northHtml, /Bem-vindo ao ambiente Norte/);
   assert.doesNotMatch(northHtml, /Bem-vindo ao ambiente Sul/);
 
-  const legacyResponse = await worker.fetch(
+  // `/api/visitantes` era a rota legada de comunidade única; foi removida em
+  // 08/09/2026 (já existia `/api/pilot/visitantes`), então hoje o esperado é
+  // 404 — ela não pode reaparecer.
+  const removedLegacyResponse = await worker.fetch(
     new Request("http://localhost/api/visitantes", {
+      headers: { cookie: sessionCookie },
+    }),
+    env,
+    context,
+  );
+  assert.equal(removedLegacyResponse.status, 404);
+
+  // As rotas legadas que sobraram (Classe B da auditoria) continuam existindo e
+  // precisam continuar barradas pelo interruptor de módulos legados.
+  const legacyResponse = await worker.fetch(
+    new Request("http://localhost/api/cultos", {
       headers: { cookie: sessionCookie },
     }),
     env,
@@ -2723,13 +2741,66 @@ test("ministérios e escalas respeitam liderança, tenant e conflitos de horári
       )
       .run(ministry.id, leaderId).lastInsertRowid,
   );
-  database
-    .prepare(
-      `INSERT INTO ministerio_equipe_membros
-       (comunidade_id, ministerio_id, equipe_id, voluntario_id)
-       VALUES (1, ?, ?, ?)`,
-    )
-    .run(ministry.id, teamId, volunteerRow.id);
+  const invalidTeamMembersResponse = await worker.fetch(
+    new Request(
+      `http://localhost/api/pilot/ministerios/equipes/${teamId}`,
+      {
+        method: "PATCH",
+        headers: {
+          cookie: leaderCookie,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          acao: "DEFINIR_MEMBROS",
+          voluntarioIds: [volunteerRow.id, 999999],
+        }),
+      },
+    ),
+    env,
+    context,
+  );
+  assert.equal(invalidTeamMembersResponse.status, 400);
+  assert.equal(
+    (await invalidTeamMembersResponse.json()).error,
+    "Um integrante selecionado não pertence ao ministério.",
+  );
+  assert.equal(
+    database
+      .prepare(
+        `SELECT COUNT(*) AS total FROM ministerio_equipe_membros WHERE equipe_id = ?`,
+      )
+      .get(teamId).total,
+    0,
+  );
+
+  const defineTeamMembersResponse = await worker.fetch(
+    new Request(
+      `http://localhost/api/pilot/ministerios/equipes/${teamId}`,
+      {
+        method: "PATCH",
+        headers: {
+          cookie: leaderCookie,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          acao: "DEFINIR_MEMBROS",
+          voluntarioIds: [volunteerRow.id],
+        }),
+      },
+    ),
+    env,
+    context,
+  );
+  assert.equal(defineTeamMembersResponse.status, 200);
+  assert.deepEqual(
+    database
+      .prepare(
+        `SELECT voluntario_id FROM ministerio_equipe_membros WHERE equipe_id = ?`,
+      )
+      .all(teamId)
+      .map((row) => row.voluntario_id),
+    [volunteerRow.id],
+  );
   const createTeamScheduleResponse = await worker.fetch(
     new Request("http://localhost/api/pilot/escalas", {
       method: "POST",
@@ -5017,5 +5088,648 @@ test("oração e solicitações persistem, notificam gestores e respeitam a comu
       )
       .get(memberId),
   );
+  database.close();
+});
+
+// A lista de pessoas baixava até 2.000 registros de uma vez e paginava,
+// buscava e separava membros de oficiais dentro do navegador. Este teste cobre
+// a troca para paginação por cursor no servidor: o corte precisa entregar todo
+// mundo exatamente uma vez, sem pular nem repetir, e busca, aba e isolamento
+// por comunidade precisam continuar valendo no SQL.
+test("lista de pessoas pagina por cursor sem perder busca, aba nem isolamento", async () => {
+  const { database, d1 } = await createPilotD1();
+  const pastorId = await createPilotUser(database, {
+    nome: "Aaa Pastor Paginacao",
+    email: "pastor.paginacao@example.test",
+    senha: "Pastor123",
+    memberships: [{ comunidadeId: 1, papel: "PASTOR" }],
+  });
+  assert.ok(pastorId > 0);
+
+  // 70 membros forçam pelo menos três lotes de 30.
+  const criados = [];
+  for (let indice = 0; indice < 70; indice += 1) {
+    const ordem = String(indice).padStart(3, "0");
+    criados.push(`Membro Paginado ${ordem}`);
+    await createPilotUser(database, {
+      nome: `Membro Paginado ${ordem}`,
+      email: `membro.paginado.${ordem}@example.test`,
+      senha: "Membro123",
+      memberships: [{ comunidadeId: 1, papel: "MEMBRO" }],
+    });
+  }
+  await createPilotUser(database, {
+    nome: "Membro Paginado 999 Outra Comunidade",
+    email: "membro.paginado.sul@example.test",
+    senha: "Membro123",
+    memberships: [{ comunidadeId: 2, papel: "MEMBRO" }],
+  });
+
+  const worker = await loadWorker();
+  const env = createEnv(d1);
+  const cookie = await login(
+    worker,
+    env,
+    "pastor.paginacao@example.test",
+    "Pastor123",
+  );
+
+  async function pedirLote(parametros) {
+    const address = new URL("http://localhost/api/pilot/pessoas");
+    for (const [chave, valor] of Object.entries(parametros)) {
+      if (valor) address.searchParams.set(chave, valor);
+    }
+    const response = await worker.fetch(
+      new Request(address, { headers: { cookie } }),
+      env,
+      context,
+    );
+    assert.equal(response.status, 200);
+    return response.json();
+  }
+
+  // Os totais esperados vêm do próprio banco: a comunidade de teste já nasce com
+  // gente, então fixar número na mão tornaria o teste frágil sem cobrir mais.
+  const esperado = database
+    .prepare(
+      `SELECT
+        SUM(CASE WHEN oc.id IS NULL THEN 1 ELSE 0 END) AS membros,
+        SUM(CASE WHEN oc.id IS NULL THEN 0 ELSE 1 END) AS oficiais
+       FROM usuario_comunidades uc
+       JOIN usuarios u ON u.id = uc.usuario_id
+       LEFT JOIN oficiais_comunidade oc ON oc.usuario_comunidade_id = uc.id
+       WHERE uc.comunidade_id = 1 AND u.ativo = 1`,
+    )
+    .get();
+  assert.ok(esperado.membros > 70, "o cenário precisa de mais de dois lotes");
+
+  // Primeiro lote: tamanho limitado e cursor para continuar.
+  const primeiro = await pedirLote({ aba: "membros" });
+  assert.equal(primeiro.people.length, 30);
+  assert.ok(primeiro.nextCursor, "o primeiro lote precisa devolver cursor");
+
+  // Os contadores do topo descrevem a comunidade inteira, não o lote.
+  assert.equal(primeiro.counts.membros, esperado.membros);
+  assert.equal(primeiro.counts.oficiais, esperado.oficiais);
+
+  // Percorrer até o fim não pode pular nem repetir ninguém.
+  const nomes = [];
+  let cursor = null;
+  let lotes = 0;
+  do {
+    const lote = await pedirLote({ aba: "membros", cursor });
+    for (const person of lote.people) nomes.push(person.nome);
+    cursor = lote.nextCursor;
+    lotes += 1;
+    assert.ok(lotes <= 20, "paginação não terminou: possível cursor parado");
+  } while (cursor);
+
+  assert.ok(lotes >= 3, "o cenário precisa exercitar mais de dois lotes");
+  assert.equal(nomes.length, esperado.membros);
+  assert.equal(
+    new Set(nomes).size,
+    esperado.membros,
+    "nenhum nome pode se repetir entre lotes",
+  );
+  // Todos os 70 criados aparecem, cada um uma única vez.
+  for (const nome of criados) {
+    assert.equal(
+      nomes.filter((item) => item === nome).length,
+      1,
+      `${nome} deveria aparecer exatamente uma vez na paginação`,
+    );
+  }
+
+  // Isolamento: quem é de outra comunidade não aparece em lote nenhum.
+  assert.ok(nomes.every((nome) => !nome.includes("Outra Comunidade")));
+
+  // A aba separa membros de oficiais no SQL.
+  const oficiais = await pedirLote({ aba: "oficiais" });
+  assert.equal(oficiais.people.length, esperado.oficiais);
+  assert.ok(oficiais.people.every((person) => person.oficial === 1));
+
+  // A busca roda no banco e continua limitada à comunidade ativa.
+  const busca = await pedirLote({ aba: "membros", busca: "Paginado 01" });
+  assert.equal(busca.people.length, 10);
+  assert.ok(busca.people.every((person) => person.nome.includes("Paginado 01")));
+
+  const buscaVazia = await pedirLote({ aba: "membros", busca: "Outra Comunidade" });
+  assert.equal(buscaVazia.people.length, 0);
+
+  // Cursor corrompido não pode virar erro nem vazar a lista inteira: cai no
+  // comportamento de primeira página.
+  const cursorInvalido = await pedirLote({ aba: "membros", cursor: "nao-e-um-cursor" });
+  assert.equal(cursorInvalido.people.length, 30);
+
+  database.close();
+});
+
+// Escalas tinha dois problemas: teto de 150 sem forma de pedir as seguintes, e
+// uma consulta de designações SEM LIMITE, que trazia as designações de todas as
+// escalas visíveis para o JavaScript descartar quase tudo em seguida. Este
+// teste cobre a paginação por cursor e exige que as designações venham
+// restritas às escalas do lote.
+test("escalas paginam por cursor e trazem só as designações do lote", async () => {
+  const { database, d1 } = await createPilotD1();
+  const pastorId = await createPilotUser(database, {
+    nome: "Pastor Escalas Cursor",
+    email: "pastor.escalas.cursor@example.test",
+    senha: "Pastor123",
+    memberships: [{ comunidadeId: 1, papel: "PASTOR" }],
+  });
+
+  const ministerioId = database
+    .prepare(
+      `INSERT INTO ministerios_comunidade
+        (comunidade_id, nome, categoria, status, responsavel_usuario_id)
+       VALUES (1, 'Ministerio Cursor', 'GERAL', 'ATIVO', ?)
+       RETURNING id`,
+    )
+    .get(pastorId).id;
+
+  // 12 escalas em datas crescentes garantem mais de um lote quando pedimos 5.
+  const escalaIds = [];
+  for (let indice = 0; indice < 12; indice += 1) {
+    const dia = String(indice + 1).padStart(2, "0");
+    escalaIds.push(
+      database
+        .prepare(
+          `INSERT INTO escalas_ministerio
+            (comunidade_id, ministerio_id, titulo, inicia_em, termina_em,
+             status, responsavel_usuario_id, criado_por)
+           VALUES (1, ?, ?, ?, ?, 'PUBLICADA', ?, ?)
+           RETURNING id`,
+        )
+        .get(
+          ministerioId,
+          `Escala Cursor ${dia}`,
+          `2027-03-${dia} 09:00:00`,
+          `2027-03-${dia} 11:00:00`,
+          pastorId,
+          pastorId,
+        ).id,
+    );
+  }
+
+  const voluntarioId = database
+    .prepare(
+      `INSERT INTO ministerio_voluntarios
+        (comunidade_id, ministerio_id, usuario_id, funcao, papel, ativo)
+       VALUES (1, ?, ?, 'Apoio', 'VOLUNTARIO', 1)
+       RETURNING id`,
+    )
+    .get(ministerioId, pastorId).id;
+
+  // Uma designação em cada escala: se a rota voltar a buscar tudo, o lote de 5
+  // traria as 12.
+  for (const escalaId of escalaIds) {
+    database
+      .prepare(
+        `INSERT INTO escala_designacoes
+          (comunidade_id, escala_id, voluntario_id, usuario_id, funcao, status, ativo)
+         VALUES (1, ?, ?, ?, 'Apoio', 'CONFIRMADA', 1)`,
+      )
+      .run(escalaId, voluntarioId, pastorId);
+  }
+
+  const worker = await loadWorker();
+  const env = createEnv(d1);
+  const cookie = await login(
+    worker,
+    env,
+    "pastor.escalas.cursor@example.test",
+    "Pastor123",
+  );
+
+  async function pedirLote(cursor) {
+    const address = new URL("http://localhost/api/pilot/escalas");
+    address.searchParams.set("limite", "5");
+    if (cursor) address.searchParams.set("cursor", cursor);
+    const response = await worker.fetch(
+      new Request(address, { headers: { cookie } }),
+      env,
+      context,
+    );
+    assert.equal(response.status, 200);
+    return response.json();
+  }
+
+  const primeiro = await pedirLote(null);
+  assert.equal(primeiro.escalas.length, 5);
+  assert.ok(primeiro.nextCursor, "o primeiro lote precisa devolver cursor");
+
+  // As designações precisam pertencer só às escalas entregues neste lote.
+  const idsDoLote = new Set(primeiro.escalas.map((escala) => Number(escala.id)));
+  const designacoes = primeiro.escalas.flatMap((escala) => escala.designacoes);
+  assert.ok(designacoes.length > 0, "o cenário precisa ter designações");
+  assert.equal(designacoes.length, 5, "só as designações das 5 escalas do lote");
+  assert.ok(
+    primeiro.escalas.every((escala) =>
+      escala.designacoes.every((d) => idsDoLote.has(Number(d.escala_id))),
+    ),
+  );
+
+  // Percorrer tudo: nenhuma escala pode ser pulada nem repetida.
+  const vistos = [];
+  let cursor = null;
+  let lotes = 0;
+  do {
+    const lote = await pedirLote(cursor);
+    for (const escala of lote.escalas) vistos.push(Number(escala.id));
+    cursor = lote.nextCursor;
+    lotes += 1;
+    assert.ok(lotes <= 10, "paginação não terminou: possível cursor parado");
+  } while (cursor);
+
+  assert.equal(new Set(vistos).size, vistos.length, "nenhuma escala repetida");
+  for (const escalaId of escalaIds) {
+    assert.ok(vistos.includes(escalaId), `escala ${escalaId} sumiu da paginação`);
+  }
+
+  // Cursor corrompido cai no primeiro lote em vez de erro ou lista inteira.
+  const invalido = await pedirLote("nao-e-um-cursor");
+  assert.equal(invalido.escalas.length, 5);
+
+  database.close();
+});
+
+// Solicitações também paginam por cursor. A ordenação agrupa por status antes
+// de descer por id, então o cursor carrega o par (grupo, id): um cursor só com
+// id pularia solicitações ao trocar de grupo.
+test("solicitações paginam por cursor respeitando o agrupamento por status", async () => {
+  const { database, d1 } = await createPilotD1();
+  const pastorId = await createPilotUser(database, {
+    nome: "Pastor Solicitacoes Cursor",
+    email: "pastor.solic.cursor@example.test",
+    senha: "Pastor123",
+    memberships: [{ comunidadeId: 1, papel: "PASTOR" }],
+  });
+
+  // Status misturados de propósito, para o cursor precisar atravessar grupos.
+  const status = ["ABERTA", "CONCLUIDA", "EM_ANALISE"];
+  const criadas = [];
+  for (let indice = 0; indice < 12; indice += 1) {
+    criadas.push(
+      database
+        .prepare(
+          `INSERT INTO solicitacoes_comunidade
+            (comunidade_id, solicitante_id, tipo, titulo, descricao,
+             status, visibilidade)
+           VALUES (1, ?, 'ORACAO', ?, 'Descricao', ?, 'PASTORAL')
+           RETURNING id`,
+        )
+        .get(pastorId, `Solicitacao Cursor ${indice}`, status[indice % 3]).id,
+    );
+  }
+
+  const worker = await loadWorker();
+  const env = createEnv(d1);
+  const cookie = await login(
+    worker,
+    env,
+    "pastor.solic.cursor@example.test",
+    "Pastor123",
+  );
+
+  async function pedirLote(cursor) {
+    const address = new URL("http://localhost/api/pilot/solicitacoes");
+    address.searchParams.set("limite", "4");
+    if (cursor) address.searchParams.set("cursor", cursor);
+    const response = await worker.fetch(
+      new Request(address, { headers: { cookie } }),
+      env,
+      context,
+    );
+    assert.equal(response.status, 200);
+    return response.json();
+  }
+
+  const primeiro = await pedirLote(null);
+  assert.equal(primeiro.solicitacoes.length, 4);
+  assert.ok(primeiro.nextCursor);
+
+  const vistos = [];
+  const ordemStatus = [];
+  let cursor = null;
+  let lotes = 0;
+  do {
+    const lote = await pedirLote(cursor);
+    for (const item of lote.solicitacoes) {
+      vistos.push(Number(item.id));
+      ordemStatus.push(item.status);
+    }
+    cursor = lote.nextCursor;
+    lotes += 1;
+    assert.ok(lotes <= 10, "paginação não terminou: possível cursor parado");
+  } while (cursor);
+
+  assert.equal(new Set(vistos).size, vistos.length, "nenhuma repetida");
+  for (const id of criadas) {
+    assert.ok(vistos.includes(id), `solicitação ${id} sumiu da paginação`);
+  }
+
+  // O agrupamento por status precisa sobreviver à paginação: abertas primeiro,
+  // depois em análise, depois o resto.
+  const grupo = (valor) =>
+    valor === "ABERTA" ? 0 : valor === "EM_ANALISE" ? 1 : 2;
+  for (let indice = 1; indice < ordemStatus.length; indice += 1) {
+    assert.ok(
+      grupo(ordemStatus[indice]) >= grupo(ordemStatus[indice - 1]),
+      "a paginação embaralhou o agrupamento por status",
+    );
+  }
+
+  database.close();
+});
+
+// A Central mostra no máximo quatro escalas com participação pendente, e antes
+// baixava o lote inteiro para descartar o resto no navegador. O filtro precisa
+// resolver isso no SQL sem afrouxar visibilidade: escala de outra pessoa, já
+// respondida ou encerrada não pode entrar.
+test("filtro minhas-pendentes devolve só escalas com resposta pendente da pessoa", async () => {
+  const { database, d1 } = await createPilotD1();
+  const pastorId = await createPilotUser(database, {
+    nome: "Pastor Filtro Pendentes",
+    email: "pastor.filtro@example.test",
+    senha: "Pastor123",
+    memberships: [{ comunidadeId: 1, papel: "PASTOR" }],
+  });
+  const outroId = await createPilotUser(database, {
+    nome: "Outro Filtro Pendentes",
+    email: "outro.filtro@example.test",
+    senha: "Outro123",
+    memberships: [{ comunidadeId: 1, papel: "MEMBRO" }],
+  });
+
+  const ministerioId = database
+    .prepare(
+      `INSERT INTO ministerios_comunidade
+        (comunidade_id, nome, categoria, status, responsavel_usuario_id)
+       VALUES (1, 'Ministerio Filtro', 'GERAL', 'ATIVO', ?) RETURNING id`,
+    )
+    .get(pastorId).id;
+  const voluntario = (usuarioId) =>
+    database
+      .prepare(
+        `INSERT INTO ministerio_voluntarios
+          (comunidade_id, ministerio_id, usuario_id, funcao, papel, ativo)
+         VALUES (1, ?, ?, 'Apoio', 'VOLUNTARIO', 1) RETURNING id`,
+      )
+      .get(ministerioId, usuarioId).id;
+  const meuVoluntario = voluntario(pastorId);
+  const outroVoluntario = voluntario(outroId);
+
+  const criarEscala = (titulo, inicio, fim, status) =>
+    database
+      .prepare(
+        `INSERT INTO escalas_ministerio
+          (comunidade_id, ministerio_id, titulo, inicia_em, termina_em,
+           status, responsavel_usuario_id, criado_por)
+         VALUES (1, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+      )
+      .get(ministerioId, titulo, inicio, fim, status, pastorId, pastorId).id;
+  const designar = (escalaId, volId, usuarioId, status) =>
+    database
+      .prepare(
+        `INSERT INTO escala_designacoes
+          (comunidade_id, escala_id, voluntario_id, usuario_id, funcao, status, ativo)
+         VALUES (1, ?, ?, ?, 'Apoio', ?, 1)`,
+      )
+      .run(escalaId, volId, usuarioId, status);
+
+  // Única que deve aparecer: futura, publicada, minha e pendente.
+  const esperada = criarEscala("Pendente Minha", "2027-05-01 09:00:00", "2027-05-01 11:00:00", "PUBLICADA");
+  designar(esperada, meuVoluntario, pastorId, "PENDENTE");
+
+  // Já respondida por mim.
+  const confirmada = criarEscala("Confirmada Minha", "2027-05-02 09:00:00", "2027-05-02 11:00:00", "PUBLICADA");
+  designar(confirmada, meuVoluntario, pastorId, "CONFIRMADA");
+
+  // Pendente, mas de outra pessoa.
+  const deOutro = criarEscala("Pendente De Outro", "2027-05-03 09:00:00", "2027-05-03 11:00:00", "PUBLICADA");
+  designar(deOutro, outroVoluntario, outroId, "PENDENTE");
+
+  // Pendente minha, porém já encerrada.
+  const passada = criarEscala("Pendente Encerrada", "2020-01-01 09:00:00", "2020-01-01 11:00:00", "PUBLICADA");
+  designar(passada, meuVoluntario, pastorId, "PENDENTE");
+
+  // Pendente minha, mas ainda em rascunho.
+  const rascunho = criarEscala("Pendente Rascunho", "2027-05-04 09:00:00", "2027-05-04 11:00:00", "RASCUNHO");
+  designar(rascunho, meuVoluntario, pastorId, "PENDENTE");
+
+  const worker = await loadWorker();
+  const env = createEnv(d1);
+  const cookie = await login(worker, env, "pastor.filtro@example.test", "Pastor123");
+
+  const response = await worker.fetch(
+    new Request("http://localhost/api/pilot/escalas?filtro=minhas-pendentes&limite=4", {
+      headers: { cookie },
+    }),
+    env,
+    context,
+  );
+  assert.equal(response.status, 200);
+  const filtrado = await response.json();
+  assert.deepEqual(
+    filtrado.escalas.map((escala) => escala.titulo),
+    ["Pendente Minha"],
+  );
+
+  // Sem o filtro, o pastor continua enxergando as demais: o filtro reduz o que
+  // é pedido, não o que a pessoa tem direito de ver.
+  const semFiltro = await worker.fetch(
+    new Request("http://localhost/api/pilot/escalas", { headers: { cookie } }),
+    env,
+    context,
+  );
+  const completo = await semFiltro.json();
+  assert.ok(completo.escalas.length > filtrado.escalas.length);
+  assert.ok(completo.escalas.some((escala) => escala.titulo === "Pendente De Outro"));
+
+  database.close();
+});
+
+// A migração do chat para o Drive lia UM lote de mensagens e em seguida apagava
+// a conversa inteira do banco: acima do tamanho do lote, o que não tinha subido
+// era apagado junto e se perdia. O laço agora avança por lotes e cada lote só é
+// apagado depois de subir. Este teste lê o código porque a migração depende do
+// Google Drive, que não existe no ambiente de teste — o que dá para garantir
+// aqui é que a exclusão não volte a ser indiscriminada.
+test("migração do chat para o Drive não apaga mensagem que não subiu", async () => {
+  const chat = await readSource("app/api/pilot/chat/route.ts");
+
+  assert.doesNotMatch(
+    chat,
+    /DELETE FROM mensagens_privadas WHERE conversa_id = \?"\)/,
+    "a exclusão não pode voltar a apagar a conversa inteira: acima do lote isso perdia mensagens que nunca subiram",
+  );
+  assert.match(
+    chat,
+    /DELETE FROM mensagens_privadas\s*\n\s*WHERE conversa_id = \? AND id IN \(/,
+    "só os ids efetivamente enviados ao Drive podem ser apagados",
+  );
+  // O laço precisa avançar: sem o `mp.id > ?` o lote seguinte repetiria o
+  // primeiro e a migração nunca terminaria.
+  assert.match(chat, /WHERE mp\.conversa_id = \? AND mp\.id > \?/);
+  assert.match(chat, /legacyMessages\(conversationId, lastMigratedId\)/);
+});
+
+// Notificações contavam as não lidas sobre o lote carregado, então quem tivesse
+// mais não lidas que o tamanho do lote via um número menor que o real.
+test("notificações paginam por cursor e contam não lidas fora do lote", async () => {
+  const { database, d1 } = await createPilotD1();
+  const usuarioId = await createPilotUser(database, {
+    nome: "Membro Notificacoes",
+    email: "membro.notif@example.test",
+    senha: "Membro123",
+    memberships: [{ comunidadeId: 1, papel: "MEMBRO" }],
+  });
+
+  // 80 não lidas: mais que o lote padrão de 60.
+  const TOTAL = 80;
+  for (let indice = 0; indice < TOTAL; indice += 1) {
+    database
+      .prepare(
+        `INSERT INTO notificacoes_sistema
+          (usuario_id, comunidade_id, tipo, titulo, mensagem, area, destino_rota,
+           criado_por, criado_em)
+         VALUES (?, 1, 'SISTEMA', ?, 'Mensagem', 'SISTEMA', '/painel', ?, ?)`,
+      )
+      .run(
+        usuarioId,
+        `Notificacao ${String(indice).padStart(3, "0")}`,
+        usuarioId,
+        `2027-01-01 00:${String(indice % 60).padStart(2, "0")}:00`,
+      );
+  }
+
+  const worker = await loadWorker();
+  const env = createEnv(d1);
+  const cookie = await login(worker, env, "membro.notif@example.test", "Membro123");
+
+  async function pedirLote(cursor) {
+    const address = new URL("http://localhost/api/pilot/notificacoes");
+    if (cursor) address.searchParams.set("cursor", cursor);
+    const response = await worker.fetch(
+      new Request(address, { headers: { cookie } }),
+      env,
+      context,
+    );
+    assert.equal(response.status, 200);
+    return response.json();
+  }
+
+  const primeiro = await pedirLote(null);
+  assert.equal(primeiro.notifications.length, 60);
+  assert.ok(primeiro.nextCursor, "deve haver lote seguinte");
+  // O contador descreve todas as não lidas, não só as do lote.
+  assert.equal(primeiro.unread, TOTAL);
+
+  const vistos = [];
+  let cursor = null;
+  let lotes = 0;
+  do {
+    const lote = await pedirLote(cursor);
+    for (const item of lote.notifications) vistos.push(item.id);
+    cursor = lote.nextCursor;
+    lotes += 1;
+    assert.ok(lotes <= 10, "paginação não terminou");
+  } while (cursor);
+
+  assert.equal(vistos.length, TOTAL, "a paginação precisa alcançar todas");
+  assert.equal(new Set(vistos).size, TOTAL, "nenhuma repetida");
+
+  database.close();
+});
+
+// A busca de designações monta um `IN (...)` com um marcador por escala do
+// lote. Com o lote padrão de 150 isso passaria de 150 parâmetros numa consulta
+// só, acima do limite que o D1 impõe por consulta — o projeto já corta em 100
+// noutros pontos pelo mesmo motivo. Por isso a busca é fatiada em blocos de 90.
+//
+// O teste anterior usava lote de 5 e nunca cruzava essa fronteira; o SQLite do
+// ambiente de teste aceita muito mais parâmetros que o D1, então a falha
+// passaria despercebida aqui e apareceria só em produção. Este cenário usa
+// escalas suficientes para exigir mais de um bloco.
+test("designações de um lote grande atravessam a fatia sem perder ninguém", async () => {
+  const { database, d1 } = await createPilotD1();
+  const pastorId = await createPilotUser(database, {
+    nome: "Pastor Fatia",
+    email: "pastor.fatia@example.test",
+    senha: "Pastor123",
+    memberships: [{ comunidadeId: 1, papel: "PASTOR" }],
+  });
+  const ministerioId = database
+    .prepare(
+      `INSERT INTO ministerios_comunidade
+        (comunidade_id, nome, categoria, status, responsavel_usuario_id)
+       VALUES (1, 'Ministerio Fatia', 'GERAL', 'ATIVO', ?) RETURNING id`,
+    )
+    .get(pastorId).id;
+  const voluntarioId = database
+    .prepare(
+      `INSERT INTO ministerio_voluntarios
+        (comunidade_id, ministerio_id, usuario_id, funcao, papel, ativo)
+       VALUES (1, ?, ?, 'Apoio', 'VOLUNTARIO', 1) RETURNING id`,
+    )
+    .get(ministerioId, pastorId).id;
+
+  // 100 escalas, cada uma com uma designação: acima dos 90 de um bloco.
+  const TOTAL = 100;
+  const escalaIds = [];
+  for (let indice = 0; indice < TOTAL; indice += 1) {
+    const dia = new Date(Date.UTC(2028, 0, 1 + indice)).toISOString().slice(0, 10);
+    const escalaId = database
+      .prepare(
+        `INSERT INTO escalas_ministerio
+          (comunidade_id, ministerio_id, titulo, inicia_em, termina_em,
+           status, responsavel_usuario_id, criado_por)
+         VALUES (1, ?, ?, ?, ?, 'PUBLICADA', ?, ?) RETURNING id`,
+      )
+      .get(ministerioId, `Escala Fatia ${indice}`, `${dia} 09:00:00`, `${dia} 11:00:00`, pastorId, pastorId).id;
+    escalaIds.push(escalaId);
+    database
+      .prepare(
+        `INSERT INTO escala_designacoes
+          (comunidade_id, escala_id, voluntario_id, usuario_id, funcao, status, ativo)
+         VALUES (1, ?, ?, ?, 'Apoio', 'CONFIRMADA', 1)`,
+      )
+      .run(escalaId, voluntarioId, pastorId);
+  }
+
+  const worker = await loadWorker();
+  const env = createEnv(d1);
+  const cookie = await login(worker, env, "pastor.fatia@example.test", "Pastor123");
+
+  const response = await worker.fetch(
+    new Request(`http://localhost/api/pilot/escalas?limite=${TOTAL}`, {
+      headers: { cookie },
+    }),
+    env,
+    context,
+  );
+  assert.equal(response.status, 200);
+  const dados = await response.json();
+
+  assert.equal(dados.escalas.length, TOTAL, "o lote precisa cruzar mais de um bloco");
+
+  // Cada escala do lote precisa ter trazido a sua designação: se a fatia
+  // perdesse um bloco, as escalas depois da 90 viriam sem ninguém.
+  const semDesignacao = dados.escalas.filter((e) => !e.designacoes.length);
+  assert.deepEqual(
+    semDesignacao.map((e) => e.titulo),
+    [],
+    "escalas sem designação indicam bloco perdido na fatia",
+  );
+
+  const total = dados.escalas.reduce((soma, e) => soma + e.designacoes.length, 0);
+  assert.equal(total, TOTAL);
+
+  // Isolamento continua valendo em todos os blocos.
+  assert.ok(
+    dados.escalas.every((e) => e.designacoes.every((d) => Number(d.escala_id) === Number(e.id))),
+    "designação atribuída à escala errada",
+  );
+
   database.close();
 });

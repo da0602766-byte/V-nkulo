@@ -18,7 +18,43 @@ const STATUSES = new Set(["ABERTA", "EM_ANALISE", "CONCLUIDA"]);
 const AUDIENCE_TYPES = new Set(["USUARIO", "MINISTERIO", "PAPEL", "TODOS_MEMBROS"]);
 const ROLES = new Set(["MEMBRO", "LIDER", "PASTOR", "ADMIN_COMUNIDADE"]);
 
-export async function GET() {
+// Lote da lista de solicitações. Antes o teto era 150 sem forma de pedir as
+// seguintes: passado esse número, as mais antigas não apareciam mais.
+const REQUEST_PAGE_SIZE = 150;
+const REQUEST_MAX_PAGE_SIZE = 200;
+
+// A ordenação agrupa por status (aberta, em análise, resto) e depois desce por
+// id, então o cursor precisa carregar o par (grupo, id).
+type RequestCursor = { grupo: number; id: number };
+
+function encodeRequestCursor(cursor: RequestCursor) {
+  return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
+}
+
+function decodeRequestCursor(value: string | null): RequestCursor | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(value, "base64url").toString("utf8"),
+    ) as Partial<RequestCursor>;
+    const grupo = Number(parsed.grupo);
+    const id = Number(parsed.id);
+    if (
+      !Number.isInteger(grupo) || grupo < 0 || grupo > 2 ||
+      !Number.isInteger(id) || id <= 0
+    ) {
+      return null;
+    }
+    return { grupo, id };
+  } catch {
+    return null;
+  }
+}
+
+const REQUEST_GROUP_SQL =
+  "CASE s.status WHEN 'ABERTA' THEN 0 WHEN 'EM_ANALISE' THEN 1 ELSE 2 END";
+
+export async function GET(request: Request) {
   const access = await requireTenantPermission("dashboard.view");
   if ("error" in access) return access.error;
   if (access.context.communityAccess === "FEED_ONLY") {
@@ -31,6 +67,17 @@ export async function GET() {
   );
   const db = getD1();
   await cleanupCompletedRequests(db, access.context.comunidadeId);
+  const requestAddress = new URL(request.url);
+  const requestCursor = decodeRequestCursor(
+    requestAddress.searchParams.get("cursor"),
+  );
+  const requestedRequestSize = Number(
+    requestAddress.searchParams.get("limite") || 0,
+  );
+  const requestPageSize =
+    Number.isInteger(requestedRequestSize) && requestedRequestSize > 0
+      ? Math.min(requestedRequestSize, REQUEST_MAX_PAGE_SIZE)
+      : REQUEST_PAGE_SIZE;
   const result = await db
     .prepare(
       `SELECT s.id, s.tipo, s.titulo, s.descricao, s.visibilidade, s.status,
@@ -82,10 +129,13 @@ export async function GET() {
              WHERE legacy.solicitacao_id = s.id
            ))
          )
-       ORDER BY CASE s.status
-         WHEN 'ABERTA' THEN 0 WHEN 'EM_ANALISE' THEN 1 ELSE 2 END,
-         s.id DESC
-       LIMIT 150`,
+         AND (
+           ? = 0
+           OR ${REQUEST_GROUP_SQL} > ?
+           OR (${REQUEST_GROUP_SQL} = ? AND s.id < ?)
+         )
+       ORDER BY ${REQUEST_GROUP_SQL}, s.id DESC
+       LIMIT ?`,
     )
     .bind(
       access.user.id,
@@ -93,8 +143,29 @@ export async function GET() {
       access.user.id,
       access.user.id,
       canManage ? 1 : 0,
+      requestCursor ? 1 : 0,
+      requestCursor?.grupo ?? 0,
+      requestCursor?.grupo ?? 0,
+      requestCursor?.id ?? 0,
+      requestPageSize + 1,
     )
     .all<Record<string, unknown>>();
+
+  const hasMoreRequests = result.results.length > requestPageSize;
+  if (hasMoreRequests) result.results.length = requestPageSize;
+  const lastRequest = result.results[result.results.length - 1];
+  const nextRequestCursor =
+    hasMoreRequests && lastRequest
+      ? encodeRequestCursor({
+          grupo:
+            lastRequest.status === "ABERTA"
+              ? 0
+              : lastRequest.status === "EM_ANALISE"
+                ? 1
+                : 2,
+          id: Number(lastRequest.id),
+        })
+      : null;
   const [users, ministries] = await Promise.all([
     db.prepare(
       `SELECT u.id, u.nome, uc.papel
@@ -124,6 +195,8 @@ export async function GET() {
   return Response.json(
     {
       solicitacoes: result.results,
+      // Nulo quando o lote alcançou a última solicitação visível.
+      nextCursor: nextRequestCursor,
       canManage,
       audienceOptions: {
         usuarios: users.results,

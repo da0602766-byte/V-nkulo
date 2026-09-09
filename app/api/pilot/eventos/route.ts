@@ -6,12 +6,42 @@ import { requireTenantPermission } from "../../../lib/tenant";
 
 const MAX_EVENTS = 100;
 
-export async function GET() {
+// O cursor guarda o par (inicia_em, id), que é a ordenação da consulta.
+type EventCursor = { inicio: string; id: number };
+
+function encodeEventCursor(cursor: EventCursor) {
+  return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
+}
+
+function decodeEventCursor(value: string | null): EventCursor | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(value, "base64url").toString("utf8"),
+    ) as Partial<EventCursor>;
+    const id = Number(parsed.id);
+    if (typeof parsed.inicio !== "string" || !Number.isInteger(id) || id <= 0) {
+      return null;
+    }
+    return { inicio: parsed.inicio, id };
+  } catch {
+    return null;
+  }
+}
+
+export async function GET(request: Request) {
   const access = await requireTenantPermission("events.view");
   if ("error" in access) return access.error;
   const canManage = access.context.permissions.includes("events.manage");
   const db = getD1();
   await ensureEventVotingTables(db);
+  const eventAddress = new URL(request.url);
+  const eventCursor = decodeEventCursor(eventAddress.searchParams.get("cursor"));
+  const requestedEventSize = Number(eventAddress.searchParams.get("limite") || 0);
+  const eventPageSize =
+    Number.isInteger(requestedEventSize) && requestedEventSize > 0
+      ? Math.min(requestedEventSize, MAX_EVENTS)
+      : MAX_EVENTS;
   const result = await db
     .prepare(
       `SELECT e.id, e.titulo, e.descricao, e.categoria, e.inicia_em,
@@ -46,6 +76,11 @@ export async function GET() {
        AND ce.comunidade_id = e.comunidade_id
       WHERE e.comunidade_id = ?
         AND (e.status = 'PUBLICADO' OR ? = 1)
+        AND (
+          ? = 0
+          OR e.inicia_em > ?
+          OR (e.inicia_em = ? AND e.id > ?)
+        )
       GROUP BY e.id
       ORDER BY e.inicia_em ASC, e.id ASC
       LIMIT ?`,
@@ -58,9 +93,24 @@ export async function GET() {
       canManage ? 1 : 0,
       access.context.comunidadeId,
       canManage ? 1 : 0,
-      MAX_EVENTS,
+      eventCursor ? 1 : 0,
+      eventCursor?.inicio ?? "",
+      eventCursor?.inicio ?? "",
+      eventCursor?.id ?? 0,
+      eventPageSize + 1,
     )
     .all<Record<string, unknown>>();
+
+  const hasMoreEvents = result.results.length > eventPageSize;
+  if (hasMoreEvents) result.results.length = eventPageSize;
+  const lastEvent = result.results[result.results.length - 1];
+  const nextEventCursor =
+    hasMoreEvents && lastEvent
+      ? encodeEventCursor({
+          inicio: String(lastEvent.inicia_em ?? ""),
+          id: Number(lastEvent.id),
+        })
+      : null;
   const pollRows = await db.prepare(
     `SELECT q.evento_id, q.pergunta, q.opcoes_json,
       MAX(CASE WHEN v.usuario_id = ? THEN v.opcao ELSE NULL END) AS minha_opcao,
@@ -102,6 +152,8 @@ export async function GET() {
         enquete: polls.get(Number(event.id)) || null,
         inscritos: parseRegistrants(event.inscritos),
       })),
+      // Nulo quando o lote alcançou o último evento visível.
+      nextCursor: nextEventCursor,
       canManage,
     },
     { headers: { "Cache-Control": "no-store" } },

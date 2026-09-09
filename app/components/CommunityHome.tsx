@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "./StableLink";
+import CommunityPresencePanel from "./CommunityPresencePanel";
 import {
   type CSSProperties,
   FormEvent,
@@ -186,7 +187,10 @@ export default function CommunityHome({
           fetch("/api/pilot/publicacoes?limit=10", { cache: "no-store" }),
           readOnlyFeed ? null : fetch("/api/pilot/eventos", { cache: "no-store" }),
           !readOnlyFeed && canViewSchedules
-            ? fetch("/api/pilot/escalas", { cache: "no-store" })
+            // A trilha mostra no máximo quatro escalas com participação
+            // pendente; o filtro e o limite vão ao servidor em vez de
+            // baixar o lote inteiro para descartar quase tudo aqui.
+            ? fetch("/api/pilot/escalas?filtro=minhas-pendentes&limite=4", { cache: "no-store" })
             : null,
         ]);
       const [feedResult, eventResult, scheduleResult] =
@@ -1160,6 +1164,8 @@ export default function CommunityHome({
               <p className="home-rail-empty">Nenhum evento publicado.</p>
             )}
           </section>
+
+          <CommunityPresencePanel />
         </aside>}
       </div>
     </section>

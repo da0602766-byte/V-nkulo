@@ -287,7 +287,22 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
   }
 
   const camadasVisiveis = CAMADAS.filter((c) => c.id !== "EVENTO" || podeVerEventos);
-  const hojeChave = chaveDia(new Date());
+  // "Hoje" precisa vir de estado, nunca de `new Date()` durante a renderização:
+  // servidor e cliente calculariam valores diferentes na virada do dia e a
+  // hidratação quebraria. Mesmo padrão já adotado em DayThreadWorkspace.
+  // Começa vazio, então nenhum dia é marcado até o cliente acertar o relógio.
+  const [hojeChave, setHojeChave] = useState("");
+  useEffect(() => {
+    const acertar = () => setHojeChave(chaveDia(new Date()));
+    // Agendado em vez de chamado direto: escrever estado no corpo do efeito
+    // dispara renderização em cascata.
+    const primeiro = window.setTimeout(acertar, 0);
+    const relogio = window.setInterval(acertar, 60000);
+    return () => {
+      window.clearTimeout(primeiro);
+      window.clearInterval(relogio);
+    };
+  }, []);
   const itensDoDiaAberto = diaAberto ? porDia.get(diaAberto) || [] : [];
 
   const rotuloPeriodo =

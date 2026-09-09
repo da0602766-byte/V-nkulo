@@ -502,7 +502,7 @@ test("padrão global evita divergência, dá acesso total ao proprietário e res
 test("conversas ficam no perfil, isolam comunidade e respeitam membro versus oficial", async () => {
   const [chatApi, chatUi, presenceUi, presenceApi, notificationApi, notificationUi, dashboard] = await Promise.all([
     readFile(new URL("../app/api/pilot/chat/route.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/components/PrivateChatDialog.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/PrivateChatWorkspace.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/components/CommunityPresencePanel.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/pilot/presenca/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/pilot/notificacoes/route.ts", import.meta.url), "utf8"),
@@ -517,8 +517,8 @@ test("conversas ficam no perfil, isolam comunidade e respeitam membro versus ofi
   assert.doesNotMatch(chatApi, /createSystemNotification/);
   assert.match(chatApi, /communicationGroup/);
   assert.match(chatApi, /Membros conversam somente com membros/);
-  assert.match(chatUi, /CONVERSA PRIVADA/);
-  assert.match(chatUi, /type="submit"/);
+  assert.match(chatUi, /Escreva uma mensagem privada…/);
+  assert.match(chatUi, /<form onSubmit=\{send\}/);
   assert.match(presenceUi, /Mensagem/);
   assert.match(presenceUi, /Biografia/);
   assert.match(presenceApi, /json_extract\(u\.cadastro_dados/);
@@ -528,4 +528,136 @@ test("conversas ficam no perfil, isolam comunidade e respeitam membro versus ofi
   assert.match(notificationUi, /window\.location\.assign\(item\.destination\)/);
   assert.doesNotMatch(dashboard, /label: "Mensagens"/);
   assert.doesNotMatch(chatApi, /chat.*public/i);
+});
+
+// Trava deliberada: as rotas legadas em `app/api/*` (fora de `app/api/pilot/*`)
+// usam o sistema de permissão de comunidade única, anterior à reforma
+// multi-tenant, e não filtram por `comunidade_id`. Hoje elas ficam inacessíveis
+// porque `requireApiPermission` checa `PILOT_CONFIG.legacyModulesEnabled` antes
+// de qualquer outra coisa. Esse teste existe para que religar a flag deixe de
+// ser uma mudança silenciosa: quem reativar precisa antes reescrever as rotas
+// com isolamento por comunidade e então atualizar este teste conscientemente.
+// O valor da flag já era coberto pelo teste do gate do piloto; o que falta lá
+// (e é o ponto deste teste) é garantir que a checagem continue existindo
+// dentro de `requireApiPermission` — flag falsa não protege nada se alguém
+// remover o `if` do caminho de código.
+// Ver a linha de 2026-09-08 em docs/coordenacao/COORDENACAO_IA.md.
+test("módulos legados de comunidade única continuam desligados", async () => {
+  const [config, access] = await Promise.all([
+    readFile(new URL("../app/lib/pilot-config.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/lib/access.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(
+    config,
+    /legacyModulesEnabled:\s*false/,
+    "PILOT_CONFIG.legacyModulesEnabled precisa continuar false até as rotas legadas isolarem por comunidade_id",
+  );
+  assert.match(
+    access,
+    /if\s*\(!PILOT_CONFIG\.legacyModulesEnabled\)/,
+    "requireApiPermission precisa continuar bloqueando os módulos legados antes de checar perfil ou permissão",
+  );
+});
+
+// O painel de presença passou meses existindo sem nenhuma página que o
+// renderizasse: a rota estava viva e testada, e a tela não aparecia para
+// ninguém. Auditoria de 08/09/2026. Este teste trava o elo que faltava — não
+// basta o componente existir e a rota responder, alguma tela alcançável
+// precisa montá-lo, e o pedido de conversa precisa cair no chat que existe
+// hoje em vez de abrir uma segunda tela própria.
+test("painel de presença está montado numa tela alcançável e usa o chat vivo", async () => {
+  const [panel, home, dashboard, chat] = await Promise.all([
+    readFile(new URL("../app/components/CommunityPresencePanel.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/CommunityHome.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/PilotDashboard.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/PrivateChatWorkspace.tsx", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(
+    home,
+    /import CommunityPresencePanel from "\.\/CommunityPresencePanel"/,
+    "CommunityHome precisa importar o painel de presença",
+  );
+  assert.match(
+    home,
+    /<CommunityPresencePanel \/>/,
+    "o painel precisa continuar renderizado: rota viva sem tela foi exatamente o defeito encontrado na auditoria",
+  );
+  // A trilha lateral só existe fora do acesso somente-feed, que é a mesma
+  // regra que `/api/pilot/presenca` aplica no servidor (403 para FEED_ONLY).
+  assert.match(home, /\{!readOnlyFeed && <aside className="community-home-rail">/);
+
+  assert.match(panel, /new CustomEvent\("vinkulo:open-chat"/);
+  assert.doesNotMatch(
+    panel,
+    /PrivateChatDialog/,
+    "o diálogo antigo de conversa foi removido; o painel deve pedir o chat vivo por evento",
+  );
+  assert.match(dashboard, /window\.addEventListener\("vinkulo:open-chat"/);
+  assert.match(dashboard, /initialTargetUserId=\{chatTargetUserId\}/);
+  assert.match(chat, /initialTargetUserId/);
+});
+
+// As rotas `/api/teens*` foram removidas em 08/09/2026: consultavam nome, data
+// de nascimento, nome dos pais e telefone de menores varrendo a tabela
+// `usuarios` inteira, sem nenhum filtro de `comunidade_id`. A trava anterior
+// exigia que elas ficassem atrás do bloqueio de módulos legados; agora que os
+// arquivos não existem, a trava passa a vigiar a ausência — restaurar aquele
+// código como estava reintroduz o vazamento entre comunidades. Quando a Área
+// Kids/Eventos for desenhada, ela precisa nascer com isolamento por comunidade
+// e este teste ser atualizado conscientemente.
+// Ver docs/relatorios/AUDITORIA_ENDPOINTS_LEGADOS_2026-09-08.md (Classe C).
+test("rota legada de menores não volta ao repositório", async () => {
+  for (const route of [
+    "../app/api/teens/route.ts",
+    "../app/api/teens/acompanhamentos/route.ts",
+    "../app/api/teens/acompanhamentos/[id]/route.ts",
+  ]) {
+    await assert.rejects(
+      readFile(new URL(route, import.meta.url), "utf8"),
+      { code: "ENOENT" },
+      `${route} voltou ao repositório: essa rota lê dados de menores sem filtro de comunidade_id e não pode ser restaurada como estava`,
+    );
+  }
+});
+
+// Hidratação (Etapa 7 do script de otimização, 08/09/2026).
+//
+// `new Date()` ou `Date.now()` no corpo da renderização de um componente de
+// cliente produz valores diferentes no servidor e no cliente — na virada do dia
+// ou do minuto, a hidratação quebra e o React descarta a árvore inteira. O
+// projeto já tinha adotado o padrão certo em `DayThreadWorkspace`: a hora vem
+// de estado, acertada num efeito. Este teste estende a mesma exigência aos dois
+// componentes onde o padrão faltava.
+test("componentes com relógio tiram a hora de estado, não da renderização", async () => {
+  const [agenda, ministerios, precedente] = await Promise.all([
+    readFile(new URL("../app/components/AgendaCalendar.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/MinistriesWorkspace.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/DayThreadWorkspace.tsx", import.meta.url), "utf8"),
+  ]);
+
+  // O precedente precisa continuar existindo: é dele que a regra vem.
+  assert.match(precedente, /const \[agora, setAgora\] = useState\(0\)/);
+
+  // AgendaCalendar: "hoje" sai de estado, e o cálculo direto não volta.
+  assert.match(agenda, /const \[hojeChave, setHojeChave\] = useState\(""\)/);
+  assert.doesNotMatch(
+    agenda,
+    /const hojeChave = chaveDia\(new Date\(\)\)/,
+    "calcular o dia de hoje durante a renderização quebra a hidratação na virada do dia",
+  );
+
+  // MinistriesWorkspace: a semana parte de uma âncora em estado e é memoizada,
+  // em vez de refazer sete varreduras da lista a cada renderização.
+  assert.match(ministerios, /const \[semanaAncora, setSemanaAncora\] = useState\(0\)/);
+  assert.match(ministerios, /const week = useMemo\(/);
+  assert.doesNotMatch(
+    ministerios,
+    /const week = Array\.from\(\{ length: 7 \}, \(_, index\) => \{\s*\n\s*const date = new Date\(\);/,
+    "montar a semana a partir de new Date() na renderização quebra a hidratação e refaz o cálculo a cada render",
+  );
+  // A faixa da semana precisa manter as sete células antes do relógio acertar,
+  // senão a altura vai a zero e o conteúdo abaixo salta.
+  assert.match(ministerios, /reserva-\$\{index\}/);
 });

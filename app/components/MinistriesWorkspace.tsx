@@ -158,6 +158,12 @@ export default function MinistriesWorkspace({
   const [availableUsers, setAvailableUsers] = useState<AvailableUser[]>([]);
   const [canCreate, setCanCreate] = useState(false);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
+  // Acima do tamanho do lote as escalas seguintes simplesmente não chegavam, e
+  // a tela não tinha como saber que faltava algo. O cursor deixa isso visível e
+  // permite trazer o resto sem perder os filtros, que operam sobre tudo o que
+  // já está carregado.
+  const [schedulesCursor, setSchedulesCursor] = useState<string | null>(null);
+  const [loadingSchedules, setLoadingSchedules] = useState(false);
   const [scheduleVolunteers, setScheduleVolunteers] = useState<
     ScheduleVolunteer[]
   >([]);
@@ -198,6 +204,7 @@ export default function MinistriesWorkspace({
       const schedulesPayload = (await schedulesResponse.json()) as {
         escalas?: Schedule[];
         voluntarios?: ScheduleVolunteer[];
+        nextCursor?: string | null;
         error?: string;
       };
       const resourcesPayload = (await resourcesResponse.json()) as {
@@ -226,6 +233,7 @@ export default function MinistriesWorkspace({
       setAvailableUsers(ministriesPayload.availableUsers || []);
       setCanCreate(Boolean(ministriesPayload.canCreate));
       setSchedules(schedulesPayload.escalas || []);
+      setSchedulesCursor(schedulesPayload.nextCursor || null);
       setScheduleVolunteers(schedulesPayload.voluntarios || []);
       setFunctions(resourcesPayload.funcoes || []);
       setTemplates(resourcesPayload.modelos || []);
@@ -241,6 +249,30 @@ export default function MinistriesWorkspace({
     const timer = window.setTimeout(() => void loadData(), 0);
     return () => window.clearTimeout(timer);
   }, [loadData]);
+
+  const loadMoreSchedules = useCallback(async () => {
+    if (!schedulesCursor) return;
+    setLoadingSchedules(true);
+    try {
+      const address = new URL("/api/pilot/escalas", window.location.origin);
+      address.searchParams.set("cursor", schedulesCursor);
+      const response = await fetch(address, { cache: "no-store" });
+      const payload = (await response.json()) as {
+        escalas?: Schedule[];
+        nextCursor?: string | null;
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(payload.error || "Não foi possível carregar mais escalas.");
+      }
+      setSchedules((current) => [...current, ...(payload.escalas || [])]);
+      setSchedulesCursor(payload.nextCursor || null);
+    } catch (loadError) {
+      setError((loadError as Error).message);
+    } finally {
+      setLoadingSchedules(false);
+    }
+  }, [schedulesCursor]);
 
   const manageableMinistries = useMemo(
     () =>
@@ -1324,6 +1356,19 @@ export default function MinistriesWorkspace({
           )}
         </>
       )}
+
+      {!loading && schedulesCursor && (
+        <div className="schedule-load-more">
+          <button
+            type="button"
+            className="event-inline-action"
+            disabled={loadingSchedules}
+            onClick={() => void loadMoreSchedules()}
+          >
+            {loadingSchedules ? "Carregando escalas…" : "Carregar mais escalas"}
+          </button>
+        </div>
+      )}
     </section>
   );
 }
@@ -1337,17 +1382,34 @@ function TeamOverview({
   users: AvailableUser[];
   ministries: Ministry[];
 }) {
-  const week = Array.from({ length: 7 }, (_, index) => {
-    const date = new Date();
-    date.setHours(12, 0, 0, 0);
-    date.setDate(date.getDate() - date.getDay() + index);
-    const count = schedules.filter(
-      (schedule) =>
-        new Date(schedule.inicia_em).toLocaleDateString("pt-BR") ===
-        date.toLocaleDateString("pt-BR"),
-    ).length;
-    return { date, count };
-  });
+  // A semana partia de `new Date()` no corpo da renderização: servidor e
+  // cliente calculariam dias diferentes na virada, quebrando a hidratação, e o
+  // arranjo era refeito a cada renderização junto com sete varreduras da lista
+  // de escalas. Agora a âncora vem de estado e o cálculo é memoizado.
+  const [semanaAncora, setSemanaAncora] = useState(0);
+  useEffect(() => {
+    const acertar = () => setSemanaAncora(Date.now());
+    const primeiro = window.setTimeout(acertar, 0);
+    const relogio = window.setInterval(acertar, 60000);
+    return () => {
+      window.clearTimeout(primeiro);
+      window.clearInterval(relogio);
+    };
+  }, []);
+  const week = useMemo(() => {
+    if (!semanaAncora) return [];
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(semanaAncora);
+      date.setHours(12, 0, 0, 0);
+      date.setDate(date.getDate() - date.getDay() + index);
+      const rotulo = date.toLocaleDateString("pt-BR");
+      const count = schedules.filter(
+        (schedule) =>
+          new Date(schedule.inicia_em).toLocaleDateString("pt-BR") === rotulo,
+      ).length;
+      return { date, count };
+    });
+  }, [schedules, semanaAncora]);
   return (
     <div className="team-overview">
       <div className="team-metrics">
@@ -1380,17 +1442,28 @@ function TeamOverview({
         </article>
       </div>
       <div className="schedule-week" aria-label="Resumo da semana">
-        {week.map(({ date, count }) => (
-          <div className={count ? "has-service" : ""} key={date.toISOString()}>
-            <span>
-              {new Intl.DateTimeFormat("pt-BR", { weekday: "short" })
-                .format(date)
-                .replace(".", "")}
-            </span>
-            <b>{date.getDate()}</b>
-            <small>{count} escala{count === 1 ? "" : "s"}</small>
-          </div>
-        ))}
+        {/* Enquanto o cliente não acerta o relógio, as sete células vão vazias
+            em vez de a faixa sumir: sem elas a altura iria a zero e o conteúdo
+            abaixo saltaria ao aparecer. */}
+        {week.length
+          ? week.map(({ date, count }) => (
+              <div className={count ? "has-service" : ""} key={date.toISOString()}>
+                <span>
+                  {new Intl.DateTimeFormat("pt-BR", { weekday: "short" })
+                    .format(date)
+                    .replace(".", "")}
+                </span>
+                <b>{date.getDate()}</b>
+                <small>{count} escala{count === 1 ? "" : "s"}</small>
+              </div>
+            ))
+          : Array.from({ length: 7 }, (_, index) => (
+              <div key={`reserva-${index}`} aria-hidden="true">
+                <span>&nbsp;</span>
+                <b>&nbsp;</b>
+                <small>&nbsp;</small>
+              </div>
+            ))}
       </div>
     </div>
   );

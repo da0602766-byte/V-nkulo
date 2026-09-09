@@ -10,7 +10,10 @@ test("visão geral privada integra perfil, logout e resposta persistente de esca
     source("app/components/PilotDashboard.tsx"),
     source("app/globals.css"),
   ]);
-  assert.match(home, /fetch\("\/api\/pilot\/escalas"/);
+  // A Central pede as escalas já filtradas e limitadas: ela mostra no
+  // máximo quatro com participação pendente, e baixar o lote inteiro para
+  // descartar o resto no navegador era desperdício a cada abertura.
+  assert.match(home, /fetch\("\/api\/pilot\/escalas\?filtro=minhas-pendentes&limite=4"/);
   assert.match(home, /acao: "RESPONDER"/);
   assert.match(home, /assignment\.status === "PENDENTE"/);
   assert.match(home, /Presença confirmada/);

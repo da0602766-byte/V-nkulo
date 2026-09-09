@@ -44,7 +44,14 @@ type ChatData = {
   recentContentLoaded?: boolean;
 };
 
-export default function PrivateChatWorkspace() {
+export default function PrivateChatWorkspace({
+  initialTargetUserId = null,
+}: {
+  // Quem o painel de presença pediu para abrir. A conversa é criada (ou
+  // reaproveitada) no primeiro carregamento; a regra de quem pode falar com
+  // quem continua sendo decidida pelo servidor em /api/pilot/chat.
+  initialTargetUserId?: number | null;
+} = {}) {
   const initialConversation = Number(
     typeof window === "undefined"
       ? 0
@@ -57,6 +64,7 @@ export default function PrivateChatWorkspace() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const loadRecentRef = useRef(false);
+  const openedTargetRef = useRef(0);
 
   async function load(
     conversationId = activeId,
@@ -127,11 +135,11 @@ export default function PrivateChatWorkspace() {
     await load(conversationId);
   }
 
-  async function startConversation(person: Person) {
+  async function openWithUser(userId: number) {
     const response = await fetch("/api/pilot/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ targetUserId: person.id }),
+      body: JSON.stringify({ targetUserId: userId }),
     });
     const result = await readResult(response) as { conversationId?: number; error?: string };
     if (!response.ok || !result.conversationId) {
@@ -140,6 +148,18 @@ export default function PrivateChatWorkspace() {
     }
     await openConversation(result.conversationId);
   }
+
+  async function startConversation(person: Person) {
+    await openWithUser(person.id);
+  }
+
+  useEffect(() => {
+    if (!initialTargetUserId || initialTargetUserId <= 0) return;
+    if (openedTargetRef.current === initialTargetUserId) return;
+    openedTargetRef.current = initialTargetUserId;
+    void openWithUser(initialTargetUserId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTargetUserId]);
 
   async function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

@@ -12,7 +12,30 @@ type CellRow = {
   [key: string]: unknown;
 };
 
-export async function GET() {
+// O histórico de relatórios de célula desce por (data_reuniao, id).
+type CellReportCursor = { data: string; id: number };
+
+function encodeCellReportCursor(cursor: CellReportCursor) {
+  return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
+}
+
+function decodeCellReportCursor(value: string | null): CellReportCursor | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(value, "base64url").toString("utf8"),
+    ) as Partial<CellReportCursor>;
+    const id = Number(parsed.id);
+    if (typeof parsed.data !== "string" || !Number.isInteger(id) || id <= 0) {
+      return null;
+    }
+    return { data: parsed.data, id };
+  } catch {
+    return null;
+  }
+}
+
+export async function GET(request: Request) {
   const access = await requireTenantPermission("cells.view");
   if ("error" in access) return access.error;
   const db = getD1();
@@ -40,6 +63,17 @@ export async function GET() {
        AND (c.ativo = 1 OR ? = 1)
      GROUP BY c.id ORDER BY c.ativo DESC, c.nome`,
   ).bind(access.context.comunidadeId, canManage ? 1 : 0).all<CellRow>();
+  const cellAddress = new URL(request.url);
+  const reportCursor = decodeCellReportCursor(
+    cellAddress.searchParams.get("cursorRelatorios"),
+  );
+  const requestedReportSize = Number(
+    cellAddress.searchParams.get("limiteRelatorios") || 0,
+  );
+  const reportPageSize =
+    Number.isInteger(requestedReportSize) && requestedReportSize > 0
+      ? Math.min(requestedReportSize, 250)
+      : 250;
   const [agenda, reports, requests, users] = await Promise.all([
     db.prepare(
       `SELECT id, celula_id, titulo, inicia_em, termina_em, lembrete,
@@ -47,12 +81,24 @@ export async function GET() {
        WHERE comunidade_id = ? AND datetime(termina_em) >= datetime('now', '-7 days')
        ORDER BY inicia_em ASC LIMIT 250`,
     ).bind(access.context.comunidadeId).all(),
+    // O histórico de relatórios é o único destes quatro conjuntos que cresce
+    // indefinidamente: agenda é limitada pela janela de datas e a lista de
+    // pessoas pelo tamanho da comunidade. Por isso é o que ganha cursor.
     db.prepare(
       `SELECT r.id, r.celula_id, r.data_reuniao, r.aconteceu, r.presentes,
         r.visitantes, r.observacoes, r.criado_em, u.nome AS enviado_por_nome
        FROM celula_relatorios r LEFT JOIN usuarios u ON u.id = r.enviado_por_usuario_id
-       WHERE r.comunidade_id = ? ORDER BY r.data_reuniao DESC LIMIT 250`,
-    ).bind(access.context.comunidadeId).all(),
+       WHERE r.comunidade_id = ?
+         AND (? = 0 OR r.data_reuniao < ? OR (r.data_reuniao = ? AND r.id < ?))
+       ORDER BY r.data_reuniao DESC, r.id DESC LIMIT ?`,
+    ).bind(
+      access.context.comunidadeId,
+      reportCursor ? 1 : 0,
+      reportCursor?.data ?? "",
+      reportCursor?.data ?? "",
+      reportCursor?.id ?? 0,
+      reportPageSize + 1,
+    ).all<{ id: number; data_reuniao: string; celula_id: number }>(),
     db.prepare(
       `SELECT id, celula_id, nome, contato, mensagem, status, criado_em
        FROM celula_solicitacoes WHERE comunidade_id = ?
@@ -72,6 +118,17 @@ export async function GET() {
       papel: string;
     }>(),
   ]);
+
+  const hasMoreReports = reports.results.length > reportPageSize;
+  if (hasMoreReports) reports.results.length = reportPageSize;
+  const lastReport = reports.results[reports.results.length - 1];
+  const nextReportCursor =
+    hasMoreReports && lastReport
+      ? encodeCellReportCursor({
+          data: String(lastReport.data_reuniao ?? ""),
+          id: Number(lastReport.id),
+        })
+      : null;
   const usersById = new Map(users.results.map((user) => [Number(user.id), user]));
   const cells = result.results.map((cell) => {
     const canOperate = canManage || Number(cell.lider_usuario_id) === access.user.id || Number(cell.vice_lider_usuario_id) === access.user.id;
@@ -99,6 +156,8 @@ export async function GET() {
   });
   return Response.json({
     celulas: cells,
+    // Nulo quando o histórico de relatórios chegou ao fim.
+    nextReportCursor,
     availableUsers: canManage ? users.results.map((user) => ({ id: user.id, nome: user.nome, papel: user.papel })) : [],
     canManage,
   }, { headers: { "Cache-Control": "no-store" } });
