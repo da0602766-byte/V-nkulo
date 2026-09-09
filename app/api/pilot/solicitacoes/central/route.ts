@@ -164,7 +164,11 @@ async function loadRepositoryItemsPage(db: ReturnType<typeof getD1>, input: {
     collection.push(event);
     eventsByItem.set(itemId, collection);
   }
-  const items = result.results.map((item) => ({ ...item, eventos: eventsByItem.get(Number(item.id)) || [] }));
+  // Anotação explícita: espalhar um Record<string, unknown> sem propriedades
+  // conhecidas faz o TypeScript inferir só { eventos: ... }, descartando a
+  // assinatura de índice — e derrubando o acesso a item.repositorio_id em
+  // quem consome o retorno desta função.
+  const items: Record<string, unknown>[] = result.results.map((item) => ({ ...item, eventos: eventsByItem.get(Number(item.id)) || [] }));
   return { items, nextCursor };
 }
 
