@@ -511,7 +511,7 @@ test("conversas ficam no perfil, isolam comunidade e respeitam membro versus ofi
   ]);
   assert.match(chatApi, /communityAccess === "FEED_ONLY"/);
   assert.match(chatApi, /c\.comunidade_id = \?/);
-  assert.match(chatApi, /ciclo_mes = strftime\('%Y-%m','now'\)/);
+  assert.match(chatApi, /ciclo_semana = strftime\('%Y-%W','now'\)/);
   assert.match(chatApi, /usuario_menor_id/);
   assert.match(chatApi, /usuario_maior_id/);
   assert.doesNotMatch(chatApi, /createSystemNotification/);

@@ -2,8 +2,6 @@ import { getD1 } from "../../../../db";
 import { getRuntimeEnv } from "../../../../db/runtime-env";
 import { getSessionUser } from "../../../lib/local-auth";
 import {
-  createDriveFolder,
-  encryptDrivePayload,
   ensurePersonalDriveStorage,
   getDriveAccessToken,
   makeStorageReference,
@@ -11,17 +9,6 @@ import {
   uploadDriveFile,
 } from "../../../lib/google-integration";
 import { getActiveTenantContext } from "../../../lib/tenant";
-
-type LegacyMessage = {
-  id: number;
-  remetente_id: number;
-  remetente_nome: string;
-  mensagem: string;
-  hierarquia: string;
-  ministerio: string;
-  criado_em: string;
-  lida_em: string | null;
-};
 
 export async function POST() {
   const user = await getSessionUser();
@@ -35,12 +22,11 @@ export async function POST() {
   if (!context || !allowed) return Response.json({ error: "Somente a administração pode migrar o conteúdo." }, { status: 403 });
   const db = getD1();
   const storage = await db.prepare(
-    `SELECT proprietario_usuario_id, pasta_midias_id, pasta_conversas_id
+    `SELECT proprietario_usuario_id, pasta_midias_id
      FROM community_drive_storage WHERE comunidade_id = ? LIMIT 1`,
   ).bind(context.comunidadeId).first<{
     proprietario_usuario_id: number;
     pasta_midias_id: string;
-    pasta_conversas_id: string;
   }>();
   if (!storage) return Response.json({ error: "Configure primeiro a pasta Google Drive da comunidade." }, { status: 409 });
   try {
@@ -48,7 +34,6 @@ export async function POST() {
       "UPDATE community_drive_storage SET status_migracao = 'IN_PROGRESS', atualizado_em = CURRENT_TIMESTAMP WHERE comunidade_id = ?",
     ).bind(context.comunidadeId).run();
     const accessToken = await getDriveAccessToken(storage.proprietario_usuario_id);
-    const migratedChats = await migrateChats(context.comunidadeId, storage.pasta_conversas_id, accessToken);
     const migratedMedia = await migrateMedia(
       context.comunidadeId,
       storage.proprietario_usuario_id,
@@ -77,7 +62,6 @@ export async function POST() {
       ).bind(context.comunidadeId).run();
     }
     return Response.json({
-      migratedChats,
       migratedMedia,
       migratedPlatformMedia,
       remaining,
@@ -89,57 +73,6 @@ export async function POST() {
     ).bind(context.comunidadeId).run();
     return Response.json({ error: (error as Error).message }, { status: 409 });
   }
-}
-
-async function migrateChats(communityId: number, chatRoot: string, accessToken: string) {
-  const db = getD1();
-  const conversations = await db.prepare(
-    `SELECT id FROM conversas_privadas
-     WHERE comunidade_id = ? AND (drive_file_id IS NULL OR storage_provider <> 'GOOGLE_DRIVE')
-     ORDER BY id LIMIT 20`,
-  ).bind(communityId).all<{ id: number }>();
-  let migrated = 0;
-  for (const conversation of conversations.results) {
-    const folderId = await createDriveFolder(accessToken, `Conversa ${conversation.id}`, chatRoot);
-    const messages = await db.prepare(
-      `SELECT mp.id, mp.remetente_id, mp.mensagem, mp.lida_em, mp.criado_em,
-        u.nome AS remetente_nome,
-        CASE
-          WHEN u.perfil = 'ADMIN' THEN 'Proprietário do sistema'
-          WHEN uc.papel = 'ADMIN_COMUNIDADE' THEN 'Administrador da comunidade'
-          WHEN uc.papel = 'PASTOR' THEN 'Pastor'
-          WHEN uc.papel = 'LIDER' THEN 'Líder'
-          ELSE 'Membro'
-        END AS hierarquia,
-        COALESCE((SELECT group_concat(DISTINCT m.nome)
-          FROM ministerio_voluntarios mv
-          JOIN ministerios_comunidade m ON m.id = mv.ministerio_id
-          WHERE mv.usuario_id = u.id AND mv.comunidade_id = c.comunidade_id
-            AND mv.ativo = 1 AND m.status = 'ATIVO'), '') AS ministerio
-       FROM mensagens_privadas mp
-       JOIN conversas_privadas c ON c.id = mp.conversa_id
-       JOIN usuarios u ON u.id = mp.remetente_id
-       JOIN usuario_comunidades uc ON uc.usuario_id = u.id AND uc.comunidade_id = c.comunidade_id
-       WHERE mp.conversa_id = ? ORDER BY mp.id`,
-    ).bind(conversation.id).all<LegacyMessage>();
-    for (const message of messages.results) {
-      await uploadDriveFile(accessToken, {
-        name: `mensagem-${message.id}.vinkulo`,
-        type: "application/vnd.vinkulo.encrypted+json",
-        bytes: await encryptDrivePayload(message),
-        parentId: folderId,
-        properties: { type: "chat-message", conversationId: String(conversation.id), messageId: String(message.id) },
-      });
-    }
-    await db.batch([
-      db.prepare("DELETE FROM mensagens_privadas WHERE conversa_id = ?").bind(conversation.id),
-      db.prepare(
-        "UPDATE conversas_privadas SET drive_file_id = ?, storage_provider = 'GOOGLE_DRIVE', atualizado_em = CURRENT_TIMESTAMP WHERE id = ?",
-      ).bind(folderId, conversation.id),
-    ]);
-    migrated += 1;
-  }
-  return migrated;
 }
 
 async function migrateMedia(
@@ -457,9 +390,12 @@ async function cleanupLegacyObject(oldValue: string, bucket: MigrationTarget["bu
 }
 
 async function remainingLegacy(communityId: number, includePlatform: boolean) {
+  // Mensagens privadas não entram mais nesta contagem: elas ficaram de fora
+  // da migração para o Drive de propósito (ver app/lib/chat-retention.ts) —
+  // vivem só no sistema e são apagadas toda semana, então nunca vão "faltar
+  // migrar".
   const row = await getD1().prepare(
     `SELECT
-      (SELECT COUNT(*) FROM mensagens_privadas mp JOIN conversas_privadas c ON c.id = mp.conversa_id WHERE c.comunidade_id = ?) +
       (SELECT COUNT(*) FROM publicacoes_piloto WHERE comunidade_id = ? AND (imagem_url LIKE '/api/pilot/uploads/%' OR imagem_thumbnail_url LIKE '/api/pilot/uploads/%')) +
       (SELECT COUNT(*) FROM programacoes_editoriais WHERE comunidade_id = ? AND imagem_url LIKE '/api/pilot/uploads/%') +
       (SELECT COUNT(*) FROM ministerios_comunidade WHERE comunidade_id = ? AND banner_url LIKE '/api/pilot/uploads/%') +
@@ -472,7 +408,7 @@ async function remainingLegacy(communityId: number, includePlatform: boolean) {
          configuracao_nova LIKE '%/api/pilot/uploads/%' OR configuracao_nova LIKE '%data:image/%'))
       AS total`,
   ).bind(
-    communityId, communityId, communityId, communityId, communityId,
+    communityId, communityId, communityId, communityId,
     communityId, communityId, communityId, communityId,
   ).first<{ total: number }>();
   let total = Number(row?.total || 0);

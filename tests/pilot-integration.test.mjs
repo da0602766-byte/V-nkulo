@@ -5549,29 +5549,25 @@ test("filtro minhas-pendentes devolve só escalas com resposta pendente da pesso
   database.close();
 });
 
-// A migração do chat para o Drive lia UM lote de mensagens e em seguida apagava
-// a conversa inteira do banco: acima do tamanho do lote, o que não tinha subido
-// era apagado junto e se perdia. O laço agora avança por lotes e cada lote só é
-// apagado depois de subir. Este teste lê o código porque a migração depende do
-// Google Drive, que não existe no ambiente de teste — o que dá para garantir
-// aqui é que a exclusão não volte a ser indiscriminada.
-test("migração do chat para o Drive não apaga mensagem que não subiu", async () => {
-  const chat = await readSource("app/api/pilot/chat/route.ts");
+// Mensagens privadas saíram do Google Drive em 09/09/2026 e passaram a viver
+// só no banco do sistema, com uma condição: toda semana o ciclo vira e a
+// conversa da semana encerrada é apagada por completo, sem exceção (ver
+// app/lib/chat-retention.ts). Este teste garante que a exclusão semanal
+// continua restrita ao próprio filtro de ciclo — nunca um DELETE
+// indiscriminado que apagaria também a conversa da semana corrente.
+test("limpeza semanal do chat apaga só conversas fora do ciclo corrente", async () => {
+  const retention = await readSource("app/lib/chat-retention.ts");
 
   assert.doesNotMatch(
-    chat,
-    /DELETE FROM mensagens_privadas WHERE conversa_id = \?"\)/,
-    "a exclusão não pode voltar a apagar a conversa inteira: acima do lote isso perdia mensagens que nunca subiram",
+    retention,
+    /DELETE FROM conversas_privadas["`]\)/,
+    "a exclusão não pode virar um DELETE sem filtro: isso apagaria também a semana corrente",
   );
   assert.match(
-    chat,
-    /DELETE FROM mensagens_privadas\s*\n\s*WHERE conversa_id = \? AND id IN \(/,
-    "só os ids efetivamente enviados ao Drive podem ser apagados",
+    retention,
+    /DELETE FROM conversas_privadas WHERE ciclo_semana <> strftime\('%Y-%W','now'\)/,
+    "só as conversas de semanas encerradas podem ser apagadas; a semana corrente precisa sobreviver à limpeza",
   );
-  // O laço precisa avançar: sem o `mp.id > ?` o lote seguinte repetiria o
-  // primeiro e a migração nunca terminaria.
-  assert.match(chat, /WHERE mp\.conversa_id = \? AND mp\.id > \?/);
-  assert.match(chat, /legacyMessages\(conversationId, lastMigratedId\)/);
 });
 
 // Notificações contavam as não lidas sobre o lote carregado, então quem tivesse

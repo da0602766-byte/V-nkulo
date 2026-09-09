@@ -633,6 +633,10 @@ export const notificacoesSistema = sqliteTable("notificacoes_sistema", {
     .default(sql`CURRENT_TIMESTAMP`),
 });
 
+// Mensagens privadas moram só no banco do sistema (nunca no Google Drive).
+// Cada semana abre uma conversa nova (`ciclo_semana`) e a rotina de
+// manutenção em app/lib/chat-retention.ts apaga, sem exceção, toda conversa
+// de uma semana encerrada — a mensagem cascateia junto pela FK abaixo.
 export const conversasPrivadas = sqliteTable(
   "conversas_privadas",
   {
@@ -646,9 +650,7 @@ export const conversasPrivadas = sqliteTable(
     usuarioMaiorId: integer("usuario_maior_id")
       .notNull()
       .references(() => usuarios.id, { onDelete: "cascade" }),
-    cicloMes: text("ciclo_mes").notNull(),
-    driveFileId: text("drive_file_id"),
-    storageProvider: text("storage_provider").notNull().default("PLATFORM_LEGACY"),
+    cicloSemana: text("ciclo_semana").notNull(),
     atualizadoEm: text("atualizado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
     criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
@@ -657,7 +659,7 @@ export const conversasPrivadas = sqliteTable(
       table.comunidadeId,
       table.usuarioMenorId,
       table.usuarioMaiorId,
-      table.cicloMes,
+      table.cicloSemana,
     ),
     index("conversas_privadas_usuario_menor_idx").on(
       table.comunidadeId,
@@ -743,6 +745,7 @@ export const mensagensPrivadas = sqliteTable(
       .notNull()
       .references(() => usuarios.id, { onDelete: "cascade" }),
     mensagem: text("mensagem").notNull(),
+    entregueEm: text("entregue_em"),
     lidaEm: text("lida_em"),
     criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
   },

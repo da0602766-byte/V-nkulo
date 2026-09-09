@@ -97,7 +97,7 @@ export default function StoragePrivacyWorkspace() {
       setGoogleToast({
         variant: "success",
         title: "Pasta da comunidade criada",
-        detail: "Publicações, banners e conversas compartilhadas passam a usar esta pasta.",
+        detail: "Publicações e banners passam a usar esta pasta.",
       });
     } catch (error) {
       setGoogleToast({
@@ -185,7 +185,7 @@ export default function StoragePrivacyWorkspace() {
         <div>
           <p className="pilot-kicker">PRIVACIDADE E ARMAZENAMENTO</p>
           <h2 id="storage-privacy-title">Seus conteúdos não ficam no Vínkulo</h2>
-          <p>Fotos, arquivos e conteúdo de conversas ficam no Google Drive autorizado ou somente neste aparelho. A plataforma guarda apenas referências técnicas, consentimentos e permissões.</p>
+          <p>Fotos e arquivos ficam no Google Drive autorizado ou somente neste aparelho — a plataforma guarda apenas referências técnicas, consentimentos e permissões. Mensagens privadas seguem outra regra: para responder na hora, ficam gravadas no próprio sistema, sem histórico permanente, e são apagadas por completo toda semana.</p>
         </div>
       </header>
 
@@ -253,7 +253,7 @@ export default function StoragePrivacyWorkspace() {
             <strong>Drive da comunidade</strong>
             <p>{data.communityStorage
               ? `Configurado por ${data.communityStorage.proprietario_nome}. Migração: ${migrationLabel(data.communityStorage.status_migracao)}.`
-              : "Ainda não configurado. Publicações, banners e conversas compartilhadas precisam desta pasta."}</p>
+              : "Ainda não configurado. Publicações e banners precisam desta pasta."}</p>
           </div>
           {!data.communityStorage && driveConnected && <button type="button" disabled={busy} onClick={() => void configureCommunity()}>Criar pasta da comunidade</button>}
           {data.communityStorage && data.communityStorage.status_migracao !== "COMPLETE" && driveConnected && (
@@ -263,9 +263,10 @@ export default function StoragePrivacyWorkspace() {
       )}
 
       <ul className="storage-privacy-facts">
-        <li>O Vínkulo não guarda uma segunda cópia de fotos, arquivos ou mensagens novas.</li>
+        <li>O Vínkulo não guarda uma segunda cópia de fotos ou arquivos novos.</li>
         <li>O usuário pode negar o Drive e manter conteúdo privado somente no aparelho.</li>
-        <li>Conteúdo antigo só será apagado da plataforma depois da migração confirmada.</li>
+        <li>Conteúdo antigo de fotos e arquivos só será apagado da plataforma depois da migração confirmada.</li>
+        <li>Mensagens privadas não entram nessa migração: ficam só no sistema e são apagadas por completo toda semana, sem exceção.</li>
       </ul>
       {message && <p className="operations-feedback" role="status">{message}</p>}
 

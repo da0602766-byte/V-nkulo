@@ -53,7 +53,7 @@ type OwnerMetricKey =
   | "ministerios_ativos"
   | "solicitacoes_pendentes"
   | "eventos_futuros"
-  | "conversas_mes";
+  | "conversas_semana";
 
 const TABS: { id: OwnerTab; label: string; icon: string }[] = [
   { id: "overview", label: "Painel geral", icon: "▦" },
@@ -81,7 +81,7 @@ const OWNER_METRICS: {
   { key: "ministerios_ativos", label: "Ministérios ativos", detail: "Todas as comunidades" },
   { key: "solicitacoes_pendentes", label: "Solicitações pendentes", detail: "Exigem sua decisão", emphasis: true },
   { key: "eventos_futuros", label: "Eventos futuros", detail: "Agenda consolidada" },
-  { key: "conversas_mes", label: "Conversas no mês", detail: "Metadados operacionais" },
+  { key: "conversas_semana", label: "Conversas na semana", detail: "Metadados operacionais" },
 ];
 
 export default function OwnerWorkspace({

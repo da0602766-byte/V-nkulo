@@ -50,30 +50,38 @@ test("fotos pessoais ficam no Drive e anexos de publicação usam o bucket compa
   // continua coberta pelas asserções acima, sobre o caminho vivo de upload.
 });
 
-test("chat grava conteúdo criptografado no Drive e remove o legado só após copiar", async () => {
-  const [chat, migration, schema] = await Promise.all([
+// Mensagens privadas foram deliberadamente tiradas do Drive em 09/09/2026:
+// o histórico permanente que o Drive garantia para fotos e publicações é
+// exatamente o que uma conversa privada não deveria ter. Em troca, o chat
+// vive só no banco do sistema e é apagado por completo toda semana (ver
+// app/lib/chat-retention.ts) — a migração para o Drive não se aplica mais a
+// mensagens, só a mídia e conteúdo publicado.
+test("chat grava direto no banco do sistema e nunca mais no Drive", async () => {
+  const [chat, migration, retention, schema] = await Promise.all([
     read("app/api/pilot/chat/route.ts"),
     read("app/api/storage/migrate/route.ts"),
+    read("app/lib/chat-retention.ts"),
     read("drizzle/0060_google_drive_privacy.sql"),
   ]);
-  assert.match(chat, /encryptDrivePayload/);
-  assert.match(chat, /application\/vnd\.vinkulo\.encrypted\+json/);
-  assert.doesNotMatch(chat, /INSERT INTO mensagens_privadas/);
-  assert.match(migration, /uploadDriveFile[\s\S]*DELETE FROM mensagens_privadas/);
+  assert.doesNotMatch(chat, /encryptDrivePayload/);
+  assert.doesNotMatch(chat, /google-integration/);
+  assert.match(chat, /INSERT INTO mensagens_privadas/);
+  assert.match(chat, /ciclo_semana = strftime\('%Y-%W','now'\)/);
+  assert.doesNotMatch(migration, /mensagens_privadas/);
   assert.match(migration, /status_migracao = 'COMPLETE'/);
   assert.match(migration, /cadastros_membros_temporarios/);
   assert.match(migration, /layouts_interface_historico/);
   assert.match(migration, /feedback_plataforma/);
+  assert.match(retention, /DELETE FROM conversas_privadas WHERE ciclo_semana <> strftime/);
   assert.match(schema, /google_connections/);
   assert.match(schema, /community_drive_storage/);
 });
 
 test("interface explica destino e deixa anexos de publicação sob demanda", async () => {
-  const [privacy, storage, image, chat] = await Promise.all([
+  const [privacy, storage, image] = await Promise.all([
     read("app/privacidade/page.tsx"),
     read("app/components/StoragePrivacyWorkspace.tsx"),
     read("app/components/ResponsiveFeedImage.tsx"),
-    read("app/api/pilot/chat/route.ts"),
   ]);
   assert.match(privacy, /não mantém cópia do conteúdo/i);
   assert.match(storage, /Seus conteúdos não ficam no Vínkulo/);
@@ -82,7 +90,6 @@ test("interface explica destino e deixa anexos de publicação sob demanda", asy
   assert.match(image, /Visualizar imagem/);
   assert.match(image, /Baixar imagem/);
   assert.match(image, /download=1/);
-  assert.match(chat, /recentContentLoaded: loadRecent/);
 });
 
 test("login Google entrega a sessão de volta ao APK sem compartilhar cookies com o Chrome", async () => {

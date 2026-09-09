@@ -20,7 +20,7 @@ const OWNER_METRIC_KEYS = [
   "ministerios_ativos",
   "solicitacoes_pendentes",
   "eventos_futuros",
-  "conversas_mes",
+  "conversas_semana",
 ] as const;
 
 function clean(value: unknown, maximum: number) {
@@ -72,7 +72,7 @@ export async function GET() {
           (SELECT COUNT(*) FROM eventos_comunidade
             WHERE status = 'PUBLICADO' AND datetime(inicia_em) >= datetime('now')) AS eventos_futuros,
           (SELECT COUNT(*) FROM conversas_privadas
-            WHERE ciclo_mes = strftime('%Y-%m','now')) AS conversas_mes`,
+            WHERE ciclo_semana = strftime('%Y-%W','now')) AS conversas_semana`,
       )
       .first<Record<string, unknown>>(),
     db
