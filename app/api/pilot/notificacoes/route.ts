@@ -20,6 +20,11 @@ type NotificationRow = {
 const NOTIFICATION_PAGE_SIZE = 60;
 const NOTIFICATION_MAX_PAGE_SIZE = 100;
 
+// Teto da varredura de não lidas. A interface mostra o total até 99, então
+// 200 mantém o número exato em tudo que ela exibe sem deixar a consulta
+// crescer indefinidamente com o histórico.
+const UNREAD_SCAN_LIMIT = 200;
+
 // A lista desce por (criado_em, id), então o cursor carrega esse par.
 type NotificationCursor = { criadoEm: string; id: number };
 
@@ -98,23 +103,32 @@ export async function GET(request: Request) {
       : null;
 
   // O contador de não lidas era calculado sobre o lote carregado, então quem
-  // tivesse mais não lidas que o tamanho do lote via um número menor que o real.
-  // Esta consulta traz só as colunas que a regra de categoria usa, e a contagem
-  // reaproveita a mesma função, para não existirem duas versões da regra.
+  // tivesse mais não lidas que o lote via um número menor que o real — e a tela
+  // mostra o número até 99, então o erro aparecia. Esta consulta traz só as
+  // colunas que a regra de categoria usa, e a contagem reaproveita a mesma
+  // função, para não existirem duas versões da regra.
+  //
+  // O teto existe porque a consulta, sem ele, cresceria com o histórico de quem
+  // nunca abre as notificações. Com o dobro do que a tela chega a exibir, o
+  // número mostrado continua exato e a consulta para de crescer.
   const unreadRows = await db
     .prepare(
       `SELECT n.id, n.tipo, n.area, n.titulo
        FROM notificacoes_sistema n
        LEFT JOIN notificacoes_lidas nl
          ON nl.notificacao_id = n.id AND nl.usuario_id = ?
-       WHERE n.usuario_id = ? AND n.area <> 'CHAT' AND nl.id IS NULL`,
+       WHERE n.usuario_id = ? AND n.area <> 'CHAT' AND nl.id IS NULL
+       LIMIT ?`,
     )
-    .bind(user.id, user.id)
+    .bind(user.id, user.id, UNREAD_SCAN_LIMIT)
     .all<NotificationRow>();
   const owner = await db.prepare("SELECT id FROM comunidades WHERE proprietario_usuario_id = ? AND status = 'ATIVA' LIMIT 1").bind(user.id).first<{ id: number }>();
   const configKey = `notification_preferences:${user.id}`;
   const stored = await db.prepare("SELECT valor FROM configuracoes WHERE chave = ? LIMIT 1").bind(configKey).first<{ valor: string }>();
   const config = parseNotificationConfig(stored?.valor);
+  const unreadVisiveis = unreadRows.results.filter(
+    (item) => config[notificationCategory(item)],
+  );
   const notifications = result.results.map((item) => ({
     id: Number(item.id),
     type: item.tipo,
@@ -133,9 +147,18 @@ export async function GET(request: Request) {
   return Response.json({
     notifications,
     nextCursor,
-    unread: unreadRows.results.filter(
-      (item) => config[notificationCategory(item)],
-    ).length,
+    unread: unreadVisiveis.length,
+    // A tela mostra contadores por categoria (Agenda soma escalas e eventos,
+    // Pedidos tem o seu). Sem esta quebra ela os calculava sobre o lote e
+    // errava para quem tem mais não lidas que o lote.
+    unreadPorCategoria: unreadVisiveis.reduce(
+      (soma, item) => {
+        const categoria = notificationCategory(item);
+        soma[categoria] = (soma[categoria] || 0) + 1;
+        return soma;
+      },
+      {} as Record<NotificationCategory, number>,
+    ),
     canConfigure: Boolean(owner),
     config,
   });

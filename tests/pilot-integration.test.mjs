@@ -5622,8 +5622,24 @@ test("notificações paginam por cursor e contam não lidas fora do lote", async
   const primeiro = await pedirLote(null);
   assert.equal(primeiro.notifications.length, 60);
   assert.ok(primeiro.nextCursor, "deve haver lote seguinte");
-  // O contador descreve todas as não lidas, não só as do lote.
+  // O contador descreve todas as não lidas, não só as do lote. A interface
+  // mostra esse número até 99, então subestimar aparece na tela.
   assert.equal(primeiro.unread, TOTAL);
+  // A quebra por categoria também vem do servidor: a tela soma escalas e
+  // eventos na Agenda e mostra Pedidos à parte, e calculava tudo sobre o lote.
+  assert.ok(
+    primeiro.unreadPorCategoria,
+    "a resposta precisa trazer a quebra por categoria",
+  );
+  const somaCategorias = Object.values(primeiro.unreadPorCategoria).reduce(
+    (soma, n) => soma + n,
+    0,
+  );
+  assert.equal(
+    somaCategorias,
+    TOTAL,
+    "a soma das categorias precisa bater com o total",
+  );
 
   const vistos = [];
   let cursor = null;

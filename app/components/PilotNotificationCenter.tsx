@@ -33,6 +33,12 @@ export default function PilotNotificationCenter({
   onUnreadChange?: (summary: NotificationUnreadSummary) => void;
 }) {
   const [items, setItems] = useState<Notification[]>([]);
+  // Nulo até a primeira resposta; a soma sobre o lote fica de reserva para esse
+  // intervalo e para uma resposta antiga que ainda não traga o campo.
+  const [serverUnread, setServerUnread] = useState<{
+    total: number;
+    porCategoria: Partial<Record<NotificationCategory, number>>;
+  } | null>(null);
   const [scope, setScope] = useState<"tudo" | "precisa">("tudo");
   // O relógio vem de estado para o rótulo "Hoje/Ontem" não divergir entre
   // servidor e cliente na hidratação.
@@ -57,7 +63,6 @@ export default function PilotNotificationCenter({
   }, []);
   const requestRef = useRef<AbortController | null>(null);
   const permissionRef = useRef<"unsupported" | NotificationPermission>("unsupported");
-  const unread = items.filter((item) => !item.read).length;
   const unreadSummary = useMemo<NotificationUnreadSummary>(() => {
     const summary: NotificationUnreadSummary = {
       total: 0,
@@ -72,8 +77,18 @@ export default function PilotNotificationCenter({
       summary.total += 1;
       summary[item.category] += 1;
     }
+    // Quando o servidor informou os totais, eles mandam: a soma acima só
+    // enxerga o lote carregado e ficaria menor que a realidade. `markRead`
+    // desconta de `serverUnread`, porque marcar como lido não recarrega.
+    if (serverUnread) {
+      summary.total = serverUnread.total;
+      for (const chave of ["escalas", "eventos", "pedidos", "mensagens", "sistema"] as const) {
+        summary[chave] = serverUnread.porCategoria[chave] || 0;
+      }
+    }
     return summary;
-  }, [items]);
+  }, [items, serverUnread]);
+  const unread = unreadSummary.total;
 
   useEffect(() => {
     onUnreadChange?.(unreadSummary);
@@ -95,6 +110,11 @@ export default function PilotNotificationCenter({
       });
       const result = (await response.json()) as {
         notifications?: Notification[];
+        // Contagem de não lidas apurada no servidor: a soma feita aqui sobre o
+        // lote carregado errava para quem tem mais não lidas do que o lote, e a
+        // interface mostra esse número até 99.
+        unread?: number;
+        unreadPorCategoria?: Partial<Record<NotificationCategory, number>>;
         canConfigure?: boolean;
         config?: NotificationConfig;
         error?: string;
@@ -103,6 +123,11 @@ export default function PilotNotificationCenter({
       const nextItems = result.notifications || [];
       void showUnreadOnDevice(nextItems);
       setItems(nextItems);
+      setServerUnread(
+        typeof result.unread === "number"
+          ? { total: result.unread, porCategoria: result.unreadPorCategoria || {} }
+          : null,
+      );
       setCanConfigure(Boolean(result.canConfigure));
       setConfig(result.config || DEFAULT_CONFIG);
       setMessage("");
@@ -176,11 +201,27 @@ export default function PilotNotificationCenter({
       body: JSON.stringify(id ? { id } : { todas: true }),
     });
     if (!response.ok) return;
+    const marcado = id ? items.find((item) => item.id === id && !item.read) : null;
     setItems((current) =>
       current.map((item) =>
         !id || item.id === id ? { ...item, read: true } : item,
       ),
     );
+    // Marcar como lido não recarrega, então o total do servidor é ajustado aqui
+    // para o contador não continuar mostrando o que já foi lido.
+    setServerUnread((atual) => {
+      if (!atual) return atual;
+      if (!id) return { total: 0, porCategoria: {} };
+      if (!marcado) return atual;
+      const categoria = marcado.category;
+      return {
+        total: Math.max(0, atual.total - 1),
+        porCategoria: {
+          ...atual.porCategoria,
+          [categoria]: Math.max(0, (atual.porCategoria[categoria] || 0) - 1),
+        },
+      };
+    });
   }
 
   async function openNotification(item: Notification) {
