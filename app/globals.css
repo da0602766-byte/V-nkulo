@@ -32574,3 +32574,176 @@ html[data-pilot-theme="escuro"] .request-care-status.tone-blue { background:#173
     font-size: var(--fs-xs);
   }
 }
+
+/* Movimento das mensagens: bolha nova entrando pelo lado de quem escreveu,
+   tique reagindo à mudança de estado (enviado → entregue → lido) e o aviso
+   flutuante de mensagem recebida, que mostra quem escreveu. Tudo isso é
+   desligado em prefers-reduced-motion, no fim do bloco. */
+@keyframes private-chat-bubble-in-own {
+  from { opacity: 0; transform: translate3d(14px, 10px, 0) scale(.95); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes private-chat-bubble-in-peer {
+  from { opacity: 0; transform: translate3d(-14px, 10px, 0) scale(.95); }
+  to { opacity: 1; transform: none; }
+}
+.private-chat-messages article.is-new {
+  animation: private-chat-bubble-in-peer .3s cubic-bezier(.2, .8, .3, 1) both;
+}
+.private-chat-messages article.own.is-new { animation-name: private-chat-bubble-in-own; }
+
+@keyframes private-chat-tick-pop {
+  from { opacity: 0; transform: scale(.55); }
+  60% { transform: scale(1.18); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes private-chat-tick-waiting {
+  0%, 100% { opacity: .4; }
+  50% { opacity: 1; }
+}
+.private-chat-tick { display: inline-block; animation: private-chat-tick-pop .26s ease-out both; }
+.private-chat-tick.pending { animation: private-chat-tick-waiting 1.1s ease-in-out infinite; }
+.private-chat-thread form button.ready:active { transform: scale(.92); }
+
+/* Aviso de mensagem recebida: entra deslizando do topo, a foto de quem
+   escreveu cresce com dois anéis pulsando e uma linha marca o tempo até
+   sumir sozinho. Clicar abre a conversa dessa pessoa. */
+@keyframes message-arrival-in {
+  from { opacity: 0; transform: translate3d(0, -18px, 0) scale(.96); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes message-arrival-avatar {
+  from { opacity: 0; transform: scale(.4) rotate(-8deg); }
+  70% { transform: scale(1.08) rotate(0); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes message-arrival-ring {
+  from { opacity: .55; transform: scale(.85); }
+  to { opacity: 0; transform: scale(1.75); }
+}
+@keyframes message-arrival-timer {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+.message-arrival-toast {
+  position: fixed;
+  z-index: 200;
+  /* Abaixo da barra do topo: o aviso não pode tapar o sino, o atalho de
+     mensagens nem o menu da conta. */
+  top: calc(96px + env(safe-area-inset-top));
+  right: 16px;
+  width: min(390px, calc(100vw - 32px));
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  overflow: hidden;
+  border: 1px solid var(--pilot-line);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--pilot-surface) 96%, transparent);
+  box-shadow: 0 20px 50px rgb(9 20 38 / .22);
+  backdrop-filter: blur(14px);
+  animation: message-arrival-in .32s cubic-bezier(.2, .8, .3, 1) both;
+}
+.message-arrival-open {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  padding: 12px 8px 12px 14px;
+  background: transparent;
+  color: var(--pilot-text);
+  text-align: left;
+  cursor: pointer;
+}
+.message-arrival-avatar {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--pilot-primary), var(--pilot-accent));
+  color: #fff;
+  font-weight: 800;
+  animation: message-arrival-avatar .45s cubic-bezier(.2, .9, .3, 1.2) both;
+}
+.message-arrival-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.message-arrival-avatar > i {
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--pilot-primary);
+  border-radius: 50%;
+  animation: message-arrival-ring 1.6s ease-out infinite;
+}
+.message-arrival-avatar > i:last-child { animation-delay: .5s; }
+.message-arrival-text { min-width: 0; display: grid; gap: 2px; }
+.message-arrival-text strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.message-arrival-text small {
+  color: var(--pilot-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-sm);
+}
+.message-arrival-open > b {
+  min-width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--pilot-primary);
+  color: #fff;
+  font-size: var(--fs-xs);
+}
+.message-arrival-close {
+  flex: none;
+  width: 34px;
+  border: 0;
+  background: transparent;
+  color: var(--pilot-muted);
+  font-size: var(--fs-2xl);
+  cursor: pointer;
+}
+.message-arrival-timer {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 2px;
+  transform-origin: left center;
+  background: linear-gradient(90deg, var(--pilot-primary), var(--pilot-accent));
+  animation: message-arrival-timer 6s linear both;
+}
+
+/* O contador do atalho de mensagens dá um pulo quando algo novo chega. */
+@keyframes pilot-message-badge-pop {
+  from { transform: scale(.4); }
+  55% { transform: scale(1.3); }
+  to { transform: none; }
+}
+.pilot-message-shortcut b.is-arriving { animation: pilot-message-badge-pop .4s cubic-bezier(.2, .9, .3, 1.3) both; }
+
+@media (max-width: 760px) {
+  .message-arrival-toast {
+    top: calc(74px + env(safe-area-inset-top));
+    right: 10px;
+    left: 10px;
+    width: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .private-chat-messages article.is-new,
+  .private-chat-tick,
+  .private-chat-tick.pending,
+  .message-arrival-toast,
+  .message-arrival-avatar,
+  .message-arrival-avatar > i,
+  .pilot-message-shortcut b.is-arriving { animation: none; }
+  .message-arrival-timer { animation: message-arrival-timer 6s linear both; }
+  .private-chat-thread form button.ready:active { transform: none; }
+}

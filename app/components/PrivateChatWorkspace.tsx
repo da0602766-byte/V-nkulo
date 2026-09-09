@@ -67,6 +67,7 @@ type ThreadItem =
       time: string;
       showAvatar: boolean;
       tight: boolean;
+      fresh: boolean;
       status?: TickStatus;
       onRetry?: () => void;
     };
@@ -102,6 +103,11 @@ export default function PrivateChatWorkspace({
   const [draftLength, setDraftLength] = useState(0);
   const [error, setError] = useState("");
   const workspaceLoadedRef = useRef(false);
+  // Mensagens que acabaram de chegar (ou de ser enviadas) entram animando.
+  // O primeiro carregamento não anima nada: abrir a conversa não pode virar
+  // uma cascata de bolhas.
+  const [freshIds, setFreshIds] = useState<number[]>([]);
+  const seenIdsRef = useRef<Set<number> | null>(null);
   const openedTargetRef = useRef(0);
   const messagesRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
@@ -217,7 +223,24 @@ export default function PrivateChatWorkspace({
 
   useEffect(() => {
     stickToBottomRef.current = true;
+    seenIdsRef.current = null;
+    setFreshIds([]);
   }, [activeId]);
+
+  useEffect(() => {
+    const known = seenIdsRef.current;
+    const ids = confirmed.map((message) => message.id);
+    if (!known) {
+      seenIdsRef.current = new Set(ids);
+      return;
+    }
+    const fresh = ids.filter((id) => !known.has(id));
+    if (!fresh.length) return;
+    for (const id of fresh) known.add(id);
+    setFreshIds(fresh);
+    const timer = window.setTimeout(() => setFreshIds([]), 600);
+    return () => window.clearTimeout(timer);
+  }, [confirmed]);
 
   useEffect(() => {
     const el = messagesRef.current;
@@ -367,9 +390,9 @@ export default function PrivateChatWorkspace({
   }, [workspace?.conversations, search]);
   const activeConversation = workspace?.conversations.find((item) => Number(item.id) === activeId);
   const threadItems = useMemo(
-    () => buildThreadItems(confirmed, pending, workspace?.currentUserId || 0, retryPending),
+    () => buildThreadItems(confirmed, pending, workspace?.currentUserId || 0, retryPending, freshIds),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [confirmed, pending, workspace?.currentUserId],
+    [confirmed, pending, workspace?.currentUserId, freshIds],
   );
   const purgeCountdown = useMemo(() => formatPurgeCountdown(workspace?.nextPurgeAt || null), [workspace?.nextPurgeAt]);
   const purgeShort = useMemo(() => formatPurgeShort(workspace?.nextPurgeAt || null), [workspace?.nextPurgeAt]);
@@ -479,6 +502,7 @@ export default function PrivateChatWorkspace({
                           item.own ? "own" : "",
                           item.tight ? "tight" : "",
                           item.status === "failed" ? "failed" : "",
+                          item.fresh ? "is-new" : "",
                         ].filter(Boolean).join(" ")}
                       >
                         {!item.own && (
@@ -493,7 +517,7 @@ export default function PrivateChatWorkspace({
                           <p>{item.text}</p>
                           <footer>
                             <time>{item.time}</time>
-                            <Tick status={item.status} />
+                            <Tick key={item.status || "none"} status={item.status} />
                           </footer>
                         </div>
                         {item.onRetry && (
@@ -659,8 +683,10 @@ function buildThreadItems(
   pending: PendingMessage[],
   currentUserId: number,
   retry: (tempId: number) => void,
+  freshIds: number[] = [],
 ): ThreadItem[] {
-  type Normalized = { key: string; own: boolean; text: string; date: Date; senderId: number; status?: TickStatus; onRetry?: () => void };
+  const fresh = new Set(freshIds);
+  type Normalized = { key: string; own: boolean; text: string; date: Date; senderId: number; status?: TickStatus; onRetry?: () => void; fresh: boolean };
   const normalized: Normalized[] = [
     ...confirmed.map((message): Normalized => ({
       key: `m${message.id}`,
@@ -671,6 +697,7 @@ function buildThreadItems(
       status: Number(message.remetente_id) === Number(currentUserId)
         ? message.lida_em ? "read" : message.entregue_em ? "delivered" : "sent"
         : undefined,
+      fresh: fresh.has(message.id),
     })),
     ...pending.map((item): Normalized => ({
       key: `p${item.tempId}`,
@@ -680,6 +707,7 @@ function buildThreadItems(
       senderId: currentUserId,
       status: item.status,
       onRetry: item.status === "failed" ? () => retry(item.tempId) : undefined,
+      fresh: true,
     })),
   ];
 
@@ -705,6 +733,7 @@ function buildThreadItems(
       time: formatBubbleTime(item.date),
       showAvatar: endsGroup,
       tight: !isNewGroup,
+      fresh: item.fresh,
       status: item.status,
       onRetry: item.onRetry,
     });
