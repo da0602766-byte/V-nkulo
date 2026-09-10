@@ -86,7 +86,7 @@ const MENU: { id: View; label: string; permission: string }[] = [
   { id: "solicitacoes", label: "Pedidos", permission: "dashboard.view" },
   { id: "visitantes", label: "Visitantes", permission: "visitors.view" },
   { id: "celulas", label: "Células", permission: "cells.view" },
-  { id: "estacionamento", label: "Estacionamento", permission: "parking.view" },
+  { id: "estacionamento", label: "Gestão", permission: "parking.view" },
   { id: "redes", label: "Redes e unidades", permission: "networks.view" },
   { id: "membro", label: "Painel do membro", permission: "dashboard.view" },
   { id: "lider", label: "Painel de liderança", permission: "leadership.panel.view" },
@@ -464,7 +464,7 @@ export default function PilotDashboard({
           }),
           makeItem("visitantes", "Visitantes"),
           makeItem("solicitacoes", "Pedidos"),
-          makeItem("estacionamento", "Estacionamento"),
+          makeItem("estacionamento", "Gestão do estacionamento"),
           makeItem("celulas"),
           makeItem("redes"),
           makeItem("diaconia"),
@@ -520,7 +520,7 @@ export default function PilotDashboard({
               : null,
             active.permissions.includes("parking.view")
               ? {
-                  label: "Estacionamento",
+                  label: "Gestão",
                   description: "Entrada, saída ou ocorrência",
                   icon: "estacionamento" as MenuIconId,
                   view: "estacionamento" as View,

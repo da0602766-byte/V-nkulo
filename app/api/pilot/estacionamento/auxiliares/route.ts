@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     );
   }
   const db = getD1();
-  const [assignment, target, schedule] = await Promise.all([
+  const [assignment, target, ministryMembership, schedule] = await Promise.all([
     getActiveParkingAssignment(access.user.id, access.context.comunidadeId),
     db
       .prepare(
@@ -36,6 +36,18 @@ export async function POST(request: Request) {
       )
       .bind(parsed.usuarioId, access.context.comunidadeId)
       .first<{ id: number; nome: string }>(),
+    db
+      .prepare(
+        `SELECT mv.id
+         FROM ministerio_voluntarios mv
+         JOIN ministerios_comunidade m ON m.id = mv.ministerio_id
+           AND m.comunidade_id = mv.comunidade_id AND m.status = 'ATIVO'
+           AND (m.categoria = 'ESTACIONAMENTO' OR lower(m.nome) LIKE '%estacionamento%')
+         WHERE mv.usuario_id = ? AND mv.comunidade_id = ? AND mv.ativo = 1
+         LIMIT 1`,
+      )
+      .bind(parsed.usuarioId, access.context.comunidadeId)
+      .first<{ id: number }>(),
     db
       .prepare(
         `SELECT s.id, s.ministerio_id, s.titulo, s.inicia_em, s.termina_em
@@ -70,23 +82,16 @@ export async function POST(request: Request) {
       { status: 404 },
     );
   }
+  if (!ministryMembership) {
+    return Response.json(
+      {
+        error:
+          "Somente pessoas já cadastradas no ministério de estacionamento podem ser escaladas.",
+      },
+      { status: 403 },
+    );
+  }
 
-  await db
-    .prepare(
-      `INSERT INTO ministerio_voluntarios
-       (comunidade_id, ministerio_id, usuario_id, funcao, papel,
-        dias_disponiveis, periodo_preferido, ativo)
-       VALUES (?, ?, ?, 'Auxiliar de estacionamento', 'VOLUNTARIO',
-        '[]', 'FLEXIVEL', 1)
-       ON CONFLICT(ministerio_id, usuario_id) DO UPDATE SET
-         funcao = excluded.funcao, ativo = 1, atualizado_em = CURRENT_TIMESTAMP`,
-    )
-    .bind(
-      access.context.comunidadeId,
-      schedule.ministerio_id,
-      parsed.usuarioId,
-    )
-    .run();
   const volunteer = await db
     .prepare(
       `SELECT id FROM ministerio_voluntarios
@@ -99,7 +104,13 @@ export async function POST(request: Request) {
     )
     .first<{ id: number }>();
   if (!volunteer) {
-    return Response.json({ error: "Não foi possível criar o apoio." }, { status: 500 });
+    return Response.json(
+      {
+        error:
+          "Somente pessoas já cadastradas no ministério de estacionamento podem ser escaladas.",
+      },
+      { status: 403 },
+    );
   }
   try {
     await db

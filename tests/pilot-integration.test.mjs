@@ -3179,6 +3179,33 @@ test("escala ativa de estacionamento libera acesso operacional temporário", asy
   );
   assert.equal(crossTenantHelper.status, 404);
 
+  // Quem ainda não faz parte do ministério de estacionamento não pode ser
+  // escalado — a Gestão só permite convidar auxiliares já cadastrados nele.
+  const inviteOutsideMinistry = await worker.fetch(
+    new Request("http://localhost/api/pilot/estacionamento/auxiliares", {
+      method: "POST",
+      headers: {
+        cookie: memberCookie,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ usuarioId: helperId, escalaId: scheduleId }),
+    }),
+    env,
+    context,
+  );
+  assert.equal(inviteOutsideMinistry.status, 403);
+  const inviteOutsideMinistryBody = await inviteOutsideMinistry.json();
+  assert.match(inviteOutsideMinistryBody.error, /ministério de estacionamento/);
+
+  database
+    .prepare(
+      `INSERT INTO ministerio_voluntarios
+      (comunidade_id, ministerio_id, usuario_id, funcao, papel,
+       dias_disponiveis, periodo_preferido, ativo)
+      VALUES (1, ?, ?, 'Apoio de entrada', 'VOLUNTARIO', '[]', 'FLEXIVEL', 1)`,
+    )
+    .run(ministryId, helperId);
+
   const inviteHelper = await worker.fetch(
     new Request("http://localhost/api/pilot/estacionamento/auxiliares", {
       method: "POST",

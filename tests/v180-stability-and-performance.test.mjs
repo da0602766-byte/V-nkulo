@@ -5,28 +5,28 @@ import test from "node:test";
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
 test("ações administrativas sincronizam sem esconder toda a tela", async () => {
-  const [owner, parking] = await Promise.all([
+  const [owner, parkingData] = await Promise.all([
     read("app/components/OwnerWorkspace.tsx"),
-    read("app/components/ParkingWorkspace.tsx"),
+    read("app/components/parking/useParkingData.ts"),
   ]);
 
   assert.match(owner, /const load = useCallback\(async \(quiet = false\)/);
   assert.match(owner, /if \(!quiet\) setLoading\(true\)/);
   assert.ok((owner.match(/await load\(true\)/g) || []).length >= 5);
-  assert.match(parking, /const load = useCallback\(async \(quiet = false\)/);
-  assert.match(parking, /if \(!quiet\) setLoading\(false\)/);
+  assert.match(parkingData, /const load = useCallback\(async \(quiet = false\)/);
+  assert.match(parkingData, /if \(!quiet\) setLoading\(false\)/);
 });
 
 test("reservas e limpezas evitam recarregar dados que já estão na tela", async () => {
-  const parking = await read("app/components/ParkingWorkspace.tsx");
-  const reservationFlow = parking.slice(
-    parking.indexOf("async function createReservation"),
-    parking.indexOf("async function reportAction"),
+  const parkingData = await read("app/components/parking/useParkingData.ts");
+  const reservationFlow = parkingData.slice(
+    parkingData.indexOf("async function createReservation"),
+    parkingData.indexOf("async function reportAction"),
   );
 
   assert.match(reservationFlow, /await refreshReservations\(\)/);
   assert.match(reservationFlow, /current\.movimentacoes\.filter\(\(item\) => item\.status === "NO_LOCAL"\)/);
-  assert.match(reservationFlow, /CHECKIN"\) await load\(true\)/);
+  assert.match(reservationFlow, /isCheckin\) await load\(true\)/);
 });
 
 test("tipos centrais de tenant e banco permanecem explícitos", async () => {

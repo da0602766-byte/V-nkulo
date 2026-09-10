@@ -25,7 +25,7 @@ export async function GET() {
     );
   }
   const rules = readRules(config.regras);
-  const [stats, spaces, movements, occurrences, users, responsible, assignment] = await Promise.all([
+  const [stats, spaces, movements, occurrences, users, ministryMembers, responsible, assignment] = await Promise.all([
     db
       .prepare(
         `SELECT
@@ -90,6 +90,20 @@ export async function GET() {
       )
       .bind(access.context.comunidadeId)
       .all<Record<string, unknown>>(),
+    db
+      .prepare(
+        `SELECT u.id, u.nome, mv.papel
+         FROM ministerio_voluntarios mv
+         JOIN ministerios_comunidade m
+           ON m.id = mv.ministerio_id AND m.comunidade_id = mv.comunidade_id
+         JOIN usuarios u ON u.id = mv.usuario_id
+         WHERE mv.comunidade_id = ? AND mv.ativo = 1 AND m.status = 'ATIVO'
+           AND (m.categoria = 'ESTACIONAMENTO' OR lower(m.nome) LIKE '%estacionamento%')
+           AND u.ativo = 1
+         ORDER BY u.nome LIMIT 250`,
+      )
+      .bind(access.context.comunidadeId)
+      .all<Record<string, unknown>>(),
     rules.responsavelUsuarioId
       ? db
           .prepare(
@@ -123,6 +137,10 @@ export async function GET() {
       availableUsers: access.context.permissions.includes("parking.helpers.manage") ||
         access.context.permissions.includes("parking.configure")
         ? users.results
+        : [],
+      ministryMembers: access.context.permissions.includes("parking.helpers.manage") ||
+        access.context.permissions.includes("parking.configure")
+        ? ministryMembers.results
         : [],
       operator: {
         id: access.user.id,
