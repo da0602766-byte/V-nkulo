@@ -33303,7 +33303,11 @@ html[data-pilot-theme="escuro"] .request-care-status.tone-blue { background:#173
   width: min(560px, 100%);
   max-height: min(92vh, calc(100dvh - 24px));
   overflow-y: auto;
-  background: var(--pilot-surface);
+  /* var(--pilot-surface) segue a opacidade de "vidro" das configurações —
+     ótima para um cartão sobre o fundo da própria página, mas ilegível
+     num painel que cobre o mapa de vagas atrás dele. var(--pilot-bg) é o
+     fundo sólido da página, sempre opaco nos dois temas. */
+  background: var(--pilot-bg);
   border-radius: 20px 20px 0 0;
   padding: 18px;
   display: grid;
