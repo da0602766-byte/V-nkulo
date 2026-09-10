@@ -37,16 +37,18 @@ test("publication comments and composer controls are compact and readable", asyn
 test("parking exposes reserved spaces and reservations do not require an RSVP", async () => {
   const availability = await read("app/api/pilot/estacionamento/disponibilidade/route.ts");
   const reservations = await read("app/api/pilot/estacionamento/reservas/route.ts");
-  const workspace = await read("app/components/ParkingWorkspace.tsx");
+  const memberPortal = await read("app/components/parking/ParkingMemberPortal.tsx");
   const qr = await read("app/components/ParkingReservationQr.tsx");
   assert.match(availability, /EXISTS\(SELECT 1 FROM estacionamento_reservas/);
-  assert.match(workspace, /Reservada/);
+  assert.match(memberPortal, /Reservada/);
   assert.doesNotMatch(reservations, /confirmacoes_evento/);
   assert.match(reservations, /status\s*=\s*'PUBLICADO'/);
   assert.match(qr, /typeof accepted === "string"/);
-  assert.match(workspace, /reservation\.status === "CONFIRMADA"[\s\S]*<ParkingReservationQr/);
+  assert.match(memberPortal, /reservation\.status === "CONFIRMADA"[\s\S]*<ParkingReservationQr/);
   assert.match(qr, /Válido até/);
   assert.match(qr, /formatRemaining/);
-  assert.match(workspace, /Horário sugerido do culto/);
+  // V2026 — o horário sugerido do culto virou preenchimento automático dos
+  // campos de chegada/saída ao escolher o evento, em vez de um aviso fixo.
+  assert.match(memberPortal, /function chooseEvent[\s\S]*getEventParkingWindow\(event\)/);
   assert.match(reservations, /O check-in era permitido até esse horário/);
 });

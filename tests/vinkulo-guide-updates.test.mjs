@@ -119,7 +119,7 @@ test("ajustes operacionais V4.7.4 conectam estacionamento, escalas, pessoas e ev
     ownerUi,
   ] = await Promise.all([
     source("../app/api/pilot/estacionamento/mapa/route.ts"),
-    source("../app/components/ParkingWorkspace.tsx"),
+    source("../app/components/parking/ParkingManagementConsole.tsx"),
     source("../app/api/pilot/escalas/route.ts"),
     source("../app/api/pilot/escalas/[id]/route.ts"),
     source("../app/components/SecretaryMinisterialWorkspace.tsx"),
@@ -135,7 +135,7 @@ test("ajustes operacionais V4.7.4 conectam estacionamento, escalas, pessoas e ev
 
   assert.match(parkingApi, /ATUALIZAR_SETOR/);
   assert.match(parkingApi, /parking\.configure/);
-  assert.match(parkingUi, /parking-sector-editor/);
+  assert.match(parkingUi, /gestao-sector-editor/);
   assert.match(scheduleApi, /DEFINIR_STATUS_DESIGNACAO/);
   assert.match(scheduleCreateApi, /ministerio_equipes[\s\S]*ativa = 1/);
   assert.match(scheduleApi, /schedule_share_access/);

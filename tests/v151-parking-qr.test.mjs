@@ -47,10 +47,12 @@ const qrComponent = await readFile(
   new URL("../app/components/ParkingReservationQr.tsx", import.meta.url),
   "utf8",
 );
-const parkingWorkspace = await readFile(
-  new URL("../app/components/ParkingWorkspace.tsx", import.meta.url),
-  "utf8",
-);
+const parkingWorkspace = (await Promise.all([
+  "app/components/ParkingWorkspace.tsx",
+  "app/components/parking/ParkingManagementConsole.tsx",
+  "app/components/parking/ParkingOperatorMobile.tsx",
+  "app/components/parking/ParkingMemberPortal.tsx",
+].map((path) => readFile(new URL(`../${path}`, import.meta.url), "utf8")))).join("\n\n");
 const reservationRoute = await readFile(
   new URL("../app/api/pilot/estacionamento/reservas/route.ts", import.meta.url),
   "utf8",

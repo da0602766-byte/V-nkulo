@@ -16,14 +16,18 @@ test("read notifications can be cleared without deleting unread notices", async 
   assert.match(route, /JOIN notificacoes_lidas/);
 });
 
-test("authorized parking roles keep management access even with an active ticket", async () => {
-  const [parking, reservations] = await Promise.all([
+// V2026 — não existe mais um "modo gestor" embutido dentro da experiência de
+// celular: o orquestrador da Gestão (ParkingWorkspace) decide, uma única
+// vez, se quem acessa é um operador em plantão (celular, sem acesso
+// permanente) ou o console de gestão completo (líder, administração, ou
+// qualquer acesso em um computador).
+test("papéis autorizados mantêm o console de gestão mesmo com uma reserva ativa", async () => {
+  const [orchestrator, reservations] = await Promise.all([
     read("app/components/ParkingWorkspace.tsx"),
     read("app/api/pilot/estacionamento/reservas/route.ts"),
   ]);
-  assert.match(parking, /canEntry \|\| canExit \|\| canEdit \|\| canConfigure/);
-  assert.match(parking, /canManage && <div className="parking-mobile-role"/);
-  assert.match(parking, /Abrir gestão/);
+  assert.match(orchestrator, /isPermanentLeader = Boolean\(parking\.data\?\.permissions\.includes\("parking\.configure"\)\)/);
+  assert.match(orchestrator, /return <ParkingManagementConsole/);
   assert.match(reservations, /"parking.entry", "parking.exit", "parking.edit", "parking.configure"/);
 });
 

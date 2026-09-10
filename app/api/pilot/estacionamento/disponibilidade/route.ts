@@ -44,7 +44,7 @@ export async function GET() {
     config:{ ...config, ...rules, responsavel:null, atualizado_por_nome:null },
     stats:{ total:Number(stats?.total||0), ocupadas:Number(stats?.ocupadas||0), livres:availableSpaces, especiais:Number(stats?.especiais||0) },
     vagas:spaces.results,
-    movimentacoes:[], ocorrencias:[], availableUsers:[],
+    movimentacoes:[], ocorrencias:[], availableUsers:[], ministryMembers:[],
     operator:{ id:access.user.id,nome:access.user.nome,email:access.user.email,papel:access.context.papel,origemAcesso:"MEMBRO",escala:null },
     permissions:access.context.permissions,
     reservationGate:{

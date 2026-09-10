@@ -222,6 +222,17 @@ export async function getActiveTenantContext(
         if (!permissions.includes(permission)) permissions.push(permission);
       }
     }
+    // O líder do ministério de estacionamento (responsável do ministério ou
+    // voluntário com papel LIDER) tem acesso permanente à Gestão, sem
+    // depender de uma escala ativa. Auxiliares comuns continuam dependendo
+    // da escala confirmada acima.
+    const parkingLeaderPermissions = await getParkingLeaderPermissions(
+      user.id,
+      membership.comunidadeId,
+    );
+    for (const permission of parkingLeaderPermissions) {
+      if (!permissions.includes(permission)) permissions.push(permission);
+    }
     const temporaryToken = jar.get(TEMPORARY_ACCESS_COOKIE)?.value;
     const cookieGrant = temporaryToken
       ? await getTemporaryAccessByToken(getD1(), temporaryToken)
@@ -353,6 +364,41 @@ async function getDiaconiaPermissions(
     permissions.push("diaconia.manage", "diaconia.report");
   }
   return permissions;
+}
+
+async function getParkingLeaderPermissions(
+  userId: number,
+  comunidadeId: number,
+): Promise<string[]> {
+  const leadership = await getD1()
+    .prepare(
+      `SELECT
+        MAX(CASE WHEN m.responsavel_usuario_id = ? THEN 1 ELSE 0 END) AS responsavel,
+        MAX(CASE WHEN mv.papel = 'LIDER' AND mv.ativo = 1 THEN 1 ELSE 0 END) AS voluntarioLider
+      FROM ministerios_comunidade m
+      LEFT JOIN ministerio_voluntarios mv
+        ON mv.ministerio_id = m.id
+       AND mv.comunidade_id = m.comunidade_id
+       AND mv.usuario_id = ?
+      WHERE m.comunidade_id = ? AND m.status = 'ATIVO'
+        AND (m.categoria = 'ESTACIONAMENTO' OR lower(m.nome) LIKE '%estacionamento%')`,
+    )
+    .bind(userId, userId, comunidadeId)
+    .first<{ responsavel: number; voluntarioLider: number }>();
+  const isLeader =
+    Number(leadership?.responsavel || 0) === 1 ||
+    Number(leadership?.voluntarioLider || 0) === 1;
+  if (!isLeader) return [];
+  return [
+    "parking.view",
+    "parking.reserve",
+    "parking.entry",
+    "parking.exit",
+    "parking.edit",
+    "parking.configure",
+    "parking.helpers.manage",
+    "parking.report",
+  ];
 }
 
 export async function requireTenantPermission(

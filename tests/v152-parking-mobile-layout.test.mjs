@@ -2,21 +2,27 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const component = await readFile(new URL("../app/components/ParkingWorkspace.tsx", import.meta.url), "utf8");
-const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+const orchestrator = await readFile(new URL("../app/components/ParkingWorkspace.tsx", import.meta.url), "utf8");
+const memberPortal = await readFile(new URL("../app/components/parking/ParkingMemberPortal.tsx", import.meta.url), "utf8");
 const migration = await readFile(new URL("../drizzle/0052_parking_vehicle_details.sql", import.meta.url), "utf8");
 
-test("mobile parking follows the compact four-step reservation flow", () => {
-  assert.match(component, /01 \/ LOCAL/);
-  assert.match(component, /02 \/ VAGA/);
-  assert.match(component, /03 \/ CONFIRMAÇÃO/);
-  assert.match(component, /DADOS DO USUÁRIO/);
-  assert.match(component, /DADOS DO VEÍCULO/);
-  assert.match(component, /placaVeiculo/);
-  assert.match(component, /modeloVeiculo/);
-  assert.match(component, /corVeiculo/);
-  assert.match(styles, /@media \(max-width:680px\)/);
-  assert.match(styles, /\.parking-desktop-shell \{ display:none!important; \}/);
+// V2026 — o painel de estacionamento foi totalmente redesenhado como
+// "Gestão": em vez de duas árvores JSX pré-renderizadas e alternadas por CSS
+// (`.parking-desktop-shell { display:none }` abaixo de 680px), a escolha de
+// experiência (membro, operador em plantão no celular ou console de gestão)
+// agora acontece uma única vez em JavaScript, via matchMedia.
+test("a experiência de celular é escolhida em JavaScript, não por CSS oculto", () => {
+  assert.match(orchestrator, /matchMedia\(MOBILE_QUERY\)/);
+  assert.match(orchestrator, /\(max-width: 900px\)/);
+  assert.match(orchestrator, /showOperatorMobile/);
+});
+
+test("a reserva do membro continua coletando os dados do usuário e do veículo", () => {
+  assert.match(memberPortal, /Seus dados/);
+  assert.match(memberPortal, /Veículo/);
+  assert.match(memberPortal, /placaVeiculo/);
+  assert.match(memberPortal, /modeloVeiculo/);
+  assert.match(memberPortal, /corVeiculo/);
 });
 
 test("vehicle details are durable fields in parking reservations", () => {
