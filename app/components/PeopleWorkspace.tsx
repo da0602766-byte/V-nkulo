@@ -106,6 +106,14 @@ const TITLES = [
   "GESTORA DE CUIDADO",
 ];
 
+const TITLE_CATEGORIES = [
+  { label: "Liderança de células", titles: ["LÍDER", "SUPERVISOR DE CÉLULAS", "SUPERVISORA DE CÉLULAS"] },
+  { label: "Cuidado e diaconia", titles: ["GESTOR DE CUIDADO", "GESTORA DE CUIDADO", "DIÁCONO", "DIACONISA"] },
+  { label: "Ministérios", titles: ["COORDENADOR DE MINISTÉRIO", "COORDENADORA DE MINISTÉRIO", "EVANGELISTA", "MISSIONÁRIO", "MISSIONÁRIA"] },
+  { label: "Pastoral", titles: ["PRESBÍTERO", "PRESBÍTERA", "PASTOR", "PASTORA"] },
+  { label: "Administração", titles: ["SECRETÁRIO", "SECRETÁRIA"] },
+] as const;
+
 const HIERARCHY_PERMISSION_PRESETS: Record<string, string[]> = {
   "LÍDER": ["visitors.view", "visitors.create", "visitors.edit", "followups.view", "followups.manage", "cells.view", "events.view", "ministries.view", "schedules.view", "feed.publish"],
   "DIÁCONO": ["visitors.view", "followups.view", "events.view", "ministries.view", "schedules.view", "parking.view", "parking.report"],
@@ -169,6 +177,7 @@ export default function PeopleWorkspace({
   const [permissionDraft, setPermissionDraft] = useState<string[]>([]);
   const [presetTitle, setPresetTitle] = useState("LÍDER");
   const [officialTitle, setOfficialTitle] = useState("LÍDER");
+  const [isOfficial, setIsOfficial] = useState(false);
   const [removing, setRemoving] = useState<Person | null>(null);
   const [removeConfirmation, setRemoveConfirmation] = useState("");
   const [removalIssue, setRemovalIssue] = useState<{ message: string; blockers: RemovalBlocker[] } | null>(null);
@@ -264,7 +273,7 @@ export default function PeopleWorkspace({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           membershipId: editing.membership_id,
-          oficial: form.get("oficial") === "on",
+          oficial: isOfficial,
           papel: form.get("papel"),
           titulo: form.get("titulo"),
           permissions: form.getAll("permissions"),
@@ -459,7 +468,7 @@ export default function PeopleWorkspace({
             </div>
             <div className="people-card-actions">
               {data.canManage && (
-                <button type="button" onClick={() => { const title = person.titulo_oficial || "LÍDER"; setEditing(person); setPermissionDraft(person.permissoes.split(",").filter(Boolean)); setPresetTitle(title); setOfficialTitle(title); }}>
+                <button type="button" onClick={() => { const title = person.titulo_oficial || "LÍDER"; setEditing(person); setPermissionDraft(person.permissoes.split(",").filter(Boolean)); setPresetTitle(title); setOfficialTitle(title); setIsOfficial(Boolean(person.oficial)); }}>
                   Editar função
                 </button>
               )}
@@ -524,15 +533,21 @@ export default function PeopleWorkspace({
             <form className="people-role-form" onSubmit={saveOfficial}>
               <label className="people-official-toggle">
                 <input
-                  name="oficial"
                   type="checkbox"
-                  defaultChecked={Boolean(editing.oficial)}
+                  checked={isOfficial}
+                  onChange={(event) => setIsOfficial(event.target.checked)}
                 />
                 <span>
                   <strong>Esta pessoa é oficial da comunidade</strong>
                   <small>Ao desativar, volta a ser membro sem permissões extras.</small>
                 </span>
               </label>
+              {isOfficial && (
+                <button type="button" className="people-remove-official" onClick={() => { setIsOfficial(false); setPermissionDraft([]); }}>
+                  Remover título e permissões extras
+                </button>
+              )}
+              {isOfficial ? <>
               <div className="people-role-grid">
                 <label>
                   Papel no sistema
@@ -550,8 +565,10 @@ export default function PeopleWorkspace({
                     value={officialTitle}
                     onChange={(event) => { setOfficialTitle(event.target.value); setPresetTitle(event.target.value); }}
                   >
-                    {TITLES.map((title) => (
-                      <option key={title}>{title}</option>
+                    {TITLE_CATEGORIES.map((category) => (
+                      <optgroup key={category.label} label={category.label}>
+                        {category.titles.map((title) => <option key={title} value={title}>{title}</option>)}
+                      </optgroup>
                     ))}
                   </select>
                 </label>
@@ -559,7 +576,7 @@ export default function PeopleWorkspace({
               <section className="people-hierarchy-builder" aria-label="Modelo de permissões por hierarquia">
                 <div><strong>Modelo de atuação</strong><small>Escolha uma hierarquia pronta; ela só preenche permissões que você já pode conceder.</small></div>
                 <select value={presetTitle} onChange={(event) => setPresetTitle(event.target.value)} aria-label="Hierarquia usada como modelo">
-                  {TITLES.map((title) => <option key={title} value={title}>{title}</option>)}
+                  {TITLE_CATEGORIES.map((category) => <optgroup key={category.label} label={category.label}>{category.titles.map((title) => <option key={title} value={title}>{title}</option>)}</optgroup>)}
                 </select>
                 <button type="button" onClick={() => applyHierarchyModel(presetTitle)}>Aplicar modelo</button>
                 <p>{HIERARCHY_MODEL_COPY[presetTitle] || "Base inicial para organizar a atuação desta pessoa."}</p>
@@ -580,6 +597,9 @@ export default function PeopleWorkspace({
                   })}
                 </div>
               </fieldset>
+              </> : (
+                <p className="people-official-removal-note">Ao salvar, o título oficial e todas as permissões extras serão removidos. A pessoa voltará a ser membro.</p>
+              )}
               <div className="people-form-actions">
                 <button disabled={saving}>
                   {saving ? "Salvando…" : "Salvar função e permissões"}

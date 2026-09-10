@@ -29878,6 +29878,12 @@ body {
 }
 .people-official-toggle > input { width:22px; height:22px; min-height:0; margin:0; accent-color:var(--pilot-accent); }
 .people-official-toggle > span { display:grid; gap:4px; }
+.people-role-form select { color-scheme:dark; }
+.people-role-form select option,
+.people-role-form select optgroup { background:var(--white); color:var(--ink); }
+.people-remove-official { justify-self:start; min-height:38px; border:1px solid color-mix(in srgb,#d9664d 58%,var(--pilot-line)); border-radius:10px; background:transparent; color:#d9664d; padding:7px 11px; font-weight:800; cursor:pointer; }
+.people-remove-official:hover { background:color-mix(in srgb,#d9664d 12%,transparent); }
+.people-official-removal-note { margin:0; border:1px solid color-mix(in srgb,#d9664d 38%,var(--pilot-line)); border-radius:12px; background:color-mix(in srgb,#d9664d 8%,var(--pilot-surface)); color:var(--pilot-muted); padding:12px 14px; font-size:var(--fs-sm); font-weight:650; line-height:1.5; }
 .people-hierarchy-builder { display:grid; grid-template-columns:minmax(0,1fr) minmax(160px,.55fr) auto; align-items:end; gap:10px; border:1px solid var(--pilot-line); border-radius:14px; background:color-mix(in srgb,var(--pilot-accent) 6%,var(--pilot-surface)); padding:13px; }
 .people-hierarchy-builder > div { display:grid; gap:3px; }
 .people-hierarchy-builder small { color:var(--pilot-muted); }

@@ -15,7 +15,8 @@ type ReceptionCommunity = {
 const AUDIENCES = [
   {
     id: "participa",
-    label: "🙋 Quem participa",
+    label: "Quem participa",
+    icon: "participant",
     titulo: "Uma recepção simples, feita pra ficar",
     texto:
       "Feed da comunidade, próximos eventos e onde estar no domingo — sem depender de grupo lotado.",
@@ -32,7 +33,8 @@ const AUDIENCES = [
   },
   {
     id: "lidera",
-    label: "🧭 Quem lidera",
+    label: "Quem lidera",
+    icon: "leader",
     titulo: "Ferramentas completas de gestão",
     texto:
       "Organize ministérios, escalas, visitantes e comunicação sem planilhas paralelas.",
@@ -101,12 +103,28 @@ const TESTIMONIALS = [
 ] as const;
 
 const FEATURES = [
-  { icone: "👥", titulo: "Pessoas", texto: "Perfis e vínculos" },
-  { icone: "🎚️", titulo: "Ministérios", texto: "Equipes e escalas" },
-  { icone: "📅", titulo: "Eventos", texto: "Agenda e inscrições" },
-  { icone: "💬", titulo: "Comunicação", texto: "Feed e avisos" },
-  { icone: "✨", titulo: "IA com revisão", texto: "Rascunhos aprovados" },
+  { icone: "people", titulo: "Pessoas", texto: "Perfis e vínculos" },
+  { icone: "controls", titulo: "Ministérios", texto: "Equipes e escalas" },
+  { icone: "calendar", titulo: "Eventos", texto: "Agenda e inscrições" },
+  { icone: "message", titulo: "Comunicação", texto: "Feed e avisos" },
+  { icone: "spark", titulo: "IA com revisão", texto: "Rascunhos aprovados" },
 ] as const;
+
+type ReceptionIconName = "participant" | "leader" | "people" | "controls" | "calendar" | "message" | "spark" | "celebration";
+
+function ReceptionIcon({ name }: { name: ReceptionIconName }) {
+  const paths: Record<ReceptionIconName, React.ReactNode> = {
+    participant: <><circle cx="12" cy="8" r="3" /><path d="M5 20c.7-4 3.1-6 7-6s6.3 2 7 6" /></>,
+    leader: <><path d="m12 3 2.2 4.5 4.8.7-3.5 3.4.8 4.8-4.3-2.3-4.3 2.3.8-4.8-3.5-3.4 4.8-.7L12 3Z" /></>,
+    people: <><circle cx="9" cy="9" r="3" /><circle cx="17" cy="10" r="2.5" /><path d="M3.5 20c.6-4 2.5-6 5.5-6 3.1 0 5 2 5.5 6M15 15c2.8.2 4.5 1.9 5 5" /></>,
+    controls: <><path d="M4 7h16M4 17h16" /><circle cx="9" cy="7" r="2" /><circle cx="15" cy="17" r="2" /></>,
+    calendar: <><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M8 3v4M16 3v4M4 10h16" /></>,
+    message: <><path d="M5 5h14v10H10l-5 4V5Z" /><path d="M8 9h8M8 12h5" /></>,
+    spark: <path d="m12 3 1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7L12 3Zm6 13 .7 2.3L21 19l-2.3.7L18 22l-.7-2.3L15 19l2.3-.7L18 16Z" />,
+    celebration: <><path d="M5 18 9 6l8 4-4 10-8-2Z" /><path d="m10 7 1 4m2-3 1 4m4-6 2-2m-4 0 1-3" /></>,
+  };
+  return <svg className="rc-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>;
+}
 
 export default function ReceptionExperience({
   communities,
@@ -221,8 +239,8 @@ export default function ReceptionExperience({
           </div>
         </div>
         <div className="rc-stack" onMouseMove={tilt} onMouseLeave={resetTilt}>
-          <span className="rc-badge rc-badge-a">🎉 Promovida a Líder</span>
-          <span className="rc-badge rc-badge-b">📅 Culto confirmado</span>
+          <span className="rc-badge rc-badge-a"><ReceptionIcon name="celebration" /> Promovida a Líder</span>
+          <span className="rc-badge rc-badge-b"><ReceptionIcon name="calendar" /> Culto confirmado</span>
           <div className="rc-card rc-card-back" aria-hidden="true">
             <h3>Escalas da semana</h3>
             <i /><i /><i />
@@ -258,7 +276,7 @@ export default function ReceptionExperience({
               aria-controls={`rc-panel-${item.id}`}
               onClick={() => setAudience(index)}
             >
-              {item.label}
+              <ReceptionIcon name={item.icon} /> {item.label}
             </button>
           ))}
         </div>
@@ -292,7 +310,7 @@ export default function ReceptionExperience({
         <div className="rc-features">
           {FEATURES.map((feature) => (
             <article key={feature.titulo}>
-              <i>{feature.icone}</i>
+              <i><ReceptionIcon name={feature.icone} /></i>
               <b>{feature.titulo}</b>
               <small>{feature.texto}</small>
             </article>
