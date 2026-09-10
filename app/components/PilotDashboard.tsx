@@ -1363,6 +1363,7 @@ export default function PilotDashboard({
             <CellsWorkspace
               permissions={active.permissions}
               communityName={active.comunidadeNome}
+              memberMode={active.papel === "MEMBRO"}
             />
           )}
           {visibleView === "estacionamento" && (

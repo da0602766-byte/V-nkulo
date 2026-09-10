@@ -19,6 +19,39 @@ export async function PATCH(request: Request, context: Context) {
   const manager = access.context.permissions.includes("cells.manage");
   const operator = manager || existing.lider_usuario_id === access.user.id || existing.vice_lider_usuario_id === access.user.id;
   const action = String(payload.acao || "").trim().toUpperCase();
+
+  if (action === "SOLICITACAO_CANCELAR") {
+    const result = await db.prepare(
+      `UPDATE celula_solicitacoes SET status = 'CANCELADA', atualizado_em = CURRENT_TIMESTAMP
+       WHERE id = ? AND celula_id = ? AND comunidade_id = ? AND usuario_id = ? AND status = 'PENDENTE'`,
+    ).bind(Number(payload.solicitacaoId), id, access.context.comunidadeId, access.user.id).run();
+    if (!result.meta.changes) return Response.json({ error: "Essa solicitação não está mais pendente." }, { status: 409 });
+    return audited(db, access.context, access.user.id, id, "SOLICITACAO_CANCELADA_PELO_MEMBRO");
+  }
+
+  if (action === "SOLICITACAO_CRIAR") {
+    if (!existing.ativo) return Response.json({ error: "Esta célula não está recebendo solicitações." }, { status: 409 });
+    const members = parseMembers(existing.membros);
+    if (members.some((member) => member.kind === "COMMUNITY" && member.userId === access.user.id)) {
+      return Response.json({ error: "Você já participa desta célula." }, { status: 409 });
+    }
+    const consent = payload.autorizacaoContato === true || payload.autorizacaoContato === "true";
+    if (!consent) return Response.json({ error: "Confirme a autorização para compartilhar seus dados com a liderança." }, { status: 400 });
+    const contact = String(payload.contato || access.user.email || "").trim().slice(0, 160);
+    const message = String(payload.mensagem || "").trim().slice(0, 500);
+    if (!contact) return Response.json({ error: "Informe um telefone, WhatsApp ou e-mail para contato." }, { status: 400 });
+    const duplicate = await db.prepare(
+      `SELECT id FROM celula_solicitacoes WHERE celula_id = ? AND comunidade_id = ? AND usuario_id = ? AND status = 'PENDENTE' LIMIT 1`,
+    ).bind(id, access.context.comunidadeId, access.user.id).first();
+    if (duplicate) return Response.json({ error: "Você já possui uma solicitação pendente para esta célula." }, { status: 409 });
+    const created = await db.prepare(
+      `INSERT INTO celula_solicitacoes (comunidade_id, celula_id, usuario_id, nome, contato, mensagem)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).bind(access.context.comunidadeId, id, access.user.id, access.user.nome, contact, message).run();
+    await recordTenantAudit(db, access.context, access.user.id, "CELULA_SOLICITACAO_CRIADA", "SUCESSO", { celulaId: id, solicitacaoId: created.meta.last_row_id });
+    return Response.json({ ok: true, id: created.meta.last_row_id }, { status: 201 });
+  }
+
   if (!operator) return Response.json({ error: "Somente líder, vice-líder ou gestão podem alterar esta célula." }, { status: 403 });
 
   if (action.startsWith("MEMBRO_")) {

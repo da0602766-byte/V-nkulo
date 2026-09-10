@@ -74,7 +74,7 @@ export async function GET(request: Request) {
     Number.isInteger(requestedReportSize) && requestedReportSize > 0
       ? Math.min(requestedReportSize, 250)
       : 250;
-  const [agenda, reports, requests, users] = await Promise.all([
+  const [agenda, reports, requests, users, requestsForUser] = await Promise.all([
     db.prepare(
       `SELECT id, celula_id, titulo, inicia_em, termina_em, lembrete,
         visibilidade, criado_por_usuario_id FROM celula_agenda
@@ -115,7 +115,19 @@ export async function GET(request: Request) {
       email: string;
       telefone: string | null;
       foto_perfil: string | null;
-      papel: string;
+        papel: string;
+      }>(),
+    db.prepare(
+      `SELECT id, celula_id, status, criado_em, atualizado_em
+       FROM celula_solicitacoes
+       WHERE comunidade_id = ? AND usuario_id = ?
+       ORDER BY atualizado_em DESC, id DESC LIMIT 100`,
+    ).bind(access.context.comunidadeId, access.user.id).all<{
+      id: number;
+      celula_id: number;
+      status: string;
+      criado_em: string;
+      atualizado_em: string;
     }>(),
   ]);
 
@@ -133,8 +145,14 @@ export async function GET(request: Request) {
   const cells = result.results.map((cell) => {
     const canOperate = canManage || Number(cell.lider_usuario_id) === access.user.id || Number(cell.vice_lider_usuario_id) === access.user.id;
     const members = parseArray(cell.membros);
+    const ownRequest = requestsForUser.results.find((request) => Number(request.celula_id) === Number(cell.id));
+    const memberOfCell = members.some((member) => {
+      const source = member as Record<string, unknown>;
+      return source.kind === "COMMUNITY" && Number(source.userId) === access.user.id;
+    });
     return {
       ...cell,
+      observacoes: canOperate ? cell.observacoes : null,
       membros_total: members.filter((member) => String((member as Record<string, unknown>).kind) === "COMMUNITY").length,
       membros: canOperate ? members.map((member) => {
         const source = member as Record<string, unknown>;
@@ -152,10 +170,15 @@ export async function GET(request: Request) {
       agenda: agenda.results.filter((item) => Number(item.celula_id) === Number(cell.id) && (canOperate || item.visibilidade === "PUBLICO")),
       relatorios: canOperate ? reports.results.filter((item) => Number(item.celula_id) === Number(cell.id)).slice(0, 12) : [],
       solicitacoes: canOperate ? requests.results.filter((item) => Number(item.celula_id) === Number(cell.id) && item.status === "PENDENTE") : [],
+      membro_atual: memberOfCell,
+      solicitacao_id: ownRequest?.id ?? null,
+      solicitacao_status: ownRequest?.status ?? null,
+      solicitacao_criada_em: ownRequest?.criado_em ?? null,
     };
   });
   return Response.json({
     celulas: cells,
+    minhasSolicitacoes: requestsForUser.results,
     // Nulo quando o histórico de relatórios chegou ao fim.
     nextReportCursor,
     availableUsers: canManage ? users.results.map((user) => ({ id: user.id, nome: user.nome, papel: user.papel })) : [],

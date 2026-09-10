@@ -12,6 +12,7 @@ import {
 import { createPortal } from "react-dom";
 import { RelacionamentoTools } from "./RelacionamentoTools";
 import CareNotesBoard from "./CareNotesBoard";
+import MemberCellsExperience from "./MemberCellsExperience";
 
 type Visitor = {
   id: number;
@@ -125,6 +126,10 @@ type Cell = {
   agenda: Array<{ id: number; titulo: string; inicia_em: string; termina_em: string; lembrete: string; visibilidade: "PUBLICO" | "PRIVADO" }>;
   relatorios: Array<{ id: number; data_reuniao: string; aconteceu: number; presentes: number; visitantes: number; observacoes: string; enviado_por_nome: string | null }>;
   solicitacoes: Array<{ id: number; nome: string; contato: string; mensagem: string; criado_em: string }>;
+  membro_atual?: boolean;
+  solicitacao_id?: number | null;
+  solicitacao_status?: string | null;
+  solicitacao_criada_em?: string | null;
 };
 
 type Followup = {
@@ -1746,7 +1751,18 @@ function cellHealth(cell: Cell, agora: number): CellHealth {
   return { id: "SAUDAVEL", label: "Saudável", weeks, semanasEmDia, mediaPresentes };
 }
 
-export function CellsWorkspace({
+export function CellsWorkspace(props: {
+  permissions: string[];
+  communityName: string;
+  memberMode?: boolean;
+}) {
+  if (props.memberMode) {
+    return <MemberCellsExperience communityName={props.communityName} />;
+  }
+  return <CellsManagementWorkspace permissions={props.permissions} communityName={props.communityName} />;
+}
+
+function CellsManagementWorkspace({
   permissions,
   communityName,
 }: {
