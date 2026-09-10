@@ -372,7 +372,7 @@ test("Ministérios, Diaconia, uploads e Aparência mantêm os novos bloqueios", 
     readFile(new URL("../app/components/DiaconiaWorkspace.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/components/GlobalVisualEditor.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/components/NativeImageUpload.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/components/ParkingWorkspace.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/parking/ParkingManagementConsole.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(ministryRoute, /export async function DELETE/);
   assert.match(ministryRoute, /canManageMinistry/);
@@ -393,8 +393,8 @@ test("Ministérios, Diaconia, uploads e Aparência mantêm os novos bloqueios", 
   assert.doesNotMatch(secretary, /requiresCleanReturn/);
   assert.match(secretary, /const raw = await response\.text\(\)/);
   assert.match(secretary, /if \(created\)/);
-  assert.match(parking, /const formElement = event\.currentTarget/);
-  assert.match(parking, /formElement\.reset\(\)/);
+  assert.match(parking, /const form = event\.currentTarget/);
+  assert.match(parking, /form\.reset\(\)/);
   assert.match(diaconia, /Somente leitura/);
   assert.doesNotMatch(diaconia, /function updateItem/);
   assert.match(editor, /navigationLocked/);

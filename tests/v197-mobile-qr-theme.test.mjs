@@ -40,15 +40,20 @@ test("Ministérios mantém criar escala e checklist junto do retorno", async () 
 });
 
 test("QR apresenta resultado detalhado e histórico removível", async () => {
-  const [qr, parking, route] = await Promise.all([
+  const [qr, operatorMobile, managementConsole, memberPortal, route] = await Promise.all([
     read("app/components/ParkingReservationQr.tsx"),
-    read("app/components/ParkingWorkspace.tsx"),
+    read("app/components/parking/ParkingOperatorMobile.tsx"),
+    read("app/components/parking/ParkingManagementConsole.tsx"),
+    read("app/components/parking/ParkingMemberPortal.tsx"),
     read("app/api/pilot/estacionamento/reservas/route.ts"),
   ]);
   assert.match(qr, /parking-qr-result/);
   assert.match(qr, /Ler próximo QR Code/);
-  assert.match(parking, /onDetected=\{\(codigo\)=>reservationAction/);
-  assert.match(parking, /parking-mobile-reservation-history/);
+  assert.match(operatorMobile, /onDetected=\{handleDetected\}/);
+  assert.match(operatorMobile, /reservationAction\(\{ codigo: code, acao: "CHECKIN" \}\)/);
+  assert.match(managementConsole, /onDetected=\{handleQr\}/);
+  assert.match(memberPortal, /gestao-history-collapse/);
+  assert.match(memberPortal, /void deleteReservationHistory\(reservation\.id\)/);
   assert.match(route, /Você só pode excluir o seu próprio histórico/);
 });
 

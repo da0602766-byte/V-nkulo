@@ -2,17 +2,19 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const parking = await readFile(new URL("../app/components/ParkingWorkspace.tsx", import.meta.url), "utf8");
+const console_ = await readFile(new URL("../app/components/parking/ParkingManagementConsole.tsx", import.meta.url), "utf8");
 const events = await readFile(new URL("../app/components/EventsWorkspace.tsx", import.meta.url), "utf8");
 const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 
-test("configuração do estacionamento organiza liderança, setores e vagas", () => {
-  assert.match(parking, /Configuração do estacionamento/);
-  assert.match(parking, /Liderança e orientações/);
-  assert.match(parking, /Criar novo setor/);
-  assert.match(parking, /Adicionar vagas/);
-  assert.match(styles, /\.parking-settings-grid\s*\{[^}]*grid-template-columns:minmax\(0,1fr\)/s);
-  assert.match(styles, /\.parking-map-settings>summary\s*\{[^}]*grid-template-columns/s);
+// V2026 — o antigo painel único "Configuração do estacionamento" virou a aba
+// "Equipe e configuração" (responsável e instruções) mais o bloco
+// "Criar setores e vagas" dentro da aba "Mapa e vagas" do novo console.
+test("gestão organiza responsável, setores e vagas em blocos dedicados", () => {
+  assert.match(console_, /Responsável e instruções/);
+  assert.match(console_, /Novo setor/);
+  assert.match(console_, /Adicionar vagas/);
+  assert.match(styles, /\.gestao-settings-grid\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(240px,\s*1fr\)\)/s);
+  assert.match(styles, /\.gestao-tabs button\.is-active/);
 });
 
 test("votação usa ação compacta, legível e responsiva", () => {
