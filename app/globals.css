@@ -33407,6 +33407,9 @@ html[data-pilot-theme="escuro"] .request-care-status.tone-blue { background:#173
 .member-cells-heading h1 { margin:4px 0 6px; font-size:clamp(30px,4vw,46px); letter-spacing:-.045em; }
 .member-cells-heading p:last-child { margin:0; color:var(--v2-muted); font-size:var(--fs-md); line-height:1.5; }
 .member-cells-heading-mark { display:grid; place-items:center; width:60px; height:60px; border-radius:18px; background:var(--v2-accent); color:#fff; font-size:30px; box-shadow:0 12px 28px color-mix(in srgb,var(--v2-accent) 23%,transparent); }
+.member-cells-heading-actions { display:flex; align-items:center; gap:10px; }
+.member-cells-management-toggle,.cells-member-view-trigger-v4 { min-height:38px; padding:8px 12px; border:1px solid var(--v2-border); border-radius:999px; background:var(--v2-surface); color:var(--v2-text); font:inherit; font-size:var(--fs-xs); font-weight:850; cursor:pointer; }
+.member-cells-management-toggle:hover,.cells-member-view-trigger-v4:hover { border-color:var(--v2-accent); color:var(--v2-accent); }
 .member-cells-feedback { margin:0 0 14px; padding:12px 14px; border-left:3px solid var(--v2-accent); background:var(--v2-hover); border-radius:8px; }
 .member-cells-feedback.success { border-left-color:#2bb981; }
 .member-cells-feedback.error { border-left-color:#d2576d; }
@@ -33498,6 +33501,7 @@ html[data-pilot-theme="escuro"] .request-care-status.tone-blue { background:#173
 .member-cell-consent { display:flex!important; grid-template-columns:none; flex-direction:row; align-items:flex-start; gap:8px; font-weight:600!important; line-height:1.4; }
 .member-cell-consent input { width:17px; flex:none; margin-top:2px; }
 .member-cell-request-form>div { display:flex; justify-content:flex-end; gap:9px; margin-top:3px; }
+.cells-header-actions-v4 { display:flex; align-items:center; justify-content:flex-end; gap:9px; flex-wrap:wrap; }
 @media (max-width:900px) {
   .member-cells-workspace { padding:4px 0 34px; }
   .member-cells-layout { grid-template-columns:1fr; gap:28px; }
@@ -33508,7 +33512,9 @@ html[data-pilot-theme="escuro"] .request-care-status.tone-blue { background:#173
   .member-cells-heading { padding:8px 0 18px; }
   .member-cells-heading h1 { font-size:var(--fs-4xl); }
   .member-cells-heading p:last-child { font-size:var(--fs-sm); }
+  .member-cells-heading-actions { align-items:flex-end; flex-direction:column-reverse; }
   .member-cells-heading-mark { width:48px; height:48px; border-radius:14px; font-size:24px; }
+  .member-cells-management-toggle { font-size:11px; padding:7px 9px; }
   .member-cells-summary { display:flex; overflow-x:auto; margin:0 -12px; padding:0 12px; border:0; scrollbar-width:none; }
   .member-cells-summary::-webkit-scrollbar { display:none; }
   .member-cells-summary article { min-width:180px; border:1px solid var(--v2-border); border-right:0; }

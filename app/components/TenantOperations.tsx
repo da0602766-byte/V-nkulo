@@ -1756,18 +1756,33 @@ export function CellsWorkspace(props: {
   communityName: string;
   memberMode?: boolean;
 }) {
-  if (props.memberMode) {
-    return <MemberCellsExperience communityName={props.communityName} />;
+  const [memberView, setMemberView] = useState(true);
+  if (props.memberMode || memberView) {
+    return (
+      <MemberCellsExperience
+        communityName={props.communityName}
+        canOpenManagement={!props.memberMode}
+        onOpenManagement={() => setMemberView(false)}
+      />
+    );
   }
-  return <CellsManagementWorkspace permissions={props.permissions} communityName={props.communityName} />;
+  return (
+    <CellsManagementWorkspace
+      permissions={props.permissions}
+      communityName={props.communityName}
+      onOpenMember={() => setMemberView(true)}
+    />
+  );
 }
 
 function CellsManagementWorkspace({
   permissions,
   communityName,
+  onOpenMember,
 }: {
   permissions: string[];
   communityName: string;
+  onOpenMember?: () => void;
 }) {
   const [cells, setCells] = useState<Cell[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1970,7 +1985,10 @@ function CellsManagementWorkspace({
     <section className="cells-workspace-v2" aria-busy={loading}>
       <header className="cells-hero-v2 cells-hero-v4">
         <div><p className="pilot-kicker">CÉLULAS · {communityName}</p><h1>Grupos que aproximam pessoas</h1><p>Acompanhe líderes, encontros e relatórios sem perder a visão de cada célula.</p></div>
-        {canManage && <button className="cell-create-trigger-v4" type="button" onClick={() => setCreateOpen(true)}><span aria-hidden="true">＋</span> Criar célula</button>}
+        <div className="cells-header-actions-v4">
+          {onOpenMember && <button className="cells-member-view-trigger-v4" type="button" onClick={onOpenMember}>Visão do membro</button>}
+          {canManage && <button className="cell-create-trigger-v4" type="button" onClick={() => setCreateOpen(true)}><span aria-hidden="true">＋</span> Criar célula</button>}
+        </div>
       </header>
       <OperationFeedback message={message} error={error} />
       <section className="cells-summary-v4" aria-label="Resumo das células">

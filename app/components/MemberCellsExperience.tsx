@@ -127,7 +127,7 @@ function downloadCalendarEvent(cell: MemberCell, meeting: MemberCell["agenda"][n
   URL.revokeObjectURL(url);
 }
 
-export default function MemberCellsExperience({ communityName }: { communityName: string }) {
+export default function MemberCellsExperience({ communityName, canOpenManagement, onOpenManagement }: { communityName: string; canOpenManagement?: boolean; onOpenManagement?: () => void }) {
   const [cells, setCells] = useState<MemberCell[]>([]);
   const [requests, setRequests] = useState<MemberRequest[]>([]);
   const [search, setSearch] = useState("");
@@ -243,7 +243,10 @@ export default function MemberCellsExperience({ communityName }: { communityName
     <section className="member-cells-workspace" aria-busy={loading}>
       <header className="member-cells-heading">
         <div><p className="pilot-kicker">CÉLULAS · {communityName}</p><h1>Caminhe com pessoas</h1><p>Encontre uma célula, conheça a proposta e solicite sua entrada.</p></div>
-        <span className="member-cells-heading-mark" aria-hidden="true">⌂</span>
+        <div className="member-cells-heading-actions">
+          {canOpenManagement && onOpenManagement && <button type="button" className="member-cells-management-toggle" onClick={onOpenManagement}>Visão de gestão</button>}
+          <span className="member-cells-heading-mark" aria-hidden="true">⌂</span>
+        </div>
       </header>
 
       {message && <p className="member-cells-feedback success" role="status">{message}</p>}
