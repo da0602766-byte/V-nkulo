@@ -259,7 +259,7 @@ export default function ParkingManagementConsole({
                 )}
                 {canManageReservations && reservation.status === "PENDENTE" && (
                   <div className="gestao-row-actions">
-                    <button type="button" disabled={working} onClick={() => void reservationAction({ id: reservation.id, acao: "CONFIRMAR" })}>Confirmar</button>
+                    <button type="button" className="gestao-primary" disabled={working} onClick={() => void reservationAction({ id: reservation.id, acao: "CONFIRMAR" })}>Confirmar</button>
                     <button type="button" className="gestao-danger" disabled={working} onClick={() => void reservationAction({ id: reservation.id, acao: "RECUSAR" })}>Recusar / cancelar</button>
                   </div>
                 )}

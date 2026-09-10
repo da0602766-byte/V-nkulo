@@ -33115,7 +33115,7 @@ html[data-pilot-theme="escuro"] .request-care-status.tone-blue { background:#173
   background: var(--pilot-surface-2);
   padding: 12px 14px;
 }
-.gestao-reservation-table article > div { display: grid; gap: 2px; min-width: 0; }
+.gestao-reservation-table article > div:not(.gestao-row-actions) { display: grid; gap: 2px; min-width: 0; }
 .gestao-reservation-table article strong { font-size: var(--fs-sm); }
 .gestao-reservation-table article small { color: var(--pilot-muted); font-size: var(--fs-2xs); }
 .gestao-reservation-table article em { font-style: normal; color: var(--gestao-accent, var(--pilot-primary)); font-size: var(--fs-2xs); font-weight: 800; }
