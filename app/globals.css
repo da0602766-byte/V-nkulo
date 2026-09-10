@@ -33289,14 +33289,19 @@ html[data-pilot-theme="escuro"] .request-care-status.tone-blue { background:#173
 .gestao-lot-legend i.is-busy { background: #d94f66; }
 
 .gestao-drawer-backdrop {
-  position: fixed; inset: 0; z-index: 60;
+  /* Acima do menu inferior fixo (.pilot-mobile-nav, z-index:60) e da barra
+     superior: um painel de reserva precisa cobrir toda a navegação do
+     aplicativo, como qualquer modal do produto (ver .cell-create-overlay-v2,
+     .visitor-registration-backdrop). */
+  position: fixed; inset: 0; z-index: 1200;
   background: rgba(10, 14, 20, .5);
   display: flex; align-items: flex-end; justify-content: center;
+  padding-bottom: env(safe-area-inset-bottom);
   animation: gestao-feedback-in .2s ease both;
 }
 .gestao-drawer {
   width: min(560px, 100%);
-  max-height: 92vh;
+  max-height: min(92vh, calc(100dvh - 24px));
   overflow-y: auto;
   background: var(--pilot-surface);
   border-radius: 20px 20px 0 0;
