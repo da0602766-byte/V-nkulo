@@ -14,13 +14,19 @@ test("mobile navigation keeps compact captions and teams open as accordions", as
   assert.match(ministries, /ministry-team-collapse-trigger/);
 });
 
-test("event actions and cell details use blocking, scroll-safe overlays", async () => {
+test("event actions block the page and the cell sheet scrolls on its own", async () => {
   const events = await read("app/components/EventsWorkspace.tsx");
   const cells = await read("app/components/TenantOperations.tsx");
   const styles = await read("app/globals.css");
   assert.match(events, /event-action-overlay/);
   assert.match(events, /document\.body\.style\.overflow = "hidden"/);
-  assert.match(cells, /selected && <div className="cell-detail-overlay-v2"/);
+  // O detalhe da célula saiu do modal e virou página cheia com "voltar": no
+  // computador não há mais nada por cima para bloquear. Quem cobre a tela agora
+  // é a ficha da célula no celular, e é dela que se cobra rolagem própria.
+  assert.match(cells, /cell-detail-page-v6/);
+  assert.doesNotMatch(cells, /cell-detail-overlay-v2/);
+  assert.match(styles, /\.cell-member-sheet-v7\s*\{[^}]*position:fixed/s);
+  assert.match(styles, /\.cell-member-sheet-v7\s*\{[^}]*overflow-y:auto/s);
   assert.match(styles, /\.cell-detail-content-v4[^}]*overflow-y:auto!important/s);
 });
 

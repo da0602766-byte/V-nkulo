@@ -12,6 +12,8 @@ import {
 import { createPortal } from "react-dom";
 import { RelacionamentoTools } from "./RelacionamentoTools";
 import CareNotesBoard from "./CareNotesBoard";
+import CellsMemberBoard from "./CellsMemberBoard";
+import NativeImageUpload from "./NativeImageUpload";
 
 type Visitor = {
   id: number;
@@ -92,17 +94,24 @@ function hojeLocal() {
   return `${agora.getFullYear()}-${mes}-${dia}`;
 }
 
-type Cell = {
+export type Cell = {
   id: number;
   nome: string;
   responsavel: string;
   observacoes: string | null;
   visitantes_ativos: number;
   dias_reuniao: string[];
+  horario_reuniao: string;
+  rede: string;
+  tags: string[];
+  capa_url: string;
   endereco_publico: string;
   descricao_publica: string;
+  sou_membro: boolean;
+  minha_solicitacao: { id: number; criado_em: string } | null;
   lider_usuario_id: number | null;
   lider_nome: string | null;
+  lider_foto: string | null;
   vice_lider_usuario_id: number | null;
   vice_lider_nome: string | null;
   ultimo_relatorio_em: string | null;
@@ -1760,7 +1769,7 @@ export function CellsWorkspace({
   const [error, setError] = useState("");
   const [availableUsers, setAvailableUsers] = useState<Array<{ id: number; nome: string; papel: string }>>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [tab, setTab] = useState<"visao" | "integrantes" | "agenda" | "relatorio" | "solicitacoes" | "entrar">("visao");
+  const [tab, setTab] = useState<"visao" | "integrantes" | "agenda" | "relatorio" | "solicitacoes" | "entrar" | "config">("visao");
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedMemberProfile, setSelectedMemberProfile] = useState<Cell["membros"][number] | null>(null);
   const [cellSearch, setCellSearch] = useState("");
@@ -1769,6 +1778,16 @@ export function CellsWorkspace({
   // O relógio vem de estado: lê-lo durante a renderização daria valores
   // diferentes no servidor e no cliente e quebraria a hidratação.
   const [agora, setAgora] = useState(0);
+  // A capa em edição fica presa à célula que a pessoa abriu: sem o id junto, a
+  // imagem escolhida numa célula apareceria na próxima que fosse aberta.
+  const [coverDraft, setCoverDraft] = useState<{ cellId: number; url: string } | null>(null);
+  // A aba tem duas caras. "gestao" é o painel do pastor, do presbítero e do
+  // líder no computador; "membro" é a tela de quem procura e acompanha a
+  // própria célula — e é ela que abre no celular mesmo para quem lidera,
+  // porque no aparelho pequeno o que se faz é o encontro, não a administração.
+  // `null` significa "ainda decidido pelo aparelho e pelo papel".
+  const [mode, setMode] = useState<"gestao" | "membro" | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
   const canManage = permissions.includes("cells.manage");
 
   const loadCells = useCallback(async (quiet = false) => {
@@ -1804,17 +1823,21 @@ export function CellsWorkspace({
   }, []);
 
   useEffect(() => {
+    const query = window.matchMedia("(max-width: 820px)");
+    const apply = () => setIsMobile(query.matches);
+    apply();
+    query.addEventListener("change", apply);
+    return () => query.removeEventListener("change", apply);
+  }, []);
+
+  useEffect(() => {
     if (!selectedId) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    window.scrollTo({ top: 0, behavior: "smooth" });
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setSelectedId(null);
     };
     window.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", closeOnEscape);
-    };
+    return () => window.removeEventListener("keydown", closeOnEscape);
   }, [selectedId]);
 
   async function createCell(event: FormEvent<HTMLFormElement>) {
@@ -1905,6 +1928,71 @@ export function CellsWorkspace({
     } finally { setSaving(false); }
   }
 
+  async function updateCellData(cell: Cell, event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (saving) return;
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const body: Record<string, unknown> = {
+      acao: "ATUALIZAR_DADOS",
+      enderecoPublico: data.get("enderecoPublico"),
+      descricaoPublica: data.get("descricaoPublica"),
+      observacoes: data.get("observacoes"),
+      diasReuniao: data.getAll("diasReuniao"),
+      horarioReuniao: data.get("horarioReuniao"),
+      rede: data.get("rede"),
+      tags: String(data.get("tags") || "").split(","),
+      capaUrl: coverDraft?.cellId === cell.id ? coverDraft.url : cell.capa_url,
+    };
+    if (canManage) body.nome = data.get("nome");
+    setSaving(true); setMessage(""); setError("");
+    try {
+      await apiJson(`/api/pilot/celulas/${cell.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      setMessage("Dados da célula atualizados.");
+      await loadCells(true);
+    } catch (caught) {
+      setError((caught as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Pedido de entrada e desistência vêm da tela do membro, que é a mesma rota
+  // pública usada pelo diretório aberto da comunidade.
+  async function submitCellEntry(cell: Cell, data: Record<string, unknown>) {
+    if (saving) return false;
+    setSaving(true); setMessage(""); setError("");
+    try {
+      await apiJson(`/api/public/celulas/${cell.id}/solicitar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      setMessage(`Solicitação enviada à liderança da célula ${cell.nome}.`);
+      await loadCells(true);
+      return true;
+    } catch (caught) {
+      setError((caught as Error).message);
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function cancelCellEntry(cell: Cell) {
+    if (saving || !window.confirm(`Cancelar sua solicitação para ${cell.nome}?`)) return;
+    setSaving(true); setMessage(""); setError("");
+    try {
+      await apiJson(`/api/public/celulas/${cell.id}/solicitar`, { method: "DELETE" });
+      setMessage("Solicitação cancelada.");
+      await loadCells(true);
+    } catch (caught) {
+      setError((caught as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function requestCellEntry(cell: Cell, event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (saving) return;
@@ -1940,6 +2028,9 @@ export function CellsWorkspace({
     acc[id] = (acc[id] || 0) + 1;
     return acc;
   }, {});
+  const archivedTotal = cells.filter((cell) => !cell.ativo).length;
+  const pendingRequestsTotal = cells.reduce((total, cell) => total + cell.solicitacoes.length, 0);
+  const visitorsTotal = activeCells.reduce((total, cell) => total + cell.visitantes_ativos, 0);
   const visibleCells = cells.filter((cell) => {
     if (cellStatus === "active" && !cell.ativo) return false;
     if (cellStatus === "archived" && cell.ativo) return false;
@@ -1950,82 +2041,159 @@ export function CellsWorkspace({
       .some((value) => String(value).toLocaleLowerCase("pt-BR").includes(normalizedCellSearch));
   });
 
+  // Quem não lidera nem administra célula nenhuma só tem a tela do membro —
+  // abrir "gestão" para essa pessoa seria abrir um painel vazio.
+  const canUseManagement = canManage || cells.some((cell) => cell.can_operate);
+  const activeMode = mode ?? (isMobile || !canUseManagement ? "membro" : "gestao");
+
+  if (activeMode === "membro") {
+    return (
+      <section className="cells-workspace-v2 cells-workspace-membro-v7" aria-busy={loading}>
+        <OperationFeedback message={message} error={error} />
+        {canUseManagement && (
+          <div className="cell-mode-switch-v7">
+            <span>{isMobile ? "No celular a célula abre no essencial." : "Você está vendo a tela do participante."}</span>
+            <button type="button" onClick={() => setMode("gestao")}>Abrir gestão das células</button>
+          </div>
+        )}
+        <CellsMemberBoard
+          cells={cells}
+          loading={loading}
+          saving={saving}
+          isMobile={isMobile}
+          agora={agora}
+          onRequestEntry={submitCellEntry}
+          onCancelRequest={cancelCellEntry}
+          onSendReport={(cell, data, form) => cellAction(cell, { acao: "RELATORIO_CRIAR", ...data }, form)}
+          onDecideRequest={(cell, requestId, status) => cellAction(cell, { acao: "SOLICITACAO_DECIDIR", solicitacaoId: requestId, status })}
+        />
+      </section>
+    );
+  }
+
   return (
     <section className="cells-workspace-v2" aria-busy={loading}>
+      <OperationFeedback message={message} error={error} />
+      {!selected && <>
       <header className="cells-hero-v2 cells-hero-v4">
         <div><p className="pilot-kicker">CÉLULAS · {communityName}</p><h1>Grupos que aproximam pessoas</h1><p>Acompanhe líderes, encontros e relatórios sem perder a visão de cada célula.</p></div>
-        {canManage && <button className="cell-create-trigger-v4" type="button" onClick={() => setCreateOpen(true)}><span aria-hidden="true">＋</span> Criar célula</button>}
+        <div className="cells-hero-actions-v7">
+          <button className="cell-view-member-v7" type="button" onClick={() => setMode("membro")}>Ver como participante</button>
+          {canManage && <button className="cell-create-trigger-v4" type="button" onClick={() => setCreateOpen(true)}><span aria-hidden="true">＋</span> Criar célula</button>}
+        </div>
       </header>
-      <OperationFeedback message={message} error={error} />
-      <section className="cells-summary-v4" aria-label="Resumo das células">
-        <article><small>Ativas</small><strong>{activeCells.length}</strong></article>
-        <article><small>Pessoas</small><strong>{membersTotal}</strong></article>
-        <article><small>Próximos encontros</small><strong>{meetingsTotal}</strong></article>
-        <article><small>Relatórios em dia</small><strong>{activeCells.filter((cell) => cell.ultimo_relatorio_em).length}<span> de {activeCells.length}</span></strong></article>
-        <article data-alerta={(healthCounts.SEM_RELATORIO || 0) > 0 ? "1" : undefined}><small>Sem relatório</small><strong>{healthCounts.SEM_RELATORIO || 0}<span> há mais de 3 semanas</span></strong></article>
+      <section className="cell-summary-grid-v6" aria-label="Resumo das células">
+        <article data-tone="purple"><span aria-hidden="true">▤</span><div><small>Total de células</small><strong>{cells.length}</strong><p>{archivedTotal} arquivada{archivedTotal === 1 ? "" : "s"}</p></div></article>
+        <article data-tone="blue"><span aria-hidden="true">✓</span><div><small>Ativas</small><strong>{activeCells.length}</strong><p>{meetingsTotal} próximos encontros</p></div></article>
+        <article data-tone="amber" data-alerta={pendingRequestsTotal > 0 ? "1" : undefined}><span aria-hidden="true">◔</span><div><small>Pendentes</small><strong>{pendingRequestsTotal}</strong><p>solicitações aguardando decisão</p></div></article>
+        <article data-tone="red" data-alerta={(healthCounts.SEM_RELATORIO || 0) > 0 ? "1" : undefined}><span aria-hidden="true">⚠</span><div><small>Sem relatório</small><strong>{healthCounts.SEM_RELATORIO || 0}</strong><p>há mais de 3 semanas</p></div></article>
+        <article data-tone="green"><span aria-hidden="true">◎</span><div><small>Pessoas nas células</small><strong>{membersTotal + visitorsTotal}</strong><p>membros e visitantes ativos</p></div></article>
+        <article data-tone="teal"><span aria-hidden="true">↗</span><div><small>Prontas p/ multiplicar</small><strong>{healthCounts.MULTIPLICAR || 0}</strong><p>média de 15+ presentes</p></div></article>
       </section>
-      <div className="cell-shell-v2 cell-shell-v4">
-        <aside className="cell-index-v2" aria-label="Células da comunidade">
-          <header><div><p className="pilot-kicker">DIRETÓRIO</p><h2>Células da comunidade</h2><small>Abra uma célula para consultar ou administrar suas informações.</small></div><span>{activeCells.length} ativas · {cells.filter((cell) => !cell.ativo).length} arquivadas</span></header>
-          <div className="cell-directory-toolbar-v4">
-            <label className="cell-directory-search-v4"><span aria-hidden="true">⌕</span><input value={cellSearch} onChange={(event) => setCellSearch(event.target.value)} placeholder="Buscar célula, líder ou bairro" aria-label="Buscar célula, líder ou bairro" /></label>
-            <div className="cell-directory-status-v4" role="group" aria-label="Filtrar células por situação">
-              {([['all','Todas'],['active','Ativas'],['archived','Arquivadas']] as const).map(([value, label]) => <button key={value} type="button" className={cellStatus === value ? "active" : ""} aria-pressed={cellStatus === value} onClick={() => setCellStatus(value)}>{label}</button>)}
-            </div>
-            <div className="cell-health-filter-v5" role="group" aria-label="Filtrar células por saúde">
-              {([
-                ['all', 'Saúde: todas', 0],
-                ['SEM_RELATORIO', 'Sem relatório', healthCounts.SEM_RELATORIO || 0],
-                ['ATENCAO', 'Atenção', healthCounts.ATENCAO || 0],
-                ['MULTIPLICAR', 'Prontas p/ multiplicar', healthCounts.MULTIPLICAR || 0],
-                ['SAUDAVEL', 'Saudáveis', healthCounts.SAUDAVEL || 0],
-              ] as const).map(([value, label, count]) => (
-                <button
-                  key={value}
-                  type="button"
-                  data-saude={value}
-                  className={cellHealthFilter === value ? "active" : ""}
-                  aria-pressed={cellHealthFilter === value}
-                  onClick={() => setCellHealthFilter(value as "all" | CellHealth["id"])}
-                >
-                  {label}{value !== 'all' && <span>{count}</span>}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="cell-directory-v4">
-            {visibleCells.map((cell) => <button type="button" key={cell.id} className={`${selectedId === cell.id ? "active" : ""}${!cell.ativo ? " archived" : ""}`} onClick={() => { setSelectedId(cell.id); setTab("visao"); }}><span className="cell-row-avatar-v4" aria-hidden="true">{cell.nome.slice(0, 1)}</span><span className="cell-row-copy-v4"><span><i>{cell.ativo ? "Ativa" : "Arquivada"}</i><strong>{cell.nome}</strong></span><small>{cell.descricao_publica || "Descrição pública ainda não informada."}</small><span className="cell-row-health-v5">{(() => { const saude = healthById.get(cell.id)!; const teto = Math.max(1, ...saude.weeks); return (<><i className="cell-health-pill-v5" data-saude={saude.id}>{saude.label}</i><span className="cell-health-weeks-v5" aria-hidden="true">{saude.weeks.map((valor, indice) => <i key={indice} data-vazio={valor === 0 ? "1" : undefined} style={{ height: `${Math.max(12, Math.round((valor / teto) * 100))}%` }} />)}</span><small>{saude.semanasEmDia}/8 relatórios</small></>); })()}</span></span><span className="cell-row-fact-v4"><small>Encontros</small><strong>{cell.dias_reuniao.map((day) => dayLabels[day] || day).join(", ") || "A definir"}</strong></span><span className="cell-row-fact-v4"><small>Pessoas</small><strong>{cell.membros_total + cell.visitantes_ativos}</strong></span><span className="cell-row-fact-v4"><small>Liderança</small><strong>{cell.lider_nome || cell.responsavel || "A definir"}</strong></span><span className="cell-row-arrow-v4" aria-hidden="true">›</span></button>)}
-            {!loading && !visibleCells.length && <p className="cell-directory-empty-v4">Nenhuma célula encontrada com esses filtros.</p>}
-          </div>
-        </aside>
-        {selected && <div className="cell-detail-overlay-v2" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedId(null); }}>
-        <main className="cell-detail-v2 cell-detail-v4" role="dialog" aria-modal="true" aria-label={`Detalhes da célula ${selected.nome}`}>
-          <button className="cell-detail-close-v2" type="button" aria-label="Fechar detalhes" onClick={() => setSelectedId(null)}>×</button>
-          <>
-            <header className="cell-detail-head-v2"><div><small>DETALHES DA CÉLULA</small><div className="cell-detail-title-v4"><h2>{selected.nome}</h2><span>{selected.ativo ? "Ativa" : "Arquivada"}</span></div><p>{selected.descricao_publica || "Descrição pública ainda não informada."}</p><div className="cell-day-pills"><small>Encontros</small>{selected.dias_reuniao.map((day) => <span key={day}>{dayLabels[day] || day}</span>)}</div></div></header>
-            <dl className="cell-metrics-v2"><div><dt>Membros</dt><dd>{selected.membros_total}</dd></div><div><dt>Visitantes</dt><dd>{selected.visitantes_ativos + selected.membros.filter((member) => member.kind === "EXTERNAL").length}</dd></div><div><dt>Liderança</dt><dd>{selected.vice_lider_nome ? "2" : "1"}</dd></div><div><dt>Próximos encontros</dt><dd>{selected.agenda.length}</dd></div></dl>
-            <div className="cell-detail-body-v4">
-            <nav className="cell-tabs-v2" aria-label="Seções da célula">{(selected.can_operate ? [["visao","Visão geral"],["integrantes","Integrantes"],["agenda","Agenda"],["relatorio","Relatório semanal"],["solicitacoes",`Solicitações ${selected.solicitacoes.length || ""}`]] : [["visao","Informações"],["agenda","Próximos encontros"],["entrar","Solicitar entrada"]]).map(([id,label], index) => <button key={id} type="button" className={tab === id ? "active" : ""} onClick={() => setTab(id as typeof tab)}><span>{String(index + 1).padStart(2,"0")}</span>{label}</button>)}</nav>
-            <div className="cell-detail-content-v4">
-            {tab === "visao" && <section className="cell-overview-v2"><article><span aria-hidden="true">♙</span><div><small>LIDERANÇA</small><strong>{selected.lider_nome || selected.responsavel}</strong><p>{selected.vice_lider_nome ? `Vice-líder: ${selected.vice_lider_nome}` : "Vice-líder ainda não definido"}</p></div></article><article><span aria-hidden="true">⌖</span><div><small>LOCAL PÚBLICO</small><strong>{selected.endereco_publico || "A definir"}</strong><p>Visível para quem procura uma célula.</p></div></article><article><span aria-hidden="true">✓</span><div><small>ÚLTIMO RELATÓRIO</small><strong>{selected.ultimo_relatorio_em ? new Date(selected.ultimo_relatorio_em).toLocaleDateString("pt-BR") : "Pendente"}</strong><p>Após 60 dias sem relatório, a célula é arquivada.</p></div></article>{canManage && <article className="cell-danger-v2"><span aria-hidden="true">⚙</span><div><small>GESTÃO PASTORAL</small><strong>{selected.ativo ? "Célula em atividade" : "Célula arquivada"}</strong>{selected.ativo ? <button type="button" onClick={() => void deactivateCell(selected)}>Arquivar célula</button> : <button type="button" onClick={() => void cellAction(selected, { acao: "REATIVAR" })}>Reativar célula</button>}</div></article>}</section>}
-            {tab === "integrantes" && <section className="cell-members-v2">
-              <div className="cell-member-list">{selected.membros.map((member) => <article key={member.id}>
-                <span aria-hidden="true">{member.name.slice(0,1)}</span>
-                <div><strong>{member.name}</strong><small>{member.role === "LEADER" ? "Líder" : member.role === "VICE_LEADER" ? "Vice-líder" : member.kind === "EXTERNAL" ? `Visitante${member.note ? ` · ${member.note}` : ""}` : "Membro"}</small>{member.kind === "COMMUNITY" && <button type="button" className="cell-member-profile-open" onClick={() => setSelectedMemberProfile(member)}>Ver perfil</button>}</div>
-                {selected.can_operate && member.role !== "LEADER" && <div className="cell-member-actions">{member.kind === "COMMUNITY" && member.role !== "VICE_LEADER" && <button type="button" onClick={() => void cellAction(selected, { acao: "MEMBRO_PROMOVER_VICE", membroId: member.id })}>Promover</button>}<button type="button" className="danger-link" onClick={() => void updateCellMember(selected, "MEMBRO_REMOVER", { membroId: member.id })}>Remover</button></div>}
-              </article>)}</div>
-              {selected.can_operate && <div className="cell-add-members-v2"><form onSubmit={(event) => { event.preventDefault(); const form=event.currentTarget; const data=new FormData(form); void updateCellMember(selected,"MEMBRO_ADICIONAR_INTERNO",{usuarioId:Number(data.get("usuarioId"))},form); }}><label>Membro da comunidade<select name="usuarioId" required defaultValue=""><option value="" disabled>Selecione</option>{availableUsers.map((user)=><option value={user.id} key={user.id}>{user.nome} · {user.papel}</option>)}</select></label><button disabled={saving}>Adicionar</button></form><form onSubmit={(event) => { event.preventDefault(); const form=event.currentTarget; const data=new FormData(form); void updateCellMember(selected,"MEMBRO_ADICIONAR_EXTERNO",{nomeExterno:data.get("nomeExterno"),descricaoExterna:data.get("descricaoExterna")},form); }}><label>Visitante de fora<input name="nomeExterno" required placeholder="Nome completo" /></label><label>Observação<input name="descricaoExterna" placeholder="Contato ou contexto" /></label><button disabled={saving}>Registrar</button></form></div>}
-            </section>}
-            {tab === "agenda" && <section className="cell-agenda-v2"><div className="cell-agenda-list-v2">{selected.agenda.map((item) => <article key={item.id}><time>{new Date(item.inicia_em).toLocaleDateString("pt-BR", { day:"2-digit", month:"short" })}</time><div><strong>{item.titulo}</strong><small>{new Date(item.inicia_em).toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" })}–{new Date(item.termina_em).toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" })} · {item.visibilidade === "PUBLICO" ? "Público" : "Só liderança"}</small><p>{item.lembrete}</p></div></article>)}{!selected.agenda.length && <p>Nenhum encontro programado.</p>}</div>{selected.can_operate && <form className="pilot-form cell-agenda-form-v2" onSubmit={(event) => { event.preventDefault(); const form=event.currentTarget; const data=Object.fromEntries(new FormData(form)); void cellAction(selected,{acao:"AGENDA_CRIAR",...data},form); }}><h3>Programar sem publicar no feed</h3><label>Título<input name="titulo" required /></label><label>Início<input name="iniciaEm" type="datetime-local" required /></label><label>Término<input name="terminaEm" type="datetime-local" required /></label><label>Visibilidade<select name="visibilidade"><option value="PUBLICO">Público para a célula</option><option value="PRIVADO">Privado para liderança</option></select></label><label className="cell-wide-field">Lembrete<textarea name="lembrete" rows={2} /></label><button disabled={saving}>Verificar horários e salvar</button></form>}</section>}
-            {tab === "relatorio" && <section className="cell-reports-v2">{selected.can_operate && <form className="pilot-form cell-report-form-v2" onSubmit={(event) => { event.preventDefault(); const form=event.currentTarget; const data=Object.fromEntries(new FormData(form)); void cellAction(selected,{acao:"RELATORIO_CRIAR",...data,aconteceu:data.aconteceu === "true"},form); }}><h3>Formulário do encontro</h3><label>Data<input name="dataReuniao" type="date" required /></label><label>Aconteceu?<select name="aconteceu"><option value="true">Sim</option><option value="false">Não</option></select></label><label>Presentes<input name="presentes" type="number" min="0" defaultValue="0" /></label><label>Visitantes<input name="visitantes" type="number" min="0" defaultValue="0" /></label><label className="cell-wide-field">Observações<textarea name="observacoes" rows={2} /></label><button disabled={saving}>Enviar ao pastor</button></form>}<div className="cell-report-history-v2">{selected.relatorios.map((report) => <article key={report.id}><time>{new Date(`${report.data_reuniao}T12:00:00`).toLocaleDateString("pt-BR")}</time><strong>{report.aconteceu ? `${report.presentes} pessoas · ${report.visitantes} visitantes` : "Encontro não realizado"}</strong><small>{report.enviado_por_nome ? `Enviado por ${report.enviado_por_nome}` : "Relatório registrado"}</small></article>)}</div></section>}
-            {tab === "solicitacoes" && <section className="cell-requests-v2">{!selected.can_operate && <p>As solicitações ficam disponíveis somente para a liderança.</p>}{selected.solicitacoes.map((request) => <article key={request.id}><div><strong>{request.nome}</strong><small>{request.contato || "Sem contato"}</small><p>{request.mensagem}</p></div><div><button type="button" onClick={() => void cellAction(selected,{acao:"SOLICITACAO_DECIDIR",solicitacaoId:request.id,status:"APROVADA"})}>Aprovar</button><button type="button" className="danger-link" onClick={() => void cellAction(selected,{acao:"SOLICITACAO_DECIDIR",solicitacaoId:request.id,status:"RECUSADA"})}>Recusar</button></div></article>)}</section>}
-            {tab === "entrar" && !selected.can_operate && <section className="cell-entry-request-v2"><header><small>ENTRAR NESTA CÉLULA</small><h3>Envie seus dados à liderança</h3><p>As informações serão usadas somente para analisar seu pedido e entrar em contato.</p></header><form className="pilot-form" onSubmit={(event) => void requestCellEntry(selected, event)}><label>Nome completo<input name="nome" required minLength={5} maxLength={120} autoComplete="name" /></label><label>WhatsApp ou e-mail<input name="contato" required maxLength={160} autoComplete="email" /></label><label className="cell-wide-field">Mensagem para a liderança<textarea name="mensagem" rows={3} maxLength={500} placeholder="Conte um pouco sobre você e o melhor horário para contato." /></label><label className="cell-request-consent"><input type="checkbox" required />Autorizo o envio destes dados à liderança desta célula.</label><button disabled={saving}>{saving ? "Enviando…" : "Solicitar entrada"}</button></form></section>}
-            </div>
-            </div>
-          </>
-        </main>
-        </div>}
+      <div className="cell-directory-toolbar-v4 cell-catalog-toolbar-v6">
+        <label className="cell-directory-search-v4"><span aria-hidden="true">⌕</span><input value={cellSearch} onChange={(event) => setCellSearch(event.target.value)} placeholder="Buscar célula, líder ou bairro" aria-label="Buscar célula, líder ou bairro" /></label>
+        <div className="cell-directory-status-v4" role="group" aria-label="Filtrar células por situação">
+          {([['all','Todas'],['active','Ativas'],['archived','Arquivadas']] as const).map(([value, label]) => <button key={value} type="button" className={cellStatus === value ? "active" : ""} aria-pressed={cellStatus === value} onClick={() => setCellStatus(value)}>{label}</button>)}
+        </div>
+        <div className="cell-health-filter-v5" role="group" aria-label="Filtrar células por saúde">
+          {([
+            ['all', 'Saúde: todas', 0],
+            ['SEM_RELATORIO', 'Sem relatório', healthCounts.SEM_RELATORIO || 0],
+            ['ATENCAO', 'Atenção', healthCounts.ATENCAO || 0],
+            ['MULTIPLICAR', 'Prontas p/ multiplicar', healthCounts.MULTIPLICAR || 0],
+            ['SAUDAVEL', 'Saudáveis', healthCounts.SAUDAVEL || 0],
+          ] as const).map(([value, label, count]) => (
+            <button
+              key={value}
+              type="button"
+              data-saude={value}
+              className={cellHealthFilter === value ? "active" : ""}
+              aria-pressed={cellHealthFilter === value}
+              onClick={() => setCellHealthFilter(value as "all" | CellHealth["id"])}
+            >
+              {label}{value !== 'all' && <span>{count}</span>}
+            </button>
+          ))}
+        </div>
       </div>
+      <div className="cell-catalog-grid-v6" aria-label="Células da comunidade">
+        {visibleCells.map((cell) => { const saude = healthById.get(cell.id)!; const teto = Math.max(1, ...saude.weeks); return (
+          <button type="button" key={cell.id} className={`cell-tile-v6${!cell.ativo ? " archived" : ""}`} onClick={() => { setSelectedId(cell.id); setTab("visao"); }}>
+            {cell.solicitacoes.length > 0 && <span className="cell-tile-pending-v6">{cell.solicitacoes.length}</span>}
+            <span className="cell-tile-avatar-v6" aria-hidden="true">{cell.nome.slice(0, 1)}</span>
+            <span className="cell-tile-copy-v6">
+              <small>{cell.ativo ? "Ativa" : "Arquivada"}</small>
+              <strong>{cell.nome}</strong>
+              <span>{cell.descricao_publica || "Descrição pública ainda não informada."}</span>
+            </span>
+            <span className="cell-tile-health-v6">
+              <i className="cell-health-pill-v5" data-saude={saude.id}>{saude.label}</i>
+              <span className="cell-health-weeks-v5" aria-hidden="true">{saude.weeks.map((valor, indice) => <i key={indice} data-vazio={valor === 0 ? "1" : undefined} style={{ height: `${Math.max(12, Math.round((valor / teto) * 100))}%` }} />)}</span>
+              <small>{saude.semanasEmDia}/8 relatórios</small>
+            </span>
+            <span className="cell-tile-meta-v6">
+              <span><small>Encontros</small><strong>{cell.dias_reuniao.map((day) => dayLabels[day] || day).join(", ") || "A definir"}</strong></span>
+              <span><small>Pessoas</small><strong>{cell.membros_total + cell.visitantes_ativos}</strong></span>
+              <span><small>Liderança</small><strong>{cell.lider_nome || cell.responsavel || "A definir"}</strong></span>
+              <em>{cell.can_operate ? "Gerenciar" : "Ver detalhes"} →</em>
+            </span>
+          </button>
+        ); })}
+        {!loading && !visibleCells.length && <p className="cell-directory-empty-v4">Nenhuma célula encontrada com esses filtros.</p>}
+      </div>
+      </>}
+      {selected && (
+        <section className="cell-detail-v4 cell-detail-page-v6">
+          <button type="button" className="cell-detail-back-v6" onClick={() => setSelectedId(null)}><span aria-hidden="true">←</span> Voltar às células</button>
+          <header className="cell-detail-head-v2 cell-detail-head-v6"><div><small>DETALHES DA CÉLULA</small><div className="cell-detail-title-v4"><h2>{selected.nome}</h2><span>{selected.ativo ? "Ativa" : "Arquivada"}</span></div><p>{selected.descricao_publica || "Descrição pública ainda não informada."}</p><div className="cell-day-pills"><small>Encontros</small>{selected.dias_reuniao.map((day) => <span key={day}>{dayLabels[day] || day}</span>)}</div></div></header>
+          <dl className="cell-metrics-v2"><div><dt>Membros</dt><dd>{selected.membros_total}</dd></div><div><dt>Visitantes</dt><dd>{selected.visitantes_ativos + selected.membros.filter((member) => member.kind === "EXTERNAL").length}</dd></div><div><dt>Liderança</dt><dd>{selected.vice_lider_nome ? "2" : "1"}</dd></div><div><dt>Próximos encontros</dt><dd>{selected.agenda.length}</dd></div></dl>
+          <div className="cell-detail-body-v4">
+          <nav className="cell-tabs-v2" aria-label="Seções da célula">{(selected.can_operate ? [["visao","Visão geral"],["integrantes","Integrantes"],["agenda","Agenda"],["relatorio","Relatório semanal"],["solicitacoes",`Solicitações ${selected.solicitacoes.length || ""}`],["config","Configurações"]] : [["visao","Informações"],["agenda","Próximos encontros"],["entrar","Solicitar entrada"]]).map(([id,label], index) => <button key={id} type="button" className={tab === id ? "active" : ""} onClick={() => setTab(id as typeof tab)}><span>{String(index + 1).padStart(2,"0")}</span>{label}</button>)}</nav>
+          <div className="cell-detail-content-v4">
+          {tab === "visao" && <section className="cell-overview-v2"><article><span aria-hidden="true">♙</span><div><small>LIDERANÇA</small><strong>{selected.lider_nome || selected.responsavel}</strong><p>{selected.vice_lider_nome ? `Vice-líder: ${selected.vice_lider_nome}` : "Vice-líder ainda não definido"}</p></div></article><article><span aria-hidden="true">⌖</span><div><small>LOCAL PÚBLICO</small><strong>{selected.endereco_publico || "A definir"}</strong><p>Visível para quem procura uma célula.</p></div></article><article><span aria-hidden="true">✓</span><div><small>ÚLTIMO RELATÓRIO</small><strong>{selected.ultimo_relatorio_em ? new Date(selected.ultimo_relatorio_em).toLocaleDateString("pt-BR") : "Pendente"}</strong><p>Após 60 dias sem relatório, a célula é arquivada.</p></div></article></section>}
+          {tab === "integrantes" && <section className="cell-members-v2">
+            <div className="cell-member-list">{selected.membros.map((member) => <article key={member.id}>
+              <span aria-hidden="true">{member.name.slice(0,1)}</span>
+              <div><strong>{member.name}</strong><small>{member.role === "LEADER" ? "Líder" : member.role === "VICE_LEADER" ? "Vice-líder" : member.kind === "EXTERNAL" ? `Visitante${member.note ? ` · ${member.note}` : ""}` : "Membro"}</small>{member.kind === "COMMUNITY" && <button type="button" className="cell-member-profile-open" onClick={() => setSelectedMemberProfile(member)}>Ver perfil</button>}</div>
+              {selected.can_operate && member.role !== "LEADER" && <div className="cell-member-actions">{member.kind === "COMMUNITY" && member.role !== "VICE_LEADER" && <button type="button" onClick={() => void cellAction(selected, { acao: "MEMBRO_PROMOVER_VICE", membroId: member.id })}>Promover</button>}<button type="button" className="danger-link" onClick={() => void updateCellMember(selected, "MEMBRO_REMOVER", { membroId: member.id })}>Remover</button></div>}
+            </article>)}</div>
+            {selected.can_operate && <div className="cell-add-members-v2"><form onSubmit={(event) => { event.preventDefault(); const form=event.currentTarget; const data=new FormData(form); void updateCellMember(selected,"MEMBRO_ADICIONAR_INTERNO",{usuarioId:Number(data.get("usuarioId"))},form); }}><label>Membro da comunidade<select name="usuarioId" required defaultValue=""><option value="" disabled>Selecione</option>{availableUsers.map((user)=><option value={user.id} key={user.id}>{user.nome} · {user.papel}</option>)}</select></label><button disabled={saving}>Adicionar</button></form><form onSubmit={(event) => { event.preventDefault(); const form=event.currentTarget; const data=new FormData(form); void updateCellMember(selected,"MEMBRO_ADICIONAR_EXTERNO",{nomeExterno:data.get("nomeExterno"),descricaoExterna:data.get("descricaoExterna")},form); }}><label>Visitante de fora<input name="nomeExterno" required placeholder="Nome completo" /></label><label>Observação<input name="descricaoExterna" placeholder="Contato ou contexto" /></label><button disabled={saving}>Registrar</button></form></div>}
+          </section>}
+          {tab === "agenda" && <section className="cell-agenda-v2"><div className="cell-agenda-list-v2">{selected.agenda.map((item) => <article key={item.id}><time>{new Date(item.inicia_em).toLocaleDateString("pt-BR", { day:"2-digit", month:"short" })}</time><div><strong>{item.titulo}</strong><small>{new Date(item.inicia_em).toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" })}–{new Date(item.termina_em).toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" })} · {item.visibilidade === "PUBLICO" ? "Público" : "Só liderança"}</small><p>{item.lembrete}</p></div></article>)}{!selected.agenda.length && <p>Nenhum encontro programado.</p>}</div>{selected.can_operate && <form className="pilot-form cell-agenda-form-v2" onSubmit={(event) => { event.preventDefault(); const form=event.currentTarget; const data=Object.fromEntries(new FormData(form)); void cellAction(selected,{acao:"AGENDA_CRIAR",...data},form); }}><h3>Programar sem publicar no feed</h3><label>Título<input name="titulo" required /></label><label>Início<input name="iniciaEm" type="datetime-local" required /></label><label>Término<input name="terminaEm" type="datetime-local" required /></label><label>Visibilidade<select name="visibilidade"><option value="PUBLICO">Público para a célula</option><option value="PRIVADO">Privado para liderança</option></select></label><label className="cell-wide-field">Lembrete<textarea name="lembrete" rows={2} /></label><button disabled={saving}>Verificar horários e salvar</button></form>}</section>}
+          {tab === "relatorio" && <section className="cell-reports-v2">{selected.can_operate && <form className="pilot-form cell-report-form-v2" onSubmit={(event) => { event.preventDefault(); const form=event.currentTarget; const data=Object.fromEntries(new FormData(form)); void cellAction(selected,{acao:"RELATORIO_CRIAR",...data,aconteceu:data.aconteceu === "true"},form); }}><h3>Formulário do encontro</h3><label>Data<input name="dataReuniao" type="date" required /></label><label>Aconteceu?<select name="aconteceu"><option value="true">Sim</option><option value="false">Não</option></select></label><label>Presentes<input name="presentes" type="number" min="0" defaultValue="0" /></label><label>Visitantes<input name="visitantes" type="number" min="0" defaultValue="0" /></label><label className="cell-wide-field">Observações<textarea name="observacoes" rows={2} /></label><button disabled={saving}>Enviar ao pastor</button></form>}<div className="cell-report-history-v2">{selected.relatorios.map((report) => <article key={report.id}><time>{new Date(`${report.data_reuniao}T12:00:00`).toLocaleDateString("pt-BR")}</time><strong>{report.aconteceu ? `${report.presentes} pessoas · ${report.visitantes} visitantes` : "Encontro não realizado"}</strong><small>{report.enviado_por_nome ? `Enviado por ${report.enviado_por_nome}` : "Relatório registrado"}</small></article>)}</div></section>}
+          {tab === "solicitacoes" && <section className="cell-requests-v2">{!selected.can_operate && <p>As solicitações ficam disponíveis somente para a liderança.</p>}{selected.solicitacoes.map((request) => <article key={request.id}><div><strong>{request.nome}</strong><small>{request.contato || "Sem contato"}</small><p>{request.mensagem}</p></div><div><button type="button" onClick={() => void cellAction(selected,{acao:"SOLICITACAO_DECIDIR",solicitacaoId:request.id,status:"APROVADA"})}>Aprovar</button><button type="button" className="danger-link" onClick={() => void cellAction(selected,{acao:"SOLICITACAO_DECIDIR",solicitacaoId:request.id,status:"RECUSADA"})}>Recusar</button></div></article>)}{selected.can_operate && !selected.solicitacoes.length && <p className="operations-muted">Nenhuma solicitação pendente.</p>}</section>}
+          {tab === "entrar" && !selected.can_operate && <section className="cell-entry-request-v2"><header><small>ENTRAR NESTA CÉLULA</small><h3>Envie seus dados à liderança</h3><p>As informações serão usadas somente para analisar seu pedido e entrar em contato.</p></header><form className="pilot-form" onSubmit={(event) => void requestCellEntry(selected, event)}><label>Nome completo<input name="nome" required minLength={5} maxLength={120} autoComplete="name" /></label><label>WhatsApp ou e-mail<input name="contato" required maxLength={160} autoComplete="email" /></label><label className="cell-wide-field">Mensagem para a liderança<textarea name="mensagem" rows={3} maxLength={500} placeholder="Conte um pouco sobre você e o melhor horário para contato." /></label><label className="cell-request-consent"><input type="checkbox" required />Autorizo o envio destes dados à liderança desta célula.</label><button disabled={saving}>{saving ? "Enviando…" : "Solicitar entrada"}</button></form></section>}
+          {tab === "config" && selected.can_operate && <section className="cell-settings-v6">
+            <form className="pilot-form cell-settings-form-v6" onSubmit={(event) => void updateCellData(selected, event)}>
+              <h3>Dados da célula</h3>
+              <label>Nome da célula<input name="nome" required maxLength={100} defaultValue={selected.nome} disabled={!canManage} /></label>
+              {!canManage && <small>Somente a gestão pastoral pode renomear a célula.</small>}
+              <label>Horário do encontro<input name="horarioReuniao" maxLength={20} placeholder="19h30" defaultValue={selected.horario_reuniao} /><small>Aparece no perfil que o participante lê.</small></label>
+              <label>Rede<input name="rede" maxLength={60} placeholder="Rede Centro" defaultValue={selected.rede} /><small>Agrupa e filtra as células no diretório.</small></label>
+              <fieldset className="cell-days-field-v2"><legend>Dias de encontro</legend>{Object.entries(dayLabels).map(([value,label]) => <label key={value}><input type="checkbox" name="diasReuniao" value={value} defaultChecked={selected.dias_reuniao.includes(value)} />{label}</label>)}</fieldset>
+              <label>Endereço público<input name="enderecoPublico" maxLength={240} defaultValue={selected.endereco_publico} /></label>
+              <label>Temas<input name="tags" maxLength={240} placeholder="Famílias, Oração, Jovens" defaultValue={selected.tags.join(", ")} /><small>Separe por vírgula. Até 8 temas.</small></label>
+              <label className="cell-wide-field">Descrição pública<textarea name="descricaoPublica" rows={2} maxLength={700} defaultValue={selected.descricao_publica} /></label>
+              <label className="cell-wide-field">Observações internas <small>só a liderança vê</small><textarea name="observacoes" rows={2} maxLength={1000} defaultValue={selected.observacoes || ""} /></label>
+              <div className="cell-wide-field">
+                <NativeImageUpload
+                  label="Foto de capa da célula"
+                  value={coverDraft?.cellId === selected.id ? coverDraft.url : selected.capa_url}
+                  purpose="cell-cover"
+                  resourceId={selected.id}
+                  previewMode="banner"
+                  onChange={(url) => setCoverDraft({ cellId: selected.id, url })}
+                  help="Aparece no topo do perfil que o participante abre. A imagem é otimizada automaticamente."
+                />
+              </div>
+              <button disabled={saving}>{saving ? "Salvando…" : "Salvar alterações"}</button>
+            </form>
+            {canManage && <div className="cell-danger-zone-v6"><div><small>ÁREA DE RISCO</small><strong>{selected.ativo ? "Célula em atividade" : "Célula arquivada"}</strong><p>Após 60 dias sem relatório, a célula é arquivada automaticamente.</p></div>{selected.ativo ? <button type="button" className="danger-link" onClick={() => void deactivateCell(selected)}>Arquivar célula</button> : <button type="button" onClick={() => void cellAction(selected, { acao: "REATIVAR" })}>Reativar célula</button>}</div>}
+          </section>}
+          </div>
+          </div>
+        </section>
+      )}
       {selectedMemberProfile && typeof document !== "undefined" && createPortal(
         <div className="cell-member-profile-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedMemberProfile(null); }}>
           <section className="cell-member-profile-dialog" role="dialog" aria-modal="true" aria-label={`Perfil de ${selectedMemberProfile.name}`}>
@@ -2035,7 +2203,7 @@ export function CellsWorkspace({
           </section>
         </div>, document.body,
       )}
-      {createOpen && createPortal(<div className="cell-create-overlay-v2" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setCreateOpen(false); }}><form className="pilot-form cell-create-dialog-v2" role="dialog" aria-modal="true" aria-label="Criar célula" onSubmit={createCell}><header><div><small>NOVA CÉLULA</small><h2>Informações essenciais</h2></div><button type="button" aria-label="Fechar" onClick={() => setCreateOpen(false)}>×</button></header><label>Nome da célula<input name="nome" required maxLength={100} /></label><label>Líder<select name="liderUsuarioId" required defaultValue=""><option value="" disabled>Selecione</option>{availableUsers.map((user)=><option value={user.id} key={user.id}>{user.nome} · {user.papel}</option>)}</select></label><fieldset className="cell-days-field-v2"><legend>Dias de encontro (obrigatório)</legend>{Object.entries(dayLabels).map(([value,label]) => <label key={value}><input type="checkbox" name="diasReuniao" value={value} />{label}</label>)}</fieldset><label className="cell-wide-field">Observações internas <small>só a liderança vê</small><textarea name="observacoes" rows={2} maxLength={1000} /></label><fieldset className="form-public-block-v5"><legend>Página pública</legend><p className="form-public-warning-v5"><span aria-hidden="true">◉</span>O que for preenchido aqui aparece na internet, no perfil público da comunidade. Deixe em branco para manter a célula fora do diretório.</p><label>Endereço público<input name="enderecoPublico" maxLength={240} placeholder="Rua e bairro do encontro" /><small>Não use o endereço da casa de alguém sem permissão.</small></label><label className="cell-wide-field">Descrição pública<textarea name="descricaoPublica" rows={2} maxLength={700} placeholder="Uma frase para quem procura uma célula perto de casa" /></label></fieldset><footer><p className="form-consequence-v5"><span aria-hidden="true">◉</span>Cria a célula, dá acesso de líder a quem você escolheu e abre o primeiro ciclo de relatórios semanais.</p><button type="button" onClick={() => setCreateOpen(false)}>Cancelar</button><button disabled={saving}>{saving ? "Criando…" : "Criar célula"}</button></footer></form></div>, document.body)}
+      {createOpen && createPortal(<div className="cell-create-overlay-v2" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setCreateOpen(false); }}><form className="pilot-form cell-create-dialog-v2" role="dialog" aria-modal="true" aria-label="Criar célula" onSubmit={createCell}><header><div><small>NOVA CÉLULA</small><h2>Informações essenciais</h2></div><button type="button" aria-label="Fechar" onClick={() => setCreateOpen(false)}>×</button></header><label>Nome da célula<input name="nome" required maxLength={100} /></label><label>Líder<select name="liderUsuarioId" required defaultValue=""><option value="" disabled>Selecione</option>{availableUsers.map((user)=><option value={user.id} key={user.id}>{user.nome} · {user.papel}</option>)}</select></label><fieldset className="cell-days-field-v2"><legend>Dias de encontro (obrigatório)</legend>{Object.entries(dayLabels).map(([value,label]) => <label key={value}><input type="checkbox" name="diasReuniao" value={value} />{label}</label>)}</fieldset><label>Horário do encontro<input name="horarioReuniao" maxLength={20} placeholder="19h30" /></label><label>Rede<input name="rede" maxLength={60} placeholder="Rede Centro" /></label><label className="cell-wide-field">Observações internas <small>só a liderança vê</small><textarea name="observacoes" rows={2} maxLength={1000} /></label><fieldset className="form-public-block-v5"><legend>Página pública</legend><p className="form-public-warning-v5"><span aria-hidden="true">◉</span>O que for preenchido aqui aparece na internet, no perfil público da comunidade. Deixe em branco para manter a célula fora do diretório.</p><label>Endereço público<input name="enderecoPublico" maxLength={240} placeholder="Rua e bairro do encontro" /><small>Não use o endereço da casa de alguém sem permissão.</small></label><label>Temas<input name="tags" maxLength={240} placeholder="Famílias, Oração, Jovens" /><small>Separe por vírgula. Ajuda quem procura uma célula com o mesmo perfil.</small></label><label className="cell-wide-field">Descrição pública<textarea name="descricaoPublica" rows={2} maxLength={700} placeholder="Uma frase para quem procura uma célula perto de casa" /></label></fieldset><footer><p className="form-consequence-v5"><span aria-hidden="true">◉</span>Cria a célula, dá acesso de líder a quem você escolheu e abre o primeiro ciclo de relatórios semanais.</p><button type="button" onClick={() => setCreateOpen(false)}>Cancelar</button><button disabled={saving}>{saving ? "Criando…" : "Criar célula"}</button></footer></form></div>, document.body)}
     </section>
   );
 }

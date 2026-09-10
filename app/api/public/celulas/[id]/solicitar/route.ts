@@ -23,3 +23,22 @@ export async function POST(request: Request, context: Context) {
     .bind(cell.comunidade_id, id, user?.id || null, nome, contato, mensagem).run();
   return Response.json({ ok:true }, { status:201 });
 }
+
+// Desistir do pedido é do próprio autor: a decisão de aprovar ou recusar
+// continua com a liderança, mas ficar preso numa fila que a pessoa já não quer
+// não é decisão de ninguém. Só apaga pedido PENDENTE e só o dela, identificado
+// pela sessão — pedido anônimo não tem como ser reivindicado depois.
+export async function DELETE(_request: Request, context: Context) {
+  const id = Number((await context.params).id);
+  const user = await getSessionUser();
+  if (!user) return Response.json({ error: "Faça login para cancelar a solicitação." }, { status: 401 });
+  if (!Number.isInteger(id) || id <= 0) return Response.json({ error: "Célula inválida." }, { status: 400 });
+  const db = getD1();
+  const result = await db.prepare(
+    `DELETE FROM celula_solicitacoes WHERE celula_id = ? AND usuario_id = ? AND status = 'PENDENTE'`,
+  ).bind(id, user.id).run();
+  if (!result.meta.changes) {
+    return Response.json({ error: "Não há solicitação pendente sua nesta célula." }, { status: 404 });
+  }
+  return Response.json({ ok: true });
+}

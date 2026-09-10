@@ -12,7 +12,10 @@ test("Células possui área própria, agenda, liderança e relatório pastoral",
     read("app/api/pilot/pastoral-dashboard/route.ts"),
     read("drizzle/0050_cells_hub.sql"),
   ]);
-  assert.match(ui, /cell-shell-v2/);
+  // A área própria da aba deixou de ser lista lateral (`cell-shell-v2`) e virou
+  // catálogo em grade na gestão mais a tela de quem participa.
+  assert.match(ui, /cell-catalog-grid-v6/);
+  assert.match(ui, /CellsMemberBoard/);
   assert.match(ui, /Relatório semanal/);
   assert.match(ui, /MEMBRO_PROMOVER_VICE/);
   assert.match(listApi, /datetime\('now', '-60 days'\)/);

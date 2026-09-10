@@ -6,8 +6,12 @@ migração nova, leia isto.
 
 ## Próximo número livre
 
-**`0071`**. Use o próximo inteiro disponível a partir daí — não reaproveite
+**`0072`**. Use o próximo inteiro disponível a partir daí — não reaproveite
 um número já usado, mesmo que o arquivo tenha sido escrito à mão.
+
+`0071_celula_perfil_publico.sql` acrescenta `horario_reuniao`, `rede`, `tags` e
+`capa_url` em `celulas`, os campos que a experiência do membro na aba Célula
+mostra no perfil público e usa como filtro do diretório.
 
 `0070_chat_system_retention.sql` reconstrói `conversas_privadas` (troca o
 ciclo mensal `ciclo_mes` pelo semanal `ciclo_semana` e remove `drive_file_id`

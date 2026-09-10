@@ -1,6 +1,12 @@
 import { getD1 } from "../../../../db";
 import { recordTenantAudit } from "../../../lib/tenant-audit";
 import { requireTenantPermission } from "../../../lib/tenant";
+import {
+  parseCellDays,
+  parseCellNetwork,
+  parseCellSchedule,
+  parseCellTags,
+} from "../../../lib/cell-profile";
 
 type CellRow = {
   id: number;
@@ -48,10 +54,12 @@ export async function GET(request: Request) {
   ).bind(access.context.comunidadeId).run();
   const result = await db.prepare(
     `SELECT c.id, c.nome, c.responsavel, c.membros, c.observacoes,
-      c.dias_reuniao, c.endereco_publico, c.descricao_publica,
+      c.dias_reuniao, c.horario_reuniao, c.rede, c.tags, c.capa_url,
+      c.endereco_publico, c.descricao_publica,
       c.lider_usuario_id, c.vice_lider_usuario_id, c.ultimo_relatorio_em,
       c.arquivada_em, c.ativo, c.criado_em,
       lider.nome AS lider_nome, vice.nome AS vice_lider_nome,
+      lider.foto_perfil AS lider_foto,
       COUNT(v.id) AS visitantes_ativos
      FROM celulas c
      LEFT JOIN usuarios lider ON lider.id = c.lider_usuario_id
@@ -100,7 +108,7 @@ export async function GET(request: Request) {
       reportPageSize + 1,
     ).all<{ id: number; data_reuniao: string; celula_id: number }>(),
     db.prepare(
-      `SELECT id, celula_id, nome, contato, mensagem, status, criado_em
+      `SELECT id, celula_id, usuario_id, nome, contato, mensagem, status, criado_em
        FROM celula_solicitacoes WHERE comunidade_id = ?
        ORDER BY criado_em DESC LIMIT 250`,
     ).bind(access.context.comunidadeId).all(),
@@ -133,6 +141,19 @@ export async function GET(request: Request) {
   const cells = result.results.map((cell) => {
     const canOperate = canManage || Number(cell.lider_usuario_id) === access.user.id || Number(cell.vice_lider_usuario_id) === access.user.id;
     const members = parseArray(cell.membros);
+    // A tela do membro precisa saber duas coisas que ninguém guardava aqui: se
+    // esta é a célula dele e se o pedido de entrada dele ainda está na fila.
+    // As duas saem de dados que já pertencem a ele, então não ampliam o que a
+    // rota devolve para quem não lidera a célula.
+    const isMember = members.some(
+      (member) => Number((member as Record<string, unknown>).userId) === access.user.id,
+    );
+    const myRequest = requests.results.find(
+      (item) =>
+        Number(item.celula_id) === Number(cell.id) &&
+        Number(item.usuario_id) === access.user.id &&
+        item.status === "PENDENTE",
+    );
     return {
       ...cell,
       membros_total: members.filter((member) => String((member as Record<string, unknown>).kind) === "COMMUNITY").length,
@@ -146,8 +167,18 @@ export async function GET(request: Request) {
           fotoPerfil: profile.foto_perfil,
           papelComunidade: profile.papel,
         } : source;
+      }) : isMember ? members.map((member) => {
+        // Na própria célula o membro vê com quem caminha — nome e função, sem
+        // e-mail nem telefone, que continuam restritos à liderança.
+        const source = member as Record<string, unknown>;
+        return { id: source.id, kind: source.kind, name: source.name, role: source.role };
       }) : [],
       dias_reuniao: parseArray(cell.dias_reuniao),
+      tags: parseArray(cell.tags),
+      sou_membro: isMember,
+      minha_solicitacao: myRequest
+        ? { id: Number(myRequest.id), criado_em: String(myRequest.criado_em) }
+        : null,
       can_operate: canOperate,
       agenda: agenda.results.filter((item) => Number(item.celula_id) === Number(cell.id) && (canOperate || item.visibilidade === "PUBLICO")),
       relatorios: canOperate ? reports.results.filter((item) => Number(item.celula_id) === Number(cell.id)).slice(0, 12) : [],
@@ -182,9 +213,10 @@ export async function POST(request: Request) {
   const observacoes = String(payload.observacoes || "").trim().slice(0, 1000);
   const endereco = String(payload.enderecoPublico || "").trim().slice(0, 240);
   const descricao = String(payload.descricaoPublica || "").trim().slice(0, 700);
-  const dias = Array.isArray(payload.diasReuniao)
-    ? payload.diasReuniao.map(String).filter((day) => ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"].includes(day))
-    : String(payload.diasReuniao || "").split(",").filter(Boolean);
+  const horario = parseCellSchedule(payload.horarioReuniao);
+  const rede = parseCellNetwork(payload.rede);
+  const tags = parseCellTags(payload.tags);
+  const dias = parseCellDays(payload.diasReuniao);
   if (legacyRequest && !dias.length) dias.push("QUA");
   if (!nome || !Number.isInteger(liderUsuarioId) || liderUsuarioId <= 0 || !dias.length) {
     return Response.json({ error: "Informe nome, líder e ao menos um dia de reunião." }, { status: 400 });
@@ -206,10 +238,10 @@ export async function POST(request: Request) {
   const result = await db.prepare(
     `INSERT INTO celulas
      (comunidade_id, nome, responsavel, membros, observacoes, dias_reuniao,
-      endereco_publico, descricao_publica, lider_usuario_id, ativo,
-      escopo_confirmado, criado_por)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?)`,
-  ).bind(access.context.comunidadeId, nome, responsibleName, JSON.stringify(members), observacoes || null, JSON.stringify([...new Set(dias)]), endereco, descricao, leader.id, access.user.email).run();
+      horario_reuniao, rede, tags, endereco_publico, descricao_publica,
+      lider_usuario_id, ativo, escopo_confirmado, criado_por)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?)`,
+  ).bind(access.context.comunidadeId, nome, responsibleName, JSON.stringify(members), observacoes || null, JSON.stringify([...new Set(dias)]), horario, rede, JSON.stringify(tags), endereco, descricao, leader.id, access.user.email).run();
   const cellId = Number(result.meta.last_row_id);
   await recordTenantAudit(db, access.context, access.user.id, "CELULA_V45_CRIADA", "SUCESSO", { celulaId: cellId, dias });
   return Response.json({ id: cellId }, { status: 201 });

@@ -109,6 +109,10 @@ export const celulas = sqliteTable(
     membros: text("membros").notNull().default("[]"),
     observacoes: text("observacoes"),
     diasReuniao: text("dias_reuniao").notNull().default("[]"),
+    horarioReuniao: text("horario_reuniao").notNull().default(""),
+    rede: text("rede").notNull().default(""),
+    tags: text("tags").notNull().default("[]"),
+    capaUrl: text("capa_url").notNull().default(""),
     enderecoPublico: text("endereco_publico").notNull().default(""),
     descricaoPublica: text("descricao_publica").notNull().default(""),
     liderUsuarioId: integer("lider_usuario_id").references(() => usuarios.id, {

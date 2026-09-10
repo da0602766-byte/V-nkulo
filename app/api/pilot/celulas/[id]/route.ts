@@ -1,6 +1,13 @@
 import { getD1 } from "../../../../../db";
 import { recordTenantAudit } from "../../../../lib/tenant-audit";
 import { requireTenantPermission } from "../../../../lib/tenant";
+import {
+  parseCellCoverUrl,
+  parseCellDays,
+  parseCellNetwork,
+  parseCellSchedule,
+  parseCellTags,
+} from "../../../../lib/cell-profile";
 
 type Context = { params: Promise<{ id: string }> };
 type StoredCellMember = { id: string; kind: "COMMUNITY" | "EXTERNAL"; userId?: number; name: string; note?: string; role?: "LEADER" | "VICE_LEADER" | "MEMBER" };
@@ -106,6 +113,62 @@ export async function PATCH(request: Request, context: Context) {
     await db.prepare(`UPDATE celula_solicitacoes SET status = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ? AND celula_id = ? AND comunidade_id = ? AND status = 'PENDENTE'`)
       .bind(status, requestId, id, access.context.comunidadeId).run();
     return audited(db, access.context, access.user.id, id, `SOLICITACAO_${status}`);
+  }
+
+  if (action === "ATUALIZAR_DADOS") {
+    const updates: string[] = [];
+    const params: unknown[] = [];
+    if (manager && typeof payload.nome === "string") {
+      const nome = String(payload.nome).trim().slice(0, 100);
+      if (!nome) return Response.json({ error: "Informe o nome da célula." }, { status: 400 });
+      const duplicate = await db.prepare(
+        `SELECT id FROM celulas WHERE comunidade_id = ? AND nome = ? COLLATE NOCASE AND ativo = 1 AND id != ?`,
+      ).bind(access.context.comunidadeId, nome, id).first();
+      if (duplicate) return Response.json({ error: "Já existe uma célula ativa com esse nome." }, { status: 409 });
+      updates.push("nome = ?");
+      params.push(nome);
+    }
+    if (typeof payload.enderecoPublico === "string") {
+      updates.push("endereco_publico = ?");
+      params.push(String(payload.enderecoPublico).trim().slice(0, 240));
+    }
+    if (typeof payload.descricaoPublica === "string") {
+      updates.push("descricao_publica = ?");
+      params.push(String(payload.descricaoPublica).trim().slice(0, 700));
+    }
+    if (typeof payload.observacoes === "string") {
+      updates.push("observacoes = ?");
+      params.push(String(payload.observacoes).trim().slice(0, 1000) || null);
+    }
+    if (Array.isArray(payload.diasReuniao)) {
+      const dias = parseCellDays(payload.diasReuniao);
+      if (!dias.length) return Response.json({ error: "Selecione ao menos um dia de encontro." }, { status: 400 });
+      updates.push("dias_reuniao = ?");
+      params.push(JSON.stringify(dias));
+    }
+    if (typeof payload.horarioReuniao === "string") {
+      updates.push("horario_reuniao = ?");
+      params.push(parseCellSchedule(payload.horarioReuniao));
+    }
+    if (typeof payload.rede === "string") {
+      updates.push("rede = ?");
+      params.push(parseCellNetwork(payload.rede));
+    }
+    if (payload.tags !== undefined) {
+      updates.push("tags = ?");
+      params.push(JSON.stringify(parseCellTags(payload.tags)));
+    }
+    if (payload.capaUrl !== undefined) {
+      const capa = parseCellCoverUrl(payload.capaUrl);
+      if ("error" in capa) return Response.json({ error: capa.error }, { status: 400 });
+      updates.push("capa_url = ?");
+      params.push(capa.value);
+    }
+    if (!updates.length) return Response.json({ error: "Nada para atualizar." }, { status: 400 });
+    updates.push("atualizado_em = CURRENT_TIMESTAMP");
+    await db.prepare(`UPDATE celulas SET ${updates.join(", ")} WHERE id = ? AND comunidade_id = ?`)
+      .bind(...params, id, access.context.comunidadeId).run();
+    return audited(db, access.context, access.user.id, id, "CELULA_DADOS_ATUALIZADOS");
   }
 
   if (action === "REATIVAR") {
