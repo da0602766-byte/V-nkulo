@@ -6,8 +6,13 @@ migração nova, leia isto.
 
 ## Próximo número livre
 
-**`0072`**. Use o próximo inteiro disponível a partir daí — não reaproveite
+**`0073`**. Use o próximo inteiro disponível a partir daí — não reaproveite
 um número já usado, mesmo que o arquivo tenha sido escrito à mão.
+
+`0072_fio_ministerio.sql` adiciona `fio_habilitado` e `fio_etapas` em
+`ministerios_comunidade` (o modelo do Fio do Ministério) e `fio_etapas` em
+`escalas_ministerio` (as etapas daquela escala, com estado). Ver
+app/components/SecretaryMinisterialWorkspace.tsx.
 
 `0071_celulas_participacao_detalhes.sql` adiciona `rede`, `horario_texto`,
 `temas` e `foto_capa` em `celulas`, para a aba Configurações do redesenho de
