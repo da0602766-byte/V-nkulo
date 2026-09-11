@@ -1,0 +1,1 @@
+ALTER TABLE `publicacoes_piloto` ADD `links_json` text DEFAULT '[]' NOT NULL;

@@ -1,0 +1,1 @@
+ALTER TABLE `usuarios` ADD `cadastro_dados` text DEFAULT '{}' NOT NULL;

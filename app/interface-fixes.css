@@ -1,0 +1,95 @@
+.theme-control-glyph { width:18px; height:18px; display:grid; place-items:center; transform-origin:center; }
+.theme-control-glyph svg { width:18px; height:18px; display:block; overflow:visible; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.theme-control-glyph .theme-sun-core { fill:currentColor; stroke:currentColor; }
+.theme-control-glyph .theme-auto-half { fill:currentColor; stroke:none; }
+.theme-control.is-transitioning .theme-control-glyph { animation:vinkulo-theme-glyph-switch .18s ease-out; }
+.theme-control button:disabled { cursor:wait; }
+
+@keyframes vinkulo-theme-glyph-switch {
+  0% { opacity:1; transform:rotate(0) scale(1); }
+  42% { opacity:0; transform:rotate(95deg) scale(.55); }
+  58% { opacity:0; transform:rotate(-75deg) scale(.55); }
+  100% { opacity:1; transform:rotate(0) scale(1); }
+}
+
+.public-account-backdrop { display:none; }
+.public-account-menu:not([open])>.public-account-backdrop { display:none; }
+.social-public-header.reception-header {
+  --reception-surface:#fff;
+  --reception-surface-soft:#eef1f7;
+  --reception-text:#11182a;
+  --reception-muted:#657087;
+  --reception-line:#dfe4ee;
+  background-color:var(--reception-surface)!important;
+  background-image:none!important;
+  color:var(--reception-text)!important;
+  -webkit-backdrop-filter:none;
+  backdrop-filter:none;
+}
+html:is([data-theme="dark"],[data-pilot-theme="escuro"]) .social-public-header.reception-header {
+  --reception-surface:#101827;
+  --reception-surface-soft:#172235;
+  --reception-text:#f2f5fb;
+  --reception-muted:#a0acc0;
+  --reception-line:#28354a;
+  color-scheme:dark;
+}
+html:is([data-theme="light"],[data-pilot-theme="claro"]) .social-public-header.reception-header { color-scheme:light; }
+.social-public-header.reception-header .public-account-popover {
+  opacity:1;
+  background-color:var(--reception-surface,#fff)!important;
+  background-image:none!important;
+  color:var(--reception-text,#11182a)!important;
+  -webkit-backdrop-filter:none;
+  backdrop-filter:none;
+}
+.social-public-header.reception-header .public-account-popover>a,
+.social-public-header.reception-header .public-account-popover>header strong { color:var(--reception-text,#11182a)!important; }
+.social-public-header.reception-header .public-account-popover>header small { color:var(--reception-muted,#657087)!important; }
+
+@keyframes public-account-sheet-in {
+  from { opacity:0; transform:translateY(-8px) scale(.985); }
+  to { opacity:1; transform:none; }
+}
+
+@media(max-width:720px) {
+  .social-public-header.reception-header .public-account-menu[open] { position:static; }
+  .social-public-header.reception-header .public-account-menu[open]>.public-account-backdrop {
+    display:block;
+    position:fixed;
+    z-index:198;
+    inset:calc(58px + env(safe-area-inset-top)) 0 0;
+    border:0;
+    background:rgba(4,9,18,.42);
+    padding:0;
+    backdrop-filter:blur(3px);
+    cursor:default;
+  }
+  .social-public-header.reception-header .public-account-menu[open]>summary { position:relative; z-index:201; }
+  .social-public-header.reception-header .public-account-popover {
+    position:fixed;
+    z-index:200;
+    top:calc(66px + env(safe-area-inset-top));
+    right:10px;
+    left:10px;
+    width:auto;
+    max-height:calc(100dvh - 82px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    display:grid;
+    overflow:auto;
+    border-color:var(--reception-line);
+    background:var(--reception-surface);
+    color:var(--reception-text);
+    padding:9px;
+    box-shadow:0 28px 80px rgba(2,7,16,.42);
+    isolation:isolate;
+    overscroll-behavior:contain;
+    animation:public-account-sheet-in .2s ease-out;
+  }
+  .social-public-header.reception-header .public-account-popover>header { padding:10px 9px 14px; }
+  .social-public-header.reception-header .public-account-popover>a { min-height:46px; font-size:.76rem; }
+}
+
+@media(prefers-reduced-motion:reduce) {
+  .theme-control.is-transitioning .theme-control-glyph,
+  .social-public-header.reception-header .public-account-popover { animation:none; }
+}

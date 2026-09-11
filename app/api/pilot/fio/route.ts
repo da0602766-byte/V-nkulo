@@ -1,0 +1,447 @@
+import { getD1 } from "../../../../db";
+import { recordTenantAudit } from "../../../lib/tenant-audit";
+import { requireTenantPermission } from "../../../lib/tenant";
+
+// O Fio do dia é uma leitura de várias fontes que já existem, ordenada pela
+// hora em que cada coisa aconteceu. Só os registros manuais nascem aqui — o
+// que o sistema não capta sozinho, como uma visita pastoral ou um imprevisto.
+
+const CAMADAS = ["CULTOS", "PESSOAS", "OPERACAO", "CUIDADO"] as const;
+const VISIBILIDADES = ["COMUNIDADE", "LIDERANCA", "PASTORAL"] as const;
+type Camada = (typeof CAMADAS)[number];
+type Visibilidade = (typeof VISIBILIDADES)[number];
+
+const MAX_ITENS = 200;
+const MAX_TITULO = 160;
+const MAX_DETALHE = 900;
+const FUSO_COMUNIDADE = "America/Sao_Paulo";
+
+type ItemFio = {
+  id: string;
+  camada: Camada;
+  titulo: string;
+  detalhe: string;
+  ocorreEm: string;
+  origem: string;
+  origemId: number;
+  manual: boolean;
+  autor?: string;
+};
+
+const formatadorDia = new Intl.DateTimeFormat("en-CA", {
+  timeZone: FUSO_COMUNIDADE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+const formatadorPartes = new Intl.DateTimeFormat("en-US", {
+  timeZone: FUSO_COMUNIDADE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+});
+
+function chaveDiaValida(valor: string | null) {
+  if (!valor || !/^\d{4}-\d{2}-\d{2}$/.test(valor)) return false;
+  const [ano, mes, dia] = valor.split("-").map(Number);
+  const conferida = new Date(Date.UTC(ano, mes - 1, dia));
+  return (
+    conferida.getUTCFullYear() === ano &&
+    conferida.getUTCMonth() === mes - 1 &&
+    conferida.getUTCDate() === dia
+  );
+}
+
+// Converte meia-noite civil de São Paulo em UTC sem depender do fuso do
+// servidor. Workers usam UTC; deixar Date escolher o fuso deslocava os
+// registros feitos à noite para o dia seguinte no Brasil.
+function meiaNoiteUtc(chave: string) {
+  const [ano, mes, dia] = chave.split("-").map(Number);
+  const palpite = Date.UTC(ano, mes - 1, dia);
+  const partes = Object.fromEntries(
+    formatadorPartes
+      .formatToParts(new Date(palpite))
+      .filter((parte) => parte.type !== "literal")
+      .map((parte) => [parte.type, Number(parte.value)]),
+  );
+  const representacaoUtc = Date.UTC(
+    partes.year,
+    partes.month - 1,
+    partes.day,
+    partes.hour,
+    partes.minute,
+    partes.second,
+  );
+  return new Date(palpite - (representacaoUtc - palpite));
+}
+
+// A janela é sempre um dia civil da comunidade. Sem isso a consulta viraria
+// varredura da tabela inteira assim que a comunidade tivesse histórico.
+function dia(url: URL) {
+  const bruto = url.searchParams.get("dia");
+  const chave = chaveDiaValida(bruto) ? bruto! : formatadorDia.format(new Date());
+  const inicio = meiaNoiteUtc(chave);
+  const proximoDia = new Date(
+    Date.UTC(
+      Number(chave.slice(0, 4)),
+      Number(chave.slice(5, 7)) - 1,
+      Number(chave.slice(8, 10)) + 1,
+    ),
+  );
+  const proximaChave = [
+    proximoDia.getUTCFullYear(),
+    String(proximoDia.getUTCMonth() + 1).padStart(2, "0"),
+    String(proximoDia.getUTCDate()).padStart(2, "0"),
+  ].join("-");
+  const fim = new Date(
+    meiaNoiteUtc(proximaChave).getTime() - 1000,
+  );
+  return { inicio: inicio.toISOString(), fim: fim.toISOString() };
+}
+
+function normalizarCamada(valor: unknown): Camada {
+  const candidato = String(valor || "").toUpperCase();
+  return (CAMADAS as readonly string[]).includes(candidato)
+    ? (candidato as Camada)
+    : "PESSOAS";
+}
+
+function normalizarVisibilidade(valor: unknown): Visibilidade {
+  const candidato = String(valor || "").toUpperCase();
+  return (VISIBILIDADES as readonly string[]).includes(candidato)
+    ? (candidato as Visibilidade)
+    : "LIDERANCA";
+}
+
+// Quem lê o quê. Um registro marcado para a pastoral não aparece para a
+// liderança comum, e o de liderança não aparece para membro — a filtragem é
+// feita no SQL, não na interface, para não depender de botão escondido.
+function visibilidadesVisiveis(permissions: string[]): Visibilidade[] {
+  const visiveis: Visibilidade[] = ["COMUNIDADE"];
+  if (permissions.includes("people.view") || permissions.includes("leadership.panel.view")) {
+    visiveis.push("LIDERANCA");
+  }
+  if (
+    permissions.includes("pastoral.panel.view") ||
+    permissions.includes("community.admin.view")
+  ) {
+    visiveis.push("PASTORAL");
+  }
+  return visiveis;
+}
+
+export async function GET(request: Request) {
+  const access = await requireTenantPermission("dashboard.view");
+  if ("error" in access) return access.error;
+  const { comunidadeId, userId, permissions } = access.context;
+  const { inicio, fim } = dia(new URL(request.url));
+  const db = getD1();
+  const itens: ItemFio[] = [];
+
+  // Cultos e encontros do dia.
+  if (permissions.includes("events.view")) {
+    const eventos = await db
+      .prepare(
+        `SELECT id, titulo, descricao, local, inicia_em
+         FROM eventos_comunidade
+         WHERE comunidade_id = ?
+           AND datetime(inicia_em) BETWEEN datetime(?) AND datetime(?)
+         ORDER BY datetime(inicia_em) ASC
+         LIMIT ?`,
+      )
+      .bind(comunidadeId, inicio, fim, MAX_ITENS)
+      .all<{ id: number; titulo: string; descricao: string; local: string; inicia_em: string }>();
+    for (const linha of eventos.results || []) {
+      itens.push({
+        id: `evento-${linha.id}`,
+        camada: "CULTOS",
+        titulo: linha.titulo,
+        detalhe: linha.local || linha.descricao || "",
+        ocorreEm: linha.inicia_em,
+        origem: "Evento",
+        origemId: linha.id,
+        manual: false,
+      });
+    }
+  }
+
+  // Escalas em que esta pessoa foi designada.
+  const escalas = await db
+    .prepare(
+      `SELECT e.id, e.titulo, e.local, e.inicia_em, d.funcao, d.status
+       FROM escala_designacoes d
+       JOIN escalas_ministerio e ON e.id = d.escala_id
+       WHERE d.comunidade_id = ?
+         AND d.usuario_id = ?
+         AND d.ativo = 1
+         AND datetime(e.inicia_em) BETWEEN datetime(?) AND datetime(?)
+       ORDER BY datetime(e.inicia_em) ASC
+       LIMIT ?`,
+    )
+    .bind(comunidadeId, userId, inicio, fim, MAX_ITENS)
+    .all<{ id: number; titulo: string; local: string; inicia_em: string; funcao: string; status: string }>();
+  for (const linha of escalas.results || []) {
+    itens.push({
+      id: `escala-${linha.id}`,
+      camada: "CULTOS",
+      titulo: linha.titulo,
+      detalhe: [linha.funcao, linha.local].filter(Boolean).join(" · "),
+      ocorreEm: linha.inicia_em,
+      origem: "Escala",
+      origemId: linha.id,
+      manual: false,
+    });
+  }
+
+  // Visitantes recebidos no dia, agrupados: quatorze linhas iguais não são
+  // catorze acontecimentos, são um só.
+  if (permissions.includes("visitors.view")) {
+    const visitantes = await db
+      .prepare(
+        `SELECT COUNT(*) AS total, MIN(criado_em) AS primeiro
+         FROM visitantes
+         WHERE comunidade_id = ?
+           AND ativo = 1
+           AND escopo_confirmado = 1
+           AND datetime(criado_em) BETWEEN datetime(?) AND datetime(?)`,
+      )
+      .bind(comunidadeId, inicio, fim)
+      .first<{ total: number; primeiro: string | null }>();
+    const total = Number(visitantes?.total || 0);
+    if (total > 0 && visitantes?.primeiro) {
+      itens.push({
+        id: "visitantes-do-dia",
+        camada: "PESSOAS",
+        titulo: total === 1 ? "1 visitante recebido" : `${total} visitantes recebidos`,
+        detalhe: "Abrir a lista para acompanhar o contato",
+        ocorreEm: visitantes.primeiro,
+        origem: "Visitantes",
+        origemId: 0,
+        manual: false,
+      });
+    }
+  }
+
+  // Pedidos abertos no dia — só a contagem, nunca o corpo. O que é
+  // confidencial não vaza para o fio de quem não pode abrir o pedido.
+  const pedidos = await db
+    .prepare(
+      `SELECT COUNT(*) AS total, MIN(criado_em) AS primeiro
+       FROM solicitacoes_comunidade
+       WHERE comunidade_id = ?
+         AND datetime(criado_em) BETWEEN datetime(?) AND datetime(?)`,
+    )
+    .bind(comunidadeId, inicio, fim)
+    .first<{ total: number; primeiro: string | null }>();
+  const totalPedidos = Number(pedidos?.total || 0);
+  if (totalPedidos > 0 && pedidos?.primeiro) {
+    itens.push({
+      id: "pedidos-do-dia",
+      camada: "CUIDADO",
+      titulo: totalPedidos === 1 ? "1 pedido recebido" : `${totalPedidos} pedidos recebidos`,
+      detalhe: "Abrir a triagem para ver o que precisa de resposta",
+      ocorreEm: pedidos.primeiro,
+      origem: "Pedidos",
+      origemId: 0,
+      manual: false,
+    });
+  }
+
+  // Publicações do mural.
+  const publicacoes = await db
+    .prepare(
+      `SELECT id, titulo, criado_em
+       FROM publicacoes_piloto
+       WHERE comunidade_id = ?
+         AND status = 'PUBLICADA'
+         AND datetime(criado_em) BETWEEN datetime(?) AND datetime(?)
+       ORDER BY datetime(criado_em) ASC
+       LIMIT 20`,
+    )
+    .bind(comunidadeId, inicio, fim)
+    .all<{ id: number; titulo: string; criado_em: string }>();
+  for (const linha of publicacoes.results || []) {
+    itens.push({
+      id: `publicacao-${linha.id}`,
+      camada: "PESSOAS",
+      titulo: linha.titulo,
+      detalhe: "Publicado no mural",
+      ocorreEm: linha.criado_em,
+      origem: "Mural",
+      origemId: linha.id,
+      manual: false,
+    });
+  }
+
+  // Registros manuais, respeitando a visibilidade de cada um.
+  const visiveis = visibilidadesVisiveis(permissions);
+  const marcadores = visiveis.map(() => "?").join(",");
+  const registros = await db
+    .prepare(
+      `SELECT f.id, f.camada, f.titulo, f.detalhe, f.ocorre_em, u.nome AS autor
+       FROM fio_registros f
+       LEFT JOIN usuarios u ON u.id = f.autor_usuario_id
+       WHERE f.comunidade_id = ?
+         AND f.ativo = 1
+         AND f.visibilidade IN (${marcadores})
+         AND datetime(f.ocorre_em) BETWEEN datetime(?) AND datetime(?)
+       ORDER BY datetime(f.ocorre_em) ASC
+       LIMIT ?`,
+    )
+    .bind(comunidadeId, ...visiveis, inicio, fim, MAX_ITENS)
+    .all<{
+      id: number; camada: string; titulo: string; detalhe: string;
+      ocorre_em: string; autor: string | null;
+    }>();
+  for (const linha of registros.results || []) {
+    itens.push({
+      id: `fio-${linha.id}`,
+      camada: normalizarCamada(linha.camada),
+      titulo: linha.titulo,
+      detalhe: linha.detalhe || "",
+      ocorreEm: linha.ocorre_em,
+      origem: "Registro",
+      origemId: linha.id,
+      manual: true,
+      autor: linha.autor || undefined,
+    });
+  }
+
+  itens.sort(
+    (esquerda, direita) =>
+      Date.parse(esquerda.ocorreEm) - Date.parse(direita.ocorreEm),
+  );
+
+  // Resumo do dia. Os números saem das mesmas consultas já feitas acima, exceto
+  // as escalas da comunidade inteira e os visitantes por categoria, que pedem
+  // duas leituras a mais — ambas presas ao mesmo dia.
+  const visitantesPorCategoria = permissions.includes("visitors.view")
+    ? await db
+        .prepare(
+          `SELECT COALESCE(vc.nome, 'Sem categoria') AS nome, COUNT(*) AS total
+           FROM visitantes v
+           LEFT JOIN visitante_categorias vc ON vc.id = v.categoria_id
+           WHERE v.comunidade_id = ?
+             AND v.ativo = 1
+             AND v.escopo_confirmado = 1
+             AND datetime(v.criado_em) BETWEEN datetime(?) AND datetime(?)
+           GROUP BY vc.id, vc.nome
+           ORDER BY total DESC
+           LIMIT 6`,
+        )
+        .bind(comunidadeId, inicio, fim)
+        .all<{ nome: string; total: number }>()
+    : { results: [] as { nome: string; total: number }[] };
+
+  const escalasDoDia = await db
+    .prepare(
+      `SELECT COUNT(*) AS total,
+        SUM(CASE WHEN d.status = 'CONFIRMADA' THEN 1 ELSE 0 END) AS confirmadas
+       FROM escala_designacoes d
+       JOIN escalas_ministerio e ON e.id = d.escala_id
+       WHERE d.comunidade_id = ?
+         AND d.ativo = 1
+         AND datetime(e.inicia_em) BETWEEN datetime(?) AND datetime(?)`,
+    )
+    .bind(comunidadeId, inicio, fim)
+    .first<{ total: number; confirmadas: number }>();
+
+  const resumo = {
+    visitantes: permissions.includes("visitors.view")
+      ? Number(
+          (
+            await db
+              .prepare(
+                `SELECT COUNT(*) AS total FROM visitantes
+                 WHERE comunidade_id = ? AND ativo = 1 AND escopo_confirmado = 1
+                   AND datetime(criado_em) BETWEEN datetime(?) AND datetime(?)`,
+              )
+              .bind(comunidadeId, inicio, fim)
+              .first<{ total: number }>()
+          )?.total || 0,
+        )
+      : null,
+    pedidos: totalPedidos,
+    registros: itens.length,
+    escalas: {
+      total: Number(escalasDoDia?.total || 0),
+      confirmadas: Number(escalasDoDia?.confirmadas || 0),
+    },
+    visitantesPorCategoria: (visitantesPorCategoria.results || []).map((linha) => ({
+      nome: linha.nome,
+      total: Number(linha.total || 0),
+    })),
+  };
+
+  return Response.json({
+    ok: true,
+    dia: inicio,
+    itens: itens.slice(0, MAX_ITENS),
+    resumo,
+  });
+}
+
+export async function POST(request: Request) {
+  const access = await requireTenantPermission("leadership.panel.view");
+  if ("error" in access) return access.error;
+  const { comunidadeId, userId, permissions } = access.context;
+  const db = getD1();
+
+  let corpo: Record<string, unknown>;
+  try {
+    corpo = (await request.json()) as Record<string, unknown>;
+  } catch {
+    return Response.json({ error: "Envio inválido." }, { status: 400 });
+  }
+
+  const titulo = String(corpo.titulo || "").trim().slice(0, MAX_TITULO);
+  if (!titulo) {
+    return Response.json(
+      { error: "Escreva um título para o registro." },
+      { status: 400 },
+    );
+  }
+  const detalhe = String(corpo.detalhe || "").trim().slice(0, MAX_DETALHE);
+  const camada = normalizarCamada(corpo.camada);
+  const visibilidade = normalizarVisibilidade(corpo.visibilidade);
+  if (!visibilidadesVisiveis(permissions).includes(visibilidade)) {
+    return Response.json(
+      { error: "Seu perfil não pode registrar conteúdo com essa visibilidade." },
+      { status: 403 },
+    );
+  }
+  const bruto = String(corpo.ocorreEm || "");
+  const ocorreEm = bruto && !Number.isNaN(Date.parse(bruto))
+    ? new Date(bruto).toISOString()
+    : new Date().toISOString();
+
+  const inserido = await db
+    .prepare(
+      `INSERT INTO fio_registros
+        (comunidade_id, autor_usuario_id, camada, titulo, detalhe, ocorre_em, visibilidade)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       RETURNING id`,
+    )
+    .bind(comunidadeId, userId, camada, titulo, detalhe, ocorreEm, visibilidade)
+    .first<{ id: number }>();
+
+  await recordTenantAudit(
+    db,
+    access.context,
+    userId,
+    "FIO_REGISTRO_CRIADO",
+    "SUCESSO",
+    { registroId: inserido?.id, camada, visibilidade },
+  );
+
+  return Response.json({
+    ok: true,
+    id: inserido?.id,
+    message: "Registro adicionado ao fio do dia.",
+  });
+}

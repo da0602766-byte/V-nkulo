@@ -1,0 +1,1 @@
+ALTER TABLE `ministerios_comunidade` ADD `banner_url` text DEFAULT '' NOT NULL;
