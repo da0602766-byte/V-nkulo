@@ -211,7 +211,7 @@ export async function requireApiPermission(permission?: string) {
       error: Response.json(
         {
           error:
-            "Este módulo operacional permanece suspenso na V4.5 Piloto até concluir a migração multi-comunidade.",
+            "Este módulo operacional permanece suspenso até concluir a migração multi-comunidade.",
           pilot: true,
         },
         { status: 423 },
