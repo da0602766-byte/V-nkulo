@@ -92,9 +92,9 @@ export default function CellMemberPortal({
       <section className="cpart-shell cpart-shell-mobile" aria-busy={cells.loading}>
         <OperationFeedback message={cells.message} error={cells.error} />
         {mobileSelected ? (
-          <MobileDetail cell={mobileSelected} cells={cells} status={statusOf(mobileSelected)} onBack={() => setMobileSelected(null)} onRequestEntry={requestEntry} />
+          <MobileDetail cell={mobileSelected} cells={cells} status={statusOf(mobileSelected)} onBack={() => setMobileSelected(null)} onBackToGestao={onBackToGestao} onRequestEntry={requestEntry} />
         ) : (
-          <MobileList list={list} statusOf={statusOf} onSelect={setMobileSelected} />
+          <MobileList list={list} statusOf={statusOf} onSelect={setMobileSelected} onBackToGestao={onBackToGestao} />
         )}
       </section>
     );
@@ -451,16 +451,19 @@ function MobileList({
   list,
   statusOf,
   onSelect,
+  onBackToGestao,
 }: {
   list: Cell[];
   statusOf: (cell: Cell) => ParticipationStatus;
   onSelect: (cell: Cell) => void;
+  onBackToGestao?: () => void;
 }) {
   const myCell = list.find((cell) => cell.minha_participacao);
   const pendingCount = list.filter((cell) => statusOf(cell) === "pendente").length;
   const openCount = list.filter((cell) => statusOf(cell) === "aberta").length;
   return (
     <div>
+      {onBackToGestao && <MobileManagementLink onClick={onBackToGestao} />}
       <div className="cpart-mobile-head">
         <h1>Células</h1>
         <p>Descubra, acompanhe e solicite entrada</p>
@@ -492,12 +495,14 @@ function MobileDetail({
   cells,
   status,
   onBack,
+  onBackToGestao,
   onRequestEntry,
 }: {
   cell: Cell;
   cells: CellsData;
   status: ParticipationStatus;
   onBack: () => void;
+  onBackToGestao?: () => void;
   onRequestEntry: (cell: Cell, nome: string, contato: string, mensagem: string) => Promise<boolean>;
 }) {
   return (
@@ -506,6 +511,7 @@ function MobileDetail({
         <button type="button" onClick={onBack} aria-label="Voltar">←</button>
         <span>Perfil da célula</span>
       </div>
+      {onBackToGestao && <MobileManagementLink onClick={onBackToGestao} />}
       <div className="cpart-panel-cover cpart-mobile-cover">
         <h2>{cell.nome}</h2>
         <p>{cell.rede}</p>
@@ -524,6 +530,14 @@ function MobileDetail({
         {cell.can_operate && <MobileLeaderEssentials cell={cell} cells={cells} />}
       </div>
     </div>
+  );
+}
+
+function MobileManagementLink({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" className="cpart-mobile-back-gestao" onClick={onClick}>
+      ← Voltar para gestão
+    </button>
   );
 }
 

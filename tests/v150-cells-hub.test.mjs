@@ -56,6 +56,11 @@ test("Gestão e Participação de Células são experiências separadas, com men
   // Participação no console e pode voltar para Gestão.
   assert.match(orchestrator, /onBackToGestao/);
   assert.match(dashboard, /memberMode=\{active\.papel === "MEMBRO"\}/);
+  // Em tela real de celular, o alternador continua acessível na lista e no
+  // perfil — não fica limitado à prévia desktop.
+  assert.match(portal, /cpart-mobile-back-gestao/);
+  assert.match(portal, /onBackToGestao=\{onBackToGestao\}/);
+  assert.match(portal, /MobileManagementLink/);
 });
 
 test("página pública exibe células autorizadas e recebe pedido de entrada", async () => {

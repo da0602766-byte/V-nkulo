@@ -34389,6 +34389,13 @@ html[data-pilot-theme="escuro"] .request-care-status.tone-blue { background:#173
   border-bottom: 1px solid var(--line); background: var(--surf); padding: 12px 16px; font-size: var(--fs-sm); font-weight: 700;
 }
 .cpart-mobile-topbar button { color: var(--muted); font-size: var(--fs-lg); cursor: pointer; }
+.cpart-mobile-back-gestao {
+  display: flex; align-items: center; width: 100%; min-height: 42px;
+  padding: 0 16px; border: 0; border-bottom: 1px solid var(--line);
+  background: var(--surf); color: var(--acc); font-size: var(--fs-xs);
+  font-weight: 800; text-align: left; cursor: pointer;
+}
+.cpart-mobile-back-gestao:hover { background: var(--bg); }
 .cpart-mobile-cover { border-radius: 0; min-height: 100px; }
 .cpart-mobile-content { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
 .cpart-mobile-essentials { border-top: 1px solid var(--line); padding-top: 14px; display: flex; flex-direction: column; gap: 12px; }
