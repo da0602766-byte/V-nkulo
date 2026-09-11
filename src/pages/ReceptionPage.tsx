@@ -95,6 +95,7 @@ export default function ReceptionPage({ onGoToLanding, onLoginSuccess }: Props) 
                 step={loginStep}
                 email={email}
                 setEmail={setEmail}
+                onGoogleSuccess={() => onLoginSuccess("google.demo@suaigreja.com.br")}
                 onNext={() => {
                   if (loginStep === "email") {
                     setLoginStep("password");
