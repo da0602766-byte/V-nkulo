@@ -111,6 +111,10 @@ export const celulas = sqliteTable(
     diasReuniao: text("dias_reuniao").notNull().default("[]"),
     enderecoPublico: text("endereco_publico").notNull().default(""),
     descricaoPublica: text("descricao_publica").notNull().default(""),
+    rede: text("rede").notNull().default(""),
+    horarioTexto: text("horario_texto").notNull().default(""),
+    temas: text("temas").notNull().default("[]"),
+    fotoCapa: text("foto_capa"),
     liderUsuarioId: integer("lider_usuario_id").references(() => usuarios.id, {
       onDelete: "set null",
     }),

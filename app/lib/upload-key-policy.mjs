@@ -2,6 +2,7 @@ export const UPLOAD_PURPOSES = new Set([
   "community-logo",
   "community-banner",
   "ministry-banner",
+  "cell-cover",
   "login-logo",
   "login-background",
   "visual-editor-image",
@@ -16,10 +17,11 @@ const FILE_NAME = /^[0-9a-f-]+\.(jpg|png|webp)$/i;
 
 export function getUploadOwnerSegment(
   purpose,
-  { userId, ministryId, communityId },
+  { userId, ministryId, cellId, communityId },
 ) {
   if (purpose === "profile-photo") return `user-${userId}`;
   if (purpose === "ministry-banner") return `ministry-${ministryId}`;
+  if (purpose === "cell-cover") return `cell-${cellId}`;
   return String(communityId);
 }
 
@@ -30,5 +32,6 @@ export function isSafeUploadKey(key) {
   if (!UPLOAD_PURPOSES.has(purpose) || !FILE_NAME.test(fileName)) return false;
   if (purpose === "profile-photo") return /^user-\d+$/.test(owner);
   if (purpose === "ministry-banner") return /^ministry-\d+$/.test(owner);
+  if (purpose === "cell-cover") return /^cell-\d+$/.test(owner);
   return /^\d+$/.test(owner);
 }
