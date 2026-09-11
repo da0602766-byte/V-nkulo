@@ -3389,7 +3389,7 @@ test("feed interno, solicitação de entrada, retenção e estatísticas usam re
     context,
   );
   const publicHomeHtml = await publicHomeResponse.text();
-  assert.match(publicHomeHtml, /conectada de verdade/i);
+  assert.match(publicHomeHtml, /Tudo que sua/i);
   assert.doesNotMatch(publicHomeHtml, /Informação interna fictícia/);
   assert.doesNotMatch(publicHomeHtml, /Publicação convertida para interna/);
   const retiredPublicFeed = await worker.fetch(

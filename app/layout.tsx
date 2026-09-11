@@ -8,6 +8,7 @@ import "./globals.css";
 import "./interface-fixes.css";
 import "./secretary.css";
 import "./recepcao.css";
+import "./landing-vinkulo.css";
 import "./mobile-quick-actions.css";
 import SmartScrollHeader from "./components/SmartScrollHeader";
 import MobileAppInstall from "./components/MobileAppInstall";

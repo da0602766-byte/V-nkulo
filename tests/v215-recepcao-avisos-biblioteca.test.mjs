@@ -50,28 +50,22 @@ async function login(worker, env, email, senha) {
   return sessionCookie;
 }
 
-test("recepção pública é escura, interativa por clique e preserva o editor visual", async () => {
+test("landing pública alterna tema, revela conteúdo e preserva o editor visual", async () => {
   const [page, experience, css] = await Promise.all([
     source("app/page.tsx"),
-    source("app/components/ReceptionExperience.tsx"),
-    source("app/recepcao.css"),
+    source("app/components/LandingPageExperience.tsx"),
+    source("app/landing-vinkulo.css"),
   ]);
 
-  assert.match(page, /className="vinkulo-reception"/);
-  assert.match(page, /data-visual-editor-root/);
-  assert.match(page, /data-editor-key="landing-page"/);
-  assert.match(page, /data-editor-key="landing-governanca"/);
-  assert.match(page, /className="landing-banner-stage"/);
-  // As três interações por clique pedidas na reforma da recepção.
-  assert.match(experience, /role="tablist" aria-label="Público da plataforma"/);
-  assert.match(experience, /role="tablist" aria-label="Etapas da jornada"/);
-  assert.match(experience, /role="tablist" aria-label="Depoimentos"/);
-  assert.match(experience, /data-rc-reveal/);
+  assert.match(page, /LandingPageExperience/);
+  assert.match(experience, /data-visual-editor-root/);
+  assert.match(experience, /data-editor-key="landing-page"/);
+  assert.match(experience, /data-editor-key="landing-governanca"/);
+  assert.match(experience, /ThemeControl compact cycle/);
+  assert.match(experience, /aria-expanded=\{activeFaq === index\}/);
   assert.match(experience, /IntersectionObserver/);
-  assert.match(experience, /--rc-rx/);
-  assert.match(css, /\.vinkulo-reception \{/);
-  assert.match(css, /prefers-reduced-motion: reduce/);
-  assert.match(css, /@keyframes rc-marquee/);
+  assert.match(css, /html\[data-theme="dark"\] \.vinkulo-landing/);
+  assert.match(css, /prefers-reduced-motion:reduce/);
 });
 
 test("avisos de promoção e introdução aparecem uma única vez e podem ser pulados", async () => {

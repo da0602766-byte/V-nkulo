@@ -54,16 +54,18 @@ test("interface VÍNKULO oferece chat, públicos e gestão responsiva", async ()
 });
 
 test("navegação pública usa links estáveis compatíveis com a hospedagem", async () => {
-  const [stableLink, publicHeader, publicHome, communities] = await Promise.all([
+  const [stableLink, publicHeader, publicHome, landing, communities] = await Promise.all([
     source("../app/components/StableLink.tsx"),
     source("../app/components/PublicHeader.tsx"),
     source("../app/page.tsx"),
+    source("../app/components/LandingPageExperience.tsx"),
     source("../app/comunidades/page.tsx"),
   ]);
 
   assert.match(stableLink, /<a href=\{href\}/);
   assert.match(publicHeader, /from "\.\/StableLink"/);
-  assert.match(publicHome, /from "\.\/components\/StableLink"/);
+  assert.match(publicHome, /LandingPageExperience/);
+  assert.match(landing, /from "\.\/StableLink"/);
   assert.match(communities, /from "\.\.\/components\/StableLink"/);
 });
 

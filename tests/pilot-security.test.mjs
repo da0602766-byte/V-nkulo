@@ -227,8 +227,10 @@ test("Secretaria V4.7.2 mantém tenant, permissões e página compartilhada sem 
 });
 
 test("páginas, temas e responsividade do VÍNKULO permanecem explícitos", async () => {
-  const [home, privacy, terms, plans, login, styles, dashboard, mobileNav, ministries, visitors, notifications, loginConfig, visualEditor, communityTheme, uploadRoute, secretaryStyles, loginWorkspace] = await Promise.all([
+  const [home, landing, landingStyles, privacy, terms, plans, login, styles, dashboard, mobileNav, ministries, visitors, notifications, loginConfig, visualEditor, communityTheme, uploadRoute, secretaryStyles, loginWorkspace] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/LandingPageExperience.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/landing-vinkulo.css", import.meta.url), "utf8"),
     readFile(new URL("../app/privacidade/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/termos/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/planos/page.tsx", import.meta.url), "utf8"),
@@ -267,9 +269,11 @@ test("páginas, temas e responsividade do VÍNKULO permanecem explícitos", asyn
     readFile(new URL("../app/secretary.css", import.meta.url), "utf8"),
     readFile(new URL("../app/components/LoginCustomizationWorkspace.tsx", import.meta.url), "utf8"),
   ]);
-  assert.match(home, /VÍNKULO/);
-  assert.match(home, /vinkulo-reception/);
-  assert.match(home, /Cada nova comunidade passa por análise do proprietário/i);
+  assert.match(home, /LandingPageExperience/);
+  assert.match(landing, /VÍNKULO/);
+  assert.match(landing, /vinkulo-reception vinkulo-landing/);
+  assert.match(landing, /Tudo que sua/);
+  assert.match(landingStyles, /@media \(max-width:620px\)/);
   assert.match(privacy, /Política de Privacidade/);
   assert.match(terms, /Termos de Uso/);
   assert.match(plans, /Não existe checkout/i);
@@ -321,7 +325,7 @@ test("páginas, temas e responsividade do VÍNKULO permanecem explícitos", asyn
   assert.match(loginWorkspace, /Cartão centralizado — padrão V2/);
   assert.match(styles, /\.login-shell\.login-shell-v2/);
   assert.match(styles, /\.login-v2-benefits/);
-  assert.match(home, /O que é conferido/);
+  assert.match(landing, /Perguntas frequentes/);
   assert.match(visualEditor, /EDITOR_UI_STORAGE_KEY/);
   assert.match(visualEditor, /setPointerCapture/);
   assert.match(visualEditor, /aria-label="Minimizar editor"/);
@@ -332,8 +336,8 @@ test("páginas, temas e responsividade do VÍNKULO permanecem explícitos", asyn
   assert.match(styles, /\.global-editor-panel\.is-minimized/);
   assert.match(styles, /\.global-editor-free-text/);
   assert.match(styles, /\.global-editor-toolbar-slot/);
-  assert.match(home, /data-editor-key="landing-page"/);
-  assert.match(home, /data-editor-key="landing-governanca"/);
+  assert.match(landing, /data-editor-key="landing-page"/);
+  assert.match(landing, /data-editor-key="landing-governanca"/);
   assert.match(dashboard, /id="global-editor-toolbar-slot"/);
   assert.match(styles, /\.schedule-week/);
   assert.match(styles, /\.visitor-registration/);

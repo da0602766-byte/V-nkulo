@@ -31,10 +31,8 @@ test("imagens aceitam originais maiores e são convertidas automaticamente", () 
   assert.match(loginPortal, /src=\{config\.backgroundImageUrl\}/);
   assert.doesNotMatch(loginPortal, /has-login-background/);
   assert.doesNotMatch(loginPortal, /backgroundImage: `linear-gradient/);
-  assert.match(source("app/page.tsx"), /className="landing-top-banner"/);
-  assert.match(source("app/page.tsx"), /src=\{branding\.feedBannerUrl\}/);
-  assert.doesNotMatch(source("app/page.tsx"), /has-platform-banner/);
-  assert.match(source("app/globals.css"), /\.landing-top-banner img,[\s\S]*?object-fit: cover/);
+  assert.match(source("app/components/LandingPageExperience.tsx"), /className="vinkulo-site vinkulo-reception vinkulo-landing"/);
+  assert.match(source("app/landing-vinkulo.css"), /overflow-x:clip/);
 });
 
 test("login usa a composição aprovada e mantém o formulário prioritário em qualquer tela", () => {

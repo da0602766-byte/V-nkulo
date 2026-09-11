@@ -14,6 +14,7 @@ export default function ThemeControl({
   storageId?: string;
 }) {
   const [theme, setTheme] = useState<Theme>("AUTO");
+  const [resolvedDark, setResolvedDark] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const transitionInProgress = useRef(false);
   const individualKey = themeStorageKey(storageId);
@@ -26,6 +27,7 @@ export default function ThemeControl({
       );
       setTheme(saved);
       applyTheme(saved);
+      setResolvedDark(currentThemeIsDark(saved));
     }, 0);
     return () => window.clearTimeout(timer);
   }, [individualKey]);
@@ -33,7 +35,10 @@ export default function ThemeControl({
   useEffect(() => {
     if (theme !== "AUTO") return;
     const media = window.matchMedia("(prefers-color-scheme: dark)");
-    const syncAutomaticTheme = () => applyTheme("AUTO");
+    const syncAutomaticTheme = () => {
+      applyTheme("AUTO");
+      setResolvedDark(media.matches);
+    };
     media.addEventListener("change", syncAutomaticTheme);
     return () => media.removeEventListener("change", syncAutomaticTheme);
   }, [theme]);
@@ -43,6 +48,7 @@ export default function ThemeControl({
     transitionInProgress.current = true;
     setIsTransitioning(true);
     setTheme(next);
+    setResolvedDark(currentThemeIsDark(next));
     window.localStorage.setItem("vinkulo-theme", next);
     if (individualKey) window.localStorage.setItem(individualKey, next);
     animateThemeChange(next).finally(() => {
@@ -52,7 +58,7 @@ export default function ThemeControl({
   }
 
   if (cycle) {
-    const isDark = currentThemeIsDark(theme);
+    const isDark = resolvedDark;
     const nextTheme = isDark ? THEMES[0] : THEMES[1];
     return (
       <div className={`theme-control theme-control-cycle ${compact ? "compact" : ""}${isTransitioning ? " is-transitioning" : ""}`}>
