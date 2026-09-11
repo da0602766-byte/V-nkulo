@@ -342,11 +342,16 @@ export default function LoginPortal({
 
   return (
     <main
-      className={`login-shell login-shell-v2 mode-${mode} ${cardStyleClass}`}
+      className={`login-shell login-shell-v2 login-shell-last-layout mode-${mode} ${cardStyleClass}`}
       data-ui-version="v2"
       data-login-theme={loginTheme}
       style={shellStyle}
     >
+      <div className="login-last-atmosphere" aria-hidden="true">
+        <span className="login-last-thread-solid" />
+        <span className="login-last-thread-dot" />
+        <span className="login-last-thread-dashed" />
+      </div>
       {config.backgroundImageUrl && (
         <figure className="login-v2-top-banner">
           <img
@@ -362,25 +367,28 @@ export default function LoginPortal({
         <div className="login-v2-page-brand" aria-label={siteName}>
           {config.logoUrl
             ? <img loading="lazy" src={config.logoUrl} alt="" />
-            : <span aria-hidden="true">{siteName.slice(0, 1).toUpperCase()}</span>}
+            : <VinkuloMark />}
           <div>
-            <strong>{siteName}</strong>
-            <small>{config.kicker || "PORTAL DA COMUNIDADE"}</small>
+            <strong>vínkulo</strong>
+            <small>{config.kicker || "GESTÃO PARA IGREJAS"}</small>
           </div>
         </div>
-        <nav className="login-v2-theme" aria-label="Tema do acesso">
-          <button type="button" className={loginTheme === "claro" ? "active" : ""} aria-label="Tema claro" aria-pressed={loginTheme === "claro"} onClick={() => changeTheme("claro")}>☀</button>
-          <button type="button" className={loginTheme === "auto" ? "active" : ""} aria-label="Tema automático" aria-pressed={loginTheme === "auto"} onClick={() => changeTheme("auto")}>◐</button>
-          <button type="button" className={loginTheme === "escuro" ? "active" : ""} aria-label="Tema escuro" aria-pressed={loginTheme === "escuro"} onClick={() => changeTheme("escuro")}>☾</button>
-        </nav>
+        <div className="login-last-header-actions">
+          <Link href="/">Conheça o sistema →</Link>
+          <nav className="login-v2-theme" aria-label="Tema do acesso">
+            <button type="button" className={loginTheme === "claro" ? "active" : ""} aria-label="Tema claro" aria-pressed={loginTheme === "claro"} onClick={() => changeTheme("claro")}>☀</button>
+            <button type="button" className={loginTheme === "auto" ? "active" : ""} aria-label="Tema automático" aria-pressed={loginTheme === "auto"} onClick={() => changeTheme("auto")}>◐</button>
+            <button type="button" className={loginTheme === "escuro" ? "active" : ""} aria-label="Tema escuro" aria-pressed={loginTheme === "escuro"} onClick={() => changeTheme("escuro")}>☾</button>
+          </nav>
+        </div>
       </div>
 
       <section className="login-v2-stage" data-auth-mode={mode}>
         {mode === "login" && <aside className="login-v2-intro" aria-label="Recursos do Vínkulo">
           <header>
-            <p>ACESSO CENTRALIZADO</p>
-            <h2>Sua comunidade organizada em um só lugar.</h2>
-            <span>Entre para acompanhar pessoas, eventos, equipes e escalas com segurança.</span>
+            <p>GESTÃO PARA IGREJAS</p>
+            <h2>Sua comunidade, <em>conectada</em> e organizada.</h2>
+            <span>Células, ministérios, escalas, visitantes e muito mais — tudo em um só lugar, de forma intuitiva.</span>
           </header>
           {/* Os três itens diziam "Seguro por contexto", "Feito para pessoas" e
               "Rotina conectada" — elogios que não informam nada a quem está
@@ -394,6 +402,12 @@ export default function LoginPortal({
         </aside>}
 
         <div className={`login-card login-v2-card ${mode === "cadastro" ? "signup-card" : ""}`}>
+          {mode !== "esqueci" && (
+            <nav className="login-last-tabs" aria-label="Escolha como acessar">
+              <button type="button" className={mode === "login" ? "active" : ""} aria-pressed={mode === "login"} onClick={() => changeMode("login")}>Entrar</button>
+              {config.cadastroHabilitado !== false && !temporaryAccessLogin && <button type="button" className={mode === "cadastro" ? "active" : ""} aria-pressed={mode === "cadastro"} onClick={() => changeMode("cadastro")}>Criar conta</button>}
+            </nav>
+          )}
           {maintenance.ativa && (
             <div className="login-maintenance-alert" role="status">
               <span aria-hidden="true">◇</span>
@@ -482,10 +496,23 @@ export default function LoginPortal({
         </div>
       </section>
 
-      <footer className="login-v2-footer">© {new Date().getFullYear()} {siteName} · <Link href="/privacidade">Política de Privacidade</Link> · <Link href="/termos">Termos de Uso</Link></footer>
+      <footer className="login-v2-footer">Ao continuar, você aceita os <Link href="/termos">Termos de Uso</Link> e a <Link href="/privacidade">Política de Privacidade</Link>. © {new Date().getFullYear()} {siteName}.</footer>
 
       <GoogleStatusToast state={googleToast} onDismiss={() => setGoogleToast(null)} />
     </main>
+  );
+}
+
+function VinkuloMark() {
+  return (
+    <svg className="login-last-mark" width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+      <rect width="28" height="28" rx="8" fill="currentColor" />
+      <path d="M14 5v7m0 4v7" stroke="#F97316" strokeWidth="1.7" strokeLinecap="round" strokeDasharray="0 0 7 4 0 0 2 2" />
+      <circle cx="14" cy="14" r="2.5" fill="#F97316" />
+      <path d="M7 14h4m6 0h4" stroke="#fff" strokeWidth="1.7" strokeLinecap="round" />
+      <circle cx="6" cy="14" r="1.5" fill="#fff" opacity=".72" />
+      <circle cx="22" cy="14" r="1.5" fill="#fff" opacity=".72" />
+    </svg>
   );
 }
 

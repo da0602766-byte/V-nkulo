@@ -37,18 +37,21 @@ test("imagens aceitam originais maiores e são convertidas automaticamente", () 
   assert.match(source("app/globals.css"), /\.landing-top-banner img,[\s\S]*?object-fit: cover/);
 });
 
-test("login mantém banner independente e prioriza o formulário em qualquer tela", () => {
+test("login usa a composição aprovada e mantém o formulário prioritário em qualquer tela", () => {
   const loginPortal = source("app/components/LoginPortal.tsx");
   const css = source("app/globals.css");
 
   assert.match(loginPortal, /className="login-v2-page-brand"/);
   assert.match(loginPortal, /className="login-v2-stage" data-auth-mode=\{mode\}/);
   assert.match(loginPortal, /className="login-v2-intro"/);
-  assert.match(loginPortal, /Sua comunidade organizada em um só lugar\./);
+  assert.match(loginPortal, /login-shell-last-layout/);
+  assert.match(loginPortal, /className="login-last-tabs"/);
+  assert.match(loginPortal, /Sua comunidade, <em>conectada<\/em> e organizada\./);
   assert.match(css, /V108 — acesso equilibrado/);
-  assert.match(css, /grid-template-columns: minmax\(0,1fr\) minmax\(420px,520px\)/);
-  assert.match(css, /\.login-shell\.login-shell-v2 \.login-v2-card \{ order: 1/);
-  assert.match(css, /\.login-shell\.login-shell-v2 \.login-v2-top-banner \{ height: clamp\(150px,42vw,220px\)/);
+  assert.match(css, /Login — composição visual da landing aprovada/);
+  assert.match(css, /grid-template-columns: minmax\(0,1fr\) minmax\(390px,440px\)/);
+  assert.match(css, /\.login-shell-last-layout \.login-v2-top-banner \{ display: none !important/);
+  assert.match(css, /\.login-shell-last-layout \.login-submit[\s\S]*?background: var\(--login-last-primary\)/);
 });
 
 test("criação de escala compacta etapas e sugere disponibilidade real da equipe", () => {
