@@ -24,11 +24,14 @@ test("Células possui área própria, agenda, liderança e relatório pastoral",
 });
 
 test("Gestão e Participação de Células são experiências separadas, com mensagem de destaque editável", async () => {
-  const [orchestrator, portal, mensagemApi, configPatch] = await Promise.all([
+  const [orchestrator, portal, mensagemApi, configPatch, listApi, uploadHelper, dashboard] = await Promise.all([
     read("app/components/CellsWorkspace.tsx"),
     read("app/components/cells/CellMemberPortal.tsx"),
     read("app/api/pilot/celulas/mensagem/route.ts"),
     read("app/api/pilot/celulas/[id]/route.ts"),
+    read("app/api/pilot/celulas/route.ts"),
+    read("app/lib/cell-membership.ts"),
+    read("app/components/PilotDashboard.tsx"),
   ]);
   // Quem não gerencia nem lidera nenhuma célula só vê Participação.
   assert.match(orchestrator, /hasGestaoAccess/);
@@ -43,6 +46,16 @@ test("Gestão e Participação de Células são experiências separadas, com men
   // Configurações da célula (rede, horário, temas, foto de capa) é uma ação
   // própria, restrita a quem opera a célula.
   assert.match(configPatch, /CONFIGURACOES_ATUALIZAR/);
+  // O criador mantém a operação da própria célula, mesmo sem ser líder ou
+  // conservar a permissão global; o mesmo critério vale para a foto de capa.
+  assert.match(listApi, /criado_por/);
+  assert.match(listApi, /creatorEmail[\s\S]*canOperate/);
+  assert.match(configPatch, /criado_por[\s\S]*operator/);
+  assert.match(uploadHelper, /lower\(criado_por\)/);
+  // SuperAdmin não entra forçado no modo membro: recebe o alternador de
+  // Participação no console e pode voltar para Gestão.
+  assert.match(orchestrator, /onBackToGestao/);
+  assert.match(dashboard, /memberMode=\{active\.papel === "MEMBRO"\}/);
 });
 
 test("página pública exibe células autorizadas e recebe pedido de entrada", async () => {

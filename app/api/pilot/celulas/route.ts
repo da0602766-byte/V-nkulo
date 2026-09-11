@@ -51,7 +51,7 @@ export async function GET(request: Request) {
       c.dias_reuniao, c.endereco_publico, c.descricao_publica,
       c.rede, c.horario_texto, c.temas, c.foto_capa,
       c.lider_usuario_id, c.vice_lider_usuario_id, c.ultimo_relatorio_em,
-      c.arquivada_em, c.ativo, c.criado_em,
+      c.arquivada_em, c.ativo, c.criado_em, c.criado_por,
       lider.nome AS lider_nome, vice.nome AS vice_lider_nome,
       COUNT(v.id) AS visitantes_ativos
      FROM celulas c
@@ -144,7 +144,8 @@ export async function GET(request: Request) {
       : null;
   const usersById = new Map(users.results.map((user) => [Number(user.id), user]));
   const cells = result.results.map((cell) => {
-    const canOperate = canManage || Number(cell.lider_usuario_id) === access.user.id || Number(cell.vice_lider_usuario_id) === access.user.id;
+    const creatorEmail = String(cell.criado_por || "").trim().toLocaleLowerCase("pt-BR");
+    const canOperate = canManage || creatorEmail === access.user.email.trim().toLocaleLowerCase("pt-BR") || Number(cell.lider_usuario_id) === access.user.id || Number(cell.vice_lider_usuario_id) === access.user.id;
     const members = parseArray(cell.membros);
     const ownRequest = requestsForUser.results.find((request) => Number(request.celula_id) === Number(cell.id));
     const memberOfCell = members.some((member) => {
@@ -157,8 +158,10 @@ export async function GET(request: Request) {
     const ownMembership = members.find(
       (member) => Number((member as Record<string, unknown>).userId) === access.user.id,
     ) as Record<string, unknown> | undefined;
+    const cellData = { ...cell };
+    delete cellData.criado_por;
     return {
-      ...cell,
+      ...cellData,
       observacoes: canOperate ? cell.observacoes : null,
       membros_total: members.filter((member) => String((member as Record<string, unknown>).kind) === "COMMUNITY").length,
       minha_participacao: (ownMembership?.role as string | undefined) || (ownMembership ? "MEMBER" : null),

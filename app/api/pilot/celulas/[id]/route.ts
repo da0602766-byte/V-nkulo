@@ -12,12 +12,12 @@ export async function PATCH(request: Request, context: Context) {
   const payload = await request.json() as Record<string, unknown>;
   const db = getD1();
   const existing = await db.prepare(
-    `SELECT id, nome, membros, lider_usuario_id, vice_lider_usuario_id, ativo
+    `SELECT id, nome, membros, lider_usuario_id, vice_lider_usuario_id, ativo, criado_por
      FROM celulas WHERE id = ? AND comunidade_id = ? AND escopo_confirmado = 1`,
-  ).bind(id, access.context.comunidadeId).first<{ id: number; nome: string; membros: string; lider_usuario_id: number | null; vice_lider_usuario_id: number | null; ativo: number }>();
+  ).bind(id, access.context.comunidadeId).first<{ id: number; nome: string; membros: string; lider_usuario_id: number | null; vice_lider_usuario_id: number | null; ativo: number; criado_por: string }>();
   if (!existing) return Response.json({ error: "Célula não encontrada." }, { status: 404 });
   const manager = access.context.permissions.includes("cells.manage");
-  const operator = manager || existing.lider_usuario_id === access.user.id || existing.vice_lider_usuario_id === access.user.id;
+  const operator = manager || existing.criado_por.trim().toLocaleLowerCase("pt-BR") === access.user.email.trim().toLocaleLowerCase("pt-BR") || existing.lider_usuario_id === access.user.id || existing.vice_lider_usuario_id === access.user.id;
   const action = String(payload.acao || "").trim().toUpperCase();
 
   if (action === "SOLICITACAO_CANCELAR") {

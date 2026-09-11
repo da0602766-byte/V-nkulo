@@ -76,6 +76,7 @@ export async function POST(request: Request) {
           context,
           user.id,
           resourceId,
+          user.email,
         )))) ||
     (purpose === "post-image" && !canPublish) ||
     (isPlatformAsset && !canEditPlatform)
