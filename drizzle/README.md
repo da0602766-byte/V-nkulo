@@ -6,7 +6,7 @@ migração nova, leia isto.
 
 ## Próximo número livre
 
-**`0072`**. Use o próximo inteiro disponível a partir daí — não reaproveite
+**`0073`**. Use o próximo inteiro disponível a partir daí — não reaproveite
 um número já usado, mesmo que o arquivo tenha sido escrito à mão.
 
 `0071_celulas_participacao_detalhes.sql` adiciona `rede`, `horario_texto`,
@@ -15,6 +15,11 @@ Gestão/Participação de Células (ver app/components/cells/). A mensagem de
 destaque editável pela liderança na Participação **não** usa migração — ela
 reaproveita a tabela `configuracoes` (chave `cell_highlight_message:<comunidadeId>`),
 o mesmo padrão de `community_theme:<comunidadeId>`.
+
+`0072_fio_ministerio.sql` adiciona `fio_habilitado` e `fio_etapas` em
+`ministerios_comunidade` (o modelo do Fio do Ministério) e `fio_etapas` em
+`escalas_ministerio` (as etapas daquela escala, com estado). Ver
+`app/components/SecretaryMinisterialWorkspace.tsx`.
 
 `0070_chat_system_retention.sql` reconstrói `conversas_privadas` (troca o
 ciclo mensal `ciclo_mes` pelo semanal `ciclo_semana` e remove `drive_file_id`

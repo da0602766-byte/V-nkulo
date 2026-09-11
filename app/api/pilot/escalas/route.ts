@@ -7,6 +7,7 @@ import {
 import {
   parseCustomFieldAnswers,
   parseSchedulePayload,
+  seedFioSteps,
   type MinistryCustomField,
 } from "../../../lib/ministry-validation";
 import { recordTenantAudit } from "../../../lib/tenant-audit";
@@ -108,7 +109,7 @@ export async function GET(request: Request) {
         s.equipe_id, equipe.nome AS equipe_nome,
         s.titulo, s.inicia_em, s.termina_em, s.local, s.status, s.publicar_em,
         s.observacoes, s.modelo_snapshot, s.campos_respostas,
-        s.repertorio, s.links_recursos, s.responsavel_usuario_id,
+        s.repertorio, s.links_recursos, s.fio_etapas, s.responsavel_usuario_id,
         responsavel.nome AS responsavel_nome, s.share_token,
         (SELECT configuracao.valor
          FROM configuracoes configuracao
@@ -338,6 +339,7 @@ export async function GET(request: Request) {
           campos_respostas: parseObject(schedule.campos_respostas),
           repertorio: parseArray(schedule.repertorio),
           links_recursos: parseArray(schedule.links_recursos),
+          fio_etapas: parseArray(schedule.fio_etapas),
           designacoes: assignmentsBySchedule.get(Number(schedule.id)) || [],
           substitution_candidates:
             substitutionCandidatesBySchedule.get(Number(schedule.id)) || [],
@@ -578,14 +580,30 @@ async function createSchedule(request: Request) {
       versao: Number(template.versao) || 1,
     };
   }
+  // O Fio da escala: usa o que veio do formulário (cada escala pode variar) e,
+  // quando o formulário não mandou nada, cai no modelo do próprio ministério.
+  let fioEtapas = parsed.fioEtapas;
+  if (!fioEtapas.length) {
+    const ministry = await db
+      .prepare(
+        `SELECT fio_habilitado, fio_etapas FROM ministerios_comunidade
+         WHERE id = ? AND comunidade_id = ?`,
+      )
+      .bind(parsed.ministerioId, access.context.comunidadeId)
+      .first<{ fio_habilitado: number; fio_etapas: string }>();
+    if (ministry && Number(ministry.fio_habilitado) === 1) {
+      const template = parseArray(ministry.fio_etapas).map(String);
+      fioEtapas = seedFioSteps(template);
+    }
+  }
   const result = await db
     .prepare(
       `INSERT INTO escalas_ministerio
       (comunidade_id, ministerio_id, equipe_id, titulo, inicia_em, termina_em,
-       local, status, observacoes, repertorio, links_recursos,
+       local, status, observacoes, repertorio, links_recursos, fio_etapas,
        responsavel_usuario_id, publicar_em, modelo_snapshot, campos_respostas,
        criado_por, atualizado_por)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       access.context.comunidadeId,
@@ -599,6 +617,7 @@ async function createSchedule(request: Request) {
       parsed.observacoes,
       JSON.stringify(parsed.repertorio),
       JSON.stringify(parsed.links),
+      JSON.stringify(fioEtapas),
       parsed.responsavelUsuarioId,
       parsed.publicarEm,
       JSON.stringify(modelSnapshot),

@@ -53,6 +53,22 @@ export type SecretaryChecklistItem = {
   voluntarioId: number | null;
 };
 
+/**
+ * Etapa do Fio do Ministério dentro de uma escala. O ministério guarda só os
+ * títulos (o modelo); a escala guarda a etapa inteira, com estado, porque
+ * cada escala varia — o modelo é ponto de partida, não camisa de força.
+ */
+export type FioStep = {
+  id: string;
+  titulo: string;
+  feito: boolean;
+  feitoEm: string | null;
+  feitoPor: number | null;
+};
+
+export const FIO_MAX_STEPS = 12;
+export const FIO_MAX_TITLE = 120;
+
 export type MinistryCustomField = {
   id: string;
   label: string;
@@ -81,6 +97,8 @@ type MinistryPayload = {
   spotifyUrl: string;
   bannerUrl: string;
   responsavelUsuarioId: number | null;
+  fioHabilitado: boolean;
+  fioEtapas: string[];
 };
 
 type ScheduleTemplatePayload = {
@@ -110,6 +128,7 @@ type SchedulePayload = {
   designacoes: SecretaryAssignment[];
   checklist: SecretaryChecklistItem[];
   camposRespostas: Record<string, unknown>;
+  fioEtapas: FioStep[];
 };
 
 export function parseMinistryPayload(
@@ -125,6 +144,9 @@ export function parseMinistryPayload(
   const spotifyUrl = parseOptionalMediaUrl(body.spotifyUrl, "SPOTIFY");
   const bannerUrl = parseMinistryAssetUrl(body.bannerUrl);
   const responsavelUsuarioId = positiveInteger(body.responsavelUsuarioId);
+  const fioHabilitado = body.fioHabilitado === true || body.fioHabilitado === "true" || body.fioHabilitado === "on";
+  const fioEtapas = parseFioTemplate(body.fioEtapas);
+  if ("error" in fioEtapas) return { error: fioEtapas.error };
   if (!nome) return { error: "O nome do ministério é obrigatório." } as const;
   if (!MINISTRY_CATEGORIES.has(categoria) || !MINISTRY_STATUSES.has(status)) {
     return { error: "Categoria ou status do ministério inválido." } as const;
@@ -141,7 +163,76 @@ export function parseMinistryPayload(
     spotifyUrl: spotifyUrl.value,
     bannerUrl: bannerUrl.value,
     responsavelUsuarioId,
+    fioHabilitado,
+    fioEtapas: fioEtapas.value,
   } as const;
+}
+
+/**
+ * O modelo do ministério é só a lista de títulos. Vazio é válido: um
+ * ministério pode ligar o Fio e definir as etapas escala a escala.
+ */
+export function parseFioTemplate(
+  value: unknown,
+): ValidationResult<{ value: string[] }> {
+  if (!Array.isArray(value)) return { value: [] as string[] } as const;
+  if (value.length > FIO_MAX_STEPS) {
+    return {
+      error: `O Fio do Ministério aceita no máximo ${FIO_MAX_STEPS} etapas.`,
+    } as const;
+  }
+  const titles = [
+    ...new Set(
+      value.map((item) => cleanText(item, FIO_MAX_TITLE)).filter(Boolean),
+    ),
+  ];
+  return { value: titles } as const;
+}
+
+/**
+ * As etapas de uma escala. Preserva o estado já registrado (feito/quando/quem)
+ * quando ele vem junto, para uma edição de etapas não apagar o progresso.
+ */
+export function parseFioSteps(
+  value: unknown,
+): ValidationResult<{ value: FioStep[] }> {
+  if (!Array.isArray(value)) return { value: [] as FioStep[] } as const;
+  if (value.length > FIO_MAX_STEPS) {
+    return {
+      error: `O Fio da escala aceita no máximo ${FIO_MAX_STEPS} etapas.`,
+    } as const;
+  }
+  const steps: FioStep[] = [];
+  const usedIds = new Set<string>();
+  for (let index = 0; index < value.length; index += 1) {
+    const source = asRecord(value[index]);
+    const titulo = cleanText(source.titulo, FIO_MAX_TITLE);
+    if (!titulo) continue;
+    let id = cleanText(source.id, 60).replace(/[^A-Za-z0-9_-]/g, "");
+    if (!id || usedIds.has(id)) id = `etapa-${index + 1}`;
+    while (usedIds.has(id)) id = `${id}-x`;
+    usedIds.add(id);
+    const feito = source.feito === true || source.feito === "true";
+    steps.push({
+      id,
+      titulo,
+      feito,
+      feitoEm: feito ? normalizeDateTime(source.feitoEm) : null,
+      feitoPor: feito ? positiveInteger(source.feitoPor) : null,
+    });
+  }
+  return { value: steps } as const;
+}
+
+/** Converte o modelo do ministério nas etapas iniciais de uma escala. */
+export function seedFioSteps(template: string[]): FioStep[] {
+  return template.slice(0, FIO_MAX_STEPS).map((titulo, index) => ({
+    id: `etapa-${index + 1}`,
+    titulo,
+    feito: false,
+    feitoEm: null,
+    feitoPor: null,
+  }));
 }
 
 export function parseMinistryAssetUrl(
@@ -320,6 +411,8 @@ export function parseSchedulePayload(
   if ("error" in designacoes) return { error: designacoes.error };
   const checklist = parseSecretaryChecklist(body.checklist);
   if ("error" in checklist) return { error: checklist.error };
+  const fioEtapas = parseFioSteps(body.fioEtapas);
+  if ("error" in fioEtapas) return { error: fioEtapas.error };
   if (!ministerioId || !titulo || !iniciaEm || !terminaEm) {
     return {
       error: "Ministério, título, início e término são obrigatórios.",
@@ -353,6 +446,7 @@ export function parseSchedulePayload(
       body.camposRespostas && typeof body.camposRespostas === "object"
         ? (body.camposRespostas as Record<string, unknown>)
         : {},
+    fioEtapas: fioEtapas.value,
   } as const;
 }
 

@@ -20,6 +20,7 @@ export async function GET() {
     .prepare(
       `SELECT m.id, m.nome, m.descricao, m.categoria, m.status,
         m.youtube_url, m.spotify_url, m.banner_url,
+        m.fio_habilitado, m.fio_etapas,
         m.responsavel_usuario_id, responsavel.nome AS responsavel_nome,
         m.criado_em, m.atualizado_em,
         CASE WHEN m.status = 'ATIVO' AND (
@@ -207,6 +208,7 @@ export async function GET() {
     {
       ministerios: ministriesResult.results.map((ministry) => ({
         ...ministry,
+        fio_etapas: parseFioTemplateColumn(ministry.fio_etapas),
         voluntarios: volunteersByMinistry.get(Number(ministry.id)) || [],
         categorias_visitantes:
           visitorCategoriesByMinistry.get(Number(ministry.id)) || [],
@@ -260,9 +262,9 @@ export async function POST(request: Request) {
       .prepare(
         `INSERT INTO ministerios_comunidade
         (comunidade_id, nome, descricao, categoria, status,
-         youtube_url, spotify_url, banner_url, responsavel_usuario_id,
-         criado_por, atualizado_por)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         youtube_url, spotify_url, banner_url, fio_habilitado, fio_etapas,
+         responsavel_usuario_id, criado_por, atualizado_por)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         access.context.comunidadeId,
@@ -273,6 +275,8 @@ export async function POST(request: Request) {
         parsed.youtubeUrl,
         parsed.spotifyUrl,
         parsed.bannerUrl,
+        parsed.fioHabilitado ? 1 : 0,
+        JSON.stringify(parsed.fioEtapas),
         parsed.responsavelUsuarioId,
         access.user.id,
         access.user.id,
@@ -329,6 +333,16 @@ export async function POST(request: Request) {
       );
     }
     throw error;
+  }
+}
+
+/** O modelo do Fio sai do banco como texto JSON; a interface espera lista. */
+function parseFioTemplateColumn(value: unknown) {
+  try {
+    const parsed = JSON.parse(String(value || "[]"));
+    return Array.isArray(parsed) ? parsed.map(String).slice(0, 12) : [];
+  } catch {
+    return [];
   }
 }
 

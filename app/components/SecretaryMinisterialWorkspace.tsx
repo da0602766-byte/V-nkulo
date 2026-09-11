@@ -50,6 +50,8 @@ type Ministry = {
   can_manage: number;
   can_archive?: number;
   can_delete: number;
+  fio_habilitado: number;
+  fio_etapas: string[];
   voluntarios: Volunteer[];
   categorias_visitantes: Array<{
     id: number;
@@ -104,6 +106,14 @@ function blankSecretaryLink(): SecretaryLink {
     url: "",
   };
 }
+/** Etapa do Fio do Ministério dentro de uma escala (ver ministry-validation.ts). */
+type FioStep = {
+  id: string;
+  titulo: string;
+  feito: boolean;
+  feitoEm: string | null;
+  feitoPor: number | null;
+};
 type Schedule = {
   id: number;
   ministerio_id: number;
@@ -122,6 +132,8 @@ type Schedule = {
   responsavel_nome: string | null;
   repertorio: string[];
   links_recursos: SecretaryLink[];
+  fio_etapas: FioStep[];
+  criado_em: string;
   campos_respostas?: Record<string, unknown>;
   can_manage: number;
   can_delete: number;
@@ -227,6 +239,11 @@ export default function SecretaryMinisterialWorkspace({
   const [scheduleEndsAt, setScheduleEndsAt] = useState("");
   const [scheduleCreatorOpen, setScheduleCreatorOpen] = useState(false);
   const [checklistDraft, setChecklistDraft] = useState<ChecklistDraft[]>([]);
+  // O relógio vem de estado: lê-lo na renderização daria valores diferentes no
+  // servidor e no cliente e quebraria a hidratação.
+  const [agora, setAgora] = useState(0);
+  const [escalasExpandidas, setEscalasExpandidas] = useState<number[]>([]);
+  const [editandoFioId, setEditandoFioId] = useState<number | null>(null);
   const [shareSchedule, setShareSchedule] = useState<Schedule | null>(null);
   const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -353,6 +370,16 @@ export default function SecretaryMinisterialWorkspace({
     return () => window.removeEventListener("vinkulo:new-schedule", openSchedule);
   }, [ministries]);
 
+  useEffect(() => {
+    const acertar = () => setAgora(Date.now());
+    const primeiro = window.setTimeout(acertar, 0);
+    const relogio = window.setInterval(acertar, 600000);
+    return () => {
+      window.clearTimeout(primeiro);
+      window.clearInterval(relogio);
+    };
+  }, []);
+
   const selectedMinistry = useMemo(
     () => ministries.find((item) => item.id === selectedMinistryId) || null,
     [ministries, selectedMinistryId],
@@ -364,6 +391,30 @@ export default function SecretaryMinisterialWorkspace({
   const ministryScheduleIds = useMemo(
     () => new Set(ministrySchedules.map((item) => item.id)),
     [ministrySchedules],
+  );
+  // Escala encerrada não precisa ocupar a tela inteira para sempre: o que já
+  // passou (ou foi encerrado/cancelado) vira uma linha recolhida, e a lista
+  // para de crescer sem necessidade. Antes do relógio acertar, nada é dado
+  // como passado — senão a primeira renderização recolheria escalas de hoje.
+  const escalasSeparadas = useMemo(() => {
+    const proximas: Schedule[] = [];
+    const encerradas: Schedule[] = [];
+    for (const schedule of ministrySchedules) {
+      const passou =
+        agora > 0 &&
+        (["ENCERRADA", "CANCELADA", "ARQUIVADA"].includes(schedule.status) ||
+          Date.parse(schedule.termina_em) < agora);
+      if (passou) encerradas.push(schedule);
+      else proximas.push(schedule);
+    }
+    return { proximas, encerradas };
+  }, [ministrySchedules, agora]);
+  // O Fio só aparece nas escalas de ministérios que o ligaram — e continua
+  // aparecendo numa escala que já tem etapas, para o ministério não perder de
+  // vista o que ficou marcado se alguém desligar a opção depois.
+  const ministeriosComFio = useMemo(
+    () => new Set(ministries.filter((item) => Boolean(item.fio_habilitado)).map((item) => item.id)),
+    [ministries],
   );
   const ministryChecklist = useMemo(
     () => checklist.filter((item) => ministryScheduleIds.has(item.escala_id)),
@@ -499,13 +550,20 @@ export default function SecretaryMinisterialWorkspace({
     setFeedback("");
   }
 
-  async function createMinistry(event: FormEvent<HTMLFormElement>) {
+  async function createMinistry(
+    event: FormEvent<HTMLFormElement>,
+    fio: FioTemplateValue,
+  ) {
     event.preventDefault();
     const created = await submit(
       "creating-ministry",
       "/api/pilot/ministerios",
       "POST",
-      formBody(event.currentTarget),
+      {
+        ...formBody(event.currentTarget),
+        fioHabilitado: fio.habilitado,
+        fioEtapas: fio.habilitado ? fio.etapas : [],
+      },
       "Ministério criado e pronto para receber integrantes.",
       event.currentTarget,
     );
@@ -676,6 +734,42 @@ export default function SecretaryMinisterialWorkspace({
       setScheduleEndsAt("");
       setScheduleCreatorOpen(false);
     }
+  }
+
+  // Marcar uma etapa do fio. Vale para quem lidera e para quem está escalado —
+  // a rota decide; aqui só mandamos a intenção.
+  async function toggleFioStep(schedule: Schedule, step: FioStep) {
+    await submit(
+      `fio-${schedule.id}-${step.id}`,
+      `/api/pilot/escalas/${schedule.id}`,
+      "PATCH",
+      { acao: "FIO_ETAPA", etapaId: step.id, feito: !step.feito },
+      step.feito ? "Etapa reaberta no fio." : "Etapa concluída no fio.",
+    );
+  }
+
+  // Cada escala pode variar as próprias etapas: o modelo do ministério é só o
+  // ponto de partida. O que já estava marcado continua marcado.
+  async function saveFioSteps(schedule: Schedule, titulos: string[]) {
+    const anteriores = new Map(schedule.fio_etapas.map((step) => [step.titulo, step]));
+    const etapas = titulos.map((titulo, index) => {
+      const anterior = anteriores.get(titulo);
+      return {
+        id: anterior?.id || `etapa-${index + 1}-${Date.now().toString(36)}`,
+        titulo,
+        feito: anterior?.feito ?? false,
+        feitoEm: anterior?.feitoEm ?? null,
+        feitoPor: anterior?.feitoPor ?? null,
+      };
+    });
+    const salvo = await submit(
+      `fio-etapas-${schedule.id}`,
+      `/api/pilot/escalas/${schedule.id}`,
+      "PATCH",
+      { acao: "FIO_ETAPAS_DEFINIR", fioEtapas: etapas },
+      "Etapas do fio atualizadas nesta escala.",
+    );
+    if (salvo) setEditandoFioId(null);
   }
 
   async function updateSchedule(
@@ -961,6 +1055,7 @@ export default function SecretaryMinisterialWorkspace({
   async function updateMinistrySettings(
     event: FormEvent<HTMLFormElement>,
     bannerUrl: string,
+    fio: FioTemplateValue,
   ) {
     event.preventDefault();
     if (!selectedMinistry) return;
@@ -972,6 +1067,8 @@ export default function SecretaryMinisterialWorkspace({
         acao: "ATUALIZAR",
         ...formBody(event.currentTarget),
         bannerUrl,
+        fioHabilitado: fio.habilitado,
+        fioEtapas: fio.habilitado ? fio.etapas : [],
         status: selectedMinistry.status,
       },
       "Configurações do ministério atualizadas.",
@@ -1260,6 +1357,159 @@ export default function SecretaryMinisterialWorkspace({
           </div>
         )}
       </section>
+    );
+  }
+
+  // O cartão da escala vive numa função para poder ser reaproveitado nas duas
+  // listas: as próximas, sempre abertas, e uma encerrada que a pessoa expandiu.
+  function renderScheduleCard(schedule: Schedule) {
+    return (
+      <article className="secretary-schedule-card" key={schedule.id}>
+        <header>
+          <time dateTime={schedule.inicia_em}><strong>{formatDay(schedule.inicia_em)}</strong><span>{formatMonth(schedule.inicia_em)}</span></time>
+          <div><span className={`secretary-status ${schedule.status.toLowerCase()}`}>{schedule.status.replaceAll("_", " ")}</span><h2>{schedule.titulo}</h2><p>{formatDate(schedule.inicia_em)} · {schedule.local || "Local não informado"}</p>{schedule.status === "AGENDADA" && schedule.publicar_em && <SchedulePublicationCountdown opensAt={schedule.publicar_em} />}</div>
+        </header>
+        <div className="secretary-schedule-body">
+          <div><small>Responsável</small><strong>{schedule.responsavel_nome || "Não definido"}</strong></div>
+          <div><small>Equipe</small><strong>{schedule.equipe_nome || "Seleção livre"}</strong><div className="secretary-avatar-stack">{schedule.designacoes.slice(0, 5).map((item) => <span key={item.id} title={`${item.nome} · ${item.funcao}`}>{initials(item.nome)}</span>)}{schedule.designacoes.length > 5 && <b>+{schedule.designacoes.length - 5}</b>}</div></div>
+          <div><small>Repertório</small><strong>{schedule.repertorio.length} itens</strong></div>
+          <div><small>Checklist</small><strong>{checklist.filter((item) => item.escala_id === schedule.id).length} tarefas</strong></div>
+        </div>
+        <ScheduleRepertoire schedule={schedule} />
+        {(schedule.fio_etapas.length > 0 ||
+          (ministeriosComFio.has(schedule.ministerio_id) && Boolean(schedule.can_manage))) && (
+          <FioThread
+            schedule={schedule}
+            agora={agora}
+            busy={busy}
+            editando={editandoFioId === schedule.id}
+            onAbrirEdicao={() => setEditandoFioId(schedule.id)}
+            onFecharEdicao={() => setEditandoFioId(null)}
+            onAlternarEtapa={(step) => void toggleFioStep(schedule, step)}
+            onSalvarEtapas={(titulos) => void saveFioSteps(schedule, titulos)}
+          />
+        )}
+        <div className="secretary-assignment-status-list">
+          {schedule.designacoes.map((assignment) => (
+            <article key={assignment.id} data-status={assignment.status.toLowerCase()}>
+              <span className="secretary-avatar">{initials(assignment.nome)}</span>
+              <div>
+                <VerifiedOwnerName name={assignment.nome} verified={Boolean(assignment.owner_verified)} />
+                <small>{assignment.funcao} · {assignmentStatusLabel(assignment.status)}</small>
+              </div>
+              {Boolean(assignment.is_mine) && assignment.status === "PENDENTE" && schedule.status === "PUBLICADA" && (
+                <div className="secretary-response-actions">
+                  <button
+                    type="button"
+                    disabled={busy === `response-${schedule.id}`}
+                    onClick={() => void respondToSchedule(schedule, "CONFIRMADA")}
+                  >
+                    Confirmar
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={busy === `response-${schedule.id}`}
+                    onClick={() => {
+                      setReplacementScheduleId(schedule.id);
+                      setReplacementVolunteerId(0);
+                    }}
+                  >
+                    Não posso
+                  </button>
+                </div>
+              )}
+              {Boolean(assignment.is_mine) && assignment.status === "PENDENTE" && replacementScheduleId === schedule.id && (
+                <div className="secretary-self-substitute-picker">
+                  <strong>Quem pode ficar no seu lugar?</strong>
+                  <p>Escolha uma pessoa ativa deste ministério.</p>
+                  {schedule.substitution_candidates?.length ? (
+                    <select value={replacementVolunteerId || ""} onChange={(event) => setReplacementVolunteerId(Number(event.target.value))}>
+                      <option value="" disabled>Selecione uma pessoa</option>
+                      {schedule.substitution_candidates.map((candidate) => (
+                        <option key={candidate.voluntarioId} value={candidate.voluntarioId}>{candidate.nome} · {candidate.funcao}</option>
+                      ))}
+                    </select>
+                  ) : <small>Não há outra pessoa disponível. Fale com a liderança.</small>}
+                  <div>
+                    <button type="button" disabled={!replacementVolunteerId || busy === `response-${schedule.id}`} onClick={() => void respondToSchedule(schedule, "INDISPONIVEL", replacementVolunteerId)}>Confirmar substituição</button>
+                    <button type="button" className="secondary" onClick={() => setReplacementScheduleId(null)}>Cancelar</button>
+                  </div>
+                </div>
+              )}
+              {Boolean(schedule.can_manage) && (
+                <div className="secretary-manager-assignment-actions">
+                  <button
+                    type="button"
+                    disabled={busy === `assignment-${assignment.id}`}
+                    onClick={() => void setAssignmentStatus(schedule, assignment, "AUSENTE")}
+                  >
+                    Marcar ausente
+                  </button>
+                  {assignment.status !== "PENDENTE" && (
+                    <button
+                      type="button"
+                      disabled={busy === `assignment-${assignment.id}`}
+                      onClick={() => void setAssignmentStatus(schedule, assignment, "PENDENTE")}
+                    >
+                      Reabrir
+                    </button>
+                  )}
+                </div>
+              )}
+            </article>
+          ))}
+        </div>
+        {Boolean(schedule.can_manage) && (
+          <form
+            className="secretary-replacement-form"
+            onSubmit={(event) => void addReplacement(schedule, event)}
+          >
+            <strong>Adicionar substituto</strong>
+            <select name="voluntarioId" required defaultValue="">
+              <option value="" disabled>Selecione um integrante</option>
+              {scheduleCandidates
+                .filter((candidate) =>
+                  !schedule.designacoes.some(
+                    (assignment) => assignment.voluntario_id === candidate.id,
+                  ),
+                )
+                .map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {candidate.nome} · {candidate.funcao}
+                  </option>
+                ))}
+            </select>
+            <input name="funcao" required maxLength={100} placeholder="Função na escala" />
+            <button disabled={busy === `replacement-${schedule.id}`}>Adicionar</button>
+          </form>
+        )}
+        <div className="secretary-schedule-actions">
+          {Boolean(schedule.can_manage) && schedule.status === "RASCUNHO" && (
+            <button type="button" className="publish" onClick={() => void publishSchedule(schedule)} disabled={busy === `publish-${schedule.id}`}>
+              {busy === `publish-${schedule.id}` ? "Publicando…" : "Publicar"}
+            </button>
+          )}
+          <button type="button" onClick={() => void downloadSchedulePdf(schedule)} disabled={busy === `pdf-${schedule.id}`}>{busy === `pdf-${schedule.id}` ? "Preparando…" : "PDF"}</button>
+          <button type="button" onClick={() => addScheduleToCalendar(schedule)}>Adicionar ao calendário</button>
+          <button type="button" className="share" onClick={() => setShareSchedule(schedule)} disabled={!schedule.can_manage || schedule.status !== "PUBLICADA" || busy === `share-${schedule.id}`}>Compartilhar</button>
+          {Boolean(schedule.can_manage) && ["RASCUNHO", "AGENDADA", "PUBLICADA"].includes(schedule.status) && (
+            <button type="button" className="edit" onClick={() => setEditingSchedule(schedule)}>
+              Editar escala
+            </button>
+          )}
+          {Boolean(schedule.can_delete) && (
+            <button
+              type="button"
+              className="danger"
+              onClick={() => void deleteSchedule(schedule)}
+              disabled={busy === `delete-${schedule.id}`}
+            >
+              Excluir
+            </button>
+          )}
+        </div>
+      </article>
     );
   }
 
@@ -1709,141 +1959,53 @@ export default function SecretaryMinisterialWorkspace({
                 </details>
               )}
               <div className="secretary-schedule-list">
-                {ministrySchedules.map((schedule) => (
-                  <article className="secretary-schedule-card" key={schedule.id}>
+                {escalasSeparadas.proximas.map((schedule) => renderScheduleCard(schedule))}
+                {escalasSeparadas.encerradas.length > 0 && (
+                  <section className="fio-encerradas">
                     <header>
-                      <time dateTime={schedule.inicia_em}><strong>{formatDay(schedule.inicia_em)}</strong><span>{formatMonth(schedule.inicia_em)}</span></time>
-                      <div><span className={`secretary-status ${schedule.status.toLowerCase()}`}>{schedule.status.replaceAll("_", " ")}</span><h2>{schedule.titulo}</h2><p>{formatDate(schedule.inicia_em)} · {schedule.local || "Local não informado"}</p>{schedule.status === "AGENDADA" && schedule.publicar_em && <SchedulePublicationCountdown opensAt={schedule.publicar_em} />}</div>
-                    </header>
-                    <div className="secretary-schedule-body">
-                      <div><small>Responsável</small><strong>{schedule.responsavel_nome || "Não definido"}</strong></div>
-                      <div><small>Equipe</small><strong>{schedule.equipe_nome || "Seleção livre"}</strong><div className="secretary-avatar-stack">{schedule.designacoes.slice(0, 5).map((item) => <span key={item.id} title={`${item.nome} · ${item.funcao}`}>{initials(item.nome)}</span>)}{schedule.designacoes.length > 5 && <b>+{schedule.designacoes.length - 5}</b>}</div></div>
-                      <div><small>Repertório</small><strong>{schedule.repertorio.length} itens</strong></div>
-                      <div><small>Checklist</small><strong>{checklist.filter((item) => item.escala_id === schedule.id).length} tarefas</strong></div>
-                    </div>
-                    <ScheduleRepertoire schedule={schedule} />
-                    <div className="secretary-assignment-status-list">
-                      {schedule.designacoes.map((assignment) => (
-                        <article key={assignment.id} data-status={assignment.status.toLowerCase()}>
-                          <span className="secretary-avatar">{initials(assignment.nome)}</span>
-                          <div>
-                            <VerifiedOwnerName name={assignment.nome} verified={Boolean(assignment.owner_verified)} />
-                            <small>{assignment.funcao} · {assignmentStatusLabel(assignment.status)}</small>
-                          </div>
-                          {Boolean(assignment.is_mine) && assignment.status === "PENDENTE" && schedule.status === "PUBLICADA" && (
-                            <div className="secretary-response-actions">
-                              <button
-                                type="button"
-                                disabled={busy === `response-${schedule.id}`}
-                                onClick={() => void respondToSchedule(schedule, "CONFIRMADA")}
-                              >
-                                Confirmar
-                              </button>
-                              <button
-                                type="button"
-                                className="secondary"
-                                disabled={busy === `response-${schedule.id}`}
-                                onClick={() => {
-                                  setReplacementScheduleId(schedule.id);
-                                  setReplacementVolunteerId(0);
-                                }}
-                              >
-                                Não posso
-                              </button>
-                            </div>
-                          )}
-                          {Boolean(assignment.is_mine) && assignment.status === "PENDENTE" && replacementScheduleId === schedule.id && (
-                            <div className="secretary-self-substitute-picker">
-                              <strong>Quem pode ficar no seu lugar?</strong>
-                              <p>Escolha uma pessoa ativa deste ministério.</p>
-                              {schedule.substitution_candidates?.length ? (
-                                <select value={replacementVolunteerId || ""} onChange={(event) => setReplacementVolunteerId(Number(event.target.value))}>
-                                  <option value="" disabled>Selecione uma pessoa</option>
-                                  {schedule.substitution_candidates.map((candidate) => (
-                                    <option key={candidate.voluntarioId} value={candidate.voluntarioId}>{candidate.nome} · {candidate.funcao}</option>
-                                  ))}
-                                </select>
-                              ) : <small>Não há outra pessoa disponível. Fale com a liderança.</small>}
-                              <div>
-                                <button type="button" disabled={!replacementVolunteerId || busy === `response-${schedule.id}`} onClick={() => void respondToSchedule(schedule, "INDISPONIVEL", replacementVolunteerId)}>Confirmar substituição</button>
-                                <button type="button" className="secondary" onClick={() => setReplacementScheduleId(null)}>Cancelar</button>
-                              </div>
-                            </div>
-                          )}
-                          {Boolean(schedule.can_manage) && (
-                            <div className="secretary-manager-assignment-actions">
-                              <button
-                                type="button"
-                                disabled={busy === `assignment-${assignment.id}`}
-                                onClick={() => void setAssignmentStatus(schedule, assignment, "AUSENTE")}
-                              >
-                                Marcar ausente
-                              </button>
-                              {assignment.status !== "PENDENTE" && (
-                                <button
-                                  type="button"
-                                  disabled={busy === `assignment-${assignment.id}`}
-                                  onClick={() => void setAssignmentStatus(schedule, assignment, "PENDENTE")}
-                                >
-                                  Reabrir
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </article>
-                      ))}
-                    </div>
-                    {Boolean(schedule.can_manage) && (
-                      <form
-                        className="secretary-replacement-form"
-                        onSubmit={(event) => void addReplacement(schedule, event)}
+                      <p>
+                        {escalasSeparadas.encerradas.length}
+                        {escalasSeparadas.encerradas.length === 1
+                          ? " escala encerrada recolhida automaticamente"
+                          : " escalas encerradas recolhidas automaticamente"}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEscalasExpandidas((atual) =>
+                            atual.length
+                              ? []
+                              : escalasSeparadas.encerradas.map((item) => item.id),
+                          )
+                        }
                       >
-                        <strong>Adicionar substituto</strong>
-                        <select name="voluntarioId" required defaultValue="">
-                          <option value="" disabled>Selecione um integrante</option>
-                          {scheduleCandidates
-                            .filter((candidate) =>
-                              !schedule.designacoes.some(
-                                (assignment) => assignment.voluntario_id === candidate.id,
-                              ),
-                            )
-                            .map((candidate) => (
-                              <option key={candidate.id} value={candidate.id}>
-                                {candidate.nome} · {candidate.funcao}
-                              </option>
-                            ))}
-                        </select>
-                        <input name="funcao" required maxLength={100} placeholder="Função na escala" />
-                        <button disabled={busy === `replacement-${schedule.id}`}>Adicionar</button>
-                      </form>
-                    )}
-                    <div className="secretary-schedule-actions">
-                      {Boolean(schedule.can_manage) && schedule.status === "RASCUNHO" && (
-                        <button type="button" className="publish" onClick={() => void publishSchedule(schedule)} disabled={busy === `publish-${schedule.id}`}>
-                          {busy === `publish-${schedule.id}` ? "Publicando…" : "Publicar"}
-                        </button>
-                      )}
-                      <button type="button" onClick={() => void downloadSchedulePdf(schedule)} disabled={busy === `pdf-${schedule.id}`}>{busy === `pdf-${schedule.id}` ? "Preparando…" : "PDF"}</button>
-                      <button type="button" onClick={() => addScheduleToCalendar(schedule)}>Adicionar ao calendário</button>
-                      <button type="button" className="share" onClick={() => setShareSchedule(schedule)} disabled={!schedule.can_manage || schedule.status !== "PUBLICADA" || busy === `share-${schedule.id}`}>Compartilhar</button>
-                      {Boolean(schedule.can_manage) && ["RASCUNHO", "AGENDADA", "PUBLICADA"].includes(schedule.status) && (
-                        <button type="button" className="edit" onClick={() => setEditingSchedule(schedule)}>
-                          Editar escala
-                        </button>
-                      )}
-                      {Boolean(schedule.can_delete) && (
+                        {escalasExpandidas.length ? "Recolher tudo" : "Expandir tudo"}
+                      </button>
+                    </header>
+                    {escalasSeparadas.encerradas.map((schedule) =>
+                      escalasExpandidas.includes(schedule.id) ? (
+                        <div key={schedule.id}>{renderScheduleCard(schedule)}</div>
+                      ) : (
                         <button
                           type="button"
-                          className="danger"
-                          onClick={() => void deleteSchedule(schedule)}
-                          disabled={busy === `delete-${schedule.id}`}
+                          className="fio-encerrada-linha"
+                          key={schedule.id}
+                          onClick={() => setEscalasExpandidas((atual) => [...atual, schedule.id])}
                         >
-                          Excluir
+                          <time dateTime={schedule.inicia_em}>
+                            <strong>{formatDay(schedule.inicia_em)}</strong>
+                            <span>{formatMonth(schedule.inicia_em)}</span>
+                          </time>
+                          <span className="fio-encerrada-copy">
+                            <strong>{schedule.titulo}</strong>
+                            <small>{formatDate(schedule.inicia_em)} · {schedule.local || "Local não informado"}</small>
+                          </span>
+                          <FioVerdict schedule={schedule} agora={agora} />
                         </button>
-                      )}
-                    </div>
-                  </article>
-                ))}
+                      ),
+                    )}
+                  </section>
+                )}
                 {!ministrySchedules.length && <div className="secretary-empty compact"><span>▣</span><h2>Nenhuma escala cadastrada</h2><p>Crie a primeira escala deste ministério.</p></div>}
               </div>
             </div>
@@ -1967,13 +2129,19 @@ function MinistrySettingsForm({
   onSubmit: (
     event: FormEvent<HTMLFormElement>,
     bannerUrl: string,
+    fio: FioTemplateValue,
   ) => Promise<void>;
 }) {
   const [bannerUrl, setBannerUrl] = useState(ministry.banner_url || "");
+  const [categoria, setCategoria] = useState(ministry.categoria);
+  const [fio, setFio] = useState<FioTemplateValue>({
+    habilitado: Boolean(ministry.fio_habilitado),
+    etapas: ministry.fio_etapas,
+  });
   return (
     <form
       className="secretary-ministry-settings"
-      onSubmit={(event) => void onSubmit(event, bannerUrl)}
+      onSubmit={(event) => void onSubmit(event, bannerUrl, fio)}
     >
       <header className="secretary-settings-hero">
         <span className="secretary-settings-icon" aria-hidden="true">
@@ -2015,7 +2183,11 @@ function MinistrySettingsForm({
           <header><span>2</span><div><strong>Liderança e categoria</strong><small>Responsabilidade isolada por ministério</small></div></header>
           <label>
             Categoria
-            <select name="categoria" defaultValue={ministry.categoria}>
+            <select
+              name="categoria"
+              value={categoria}
+              onChange={(event) => setCategoria(event.target.value)}
+            >
               {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
                 <option value={value} key={value}>{label}</option>
               ))}
@@ -2048,8 +2220,13 @@ function MinistrySettingsForm({
           </label>
         </section>
 
+        <section className="secretary-settings-section secretary-settings-fio">
+          <header><span>4</span><div><strong>Fio do Ministério</strong><small>O modelo de checkpoints que cada escala nova recebe</small></div></header>
+          <FioTemplateFields categoria={categoria} value={fio} onChange={setFio} />
+        </section>
+
         <section className="secretary-settings-section secretary-settings-banner">
-          <header><span>4</span><div><strong>Imagem de capa</strong><small>Banner responsivo para celular e computador</small></div></header>
+          <header><span>5</span><div><strong>Imagem de capa</strong><small>Banner responsivo para celular e computador</small></div></header>
           <NativeImageUpload
             label="Banner do ministério"
             value={bannerUrl}
@@ -2078,12 +2255,17 @@ function MinistryForm({
   users: AvailableUser[];
   loadingUsers: boolean;
   busy: boolean;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>, fio: FioTemplateValue) => void;
 }) {
+  const [categoria, setCategoria] = useState("OUTRO");
+  const [fio, setFio] = useState<FioTemplateValue>({ habilitado: false, etapas: [] });
   return (
-    <form className="secretary-form secretary-ministry-form" onSubmit={onSubmit}>
+    <form
+      className="secretary-form secretary-ministry-form"
+      onSubmit={(event) => onSubmit(event, fio)}
+    >
       <label>Nome do ministério<input name="nome" required maxLength={120} /></label>
-      <label>Categoria<select name="categoria" defaultValue="OUTRO">{Object.entries(CATEGORY_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
+      <label>Categoria<select name="categoria" value={categoria} onChange={(event) => setCategoria(event.target.value)}>{Object.entries(CATEGORY_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
       <label>
         Líder responsável
         <select name="responsavelUsuarioId" required defaultValue="">
@@ -2105,6 +2287,9 @@ function MinistryForm({
         )}
       </label>
       <label className="span-2">Descrição<textarea name="descricao" rows={4} maxLength={1200} /></label>
+      <div className="span-2">
+        <FioTemplateFields categoria={categoria} value={fio} onChange={setFio} />
+      </div>
       <input type="hidden" name="status" value="ATIVO" />
       <button disabled={busy || loadingUsers || !users.length}>{busy ? "Criando…" : "Criar ministério"}</button>
     </form>
@@ -3012,6 +3197,327 @@ async function readJson<T>(response: Response) {
   } catch {
     return {} as T;
   }
+}
+
+/**
+ * Fio do Ministério: a linha de checkpoints de uma escala, da criação até o dia
+ * do culto. Mistura o que o sistema já sabe sozinho (publicação agendada,
+ * confirmações da equipe) com as etapas que o ministério definiu.
+ */
+type FioNode = {
+  id: string;
+  titulo: string;
+  estado: "feito" | "pronto" | "aguardando" | "pendente";
+  detalhe?: React.ReactNode;
+  step?: FioStep;
+};
+
+function fioNodes(schedule: Schedule, agora: number): FioNode[] {
+  const confirmados = schedule.designacoes.filter((item) => item.status === "CONFIRMADA").length;
+  const total = schedule.designacoes.length;
+  const publicada = ["PUBLICADA", "AGUARDANDO_CHECKLIST", "ENCERRADA"].includes(schedule.status);
+  const passou = agora > 0 && Date.parse(schedule.termina_em) < agora;
+  const nodes: FioNode[] = [
+    { id: "criada", titulo: "Escala criada", estado: "feito", detalhe: formatDate(schedule.criado_em) },
+  ];
+  if (schedule.status === "AGENDADA" && schedule.publicar_em) {
+    nodes.push({
+      id: "publicacao",
+      titulo: "Publicação para a equipe",
+      estado: "aguardando",
+      detalhe: <SchedulePublicationCountdown opensAt={schedule.publicar_em} />,
+    });
+  } else {
+    nodes.push({
+      id: "publicacao",
+      titulo: "Publicação para a equipe",
+      estado: publicada ? "feito" : "pendente",
+      detalhe: publicada ? "Publicada e equipe notificada" : "Ainda é rascunho",
+    });
+  }
+  for (const step of schedule.fio_etapas) {
+    nodes.push({
+      id: step.id,
+      titulo: step.titulo,
+      estado: step.feito ? "feito" : "pendente",
+      step,
+    });
+  }
+  if (total > 0) {
+    nodes.push({
+      id: "equipe",
+      titulo: "Equipe confirmada",
+      estado: confirmados === total ? "feito" : "pendente",
+      detalhe: `${confirmados}/${total} confirmaram presença`,
+    });
+  }
+  const tudoPronto =
+    schedule.fio_etapas.every((step) => step.feito) && (!total || confirmados === total);
+  nodes.push({
+    id: "dia",
+    titulo: "Dia do culto",
+    estado: passou ? "feito" : tudoPronto && publicada ? "pronto" : "pendente",
+    detalhe: formatDate(schedule.inicia_em),
+  });
+  return nodes;
+}
+
+function fioVerdict(schedule: Schedule, agora: number) {
+  const confirmados = schedule.designacoes.filter((item) => item.status === "CONFIRMADA").length;
+  const total = schedule.designacoes.length;
+  const pendentesEtapas = schedule.fio_etapas.filter((step) => !step.feito).length;
+  const equipePendente = total > 0 && confirmados < total ? 1 : 0;
+  const pendencias = pendentesEtapas + equipePendente;
+  if (schedule.status === "RASCUNHO") return { tom: "muted", label: "Rascunho" };
+  if (schedule.status === "CANCELADA") return { tom: "muted", label: "Cancelada" };
+  if (schedule.status === "AGENDADA") return { tom: "info", label: "Aguardando liberação" };
+  const passou = agora > 0 && Date.parse(schedule.termina_em) < agora;
+  if (!pendencias) {
+    return passou
+      ? { tom: "muted", label: "Concluída sem pendências" }
+      : { tom: "ok", label: "Tudo pronto" };
+  }
+  if (passou) return { tom: "bad", label: "Encerrada com pendências" };
+  return {
+    tom: "warn",
+    label: pendencias === 1 ? "Falta 1 item" : `Faltam ${pendencias} itens`,
+  };
+}
+
+function FioVerdict({ schedule, agora }: { schedule: Schedule; agora: number }) {
+  const verdict = fioVerdict(schedule, agora);
+  return <span className="fio-verdict" data-tom={verdict.tom}>{verdict.label}</span>;
+}
+
+function FioThread({
+  schedule,
+  agora,
+  busy,
+  editando,
+  onAbrirEdicao,
+  onFecharEdicao,
+  onAlternarEtapa,
+  onSalvarEtapas,
+}: {
+  schedule: Schedule;
+  agora: number;
+  busy: string;
+  editando: boolean;
+  onAbrirEdicao: () => void;
+  onFecharEdicao: () => void;
+  onAlternarEtapa: (step: FioStep) => void;
+  onSalvarEtapas: (titulos: string[]) => void;
+}) {
+  const nodes = fioNodes(schedule, agora);
+  const prontas = schedule.fio_etapas.filter((step) => step.feito).length;
+  return (
+    <section className="fio-thread-card" aria-label={`Fio da escala ${schedule.titulo}`}>
+      <header>
+        <div>
+          <p className="pilot-kicker">FIO DO MINISTÉRIO</p>
+          <strong>
+            {schedule.fio_etapas.length
+              ? `${prontas}/${schedule.fio_etapas.length} etapas prontas`
+              : "Sem etapas definidas nesta escala"}
+          </strong>
+        </div>
+        <FioVerdict schedule={schedule} agora={agora} />
+      </header>
+      {editando ? (
+        <FioStepEditor
+          titulosIniciais={schedule.fio_etapas.map((step) => step.titulo)}
+          salvando={busy === `fio-etapas-${schedule.id}`}
+          onCancelar={onFecharEdicao}
+          onSalvar={onSalvarEtapas}
+        />
+      ) : (
+        <>
+          <ol className="fio-thread">
+            {nodes.map((node, index) => (
+              <li className="fio-node" data-estado={node.estado} style={{ "--i": index } as CSSProperties} key={node.id}>
+                {node.step ? (
+                  <button
+                    type="button"
+                    className="fio-node-toggle"
+                    disabled={busy === `fio-${schedule.id}-${node.step.id}`}
+                    onClick={() => onAlternarEtapa(node.step as FioStep)}
+                    aria-pressed={node.estado === "feito"}
+                  >
+                    <span className="fio-checkbox" aria-hidden="true">{node.estado === "feito" ? "✓" : ""}</span>
+                    <span className="fio-node-title">{node.titulo}</span>
+                  </button>
+                ) : (
+                  <p className="fio-node-title">{node.titulo}</p>
+                )}
+                {node.detalhe && <div className="fio-node-detail">{node.detalhe}</div>}
+              </li>
+            ))}
+          </ol>
+          {Boolean(schedule.can_manage) && (
+            <button type="button" className="fio-edit-trigger" onClick={onAbrirEdicao}>
+              {schedule.fio_etapas.length ? "Ajustar etapas desta escala" : "Definir etapas desta escala"}
+            </button>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+type FioTemplateValue = { habilitado: boolean; etapas: string[] };
+
+/**
+ * Modelo do Fio guardado no ministério. Ele não é a lista de uma escala: é o
+ * ponto de partida que cada escala nova recebe e depois varia por conta
+ * própria. As sugestões mudam com a categoria porque o caso que originou o Fio
+ * é o louvor ("o som está testado?"), mas recepção e mídia têm a mesma rotina.
+ */
+const FIO_SUGESTOES: Record<string, string[]> = {
+  LOUVOR: [
+    "Repertório fechado",
+    "Tons e cifras enviados",
+    "Ensaio confirmado",
+    "Som e retornos testados",
+    "Slides prontos",
+  ],
+  MIDIA: ["Roteiro definido", "Câmeras e transmissão testadas", "Slides prontos"],
+  RECEPCAO: ["Escala de portas definida", "Materiais separados", "Equipe orientada"],
+};
+const FIO_SUGESTAO_PADRAO = ["Equipe avisada", "Materiais separados", "Tudo testado no local"];
+
+function FioTemplateFields({
+  categoria,
+  value,
+  onChange,
+}: {
+  categoria: string;
+  value: FioTemplateValue;
+  onChange: (next: FioTemplateValue) => void;
+}) {
+  const sugestoes = FIO_SUGESTOES[categoria] || FIO_SUGESTAO_PADRAO;
+  return (
+    <div className="fio-template">
+      <label className="fio-template-toggle">
+        <input
+          type="checkbox"
+          checked={value.habilitado}
+          onChange={(event) =>
+            onChange({
+              habilitado: event.target.checked,
+              etapas:
+                event.target.checked && !value.etapas.length ? sugestoes : value.etapas,
+            })
+          }
+        />
+        <span>
+          <strong>Ativar o Fio do Ministério</strong>
+          <small>
+            Cada escala ganha um fio de checkpoints para responder, num olhar, se
+            está tudo pronto para o dia.
+          </small>
+        </span>
+      </label>
+      {value.habilitado && (
+        <>
+          <FioStepEditor
+            titulosIniciais={value.etapas}
+            salvando={false}
+            modo="embutido"
+            onSalvar={(etapas) => onChange({ ...value, etapas })}
+          />
+          <small className="fio-template-help">
+            Estas etapas são o ponto de partida. Cada escala pode acrescentar ou
+            tirar as suas depois, sem mexer neste modelo.
+          </small>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Editor de etapas — usado tanto na escala quanto no modelo do ministério. */
+function FioStepEditor({
+  titulosIniciais,
+  salvando,
+  modo = "escala",
+  onCancelar,
+  onSalvar,
+}: {
+  titulosIniciais: string[];
+  salvando: boolean;
+  /**
+   * "escala" tem botões próprios e só grava quando o usuário confirma;
+   * "embutido" vive dentro de outro formulário e devolve a lista a cada
+   * digitada, porque quem grava é o formulário de fora.
+   */
+  modo?: "escala" | "embutido";
+  onCancelar?: () => void;
+  onSalvar: (titulos: string[]) => void;
+}) {
+  const [titulos, setTitulos] = useState<string[]>(
+    titulosIniciais.length ? titulosIniciais : [""],
+  );
+  function aplicar(proximos: string[]) {
+    setTitulos(proximos);
+    if (modo === "embutido") onSalvar(limpar(proximos));
+  }
+  return (
+    <div className="fio-editor" data-modo={modo}>
+      {titulos.map((titulo, index) => (
+        <div className="fio-editor-row" key={index}>
+          <span className="fio-editor-bullet" aria-hidden="true" />
+          <input
+            value={titulo}
+            maxLength={120}
+            placeholder="Ex.: Som e slides testados"
+            aria-label={`Etapa ${index + 1}`}
+            onChange={(event) =>
+              aplicar(titulos.map((item, position) => (position === index ? event.target.value : item)))
+            }
+          />
+          <button
+            type="button"
+            className="fio-editor-remove"
+            aria-label={`Remover etapa ${index + 1}`}
+            onClick={() => aplicar(titulos.filter((_, position) => position !== index))}
+          >
+            ×
+          </button>
+        </div>
+      ))}
+      <div className="fio-editor-actions">
+        <button
+          type="button"
+          className="fio-add"
+          disabled={titulos.length >= 12}
+          onClick={() => aplicar([...titulos, ""])}
+        >
+          + Adicionar etapa
+        </button>
+        <span className="fio-editor-spacer" />
+        {modo === "escala" && onCancelar && (
+          <button type="button" className="fio-cancel" onClick={onCancelar}>
+            Cancelar
+          </button>
+        )}
+        {modo === "escala" && (
+          <button
+            type="button"
+            className="fio-save"
+            disabled={salvando}
+            onClick={() => onSalvar(limpar(titulos))}
+          >
+            {salvando ? "Salvando…" : "Salvar etapas"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Tira espaços sobrando e linhas em branco antes de enviar as etapas. */
+function limpar(titulos: string[]) {
+  return titulos.map((item) => item.trim()).filter(Boolean);
 }
 
 function SchedulePublicationCountdown({ opensAt }: { opensAt: string }) {
