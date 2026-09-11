@@ -31253,7 +31253,8 @@ html[data-pilot-theme="claro"] .pilot-dashboard[data-ui-version="v2"] :is(
   .pilot-mobile-profile,
   .pilot-mobile-profile-card,
   .pilot-profile-community-switcher,
-  .account-personalization-v4
+  .account-personalization-v4,
+  .cell-detail-overlay-v2 .cell-detail-v2
 ) {
   background: var(--pilot-surface-opaque) !important;
   color: var(--pilot-text) !important;
@@ -31276,6 +31277,34 @@ html[data-pilot-theme="claro"] .pilot-dashboard[data-ui-version="v2"] .pilot-mob
   background: color-mix(in srgb, var(--pilot-surface-opaque) 98%, var(--pilot-bg)) !important;
   box-shadow: 0 -10px 30px color-mix(in srgb, var(--pilot-text) 9%, transparent) !important;
   backdrop-filter: none !important;
+}
+/* QA Fase 4 — o painel de detalhes da célula (.cell-detail-v2/.cell-detail-v4)
+   herdava --v2-surface, ligado ao slider "Intensidade do vidro"; no tema
+   automático (sem atributo, a maioria dos usuários que nunca trocou o tema)
+   o painel ficava translúcido e o conteúdo de trás vazava através dele.
+   Mesma correção do bloco "claro" acima, também para quem nunca escolheu
+   tema explicitamente e o sistema prefere claro. */
+@media (prefers-color-scheme: light) {
+  html:not([data-pilot-theme]) .pilot-dashboard[data-ui-version="v2"] .cell-detail-overlay-v2 .cell-detail-v2 {
+    background: #fbf9ff !important;
+    color: var(--pilot-text) !important;
+    backdrop-filter: none !important;
+  }
+}
+/* Mesmo vazamento no escuro: var(--pilot-bg) é o token que o redesenho do
+   Estacionamento (versão 235) já usou para este bug exato, por ser sempre
+   opaco independente do slider de vidro. */
+html[data-pilot-theme="escuro"] .pilot-dashboard[data-ui-version="v2"] .cell-detail-overlay-v2 .cell-detail-v2 {
+  background: var(--pilot-bg) !important;
+  color: var(--pilot-text) !important;
+  backdrop-filter: none !important;
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-pilot-theme]) .pilot-dashboard[data-ui-version="v2"] .cell-detail-overlay-v2 .cell-detail-v2 {
+    background: var(--pilot-bg) !important;
+    color: var(--pilot-text) !important;
+    backdrop-filter: none !important;
+  }
 }
 
 .pilot-mobile-task-summary > .pilot-mobile-device-notifications {
