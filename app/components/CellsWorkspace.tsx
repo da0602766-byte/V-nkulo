@@ -21,9 +21,11 @@ import { useCellsData } from "./cells/useCellsData";
 export default function CellsWorkspace({
   permissions,
   communityName,
+  memberMode = false,
 }: {
   permissions: string[];
   communityName: string;
+  memberMode?: boolean;
 }) {
   const cells = useCellsData();
   const [view, setView] = useState<"gestao" | "participacao">("gestao");
@@ -31,7 +33,7 @@ export default function CellsWorkspace({
   const hasGestaoAccess =
     permissions.includes("cells.manage") || cells.cells.some((cell) => cell.can_operate);
 
-  if (!hasGestaoAccess) {
+  if (memberMode || !hasGestaoAccess) {
     return <CellMemberPortal communityName={communityName} cells={cells} />;
   }
 
