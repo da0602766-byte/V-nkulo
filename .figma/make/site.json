@@ -1,0 +1,12 @@
+{
+  "title": "VÍNKULO | Gestão para igrejas e comunidades",
+  "description": "Plataforma brasileira de gestão para igrejas: células, ministérios, escalas, visitantes, pedidos de oração e agenda em um só lugar.",
+  "language": "pt-BR",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
