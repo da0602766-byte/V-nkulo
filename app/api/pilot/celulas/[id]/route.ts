@@ -141,6 +141,48 @@ export async function PATCH(request: Request, context: Context) {
     return audited(db, access.context, access.user.id, id, `SOLICITACAO_${status}`);
   }
 
+  if (action === "CONFIGURACOES_ATUALIZAR") {
+    const nome = String(payload.nome || "").trim().slice(0, 100);
+    const dias = Array.isArray(payload.diasReuniao)
+      ? payload.diasReuniao.map(String).filter((day) => ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"].includes(day))
+      : [];
+    if (!nome || !dias.length) {
+      return Response.json({ error: "Informe nome e ao menos um dia de encontro." }, { status: 400 });
+    }
+    const rede = String(payload.rede || "").trim().slice(0, 80);
+    const horarioTexto = String(payload.horarioTexto || "").trim().slice(0, 120);
+    const enderecoPublico = String(payload.enderecoPublico || "").trim().slice(0, 240);
+    const descricaoPublica = String(payload.descricaoPublica || "").trim().slice(0, 700);
+    const observacoes = String(payload.observacoes || "").trim().slice(0, 1000);
+    const temas = Array.isArray(payload.temas)
+      ? [...new Set(payload.temas.map((item) => String(item).trim().slice(0, 40)).filter(Boolean))].slice(0, 12)
+      : [];
+    const fotoCapa = String(payload.fotoCapa || "").trim().slice(0, 500) || null;
+    const duplicate = await db.prepare(
+      `SELECT id FROM celulas WHERE comunidade_id = ? AND nome = ? COLLATE NOCASE AND ativo = 1 AND id != ?`,
+    ).bind(access.context.comunidadeId, nome, id).first();
+    if (duplicate) return Response.json({ error: "Já existe uma célula ativa com esse nome." }, { status: 409 });
+    await db.prepare(
+      `UPDATE celulas SET nome = ?, dias_reuniao = ?, rede = ?, horario_texto = ?,
+        endereco_publico = ?, descricao_publica = ?, observacoes = ?, temas = ?,
+        foto_capa = ?, atualizado_em = CURRENT_TIMESTAMP
+       WHERE id = ? AND comunidade_id = ?`,
+    ).bind(
+      nome,
+      JSON.stringify([...new Set(dias)]),
+      rede,
+      horarioTexto,
+      enderecoPublico,
+      descricaoPublica,
+      observacoes || null,
+      JSON.stringify(temas),
+      fotoCapa,
+      id,
+      access.context.comunidadeId,
+    ).run();
+    return audited(db, access.context, access.user.id, id, "CONFIGURACOES_ATUALIZADAS");
+  }
+
   if (action === "REATIVAR") {
     if (!manager) return Response.json({ error: "Somente a gestão pastoral pode reativar células." }, { status: 403 });
     await db.prepare(`UPDATE celulas SET ativo = 1, arquivada_em = NULL, ultimo_relatorio_em = CURRENT_TIMESTAMP, atualizado_em = CURRENT_TIMESTAMP WHERE id = ? AND comunidade_id = ?`).bind(id, access.context.comunidadeId).run();

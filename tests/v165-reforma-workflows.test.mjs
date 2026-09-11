@@ -37,12 +37,12 @@ test("ministry schedules can be collected for timed publication with live status
 
 test("reading mode offers signup and cell profiles render above the page", async () => {
   const gate = await read("app/components/SharedScheduleAccessGate.tsx");
-  const cells = await read("app/components/TenantOperations.tsx");
+  const managementConsole = await read("app/components/cells/CellManagementConsole.tsx");
   const styles = await read("app/globals.css");
   assert.match(gate, /\/login\?modo=cadastro/);
-  assert.match(cells, /selectedMemberProfile/);
-  assert.match(cells, /cell-member-profile-dialog/);
-  assert.match(styles, /\.cell-member-profile-overlay\s*\{[^}]*z-index:1200/s);
+  assert.match(managementConsole, /memberProfile/);
+  assert.match(managementConsole, /cgestao-member-dialog/);
+  assert.match(styles, /\.cgestao-create-overlay,\s*\.cgestao-member-overlay\s*\{[^}]*z-index:\s*1200/s);
 });
 
 test("publication copy remains readable and preserves authored line breaks", async () => {
