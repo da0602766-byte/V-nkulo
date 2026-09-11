@@ -3,12 +3,15 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import Link from "./StableLink";
 import ThemeControl from "./ThemeControl";
+import { DEFAULT_LANDING_PLANS, type LandingPlan } from "../lib/platform-plans";
 
 type LandingPageExperienceProps = {
   signedIn: boolean;
   panelHref: string;
   canEdit: boolean;
+  plans: LandingPlan[];
 };
+
 
 const MODULES = [
   { icon: "thread", label: "Fio do dia", desc: "A linha do tempo da comunidade. Passado sólido, futuro tracejado e o momento certo entre os dois.", tone: "blue" },
@@ -31,11 +34,7 @@ const TESTIMONIALS = [
   { name: "Diácono Samuel Costa", role: "Coordenador de ministérios", church: "Igreja Betânia, RJ", text: "As escalas automáticas com notificação salvaram horas de reunião toda semana. A equipe sabe onde estar e a que horas.", avatar: "SC" },
 ] as const;
 
-const PLANS = [
-  { name: "Comunidade", price: "Gratuito", description: "Para igrejas em início de organização digital.", items: ["Até 100 membros cadastrados", "Módulos: Fio, Agenda, Pedidos", "1 administrador", "Suporte por e-mail"], cta: "Começar grátis", featured: false, contact: false },
-  { name: "Crescimento", price: "R$ 89", period: "/mês", description: "Para igrejas em expansão que precisam de mais controle.", items: ["Membros ilimitados", "Todos os módulos", "Até 5 administradores", "Células e relatórios", "Suporte prioritário"], cta: "Experimentar 30 dias grátis", featured: true, contact: false },
-  { name: "Rede", price: "Fale conosco", description: "Para redes de igrejas com múltiplas unidades.", items: ["Múltiplas comunidades", "Painel de rede unificado", "Customização de cor e marca", "Suporte dedicado", "Treinamento de equipe"], cta: "Falar com o time", featured: false, contact: true },
-] as const;
+export { DEFAULT_LANDING_PLANS };
 
 const FAQS = [
   ["Preciso instalar algum aplicativo?", "Não. O Vínkulo funciona diretamente no navegador do celular ou computador, sem instalação. A experiência é otimizada para toque e para telas pequenas."],
@@ -45,8 +44,9 @@ const FAQS = [
   ["Posso cancelar quando quiser?", "Sim. Não há fidelidade. Você cancela pelo painel e continua com acesso até o fim do período pago."],
 ] as const;
 
-export default function LandingPageExperience({ signedIn, panelHref, canEdit }: LandingPageExperienceProps) {
+export default function LandingPageExperience({ signedIn, panelHref, canEdit, plans }: LandingPageExperienceProps) {
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
+  const [ownerAccessOpen, setOwnerAccessOpen] = useState(false);
   const signupHref = signedIn ? panelHref : "/login?modo=cadastro";
   const loginHref = signedIn ? panelHref : "/login";
 
@@ -56,12 +56,12 @@ export default function LandingPageExperience({ signedIn, panelHref, canEdit }: 
         <div className="lp-shell lp-nav-inner">
           <Link className="lp-brand" href="/" aria-label="Vínkulo — início"><VinkuloMark /><span>vínkulo</span></Link>
           <div className="lp-nav-links">
-            <a href="#recursos">Recursos</a><a href="#fio-do-dia">Fio do dia</a><a href="#planos">Planos</a><a href="#duvidas">Dúvidas</a>
+            <a href="#recursos">Recursos</a><a href="#fio-do-dia">Fio do dia</a>{canEdit && <a href="#planos">Planos</a>}<a href="#duvidas">Dúvidas</a>
           </div>
           <div className="lp-nav-actions">
             <ThemeControl compact cycle />
             {canEdit && <span id="global-editor-toolbar-slot" className="global-editor-toolbar-slot" aria-label="Aparência" />}
-            <Link className="lp-button lp-button-small" href={loginHref} showLoading>{signedIn ? "Abrir painel" : "Entrar"} <span aria-hidden="true">→</span></Link>
+            {canEdit ? <div className="lp-owner-access"><button type="button" className="lp-button lp-button-small" aria-expanded={ownerAccessOpen} onClick={() => setOwnerAccessOpen((open) => !open)}>Proprietário <span aria-hidden="true">⌄</span></button>{ownerAccessOpen && <div className="lp-owner-access-menu" role="menu"><Link href="/proprietario" showLoading role="menuitem">Central do proprietário</Link><Link href="/painel" showLoading role="menuitem">Entrar na comunidade</Link></div>}</div> : <Link className="lp-button lp-button-small" href={loginHref} showLoading>{signedIn ? "Abrir painel" : "Entrar"} <span aria-hidden="true">→</span></Link>}
           </div>
         </div>
       </nav>
@@ -108,10 +108,11 @@ export default function LandingPageExperience({ signedIn, panelHref, canEdit }: 
         <div className="lp-shell"><Reveal className="lp-section-heading lp-centered"><SectionLabel>Depoimentos</SectionLabel><h2>Quem usa, <em>recomenda</em></h2></Reveal><div className="lp-testimonial-grid">{TESTIMONIALS.map((testimonial, index) => <Reveal key={testimonial.name} delay={index * 150}><article><blockquote>“{testimonial.text}”</blockquote><footer><span>{testimonial.avatar}</span><div><strong>{testimonial.name}</strong><small>{testimonial.role} · {testimonial.church}</small></div></footer></article></Reveal>)}</div></div>
       </section>
 
-      <section className="lp-section lp-shell" id="planos" data-editor-key="landing-governanca">
+      {canEdit && <section className="lp-section lp-shell" id="planos" data-editor-key="landing-governanca">
         <Reveal className="lp-section-heading lp-centered"><SectionLabel>Planos</SectionLabel><h2>Simples e <em>transparente</em></h2><p>Comece grátis. Escale quando sua comunidade crescer.</p></Reveal>
-        <div className="lp-plan-grid">{PLANS.map((plan, index) => <Reveal key={plan.name} delay={index * 150}><article className={plan.featured ? "featured" : ""}>{plan.featured && <span className="lp-popular">Mais popular</span>}<h3>{plan.name}</h3><div className="lp-price"><strong>{plan.price}</strong>{"period" in plan && plan.period && <span>{plan.period}</span>}</div><p>{plan.description}</p><ul>{plan.items.map((item) => <li key={item}><CheckIcon />{item}</li>)}</ul><Link className={`lp-button ${plan.featured ? "" : "lp-button-secondary"}`} href={plan.contact ? "/contato" : signupHref} showLoading>{plan.cta}</Link></article></Reveal>)}</div>
-      </section>
+        <div className="lp-plan-grid">{plans.map((plan, index) => <Reveal key={plan.name} delay={index * 150}><article className={plan.featured ? "featured" : ""}>{plan.featured && <span className="lp-popular">Mais popular</span>}<h3>{plan.name}</h3><div className="lp-price"><strong>{plan.price}</strong>{plan.period && <span>{plan.period}</span>}</div><p>{plan.description}</p><ul>{plan.items.map((item) => <li key={item}><CheckIcon />{item}</li>)}</ul><Link className={`lp-button ${plan.featured ? "" : "lp-button-secondary"}`} href="/proprietario?tab=plans" showLoading>{plan.cta}</Link></article></Reveal>)}</div>
+        <p className="lp-owner-plan-note">Esta prévia é exclusiva do proprietário. <Link href="/proprietario?tab=plans">Configurar planos e chamadas →</Link></p>
+      </section>}
 
       <section className="lp-section lp-faq lp-shell" id="duvidas">
         <Reveal className="lp-section-heading lp-centered"><SectionLabel>Dúvidas</SectionLabel><h2>Perguntas frequentes</h2></Reveal>

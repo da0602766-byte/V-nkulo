@@ -221,6 +221,7 @@ export default function SecretaryMinisterialWorkspace({
   const [availableUsers, setAvailableUsers] = useState<AvailableUser[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
+  const [expandedChecklistSchedules, setExpandedChecklistSchedules] = useState<number[]>([]);
   const [teams, setTeams] = useState<MinistryTeam[]>([]);
   const [canCreate, setCanCreate] = useState(false);
   const [selectedMinistryId, setSelectedMinistryId] = useState<number | null>(null);
@@ -2018,10 +2019,14 @@ export default function SecretaryMinisterialWorkspace({
                 {ministrySchedules.map((schedule) => {
                   const items = ministryChecklist.filter((item) => item.escala_id === schedule.id);
                   if (!items.length) return null;
+                  const done = items.filter((item) => item.status === "FEITO").length;
+                  const isOpen = expandedChecklistSchedules.includes(schedule.id);
+                  const isPast = new Date(schedule.inicia_em.replace(" ", "T")).getTime() < Date.now();
+                  const state = done === items.length ? "done" : isPast ? "overdue" : "pending";
                   return (
-                    <section key={schedule.id}>
-                      <header><div><strong>{schedule.titulo}</strong><small>{formatDate(schedule.inicia_em)}</small></div><span>{items.filter((item) => item.status === "FEITO").length}/{items.length}</span></header>
-                      {items.map((item) => (
+                    <section key={schedule.id} className={`secretary-checklist-group is-${state}`}>
+                      <header><button type="button" className="secretary-checklist-collapse" aria-expanded={isOpen} onClick={() => setExpandedChecklistSchedules((current) => current.includes(schedule.id) ? current.filter((id) => id !== schedule.id) : [...current, schedule.id])}><div><strong>{schedule.titulo}</strong><small>{formatDate(schedule.inicia_em)}</small></div><span><b>{done}/{items.length}</b><i aria-hidden="true">⌄</i></span></button><em>{state === "done" ? "Concluído" : state === "overdue" ? "Atenção: pendente" : "Pendente"}</em></header>
+                      {isOpen && items.map((item) => (
                         <div key={item.id}>
                           <button type="button" onClick={() => void updateChecklist(item, item.status === "FEITO" ? "PENDENTE" : "FEITO")} disabled={busy === `checklist-${item.id}`} aria-label={item.status === "FEITO" ? "Reabrir item" : "Concluir item"}>{item.status === "FEITO" ? "✓" : "○"}</button>
                           <strong>{item.tarefa}</strong>
