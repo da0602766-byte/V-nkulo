@@ -1,4 +1,4 @@
-# Prompt de publicação — para outra IA (Codex ou equivalente)
+# Prompt de publicação — para ChatGPT/Codex
 
 Copie daqui para baixo.
 
@@ -7,8 +7,15 @@ Copie daqui para baixo.
 Você vai publicar o **redesenho completo da aba "Células" em duas
 experiências — Gestão e Participação**, pronto no branch
 `claude/dreamy-cerf-b5b9f8` do repositório `da0602766-byte/V-nkulo`
-(commit `c8b23fc`). Não há pull request aberto ainda — abra um a partir
-deste branch, ou integre direto em `main` se for o seu fluxo de costume.
+(3 commits, ponta em `71ed244`). Não há pull request aberto ainda — abra
+um a partir deste branch, ou integre direto em `main` se for o seu fluxo
+de costume.
+
+Uma prévia estática (HTML/CSS/JS reproduzindo fielmente as classes reais,
+com dados fictícios) está publicada em
+https://claude.ai/code/artifact/57842073-51ef-4ddd-b0f1-bd6088bdcf61 —
+útil para ver as duas telas sem subir o ambiente, mas não substitui o QA
+visual no app de verdade pedido mais abaixo.
 
 ## Antes de tudo: há uma migração, sim
 
@@ -156,17 +163,25 @@ desta rodada:
   substituta; ver `git log -p` no commit `c8b23fc` para o antes/depois de
   cada uma).
 
-Não fiz QA visual manual (sem navegador disponível neste ambiente) — vale
-a pena um passe rápido pelas quatro telas (Gestão lista, Gestão detalhe,
-Participação computador, Participação celular) antes de publicar, do
-mesmo jeito que foi feito no redesenho do estacionamento.
+Depois de escrever este prompt, montei a prévia estática linkada acima
+(mesmas classes CSS reais, dados fictícios) e usei Playwright só para
+tirar capturas de tela dela — não é QA no app de verdade, mas pegou um
+defeito real: `.cpart-badge` sem `flex-shrink:0` deixava a etiqueta
+"Solicitação pendente" (a mais longa das três) espremer o nome da célula
+na lista compacta de celular (Frame 4). Corrigido no commit `71ed244`
+(`app/globals.css`). Ainda vale um passe pelas quatro telas no app de
+verdade (Gestão lista, Gestão detalhe, Participação computador,
+Participação celular) antes de publicar, do mesmo jeito que foi feito no
+redesenho do estacionamento — a prévia estática não roda contra dados ou
+permissões reais.
 
 ## Passos
 
 1. `git fetch origin claude/dreamy-cerf-b5b9f8`
 2. Confira o diff contra `main`
-   (`git diff origin/main...claude/dreamy-cerf-b5b9f8`) — 1 commit,
-   24 arquivos.
+   (`git diff origin/main...claude/dreamy-cerf-b5b9f8`) — 3 commits
+   (`c8b23fc` o redesenho, `fe6f4d6` este prompt, `71ed244` a correção do
+   badge), 26 arquivos ao todo.
 3. **Aplique a migração** `drizzle/0071_celulas_participacao_detalhes.sql`
    no D1 de produção antes ou junto com o deploy do código (colunas com
    `DEFAULT`, então a ordem entre migração e deploy não quebra nada, mas
@@ -207,6 +222,6 @@ mesmo jeito que foi feito no redesenho do estacionamento.
 - Um membro de outra comunidade continua sem ver células, integrantes ou
   solicitações desta comunidade em nenhuma tela.
 
-Se algo dessa lista falhar, é um commit só (`c8b23fc`) — reverter é
-simples, mas a lista acima deve dar sinal de qual parte investigar antes
-disso.
+Se algo dessa lista falhar, são só três commits (`c8b23fc`, `fe6f4d6`,
+`71ed244`) — reverter é simples, mas a lista acima deve dar sinal de qual
+parte investigar antes disso.
