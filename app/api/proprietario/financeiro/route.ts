@@ -363,13 +363,29 @@ export async function POST(request: Request) {
     return Response.json({ error: "Esta comunidade já possui uma assinatura vigente. Use a ação de troca de plano." }, { status: 409 });
   }
 
+  const codigoCupom = clean(body.cupom, 40).toUpperCase();
+  const cupomResolvido = await resolverCupom(db, codigoCupom, planoId);
+  if (!cupomResolvido.ok) {
+    return Response.json({ error: cupomResolvido.erro }, { status: 400 });
+  }
+  const cupom = cupomResolvido.cupom;
+
   const inicia = isoDate(body.iniciaEm) || today();
   const diasTeste = Number(plan.dias_teste) || 0;
   const testeAte = diasTeste > 0 ? addDays(inicia, diasTeste) : null;
   const meses = cycleMonths(plan.periodicidade, plan.duracao_meses);
   const renovaEm = addMonths(testeAte || inicia, meses);
   const status = testeAte ? "TESTE" : "ATIVA";
-  const desconto = Math.min(100, Math.max(0, Math.trunc(Number(body.descontoPercentual ?? plan.desconto_percentual)) || 0));
+  const descontoBase = Math.min(
+    100,
+    Math.max(0, Math.trunc(Number(body.descontoPercentual ?? plan.desconto_percentual)) || 0),
+  );
+  // Cupom percentual vence o desconto padrão do plano quando é maior; cupom de
+  // valor fixo não mexe no percentual, entra em centavos na cobrança.
+  const desconto =
+    cupom && cupom.tipo === "PERCENTUAL"
+      ? Math.min(100, Math.max(descontoBase, Math.trunc(Number(cupom.valor) || 0)))
+      : descontoBase;
 
   const result = await db
     .prepare(
@@ -384,7 +400,7 @@ export async function POST(request: Request) {
       inicia,
       renovaEm,
       testeAte,
-      clean(body.cupom, 40).toUpperCase(),
+      cupom ? cupom.codigo : "",
       desconto,
       body.renovacaoAutomatica === false ? 0 : 1,
       clean(body.observacoes, 500),
@@ -392,7 +408,17 @@ export async function POST(request: Request) {
     )
     .run();
   const assinaturaId = Number(result.meta.last_row_id);
-  await audit(db, access.user.id, "ASSINATURA_CRIADA", { assinaturaId, planoId, plano: plan.nome, status, renovaEm, testeAte }, comunidadeId);
+  if (cupom) await consumirCupom(db, cupom.id);
+  await audit(
+    db,
+    access.user.id,
+    "ASSINATURA_CRIADA",
+    {
+      assinaturaId, planoId, plano: plan.nome, status, renovaEm, testeAte,
+      cupom: cupom ? cupom.codigo : "", cupomTipo: cupom ? cupom.tipo : "",
+    },
+    comunidadeId,
+  );
 
   let cobrancaId = 0;
   if (body.gerarCobranca === true && status === "ATIVA") {
@@ -406,6 +432,62 @@ export async function POST(request: Request) {
   return Response.json({ ok: true, id: assinaturaId, cobrancaId }, { status: 201 });
 }
 
+/**
+ * Valida um cupom contra `cupons_assinatura` e devolve o desconto aplicável.
+ *
+ * O cupom só vale se estiver ativo, dentro da validade, com usos disponíveis e
+ * (quando amarrado a um plano) para aquele plano. Um código que não passa em
+ * alguma dessas regras é recusado em vez de virar texto solto na assinatura —
+ * era o que acontecia antes, e fazia o campo `cupom` não significar nada.
+ *
+ * PERCENTUAL vira desconto percentual na assinatura; VALOR fica registrado no
+ * cupom e é aplicado em centavos na geração de cada cobrança.
+ */
+async function resolverCupom(
+  db: ReturnType<typeof getD1>,
+  codigo: string,
+  planoId: number,
+) {
+  if (!codigo) return { ok: true as const, cupom: null };
+  const row = await db
+    .prepare(
+      `SELECT id, codigo, tipo, valor, plano_id, valido_ate, usos_maximos, usos, ativo
+       FROM cupons_assinatura WHERE codigo = ? LIMIT 1`,
+    )
+    .bind(codigo)
+    .first<{
+      id: number;
+      codigo: string;
+      tipo: string;
+      valor: number;
+      plano_id: number | null;
+      valido_ate: string | null;
+      usos_maximos: number;
+      usos: number;
+      ativo: number;
+    }>();
+  if (!row) return { ok: false as const, erro: "Cupom não encontrado." };
+  if (!row.ativo) return { ok: false as const, erro: "Este cupom está desativado." };
+  if (row.valido_ate && row.valido_ate < today()) {
+    return { ok: false as const, erro: "Este cupom está fora da validade." };
+  }
+  if (row.usos_maximos > 0 && row.usos >= row.usos_maximos) {
+    return { ok: false as const, erro: "Este cupom já atingiu o limite de usos." };
+  }
+  if (row.plano_id && row.plano_id !== planoId) {
+    return { ok: false as const, erro: "Este cupom não vale para o plano escolhido." };
+  }
+  return { ok: true as const, cupom: row };
+}
+
+/** Registra o uso do cupom. Só é chamado depois que a assinatura foi criada. */
+async function consumirCupom(db: ReturnType<typeof getD1>, cupomId: number) {
+  await db
+    .prepare("UPDATE cupons_assinatura SET usos = usos + 1 WHERE id = ?")
+    .bind(cupomId)
+    .run();
+}
+
 async function createCharge(
   db: ReturnType<typeof getD1>,
   userId: number,
@@ -416,9 +498,25 @@ async function createCharge(
   const comp = competencia(body.competencia) || venceEm.slice(0, 7);
   const bruto = body.valorCentavos === undefined ? Number(subscription.preco_centavos) || 0 : count(body.valorCentavos);
   const descontoPercentual = Number(subscription.desconto_percentual) || 0;
+  // Cupom de valor fixo amarrado à assinatura desconta em centavos; o de
+  // percentual já está refletido em desconto_percentual. Um valor explícito no
+  // corpo vence os dois, para o proprietário poder ajustar uma cobrança pontual.
+  const cupomValor = subscription.cupom
+    ? await db
+        .prepare(
+          `SELECT valor FROM cupons_assinatura
+           WHERE codigo = ? AND tipo = 'VALOR' AND ativo = 1 LIMIT 1`,
+        )
+        .bind(subscription.cupom)
+        .first<{ valor: number }>()
+    : null;
   const desconto =
     body.descontoCentavos === undefined
-      ? Math.round((bruto * descontoPercentual) / 100)
+      ? Math.min(
+          bruto,
+          Math.round((bruto * descontoPercentual) / 100) +
+            (cupomValor ? Math.max(0, Math.trunc(Number(cupomValor.valor) || 0)) : 0),
+        )
       : Math.min(bruto, count(body.descontoCentavos));
   const result = await db
     .prepare(
