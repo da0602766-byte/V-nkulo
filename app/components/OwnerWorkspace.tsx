@@ -20,6 +20,7 @@ import OwnerIncidentsWorkspace from "./OwnerIncidentsWorkspace";
 import OwnerPasswordResetsWorkspace from "./OwnerPasswordResetsWorkspace";
 import OwnerDeletedAccountsWorkspace from "./OwnerDeletedAccountsWorkspace";
 import OwnerOverviewSignals from "./OwnerOverviewSignals";
+import OwnerPeopleInsights from "./OwnerPeopleInsights";
 import Link from "./StableLink";
 import ThemeControl from "./ThemeControl";
 import {
@@ -524,6 +525,14 @@ export default function OwnerWorkspace({
             </section>
           )}
 
+          {tab === "users" && data && (
+            <OwnerPeopleInsights
+              comunidades={(data.communities || []).map((item) => ({
+                id: Number(item.id),
+                nome: String(item.nome),
+              }))}
+            />
+          )}
           {(tab === "communities" || tab === "users") && data && (
             <section className="owner-directory-panel">
               <header className="owner-directory-header">
