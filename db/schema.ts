@@ -61,6 +61,17 @@ export const redefinicoesSenha = sqliteTable("redefinicoes_senha", {
   tokenHash: text("token_hash"),
   expiraEm: text("expira_em"),
   usado: integer("usado", { mode: "boolean" }).notNull().default(false),
+  // Fluxo de aprovação do Proprietário (ver drizzle/0071_owner_command_center.sql):
+  // SOLICITADO → EM_ANALISE → APROVADO/RECUSADO → ENVIADO → CONCLUIDO/EXPIRADO.
+  status: text("status").notNull().default("SOLICITADO"),
+  comunidadeId: integer("comunidade_id"),
+  motivo: text("motivo").notNull().default(""),
+  decisaoMotivo: text("decisao_motivo").notNull().default(""),
+  analisadoPor: integer("analisado_por"),
+  analisadoEm: text("analisado_em"),
+  enviadoEm: text("enviado_em"),
+  concluidoEm: text("concluido_em"),
+  tentativas: integer("tentativas").notNull().default(0),
 });
 
 export const comunidades = sqliteTable("comunidades", {
@@ -2940,5 +2951,232 @@ export const feedbackPlataforma = sqliteTable(
     index("feedback_plataforma_status_idx").on(table.status, table.criadoEm),
     index("feedback_plataforma_usuario_idx").on(table.usuarioId, table.criadoEm),
     index("feedback_plataforma_tipo_idx").on(table.tipo, table.categoria, table.criadoEm),
+  ],
+);
+
+export const planosPlataforma = sqliteTable(
+  "planos_plataforma",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    nome: text("nome").notNull(),
+    slug: text("slug").notNull(),
+    descricao: text("descricao").notNull().default(""),
+    precoCentavos: integer("preco_centavos").notNull().default(0),
+    periodicidade: text("periodicidade").notNull().default("MENSAL"),
+    limiteMembros: integer("limite_membros").notNull().default(0),
+    limiteArmazenamentoMb: integer("limite_armazenamento_mb").notNull().default(0),
+    modulos: text("modulos").notNull().default("[]"),
+    recursos: text("recursos").notNull().default("[]"),
+    diasTeste: integer("dias_teste").notNull().default(0),
+    duracaoMeses: integer("duracao_meses").notNull().default(0),
+    descontoPercentual: integer("desconto_percentual").notNull().default(0),
+    regras: text("regras").notNull().default("{}"),
+    comunidadeExclusivaId: integer("comunidade_exclusiva_id").references(
+      () => comunidades.id,
+      { onDelete: "set null" },
+    ),
+    status: text("status").notNull().default("ATIVO"),
+    criadoPor: integer("criado_por").references(() => usuarios.id, {
+      onDelete: "set null",
+    }),
+    criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+    atualizadoEm: text("atualizado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("planos_plataforma_slug_unique").on(table.slug),
+    index("planos_plataforma_status_idx").on(table.status, table.nome),
+  ],
+);
+
+export const assinaturasComunidade = sqliteTable(
+  "assinaturas_comunidade",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    comunidadeId: integer("comunidade_id")
+      .notNull()
+      .references(() => comunidades.id, { onDelete: "cascade" }),
+    planoId: integer("plano_id")
+      .notNull()
+      .references(() => planosPlataforma.id, { onDelete: "restrict" }),
+    status: text("status").notNull().default("ATIVA"),
+    iniciaEm: text("inicia_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+    renovaEm: text("renova_em"),
+    testeAte: text("teste_ate"),
+    carenciaAte: text("carencia_ate"),
+    canceladoEm: text("cancelado_em"),
+    encerradaEm: text("encerrada_em"),
+    cupom: text("cupom").notNull().default(""),
+    descontoPercentual: integer("desconto_percentual").notNull().default(0),
+    renovacaoAutomatica: integer("renovacao_automatica", { mode: "boolean" })
+      .notNull()
+      .default(true),
+    observacoes: text("observacoes").notNull().default(""),
+    criadoPor: integer("criado_por").references(() => usuarios.id, {
+      onDelete: "set null",
+    }),
+    criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+    atualizadoEm: text("atualizado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("assinaturas_comunidade_status_idx").on(table.status, table.renovaEm),
+    index("assinaturas_comunidade_comunidade_idx").on(
+      table.comunidadeId,
+      table.status,
+    ),
+  ],
+);
+
+export const cobrancasAssinatura = sqliteTable(
+  "cobrancas_assinatura",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    assinaturaId: integer("assinatura_id")
+      .notNull()
+      .references(() => assinaturasComunidade.id, { onDelete: "cascade" }),
+    comunidadeId: integer("comunidade_id")
+      .notNull()
+      .references(() => comunidades.id, { onDelete: "cascade" }),
+    competencia: text("competencia").notNull(),
+    valorCentavos: integer("valor_centavos").notNull().default(0),
+    descontoCentavos: integer("desconto_centavos").notNull().default(0),
+    status: text("status").notNull().default("PENDENTE"),
+    venceEm: text("vence_em").notNull(),
+    pagoEm: text("pago_em"),
+    metodo: text("metodo").notNull().default(""),
+    // Campos neutros de provedor: a integração com gateway preenche estes
+    // dois sem que o restante do modelo dependa de um fornecedor específico.
+    provedor: text("provedor").notNull().default(""),
+    referenciaExterna: text("referencia_externa").notNull().default(""),
+    tentativas: integer("tentativas").notNull().default(0),
+    observacoes: text("observacoes").notNull().default(""),
+    registradoPor: integer("registrado_por").references(() => usuarios.id, {
+      onDelete: "set null",
+    }),
+    criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+    atualizadoEm: text("atualizado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("cobrancas_assinatura_status_idx").on(table.status, table.venceEm),
+    index("cobrancas_assinatura_comunidade_idx").on(
+      table.comunidadeId,
+      table.competencia,
+    ),
+  ],
+);
+
+export const cuponsAssinatura = sqliteTable(
+  "cupons_assinatura",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    codigo: text("codigo").notNull(),
+    tipo: text("tipo").notNull().default("PERCENTUAL"),
+    valor: integer("valor").notNull().default(0),
+    planoId: integer("plano_id").references(() => planosPlataforma.id, {
+      onDelete: "set null",
+    }),
+    validoAte: text("valido_ate"),
+    usosMaximos: integer("usos_maximos").notNull().default(0),
+    usos: integer("usos").notNull().default(0),
+    ativo: integer("ativo", { mode: "boolean" }).notNull().default(true),
+    criadoPor: integer("criado_por").references(() => usuarios.id, {
+      onDelete: "set null",
+    }),
+    criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [uniqueIndex("cupons_assinatura_codigo_unique").on(table.codigo)],
+);
+
+export const incidentesPlataforma = sqliteTable(
+  "incidentes_plataforma",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    // Agrupa erros semelhantes: a mesma chave incrementa o contador em vez de
+    // abrir um incidente novo.
+    chaveAgrupamento: text("chave_agrupamento").notNull(),
+    titulo: text("titulo").notNull(),
+    descricao: text("descricao").notNull().default(""),
+    area: text("area").notNull().default("MODULO"),
+    modulo: text("modulo").notNull().default(""),
+    gravidade: text("gravidade").notNull().default("MEDIA"),
+    status: text("status").notNull().default("ABERTO"),
+    prioridade: integer("prioridade").notNull().default(3),
+    ocorrencias: integer("ocorrencias").notNull().default(1),
+    comunidadesAfetadas: integer("comunidades_afetadas").notNull().default(0),
+    primeiraOcorrencia: text("primeira_ocorrencia")
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+    ultimaOcorrencia: text("ultima_ocorrencia")
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+    resolucao: text("resolucao").notNull().default(""),
+    resolvidoPor: integer("resolvido_por").references(() => usuarios.id, {
+      onDelete: "set null",
+    }),
+    resolvidoEm: text("resolvido_em"),
+    criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+    atualizadoEm: text("atualizado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("incidentes_plataforma_chave_unique").on(table.chaveAgrupamento),
+    index("incidentes_plataforma_status_idx").on(
+      table.status,
+      table.gravidade,
+      table.ultimaOcorrencia,
+    ),
+  ],
+);
+
+export const incidenteOcorrencias = sqliteTable(
+  "incidente_ocorrencias",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    incidenteId: integer("incidente_id")
+      .notNull()
+      .references(() => incidentesPlataforma.id, { onDelete: "cascade" }),
+    comunidadeId: integer("comunidade_id").references(() => comunidades.id, {
+      onDelete: "set null",
+    }),
+    usuarioId: integer("usuario_id").references(() => usuarios.id, {
+      onDelete: "set null",
+    }),
+    detalhe: text("detalhe").notNull().default(""),
+    contexto: text("contexto").notNull().default("{}"),
+    criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("incidente_ocorrencias_incidente_idx").on(
+      table.incidenteId,
+      table.criadoEm,
+    ),
+  ],
+);
+
+export const contasExcluidas = sqliteTable(
+  "contas_excluidas",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    // Só o mínimo administrativo/auditável — nenhum conteúdo pessoal.
+    referenciaTecnica: text("referencia_tecnica").notNull(),
+    usuarioIdOriginal: integer("usuario_id_original").notNull(),
+    comunidadeId: integer("comunidade_id").references(() => comunidades.id, {
+      onDelete: "set null",
+    }),
+    perfil: text("perfil").notNull().default(""),
+    motivo: text("motivo").notNull().default(""),
+    origem: text("origem").notNull().default("ADMINISTRATIVA"),
+    excluidoPor: integer("excluido_por").references(() => usuarios.id, {
+      onDelete: "set null",
+    }),
+    excluidoEm: text("excluido_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+    restauravelAte: text("restauravel_ate"),
+    restauradoEm: text("restaurado_em"),
+    restauradoPor: integer("restaurado_por").references(() => usuarios.id, {
+      onDelete: "set null",
+    }),
+    purgadoEm: text("purgado_em"),
+  },
+  (table) => [
+    uniqueIndex("contas_excluidas_referencia_unique").on(table.referenciaTecnica),
+    index("contas_excluidas_janela_idx").on(table.restauravelAte, table.purgadoEm),
   ],
 );

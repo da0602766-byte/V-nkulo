@@ -6,8 +6,18 @@ migração nova, leia isto.
 
 ## Próximo número livre
 
-**`0071`**. Use o próximo inteiro disponível a partir daí — não reaproveite
+**`0072`**. Use o próximo inteiro disponível a partir daí — não reaproveite
 um número já usado, mesmo que o arquivo tenha sido escrito à mão.
+
+`0071_owner_command_center.sql` cria as tabelas do centro de comando do
+Proprietário (`planos_plataforma`, `assinaturas_comunidade`,
+`cobrancas_assinatura`, `cupons_assinatura`, `incidentes_plataforma`,
+`incidente_ocorrencias`, `contas_excluidas`) e acrescenta em
+`redefinicoes_senha` as colunas do fluxo de aprovação do Proprietário
+(`status`, `comunidade_id`, `motivo`, `decisao_motivo`, `analisado_por`,
+`analisado_em`, `enviado_em`, `concluido_em`, `tentativas`). As colunas novas
+usam `ALTER TABLE ... ADD`, que o SQLite não aceita com `IF NOT EXISTS` — a
+migração só pode rodar uma vez por banco, como as demais.
 
 `0070_chat_system_retention.sql` reconstrói `conversas_privadas` (troca o
 ciclo mensal `ciclo_mes` pelo semanal `ciclo_semana` e remove `drive_file_id`
