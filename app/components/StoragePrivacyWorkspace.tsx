@@ -142,6 +142,10 @@ export default function StoragePrivacyWorkspace() {
           : `${migrated} item(ns) migrados. Execute novamente para continuar.`,
       });
     } catch (error) {
+      // Se o servidor detectou um refresh token revogado, ele atualiza a
+      // conexão para desconectada. Recarregar aqui revela imediatamente o
+      // botão de reconexão, sem exigir que a pessoa atualize a página.
+      await load().catch(() => null);
       setGoogleToast({
         variant: "error",
         title: "A migração parou",
