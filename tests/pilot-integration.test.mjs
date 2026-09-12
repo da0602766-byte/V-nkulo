@@ -1594,8 +1594,10 @@ test("sessão, tenant e gates críticos são validados no backend", async () => 
   );
   assert.equal(removedLegacyResponse.status, 404);
 
-  // As rotas legadas que sobraram (Classe B da auditoria) continuam existindo e
-  // precisam continuar barradas pelo interruptor de módulos legados.
+  // `/api/cultos` era a última rota legada de comunidade única. O módulo Cultos
+  // foi removido em 12/09/2026 por decisão do proprietário, junto com o
+  // interruptor `legacyModulesEnabled` que o mantinha barrado — não há mais
+  // módulo legado para desligar. O esperado passa a ser 404, como nas demais.
   const legacyResponse = await worker.fetch(
     new Request("http://localhost/api/cultos", {
       headers: { cookie: sessionCookie },
@@ -1603,7 +1605,7 @@ test("sessão, tenant e gates críticos são validados no backend", async () => 
     env,
     context,
   );
-  assert.equal(legacyResponse.status, 423);
+  assert.equal(legacyResponse.status, 404);
 
   const flagsResponse = await worker.fetch(
     new Request("http://localhost/api/pilot/feature-flags", {
