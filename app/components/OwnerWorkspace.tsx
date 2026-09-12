@@ -12,6 +12,7 @@ import StatisticsWorkspace from "./StatisticsWorkspace";
 import PlatformOptimizerWorkspace from "./PlatformOptimizerWorkspace";
 import OwnerLaboratoryWorkspace from "./OwnerLaboratoryWorkspace";
 import OwnerAppearanceWorkspace from "./OwnerAppearanceWorkspace";
+import OwnerInfrastructureWorkspace from "./OwnerInfrastructureWorkspace";
 import Link from "./StableLink";
 import ThemeControl from "./ThemeControl";
 import {
@@ -45,7 +46,12 @@ type OwnerTab =
   | "optimization"
   | "appearance"
   | "controls"
-  | "laboratory";
+  | "laboratory"
+  | "plans"
+  | "finance"
+  | "realtime"
+  | "performance"
+  | "incidents";
 type OwnerGridPreset = "2x2" | "2x4" | "4x2" | "4x4";
 type OwnerMetricKey =
   | "comunidades_ativas"
@@ -60,10 +66,15 @@ const TABS: { id: OwnerTab; label: string; icon: string }[] = [
   { id: "requests", label: "Solicitações", icon: "◫" },
   { id: "communities", label: "Comunidades", icon: "◇" },
   { id: "users", label: "Pessoas", icon: "◎" },
+  { id: "plans", label: "Planos e assinaturas", icon: "◆" },
+  { id: "finance", label: "Financeiro", icon: "$" },
+  { id: "statistics", label: "Uso", icon: "▥" },
+  { id: "realtime", label: "Tempo real", icon: "◉" },
+  { id: "performance", label: "Desempenho", icon: "⚡" },
   { id: "audit", label: "Segurança e auditoria", icon: "✓" },
+  { id: "editorial", label: "Publicações", icon: "✦" },
+  { id: "incidents", label: "Incidentes", icon: "▲" },
   { id: "feedback", label: "Feedback e denúncias", icon: "!" },
-  { id: "editorial", label: "IA Editorial", icon: "✦" },
-  { id: "statistics", label: "Estatísticas", icon: "▥" },
   { id: "optimization", label: "Otimização", icon: "↻" },
   { id: "appearance", label: "Aparência", icon: "◐" },
   { id: "laboratory", label: "Laboratório", icon: "◈" },
@@ -198,9 +209,31 @@ export default function OwnerWorkspace({
   }
 
   async function openCommunity(id: number, postId?: number) {
+    // Acesso excepcional: o proprietário pode acessar o conteúdo privado de
+    // qualquer comunidade para suporte e continuidade, mas isso nunca deve
+    // ser silencioso. Toda abertura por este atalho exige uma justificativa,
+    // que fica registrada na auditoria com quem, quando e qual comunidade.
+    const justificativa = window.prompt(
+      "Este acesso a conteúdo privado da comunidade será registrado na auditoria com seu nome. Descreva o motivo (mín. 10 caracteres):",
+    );
+    if (!justificativa || justificativa.trim().length < 10) {
+      setMessage("Acesso cancelado: é necessário informar uma justificativa para continuar.");
+      return;
+    }
     setWorking(id);
     setMessage("");
     try {
+      const auditResponse = await fetch("/api/proprietario", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "REGISTRAR_ACESSO_EXCEPCIONAL",
+          communityId: id,
+          justificativa: justificativa.trim(),
+        }),
+      });
+      const auditResult = (await auditResponse.json()) as { error?: string };
+      if (!auditResponse.ok) throw new Error(auditResult.error || "Não foi possível registrar o acesso.");
       const response = await fetch("/api/pilot/comunidade-ativa", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -557,6 +590,66 @@ export default function OwnerWorkspace({
           {tab === "optimization" && <PlatformOptimizerWorkspace />}
           {tab === "appearance" && <OwnerAppearanceWorkspace />}
           {tab === "controls" && <PlatformControlsWorkspace features={features} currentCommunityId={currentCommunityId} />}
+          {tab === "plans" && (
+            <OwnerInfrastructureWorkspace
+              title="Planos e assinaturas"
+              integration="gateway de pagamento e catálogo de planos"
+              summary="Esta área listará planos, limites por comunidade e o ciclo de cada assinatura assim que houver um gateway de pagamento conectado. Nenhum valor é simulado."
+              fields={[
+                { label: "Plano vigente por comunidade", detail: "Nome do plano, limite de membros/módulos e data de renovação." },
+                { label: "Histórico de mudanças de plano", detail: "Upgrade, downgrade e cancelamento, com quem autorizou." },
+                { label: "Status da assinatura", detail: "Ativa, inadimplente, em teste ou cancelada, vindo do gateway." },
+              ]}
+            />
+          )}
+          {tab === "finance" && (
+            <OwnerInfrastructureWorkspace
+              title="Financeiro"
+              integration="processador de pagamentos"
+              summary="Receita, inadimplência e repasses dependem de um processador de pagamentos real. A tela é exibida vazia até essa conexão existir, para não apresentar números fictícios."
+              fields={[
+                { label: "Receita recorrente", detail: "MRR consolidado por plano e por comunidade." },
+                { label: "Faturas e recibos", detail: "Emissão, status de pagamento e conciliação." },
+                { label: "Inadimplência", detail: "Comunidades com pagamento pendente e prazo de suspensão." },
+              ]}
+            />
+          )}
+          {tab === "realtime" && (
+            <OwnerInfrastructureWorkspace
+              title="Tempo real"
+              integration="stream de eventos/observabilidade"
+              summary="Sessões ativas, presença e eventos ao vivo exigem um canal de telemetria em tempo real. Sem essa integração, nenhuma contagem é inventada."
+              fields={[
+                { label: "Usuários on-line agora", detail: "Contagem por comunidade a partir de sessões ativas em tempo real." },
+                { label: "Eventos ao vivo", detail: "Publicações, mensagens e confirmações no instante em que ocorrem." },
+                { label: "Alertas em tempo real", detail: "Picos de erro ou de uso encaminhados assim que detectados." },
+              ]}
+            />
+          )}
+          {tab === "performance" && (
+            <OwnerInfrastructureWorkspace
+              title="Desempenho"
+              integration="métricas de infraestrutura (CPU, memória, latência)"
+              summary="Métricas de desempenho de infraestrutura vêm do provedor de hospedagem/observabilidade, ainda não conectado neste ambiente. A tela reserva o espaço sem forjar valores."
+              fields={[
+                { label: "Latência das rotas principais", detail: "Tempo de resposta por endpoint, percentis p50/p95." },
+                { label: "Uso de CPU e memória", detail: "Consumo do runtime de hospedagem ao longo do tempo." },
+                { label: "Erros por minuto", detail: "Taxa de erro consolidada, cruzada com a auditoria." },
+              ]}
+            />
+          )}
+          {tab === "incidents" && (
+            <OwnerInfrastructureWorkspace
+              title="Incidentes"
+              integration="registro dedicado de incidentes"
+              summary="Ainda não existe uma tabela dedicada a incidentes operacionais. Até que essa base seja criada, use a auditoria e o feedback para identificar problemas relatados pelos usuários."
+              fields={[
+                { label: "Linha do tempo do incidente", detail: "Abertura, atualizações e resolução, com responsável." },
+                { label: "Comunidades afetadas", detail: "Escopo do impacto, para isolar o que foi realmente afetado." },
+                { label: "Causa raiz e ação tomada", detail: "Registro do que causou e do que foi corrigido." },
+              ]}
+            />
+          )}
         </section>
       </div>
       <GlobalVisualEditor canEdit communityName="Área do Proprietário" screenId={`owner:${tab}`} rootSelector=".owner-area" />
@@ -801,12 +894,17 @@ function tabDescription(tab: OwnerTab) {
     users: "Consulte pessoas, vínculos e perfis globais.",
     audit: "Investigue ações, resultados e contexto de segurança.",
     feedback: "Analise problemas, sugestões, melhorias e denúncias enviadas em todo o sistema.",
-    editorial: "Revise e programe conteúdos da plataforma fora do contexto comunitário.",
-    statistics: "Consulte indicadores globais sem expor ferramentas da plataforma nos menus comunitários.",
+    editorial: "Revise, aprove e programe publicações da plataforma fora do contexto comunitário.",
+    statistics: "Consulte indicadores globais de uso sem expor ferramentas da plataforma nos menus comunitários.",
     optimization: "Diagnostique e execute retenções seguras sem remover dados ativos.",
     appearance: "Aplique paleta, logotipo, banner e papel de parede a uma comunidade ou a todas de uma vez.",
     laboratory: "Crie e valide protótipos isolados, sem modificar páginas ou dados reais.",
     controls: "Configure identidade, módulos e regras globais da plataforma.",
+    plans: "Planos, limites e ciclo de assinatura por comunidade.",
+    finance: "Receita, faturas e inadimplência da plataforma.",
+    realtime: "Presença e eventos ao vivo em toda a plataforma.",
+    performance: "Latência, uso de recursos e erros da infraestrutura.",
+    incidents: "Linha do tempo de incidentes operacionais reportados.",
   }[tab];
 }
 function initials(value: string) { return value.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "V"; }

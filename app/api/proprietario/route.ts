@@ -273,6 +273,43 @@ export async function PATCH(request: Request) {
     return Response.json({ ok: true, status });
   }
 
+  if (action === "REGISTRAR_ACESSO_EXCEPCIONAL") {
+    const communityId = Number(payload.communityId || 0);
+    const justificativa = clean(payload.justificativa, 800);
+    if (!Number.isInteger(communityId) || communityId <= 0) {
+      return Response.json({ error: "Comunidade inválida." }, { status: 400 });
+    }
+    if (justificativa.length < 10) {
+      return Response.json(
+        {
+          error:
+            "Informe uma justificativa com pelo menos 10 caracteres para acessar o conteúdo desta comunidade.",
+        },
+        { status: 400 },
+      );
+    }
+    const community = await db
+      .prepare("SELECT id, nome FROM comunidades WHERE id = ? LIMIT 1")
+      .bind(communityId)
+      .first<{ id: number; nome: string }>();
+    if (!community) {
+      return Response.json({ error: "Comunidade não encontrada." }, { status: 404 });
+    }
+    await db
+      .prepare(
+        `INSERT INTO auditoria_piloto
+         (comunidade_id, usuario_id, evento, resultado, metadados)
+         VALUES (?, ?, 'ACESSO_EXCEPCIONAL_PROPRIETARIO', 'SUCESSO', ?)`,
+      )
+      .bind(
+        communityId,
+        access.user.id,
+        JSON.stringify({ comunidadeId: communityId, comunidadeNome: community.nome, justificativa }),
+      )
+      .run();
+    return Response.json({ ok: true });
+  }
+
   if (action === "ATUALIZAR_LAYOUT_PROPRIETARIO") {
     const gridPreset = String(payload.gridPreset || "");
     if (!["2x2", "2x4", "4x2", "4x4"].includes(gridPreset)) {
