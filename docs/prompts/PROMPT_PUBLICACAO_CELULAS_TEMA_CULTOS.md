@@ -60,9 +60,23 @@ No tema automático, `currentThemeIsDark` era chamada **durante a
 renderização** e lia `document.documentElement.dataset.theme` e `matchMedia`.
 O servidor não tem navegador: caía no `return false` e desenhava o sol. O
 script inline do `layout.tsx` já havia marcado `data-theme="dark"` antes da
-hidratação, então o cliente desenhava a lua. A árvore divergia, o React
-descartava e refazia a renderização, e **em desenvolvimento a sobreposição de
-erro cobria a tela inteira**.
+hidratação, então o cliente desenhava a lua. A árvore divergia e o React
+descartava o que o servidor já tinha montado, refazendo esse pedaço no
+navegador — em toda abertura do painel, para quem está no tema automático com
+o sistema no escuro.
+
+> **Dimensione esta correção antes de publicar.** A sobreposição vermelha que
+> tornou o defeito visível **só existe em modo de desenvolvimento**. Medido em
+> build de produção, com e sem a correção: o console fica **igual nos dois
+> casos**, sem erro nenhum — o React não registra divergência de hidratação na
+> versão publicada. O ganho aqui é interno (trabalho descartado que deixa de
+> ser descartado) e de quem desenvolve (a sobreposição não cobre mais a tela
+> ao trabalhar no projeto). **Não é uma correção visível para o usuário final,
+> e não deve ser anunciada como tal.** Fica registrado também o que não foi
+> possível medir: o efeito exato em produção não pôde ser observado porque o
+> `vinext start` local devolve 500 nas APIs do painel neste ambiente, sem
+> binding — se você tiver um ambiente de produção funcional, essa é a medição
+> que falta.
 
 `currentThemeIsDark` virou função pura que recebe o valor já resolvido; o
 "escuro do sistema" passou a ser estado (`autoIsDark`), acertado no mesmo
@@ -149,10 +163,13 @@ Playwright, banco local semeado com dados fictícios), não só em teste:
   zero rolagem horizontal em todas; fundo do painel conferido por estilo
   computado, `rgb(251, 249, 255)` no claro e `rgb(11, 13, 16)` no escuro,
   ambos sem canal alfa (antes: 62% de opacidade).
-- **Tema**: erros de hidratação de **5 para 0** nas mesmas 10 combinações,
-  console sem nenhum erro, e o botão conferido funcionalmente — com o sistema
-  no escuro ele exibe "Tema escuro" (o estado corrige depois da montagem, não
+- **Tema**, medido em **modo de desenvolvimento**, que é onde a divergência é
+  observável: erros de hidratação de **5 para 0** nas mesmas 10 combinações e
+  console limpo. O botão foi conferido funcionalmente — com o sistema no
+  escuro ele exibe "Tema escuro" (o estado corrige depois da montagem, não
   ficou preso no claro) e a alternância muda `data-theme` nos dois sentidos.
+  Em **modo de produção** o console já era limpo antes da correção, conforme o
+  aviso na seção do commit 2: lá não há número para comparar.
 
 ## Passos
 
@@ -196,7 +213,9 @@ alguma célula):
   abra o menu da conta: o botão precisa dizer "Tema escuro" e mostrar a lua —
   não o sol. Era exatamente isso que divergia.
 - Clicar alterna claro ↔ escuro normalmente, e a escolha sobrevive a recarga.
-- Nenhum erro novo no console do navegador ao carregar o painel.
+- **Não use o console como critério aqui**: em produção ele já era limpo antes
+  da correção, então ausência de erro não prova nada. O que vale conferir é o
+  comportamento acima — ícone certo e alternância nos dois sentidos.
 
 **Cultos** (a remoção):
 
