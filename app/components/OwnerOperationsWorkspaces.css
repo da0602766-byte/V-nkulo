@@ -1,0 +1,268 @@
+/* Estilos das áreas operacionais do Proprietário: tempo real, redefinições
+   de senha e contas excluídas. Escopo próprio (prefixo .owner-ops-) para não
+   colidir com globals.css. Tudo responsivo até ~360px. */
+
+.owner-ops {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+}
+
+.owner-ops-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.owner-ops-head h1 {
+  margin: 2px 0 4px;
+  font-size: clamp(1.15rem, 3.4vw, 1.5rem);
+  line-height: 1.2;
+}
+
+.owner-ops-head p {
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.78;
+  max-width: 62ch;
+}
+
+.owner-ops-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.owner-ops-actions button {
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+}
+
+.owner-ops-actions button[disabled] {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.owner-ops-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.owner-ops-cards article {
+  border: 1px solid rgba(128, 128, 128, 0.28);
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.owner-ops-cards article span {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.owner-ops-cards article strong {
+  font-size: clamp(1.4rem, 5vw, 1.9rem);
+  line-height: 1.1;
+}
+
+.owner-ops-cards article small {
+  font-size: 0.72rem;
+  opacity: 0.72;
+}
+
+.owner-ops-chart {
+  border: 1px solid rgba(128, 128, 128, 0.28);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.owner-ops-chart h2 {
+  margin: 0;
+  font-size: 0.98rem;
+}
+
+.owner-ops-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 150px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.owner-ops-bars > div {
+  flex: 1 0 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+  min-width: 14px;
+}
+
+.owner-ops-bars > div > b {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+
+.owner-ops-bars i {
+  display: block;
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  background: currentColor;
+  opacity: 0.72;
+  min-height: 3px;
+}
+
+.owner-ops-bars span {
+  font-size: 0.6rem;
+  opacity: 0.7;
+  white-space: nowrap;
+}
+
+.owner-ops-table-wrap {
+  overflow-x: auto;
+  border: 1px solid rgba(128, 128, 128, 0.28);
+  border-radius: 14px;
+}
+
+.owner-ops-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  min-width: 560px;
+}
+
+.owner-ops-table th,
+.owner-ops-table td {
+  text-align: left;
+  padding: 9px 12px;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+  vertical-align: top;
+}
+
+.owner-ops-table th {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
+.owner-ops-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.owner-ops-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.owner-ops-row-actions button {
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  padding: 5px 10px;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.owner-ops-row-actions button[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.owner-ops-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(128, 128, 128, 0.4);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.owner-ops-badge.solicitado { border-color: #8a8a8a; }
+.owner-ops-badge.em_analise { border-color: #c08a2e; }
+.owner-ops-badge.aprovado { border-color: #2f8f4e; }
+.owner-ops-badge.recusado { border-color: #b23b3b; }
+.owner-ops-badge.enviado { border-color: #2f6f9f; }
+.owner-ops-badge.concluido { border-color: #2f8f4e; }
+.owner-ops-badge.expirado { border-color: #8a8a8a; opacity: 0.7; }
+
+.owner-ops-flow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.72rem;
+}
+
+.owner-ops-flow span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px dashed rgba(128, 128, 128, 0.5);
+  white-space: nowrap;
+}
+
+.owner-ops-flow span b {
+  font-weight: 700;
+}
+
+.owner-ops-note {
+  margin: 0;
+  font-size: 0.76rem;
+  opacity: 0.72;
+}
+
+.owner-ops-link {
+  border: 1px solid rgba(128, 128, 128, 0.4);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  word-break: break-all;
+  font-size: 0.8rem;
+}
+
+.owner-ops-link code {
+  font-size: 0.76rem;
+}
+
+@media (max-width: 520px) {
+  .owner-ops-head {
+    align-items: flex-start;
+  }
+  .owner-ops-actions {
+    width: 100%;
+  }
+  .owner-ops-bars {
+    height: 120px;
+  }
+}
