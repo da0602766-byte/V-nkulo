@@ -6,8 +6,16 @@ migração nova, leia isto.
 
 ## Próximo número livre
 
-**`0072`**. Use o próximo inteiro disponível a partir daí — não reaproveite
+**`0073`**. Use o próximo inteiro disponível a partir daí — não reaproveite
 um número já usado, mesmo que o arquivo tenha sido escrito à mão.
+
+`0072_owner_release_and_controls.sql` cria o pipeline de publicação
+(`publicacoes_deploy`, `publicacao_etapas`), as configurações globais
+versionadas (`configuracoes_globais`, `configuracoes_globais_historico`) e o
+histórico de feature flags (`feature_flags_historico`), e acrescenta em
+`comunidades` as colunas `limites_json`, `manutencao_motivo` e
+`manutencao_ate`. Como em 0071, as colunas novas usam `ALTER TABLE ... ADD` e
+a migração só pode rodar uma vez por banco.
 
 `0071_owner_command_center.sql` cria as tabelas do centro de comando do
 Proprietário (`planos_plataforma`, `assinaturas_comunidade`,

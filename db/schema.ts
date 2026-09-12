@@ -85,6 +85,11 @@ export const comunidades = sqliteTable("comunidades", {
   descricaoPublica: text("descricao_publica").notNull().default(""),
   cidadePublica: text("cidade_publica").notNull().default(""),
   status: text("status").notNull().default("ATIVA"),
+  // Limites administrativos (membros, armazenamento, etc.) em JSON: o plano
+  // define os valores sem exigir migração a cada limite novo.
+  limitesJson: text("limites_json").notNull().default("{}"),
+  manutencaoMotivo: text("manutencao_motivo").notNull().default(""),
+  manutencaoAte: text("manutencao_ate"),
   ambienteDemo: integer("ambiente_demo", { mode: "boolean" })
     .notNull()
     .default(true),
@@ -3178,5 +3183,154 @@ export const contasExcluidas = sqliteTable(
   (table) => [
     uniqueIndex("contas_excluidas_referencia_unique").on(table.referenciaTecnica),
     index("contas_excluidas_janela_idx").on(table.restauravelAte, table.purgadoEm),
+  ],
+);
+
+export const publicacoesDeploy = sqliteTable(
+  "publicacoes_deploy",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    versao: text("versao").notNull(),
+    commitSha: text("commit_sha").notNull().default(""),
+    branch: text("branch").notNull().default(""),
+    autor: text("autor").notNull().default(""),
+    mensagem: text("mensagem").notNull().default(""),
+    ambiente: text("ambiente").notNull().default("PRODUCAO"),
+    status: text("status").notNull().default("PENDENTE"),
+    etapaAtual: text("etapa_atual").notNull().default("COMMIT"),
+    iniciadoEm: text("iniciado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+    concluidoEm: text("concluido_em"),
+    duracaoMs: integer("duracao_ms").notNull().default(0),
+    // Publicação em produção não avança sem aprovação explícita.
+    aprovacaoStatus: text("aprovacao_status").notNull().default("PENDENTE"),
+    aprovadoPor: integer("aprovado_por").references(() => usuarios.id, {
+      onDelete: "set null",
+    }),
+    aprovadoEm: text("aprovado_em"),
+    aprovacaoMotivo: text("aprovacao_motivo").notNull().default(""),
+    healthCheck: text("health_check").notNull().default("{}"),
+    rollbackDeId: integer("rollback_de_id"),
+    rollbackMotivo: text("rollback_motivo").notNull().default(""),
+    rollbackAutomatico: integer("rollback_automatico", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    observacoes: text("observacoes").notNull().default(""),
+    registradoPor: integer("registrado_por").references(() => usuarios.id, {
+      onDelete: "set null",
+    }),
+    criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+    atualizadoEm: text("atualizado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("publicacoes_deploy_status_idx").on(table.status, table.iniciadoEm),
+    index("publicacoes_deploy_versao_idx").on(table.versao, table.ambiente),
+  ],
+);
+
+export const publicacaoEtapas = sqliteTable(
+  "publicacao_etapas",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    deployId: integer("deploy_id")
+      .notNull()
+      .references(() => publicacoesDeploy.id, { onDelete: "cascade" }),
+    etapa: text("etapa").notNull(),
+    ordem: integer("ordem").notNull().default(0),
+    status: text("status").notNull().default("PENDENTE"),
+    iniciadoEm: text("iniciado_em"),
+    concluidoEm: text("concluido_em"),
+    duracaoMs: integer("duracao_ms").notNull().default(0),
+    resultado: text("resultado").notNull().default(""),
+    logs: text("logs").notNull().default(""),
+    criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("publicacao_etapas_deploy_etapa_unique").on(
+      table.deployId,
+      table.etapa,
+    ),
+  ],
+);
+
+export const configuracoesGlobais = sqliteTable(
+  "configuracoes_globais",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    chave: text("chave").notNull(),
+    escopoTipo: text("escopo_tipo").notNull().default("GLOBAL"),
+    escopoId: integer("escopo_id").notNull().default(0),
+    valor: text("valor").notNull().default("{}"),
+    versao: integer("versao").notNull().default(1),
+    critica: integer("critica", { mode: "boolean" }).notNull().default(false),
+    alteradoPor: integer("alterado_por").references(() => usuarios.id, {
+      onDelete: "set null",
+    }),
+    motivo: text("motivo").notNull().default(""),
+    atualizadoEm: text("atualizado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("configuracoes_globais_chave_escopo_unique").on(
+      table.chave,
+      table.escopoTipo,
+      table.escopoId,
+    ),
+  ],
+);
+
+export const configuracoesGlobaisHistorico = sqliteTable(
+  "configuracoes_globais_historico",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    configuracaoId: integer("configuracao_id")
+      .notNull()
+      .references(() => configuracoesGlobais.id, { onDelete: "cascade" }),
+    chave: text("chave").notNull(),
+    escopoTipo: text("escopo_tipo").notNull().default("GLOBAL"),
+    escopoId: integer("escopo_id").notNull().default(0),
+    valorAnterior: text("valor_anterior").notNull().default("{}"),
+    valorNovo: text("valor_novo").notNull().default("{}"),
+    versao: integer("versao").notNull().default(1),
+    motivo: text("motivo").notNull().default(""),
+    alteradoPor: integer("alterado_por").references(() => usuarios.id, {
+      onDelete: "set null",
+    }),
+    criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("configuracoes_globais_historico_idx").on(
+      table.configuracaoId,
+      table.criadoEm,
+    ),
+  ],
+);
+
+export const featureFlagsHistorico = sqliteTable(
+  "feature_flags_historico",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    flagKey: text("flag_key").notNull(),
+    escopoTipo: text("escopo_tipo").notNull().default("GLOBAL"),
+    escopoId: integer("escopo_id").notNull().default(0),
+    habilitadoAnterior: integer("habilitado_anterior", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    habilitadoNovo: integer("habilitado_novo", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    configAnterior: text("config_anterior").notNull().default("{}"),
+    configNova: text("config_nova").notNull().default("{}"),
+    motivo: text("motivo").notNull().default(""),
+    alteradoPor: integer("alterado_por").references(() => usuarios.id, {
+      onDelete: "set null",
+    }),
+    criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("feature_flags_historico_idx").on(
+      table.flagKey,
+      table.escopoTipo,
+      table.escopoId,
+      table.criadoEm,
+    ),
   ],
 );
