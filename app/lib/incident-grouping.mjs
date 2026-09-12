@@ -6,7 +6,9 @@
 //
 // Fica em .mjs (e não .ts) pela mesma razão que tenant-policy.mjs: são funções
 // puras, e assim os testes em tests/ conseguem importá-las direto. A parte que
-// fala com o banco vive em incident-center.ts, que reexporta tudo daqui.
+// fala com o banco vive em incident-center.ts, que reexporta tudo daqui. O
+// nome precisa ser diferente do .ts: com o mesmo basename o bundler resolve
+// o .mjs no lugar do .ts e o build quebra.
 
 export const AREAS_INCIDENTE = [
   "MODULO",

@@ -307,3 +307,103 @@
     flex: 0 0 auto;
   }
 }
+
+/* Visão Geral: faixa de decisão. */
+.occ-overview {
+  gap: 18px;
+}
+
+.occ-health b {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+.occ-highlights {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+
+.occ-highlights h2 {
+  margin: 2px 0 0;
+  font-size: var(--fs-lg);
+  color: var(--ink);
+}
+
+.occ-highlight-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.occ-highlight-list li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--line);
+  border-radius: 0 8px 8px 0;
+  background: var(--canvas);
+}
+
+.occ-highlight-list li[data-nivel="CRITICO"] {
+  border-left-color: var(--rose);
+  background: var(--rose-soft);
+}
+
+.occ-highlight-list li[data-nivel="ATENCAO"] {
+  border-left-color: var(--amber);
+  background: var(--amber-soft);
+}
+
+.occ-highlight-list strong {
+  display: block;
+  font-size: var(--fs-sm);
+  color: var(--ink);
+}
+
+.occ-highlight-list p {
+  margin: 2px 0 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+.occ-highlight-list em {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  font-style: normal;
+  color: var(--faint);
+}
+
+.occ-highlight-list button {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+}
+
+.occ-highlight-list button:hover {
+  border-color: var(--teal);
+  color: var(--teal);
+}
+
+@media (max-width: 480px) {
+  .occ-highlight-list li {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

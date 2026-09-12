@@ -12,7 +12,14 @@ import StatisticsWorkspace from "./StatisticsWorkspace";
 import PlatformOptimizerWorkspace from "./PlatformOptimizerWorkspace";
 import OwnerLaboratoryWorkspace from "./OwnerLaboratoryWorkspace";
 import OwnerAppearanceWorkspace from "./OwnerAppearanceWorkspace";
-import OwnerInfrastructureWorkspace from "./OwnerInfrastructureWorkspace";
+import OwnerPlansWorkspace from "./OwnerPlansWorkspace";
+import OwnerFinanceWorkspace from "./OwnerFinanceWorkspace";
+import OwnerRealtimeWorkspace from "./OwnerRealtimeWorkspace";
+import OwnerPerformanceWorkspace from "./OwnerPerformanceWorkspace";
+import OwnerIncidentsWorkspace from "./OwnerIncidentsWorkspace";
+import OwnerPasswordResetsWorkspace from "./OwnerPasswordResetsWorkspace";
+import OwnerDeletedAccountsWorkspace from "./OwnerDeletedAccountsWorkspace";
+import OwnerOverviewSignals from "./OwnerOverviewSignals";
 import Link from "./StableLink";
 import ThemeControl from "./ThemeControl";
 import {
@@ -51,7 +58,9 @@ type OwnerTab =
   | "finance"
   | "realtime"
   | "performance"
-  | "incidents";
+  | "incidents"
+  | "resets"
+  | "deleted";
 type OwnerGridPreset = "2x2" | "2x4" | "4x2" | "4x4";
 type OwnerMetricKey =
   | "comunidades_ativas"
@@ -63,9 +72,11 @@ type OwnerMetricKey =
 
 const TABS: { id: OwnerTab; label: string; icon: string }[] = [
   { id: "overview", label: "Painel geral", icon: "▦" },
-  { id: "requests", label: "Solicitações", icon: "◫" },
+  { id: "requests", label: "Solicitações de comunidade", icon: "◫" },
   { id: "communities", label: "Comunidades", icon: "◇" },
   { id: "users", label: "Pessoas", icon: "◎" },
+  { id: "resets", label: "Redefinições de senha", icon: "⚿" },
+  { id: "deleted", label: "Contas excluídas", icon: "⌫" },
   { id: "plans", label: "Planos e assinaturas", icon: "◆" },
   { id: "finance", label: "Financeiro", icon: "$" },
   { id: "statistics", label: "Uso", icon: "▥" },
@@ -473,6 +484,7 @@ export default function OwnerWorkspace({
                   <span><small>Pessoas ativas</small><strong>{Number(data.metrics.usuarios_ativos || 0)}</strong></span>
                 </div>
               </section>
+              <OwnerOverviewSignals onNavigate={(destino) => setTab(destino as OwnerTab)} />
               <div className="owner-grid-toolbar" aria-label="Organização dos cartões">
                 <div><strong>Organização dos cartões</strong><small>Escolha a densidade do seu painel.</small></div>
                 <div>{(["2x2", "2x4", "4x2", "4x4"] as OwnerGridPreset[]).map((preset) => <button type="button" key={preset} className={gridPreset === preset ? "active" : ""} onClick={() => void saveOwnerLayout(preset, metricOrder, `Organização ${preset} salva para sua área de proprietário.`)} aria-pressed={gridPreset === preset}>{preset}</button>)}</div>
@@ -585,71 +597,18 @@ export default function OwnerWorkspace({
 
           {tab === "audit" && data && <section className="owner-audit-panel"><header><div><h2>Trilha de auditoria</h2><p>Pesquise e abra um registro para conferir os detalhes preservados.</p></div><div className="owner-audit-filters"><input type="search" value={auditSearch} onChange={(event) => setAuditSearch(event.target.value)} placeholder="Pesquisar ação, pessoa ou comunidade" /><select value={auditResult} onChange={(event) => setAuditResult(event.target.value)} aria-label="Filtrar por resultado"><option value="TODOS">Todos os resultados</option><option value="SUCESSO">Sucesso</option><option value="NEGADO">Negado</option><option value="ERRO">Erro</option></select></div></header><p className="owner-audit-retention" role="note">Retenção automática: registros com mais de {data.auditRetention?.days || 14} dias são excluídos. Esta tela mostra somente as {data.auditRetention?.visibleLimit || 20} ações mais recentes.</p><div className="owner-audit-list">{filteredAudit.map((item) => <details key={Number(item.id)}><summary><span>{String(item.resultado) === "SUCESSO" ? "✓" : "!"}</span><div><strong>{humanize(String(item.evento))}</strong><p>{String(item.comunidade_nome || "Plataforma")} · {String(item.usuario_nome || "Sistema")}</p></div><time>{formatDate(String(item.criado_em))}</time></summary><div className="owner-audit-detail"><span><small>Resultado</small><strong>{String(item.resultado || "NÃO INFORMADO")}</strong></span><span><small>Registro</small><strong>#{Number(item.id)}</strong></span><span><small>Responsável</small><strong>{String(item.usuario_nome || "Sistema")}</strong></span><span><small>Contexto</small><strong>{String(item.comunidade_nome || "Plataforma")}</strong></span><AuditMetadata value={item.metadados} /></div></details>)}{!filteredAudit.length && <Empty title="Nenhum registro encontrado" text="Ajuste a pesquisa ou o filtro de resultado." />}</div></section>}
           {tab === "feedback" && data && <FeedbackRepository items={data.feedback || []} working={working} onAction={feedbackAction} onOpenPost={(communityId, postId) => openCommunity(communityId, postId)} />}
+          {tab === "resets" && <OwnerPasswordResetsWorkspace />}
+          {tab === "deleted" && <OwnerDeletedAccountsWorkspace />}
           {tab === "editorial" && <EditorialAutomationWorkspace />}
           {tab === "statistics" && <StatisticsWorkspace />}
           {tab === "optimization" && <PlatformOptimizerWorkspace />}
           {tab === "appearance" && <OwnerAppearanceWorkspace />}
           {tab === "controls" && <PlatformControlsWorkspace features={features} currentCommunityId={currentCommunityId} />}
-          {tab === "plans" && (
-            <OwnerInfrastructureWorkspace
-              title="Planos e assinaturas"
-              integration="gateway de pagamento e catálogo de planos"
-              summary="Esta área listará planos, limites por comunidade e o ciclo de cada assinatura assim que houver um gateway de pagamento conectado. Nenhum valor é simulado."
-              fields={[
-                { label: "Plano vigente por comunidade", detail: "Nome do plano, limite de membros/módulos e data de renovação." },
-                { label: "Histórico de mudanças de plano", detail: "Upgrade, downgrade e cancelamento, com quem autorizou." },
-                { label: "Status da assinatura", detail: "Ativa, inadimplente, em teste ou cancelada, vindo do gateway." },
-              ]}
-            />
-          )}
-          {tab === "finance" && (
-            <OwnerInfrastructureWorkspace
-              title="Financeiro"
-              integration="processador de pagamentos"
-              summary="Receita, inadimplência e repasses dependem de um processador de pagamentos real. A tela é exibida vazia até essa conexão existir, para não apresentar números fictícios."
-              fields={[
-                { label: "Receita recorrente", detail: "MRR consolidado por plano e por comunidade." },
-                { label: "Faturas e recibos", detail: "Emissão, status de pagamento e conciliação." },
-                { label: "Inadimplência", detail: "Comunidades com pagamento pendente e prazo de suspensão." },
-              ]}
-            />
-          )}
-          {tab === "realtime" && (
-            <OwnerInfrastructureWorkspace
-              title="Tempo real"
-              integration="stream de eventos/observabilidade"
-              summary="Sessões ativas, presença e eventos ao vivo exigem um canal de telemetria em tempo real. Sem essa integração, nenhuma contagem é inventada."
-              fields={[
-                { label: "Usuários on-line agora", detail: "Contagem por comunidade a partir de sessões ativas em tempo real." },
-                { label: "Eventos ao vivo", detail: "Publicações, mensagens e confirmações no instante em que ocorrem." },
-                { label: "Alertas em tempo real", detail: "Picos de erro ou de uso encaminhados assim que detectados." },
-              ]}
-            />
-          )}
-          {tab === "performance" && (
-            <OwnerInfrastructureWorkspace
-              title="Desempenho"
-              integration="métricas de infraestrutura (CPU, memória, latência)"
-              summary="Métricas de desempenho de infraestrutura vêm do provedor de hospedagem/observabilidade, ainda não conectado neste ambiente. A tela reserva o espaço sem forjar valores."
-              fields={[
-                { label: "Latência das rotas principais", detail: "Tempo de resposta por endpoint, percentis p50/p95." },
-                { label: "Uso de CPU e memória", detail: "Consumo do runtime de hospedagem ao longo do tempo." },
-                { label: "Erros por minuto", detail: "Taxa de erro consolidada, cruzada com a auditoria." },
-              ]}
-            />
-          )}
-          {tab === "incidents" && (
-            <OwnerInfrastructureWorkspace
-              title="Incidentes"
-              integration="registro dedicado de incidentes"
-              summary="Ainda não existe uma tabela dedicada a incidentes operacionais. Até que essa base seja criada, use a auditoria e o feedback para identificar problemas relatados pelos usuários."
-              fields={[
-                { label: "Linha do tempo do incidente", detail: "Abertura, atualizações e resolução, com responsável." },
-                { label: "Comunidades afetadas", detail: "Escopo do impacto, para isolar o que foi realmente afetado." },
-                { label: "Causa raiz e ação tomada", detail: "Registro do que causou e do que foi corrigido." },
-              ]}
-            />
-          )}
+          {tab === "plans" && <OwnerPlansWorkspace />}
+          {tab === "finance" && <OwnerFinanceWorkspace />}
+          {tab === "realtime" && <OwnerRealtimeWorkspace />}
+          {tab === "performance" && <OwnerPerformanceWorkspace />}
+          {tab === "incidents" && <OwnerIncidentsWorkspace />}
         </section>
       </div>
       <GlobalVisualEditor canEdit communityName="Área do Proprietário" screenId={`owner:${tab}`} rootSelector=".owner-area" />
@@ -900,11 +859,13 @@ function tabDescription(tab: OwnerTab) {
     appearance: "Aplique paleta, logotipo, banner e papel de parede a uma comunidade ou a todas de uma vez.",
     laboratory: "Crie e valide protótipos isolados, sem modificar páginas ou dados reais.",
     controls: "Configure identidade, módulos e regras globais da plataforma.",
-    plans: "Planos, limites e ciclo de assinatura por comunidade.",
-    finance: "Receita, faturas e inadimplência da plataforma.",
-    realtime: "Presença e eventos ao vivo em toda a plataforma.",
-    performance: "Latência, uso de recursos e erros da infraestrutura.",
-    incidents: "Linha do tempo de incidentes operacionais reportados.",
+    plans: "Crie planos configuráveis e acompanhe as assinaturas de cada comunidade.",
+    finance: "Cobrança, vencimentos, inadimplência e renovação das assinaturas.",
+    realtime: "Presença e atividade agregada, sem expor conteúdo das comunidades.",
+    performance: "Falhas, negações e incidentes registrados pela própria plataforma.",
+    incidents: "Incidentes agrupados por assinatura do erro, com gravidade e recorrência.",
+    resets: "Aprove e acompanhe pedidos de redefinição de senha dos donos de comunidade.",
+    deleted: "Contas removidas, janela de restauração e exclusão definitiva.",
   }[tab];
 }
 function initials(value: string) { return value.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "V"; }

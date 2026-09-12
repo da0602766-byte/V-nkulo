@@ -12,7 +12,8 @@ import type { getD1 } from "../../db";
 export type IncidentDatabase = ReturnType<typeof getD1>;
 
 // O núcleo puro (conjuntos fechados, normalização de título, fingerprint de
-// agrupamento e prioridade) vive em incident-center.mjs para poder ser
+// agrupamento e prioridade) vive em incident-grouping.mjs (nome distinto para o bundler não
+// confundir os dois módulos) para poder ser
 // importado direto pelos testes, seguindo a convenção de tenant-policy.mjs.
 // Este módulo acrescenta os tipos e a parte que fala com o banco.
 export {
@@ -27,7 +28,7 @@ export {
   normalizarTituloIncidente,
   calcularChaveAgrupamento,
   classificarPrioridade,
-} from "./incident-center.mjs";
+} from "./incident-grouping.mjs";
 
 import {
   calcularChaveAgrupamento,
@@ -36,7 +37,7 @@ import {
   normalizarArea,
   normalizarGravidade as normalizarGravidadePura,
   normalizarStatus as normalizarStatusPura,
-} from "./incident-center.mjs";
+} from "./incident-grouping.mjs";
 
 // Reexpõe os normalizadores puros com o tipo estreito do conjunto fechado:
 // em .mjs eles devolvem string, e aqui o resto do módulo depende da união.

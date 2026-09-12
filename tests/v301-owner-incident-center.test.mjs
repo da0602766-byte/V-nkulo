@@ -7,7 +7,7 @@ import {
   gravidadeMaisSevera,
   normalizarTituloIncidente,
   rotularIncidente,
-} from "../app/lib/incident-center.mjs";
+} from "../app/lib/incident-grouping.mjs";
 
 test("o mesmo erro com ids diferentes cai na mesma chave de agrupamento", () => {
   const primeira = calcularChaveAgrupamento({
