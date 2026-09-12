@@ -26,7 +26,6 @@ export default function ThemeControl({
         window.localStorage.getItem("vinkulo-theme"),
       );
       setTheme(saved);
-      setAutoIsDark(systemPrefersDark());
       applyTheme(saved);
       setResolvedDark(currentThemeIsDark(saved));
     }, 0);
@@ -128,16 +127,12 @@ function themeStorageKey(storageId: string) {
   return normalized ? `vinkulo:theme:${normalized}` : "";
 }
 
-function systemPrefersDark() {
+function currentThemeIsDark(theme: Theme) {
+  if (theme === "ESCURO") return true;
+  if (theme === "CLARO") return false;
   if (typeof window === "undefined") return false;
   return document.documentElement.dataset.theme === "dark" ||
     window.matchMedia("(prefers-color-scheme: dark)").matches;
-}
-
-function currentThemeIsDark(theme: Theme, autoIsDark: boolean) {
-  if (theme === "ESCURO") return true;
-  if (theme === "CLARO") return false;
-  return autoIsDark;
 }
 
 async function animateThemeChange(theme: Theme) {
