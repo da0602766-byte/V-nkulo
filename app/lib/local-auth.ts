@@ -209,7 +209,6 @@ export async function getSessionState(): Promise<SessionState> {
         `SELECT u.id, u.nome, u.email, u.perfil, u.permissoes, u.foto_perfil, u.telefone,
       u.data_nascimento, u.nome_pais, u.endereco, u.celula, u.ministerio, u.observacoes,
       u.diaconia_equipe_id, d.nome AS diaconia_equipe_nome, u.tema_preferido,
-      EXISTS(SELECT 1 FROM culto_rotinas c WHERE c.registrador_usuario_id = u.id) AS culto_registrador,
       u.titulo_eclesiastico, u.ativo, u.criado_em, u.senha_hash
       FROM usuarios u LEFT JOIN diaconia_equipes d ON d.id = u.diaconia_equipe_id
       WHERE u.id = ? LIMIT 1`,
@@ -245,7 +244,6 @@ export async function getSessionState(): Promise<SessionState> {
       `SELECT u.id, u.nome, u.email, u.perfil, u.permissoes, u.foto_perfil, u.telefone,
     u.data_nascimento, u.nome_pais, u.endereco, u.celula, u.ministerio, u.observacoes,
     u.diaconia_equipe_id, d.nome AS diaconia_equipe_nome, u.tema_preferido,
-    EXISTS(SELECT 1 FROM culto_rotinas c WHERE c.registrador_usuario_id = u.id) AS culto_registrador,
     u.titulo_eclesiastico, u.ativo, u.criado_em
     FROM usuarios u LEFT JOIN diaconia_equipes d ON d.id = u.diaconia_equipe_id
     WHERE u.id = ? LIMIT 1`,
