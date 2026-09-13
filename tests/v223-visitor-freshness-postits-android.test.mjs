@@ -18,17 +18,18 @@ test("cadastro novo usa a data real de entrada e nunca inventa 999 dias sem cont
   assert.match(tools, /rotuloTempoSemContato\(item\)/);
 });
 
-test("post-its ficam em uma coluna lateral compacta com cartões quadrados", async () => {
+test("post-its continuam disponíveis na central completa sem poluir o layout principal", async () => {
   const [operations, notes, css] = await Promise.all([
     read("app/components/TenantOperations.tsx"),
     read("app/components/CareNotesBoard.tsx"),
     read("app/globals.css"),
   ]);
 
-  assert.match(operations, /visitor-care-workspace-v3/);
-  assert.match(operations, /<CareNotesBoard side \/>/);
+  assert.match(operations, /visitor-project-center-drawer-v6/);
+  assert.match(operations, /<RelacionamentoTools visitantes=\{visitors\} compacto=\{false\}/);
+  assert.match(operations, /<CareNotesBoard \/>/);
   assert.match(notes, /side\?: boolean/);
-  assert.match(css, /\.visitor-care-workspace-v3[^}]*grid-template-columns:minmax\(0,1fr\) minmax\(250px,300px\)/);
+  assert.match(css, /\.visitor-project-center-drawer-v6[^}]*overflow-y:\s*auto/);
   assert.match(css, /\.care-notes-board\.is-side \.care-note[^}]*aspect-ratio:1/);
 });
 

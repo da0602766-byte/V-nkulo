@@ -114,7 +114,7 @@ test("Visitantes oferece ficha única, filtros, aniversários e exclusão defini
   assert.equal(database.prepare("SELECT id FROM visitantes WHERE id = ?").get(created.body.id), undefined);
 });
 
-test("layout compacto inclui dashboard por categoria, filtro e diálogo em portal", async () => {
+test("layout do projeto inclui filtros laterais, tabela rígida e diálogos em portal", async () => {
   const [workspace, styles, visitorsApi, categoryApi] = await Promise.all([
     source("app/components/TenantOperations.tsx"),
     source("app/globals.css"),
@@ -122,13 +122,16 @@ test("layout compacto inclui dashboard por categoria, filtro e diálogo em porta
     source("app/api/pilot/visitante-categorias/route.ts"),
   ]);
   assert.match(workspace, /createPortal\(/);
-  assert.match(workspace, /visitor-category-dashboards/);
-  assert.match(workspace, /visitor-birthday-card/);
+  assert.match(workspace, /visitor-project-categories-v6/);
+  assert.match(workspace, /visitor-project-birthdays-v6/);
+  assert.match(workspace, /visitor-project-main-v6/);
+  assert.match(workspace, /visitor-project-center-drawer-v6/);
   assert.match(workspace, /Filtrar visitantes por categoria/);
   assert.match(workspace, /Possível cadastro duplicado/);
   assert.match(workspace, /Excluir cadastro/);
-  assert.match(styles, /\.visitor-overview-grid/);
-  assert.match(styles, /max-height:690px;[^}]*overflow-y:auto/);
+  assert.match(styles, /\.visitor-workspace-redesign \.visitor-command-layout-v4[^}]*grid-template-columns:\s*256px minmax\(0,\s*1fr\) 320px/);
+  assert.match(styles, /\.visitor-project-main-v6 \.visitor-table-v2[^}]*min-width:\s*800px/);
+  assert.match(styles, /@media \(max-width:\s*1023px\)[\s\S]*\.visitor-project-main-v6\s*\{\s*order:\s*3/);
   assert.match(visitorsApi, /const PAGE_SIZE = 10/);
   assert.match(visitorsApi, /ORDER BY v\.id DESC/);
   assert.match(categoryApi, /vc\.exibir_dashboard/);

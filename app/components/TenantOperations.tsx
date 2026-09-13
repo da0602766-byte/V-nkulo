@@ -173,6 +173,7 @@ export function VisitorsWorkspace({
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [exportReviewOpen, setExportReviewOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [relationshipCenterOpen, setRelationshipCenterOpen] = useState(false);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const categoriesRef = useRef<VisitorCategory[]>([]);
   const categoryDragTimerRef = useRef<number | null>(null);
@@ -961,15 +962,29 @@ export function VisitorsWorkspace({
     label,
     total: visitors.filter((visitor) => visitor.status === id).length,
   }));
-  const funnelTotal = funnelStages.reduce((soma, etapa) => soma + etapa.total, 0);
+  const previousGrowthTotal = growthDashboard.points.at(-2)?.value ?? growthDashboard.currentTotal;
+  const monthlyGrowth = Math.max(0, growthDashboard.currentTotal - previousGrowthTotal);
+  const monthlyGrowthPercentage = previousGrowthTotal
+    ? Math.round((monthlyGrowth / previousGrowthTotal) * 100)
+    : monthlyGrowth > 0 ? 100 : 0;
+  const relationshipPriorities = [...visitors]
+    .filter((visitor) => visitor.status !== "INTEGRADO")
+    .map((visitor) => ({
+      visitor,
+      daysWithoutContact: daysSince(visitor.ultimo_contato || visitor.criado_em),
+    }))
+    .sort((left, right) => right.daysWithoutContact - left.daysWithoutContact)
+    .slice(0, 4);
+  const urgentRelationshipCount = relationshipPriorities.filter(
+    (item) => item.daysWithoutContact >= 15,
+  ).length;
 
   return (
     <section className="visitor-workspace-redesign">
-      <header className="visitor-hero">
+      <header className="visitor-hero visitor-project-header-v6">
         <div>
-          <p className="pilot-kicker">GESTÃO DE VISITANTES · {communityName}</p>
-          <h1>Gestão de Visitantes</h1>
-          <p>Organize o acolhimento, acompanhe cada contato e cuide dos próximos passos.</p>
+          <h1>{communityName}</h1>
+          <p>Gestão de Visitantes</p>
         </div>
         <div className="visitor-hero-actions-v2">
           {canCreate && <button type="button" className="visitor-hero-new-v2" onClick={() => setRegistrationOpen(true)}>＋ Novo visitante</button>}
@@ -1097,80 +1112,51 @@ export function VisitorsWorkspace({
         </div>
       </header>
       <div className="visitor-command-layout-v4">
-      <aside className="visitor-reference-left-v4" aria-label="Resumo e filtros de visitantes">
-      <details className="visitor-funnel-v5" open>
-        <summary className="visitor-rail-summary-v4">
-          <span><small>FUNIL</small><strong>Jornada do visitante</strong></span>
-          <i aria-hidden="true">⌄</i>
-        </summary>
-        <div className="visitor-funnel-list-v4">
-          {funnelStages.map((etapa) => {
-            const proporcao = funnelTotal ? Math.round((etapa.total / funnelTotal) * 100) : 0;
-            return (
-              <article key={etapa.id} data-etapa={etapa.id}>
-                <small>{etapa.label}</small>
-                <strong>{etapa.total}</strong>
-                <span className="visitor-funnel-bar-v5" aria-hidden="true">
-                  <i style={{ width: `${proporcao}%` }} />
-                </span>
-                <em>{proporcao}% do total</em>
-              </article>
-            );
-          })}
-        </div>
-      </details>
+      <aside className="visitor-reference-left-v4 visitor-project-left-v6" aria-label="Resumo e filtros de visitantes">
+        <details className="visitor-project-panel-v6" open>
+          <summary><span aria-hidden="true">↗</span><strong>Painel de Crescimento</strong><i aria-hidden="true">›</i></summary>
+          <div className="visitor-project-panel-body-v6">
+            <article className="visitor-project-growth-v6">
+              <span>Visitantes Ativos</span>
+              <strong>{categoriesLoaded ? growthDashboard.currentTotal : "—"}</strong>
+              <small>{monthlyGrowthPercentage > 0 ? `+${monthlyGrowthPercentage}% no mês` : "Sem variação no mês"}</small>
+            </article>
+          </div>
+        </details>
 
-      <section className="visitor-dashboard" aria-labelledby="visitor-growth-title">
-        <header>
-          <div><p className="pilot-kicker">DASHBOARD CRESCENTE · Acompanhamento por categoria</p><h2 id="visitor-growth-title">Crescimento dos acompanhamentos</h2></div>
-          <strong>{categoriesLoaded ? growthDashboard.currentTotal : "—"}<small> visitantes ativos</small></strong>
-        </header>
-        <div className={`visitor-growth-chart ${!categoriesLoaded ? "is-loading" : ""}`} aria-label="Cadastros acumulados nos últimos seis meses" aria-busy={!categoriesLoaded}>
-          {!categoriesLoaded && <p className="visitor-dashboard-loading">Carregando crescimento…</p>}
-          {categoriesLoaded && growthDashboard.points.map((point) => (
-            <div key={point.month}>
-              <span><i style={{ height: `${Math.max(8, (point.value / growthDashboard.max) * 100)}%` }} /></span>
-              <b>{point.value}</b>
-              <small>{formatGrowthMonth(point.month)}</small>
-            </div>
-          ))}
-          {categoriesLoaded && !growthDashboard.points.length && <p>O gráfico aparecerá após o primeiro cadastro.</p>}
-        </div>
-        <details className="visitor-category-dashboards" open>
-          <summary>
-            <span><strong>Categorias</strong><small>Clique para filtrar a lista</small></span>
-            <b>{categoryDashboards.length}</b>
-            <i aria-hidden="true">⌄</i>
-          </summary>
-          <div className="visitor-category-filter-cards" aria-label="Filtros por categoria">
-            <button
-              type="button"
-              className={categoryFilter === "all" ? "selected" : ""}
-              onClick={() => filterByCategory("all")}
-            >
-              <span className="visitor-category-icon" aria-hidden="true">◎</span>
-              <span><strong>Todas</strong><small>Todos os cadastros</small></span>
-              <b>{growthDashboard.currentTotal}</b>
-            </button>
-            {!categoriesLoaded && <p className="visitor-dashboard-loading">Carregando categorias…</p>}
+        <details className="visitor-project-panel-v6" open>
+          <summary><span aria-hidden="true">⌁</span><strong>Funil de Acolhimento</strong><i aria-hidden="true">›</i></summary>
+          <nav className="visitor-project-funnel-v6" aria-label="Funil de acolhimento">
+            {funnelStages.map((etapa, index) => (
+              <button type="button" key={etapa.id} data-etapa={etapa.id} onClick={() => changeVision(index === 0 ? "novos" : index === 2 ? "acompanhamento" : "todos")}>
+                <span aria-hidden="true">{index === 0 ? "＋" : index === 1 ? "◌" : index === 2 ? "♡" : "✓"}</span>
+                <strong>{etapa.label}</strong>
+                <b>{etapa.total}</b>
+              </button>
+            ))}
+          </nav>
+        </details>
+
+        <details className="visitor-project-panel-v6" open>
+          <summary><span aria-hidden="true">◫</span><strong>Categorias</strong><i aria-hidden="true">›</i></summary>
+          <nav className="visitor-project-categories-v6" aria-label="Filtros por categoria">
+            {!categoriesLoaded && <p>Carregando categorias…</p>}
             {categoriesLoaded && categoryDashboards.map((category) => (
               <button
                 type="button"
                 key={category.id}
-                className={categoryFilter === String(category.id) ? "selected" : ""}
+                className={categoryFilter === String(category.id) ? "active" : ""}
                 style={{ "--category-color": category.cor } as CSSProperties}
-                onClick={() => filterByCategory(String(category.id))}
+                onClick={() => filterByCategory(categoryFilter === String(category.id) ? "all" : String(category.id))}
               >
-                <span className="visitor-category-icon" aria-hidden="true">{category.icone}</span>
-                <span><strong>{category.nome}</strong><small>{category.ministerio_nome || "Sem ministério"}</small></span>
+                <span aria-hidden="true" />
+                <strong>{category.nome}</strong>
                 <b>{category.total_visitantes}</b>
               </button>
             ))}
-            {categoriesLoaded && !categories.length && <div className="pilot-empty-state"><strong>Nenhuma categoria criada</strong><p>Crie a primeira categoria nas configurações de visitantes.</p></div>}
-            {categoriesLoaded && categories.length > 0 && !categoryDashboards.length && <div className="pilot-empty-state"><strong>Nenhum cartão de categoria ativo</strong><p>Ative os cartões nas configurações de visitantes.</p></div>}
-          </div>
+            {categoriesLoaded && !categoryDashboards.length && <p>Nenhuma categoria ativa.</p>}
+          </nav>
         </details>
-      </section>
       </aside>
 
       {canCreate && <button type="button" className="visitor-registration-launch" onClick={() => setRegistrationOpen(true)}><span aria-hidden="true">＋</span><span><strong>Cadastrar novo visitante</strong><small>Abrir ficha completa em uma janela protegida</small></span><i aria-hidden="true">›</i></button>}
@@ -1236,7 +1222,7 @@ export function VisitorsWorkspace({
         </section>
         </div>, document.body)}
 
-      <main className="visitor-reference-main-v4" aria-label="Diretório de visitantes">
+      <main className="visitor-reference-main-v4 visitor-project-main-v6" aria-label="Diretório de visitantes">
         <nav className="visitor-view-tabs-v2" aria-label="Visões de visitantes">
           {([
             ["todos", "Todos"],
@@ -1252,63 +1238,24 @@ export function VisitorsWorkspace({
               aria-current={activeVision === vision ? "page" : undefined}
               onClick={() => changeVision(vision)}
             >
-              <span>{label}</span><b>{counts[vision]}</b>
+              <span>{label === "Sem contato há 15 dias" ? "Sem contato" : label}</span>
             </button>
           ))}
         </nav>
-
-        <div className="visitor-category-strip-v2" aria-label="Categorias de visitantes">
-          <button type="button" className={categoryFilter === "all" ? "active" : ""} onClick={() => setCategoryFilter("all")}>
-            <span aria-hidden="true">◎</span><strong>Todos</strong><b>{counts.todos}</b>
-          </button>
-          {categories.map((category) => (
-            <button
-              type="button"
-              key={category.id}
-              className={categoryFilter === String(category.id) ? "active" : ""}
-              style={{ "--category-color": category.cor } as CSSProperties}
-              onClick={() => setCategoryFilter(String(category.id))}
-            >
-              <span aria-hidden="true">{category.icone}</span><strong>{category.nome}</strong><b>{category.total_visitantes}</b>
-            </button>
-          ))}
-          <button type="button" className={categoryFilter === "sem-categoria" ? "active" : ""} onClick={() => setCategoryFilter("sem-categoria")}>
-            <span aria-hidden="true">○</span><strong>Sem categoria</strong>
-          </button>
-        </div>
-
-        <div className="visitor-insights-v2">
-          <article>
-            <span className="visitor-insight-icon-v2" aria-hidden="true">◫</span>
-            <div><small>Pessoas ativas</small><strong>{counts.todos}</strong><span>Cadastro central da comunidade</span></div>
-          </article>
-          <article>
-            <span className="visitor-insight-icon-v2 is-warning" aria-hidden="true">!</span>
-            <div><small>Próximas ações</small><strong>{counts.pendencias}</strong><span>Contatos que pedem atenção</span></div>
-          </article>
-          <section className="visitor-birthdays-compact-v2" aria-labelledby="birthday-compact-title">
-            <header><div><small>ANIVERSÁRIOS DO MÊS</small><strong id="birthday-compact-title">Celebre com carinho</strong></div><b>{birthdays.length}</b></header>
-            <div>
-              {birthdays.slice(0, 5).map((visitor) => (
-                <span key={visitor.id}>
-                  <time dateTime={visitor.data_nascimento || ""}>{birthdayDay(visitor.data_nascimento)}</time>
-                  <span><strong>{visitor.nome_completo}</strong><small>{formatBirthday(visitor.data_nascimento)}</small></span>
-                  {visitor.telefone && birthdayWhatsappHref(visitor) ? <a href={birthdayWhatsappHref(visitor) || undefined} target="_blank" rel="noreferrer">WhatsApp</a> : <i>Sem contato</i>}
-                </span>
-              ))}
-              {!birthdays.length && <p>Nenhum aniversariante neste mês.</p>}
-            </div>
-          </section>
-        </div>
-
-        <section className="visitor-sheet-v2" aria-labelledby="visitor-sheet-title">
-          <header className="visitor-sheet-head-v2">
-            <div><p className="pilot-kicker">DIRETÓRIO CENTRAL</p><h2 id="visitor-sheet-title">Pessoas e próximos cuidados</h2><span>Uma ficha por pessoa, em todas as visões.</span></div>
-            <div>
+        <section className="visitor-sheet-v2" aria-label="Lista de visitantes">
+          <div className="visitor-project-toolbar-v6">
+            <form className="visitor-commandbar-v2" onSubmit={(event) => { event.preventDefault(); void loadVisitors(); }}>
+              <label className="visitor-search-v2"><span aria-hidden="true">⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar visitante por nome, telefone..." aria-label="Buscar visitante" /></label>
+              <button type="button" className={filtersOpen ? "active" : ""} onClick={() => setFiltersOpen((current) => !current)}>☷ Filtros</button>
+              <button type="button" className={columnsOpen ? "active" : ""} onClick={() => setColumnsOpen((current) => !current)}>▦ Colunas</button>
+              <button type="button" className="visitor-project-sort-v6" onClick={() => setSortDirection((current) => current === "asc" ? "desc" : "asc")}>↕ {sortDirection === "asc" ? "A–Z" : "Z–A"}</button>
+              <button type="submit" className="visitor-project-refresh-v6" disabled={loading} aria-label="Atualizar lista">↻</button>
+            </form>
+            <div className="visitor-project-transfer-v6">
               {canCreate && <><input ref={importInputRef} className="visitor-import-input-v2" type="file" accept=".xlsx,.xls,.csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) void prepareVisitorImport(file); }} /><button type="button" disabled={importing} onClick={() => importInputRef.current?.click()}>⇧ Importar Excel</button></>}
-              <button type="button" onClick={() => setExportReviewOpen(true)}>⇩ Revisar e exportar</button>
+              <button type="button" onClick={() => setExportReviewOpen(true)}>⇩ Exportar</button>
             </div>
-          </header>
+          </div>
 
           {exportReviewOpen && <section className="visitor-export-review-v2" aria-label="Revisão antes da exportação">
             <div><p className="pilot-kicker">ANTES DE EXPORTAR</p><h3>Revise e organize as informações</h3><p>Abra a ficha de qualquer pessoa para editar dados. A planilha só deve sair depois dessa conferência.</p></div>
@@ -1320,14 +1267,6 @@ export function VisitorsWorkspace({
             <div className="visitor-export-suggestions-v2"><strong>Categorias sugeridas</strong><span>Novo visitante</span><span>Primeiro contato</span><span>Em acompanhamento</span><span>Integrado</span><span>Sem contato há 15 dias</span></div>
             <footer><button type="button" onClick={() => setExportReviewOpen(false)}>Continuar editando</button><button type="button" className="primary" onClick={() => { setExportReviewOpen(false); void exportVisitors(); }}>Exportar informações revisadas</button></footer>
           </section>}
-
-          <form className="visitor-commandbar-v2" onSubmit={(event) => { event.preventDefault(); void loadVisitors(); }}>
-            <label className="visitor-search-v2"><span aria-hidden="true">⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nome, telefone ou e-mail" /></label>
-            <button type="button" className={filtersOpen ? "active" : ""} onClick={() => setFiltersOpen((current) => !current)}>☷ Filtros</button>
-            <button type="button" className={columnsOpen ? "active" : ""} onClick={() => setColumnsOpen((current) => !current)}>▦ Colunas</button>
-            <button type="button" onClick={() => setSortDirection((current) => current === "asc" ? "desc" : "asc")}>↕ Nome {sortDirection === "asc" ? "A–Z" : "Z–A"}</button>
-            <button type="submit" disabled={loading}>{loading ? "Atualizando…" : "Atualizar"}</button>
-          </form>
 
           {filtersOpen && (
             <div className="visitor-filter-panel-v2">
@@ -1354,7 +1293,7 @@ export function VisitorsWorkspace({
             <table className="visitor-table-v2">
               <thead><tr>
                 <th><input type="checkbox" aria-label="Selecionar página" checked={Boolean(visibleVisitors.length && selectedRows.length === visibleVisitors.length)} onChange={(event) => setSelectedRows(event.target.checked ? visibleVisitors.map((visitor) => visitor.id) : [])} /></th>
-                <th>Nome</th><th>Contato</th><th>Categoria</th><th>Ministério</th><th>Responsável</th><th>Status</th><th>Último contato</th><th>Próximo passo</th><th aria-label="Ações" />
+                <th>Nome / Entrada</th><th>Contato</th><th>Categoria</th><th>Status</th><th>Último contato</th><th>Próximo passo</th>
               </tr></thead>
               <tbody>
                 {visibleVisitors.map((visitor) => (
@@ -1363,12 +1302,9 @@ export function VisitorsWorkspace({
                     <th scope="row"><button type="button" className="visitor-person-cell-v2" onClick={() => void loadFollowups(visitor.id)}><span style={{ "--category-color": visitor.categoria_cor || "var(--pilot-blue)" } as CSSProperties}>{visitor.nome_completo.slice(0, 1).toLocaleUpperCase("pt-BR")}</span><span><strong>{visitor.nome_completo}</strong><small>Entrada {formatDate(visitor.data_entrada)}</small></span></button></th>
                     <td><strong>{visitor.telefone || "Sem telefone"}</strong><small>{visitor.email || "Sem e-mail"}</small></td>
                     <td><span className="visitor-category-tag-v2" style={{ "--category-color": visitor.categoria_cor || "var(--pilot-blue)" } as CSSProperties}>{visitor.categoria_icone || "○"} {visitor.categoria_nome || "Sem categoria"}</span></td>
-                    <td>{visitor.ministerio || "—"}</td>
-                    <td><strong>{visitor.responsavel_email?.split("@")[0] || visitor.acompanhante || "A definir"}</strong></td>
-                    <td>{canEdit && activeVision !== "arquivados" ? <select aria-label={`Status de ${visitor.nome_completo}`} value={visitor.status} onChange={(event) => void updateVisitorField(visitor, { status: event.target.value })}><option value="NOVO">Novo</option><option value="EM_CONTATO">Em contato</option><option value="EM_ACOMPANHAMENTO">Em acompanhamento</option><option value="INTEGRADO">Integrado</option></select> : <span className={`status-pill status-${visitor.status.toLowerCase()}`}>{activeVision === "arquivados" ? "Arquivado" : statusLabel(visitor.status)}</span>}</td>
+                    <td><span className={`visitor-project-status-v6 status-${visitor.status.toLowerCase()}`} aria-hidden="true" />{canEdit && activeVision !== "arquivados" ? <select aria-label={`Status de ${visitor.nome_completo}`} value={visitor.status} onChange={(event) => void updateVisitorField(visitor, { status: event.target.value })}><option value="NOVO">Recebido</option><option value="EM_CONTATO">Contatado</option><option value="EM_ACOMPANHAMENTO">Em acompanhamento</option><option value="INTEGRADO">Integrado</option></select> : <span>{activeVision === "arquivados" ? "Arquivado" : statusLabel(visitor.status)}</span>}</td>
                     <td>{visitor.ultimo_contato ? formatDateTime(visitor.ultimo_contato) : "Sem contato"}</td>
-                    <td className={visitor.proximo_contato && visitor.proximo_contato <= hojeLocal() ? "overdue" : ""}><button type="button" className="visitor-next-step-v2" onClick={() => void loadFollowups(visitor.id)}>{canFollowup ? "Registrar contato" : "Abrir ficha"}</button>{visitor.proximo_contato && <small>{formatDate(visitor.proximo_contato)}</small>}</td>
-                    <td><button type="button" className="visitor-row-open-v2" aria-label={`Abrir ficha de ${visitor.nome_completo}`} onClick={() => void loadFollowups(visitor.id)}>›</button></td>
+                    <td className={visitor.proximo_contato && visitor.proximo_contato <= hojeLocal() ? "overdue" : ""}><div className="visitor-project-next-v6"><button type="button" className="visitor-next-step-v2" onClick={() => void loadFollowups(visitor.id)}>{canFollowup ? "Registrar contato" : "Abrir ficha"}</button>{visitor.proximo_contato && <small>{formatDate(visitor.proximo_contato)}</small>}<button type="button" className="visitor-row-open-v2" aria-label={`Abrir ficha de ${visitor.nome_completo}`} onClick={() => void loadFollowups(visitor.id)}>⋮</button></div></td>
                   </tr>
                 ))}
               </tbody>
@@ -1379,48 +1315,54 @@ export function VisitorsWorkspace({
         </section>
       </main>
 
-      <aside className="visitor-reference-right-v4" aria-label="Relacionamento e datas importantes">
-        <details className="visitor-rail-section-v4" open>
-          <summary className="visitor-rail-summary-v4">
-            <span><small>CUIDADO</small><strong>Central de relacionamento</strong></span>
-            <i aria-hidden="true">⌄</i>
-          </summary>
-          <div className="visitor-care-workspace-v3">
-            {/* A central usa os mesmos dados do funil, mas organiza as decisões por
-                prioridade, pessoa e próximo cuidado. */}
-            <RelacionamentoTools visitantes={visitors} compacto={false} onAbrirVisitante={(visitorId) => void loadFollowups(visitorId)} />
+      <aside className="visitor-reference-right-v4 visitor-project-right-v6" aria-label="Relacionamento e datas importantes">
+        <details className="visitor-project-panel-v6" open>
+          <summary><span aria-hidden="true">♡</span><strong>Central de Relacionamento</strong><i aria-hidden="true">›</i></summary>
+          <div className="visitor-project-relationship-v6">
+            <div className={urgentRelationshipCount ? "is-urgent" : "is-ok"}>
+              <strong><i aria-hidden="true" />{urgentRelationshipCount ? `${urgentRelationshipCount} ${urgentRelationshipCount === 1 ? "pessoa urgente" : "pessoas urgentes"}` : "Nenhuma urgência agora"}</strong>
+              <small>{urgentRelationshipCount ? "Sem contato há mais de 15 dias" : "Os contatos estão dentro do prazo"}</small>
+            </div>
+            <h3>Ordem de cuidado</h3>
+            <div className="visitor-project-priority-list-v6">
+              {relationshipPriorities.slice(0, 2).map(({ visitor, daysWithoutContact }) => (
+                <button type="button" key={visitor.id} onClick={() => void loadFollowups(visitor.id)}>
+                  <span><strong>{visitor.nome_completo}</strong><b>{visitor.ultimo_contato ? `${daysWithoutContact} dias` : "Nenhum"}</b></span>
+                  <small><i aria-hidden="true" />{visitor.ultimo_contato ? "Retomar o acompanhamento" : "Dar as boas-vindas"}</small>
+                </button>
+              ))}
+              {!relationshipPriorities.length && <p>Nenhuma pessoa aguardando cuidado nesta visão.</p>}
+            </div>
+            <button type="button" className="visitor-project-open-center-v6" onClick={() => setRelationshipCenterOpen(true)}>Abrir central completa</button>
           </div>
         </details>
 
-        <section className="visitor-birthday-card" aria-labelledby="visitor-birthday-title">
-          <header>
-            <div><p className="pilot-kicker">ANIVERSÁRIOS DO MÊS</p><h2 id="visitor-birthday-title">Celebre com carinho</h2></div>
-            <span>{birthdays.length}</span>
-          </header>
-          <div className="visitor-birthday-list">
-            {birthdays.map((visitor) => (
+        <details className="visitor-project-panel-v6" open>
+          <summary><span aria-hidden="true">□</span><strong>Aniversariantes</strong><i aria-hidden="true">›</i></summary>
+          <div className="visitor-project-birthdays-v6">
+            {birthdays.slice(0, 5).map((visitor) => (
               <article key={visitor.id}>
                 <time dateTime={visitor.data_nascimento || ""}>{birthdayDay(visitor.data_nascimento)}</time>
                 <div><strong>{visitor.nome_completo}</strong><small>{formatBirthday(visitor.data_nascimento)}</small></div>
-                {visitor.telefone && birthdayWhatsappHref(visitor) ? (
-                  <a href={birthdayWhatsappHref(visitor) || undefined} target="_blank" rel="noreferrer" aria-label={`Enviar parabéns para ${visitor.nome_completo} pelo WhatsApp`}>WhatsApp</a>
-                ) : <span>Sem contato</span>}
+                {visitor.telefone && birthdayWhatsappHref(visitor) ? <a href={birthdayWhatsappHref(visitor) || undefined} target="_blank" rel="noreferrer" aria-label={`Enviar parabéns para ${visitor.nome_completo} pelo WhatsApp`}>◌</a> : null}
               </article>
             ))}
-            {!birthdays.length && <p className="operations-muted">Nenhum aniversariante cadastrado neste mês.</p>}
+            {!birthdays.length && <p>Nenhum aniversariante neste mês.</p>}
           </div>
-          <small>Exibindo até 5 pessoas com mensagem de parabéns pronta para envio.</small>
-        </section>
-
-        <details className="visitor-rail-section-v4 visitor-notes-rail-v4">
-          <summary className="visitor-rail-summary-v4">
-            <span><small>HISTÓRICO INTERNO</small><strong>Notas de cuidado</strong></span>
-            <i aria-hidden="true">⌄</i>
-          </summary>
-          <CareNotesBoard side />
         </details>
       </aside>
       </div>
+
+      {relationshipCenterOpen && createPortal(
+        <div className="visitor-project-center-backdrop-v6" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setRelationshipCenterOpen(false); }}>
+          <aside className="visitor-project-center-drawer-v6" role="dialog" aria-modal="true" aria-labelledby="visitor-project-center-title-v6">
+            <header><div><p>GESTÃO DE VISITANTES</p><h2 id="visitor-project-center-title-v6">Central completa de relacionamento</h2></div><button type="button" onClick={() => setRelationshipCenterOpen(false)} aria-label="Fechar central de relacionamento">×</button></header>
+            <RelacionamentoTools visitantes={visitors} compacto={false} onAbrirVisitante={(visitorId) => void loadFollowups(visitorId)} />
+            <CareNotesBoard />
+          </aside>
+        </div>,
+        document.body,
+      )}
 
       {Boolean(importRows.length) && createPortal(
         <div className="visitor-import-backdrop-v2" role="presentation">
@@ -1819,6 +1761,13 @@ function formatDate(value: string) {
   return year && month && day ? `${day}/${month}/${year}` : value;
 }
 
+function daysSince(value: string | null) {
+  if (!value) return 0;
+  const date = new Date(value.includes("T") ? value : `${value.replace(" ", "T")}Z`);
+  if (Number.isNaN(date.getTime())) return 0;
+  return Math.max(0, Math.floor((Date.now() - date.getTime()) / 86_400_000));
+}
+
 function formatAgeRule(category: VisitorCategory) {
   if (!category.migracao_automatica) return "Classificação manual";
   if (category.idade_minima !== null && category.idade_maxima !== null) {
@@ -1863,12 +1812,4 @@ function formatBirthday(value: string | null) {
   if (!value) return "Data não informada";
   const [, month, day] = value.slice(0, 10).split("-");
   return day && month ? `${day}/${month}` : value;
-}
-
-function formatGrowthMonth(value: string) {
-  const [year, month] = value.split("-").map(Number);
-  if (!year || !month) return value;
-  return new Intl.DateTimeFormat("pt-BR", { month: "short" })
-    .format(new Date(Date.UTC(year, month - 1, 1)))
-    .replace(".", "");
 }

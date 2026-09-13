@@ -28,6 +28,6 @@ test("dashboard não exibe estado vazio antes de carregar categorias", async () 
 
   assert.match(workspace, /const \[categoriesLoaded, setCategoriesLoaded\] = useState\(false\)/);
   assert.match(workspace, /finally \{\s*setCategoriesLoaded\(true\);/);
-  assert.match(workspace, /!categoriesLoaded && <p className="visitor-dashboard-loading">Carregando crescimento/);
-  assert.match(workspace, /categoriesLoaded && !categories\.length/);
+  assert.match(workspace, /!categoriesLoaded && <p>Carregando categorias…<\/p>/);
+  assert.match(workspace, /categoriesLoaded && !categoryDashboards\.length/);
 });
