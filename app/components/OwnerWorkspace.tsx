@@ -14,6 +14,7 @@ import PlatformOptimizerWorkspace from "./PlatformOptimizerWorkspace";
 import OwnerLaboratoryWorkspace from "./OwnerLaboratoryWorkspace";
 import OwnerAppearanceWorkspace from "./OwnerAppearanceWorkspace";
 import PlatformPlansWorkspace from "./PlatformPlansWorkspace";
+import OwnerOperationsWorkspace, { type OwnerOperationsScreen } from "./OwnerOperationsWorkspace";
 import Link from "./StableLink";
 import ThemeControl from "./ThemeControl";
 import {
@@ -48,7 +49,8 @@ type OwnerTab =
   | "appearance"
   | "plans"
   | "controls"
-  | "laboratory";
+  | "laboratory"
+  | OwnerOperationsScreen;
 type OwnerGridPreset = "2x2" | "2x4" | "4x2" | "4x4";
 type OwnerMetricKey =
   | "comunidades_ativas"
@@ -71,6 +73,13 @@ const TABS: { id: OwnerTab; label: string; icon: string }[] = [
   { id: "appearance", label: "Aparência", icon: "◐" },
   { id: "plans", label: "Planos", icon: "¤" },
   { id: "laboratory", label: "Laboratório", icon: "◈" },
+  { id: "passwords", label: "Redefinições de senha", icon: "⌁" },
+  { id: "deleted", label: "Contas excluídas", icon: "⊘" },
+  { id: "finance", label: "Financeiro", icon: "¤" },
+  { id: "realtime", label: "Tempo real", icon: "◉" },
+  { id: "performance", label: "Desempenho", icon: "↗" },
+  { id: "publication", label: "Publicação do sistema", icon: "⇧" },
+  { id: "incidents", label: "Incidentes", icon: "!" },
   { id: "controls", label: "Configurações", icon: "⚙" },
 ];
 
@@ -476,6 +485,7 @@ export default function OwnerWorkspace({
             </>
           )}
           {tab === "laboratory" && <OwnerLaboratoryWorkspace />}
+          {(["passwords", "deleted", "finance", "realtime", "performance", "publication", "incidents"] as OwnerOperationsScreen[]).includes(tab as OwnerOperationsScreen) && <OwnerOperationsWorkspace screen={tab as OwnerOperationsScreen} />}
 
           {tab === "requests" && data && (
             <section className="owner-request-board">
@@ -819,6 +829,13 @@ function tabDescription(tab: OwnerTab) {
     appearance: "Aplique paleta, logotipo, banner e papel de parede a uma comunidade ou a todas de uma vez.",
     plans: "Defina os planos e chamadas comerciais da prévia exclusiva do proprietário.",
     laboratory: "Crie e valide protótipos isolados, sem modificar páginas ou dados reais.",
+    passwords: "Acompanhe redefinições com links de uso único e prazo curto.",
+    deleted: "Consulte contas anonimizadas e restaure somente dentro do prazo.",
+    finance: "Acompanhe cobranças administrativas, vencimentos e renovações.",
+    realtime: "Monitore presença e atividade agregada sem expor conteúdo.",
+    performance: "Investigue falhas, incidentes e lacunas de observabilidade.",
+    publication: "Aprove e acompanhe cada etapa antes de liberar uma versão.",
+    incidents: "Priorize ocorrências, acompanhe impacto e registre resoluções.",
     controls: "Configure identidade, módulos e regras globais da plataforma.",
   }[tab];
 }
