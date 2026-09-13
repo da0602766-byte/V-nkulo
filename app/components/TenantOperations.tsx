@@ -12,6 +12,7 @@ import {
 import { createPortal } from "react-dom";
 import { RelacionamentoTools } from "./RelacionamentoTools";
 import CareNotesBoard from "./CareNotesBoard";
+import { getVisitorAttention, visitorDaysWithoutContact, visitorToday } from "../lib/visitor-attention";
 
 type Visitor = {
   id: number;
@@ -1045,13 +1046,12 @@ export function VisitorsWorkspace({
     ? Math.round((monthlyGrowth / previousGrowthTotal) * 100)
     : monthlyGrowth > 0 ? 100 : 0;
   const relationshipPriorities = [...visitors]
-    .filter((visitor) => visitor.status !== "INTEGRADO")
+    .filter((visitor) => visitor.ativo && visitor.status !== "INTEGRADO")
     .map((visitor) => ({
       visitor,
-      daysWithoutContact: daysSince(visitor.ultimo_contato || visitor.criado_em),
+      daysWithoutContact: visitorDaysWithoutContact(visitor),
     }))
-    .sort((left, right) => right.daysWithoutContact - left.daysWithoutContact)
-    .slice(0, 4);
+    .sort((left, right) => right.daysWithoutContact - left.daysWithoutContact);
   const urgentRelationshipCount = relationshipPriorities.filter(
     (item) => item.daysWithoutContact >= 15,
   ).length;
@@ -1363,13 +1363,12 @@ export function VisitorsWorkspace({
           </div>
 
           {exportReviewOpen && <section className="visitor-export-review-v2" aria-label="Revisão antes da exportação">
-            <div><p className="pilot-kicker">ANTES DE EXPORTAR</p><h3>Revise e organize as informações</h3><p>Abra a ficha de qualquer pessoa para editar dados. A planilha só deve sair depois dessa conferência.</p></div>
+            <div><p className="pilot-kicker">ANTES DE EXPORTAR</p><h3>Revise e organize as informações</h3><p>A revisão e a planilha incluem os {visitors.length} cadastros carregados nesta lista.{nextCursor ? " Use Carregar mais pessoas para incluir os demais." : ""} Abra uma ficha para corrigir os dados.</p></div>
             <dl>
-              <div><dt>Sem categoria</dt><dd>{visitors.filter((item) => !item.categoria_id).length}</dd></div>
-              <div><dt>Sem telefone</dt><dd>{visitors.filter((item) => !item.telefone).length}</dd></div>
-              <div><dt>Sem responsável</dt><dd>{visitors.filter((item) => !item.responsavel_email && !item.acompanhante).length}</dd></div>
+              <div><dt>Sem categoria</dt><dd>{visitors.filter((item) => !item.categoria_nome?.trim()).length}</dd></div>
+              <div><dt>Sem telefone</dt><dd>{visitors.filter((item) => !item.telefone?.trim()).length}</dd></div>
+              <div><dt>Sem responsável</dt><dd>{visitors.filter((item) => !item.responsavel_email?.trim() && !item.acompanhante?.trim()).length}</dd></div>
             </dl>
-            <div className="visitor-export-suggestions-v2"><strong>Categorias sugeridas</strong><span>Novo visitante</span><span>Primeiro contato</span><span>Em acompanhamento</span><span>Integrado</span><span>Sem contato há 15 dias</span></div>
             <footer><button type="button" onClick={() => setExportReviewOpen(false)}>Continuar editando</button><button type="button" className="primary" onClick={() => { setExportReviewOpen(false); void exportVisitors(); }}>Exportar informações revisadas</button></footer>
           </section>}
 
@@ -1387,12 +1386,13 @@ export function VisitorsWorkspace({
               {activeVision === "arquivados" && <button type="button" onClick={() => changeVision("todos")}>Arquivados <span aria-hidden="true">×</span></button>}
             </div>
           )}
-          {columnsOpen && <div className="visitor-column-panel-v2"><span>Colunas essenciais do Figma</span><b>Nome</b><b>Contato</b><b>Categoria</b><b>Responsável</b><b>Status</b><b>Próxima ação</b></div>}
+          {columnsOpen && <div className="visitor-column-panel-v2"><span>No celular: nome, entrada, categoria e alertas. Toque no nome para abrir os demais dados.</span><b>Contato</b><b>Status</b><b>Último contato</b><b>Próximo passo</b></div>}
 
           {Boolean(selectedRows.length) && (
             <div className="visitor-bulkbar-v2"><strong>{selectedRows.length} selecionado(s)</strong><button type="button" onClick={() => setSelectedRows([])}>Limpar seleção</button>{canDeactivate && activeVision !== "arquivados" && <button type="button" className="danger" onClick={() => void archiveSelectedVisitors()}>Arquivar</button>}{canDeactivate && <button type="button" className="danger permanent" onClick={() => void permanentlyDeleteSelectedVisitors()}>Excluir</button>}</div>
           )}
           <OperationFeedback message={message} error={error} />
+          <div className="visitor-attention-legend" aria-label="Legenda dos alertas"><span data-tone="attention">Atenção ou dados incompletos</span><span data-tone="overdue">Retorno atrasado</span></div>
 
           <div className="visitor-table-scroll-v2" aria-busy={loading}>
             <table className="visitor-table-v2">
@@ -1401,17 +1401,19 @@ export function VisitorsWorkspace({
                 <th>Nome / Entrada</th><th>Contato</th><th>Categoria</th><th>Status</th><th>Último contato</th><th>Próximo passo</th>
               </tr></thead>
               <tbody>
-                {visibleVisitors.map((visitor) => (
-                  <tr key={visitor.id} onDoubleClick={() => void loadFollowups(visitor.id)}>
+                {visibleVisitors.map((visitor) => {
+                  const attention = getVisitorAttention(visitor);
+                  return (
+                  <tr key={visitor.id} data-attention={attention.tone} onDoubleClick={() => void loadFollowups(visitor.id)}>
                     <td><input type="checkbox" aria-label={`Selecionar ${visitor.nome_completo}`} checked={selectedRows.includes(visitor.id)} onChange={(event) => setSelectedRows((current) => event.target.checked ? [...current, visitor.id] : current.filter((id) => id !== visitor.id))} /></td>
-                    <th scope="row"><button type="button" className="visitor-person-cell-v2" onClick={() => void loadFollowups(visitor.id)}><span style={{ "--category-color": visitor.categoria_cor || "var(--pilot-blue)" } as CSSProperties}>{visitor.nome_completo.slice(0, 1).toLocaleUpperCase("pt-BR")}</span><span><strong>{visitor.nome_completo}</strong><small>Entrada {formatDate(visitor.data_entrada)}</small></span></button></th>
+                    <th scope="row"><button type="button" className="visitor-person-cell-v2" onClick={() => void loadFollowups(visitor.id)}><span aria-hidden="true" style={{ "--category-color": visitor.categoria_cor || "var(--pilot-blue)" } as CSSProperties}>{visitor.nome_completo.slice(0, 1).toLocaleUpperCase("pt-BR")}</span><span><strong>{visitor.nome_completo}</strong><span className="visitor-person-meta"><span className="visitor-person-category" style={{ "--category-color": visitor.categoria_cor || "var(--pilot-blue)" } as CSSProperties}><span aria-hidden="true">{visitor.categoria_icone || "○"}</span> {visitor.categoria_nome || "Sem categoria"}</span><small>Entrada <time dateTime={visitor.data_entrada}>{formatDate(visitor.data_entrada)}</time></small></span>{attention.reasons.length > 0 && <span className="visitor-person-attention"><span aria-hidden="true">⚠ </span>{attention.reasons.join(" · ")}</span>}</span></button></th>
                     <td><strong>{visitor.telefone || "Sem telefone"}</strong><small>{visitor.email || "Sem e-mail"}</small></td>
                     <td><span className="visitor-category-tag-v2" style={{ "--category-color": visitor.categoria_cor || "var(--pilot-blue)" } as CSSProperties}>{visitor.categoria_icone || "○"} {visitor.categoria_nome || "Sem categoria"}</span></td>
                     <td><span className={`visitor-project-status-v6 status-${visitor.status.toLowerCase()}`} aria-hidden="true" />{canEdit && activeVision !== "arquivados" ? <select aria-label={`Status de ${visitor.nome_completo}`} value={visitor.status} onChange={(event) => void updateVisitorField(visitor, { status: event.target.value })}><option value="NOVO">Recebido</option><option value="EM_CONTATO">Contatado</option><option value="EM_ACOMPANHAMENTO">Em acompanhamento</option><option value="INTEGRADO">Integrado</option></select> : <span>{activeVision === "arquivados" ? "Arquivado" : statusLabel(visitor.status)}</span>}</td>
                     <td>{visitor.ultimo_contato ? formatDateTime(visitor.ultimo_contato) : "Sem contato"}</td>
-                    <td className={visitor.proximo_contato && visitor.proximo_contato <= hojeLocal() ? "overdue" : ""}><div className="visitor-project-next-v6"><button type="button" className="visitor-next-step-v2" onClick={() => void loadFollowups(visitor.id)}>{canFollowup ? "Registrar contato" : "Abrir ficha"}</button>{visitor.proximo_contato && <small>{formatDate(visitor.proximo_contato)}</small>}<button type="button" className="visitor-row-open-v2" aria-label={`Abrir ficha de ${visitor.nome_completo}`} onClick={() => void loadFollowups(visitor.id)}>⋮</button></div></td>
+                    <td className={visitor.ativo && visitor.proximo_contato && visitor.proximo_contato < visitorToday() ? "overdue" : ""}><div className="visitor-project-next-v6"><button type="button" className="visitor-next-step-v2" onClick={() => void loadFollowups(visitor.id)}>{canFollowup && visitor.ativo ? "Registrar contato" : "Abrir ficha"}</button>{visitor.proximo_contato && <small>{formatDate(visitor.proximo_contato)}</small>}<button type="button" className="visitor-row-open-v2" aria-label={`Abrir ficha de ${visitor.nome_completo}`} onClick={() => void loadFollowups(visitor.id)}>⋮</button></div></td>
                   </tr>
-                ))}
+                ); })}
               </tbody>
             </table>
             {!loading && !visibleVisitors.length && <div className="visitor-empty-v2"><span aria-hidden="true">◎</span><strong>Nenhuma pessoa nesta visão</strong><p>Ajuste os filtros ou cadastre um novo visitante.</p></div>}
@@ -1864,13 +1866,6 @@ function spreadsheetDate(value: string) {
 function formatDate(value: string) {
   const [year, month, day] = value.slice(0, 10).split("-");
   return year && month && day ? `${day}/${month}/${year}` : value;
-}
-
-function daysSince(value: string | null) {
-  if (!value) return 0;
-  const date = new Date(value.includes("T") ? value : `${value.replace(" ", "T")}Z`);
-  if (Number.isNaN(date.getTime())) return 0;
-  return Math.max(0, Math.floor((Date.now() - date.getTime()) / 86_400_000));
 }
 
 function formatAgeRule(category: VisitorCategory) {
