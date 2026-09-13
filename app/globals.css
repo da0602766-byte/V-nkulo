@@ -34908,7 +34908,7 @@ html[data-pilot-theme="escuro"] :is(.ops-select-label select,.ops-filter-row sel
 .visitor-project-funnel-v6 button[data-etapa="EM_ACOMPANHAMENTO"] > span { background: #fdf2f8; color: #db2777; }
 .visitor-project-funnel-v6 button[data-etapa="INTEGRADO"] > span { background: #ecfdf5; color: #059669; }
 .visitor-project-funnel-v6 button > strong,
-.visitor-project-categories-v6 button > strong { overflow: hidden; font-size: .875rem; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.visitor-project-categories-v6 button > strong { overflow: hidden; color: var(--visitor-project-text) !important; font-size: .875rem; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .visitor-project-funnel-v6 button > b {
   border: 1px solid var(--visitor-project-border);
   border-radius: 999px;
@@ -35133,7 +35133,7 @@ html[data-pilot-theme="escuro"] :is(.ops-select-label select,.ops-filter-row sel
 }
 .visitor-project-priority-list-v6 > button:hover { border-color: #93c5fd; }
 .visitor-project-priority-list-v6 > button > span { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-.visitor-project-priority-list-v6 > button strong { font-size: .875rem; }
+.visitor-project-priority-list-v6 > button strong { color: var(--visitor-project-text) !important; font-size: .875rem; }
 .visitor-project-priority-list-v6 > button b { border-radius: 4px; background: #fef2f2; color: #dc2626; padding: 2px 6px; font-size: .65rem; letter-spacing: .06em; text-transform: uppercase; }
 .visitor-project-priority-list-v6 > button small { display: flex; align-items: center; gap: 7px; color: var(--visitor-project-muted); font-size: .75rem; }
 .visitor-project-priority-list-v6 > button small i { width: 6px; height: 6px; border-radius: 50%; background: #d1d5db; }
