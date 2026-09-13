@@ -1,0 +1,481 @@
+/* Pipeline de publicação. A trilha é horizontal no desktop e vertical no
+   celular — a ordem das etapas é a informação principal, e ela se lê melhor
+   empilhada quando não há largura. Herda os tokens de tema de globals.css. */
+
+.release-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.release-controls,
+.release-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.release-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.release-filters select,
+.release-filters input,
+.release-form input,
+.release-form select,
+.release-form textarea,
+.release-approval textarea,
+.release-rollback textarea {
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  font-family: inherit;
+}
+
+.release-indicators {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.release-indicators article {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  background: var(--surface);
+}
+
+.release-indicators span {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--faint);
+}
+
+.release-indicators strong {
+  font-size: 22px;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.release-indicators small {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+.release-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px 18px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.release-meta > span,
+.release-meta > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.release-meta small {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.release-meta strong {
+  font-size: var(--fs-sm);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+/* ---- Trilha das etapas ---- */
+.release-track {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(120px, 1fr);
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+  list-style: none;
+}
+
+.release-step {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  /* A barra de topo é o indicador de estado da etapa. */
+  border-top: 3px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.release-step-order {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--canvas);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.release-step-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.release-step-body strong {
+  font-size: var(--fs-sm);
+  color: var(--ink);
+}
+
+.release-step-body small {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.release-step-body em {
+  align-self: flex-start;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--rose-soft);
+  color: var(--rose);
+  font-size: 10px;
+  font-style: normal;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.release-step.step-SUCESSO {
+  border-top-color: var(--green);
+}
+
+.release-step.step-FALHA {
+  border-top-color: var(--rose);
+  background: var(--rose-soft);
+}
+
+.release-step.step-EM_ANDAMENTO {
+  border-top-color: var(--teal);
+}
+
+.release-step.step-PULADA {
+  opacity: 0.6;
+}
+
+.release-step.current {
+  box-shadow: inset 0 0 0 1px var(--teal);
+}
+
+.release-log-toggle {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--teal);
+  font-size: 11px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.release-logs {
+  max-height: 260px;
+  margin: 0;
+  padding: 10px 12px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ---- Aprovação e reversão ---- */
+.release-panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.release-approval,
+.release-rollback,
+.release-form,
+.release-compare {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+/* Aguardando decisão do proprietário: precisa saltar aos olhos, porque
+   nenhuma publicação em produção avança sem essa ação. */
+.release-approval.waiting {
+  border-color: var(--amber);
+  background: var(--amber-soft);
+}
+
+.release-approval.release-approved {
+  border-color: var(--green);
+}
+
+.release-rollback.critical {
+  border-color: var(--rose);
+  background: var(--rose-soft);
+}
+
+.release-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.release-actions button,
+.release-controls button,
+.release-form button,
+.release-rollback button,
+.release-approval button {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+.release-actions button:hover:not(:disabled),
+.release-controls button:hover:not(:disabled) {
+  border-color: var(--teal);
+  color: var(--teal);
+}
+
+.release-actions button:disabled,
+.release-controls button:disabled,
+.release-approval button:disabled,
+.release-rollback button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.release-alert,
+.release-unreported {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--amber);
+  border-radius: 0 8px 8px 0;
+  background: var(--amber-soft);
+  color: var(--ink);
+  font-size: var(--fs-xs);
+}
+
+.release-alert.critical {
+  border-left-color: var(--rose);
+  background: var(--rose-soft);
+}
+
+.release-failures {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.release-failures li {
+  padding: 8px 10px;
+  border-left: 3px solid var(--rose);
+  border-radius: 0 8px 8px 0;
+  background: var(--rose-soft);
+  font-size: var(--fs-xs);
+  color: var(--ink);
+}
+
+.release-current-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+/* ---- Histórico ---- */
+.release-table-wrap {
+  overflow-x: auto;
+}
+
+.release-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.release-table th {
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.release-table td {
+  padding: 10px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  vertical-align: top;
+}
+
+.release-table tbody tr:hover {
+  background: var(--canvas);
+}
+
+.release-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--canvas);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.release-tag.st-PUBLICADO {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.release-tag.st-FALHOU,
+.release-tag.st-REVERTIDO {
+  background: var(--rose-soft);
+  color: var(--rose);
+}
+
+.release-tag.st-AGUARDANDO_APROVACAO,
+.release-tag.st-EM_ANDAMENTO {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.release-tag.rollback {
+  background: var(--rose-soft);
+  color: var(--rose);
+}
+
+.release-tag.auto {
+  background: var(--violet-soft);
+  color: var(--violet-deep);
+}
+
+.release-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 0;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+@media (max-width: 720px) {
+  /* A trilha empilha: no celular a leitura vertical mantém a ordem clara. */
+  .release-track {
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+  }
+
+  .release-step {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 10px;
+    border-top: 1px solid var(--line);
+    border-left: 3px solid var(--line);
+  }
+
+  .release-step.step-SUCESSO {
+    border-top-color: var(--line);
+    border-left-color: var(--green);
+  }
+
+  .release-step.step-FALHA {
+    border-top-color: var(--line);
+    border-left-color: var(--rose);
+  }
+
+  .release-step.step-EM_ANDAMENTO {
+    border-top-color: var(--line);
+    border-left-color: var(--teal);
+  }
+
+  .release-indicators strong {
+    font-size: 19px;
+  }
+
+  .release-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .release-table tr {
+    display: block;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .release-table td {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 2px;
+    border: 0;
+  }
+
+  .release-table td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+}
