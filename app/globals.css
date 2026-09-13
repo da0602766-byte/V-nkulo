@@ -35379,3 +35379,249 @@ html[data-pilot-theme="escuro"] :is(.ops-select-label select,.ops-filter-row sel
     padding-bottom: calc(94px + env(safe-area-inset-bottom));
   }
 }
+
+/* Visitantes — cadastro guiado. O formulário fica em uma etapa por vez para
+   preservar contexto no celular e reduzir a carga visual de uma ficha longa. */
+.visitor-registration-dialog {
+  --vr-bg: var(--pilot-bg, #f2f3f5);
+  --vr-surface: var(--pilot-surface, #fbfbfa);
+  --vr-surface-soft: var(--pilot-surface-2, #e9ecef);
+  --vr-text: var(--pilot-text, #1b2430);
+  --vr-muted: var(--pilot-muted, #5f6975);
+  --vr-line: var(--pilot-line, #d6dbe0);
+  --vr-accent: var(--pilot-primary, #b25a33);
+  --vr-accent-soft: color-mix(in srgb, var(--vr-accent) 10%, var(--vr-surface));
+  --vr-danger: var(--pilot-danger, #c6475e);
+  width: min(820px, calc(100vw - 32px)) !important;
+  max-height: min(820px, calc(100dvh - 32px)) !important;
+  border: 1px solid var(--vr-line) !important;
+  border-radius: 24px !important;
+  background: var(--vr-bg) !important;
+  color: var(--vr-text) !important;
+  box-shadow: 0 30px 100px rgb(6 12 22 / .4) !important;
+}
+.visitor-registration-backdrop {
+  z-index: 1500;
+  padding: 16px !important;
+  background: rgb(5 10 18 / .7) !important;
+  backdrop-filter: blur(14px);
+}
+.visitor-registration-dialog > header.visitor-registration-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 25px 28px 20px !important;
+  border: 0;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--vr-accent) 7%, var(--vr-bg)), var(--vr-bg));
+}
+.visitor-registration-dialog-header > div { min-width: 0; }
+.visitor-registration-dialog-header h2 {
+  margin: 7px 0 6px !important;
+  color: var(--vr-text);
+  font-size: clamp(1.65rem, 3vw, 2.15rem) !important;
+  line-height: 1.08;
+  letter-spacing: -.035em;
+}
+.visitor-registration-dialog-header p:last-child {
+  max-width: 580px;
+  margin: 0 !important;
+  color: var(--vr-muted) !important;
+  font-size: .98rem;
+  line-height: 1.45;
+}
+.visitor-registration-dialog-header > button {
+  width: 42px !important;
+  height: 42px !important;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--vr-line) !important;
+  border-radius: 13px !important;
+  background: var(--vr-surface) !important;
+  color: var(--vr-text) !important;
+  font-size: 1.7rem !important;
+  line-height: 1;
+  cursor: pointer;
+}
+.visitor-registration-dialog-header > button:hover { border-color: var(--vr-accent) !important; color: var(--vr-accent) !important; }
+.visitor-registration-progress {
+  display: grid;
+  grid-template-columns: minmax(170px, .8fr) minmax(160px, 1fr);
+  align-items: end;
+  gap: 12px 24px;
+  padding: 15px 28px 16px;
+  border-top: 1px solid color-mix(in srgb, var(--vr-line) 70%, transparent);
+  border-bottom: 1px solid var(--vr-line);
+  background: var(--vr-surface);
+}
+.visitor-registration-progress-copy { min-width: 0; display: grid; gap: 2px; }
+.visitor-registration-progress-copy span { color: var(--vr-accent); font-size: .74rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.visitor-registration-progress-copy strong { overflow: hidden; color: var(--vr-text); font-size: 1rem; text-overflow: ellipsis; white-space: nowrap; }
+.visitor-registration-progress-copy small { color: var(--vr-muted); font-size: .78rem; }
+.visitor-registration-progress-track { height: 7px; overflow: hidden; align-self: center; border-radius: 999px; background: var(--vr-surface-soft); }
+.visitor-registration-progress-track i { display: block; height: 100%; border-radius: inherit; background: var(--vr-accent); transition: width .28s ease; }
+.visitor-registration-step-list { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.visitor-registration-step-list button {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 7px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--vr-muted);
+  text-align: left;
+  cursor: pointer;
+}
+.visitor-registration-step-list button > span { width: 24px; height: 24px; display: grid; flex: 0 0 auto; place-items: center; border: 1px solid var(--vr-line); border-radius: 8px; font-size: .68rem; font-weight: 900; }
+.visitor-registration-step-list button > strong { overflow: hidden; font-size: .78rem; text-overflow: ellipsis; white-space: nowrap; }
+.visitor-registration-step-list button.active { background: var(--vr-accent-soft); color: var(--vr-text); }
+.visitor-registration-step-list button.active > span,.visitor-registration-step-list button.complete > span { border-color: var(--vr-accent); background: var(--vr-accent); color: #fff; }
+.visitor-registration-step-list button.complete { color: var(--vr-accent); }
+.visitor-registration-step-list button:disabled { cursor: default; opacity: .68; }
+.visitor-registration-step-list button:focus-visible,.visitor-registration-dialog button:focus-visible,.visitor-registration-dialog input:focus-visible,.visitor-registration-dialog select:focus-visible,.visitor-registration-dialog textarea:focus-visible { outline: 3px solid color-mix(in srgb, var(--vr-accent) 30%, transparent); outline-offset: 2px; }
+.visitor-registration-dialog .visitor-registration {
+  min-height: 0;
+  display: block !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  padding: 20px 28px 24px !important;
+  background: var(--vr-bg);
+}
+.visitor-registration-section {
+  display: none !important;
+  min-width: 0;
+  margin: 0 !important;
+  overflow: visible !important;
+  border: 1px solid var(--vr-line) !important;
+  border-radius: 18px !important;
+  background: var(--vr-surface) !important;
+  box-shadow: 0 8px 24px rgb(12 20 35 / .05);
+}
+.visitor-registration-section.is-active { display: block !important; animation: visitor-registration-panel-in .24s ease both; }
+.visitor-registration-section[hidden] { display: none !important; }
+.visitor-registration-section-heading {
+  min-width: 0;
+  display: flex !important;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 19px 20px 17px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--vr-line) !important;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--vr-accent) 5%, var(--vr-surface)), var(--vr-surface)) !important;
+}
+.visitor-registration-section-heading > div { min-width: 0; display: flex; align-items: flex-start; gap: 12px; }
+.visitor-registration-number { width: 38px; height: 38px; display: grid; flex: 0 0 auto; place-items: center; border-radius: 12px; background: var(--vr-accent); color: #fff; font-size: .76rem; font-weight: 900; letter-spacing: .04em; }
+.visitor-registration-section-heading h3 { margin: 3px 0 4px; color: var(--vr-text); font-size: 1.2rem; letter-spacing: -.02em; }
+.visitor-registration-section-heading p { margin: 0; color: var(--vr-accent); font-size: .7rem; font-weight: 900; letter-spacing: .08em; }
+.visitor-registration-section-heading small { display: block; max-width: 540px; color: var(--vr-muted); font-size: .86rem; line-height: 1.4; }
+.visitor-registration-field-note { flex: 0 0 auto; padding: 6px 9px; border: 1px solid color-mix(in srgb, var(--vr-accent) 22%, var(--vr-line)); border-radius: 999px; background: var(--vr-accent-soft); color: var(--vr-accent); font-size: .72rem; font-weight: 850; white-space: nowrap; }
+.visitor-registration-section > fieldset {
+  min-width: 0;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0 !important;
+  padding: 20px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: var(--vr-surface) !important;
+}
+.visitor-registration-section > fieldset > legend { grid-column: 1 / -1; margin: 0; padding: 0; color: var(--vr-text); font-size: 1rem; font-weight: 850; }
+.visitor-registration-field { min-width: 0; display: grid !important; align-content: start; gap: 7px !important; color: var(--vr-text) !important; font-size: .86rem !important; font-weight: 800 !important; }
+.visitor-registration-field > span:first-child { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.visitor-registration-field > span:first-child em { color: var(--vr-muted); font-size: .72rem; font-style: normal; font-weight: 650; }
+.visitor-registration-field > small { color: var(--vr-muted); font-size: .76rem; font-weight: 500; line-height: 1.4; }
+.visitor-registration-field-wide { grid-column: 1 / -1 !important; }
+.visitor-registration-dialog .visitor-registration-field :is(input, select, textarea) { width: 100% !important; min-width: 0; min-height: 48px !important; padding: 0 13px !important; border: 1px solid var(--vr-line) !important; border-radius: 12px !important; background: var(--vr-bg) !important; color: var(--vr-text) !important; font: inherit; font-size: .95rem; box-shadow: none !important; }
+.visitor-registration-dialog .visitor-registration-field textarea { min-height: 116px !important; padding: 12px 13px !important; resize: vertical !important; line-height: 1.45; }
+.visitor-registration-dialog .visitor-registration-field :is(input, select, textarea)::placeholder { color: color-mix(in srgb, var(--vr-muted) 78%, transparent); opacity: 1; }
+.visitor-registration-dialog .visitor-registration-field :is(input, select, textarea):hover { border-color: color-mix(in srgb, var(--vr-accent) 30%, var(--vr-line)) !important; }
+.visitor-registration-field-help { grid-column: 1 / -1; margin: -5px 0 0; color: var(--vr-muted); font-size: .85rem; line-height: 1.45; }
+.visitor-registration-field-grid { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.visitor-choice-grid { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.visitor-choice-card,.visitor-status-card { min-width: 0; position: relative; display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: start; gap: 10px; min-height: 82px; padding: 13px; border: 1px solid var(--vr-line); border-radius: 13px; background: var(--vr-bg); color: var(--vr-text); cursor: pointer; transition: border-color .18s ease, background .18s ease, transform .18s ease; }
+.visitor-choice-card:hover,.visitor-status-card:hover { border-color: color-mix(in srgb, var(--vr-accent) 55%, var(--vr-line)); transform: translateY(-1px); }
+.visitor-choice-card:has(input:checked),.visitor-status-card:has(input:checked) { border-color: var(--vr-accent); background: var(--vr-accent-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--vr-accent) 30%, transparent); }
+.visitor-choice-card > input,.visitor-status-card > input,.visitor-toggle-card > input { position: absolute; width: 1px !important; height: 1px !important; min-height: 1px !important; margin: -1px; padding: 0 !important; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0 !important; opacity: 0; }
+.visitor-choice-mark { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid var(--vr-line); border-radius: 9px; background: var(--vr-surface); color: var(--vr-muted); font-size: .96rem; font-weight: 900; }
+.visitor-choice-card:has(input:checked) .visitor-choice-mark { border-color: var(--vr-accent); background: var(--vr-accent); color: #fff; }
+.visitor-choice-card > span:last-child,.visitor-status-card > span { min-width: 0; display: grid; align-content: start; gap: 4px; }
+.visitor-choice-card strong,.visitor-status-card strong { overflow: hidden; color: var(--vr-text); font-size: .86rem; line-height: 1.2; text-overflow: ellipsis; }
+.visitor-choice-card small,.visitor-status-card small { color: var(--vr-muted); font-size: .75rem; font-weight: 550; line-height: 1.35; }
+.visitor-toggle-list { grid-column: 1 / -1; display: grid; gap: 9px; margin-top: 3px; }
+.visitor-toggle-card { min-width: 0; position: relative; display: grid !important; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 10px !important; min-height: 64px; padding: 11px 13px; border: 1px solid var(--vr-line); border-radius: 13px; background: var(--vr-bg); color: var(--vr-text) !important; cursor: pointer; }
+.visitor-toggle-card:has(input:checked) { border-color: var(--vr-accent); background: var(--vr-accent-soft); }
+.visitor-toggle-mark { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 10px; background: var(--vr-surface); color: var(--vr-accent); font-size: 1rem; font-weight: 900; }
+.visitor-toggle-card:has(input:checked) .visitor-toggle-mark { background: var(--vr-accent); color: #fff; }
+.visitor-toggle-card > span:nth-of-type(2) { min-width: 0; display: grid; gap: 3px; }
+.visitor-toggle-card strong { color: var(--vr-text); font-size: .88rem; }
+.visitor-toggle-card small { color: var(--vr-muted); font-size: .76rem; font-weight: 550; }
+.visitor-toggle-card > i { color: var(--vr-muted); font-size: .7rem; font-style: normal; font-weight: 750; }
+.visitor-status-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.visitor-status-card { min-height: 72px; grid-template-columns: 1fr; padding: 11px; }
+.visitor-status-card > span { gap: 3px; }
+.visitor-registration-finish-grid > .visitor-registration-field > span:first-child { justify-content: flex-start; }
+.visitor-registration-finish-grid > .visitor-registration-field:nth-child(2) { grid-column: 1 / -1; }
+.visitor-registration-finish-grid > .visitor-registration-field-wide { grid-column: 1 / -1 !important; }
+.visitor-registration-dialog .visitor-duplicate-check { margin-top: 12px; padding: 14px; border-color: color-mix(in srgb, #e09a21 55%, var(--vr-line)); border-radius: 15px; background: color-mix(in srgb, #e09a21 8%, var(--vr-surface)); }
+.visitor-registration-dialog .visitor-duplicate-check > header strong { color: var(--vr-text); font-size: .9rem; }
+.visitor-registration-dialog .visitor-duplicate-check > header small { color: var(--vr-muted); font-size: .78rem; }
+.visitor-registration-dialog .visitor-duplicate-check > button { min-height: 50px; border-color: color-mix(in srgb, #e09a21 32%, var(--vr-line)); border-radius: 11px; background: var(--vr-surface); }
+.visitor-registration-dialog .visitor-duplicate-check > button > strong { color: var(--vr-accent); }
+.visitor-registration-duplicate-back { width: 100%; margin-top: 12px; padding: 11px 13px; border: 1px solid color-mix(in srgb, var(--vr-accent) 35%, var(--vr-line)) !important; border-radius: 11px !important; background: var(--vr-accent-soft) !important; color: var(--vr-accent) !important; font-size: .83rem; font-weight: 800; text-align: left; cursor: pointer; }
+.visitor-registration-error { margin: 13px 0 0; padding: 11px 13px; border: 1px solid color-mix(in srgb, var(--vr-danger) 35%, var(--vr-line)); border-radius: 11px; background: color-mix(in srgb, var(--vr-danger) 8%, var(--vr-surface)); color: var(--vr-danger); font-size: .84rem; font-weight: 750; line-height: 1.4; }
+.visitor-registration-actions {
+  position: sticky !important;
+  bottom: -24px;
+  z-index: 5;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  margin: 20px -28px -24px !important;
+  padding: 14px 28px calc(14px + env(safe-area-inset-bottom)) !important;
+  border-top: 1px solid var(--vr-line) !important;
+  background: color-mix(in srgb, var(--vr-bg) 94%, transparent) !important;
+  backdrop-filter: blur(12px);
+}
+.visitor-registration-actions > .form-consequence-v5 { min-width: 0; display: flex; align-items: flex-start; gap: 8px; margin: 0 !important; color: var(--vr-muted) !important; font-size: .78rem !important; font-weight: 550 !important; line-height: 1.4; }
+.visitor-registration-actions > .form-consequence-v5 > span { color: var(--vr-accent); flex: 0 0 auto; }
+.visitor-registration-action-buttons { display: flex; align-items: center; justify-content: flex-end; gap: 9px; }
+.visitor-registration-action-buttons button { min-height: 46px !important; border: 1px solid var(--vr-line) !important; border-radius: 12px !important; padding: 0 17px !important; background: var(--vr-surface) !important; color: var(--vr-text) !important; font-size: .88rem; font-weight: 850; cursor: pointer; }
+.visitor-registration-action-buttons .visitor-registration-primary { border-color: transparent !important; background: var(--vr-accent) !important; color: #fff !important; box-shadow: 0 8px 18px color-mix(in srgb, var(--vr-accent) 22%, transparent); }
+.visitor-registration-action-buttons button:disabled { cursor: wait; opacity: .66; }
+@keyframes visitor-registration-panel-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .visitor-registration-section.is-active,.visitor-registration-progress-track i,.visitor-choice-card,.visitor-status-card { animation: none; transition: none; }
+}
+@media (max-width: 680px) {
+  .visitor-registration-backdrop { align-items: stretch !important; padding: 0 !important; }
+  .visitor-registration-dialog { width: 100% !important; max-width: none !important; height: 100dvh !important; max-height: 100dvh !important; border: 0 !important; border-radius: 0 !important; }
+  .visitor-registration-dialog > header.visitor-registration-dialog-header { padding: calc(20px + env(safe-area-inset-top)) 18px 16px !important; }
+  .visitor-registration-dialog-header h2 { font-size: 1.65rem !important; }
+  .visitor-registration-dialog-header p:last-child { font-size: .9rem; }
+  .visitor-registration-progress { position: sticky; top: 0; z-index: 10; grid-template-columns: 1fr auto; gap: 8px 14px; padding: 12px 18px 13px; }
+  .visitor-registration-progress-copy small { display: none; }
+  .visitor-registration-progress-track { grid-column: 1 / -1; grid-row: 2; height: 6px; }
+  .visitor-registration-step-list { gap: 4px; }
+  .visitor-registration-step-list button { justify-content: center; padding: 5px 3px; }
+  .visitor-registration-step-list button > strong { display: none; }
+  .visitor-registration-step-list button > span { width: 27px; height: 27px; }
+  .visitor-registration-dialog .visitor-registration { padding: 14px 12px calc(104px + env(safe-area-inset-bottom)) !important; }
+  .visitor-registration-section-heading { padding: 16px 15px 15px !important; }
+  .visitor-registration-section-heading h3 { font-size: 1.08rem; }
+  .visitor-registration-section-heading small { font-size: .8rem; }
+  .visitor-registration-field-note { max-width: 108px; overflow: hidden; padding: 5px 7px; font-size: .65rem; text-overflow: ellipsis; }
+  .visitor-registration-section > fieldset { grid-template-columns: 1fr; gap: 13px; padding: 16px 15px !important; }
+  .visitor-registration-field-grid,.visitor-choice-grid,.visitor-status-grid { grid-template-columns: 1fr; gap: 10px; }
+  .visitor-registration-field-wide,.visitor-registration-finish-grid > .visitor-registration-field:nth-child(2) { grid-column: 1 !important; }
+  .visitor-choice-card { min-height: 68px; }
+  .visitor-registration-actions { bottom: -104px; grid-template-columns: 1fr; gap: 9px; margin: 18px -12px -104px !important; padding: 12px 12px calc(12px + env(safe-area-inset-bottom)) !important; }
+  .visitor-registration-actions > .form-consequence-v5 { order: 2; font-size: .74rem !important; }
+  .visitor-registration-action-buttons { order: 1; display: grid; grid-template-columns: 1fr 1.35fr; }
+  .visitor-registration-action-buttons button { width: 100%; }
+}

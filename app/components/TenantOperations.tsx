@@ -81,6 +81,12 @@ type VisitorGrowth = { categoria_id: number; mes: string; novos: number };
 
 const VISITOR_CATEGORY_ICONS = ["◎", "◇", "♡", "✦", "♙", "▣", "○", "△"];
 const VISITOR_CATEGORY_COLORS = ["#7357e8", "#2f80ed", "#12a879", "#e09a21", "#df5b72", "#8d5bd2"];
+const VISITOR_REGISTRATION_STEPS = [
+  { number: "01", title: "Dados pessoais", shortTitle: "Pessoa", description: "O essencial para identificar e encontrar essa pessoa." },
+  { number: "02", title: "Conexão espiritual", shortTitle: "Caminhada", description: "Um pouco do momento atual da sua caminhada." },
+  { number: "03", title: "Vínculo com a igreja", shortTitle: "Vínculo", description: "Onde ela pode se conectar e ser acolhida." },
+  { number: "04", title: "Finalização", shortTitle: "Revisão", description: "Organize a entrada e deixe uma observação." },
+] as const;
 
 // A data de hoje em fuso local. toISOString() devolve UTC: no Brasil, das 21h
 // em diante a data já virou, e um visitante recebido no culto de domingo à
@@ -157,6 +163,7 @@ export function VisitorsWorkspace({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [registrationOpen, setRegistrationOpen] = useState(false);
+  const [registrationStep, setRegistrationStep] = useState(0);
   const [importing, setImporting] = useState(false);
   const [importFileName, setImportFileName] = useState("");
   const [importRows, setImportRows] = useState<VisitorImportRow[]>([]);
@@ -193,6 +200,21 @@ export function VisitorsWorkspace({
   const canEdit = permissions.includes("visitors.edit");
   const canDeactivate = permissions.includes("visitors.deactivate");
   const canFollowup = permissions.includes("followups.manage");
+  const openRegistrationDialog = useCallback(() => {
+    setRegistrationStep(0);
+    setDuplicateMatches([]);
+    setDuplicateChecking(false);
+    setError("");
+    setRegistrationOpen(true);
+  }, []);
+  const closeRegistrationDialog = useCallback(() => {
+    if (saving) return;
+    setRegistrationOpen(false);
+    setRegistrationStep(0);
+    setDuplicateMatches([]);
+    setDuplicateChecking(false);
+    setError("");
+  }, [saving]);
   const visibleCategories = useMemo(() => {
     const term = categorySearch.trim().toLocaleLowerCase("pt-BR");
     if (!term) return categories;
@@ -533,11 +555,25 @@ export function VisitorsWorkspace({
 
   useEffect(() => {
     if (!canCreate) return;
-    const openRegistration = () => setRegistrationOpen(true);
+    const openRegistration = () => openRegistrationDialog();
     window.addEventListener("vinkulo:new-visitor", openRegistration);
     return () =>
       window.removeEventListener("vinkulo:new-visitor", openRegistration);
-  }, [canCreate]);
+  }, [canCreate, openRegistrationDialog]);
+
+  useEffect(() => {
+    if (!registrationOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeRegistrationDialog();
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [closeRegistrationDialog, registrationOpen]);
 
   async function loadFollowups(visitorId: number) {
     setSelectedId(visitorId);
@@ -577,6 +613,45 @@ export function VisitorsWorkspace({
     }, 380);
   }
 
+  function scrollRegistrationToTop() {
+    window.requestAnimationFrame(() => {
+      document
+        .querySelector<HTMLFormElement>("#visitor-registration-card .visitor-registration")
+        ?.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }
+
+  function continueRegistration(form: HTMLFormElement) {
+    if (saving) return;
+    if (registrationStep === 0) {
+      const nameInput = form.elements.namedItem("nomeCompleto") as HTMLInputElement | null;
+      if (!nameInput?.checkValidity()) {
+        form.reportValidity();
+        return;
+      }
+      if (duplicateChecking) {
+        setError("Aguarde a verificação de cadastro duplicado terminar.");
+        return;
+      }
+      if (duplicateMatches.length) {
+        setError("Revise o cadastro parecido encontrado antes de continuar.");
+        return;
+      }
+    }
+    setError("");
+    setRegistrationStep((current) => Math.min(VISITOR_REGISTRATION_STEPS.length - 1, current + 1));
+    scrollRegistrationToTop();
+  }
+
+  function handleRegistrationSubmit(event: FormEvent<HTMLFormElement>) {
+    if (registrationStep < VISITOR_REGISTRATION_STEPS.length - 1) {
+      event.preventDefault();
+      continueRegistration(event.currentTarget);
+      return;
+    }
+    void createVisitor(event);
+  }
+
   function openExistingVisitor(visitor: Visitor) {
     setSearch(visitor.nome_completo);
     setCategoryFilter("all");
@@ -604,6 +679,8 @@ export function VisitorsWorkspace({
       });
       form.reset();
       setDuplicateMatches([]);
+      setDuplicateChecking(false);
+      setRegistrationStep(0);
       setRegistrationOpen(false);
       setMessage("Cadastro salvo somente na comunidade ativa.");
       await Promise.all([loadVisitors(), loadCategories()]);
@@ -987,7 +1064,7 @@ export function VisitorsWorkspace({
           <p>Gestão de Visitantes</p>
         </div>
         <div className="visitor-hero-actions-v2">
-          {canCreate && <button type="button" className="visitor-hero-new-v2" onClick={() => setRegistrationOpen(true)}>＋ Novo visitante</button>}
+          {canCreate && <button type="button" className="visitor-hero-new-v2" onClick={openRegistrationDialog}>＋ Novo visitante</button>}
           {canManageCategories && (
           <div className="visitor-settings">
             <button
@@ -1159,28 +1236,39 @@ export function VisitorsWorkspace({
         </details>
       </aside>
 
-      {canCreate && <button type="button" className="visitor-registration-launch" onClick={() => setRegistrationOpen(true)}><span aria-hidden="true">＋</span><span><strong>Cadastrar novo visitante</strong><small>Abrir ficha completa em uma janela protegida</small></span><i aria-hidden="true">›</i></button>}
+      {canCreate && <button type="button" className="visitor-registration-launch" onClick={openRegistrationDialog}><span aria-hidden="true">＋</span><span><strong>Cadastrar novo visitante</strong><small>Abrir ficha completa em uma janela protegida</small></span><i aria-hidden="true">›</i></button>}
       <details className="visitor-registration-compat" aria-hidden="true"><summary>Cadastrar novo visitante</summary></details>
       {canCreate && registrationOpen && createPortal(
         <div className="visitor-registration-backdrop" role="presentation">
         <section id="visitor-registration-card" className="visitor-registration-dialog" role="dialog" aria-modal="true" aria-labelledby="visitor-registration-title">
-          <header><div><p className="pilot-kicker">NOVO VISITANTE</p><h2 id="visitor-registration-title">Cadastrar visitante</h2><p>Preencha a ficha sem perder o contexto da lista.</p></div><button type="button" aria-label="Fechar cadastro" onClick={() => !saving && setRegistrationOpen(false)}>×</button></header>
-          <form className="pilot-form visitor-registration" onSubmit={createVisitor} onInput={(event) => scheduleDuplicateCheck(event.currentTarget)}>
-            <section className="visitor-registration-section visitor-registration-form-section">
-              <header><span><b>1</b><strong>Informações pessoais</strong><small>Nome e formas de contato</small></span></header>
+          <header className="visitor-registration-dialog-header"><div><p className="pilot-kicker">NOVO VISITANTE · ETAPA {registrationStep + 1} DE {VISITOR_REGISTRATION_STEPS.length}</p><h2 id="visitor-registration-title">Cadastrar visitante</h2><p>{VISITOR_REGISTRATION_STEPS[registrationStep].description}</p></div><button type="button" aria-label="Fechar cadastro" onClick={closeRegistrationDialog}>×</button></header>
+          <nav className="visitor-registration-progress" aria-label="Etapas do cadastro">
+            <div className="visitor-registration-progress-copy"><span>Cadastro guiado</span><strong>{VISITOR_REGISTRATION_STEPS[registrationStep].title}</strong><small>{registrationStep === 0 ? "Comece pelo essencial" : "Você pode voltar e ajustar"}</small></div>
+            <div className="visitor-registration-progress-track" aria-hidden="true"><i style={{ width: `${((registrationStep + 1) / VISITOR_REGISTRATION_STEPS.length) * 100}%` }} /></div>
+            <div className="visitor-registration-step-list">
+              {VISITOR_REGISTRATION_STEPS.map((step, index) => (
+                <button key={step.number} type="button" className={index === registrationStep ? "active" : index < registrationStep ? "complete" : ""} aria-current={index === registrationStep ? "step" : undefined} disabled={index > registrationStep} onClick={() => { setError(""); setRegistrationStep(index); scrollRegistrationToTop(); }}>
+                  <span>{index < registrationStep ? "✓" : step.number}</span><strong>{step.shortTitle}</strong>
+                </button>
+              ))}
+            </div>
+          </nav>
+          <form className="pilot-form visitor-registration" onSubmit={handleRegistrationSubmit} onInput={(event) => scheduleDuplicateCheck(event.currentTarget)}>
+            <section className={`visitor-registration-section visitor-registration-form-section ${registrationStep === 0 ? "is-active" : "is-hidden"}`} aria-labelledby="visitor-registration-person-title" hidden={registrationStep !== 0}>
+              <header className="visitor-registration-section-heading"><div><span className="visitor-registration-number">01</span><div><p>ETAPA 1 · ESSENCIAL</p><h3 id="visitor-registration-person-title">Quem chegou?</h3><small>Comece com o dado que ajuda a equipe a reconhecer essa pessoa.</small></div></div><span className="visitor-registration-field-note">Nome obrigatório</span></header>
               <fieldset>
                 <legend>Dados pessoais</legend>
-                <label>Nome completo*<input name="nomeCompleto" required maxLength={120} /></label>
-                <label>Data de nascimento<input name="dataNascimento" type="date" /></label>
-                <label>Telefone/WhatsApp<input name="telefone" inputMode="tel" maxLength={30} /></label>
-                <label>E-mail<input name="email" type="email" maxLength={180} /></label>
-                <label className="visitor-wide-field">Parente ou responsável<input name="parente" maxLength={120} placeholder="Nome do familiar ou responsável" /></label>
-                <label className="visitor-wide-field">Endereço<input name="endereco" maxLength={250} /></label>
+                <label className="visitor-registration-field visitor-registration-field-wide"><span>Nome completo <em>obrigatório</em></span><input name="nomeCompleto" required maxLength={120} autoFocus={registrationStep === 0} placeholder="Ex.: Ana Clara Souza" /><small>O restante da ficha pode ser completado depois.</small></label>
+                <label className="visitor-registration-field"><span>Data de nascimento <em>opcional</em></span><input name="dataNascimento" type="date" /></label>
+                <label className="visitor-registration-field"><span>Telefone ou WhatsApp <em>opcional</em></span><input name="telefone" inputMode="tel" maxLength={30} placeholder="(00) 00000-0000" /></label>
+                <label className="visitor-registration-field"><span>E-mail <em>opcional</em></span><input name="email" type="email" maxLength={180} placeholder="nome@email.com" /></label>
+                <label className="visitor-registration-field"><span>Parente ou responsável <em>opcional</em></span><input name="parente" maxLength={120} placeholder="Nome do familiar ou responsável" /></label>
+                <label className="visitor-registration-field visitor-registration-field-wide"><span>Endereço <em>opcional</em></span><input name="endereco" maxLength={250} placeholder="Rua, número e bairro" /></label>
               </fieldset>
             </section>
-            {(duplicateChecking || duplicateMatches.length > 0) && (
+            {registrationStep === 0 && (duplicateChecking || duplicateMatches.length > 0) && (
               <section className={`visitor-duplicate-check ${duplicateMatches.length ? "has-matches" : ""}`} aria-live="polite">
-                <header><strong>{duplicateChecking ? "Verificando fichas…" : "Possível cadastro duplicado"}</strong><small>Comparamos nome, e-mail, telefone e parente.</small></header>
+                <header><strong>{duplicateChecking ? "Só um instante…" : "Possível cadastro duplicado"}</strong><small>{duplicateChecking ? "Estamos conferindo se essa pessoa já está cadastrada." : "Encontramos uma ficha parecida. Confira antes de criar outro cadastro."}</small></header>
                 {duplicateMatches.map((visitor) => (
                   <button key={visitor.id} type="button" onClick={() => openExistingVisitor(visitor)}>
                     <span><b>{visitor.nome_completo}</b><small>{visitor.email || visitor.telefone || visitor.parente || "Sem contato informado"}</small></span>
@@ -1189,35 +1277,52 @@ export function VisitorsWorkspace({
                 ))}
               </section>
             )}
-            <section className="visitor-registration-section visitor-registration-form-section">
-              <header><span><b>2</b><strong>Conexão espiritual</strong><small>Batismo e formação</small></span></header>
+            <section className={`visitor-registration-section visitor-registration-form-section ${registrationStep === 1 ? "is-active" : "is-hidden"}`} aria-labelledby="visitor-registration-spiritual-title" hidden={registrationStep !== 1}>
+              <header className="visitor-registration-section-heading"><div><span className="visitor-registration-number">02</span><div><p>ETAPA 2 · CAMINHADA</p><h3 id="visitor-registration-spiritual-title">Como está a caminhada?</h3><small>Essas informações ajudam a escolher uma conversa mais cuidadosa.</small></div></div><span className="visitor-registration-field-note">Tudo opcional</span></header>
               <fieldset>
-                <legend>Informações espirituais</legend>
-                <label>Batismo<select name="batizado" defaultValue="NAO_INFORMADO"><option value="NAO_INFORMADO">Não informado</option><option value="SIM">Sim</option><option value="NAO">Não</option></select></label>
-                <label className="visitor-check"><input name="encontroComDeus" type="checkbox" />Já participou do Encontro com Deus</label>
-                <label className="visitor-check"><input name="cursoMembros" type="checkbox" />Já concluiu o curso de membros</label>
+                <legend>Batismo</legend>
+                <p className="visitor-registration-field-help">Se não souber agora, escolha “Ainda não informado”.</p>
+                <div className="visitor-choice-grid" role="radiogroup" aria-label="Situação do batismo">
+                  <label className="visitor-choice-card"><input type="radio" name="batizado" value="NAO_INFORMADO" defaultChecked /><span className="visitor-choice-mark">?</span><span><strong>Ainda não informado</strong><small>Preencher depois</small></span></label>
+                  <label className="visitor-choice-card"><input type="radio" name="batizado" value="SIM" /><span className="visitor-choice-mark">✓</span><span><strong>Já foi batizado</strong><small>Sim, já passou pelo batismo</small></span></label>
+                  <label className="visitor-choice-card"><input type="radio" name="batizado" value="NAO" /><span className="visitor-choice-mark">—</span><span><strong>Ainda não</strong><small>Não foi batizado</small></span></label>
+                </div>
+                <div className="visitor-toggle-list">
+                  <label className="visitor-toggle-card"><input name="encontroComDeus" type="checkbox" /><span className="visitor-toggle-mark">✦</span><span><strong>Encontro com Deus</strong><small>Já participou dessa experiência</small></span><i>opcional</i></label>
+                  <label className="visitor-toggle-card"><input name="cursoMembros" type="checkbox" /><span className="visitor-toggle-mark">＋</span><span><strong>Curso de membros</strong><small>Já concluiu ou está fazendo o curso</small></span><i>opcional</i></label>
+                </div>
               </fieldset>
             </section>
-            <section className="visitor-registration-section visitor-registration-form-section">
-              <header><span><b>3</b><strong>Vínculo com a igreja</strong><small>Célula, categoria e ministério</small></span></header>
+            <section className={`visitor-registration-section visitor-registration-form-section ${registrationStep === 2 ? "is-active" : "is-hidden"}`} aria-labelledby="visitor-registration-connection-title" hidden={registrationStep !== 2}>
+              <header className="visitor-registration-section-heading"><div><span className="visitor-registration-number">03</span><div><p>ETAPA 3 · VÍNCULO</p><h3 id="visitor-registration-connection-title">Onde ela pode se conectar?</h3><small>Organize o próximo passo de acolhimento sem perder tempo.</small></div></div><span className="visitor-registration-field-note">Você pode completar depois</span></header>
               <fieldset>
                 <legend>Conexão com a igreja</legend>
-                <label>Célula<select name="celulaId" defaultValue=""><option value="">Sem célula</option>{cells.map((cell) => <option key={cell.id} value={cell.id}>{cell.nome}</option>)}</select></label>
-                <label>Categoria de acompanhamento<select name="categoriaId" defaultValue=""><option value="">Sem categoria</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.nome}</option>)}</select><small>Com data de nascimento, uma faixa automática configurada terá prioridade.</small></label>
-                <label>Quem recebeu<input name="acompanhante" maxLength={120} /></label>
-                <label>Ministério de interesse<input name="ministerio" maxLength={120} /></label>
+                <div className="visitor-registration-field-grid">
+                  <label className="visitor-registration-field"><span>Célula <em>opcional</em></span><select name="celulaId" defaultValue=""><option value="">Ainda não definida</option>{cells.map((cell) => <option key={cell.id} value={cell.id}>{cell.nome}</option>)}</select></label>
+                  <label className="visitor-registration-field"><span>Categoria de acompanhamento <em>opcional</em></span><select name="categoriaId" defaultValue=""><option value="">Ainda não definida</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.nome}</option>)}</select><small>Se houver data de nascimento, uma faixa automática terá prioridade.</small></label>
+                  <label className="visitor-registration-field"><span>Quem recebeu <em>opcional</em></span><input name="acompanhante" maxLength={120} placeholder="Nome de quem acolheu" /></label>
+                  <label className="visitor-registration-field"><span>Ministério de interesse <em>opcional</em></span><input name="ministerio" maxLength={120} placeholder="Ex.: Música, infantil, ação social" /></label>
+                </div>
               </fieldset>
             </section>
-            <section className="visitor-registration-section visitor-registration-form-section">
-              <header><span><b>4</b><strong>Finalização</strong><small>Entrada, status e observações</small></span></header>
+            <section className={`visitor-registration-section visitor-registration-form-section ${registrationStep === 3 ? "is-active" : "is-hidden"}`} aria-labelledby="visitor-registration-finish-title" hidden={registrationStep !== 3}>
+              <header className="visitor-registration-section-heading"><div><span className="visitor-registration-number">04</span><div><p>ETAPA 4 · REVISÃO</p><h3 id="visitor-registration-finish-title">Só falta organizar a entrada</h3><small>Revise o básico e deixe uma pista para o próximo contato.</small></div></div><span className="visitor-registration-field-note">Quase pronto</span></header>
               <fieldset>
-                <legend>Observações e finalização</legend>
-                <label>Entrada<input name="dataEntrada" type="date" required defaultValue={hojeLocal()} /></label>
-                <label>Status<select name="status" defaultValue="NOVO"><option value="NOVO">Novo</option><option value="EM_CONTATO">Em contato</option><option value="EM_ACOMPANHAMENTO">Em acompanhamento</option><option value="INTEGRADO">Integrado</option></select></label>
-                <label className="visitor-wide-field">Observações<textarea name="observacoes" maxLength={1000} rows={3} /></label>
+                <legend>Entrada e próximo passo</legend>
+                <div className="visitor-registration-field-grid visitor-registration-finish-grid">
+                  <label className="visitor-registration-field"><span>Data de entrada <em>obrigatório</em></span><input name="dataEntrada" type="date" required defaultValue={hojeLocal()} /></label>
+                  <div className="visitor-registration-field"><span>Status inicial</span><div className="visitor-status-grid" role="radiogroup" aria-label="Status inicial do visitante">
+                    <label className="visitor-status-card"><input type="radio" name="status" value="NOVO" defaultChecked /><span><strong>Novo</strong><small>Começar acolhimento</small></span></label>
+                    <label className="visitor-status-card"><input type="radio" name="status" value="EM_CONTATO" /><span><strong>Em contato</strong><small>Já conversamos</small></span></label>
+                    <label className="visitor-status-card"><input type="radio" name="status" value="EM_ACOMPANHAMENTO" /><span><strong>Acompanhamento</strong><small>Próximo cuidado definido</small></span></label>
+                  </div></div>
+                  <label className="visitor-registration-field visitor-registration-field-wide"><span>Observações <em>opcional</em></span><textarea name="observacoes" maxLength={1000} rows={4} placeholder="Como foi a chegada? Existe algum cuidado ou combinado para o próximo contato?" /></label>
+                </div>
               </fieldset>
             </section>
-            <footer className="visitor-registration-actions"><p className="form-consequence-v5"><span aria-hidden="true">◉</span>Só o nome é obrigatório. O visitante entra no fio do dia na hora e abre um acompanhamento para o contato.</p><button type="button" onClick={() => setRegistrationOpen(false)} disabled={saving}>Cancelar</button><button disabled={saving}>{saving ? "Salvando…" : "Salvar visitante"}</button></footer>
+            {registrationStep > 0 && duplicateMatches.length > 0 && <button type="button" className="visitor-registration-duplicate-back" onClick={() => { setRegistrationStep(0); setError(""); scrollRegistrationToTop(); }}>Voltar aos dados pessoais para revisar o cadastro parecido</button>}
+            {error && <p className="visitor-registration-error" role="alert">{error}</p>}
+            <footer className="visitor-registration-actions"><p className="form-consequence-v5"><span aria-hidden="true">◉</span>{registrationStep === VISITOR_REGISTRATION_STEPS.length - 1 ? "Ao salvar, a pessoa entra na lista de visitantes e fica pronta para acompanhamento." : "Só o nome é obrigatório. Você pode avançar e completar o restante depois."}</p><div className="visitor-registration-action-buttons"><button type="button" className="visitor-registration-secondary" onClick={() => registrationStep === 0 ? closeRegistrationDialog() : (setError(""), setRegistrationStep((current) => Math.max(0, current - 1)), scrollRegistrationToTop())} disabled={saving}>{registrationStep === 0 ? "Cancelar" : "Voltar"}</button><button type="submit" className="visitor-registration-primary" disabled={saving}>{saving ? "Salvando…" : registrationStep === VISITOR_REGISTRATION_STEPS.length - 1 ? "Salvar visitante" : "Continuar →"}</button></div></footer>
           </form>
         </section>
         </div>, document.body)}
