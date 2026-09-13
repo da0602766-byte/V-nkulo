@@ -135,29 +135,44 @@ export async function getPendingPromotionNotice(
   comunidadeId: number,
   usuarioId: number,
 ): Promise<PromotionNotice | null> {
-  const row = await db
-    .prepare(
-      `SELECT a.id, a.escopo, a.contexto, a.papel_anterior, a.papel_novo,
-        a.titulo, a.destaques, a.criado_em,
-        COALESCE(u.nome, '') AS promovido_por_nome
-       FROM avisos_promocao a
-       LEFT JOIN usuarios u ON u.id = a.promovido_por
-       WHERE a.usuario_id = ? AND a.comunidade_id = ? AND a.visto_em IS NULL
-       ORDER BY a.id DESC
-       LIMIT 1`,
-    )
-    .bind(usuarioId, comunidadeId)
-    .first<{
-      id: number;
-      escopo: string;
-      contexto: string;
-      papel_anterior: string;
-      papel_novo: string;
-      titulo: string;
-      destaques: string;
-      criado_em: string;
-      promovido_por_nome: string;
-    }>();
+  let row: {
+    id: number;
+    escopo: string;
+    contexto: string;
+    papel_anterior: string;
+    papel_novo: string;
+    titulo: string;
+    destaques: string;
+    criado_em: string;
+    promovido_por_nome: string;
+  } | null = null;
+  try {
+    row = await db
+      .prepare(
+        `SELECT a.id, a.escopo, a.contexto, a.papel_anterior, a.papel_novo,
+          a.titulo, a.destaques, a.criado_em,
+          COALESCE(u.nome, '') AS promovido_por_nome
+         FROM avisos_promocao a
+         LEFT JOIN usuarios u ON u.id = a.promovido_por
+         WHERE a.usuario_id = ? AND a.comunidade_id = ? AND a.visto_em IS NULL
+         ORDER BY a.id DESC
+         LIMIT 1`,
+      )
+      .bind(usuarioId, comunidadeId)
+      .first<{
+        id: number;
+        escopo: string;
+        contexto: string;
+        papel_anterior: string;
+        papel_novo: string;
+        titulo: string;
+        destaques: string;
+        criado_em: string;
+        promovido_por_nome: string;
+      }>();
+  } catch (error) {
+    if (!String(error).includes("no such table: avisos_promocao")) throw error;
+  }
   if (!row) return null;
   let destaques: string[] = [];
   try {
@@ -201,15 +216,20 @@ export async function getIntroductionState(
   usuarioId: number,
   comunidadeId: number,
 ): Promise<IntroductionState> {
-  const rows = await db
-    .prepare(
-      `SELECT tipo FROM usuario_introducoes
-       WHERE usuario_id = ?
-         AND ((tipo = 'PLATAFORMA' AND comunidade_id = 0)
-           OR (tipo = 'COMUNIDADE' AND comunidade_id = ?))`,
-    )
-    .bind(usuarioId, comunidadeId)
-    .all<{ tipo: string }>();
+  let rows: { results?: Array<{ tipo: string }> } = {};
+  try {
+    rows = await db
+      .prepare(
+        `SELECT tipo FROM usuario_introducoes
+         WHERE usuario_id = ?
+           AND ((tipo = 'PLATAFORMA' AND comunidade_id = 0)
+             OR (tipo = 'COMUNIDADE' AND comunidade_id = ?))`,
+      )
+      .bind(usuarioId, comunidadeId)
+      .all<{ tipo: string }>();
+  } catch (error) {
+    if (!String(error).includes("no such table: usuario_introducoes")) throw error;
+  }
   const seen = new Set((rows.results || []).map((row) => String(row.tipo)));
   return {
     plataforma: seen.has("PLATAFORMA"),
