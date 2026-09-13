@@ -1,0 +1,317 @@
+/* Controle global e gestão administrativa de comunidades.
+   Tabelas fortes, formulários densos e poucos cartões; herda os tokens de tema
+   de globals.css, então acompanha claro/escuro. */
+
+.ctrl-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.ctrl-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.ctrl-block > header h2 {
+  margin: 2px 0 0;
+  font-size: var(--fs-lg);
+  color: var(--ink);
+}
+
+.ctrl-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-items: end;
+  gap: 10px;
+}
+
+.ctrl-form label,
+.ctrl-workspace > label,
+.ctrl-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ctrl-form label > span,
+.ctrl-workspace label > span,
+.ctrl-inline > span {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.ctrl-wide {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ctrl-form input,
+.ctrl-form select,
+.ctrl-wide input,
+.ctrl-inline input {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  font-family: inherit;
+}
+
+.ctrl-inline {
+  max-width: 110px;
+}
+
+.ctrl-form button,
+.ctrl-actions button,
+.ctrl-history button,
+.ctrl-table button {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+.ctrl-form button:hover:not(:disabled),
+.ctrl-actions button:hover:not(:disabled),
+.ctrl-table button:hover:not(:disabled),
+.ctrl-history button:hover:not(:disabled) {
+  border-color: var(--teal);
+  color: var(--teal);
+}
+
+.ctrl-form button:disabled,
+.ctrl-actions button:disabled,
+.ctrl-history button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.ctrl-primary {
+  border-color: var(--teal) !important;
+  color: var(--teal) !important;
+}
+
+.ctrl-danger {
+  border-color: var(--rose) !important;
+  color: var(--rose) !important;
+}
+
+.ctrl-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ctrl-hint,
+.ctrl-quiet,
+.ctrl-updated {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+.ctrl-updated {
+  color: var(--faint);
+}
+
+.ctrl-table-wrap {
+  overflow-x: auto;
+}
+
+.ctrl-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.ctrl-table th {
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.ctrl-table td {
+  padding: 10px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  vertical-align: top;
+}
+
+.ctrl-table tbody tr:hover {
+  background: var(--canvas);
+}
+
+.ctrl-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.ctrl-sub.warn {
+  color: var(--amber);
+}
+
+.ctrl-sub.bad {
+  color: var(--rose);
+}
+
+.ctrl-tag {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--canvas);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ctrl-tag.ok {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.ctrl-tag.warn {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+/* Alteração crítica precisa ser visível antes do clique, não depois. */
+.ctrl-tag.critical {
+  background: var(--rose-soft);
+  color: var(--rose);
+}
+
+.ctrl-tag.off {
+  background: var(--canvas);
+  color: var(--faint);
+}
+
+.ctrl-history {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ctrl-history li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--line);
+  border-radius: 0 8px 8px 0;
+  background: var(--canvas);
+}
+
+.ctrl-history li[data-critica="1"] {
+  border-left-color: var(--rose);
+}
+
+.ctrl-history strong {
+  display: block;
+  font-size: var(--fs-sm);
+  color: var(--ink);
+}
+
+.ctrl-history p {
+  margin: 2px 0 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+.ctrl-history small {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.ctrl-admin {
+  padding: 14px;
+  border: 1px solid var(--teal);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.ctrl-subblock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.ctrl-subblock > strong {
+  font-size: var(--fs-sm);
+  color: var(--ink);
+}
+
+@media (max-width: 640px) {
+  .ctrl-form {
+    grid-template-columns: 1fr;
+  }
+
+  .ctrl-inline {
+    max-width: none;
+  }
+
+  .ctrl-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .ctrl-table tr {
+    display: block;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .ctrl-table td {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 2px;
+    border: 0;
+  }
+
+  .ctrl-table td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  .ctrl-history li {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

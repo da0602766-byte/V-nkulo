@@ -21,6 +21,9 @@ import OwnerPasswordResetsWorkspace from "./OwnerPasswordResetsWorkspace";
 import OwnerDeletedAccountsWorkspace from "./OwnerDeletedAccountsWorkspace";
 import OwnerOverviewSignals from "./OwnerOverviewSignals";
 import OwnerPeopleInsights from "./OwnerPeopleInsights";
+import OwnerReleaseWorkspace from "./OwnerReleaseWorkspace";
+import OwnerGlobalControlsWorkspace from "./OwnerGlobalControlsWorkspace";
+import OwnerCommunityAdminWorkspace from "./OwnerCommunityAdminWorkspace";
 import Link from "./StableLink";
 import ThemeControl from "./ThemeControl";
 import {
@@ -61,7 +64,8 @@ type OwnerTab =
   | "performance"
   | "incidents"
   | "resets"
-  | "deleted";
+  | "deleted"
+  | "releases";
 type OwnerGridPreset = "2x2" | "2x4" | "4x2" | "4x4";
 type OwnerMetricKey =
   | "comunidades_ativas"
@@ -84,7 +88,8 @@ const TABS: { id: OwnerTab; label: string; icon: string }[] = [
   { id: "realtime", label: "Tempo real", icon: "◉" },
   { id: "performance", label: "Desempenho", icon: "⚡" },
   { id: "audit", label: "Segurança e auditoria", icon: "✓" },
-  { id: "editorial", label: "Publicações", icon: "✦" },
+  { id: "releases", label: "Publicação do sistema", icon: "⇧" },
+  { id: "editorial", label: "Publicações editoriais", icon: "✦" },
   { id: "incidents", label: "Incidentes", icon: "▲" },
   { id: "feedback", label: "Feedback e denúncias", icon: "!" },
   { id: "optimization", label: "Otimização", icon: "↻" },
@@ -525,6 +530,7 @@ export default function OwnerWorkspace({
             </section>
           )}
 
+          {tab === "communities" && <OwnerCommunityAdminWorkspace />}
           {tab === "users" && data && (
             <OwnerPeopleInsights
               comunidades={(data.communities || []).map((item) => ({
@@ -606,13 +612,19 @@ export default function OwnerWorkspace({
 
           {tab === "audit" && data && <section className="owner-audit-panel"><header><div><h2>Trilha de auditoria</h2><p>Pesquise e abra um registro para conferir os detalhes preservados.</p></div><div className="owner-audit-filters"><input type="search" value={auditSearch} onChange={(event) => setAuditSearch(event.target.value)} placeholder="Pesquisar ação, pessoa ou comunidade" /><select value={auditResult} onChange={(event) => setAuditResult(event.target.value)} aria-label="Filtrar por resultado"><option value="TODOS">Todos os resultados</option><option value="SUCESSO">Sucesso</option><option value="NEGADO">Negado</option><option value="ERRO">Erro</option></select></div></header><p className="owner-audit-retention" role="note">Retenção automática: registros com mais de {data.auditRetention?.days || 14} dias são excluídos. Esta tela mostra somente as {data.auditRetention?.visibleLimit || 20} ações mais recentes.</p><div className="owner-audit-list">{filteredAudit.map((item) => <details key={Number(item.id)}><summary><span>{String(item.resultado) === "SUCESSO" ? "✓" : "!"}</span><div><strong>{humanize(String(item.evento))}</strong><p>{String(item.comunidade_nome || "Plataforma")} · {String(item.usuario_nome || "Sistema")}</p></div><time>{formatDate(String(item.criado_em))}</time></summary><div className="owner-audit-detail"><span><small>Resultado</small><strong>{String(item.resultado || "NÃO INFORMADO")}</strong></span><span><small>Registro</small><strong>#{Number(item.id)}</strong></span><span><small>Responsável</small><strong>{String(item.usuario_nome || "Sistema")}</strong></span><span><small>Contexto</small><strong>{String(item.comunidade_nome || "Plataforma")}</strong></span><AuditMetadata value={item.metadados} /></div></details>)}{!filteredAudit.length && <Empty title="Nenhum registro encontrado" text="Ajuste a pesquisa ou o filtro de resultado." />}</div></section>}
           {tab === "feedback" && data && <FeedbackRepository items={data.feedback || []} working={working} onAction={feedbackAction} onOpenPost={(communityId, postId) => openCommunity(communityId, postId)} />}
+          {tab === "releases" && <OwnerReleaseWorkspace />}
           {tab === "resets" && <OwnerPasswordResetsWorkspace />}
           {tab === "deleted" && <OwnerDeletedAccountsWorkspace />}
           {tab === "editorial" && <EditorialAutomationWorkspace />}
           {tab === "statistics" && <StatisticsWorkspace />}
           {tab === "optimization" && <PlatformOptimizerWorkspace />}
           {tab === "appearance" && <OwnerAppearanceWorkspace />}
-          {tab === "controls" && <PlatformControlsWorkspace features={features} currentCommunityId={currentCommunityId} />}
+          {tab === "controls" && (
+            <>
+              <PlatformControlsWorkspace features={features} currentCommunityId={currentCommunityId} />
+              <OwnerGlobalControlsWorkspace />
+            </>
+          )}
           {tab === "plans" && <OwnerPlansWorkspace />}
           {tab === "finance" && <OwnerFinanceWorkspace />}
           {tab === "realtime" && <OwnerRealtimeWorkspace />}
@@ -862,7 +874,7 @@ function tabDescription(tab: OwnerTab) {
     users: "Consulte pessoas, vínculos e perfis globais.",
     audit: "Investigue ações, resultados e contexto de segurança.",
     feedback: "Analise problemas, sugestões, melhorias e denúncias enviadas em todo o sistema.",
-    editorial: "Revise, aprove e programe publicações da plataforma fora do contexto comunitário.",
+    editorial: "Revise, aprove e programe conteúdo editorial da plataforma fora do contexto comunitário.",
     statistics: "Consulte indicadores globais de uso sem expor ferramentas da plataforma nos menus comunitários.",
     optimization: "Diagnostique e execute retenções seguras sem remover dados ativos.",
     appearance: "Aplique paleta, logotipo, banner e papel de parede a uma comunidade ou a todas de uma vez.",
@@ -873,6 +885,7 @@ function tabDescription(tab: OwnerTab) {
     realtime: "Presença e atividade agregada, sem expor conteúdo das comunidades.",
     performance: "Falhas, negações e incidentes registrados pela própria plataforma.",
     incidents: "Incidentes agrupados por assinatura do erro, com gravidade e recorrência.",
+    releases: "Pipeline de publicação do sistema, com aprovação e reversão.",
     resets: "Aprove e acompanhe pedidos de redefinição de senha dos donos de comunidade.",
     deleted: "Contas removidas, janela de restauração e exclusão definitiva.",
   }[tab];
