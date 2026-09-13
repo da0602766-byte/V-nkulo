@@ -100,6 +100,9 @@
 }
 
 .incident-table-wrap {
+  /* Item de grid não encolhe abaixo do conteúdo sem isto: .owner-directory-panel
+     é display:grid e a tabela larga estouraria a viewport no celular. */
+  min-width: 0;
   overflow-x: auto;
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -292,6 +295,15 @@
 }
 
 @media (max-width: 720px) {
+
+  /* globals.css impõe `table { min-width: 760px }` a todas as tabelas do app.
+     Sem zerar isso aqui, a tabela empilhada no celular continua com 760px e
+     vaza da viewport — os rótulos aparecem e os valores ficam fora da tela. */
+  .incident-table {
+    min-width: 0;
+    max-width: 100%;
+  }
+
   /* A tabela vira lista empilhada: cada linha é um cartão. */
   .incident-table-wrap {
     overflow-x: visible;

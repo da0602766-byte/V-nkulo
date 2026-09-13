@@ -3,6 +3,9 @@
    empilhada quando não há largura. Herda os tokens de tema de globals.css. */
 
 .release-workspace {
+  /* Item de grid não encolhe abaixo do conteúdo sem isto: .owner-directory-panel
+     é display:grid e a tabela larga estouraria a viewport no celular. */
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -79,40 +82,76 @@
   color: var(--muted);
 }
 
-.release-meta {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px 18px;
-  padding: 12px 0;
-  border-top: 1px solid var(--line);
+.release-current-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 12px;
   border-bottom: 1px solid var(--line);
 }
 
-.release-meta > span,
+.release-current-head > div:first-child {
+  display: flex;
+  flex: 1 1 240px;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.release-current-head > div:first-child strong {
+  font-size: var(--fs-xl);
+  color: var(--ink);
+}
+
+.release-current-head > div:first-child span {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+/* O bloco de metadados é um <dl> com um <div> por par dt/dd. */
+.release-meta {
+  display: grid;
+  flex: 2 1 420px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px 18px;
+  margin: 0;
+}
+
 .release-meta > div {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
 
-.release-meta small {
+.release-meta dt {
   font-size: 11px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--faint);
 }
 
-.release-meta strong {
+.release-meta dd {
+  margin: 0;
   font-size: var(--fs-sm);
   color: var(--ink);
   overflow-wrap: anywhere;
 }
 
+.release-meta code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
 /* ---- Trilha das etapas ---- */
 .release-track {
+  /* Item de grid não encolhe abaixo do conteúdo sem isto: .owner-directory-panel
+     é display:grid e a tabela larga estouraria a viewport no celular. */
+  min-width: 0;
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(120px, 1fr);
+  grid-auto-columns: minmax(106px, 1fr);
   gap: 8px;
   margin: 0;
   padding: 0;
@@ -228,6 +267,40 @@
   gap: 14px;
 }
 
+.release-approval > label,
+.release-rollback > label,
+.release-form > label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.release-approval textarea,
+.release-rollback textarea {
+  min-height: 70px;
+  resize: vertical;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.release-approval > strong,
+.release-rollback > strong {
+  font-size: var(--fs-md);
+  color: var(--ink);
+}
+
+.release-approval > p,
+.release-rollback > p,
+.release-compare {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
 .release-approval,
 .release-rollback,
 .release-form,
@@ -326,17 +399,68 @@
   color: var(--ink);
 }
 
-.release-current-head {
+/* Comparação entre versões: cada item é uma linha de campos. */
+.release-history ul {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.release-history ul li {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  font-size: var(--fs-sm);
+  color: var(--ink);
+}
+
+.release-history ul li strong {
+  min-width: 64px;
+}
+
+.release-history ul li code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.release-history ul li time {
+  margin-left: auto;
+  font-size: var(--fs-xs);
+  color: var(--faint);
+}
+
+.release-history h3 {
+  margin: 0;
+  font-size: var(--fs-lg);
+  color: var(--ink);
+}
+
+.release-history > p {
+  margin: 0;
   font-size: var(--fs-xs);
   color: var(--muted);
 }
 
+.release-history {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
 /* ---- Histórico ---- */
 .release-table-wrap {
+  /* Item de grid não encolhe abaixo do conteúdo sem isto: .owner-directory-panel
+     é display:grid e a tabela larga estouraria a viewport no celular. */
+  min-width: 0;
   overflow-x: auto;
 }
 
@@ -415,6 +539,15 @@
 }
 
 @media (max-width: 720px) {
+
+  /* globals.css impõe `table { min-width: 760px }` a todas as tabelas do app.
+     Sem zerar isso aqui, a tabela empilhada no celular continua com 760px e
+     vaza da viewport — os rótulos aparecem e os valores ficam fora da tela. */
+  .release-table {
+    min-width: 0;
+    max-width: 100%;
+  }
+
   /* A trilha empilha: no celular a leitura vertical mantém a ordem clara. */
   .release-track {
     grid-auto-flow: row;
