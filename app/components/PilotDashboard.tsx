@@ -249,6 +249,7 @@ export default function PilotDashboard({
   const [communitySearch, setCommunitySearch] = useState("");
   const [navigationSearch, setNavigationSearch] = useState("");
   const [navigationSearchOpen, setNavigationSearchOpen] = useState(false);
+  const [quickActionSearch, setQuickActionSearch] = useState("");
   const [switching, setSwitching] = useState(false);
   const [viewLoading, setViewLoading] = useState(false);
   const [fontScale, setFontScale] = useState(1);
@@ -561,6 +562,13 @@ export default function PilotDashboard({
           }[],
     [active.communityAccess, active.permissions],
   );
+  const visibleQuickActions = useMemo(() => {
+    const term = quickActionSearch.trim().toLocaleLowerCase("pt-BR");
+    if (!term) return quickActions;
+    return quickActions.filter((action) =>
+      `${action.label} ${action.description}`.toLocaleLowerCase("pt-BR").includes(term),
+    );
+  }, [quickActionSearch, quickActions]);
   const filteredMemberships = useMemo(() => {
     const term = communitySearch.trim().toLocaleLowerCase("pt-BR");
     return term
@@ -1453,7 +1461,10 @@ export default function PilotDashboard({
         <button
           className={`pilot-mobile-create-button ${mobileMenu === "actions" ? "active" : ""}`}
           type="button"
-          onClick={() => setMobileMenu((current) => current === "actions" ? null : "actions")}
+          onClick={() => {
+            if (mobileMenu !== "actions") setQuickActionSearch("");
+            setMobileMenu((current) => current === "actions" ? null : "actions");
+          }}
           aria-expanded={mobileMenu === "actions"}
           aria-controls="pilot-mobile-sheet"
           aria-label="Adicionar ou cadastrar"
@@ -1631,20 +1642,63 @@ export default function PilotDashboard({
                 </div>
               </div>
             ) : mobileMenu === "actions" ? (
-              <div className="pilot-mobile-action-grid">
-                {quickActions.map((action) => (
-                  <button
-                    type="button"
-                    key={action.label}
-                    onClick={() => runQuickAction(action)}
-                  >
-                    <span aria-hidden="true"><MenuIcon id={action.icon} /></span>
-                    <div>
-                      <strong>{action.label}</strong>
-                      <small>{action.description}</small>
-                    </div>
-                  </button>
-                ))}
+              <div className="pilot-mobile-actions-content">
+                <label className="pilot-mobile-action-search">
+                  <span aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <circle cx="10.8" cy="10.8" r="6.8" />
+                      <path d="m16 16 4.2 4.2" />
+                    </svg>
+                  </span>
+                  <input
+                    type="search"
+                    value={quickActionSearch}
+                    onChange={(event) => setQuickActionSearch(event.target.value)}
+                    placeholder="Buscar ação..."
+                    aria-label="Buscar ação"
+                  />
+                </label>
+                {visibleQuickActions.length > 0 ? (
+                  <div className="pilot-mobile-action-grid">
+                    {visibleQuickActions.map((action) => {
+                      const chips = action.label === "Novo visitante"
+                        ? ["Visitantes", "Cadastro"]
+                        : action.label === "Gestão"
+                          ? ["Estacionamento", "Operação"]
+                          : action.label === "Novo evento"
+                            ? ["Agenda", "Comunidade"]
+                            : action.label === "Nova escala"
+                              ? ["Ministérios", "Escala"]
+                              : ["Pedidos", "Privacidade"];
+                      return (
+                        <button
+                          type="button"
+                          key={action.label}
+                          onClick={() => runQuickAction(action)}
+                        >
+                          <div className="pilot-mobile-action-copy">
+                            <strong>{action.label}</strong>
+                            <small>{action.description}</small>
+                            <span className="pilot-mobile-action-chips" aria-label={`Categorias: ${chips.join(", ")}`}>
+                              {chips.map((chip) => <i key={chip}>{chip}</i>)}
+                            </span>
+                          </div>
+                          <span className="pilot-mobile-action-illustration" aria-hidden="true"><MenuIcon id={action.icon} /></span>
+                          <span className="pilot-mobile-action-next" aria-hidden="true">→</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="pilot-mobile-action-empty" role="status">Nenhuma ação encontrada.</p>
+                )}
+                <footer className="pilot-mobile-action-footer">
+                  <span>
+                    <strong>Precisa de outra opção?</strong>
+                    <small>Encontre tudo no menu geral.</small>
+                  </span>
+                  <button type="button" onClick={() => setMobileMenu("menu")}>Ver menu geral <span aria-hidden="true">→</span></button>
+                </footer>
               </div>
             ) : mobileMenu === "shortcuts" && mobileShortcutSlot !== null ? (
               <div className="pilot-mobile-shortcut-customizer">
