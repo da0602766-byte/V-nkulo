@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import OwnerAreaChart from "./OwnerAreaChart";
 
 type Statistics = {
   totals: { users: number; communities: number };
@@ -46,11 +47,6 @@ export default function StatisticsWorkspace() {
     () => buildGrowth(data?.growth.users || [], data?.growth.communities || []),
     [data],
   );
-  const maxGrowth = Math.max(
-    1,
-    ...growth.flatMap((item) => [item.users, item.communities]),
-  );
-
   return (
     <section className="statistics-workspace">
       <header className="workspace-heading">
@@ -115,30 +111,28 @@ export default function StatisticsWorkspace() {
                 <p className="pilot-kicker">ÚLTIMOS 6 MESES</p>
                 <h2>Novos usuários e comunidades</h2>
               </div>
-              <div className="statistics-legend">
-                <span><i />Usuários</span>
-                <span><i />Comunidades</span>
-              </div>
             </header>
-            <div className="statistics-bars" aria-label="Gráfico de crescimento">
-              {growth.map((item) => (
-                <div key={item.month}>
-                  <div>
-                    <i
-                      style={{ height: `${Math.max(5, (item.users / maxGrowth) * 100)}%` }}
-                      title={`${item.users} novos usuários`}
-                    />
-                    <i
-                      style={{
-                        height: `${Math.max(5, (item.communities / maxGrowth) * 100)}%`,
-                      }}
-                      title={`${item.communities} novas comunidades`}
-                    />
-                  </div>
-                  <span>{formatMonthKey(item.month)}</span>
-                </div>
-              ))}
-            </div>
+            <OwnerAreaChart
+              ariaLabel="Gráfico de crescimento de usuários e comunidades"
+              series={[
+                {
+                  name: "Usuários",
+                  color: "teal",
+                  points: growth.map((item) => ({
+                    label: formatMonthKey(item.month),
+                    value: item.users,
+                  })),
+                },
+                {
+                  name: "Comunidades",
+                  color: "violet",
+                  points: growth.map((item) => ({
+                    label: formatMonthKey(item.month),
+                    value: item.communities,
+                  })),
+                },
+              ]}
+            />
           </section>
           <p className="statistics-updated">
             Atualizado em {new Intl.DateTimeFormat("pt-BR", {

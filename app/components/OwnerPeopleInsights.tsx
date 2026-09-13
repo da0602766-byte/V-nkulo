@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import "./OwnerCommandCenter.css";
+import OwnerAreaChart from "./OwnerAreaChart";
 
 type Tendencia = { atual: number; anterior: number; variacao: number; direcao: string };
 
@@ -64,8 +65,6 @@ export default function OwnerPeopleInsights({
     const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
   }, [load]);
-
-  const maximo = Math.max(1, ...(data?.evolucao || []).map((ponto) => ponto.total));
 
   return (
     <section className="owner-directory-panel occ-panel" aria-label="Indicadores de pessoas">
@@ -186,17 +185,20 @@ export default function OwnerPeopleInsights({
             {data.evolucao.length === 0 ? (
               <p className="occ-quiet">Nenhum cadastro no período selecionado.</p>
             ) : (
-              <div className="occ-bars" role="img" aria-label="Novos cadastros por mês">
-                {data.evolucao.map((ponto) => (
-                  <div key={ponto.chave} className="occ-bar">
-                    <i
-                      style={{ height: `${Math.max(2, (ponto.total / maximo) * 100)}%` }}
-                      title={`${ponto.chave}: ${ponto.total} cadastro(s)`}
-                    />
-                    <span>{ponto.chave.slice(5)}</span>
-                  </div>
-                ))}
-              </div>
+              <OwnerAreaChart
+                ariaLabel="Novos cadastros por mês"
+                series={[
+                  {
+                    name: "Cadastros",
+                    color: "teal",
+                    points: data.evolucao.map((ponto) => ({
+                      label: ponto.chave.slice(5),
+                      value: ponto.total,
+                    })),
+                  },
+                ]}
+                formatValue={(valor) => `${valor} cadastro(s)`}
+              />
             )}
           </section>
 

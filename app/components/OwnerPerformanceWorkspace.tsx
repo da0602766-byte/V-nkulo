@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import "./OwnerCommandCenter.css";
+import OwnerAreaChart from "./OwnerAreaChart";
 
 type Serie = { chave: string; total: number };
 type Tendencia = { atual: number; anterior: number; variacao: number; direcao: string };
@@ -61,8 +62,6 @@ export default function OwnerPerformanceWorkspace() {
     () => new Set((data?.falhas.anomalias || []).filter((item) => item.desvio > 0).map((item) => item.chave)),
     [data],
   );
-  const maximo = Math.max(1, ...(data?.falhas.serie || []).map((ponto) => ponto.total));
-
   return (
     <section className="owner-directory-panel occ-panel" aria-label="Desempenho e saúde do sistema">
       <header className="owner-directory-header">
@@ -148,17 +147,21 @@ export default function OwnerPerformanceWorkspace() {
                 Nenhuma falha ou negação registrada nesta janela. O gráfico aparece assim que houver ocorrências.
               </p>
             ) : (
-              <div className="occ-bars" role="img" aria-label="Falhas registradas por dia">
-                {data.falhas.serie.map((ponto) => (
-                  <div key={ponto.chave} className={anomalias.has(ponto.chave) ? "occ-bar occ-bar-alert" : "occ-bar"}>
-                    <i
-                      style={{ height: `${Math.max(2, (ponto.total / maximo) * 100)}%` }}
-                      title={`${ponto.chave}: ${ponto.total} falha(s)`}
-                    />
-                    <span>{ponto.chave.slice(8)}</span>
-                  </div>
-                ))}
-              </div>
+              <OwnerAreaChart
+                ariaLabel="Falhas registradas por dia"
+                series={[
+                  {
+                    name: "Falhas",
+                    color: "teal",
+                    points: data.falhas.serie.map((ponto) => ({
+                      label: ponto.chave.slice(8),
+                      value: ponto.total,
+                      alert: anomalias.has(ponto.chave),
+                    })),
+                  },
+                ]}
+                formatValue={(valor) => `${valor} falha(s)`}
+              />
             )}
             {anomalias.size > 0 && (
               <p className="occ-correlation" role="note">

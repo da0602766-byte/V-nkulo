@@ -425,3 +425,39 @@
     align-items: stretch;
   }
 }
+
+/* ---- Paleta refinada do redesign (escopada à área do Proprietário) ----
+   Ajusta a temperatura dos tokens neutros/verdes só dentro de .owner-area,
+   a partir do estudo visual feito no Figma Make. Não toca em :root nem em
+   outras áreas do produto — comunidade, células, escalas etc. continuam com
+   a paleta atual. */
+.owner-area {
+  --ink: #172128;
+  --muted: #66737b;
+  --faint: #9aa4a7;
+  --line: #e6e9e6;
+  --canvas: #f7f8f7;
+  --teal: #2c897e;
+  --green: #25805d;
+  --green-soft: #e6f3ec;
+}
+
+html[data-pilot-theme="escuro"] .owner-area {
+  --ink: #edf1f5;
+  --muted: #9aa7b3;
+  --faint: #71808c;
+  --line: #262f38;
+  --canvas: #1a2129;
+  --teal: #35a294;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-pilot-theme]) .owner-area {
+    --ink: #edf1f5;
+    --muted: #9aa7b3;
+    --faint: #71808c;
+    --line: #262f38;
+    --canvas: #1a2129;
+    --teal: #35a294;
+  }
+}
