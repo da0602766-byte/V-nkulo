@@ -34499,3 +34499,217 @@ html[data-pilot-theme="escuro"] .request-care-status.tone-blue { background:#173
 html[data-pilot-theme="escuro"] :is(.ops-section,.ops-panel,.ops-metrics article,.ops-stepper div,.ops-renewals article,.ops-incident,.ops-history span) { border-color: #2b364a; background: #111b2d; color: #eef3ff; }
 html[data-pilot-theme="escuro"] :is(.ops-table td,.ops-list > div) { border-color: #2b364a; }
 html[data-pilot-theme="escuro"] :is(.ops-select-label select,.ops-filter-row select,.ops-filter-row input,.ops-incident-detail) { border-color: #2b364a; background: #152034; color: #eef3ff; }
+
+/* Visitantes v4 — composição do protótipo do ZIP com os dados e permissões reais. */
+.pilot-dashboard[data-ui-version="v2"] .visitor-workspace-redesign {
+  width: 100%;
+  max-width: 1440px;
+}
+.visitor-command-layout-v4 {
+  display: grid;
+  grid-template-columns: minmax(190px, 232px) minmax(0, 1fr) minmax(260px, 300px);
+  align-items: start;
+  gap: 14px;
+  min-width: 0;
+}
+.visitor-reference-left-v4,
+.visitor-reference-main-v4,
+.visitor-reference-right-v4 {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+}
+.visitor-command-layout-v4 > .visitor-registration-launch,
+.visitor-command-layout-v4 > .visitor-registration-compat { display: none !important; }
+
+.visitor-rail-section-v4,
+.visitor-reference-left-v4 > .visitor-funnel-v5 {
+  min-width: 0;
+  overflow: hidden;
+  margin: 0;
+  border: 1px solid var(--pilot-line);
+  border-radius: 16px;
+  background: var(--pilot-surface);
+}
+.visitor-rail-summary-v4 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 58px;
+  padding: 12px 14px;
+  color: var(--pilot-text);
+  cursor: pointer;
+  list-style: none;
+}
+.visitor-rail-summary-v4::-webkit-details-marker { display: none; }
+.visitor-rail-summary-v4 > span { display: grid; gap: 2px; min-width: 0; }
+.visitor-rail-summary-v4 small {
+  color: var(--pilot-primary);
+  font-size: var(--fs-2xs);
+  font-weight: 900;
+  letter-spacing: .11em;
+}
+.visitor-rail-summary-v4 strong { font-size: var(--fs-sm); }
+.visitor-rail-summary-v4 > i {
+  color: var(--pilot-muted);
+  font-style: normal;
+  transition: transform .18s ease;
+}
+.visitor-rail-section-v4[open] > .visitor-rail-summary-v4 > i,
+.visitor-funnel-v5[open] > .visitor-rail-summary-v4 > i { transform: rotate(180deg); }
+
+.visitor-reference-left-v4 > .visitor-funnel-v5 {
+  display: block;
+}
+.visitor-funnel-list-v4 {
+  display: grid;
+  gap: 7px;
+  padding: 0 10px 10px;
+}
+.visitor-funnel-list-v4 article {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  border-radius: 11px;
+  padding: 10px 11px;
+}
+.visitor-funnel-list-v4 article > small { align-self: center; }
+.visitor-funnel-list-v4 article > strong {
+  grid-column: 2;
+  grid-row: 1 / 4;
+  align-self: center;
+  font-size: var(--fs-3xl);
+}
+.visitor-funnel-list-v4 article > :is(.visitor-funnel-bar-v5, em) { grid-column: 1; }
+
+.visitor-reference-left-v4 > .visitor-dashboard {
+  grid-template-columns: 1fr;
+  gap: 0;
+  overflow: hidden;
+  border-radius: 16px;
+  padding: 0;
+}
+.visitor-reference-left-v4 > .visitor-dashboard > header {
+  grid-column: 1;
+  align-items: start;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+}
+.visitor-reference-left-v4 > .visitor-dashboard h2 {
+  font-size: var(--fs-md);
+  line-height: 1.25;
+}
+.visitor-reference-left-v4 > .visitor-dashboard > header > strong { font-size: var(--fs-2xl); }
+.visitor-reference-left-v4 .visitor-growth-chart {
+  min-height: 144px;
+  margin: 12px;
+  gap: 4px;
+  padding: 8px 6px 0;
+}
+.visitor-reference-left-v4 .visitor-growth-chart > div { height: 128px; }
+.visitor-reference-left-v4 .visitor-growth-chart > div > span { width: min(24px, 78%); }
+.visitor-reference-left-v4 .visitor-category-dashboards { border-top: 1px solid var(--pilot-line); }
+.visitor-reference-left-v4 .visitor-category-filter-cards {
+  grid-template-columns: 1fr;
+  padding: 0 10px 10px;
+}
+
+.visitor-reference-main-v4 > .visitor-category-strip-v2,
+.visitor-reference-main-v4 > .visitor-insights-v2 { display: none; }
+.visitor-reference-main-v4 .visitor-view-tabs-v2 { min-width: 0; }
+.visitor-reference-main-v4 .visitor-sheet-v2 { border-radius: 16px; }
+.visitor-reference-main-v4 .visitor-table-scroll-v2 { max-height: 720px; }
+.visitor-reference-main-v4 :is(.visitor-sheet-head-v2 button,.visitor-commandbar-v2 button) {
+  color: var(--pilot-text);
+  font-size: .72rem;
+}
+.visitor-reference-main-v4 .visitor-table-v2 :is(th, td) { font-size: .68rem; }
+.visitor-reference-main-v4 .visitor-table-v2 thead th { color: var(--pilot-text); font-size: .61rem; }
+
+.visitor-reference-right-v4 .visitor-care-workspace-v3 { display: block; }
+.visitor-reference-right-v4 .relationship-command-center-v3 {
+  gap: 12px;
+  overflow: hidden;
+  border: 0;
+  border-top: 1px solid var(--pilot-line);
+  border-radius: 0;
+  padding: 13px;
+}
+.visitor-reference-right-v4 .relationship-head-v3 {
+  grid-template-columns: 1fr;
+  align-items: start;
+  gap: 10px;
+}
+.visitor-reference-right-v4 .relationship-head-v3 h2 { font-size: var(--fs-lg); }
+.visitor-reference-right-v4 .relationship-head-v3 > div > span { font-size: var(--fs-xs); }
+.visitor-reference-right-v4 .relationship-head-v3 dl {
+  width: 100%;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.visitor-reference-right-v4 .relationship-head-v3 dl div { min-width: 0; padding: 7px 4px; }
+.visitor-reference-right-v4 .relationship-head-v3 dd { font-size: var(--fs-lg); }
+.visitor-reference-right-v4 :is(.relationship-priority-grid-v3,.relationship-people-v3 > div,.relationship-history-columns-v3,.relationship-insights-v3 > div) {
+  grid-template-columns: 1fr;
+}
+.visitor-reference-right-v4 .relationship-insight-card-v4.is-alerts { grid-column: auto; }
+.visitor-reference-right-v4 :is(.relationship-priority-list-v3,.relationship-suggestions-v3,.relationship-people-v3,.relationship-history-v3) {
+  border-radius: 11px;
+  padding: 11px;
+}
+.visitor-reference-right-v4 .relationship-priority-list-v3 > div > button {
+  grid-template-columns: 9px minmax(0, 1fr);
+}
+.visitor-reference-right-v4 .relationship-priority-list-v3 button > b {
+  grid-column: 2;
+  justify-self: start;
+}
+.visitor-reference-right-v4 .relationship-history-v3 > header {
+  align-items: stretch;
+  flex-direction: column;
+}
+.visitor-reference-right-v4 .relationship-history-v3 > header select { width: 100%; min-width: 0; }
+.visitor-reference-right-v4 .visitor-birthday-card { border-radius: 16px; }
+.visitor-reference-right-v4 .visitor-birthday-list > article {
+  grid-template-columns: 34px minmax(0, 1fr);
+}
+.visitor-reference-right-v4 .visitor-birthday-list :is(a, article > span) { grid-column: 2; }
+.visitor-notes-rail-v4 > .care-notes-board.is-side {
+  position: static;
+  gap: 11px;
+  border: 0;
+  border-top: 1px solid var(--pilot-line);
+  border-radius: 0;
+  padding: 13px;
+}
+
+@media (max-width: 1180px) {
+  .visitor-command-layout-v4 { grid-template-columns: 218px minmax(0, 1fr); }
+  .visitor-reference-right-v4 {
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1.5fr) minmax(240px, .75fr);
+  }
+  .visitor-reference-right-v4 .visitor-notes-rail-v4 { grid-column: 1 / -1; }
+}
+
+@media (max-width: 840px) {
+  .visitor-command-layout-v4 { grid-template-columns: 1fr; }
+  .visitor-reference-left-v4 { order: 1; }
+  .visitor-reference-right-v4 {
+    order: 2;
+    grid-column: auto;
+    grid-template-columns: 1fr;
+  }
+  .visitor-reference-main-v4 { order: 3; }
+  .visitor-reference-right-v4 .visitor-notes-rail-v4 { grid-column: auto; }
+  .visitor-reference-left-v4 .visitor-category-filter-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 560px) {
+  .visitor-reference-left-v4 .visitor-category-filter-cards { grid-template-columns: 1fr; }
+  .visitor-sheet-head-v2 { align-items: stretch; flex-direction: column; }
+  .visitor-sheet-head-v2 > div:last-child { display: grid; grid-template-columns: 1fr; }
+  .visitor-commandbar-v2 { grid-template-columns: 1fr 1fr; }
+  .visitor-commandbar-v2 .visitor-search-v2 { grid-column: 1 / -1; }
+}

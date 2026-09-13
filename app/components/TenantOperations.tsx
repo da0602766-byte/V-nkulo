@@ -967,9 +967,9 @@ export function VisitorsWorkspace({
     <section className="visitor-workspace-redesign">
       <header className="visitor-hero">
         <div>
-          <p className="pilot-kicker">VISITANTES · {communityName}</p>
-          <h1>Relacionamento</h1>
-          <p>Acompanhe pessoas, contatos e próximos cuidados em uma única ficha.</p>
+          <p className="pilot-kicker">GESTÃO DE VISITANTES · {communityName}</p>
+          <h1>Gestão de Visitantes</h1>
+          <p>Organize o acolhimento, acompanhe cada contato e cuide dos próximos passos.</p>
         </div>
         <div className="visitor-hero-actions-v2">
           {canCreate && <button type="button" className="visitor-hero-new-v2" onClick={() => setRegistrationOpen(true)}>＋ Novo visitante</button>}
@@ -1096,23 +1096,30 @@ export function VisitorsWorkspace({
           )}
         </div>
       </header>
-      <section className="visitor-funnel-v5" aria-label="Funil de acolhimento">
-        {funnelStages.map((etapa) => {
-          const proporcao = funnelTotal ? Math.round((etapa.total / funnelTotal) * 100) : 0;
-          return (
-            <article key={etapa.id} data-etapa={etapa.id}>
-              <small>{etapa.label}</small>
-              <strong>{etapa.total}</strong>
-              <span className="visitor-funnel-bar-v5" aria-hidden="true">
-                <i style={{ width: `${proporcao}%` }} />
-              </span>
-              <em>{proporcao}% do total</em>
-            </article>
-          );
-        })}
-      </section>
+      <div className="visitor-command-layout-v4">
+      <aside className="visitor-reference-left-v4" aria-label="Resumo e filtros de visitantes">
+      <details className="visitor-funnel-v5" open>
+        <summary className="visitor-rail-summary-v4">
+          <span><small>FUNIL</small><strong>Jornada do visitante</strong></span>
+          <i aria-hidden="true">⌄</i>
+        </summary>
+        <div className="visitor-funnel-list-v4">
+          {funnelStages.map((etapa) => {
+            const proporcao = funnelTotal ? Math.round((etapa.total / funnelTotal) * 100) : 0;
+            return (
+              <article key={etapa.id} data-etapa={etapa.id}>
+                <small>{etapa.label}</small>
+                <strong>{etapa.total}</strong>
+                <span className="visitor-funnel-bar-v5" aria-hidden="true">
+                  <i style={{ width: `${proporcao}%` }} />
+                </span>
+                <em>{proporcao}% do total</em>
+              </article>
+            );
+          })}
+        </div>
+      </details>
 
-      <div className="visitor-overview-grid">
       <section className="visitor-dashboard" aria-labelledby="visitor-growth-title">
         <header>
           <div><p className="pilot-kicker">DASHBOARD CRESCENTE · Acompanhamento por categoria</p><h2 id="visitor-growth-title">Crescimento dos acompanhamentos</h2></div>
@@ -1164,27 +1171,7 @@ export function VisitorsWorkspace({
           </div>
         </details>
       </section>
-
-      <section className="visitor-birthday-card" aria-labelledby="visitor-birthday-title">
-        <header>
-          <div><p className="pilot-kicker">ANIVERSÁRIOS DO MÊS</p><h2 id="visitor-birthday-title">Celebre com carinho</h2></div>
-          <span>{birthdays.length}</span>
-        </header>
-        <div className="visitor-birthday-list">
-          {birthdays.map((visitor) => (
-            <article key={visitor.id}>
-              <time dateTime={visitor.data_nascimento || ""}>{birthdayDay(visitor.data_nascimento)}</time>
-              <div><strong>{visitor.nome_completo}</strong><small>{formatBirthday(visitor.data_nascimento)}</small></div>
-              {visitor.telefone && birthdayWhatsappHref(visitor) ? (
-                <a href={birthdayWhatsappHref(visitor) || undefined} target="_blank" rel="noreferrer" aria-label={`Enviar parabéns para ${visitor.nome_completo} pelo WhatsApp`}>WhatsApp</a>
-              ) : <span>Sem contato</span>}
-            </article>
-          ))}
-          {!birthdays.length && <p className="operations-muted">Nenhum aniversariante cadastrado neste mês.</p>}
-        </div>
-        <small>Exibindo até 5 pessoas com mensagem de parabéns pronta para envio.</small>
-      </section>
-      </div>
+      </aside>
 
       {canCreate && <button type="button" className="visitor-registration-launch" onClick={() => setRegistrationOpen(true)}><span aria-hidden="true">＋</span><span><strong>Cadastrar novo visitante</strong><small>Abrir ficha completa em uma janela protegida</small></span><i aria-hidden="true">›</i></button>}
       <details className="visitor-registration-compat" aria-hidden="true"><summary>Cadastrar novo visitante</summary></details>
@@ -1249,7 +1236,7 @@ export function VisitorsWorkspace({
         </section>
         </div>, document.body)}
 
-      <section className="visitor-relations-v2" aria-label="Relacionamento com visitantes">
+      <main className="visitor-reference-main-v4" aria-label="Diretório de visitantes">
         <nav className="visitor-view-tabs-v2" aria-label="Visões de visitantes">
           {([
             ["todos", "Todos"],
@@ -1312,13 +1299,6 @@ export function VisitorsWorkspace({
               {!birthdays.length && <p>Nenhum aniversariante neste mês.</p>}
             </div>
           </section>
-        </div>
-
-        <div className="visitor-care-workspace-v3">
-          {/* A central usa os mesmos dados do funil, mas organiza as decisões por
-              prioridade, pessoa e próximo cuidado. */}
-          <RelacionamentoTools visitantes={visitors} compacto={false} onAbrirVisitante={(visitorId) => void loadFollowups(visitorId)} />
-          <CareNotesBoard side />
         </div>
 
         <section className="visitor-sheet-v2" aria-labelledby="visitor-sheet-title">
@@ -1397,7 +1377,50 @@ export function VisitorsWorkspace({
           </div>
           {nextCursor && <button type="button" className="visitor-load-more-v2" disabled={loading} onClick={() => void loadVisitors(nextCursor, true)}>Carregar mais pessoas</button>}
         </section>
-      </section>
+      </main>
+
+      <aside className="visitor-reference-right-v4" aria-label="Relacionamento e datas importantes">
+        <details className="visitor-rail-section-v4" open>
+          <summary className="visitor-rail-summary-v4">
+            <span><small>CUIDADO</small><strong>Central de relacionamento</strong></span>
+            <i aria-hidden="true">⌄</i>
+          </summary>
+          <div className="visitor-care-workspace-v3">
+            {/* A central usa os mesmos dados do funil, mas organiza as decisões por
+                prioridade, pessoa e próximo cuidado. */}
+            <RelacionamentoTools visitantes={visitors} compacto={false} onAbrirVisitante={(visitorId) => void loadFollowups(visitorId)} />
+          </div>
+        </details>
+
+        <section className="visitor-birthday-card" aria-labelledby="visitor-birthday-title">
+          <header>
+            <div><p className="pilot-kicker">ANIVERSÁRIOS DO MÊS</p><h2 id="visitor-birthday-title">Celebre com carinho</h2></div>
+            <span>{birthdays.length}</span>
+          </header>
+          <div className="visitor-birthday-list">
+            {birthdays.map((visitor) => (
+              <article key={visitor.id}>
+                <time dateTime={visitor.data_nascimento || ""}>{birthdayDay(visitor.data_nascimento)}</time>
+                <div><strong>{visitor.nome_completo}</strong><small>{formatBirthday(visitor.data_nascimento)}</small></div>
+                {visitor.telefone && birthdayWhatsappHref(visitor) ? (
+                  <a href={birthdayWhatsappHref(visitor) || undefined} target="_blank" rel="noreferrer" aria-label={`Enviar parabéns para ${visitor.nome_completo} pelo WhatsApp`}>WhatsApp</a>
+                ) : <span>Sem contato</span>}
+              </article>
+            ))}
+            {!birthdays.length && <p className="operations-muted">Nenhum aniversariante cadastrado neste mês.</p>}
+          </div>
+          <small>Exibindo até 5 pessoas com mensagem de parabéns pronta para envio.</small>
+        </section>
+
+        <details className="visitor-rail-section-v4 visitor-notes-rail-v4">
+          <summary className="visitor-rail-summary-v4">
+            <span><small>HISTÓRICO INTERNO</small><strong>Notas de cuidado</strong></span>
+            <i aria-hidden="true">⌄</i>
+          </summary>
+          <CareNotesBoard side />
+        </details>
+      </aside>
+      </div>
 
       {Boolean(importRows.length) && createPortal(
         <div className="visitor-import-backdrop-v2" role="presentation">
