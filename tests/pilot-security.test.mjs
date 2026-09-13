@@ -119,7 +119,7 @@ test("governança V4.7.2 mantém exclusões protegidas, conta neutra e temas iso
 });
 
 test("gate do piloto protege recursos críticos e reautentica controles de rede", async () => {
-  const [config, flags, networks, editorial, signup, access, migration] =
+  const [config, flags, networks, editorial, signup, migration] =
     await Promise.all([
       readFile(new URL("../app/lib/pilot-config.ts", import.meta.url), "utf8"),
       readFile(
@@ -138,13 +138,11 @@ test("gate do piloto protege recursos críticos e reautentica controles de rede"
         new URL("../app/api/auth/cadastro/route.ts", import.meta.url),
         "utf8",
       ),
-      readFile(new URL("../app/lib/access.ts", import.meta.url), "utf8"),
       readFile(
         new URL("../drizzle/0013_chunky_scalphunter.sql", import.meta.url),
         "utf8",
       ),
     ]);
-  assert.match(config, /legacyModulesEnabled:\s*false/);
   assert.match(config, /networkModuleEnabled:\s*false/);
   assert.match(config, /paymentsEnabled:\s*false/);
   assert.match(config, /aiEditorialMode:\s*"COM_REVISAO"/);
@@ -160,14 +158,6 @@ test("gate do piloto protege recursos críticos e reautentica controles de rede"
   assert.match(signup, /INSERT INTO usuarios/);
   assert.match(signup, /membershipCreated:\s*false/);
   assert.doesNotMatch(signup, /INSERT INTO usuario_comunidades/);
-  assert.match(access, /legacyModulesEnabled/);
-  const legacyGate = access.indexOf("!PILOT_CONFIG.legacyModulesEnabled");
-  const permissionGate = access.indexOf("permission && !hasPermission");
-  assert.ok(legacyGate > -1, "gate dos módulos legados ausente");
-  assert.ok(
-    legacyGate < permissionGate,
-    "o bloqueio legado precisa ocorrer antes da autorização operacional",
-  );
   assert.match(migration, /'network_module_enabled','GLOBAL',0,0/);
   assert.match(migration, /'COM_REVISAO','ATIVA',0/);
 });
@@ -534,33 +524,72 @@ test("conversas ficam no perfil, isolam comunidade e respeitam membro versus ofi
   assert.doesNotMatch(chatApi, /chat.*public/i);
 });
 
-// Trava deliberada: as rotas legadas em `app/api/*` (fora de `app/api/pilot/*`)
-// usam o sistema de permissão de comunidade única, anterior à reforma
-// multi-tenant, e não filtram por `comunidade_id`. Hoje elas ficam inacessíveis
-// porque `requireApiPermission` checa `PILOT_CONFIG.legacyModulesEnabled` antes
-// de qualquer outra coisa. Esse teste existe para que religar a flag deixe de
-// ser uma mudança silenciosa: quem reativar precisa antes reescrever as rotas
-// com isolamento por comunidade e então atualizar este teste conscientemente.
-// O valor da flag já era coberto pelo teste do gate do piloto; o que falta lá
-// (e é o ponto deste teste) é garantir que a checagem continue existindo
-// dentro de `requireApiPermission` — flag falsa não protege nada se alguém
-// remover o `if` do caminho de código.
-// Ver a linha de 2026-09-08 em docs/coordenacao/COORDENACAO_IA.md.
-test("módulos legados de comunidade única continuam desligados", async () => {
-  const [config, access] = await Promise.all([
-    readFile(new URL("../app/lib/pilot-config.ts", import.meta.url), "utf8"),
+// As rotas `/api/cultos*` eram as últimas do sistema de permissão de comunidade
+// única: nenhuma delas filtrava por `comunidade_id` (zero ocorrências), e a
+// única proteção era o interruptor `PILOT_CONFIG.legacyModulesEnabled`, que as
+// barrava com 423. O proprietário decidiu em 12/09/2026 que o módulo Cultos não
+// é mais desejado, então rotas, `app/lib/cultos.ts`, o interruptor e o restante
+// de `app/lib/access.ts` (catálogo legado, `hasPermission`,
+// `requireApiPermission`) saíram juntos — `access.ts` ficou só com o tipo
+// `AppUser`, que o sistema atual usa.
+//
+// A trava anterior exigia que essas rotas continuassem atrás do interruptor;
+// agora que os arquivos não existem, ela passa a vigiar a ausência, mesmo
+// padrão já adotado para `/api/teens`. Restaurar aquele código como estava
+// reintroduz leitura sem isolamento entre comunidades. As tabelas
+// `culto_rotinas` e `culto_lancamentos` continuam no banco e no schema: remover
+// código não apaga dado, e a decisão foi aposentar a funcionalidade, não
+// descartar o histórico.
+// Ver docs/relatorios/AUDITORIA_ENDPOINTS_LEGADOS_2026-09-08.md (Classe B).
+test("módulo legado de cultos não volta ao repositório", async () => {
+  for (const caminho of [
+    "../app/api/cultos/route.ts",
+    "../app/api/cultos/[id]/route.ts",
+    "../app/api/cultos/[id]/lancamentos/route.ts",
+    "../app/api/cultos/[id]/lancamentos/[entryId]/route.ts",
+    "../app/api/cultos/pdf/route.ts",
+    "../app/lib/cultos.ts",
+  ]) {
+    await assert.rejects(
+      readFile(new URL(caminho, import.meta.url), "utf8"),
+      { code: "ENOENT" },
+      `${caminho} voltou ao repositório: essas rotas não filtram por comunidade_id e não podem ser restauradas como estavam`,
+    );
+  }
+
+  const [access, config, auth] = await Promise.all([
     readFile(new URL("../app/lib/access.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/lib/pilot-config.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/lib/local-auth.ts", import.meta.url), "utf8"),
   ]);
 
-  assert.match(
-    config,
-    /legacyModulesEnabled:\s*false/,
-    "PILOT_CONFIG.legacyModulesEnabled precisa continuar false até as rotas legadas isolarem por comunidade_id",
+  // O portão legado saiu inteiro: sem ele, não existe caminho de código que
+  // conceda acesso por perfil único, sem comunidade.
+  // Verificado sobre o que o arquivo EXPORTA, não sobre o texto: o comentário
+  // de cabeçalho cita os nomes removidos de propósito, para explicar a história.
+  assert.doesNotMatch(
+    access,
+    /export\s+(async\s+)?function|export\s+const/,
+    "app/lib/access.ts deve exportar apenas o tipo AppUser: qualquer função exportada aqui é o sistema de permissão de comunidade única voltando",
   );
   assert.match(
     access,
-    /if\s*\(!PILOT_CONFIG\.legacyModulesEnabled\)/,
-    "requireApiPermission precisa continuar bloqueando os módulos legados antes de checar perfil ou permissão",
+    /export type AppUser/,
+    "o tipo AppUser precisa continuar: local-auth.ts e tenant.ts dependem dele",
+  );
+  assert.doesNotMatch(
+    config,
+    /legacyModulesEnabled/,
+    "o interruptor de módulos legados não tem mais o que desligar e não deve voltar sem rotas que o justifiquem",
+  );
+
+  // A consulta de sessão roda em toda requisição autenticada. A subconsulta a
+  // `culto_rotinas` que vivia nela existia só para marcar `culto_registrador`,
+  // consumido apenas pelo catálogo legado; saiu junto e não deve voltar.
+  assert.doesNotMatch(
+    auth,
+    /culto_rotinas/,
+    "a consulta de sessão não deve voltar a consultar culto_rotinas: é o caminho mais quente do sistema",
   );
 });
 

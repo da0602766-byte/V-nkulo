@@ -1,6 +1,5 @@
 export const PILOT_CONFIG = {
   environment: "PILOTO",
-  legacyModulesEnabled: false,
   openRegistrationEnabled: true,
   privilegedMutationsEnabled: false,
   paymentsEnabled: false,
