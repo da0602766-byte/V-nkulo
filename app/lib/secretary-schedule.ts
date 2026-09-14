@@ -25,6 +25,8 @@ export type SecretaryScheduleDetail = Record<string, unknown> & {
     equipe_nome: string;
     equipe_cor: string;
     funcao: string;
+    ponto_encontro: string;
+    horario_encontro: string;
   }>;
   designacoes: Array<Record<string, unknown>>;
   checklist: Array<Record<string, unknown>>;
@@ -86,7 +88,7 @@ export async function getSecretaryScheduleDetail(
   const teams = await db
     .prepare(
       `SELECT se.equipe_id, equipe.nome AS equipe_nome, equipe.cor AS equipe_cor,
-        se.funcao
+        se.funcao, se.ponto_encontro, se.horario_encontro
        FROM escala_equipes se
        JOIN ministerio_equipes equipe
          ON equipe.id = se.equipe_id

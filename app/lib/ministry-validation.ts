@@ -52,6 +52,8 @@ export type SecretaryAssignment = {
 export type SecretaryScheduleTeam = {
   equipeId: number;
   funcao: string;
+  pontoEncontro: string;
+  horarioEncontro: string;
 };
 
 export type SecretaryChecklistItem = {
@@ -551,7 +553,12 @@ function parseScheduleTeams(
     const existingIndex = seen.get(equipeId);
     if (existingIndex === undefined) {
       seen.set(equipeId, teams.length);
-      teams.push({ equipeId, funcao });
+      teams.push({
+        equipeId,
+        funcao,
+        pontoEncontro: cleanText(source.pontoEncontro, 180),
+        horarioEncontro: cleanText(source.horarioEncontro, 10),
+      });
     } else if (funcao && !teams[existingIndex].funcao) {
       teams[existingIndex].funcao = funcao;
     }

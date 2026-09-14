@@ -58,6 +58,7 @@ export async function GET(request: Request) {
   if ("error" in access) return access.error;
   const db = getD1();
   await publishDueSchedules(db, access.context.comunidadeId);
+  await notifyUpcomingPendingConfirmations(db, access.context.comunidadeId);
   const scheduleAddress = new URL(request.url);
   const scheduleCursor = decodeScheduleCursor(
     scheduleAddress.searchParams.get("cursor"),
@@ -251,7 +252,7 @@ export async function GET(request: Request) {
     assignmentRows.push(...parcial.results);
     const teamsPartial = await db
       .prepare(
-        `SELECT se.escala_id, se.equipe_id, se.funcao,
+        `SELECT se.escala_id, se.equipe_id, se.funcao, se.ponto_encontro, se.horario_encontro,
           equipe.nome AS equipe_nome, equipe.cor AS equipe_cor, equipe.ordem AS equipe_ordem
          FROM escala_equipes se
          JOIN ministerio_equipes equipe
@@ -284,6 +285,8 @@ export async function GET(request: Request) {
         equipe_cor: "#7357e8",
         equipe_ordem: 0,
         funcao: "",
+        ponto_encontro: "",
+        horario_encontro: "",
       }]);
     }
   }
@@ -695,14 +698,16 @@ async function createSchedule(request: Request) {
       await db
         .prepare(
           `INSERT INTO escala_equipes
-           (comunidade_id, escala_id, equipe_id, funcao)
-           VALUES (?, ?, ?, ?)`,
+           (comunidade_id, escala_id, equipe_id, funcao, ponto_encontro, horario_encontro)
+           VALUES (?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           access.context.comunidadeId,
           scheduleId,
           team.equipeId,
           team.funcao,
+          team.pontoEncontro,
+          team.horarioEncontro,
         )
         .run();
     }
@@ -823,6 +828,73 @@ async function publishDueSchedules(db: D1Database, communityId: number) {
     })));
     if (notificationResults.some((item) => item.status === "rejected")) {
       console.error(`Escala agendada ${schedule.id} publicada, mas uma ou mais notificações falharam.`);
+    }
+  }
+}
+
+// A listagem das escalas é carregada pela liderança durante a preparação.
+// Nela reservamos, uma única vez, o lembrete de aproximadamente 24h antes do
+// início, sem depender do navegador da pessoa que ainda não respondeu.
+async function notifyUpcomingPendingConfirmations(db: D1Database, communityId: number) {
+  const upcoming = await db.prepare(
+    `SELECT s.id, s.titulo, COUNT(d.id) AS pendentes
+     FROM escalas_ministerio s
+     JOIN escala_designacoes d
+       ON d.escala_id = s.id
+      AND d.comunidade_id = s.comunidade_id
+      AND d.ativo = 1
+      AND d.status = 'PENDENTE'
+     WHERE s.comunidade_id = ?
+       AND s.status = 'PUBLICADA'
+       AND datetime(s.inicia_em) BETWEEN datetime('now', '+18 hours') AND datetime('now', '+30 hours')
+     GROUP BY s.id, s.titulo
+     LIMIT 40`,
+  ).bind(communityId).all<{ id: number; titulo: string; pendentes: number }>();
+
+  for (const schedule of upcoming.results) {
+    const recipients = await db.prepare(
+      `SELECT DISTINCT usuario_id FROM (
+        SELECT responsavel_usuario_id AS usuario_id
+        FROM escalas_ministerio
+        WHERE id = ? AND comunidade_id = ?
+        UNION
+        SELECT responsavel_usuario_id AS usuario_id
+        FROM ministerios_comunidade
+        WHERE id = (SELECT ministerio_id FROM escalas_ministerio WHERE id = ? AND comunidade_id = ?)
+          AND comunidade_id = ?
+        UNION
+        SELECT usuario_id
+        FROM ministerio_voluntarios
+        WHERE ministerio_id = (SELECT ministerio_id FROM escalas_ministerio WHERE id = ? AND comunidade_id = ?)
+          AND comunidade_id = ? AND ativo = 1 AND papel = 'LIDER'
+      ) WHERE usuario_id IS NOT NULL`,
+    ).bind(
+      schedule.id, communityId,
+      schedule.id, communityId, communityId,
+      schedule.id, communityId, communityId,
+    ).all<{ usuario_id: number }>();
+    if (!recipients.results.length) continue;
+
+    const reminderKey = `schedule_pending_reminder:${communityId}:${schedule.id}`;
+    const reserved = await db.prepare(
+      `INSERT OR IGNORE INTO configuracoes (chave, valor, atualizado_por, atualizado_em)
+       VALUES (?, ?, 'lembrete-escala', CURRENT_TIMESTAMP)`,
+    ).bind(reminderKey, JSON.stringify({ pendentes: Number(schedule.pendentes) })).run();
+    if (!Number((reserved.meta as { changes?: number }).changes || 0)) continue;
+
+    const pendingLabel = Number(schedule.pendentes) === 1 ? "1 confirmação pendente" : `${schedule.pendentes} confirmações pendentes`;
+    const results = await Promise.allSettled(recipients.results.map((recipient) => notifyUser(db, {
+      userId: Number(recipient.usuario_id),
+      title: "Confirmações pendentes para amanhã",
+      message: `A escala “${schedule.titulo}” começa em aproximadamente 24 horas e tem ${pendingLabel}.`,
+      entityId: Number(schedule.id),
+      area: "ESCALAS",
+      destination: "/painel?view=ministerios",
+      createdBy: "lembrete-escala",
+    })));
+    if (results.every((result) => result.status === "rejected")) {
+      await db.prepare("DELETE FROM configuracoes WHERE chave = ?").bind(reminderKey).run();
+      console.error(`Lembrete da escala ${schedule.id} não pôde ser entregue; ele será tentado novamente.`);
     }
   }
 }

@@ -1972,6 +1972,8 @@ export const escalaEquipes = sqliteTable(
       .notNull()
       .references(() => ministerioEquipes.id, { onDelete: "cascade" }),
     funcao: text("funcao").notNull().default(""),
+    pontoEncontro: text("ponto_encontro").notNull().default(""),
+    horarioEncontro: text("horario_encontro").notNull().default(""),
     criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
     atualizadoEm: text("atualizado_em")
       .notNull()

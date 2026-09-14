@@ -99,8 +99,8 @@ export default async function SharedSchedulePage({
                     <span className="shared-secretary-team-marker" aria-hidden="true" />
                     <div>
                       <strong>{String(group.team?.equipe_nome || "Sem equipe definida")}</strong>
-                      <small>Destino/local</small>
-                      <span>{String(group.team?.funcao || schedule.local || "Não informado")}</span>
+                      <small>{group.team?.horario_encontro ? `Destino/local · encontro às ${group.team.horario_encontro}` : "Destino/local"}</small>
+                      <span>{teamMeetingDetail(group.team, schedule.local)}</span>
                     </div>
                     <b aria-label={`${group.assignments.length} integrante${group.assignments.length === 1 ? "" : "s"}`}>
                       {group.assignments.length}
@@ -234,8 +234,16 @@ function statusLabel(value: unknown) {
   );
 }
 
+function teamMeetingDetail(
+  team: { funcao: string; ponto_encontro: string; horario_encontro: string } | null,
+  scheduleLocal: string,
+) {
+  const destination = team?.funcao || scheduleLocal || "Não informado";
+  return team?.ponto_encontro ? `${destination} · encontro: ${team.ponto_encontro}` : destination;
+}
+
 function groupAssignmentsByTeam(
-  teams: Array<{ equipe_id: number; equipe_nome: string; equipe_cor: string; funcao: string }>,
+  teams: Array<{ equipe_id: number; equipe_nome: string; equipe_cor: string; funcao: string; ponto_encontro: string; horario_encontro: string }>,
   assignments: Array<Record<string, unknown>>,
 ) {
   const knownIds = new Set(teams.map((team) => team.equipe_id));

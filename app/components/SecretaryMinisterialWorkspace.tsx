@@ -82,10 +82,14 @@ type ScheduleTeam = {
   equipe_nome: string;
   equipe_cor: string;
   funcao: string;
+  ponto_encontro: string;
+  horario_encontro: string;
 };
 type SelectedScheduleTeam = {
   equipeId: number;
   funcao: string;
+  pontoEncontro: string;
+  horarioEncontro: string;
 };
 type SelectedScheduleAssignment = {
   voluntarioId: number;
@@ -1452,7 +1456,7 @@ export default function SecretaryMinisterialWorkspace({
           (assignment) => !assignment.equipe_id || !knownTeamIds.has(assignment.equipe_id),
         ),
       },
-    ].filter((group) => group.assignments.length > 0);
+    ].filter((group) => group.team || group.assignments.length > 0);
     return (
       <article className="secretary-schedule-card" key={schedule.id}>
         <header>
@@ -1486,11 +1490,15 @@ export default function SecretaryMinisterialWorkspace({
                 <header>
                   <div>
                     <strong>{group.team.equipe_nome}</strong>
-                    <small>{group.team.funcao ? `Função/local: ${group.team.funcao}` : "Função/local não informado"}</small>
+                    <small>{teamMeetingSummary(group.team, schedule.local)}</small>
                   </div>
-                  <span>{group.assignments.length}</span>
+                  <div className="secretary-team-readiness" data-tone={teamReadiness(group.assignments).tone}>
+                    <em>{teamReadiness(group.assignments).label}</em>
+                    <span>{group.assignments.length}</span>
+                  </div>
                 </header>
               )}
+              {group.team && !group.assignments.length && <p className="secretary-team-empty">Inclua integrantes para deixar esta equipe pronta.</p>}
               {group.assignments.map((assignment) => (
             <article key={assignment.id} data-status={assignment.status.toLowerCase()}>
               <span className="secretary-avatar">{initials(assignment.nome)}</span>
@@ -1988,7 +1996,7 @@ export default function SecretaryMinisterialWorkspace({
                                         setSelectedTeams((current) =>
                                           selection
                                             ? current.filter((item) => item.equipeId !== team.id)
-                                            : [...current, { equipeId: team.id, funcao: "" }],
+                                            : [...current, { equipeId: team.id, funcao: "", pontoEncontro: "", horarioEncontro: "" }],
                                         );
                                         if (selection) {
                                           setSelectedAssignments((current) =>
@@ -2004,21 +2012,11 @@ export default function SecretaryMinisterialWorkspace({
                                     <small>{team.membros.length} integrantes</small>
                                   </label>
                                   {selection && (
-                                    <label className="secretary-team-duty">
-                                      <span>Função/local desta equipe</span>
-                                      <input
-                                        value={selection.funcao}
-                                        onChange={(event) => setSelectedTeams((current) =>
-                                          current.map((item) =>
-                                            item.equipeId === team.id
-                                              ? { ...item, funcao: event.target.value }
-                                              : item,
-                                          ),
-                                        )}
-                                        maxLength={180}
-                                        placeholder="Ex.: Velha, Centro ou Recepção"
-                                      />
-                                    </label>
+                                    <div className="secretary-team-duty">
+                                      <label><span>Função/local desta equipe</span><input value={selection.funcao} onChange={(event) => setSelectedTeams((current) => current.map((item) => item.equipeId === team.id ? { ...item, funcao: event.target.value } : item))} maxLength={180} placeholder="Ex.: Velha, Centro ou Recepção" /></label>
+                                      <label><span>Ponto de encontro</span><input value={selection.pontoEncontro} onChange={(event) => setSelectedTeams((current) => current.map((item) => item.equipeId === team.id ? { ...item, pontoEncontro: event.target.value } : item))} maxLength={180} placeholder="Ex.: Portão principal" /></label>
+                                      <label><span>Horário de encontro</span><input type="time" value={selection.horarioEncontro} onChange={(event) => setSelectedTeams((current) => current.map((item) => item.equipeId === team.id ? { ...item, horarioEncontro: event.target.value } : item))} /></label>
+                                    </div>
                                   )}
                                 </section>
                               );
@@ -2651,9 +2649,11 @@ function EditScheduleDialog({
       ? schedule.equipes.map((team) => ({
           equipeId: team.equipe_id,
           funcao: team.funcao,
+          pontoEncontro: team.ponto_encontro || "",
+          horarioEncontro: team.horario_encontro || "",
         }))
       : schedule.equipe_id
-        ? [{ equipeId: schedule.equipe_id, funcao: "" }]
+        ? [{ equipeId: schedule.equipe_id, funcao: "", pontoEncontro: "", horarioEncontro: "" }]
         : [],
   );
 
@@ -2708,26 +2708,18 @@ function EditScheduleDialog({
                           onChange={() => setSelectedScheduleTeams((current) =>
                             selection
                               ? current.filter((item) => item.equipeId !== team.id)
-                              : [...current, { equipeId: team.id, funcao: "" }],
+                              : [...current, { equipeId: team.id, funcao: "", pontoEncontro: "", horarioEncontro: "" }],
                           )}
                         />
                         <span>{team.nome}</span>
                         <small>{team.membros.length} integrantes</small>
                       </label>
                       {selection && (
-                        <label className="secretary-team-duty">
-                          <span>Função/local desta equipe</span>
-                          <input
-                            value={selection.funcao}
-                            onChange={(event) => setSelectedScheduleTeams((current) =>
-                              current.map((item) => item.equipeId === team.id
-                                ? { ...item, funcao: event.target.value }
-                                : item),
-                            )}
-                            maxLength={180}
-                            placeholder="Ex.: Velha, Centro ou Recepção"
-                          />
-                        </label>
+                        <div className="secretary-team-duty">
+                          <label><span>Função/local desta equipe</span><input value={selection.funcao} onChange={(event) => setSelectedScheduleTeams((current) => current.map((item) => item.equipeId === team.id ? { ...item, funcao: event.target.value } : item))} maxLength={180} placeholder="Ex.: Velha, Centro ou Recepção" /></label>
+                          <label><span>Ponto de encontro</span><input value={selection.pontoEncontro} onChange={(event) => setSelectedScheduleTeams((current) => current.map((item) => item.equipeId === team.id ? { ...item, pontoEncontro: event.target.value } : item))} maxLength={180} placeholder="Ex.: Portão principal" /></label>
+                          <label><span>Horário de encontro</span><input type="time" value={selection.horarioEncontro} onChange={(event) => setSelectedScheduleTeams((current) => current.map((item) => item.equipeId === team.id ? { ...item, horarioEncontro: event.target.value } : item))} /></label>
+                        </div>
                       )}
                     </section>
                   );
@@ -3805,6 +3797,22 @@ function SchedulePublicationCountdown({ opensAt }: { opensAt: string }) {
 
 function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+}
+
+function teamMeetingSummary(team: ScheduleTeam, scheduleLocal: string) {
+  const destination = team.funcao || scheduleLocal || "Destino/local não informado";
+  const meetingPoint = team.ponto_encontro ? ` · Encontro: ${team.ponto_encontro}` : "";
+  const meetingTime = team.horario_encontro ? ` às ${team.horario_encontro}` : "";
+  return `Destino/local: ${destination}${meetingPoint}${meetingTime}`;
+}
+
+function teamReadiness(assignments: Assignment[]) {
+  const missing = assignments.filter((item) => ["INDISPONIVEL", "SUBSTITUICAO_SOLICITADA", "AUSENTE"].includes(item.status)).length;
+  if (!assignments.length) return { tone: "muted", label: "Sem integrantes" };
+  if (missing) return { tone: "danger", label: missing === 1 ? "Precisa de substituto" : `${missing} substituições` };
+  const pending = assignments.filter((item) => item.status === "PENDENTE").length;
+  if (pending) return { tone: "warning", label: pending === 1 ? "1 confirmação pendente" : `${pending} confirmações pendentes` };
+  return { tone: "success", label: "Equipe confirmada" };
 }
 
 function assignmentStatusLabel(status: Assignment["status"]) {

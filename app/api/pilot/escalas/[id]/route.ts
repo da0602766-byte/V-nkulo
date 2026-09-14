@@ -702,13 +702,15 @@ export async function PATCH(request: Request, context: Context) {
       ...parsed.equipes.map((team) =>
         db.prepare(
           `INSERT INTO escala_equipes
-           (comunidade_id, escala_id, equipe_id, funcao)
-           VALUES (?, ?, ?, ?)`,
+           (comunidade_id, escala_id, equipe_id, funcao, ponto_encontro, horario_encontro)
+           VALUES (?, ?, ?, ?, ?, ?)`,
         ).bind(
           access.context.comunidadeId,
           id,
           team.equipeId,
           team.funcao,
+          team.pontoEncontro,
+          team.horarioEncontro,
         ),
       ),
     ]);
