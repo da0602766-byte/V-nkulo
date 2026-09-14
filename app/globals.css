@@ -22018,6 +22018,8 @@ html[data-pilot-theme="claro"] .social-public-community .community-public-avatar
 .temporary-access-status:is(.status-expirado,.status-cancelado,.status-negado) { border-color: rgba(239,102,128,.38); background: rgba(194,57,84,.11); }
 .temporary-access-primary { min-height: 52px; display: flex; align-items: center; justify-content: center; border: 0; border-radius: 14px; background: linear-gradient(135deg,#7046e8,#35c9c2); color: #fff; padding: 0 18px; font: inherit; font-weight: 900; text-align: center; text-decoration: none; cursor: pointer; }
 .temporary-access-primary:disabled { opacity: .6; cursor: wait; }
+.temporary-access-home { min-height: 44px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--temp-line); border-radius: 12px; color: #d9d1ff; font-size: .76rem; font-weight: 850; text-align: center; text-decoration: none; }
+.temporary-access-home:hover { border-color: rgba(181,165,255,.65); background: rgba(127,97,232,.12); }
 .temporary-access-error { margin: 0; border: 1px solid rgba(239,102,128,.4); border-radius: 12px; background: rgba(194,57,84,.11); color: #ffb6c3; padding: 11px 13px; }
 .temporary-access-card > footer { color: var(--temp-muted); font-size: .68rem; line-height: 1.55; text-align: center; }
 .temporary-access-banner { min-width: 0; display: grid; grid-template-columns: 36px minmax(0,1fr); gap: 10px; align-items: center; margin: 0 clamp(14px,4vw,52px); border: 1px solid color-mix(in srgb,#22a06b 40%,var(--pilot-line)); border-radius: 14px; background: color-mix(in srgb,#22a06b 8%,var(--pilot-surface)); color: var(--pilot-text); padding: 10px 12px; }

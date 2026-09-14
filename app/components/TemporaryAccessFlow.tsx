@@ -354,6 +354,7 @@ export default function TemporaryAccessFlow({
           </button>
         )}
         {error && <p className="temporary-access-error" role="alert">{error}</p>}
+        <Link className="temporary-access-home" href="/">Ir para tela inicial</Link>
         <footer>
           Esta autorização não altera seu cargo nem concede acesso a outras abas.
         </footer>

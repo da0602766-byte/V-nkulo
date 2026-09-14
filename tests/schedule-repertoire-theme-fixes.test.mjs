@@ -45,6 +45,35 @@ test("modo leitura pessoal exibe repertório e links e a marca volta à platafor
   }
 });
 
+test("modo leitura organiza todas as equipes e oferece retorno público", () => {
+  const temporaryPage = read("app/acesso/[token]/page.tsx");
+  const sharedPage = read("app/escala/[token]/page.tsx");
+  const accessGate = read("app/components/SharedScheduleAccessGate.tsx");
+  const pendingState = read("app/components/SharedSchedulePendingState.tsx");
+  const temporaryFlow = read("app/components/TemporaryAccessFlow.tsx");
+  const styles = read("app/secretary.css");
+  for (const source of [temporaryPage, sharedPage]) {
+    assert.match(source, /groupAssignmentsByTeam/);
+    assert.match(source, /shared-secretary-team-card/);
+    assert.match(source, /Destino\/local/);
+    assert.match(source, /Nenhum integrante escalado nesta equipe/);
+  }
+  for (const source of [temporaryPage, sharedPage, accessGate, pendingState, temporaryFlow]) {
+    assert.match(source, /Ir para tela inicial/);
+  }
+  assert.match(styles, /\.shared-secretary-team-card>header/);
+  assert.match(styles, /\.shared-secretary-home/);
+});
+
+test("etapas do fio respondem ao toque com estado otimista", () => {
+  const workspace = read("app/components/SecretaryMinisterialWorkspace.tsx");
+  const styles = read("app/secretary.css");
+  assert.match(workspace, /applyStepState\(feito\)/);
+  assert.match(workspace, /className="fio-node-action"/);
+  assert.match(workspace, /aria-label=\{`\$\{node\.estado === "feito"/);
+  assert.match(styles, /\.fio-node-toggle\{[\s\S]*?touch-action:manipulation/);
+});
+
 test("troca de tema é imediata e bloqueia apenas toques simultâneos", () => {
   const control = read("app/components/ThemeControl.tsx");
   assert.match(control, /transitionInProgress/);

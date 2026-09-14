@@ -46,6 +46,7 @@ export default function SharedSchedulePendingState({
         <button type="button" onClick={() => window.location.reload()}>
           Verificar acesso agora
         </button>
+        <Link className="shared-secretary-home" href="/">Ir para tela inicial</Link>
         <a className="shared-secretary-signup" href="/login?modo=cadastro">Ainda não tem conta? Cadastre-se</a>
       </section>
     </main>

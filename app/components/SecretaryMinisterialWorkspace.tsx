@@ -569,7 +569,6 @@ export default function SecretaryMinisterialWorkspace({
     setLinks([blankSecretaryLink()]);
     setSelectedLibraryItemIds([]);
     setTeams([]);
-    setSelectedTeamId(null);
     setExpandedTeamId(null);
     setScheduleCreatorOpen(false);
     setTab("painel");
@@ -773,15 +772,47 @@ export default function SecretaryMinisterialWorkspace({
   }
 
   // Marcar uma etapa do fio. Vale para quem lidera e para quem está escalado —
-  // a rota decide; aqui só mandamos a intenção.
+  // a rota decide; aqui só mandamos a intenção. A marca aparece de imediato;
+  // assim, no celular, o toque sempre produz uma resposta visível mesmo antes
+  // de a recarga silenciosa terminar.
   async function toggleFioStep(schedule: Schedule, step: FioStep) {
-    await submit(
-      `fio-${schedule.id}-${step.id}`,
-      `/api/pilot/escalas/${schedule.id}`,
-      "PATCH",
-      { acao: "FIO_ETAPA", etapaId: step.id, feito: !step.feito },
-      step.feito ? "Etapa reaberta no fio." : "Etapa concluída no fio.",
-    );
+    const feito = !step.feito;
+    const applyStepState = (nextFeito: boolean) => {
+      setSchedules((current) => current.map((item) => item.id !== schedule.id
+        ? item
+        : {
+            ...item,
+            fio_etapas: item.fio_etapas.map((itemStep) => itemStep.id !== step.id
+              ? itemStep
+              : {
+                  ...itemStep,
+                  feito: nextFeito,
+                  feitoEm: nextFeito ? new Date().toISOString() : null,
+                  feitoPor: nextFeito ? itemStep.feitoPor || -1 : null,
+                }),
+          }));
+    };
+
+    applyStepState(feito);
+    setBusy(`fio-${schedule.id}-${step.id}`);
+    setError("");
+    setFeedback("");
+    try {
+      const response = await fetch(`/api/pilot/escalas/${schedule.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acao: "FIO_ETAPA", etapaId: step.id, feito }),
+      });
+      const result = await readJson<{ error?: string }>(response);
+      if (!response.ok) throw new Error(result.error || "Não foi possível atualizar esta etapa.");
+      setFeedback(feito ? "Etapa concluída no fio." : "Etapa reaberta no fio.");
+      await loadData(true);
+    } catch (cause) {
+      applyStepState(step.feito);
+      setError((cause as Error).message);
+    } finally {
+      setBusy("");
+    }
   }
 
   // Cada escala pode variar as próprias etapas: o modelo do ministério é só o
@@ -3569,9 +3600,16 @@ function FioThread({
                     disabled={busy === `fio-${schedule.id}-${node.step.id}`}
                     onClick={() => onAlternarEtapa(node.step as FioStep)}
                     aria-pressed={node.estado === "feito"}
+                    aria-label={`${node.estado === "feito" ? "Reabrir" : "Concluir"} etapa: ${node.titulo}`}
+                    title={node.estado === "feito" ? "Toque para reabrir esta etapa" : "Toque para concluir esta etapa"}
                   >
                     <span className="fio-checkbox" aria-hidden="true">{node.estado === "feito" ? "✓" : ""}</span>
                     <span className="fio-node-title">{node.titulo}</span>
+                    <span className="fio-node-action" aria-hidden="true">
+                      {busy === `fio-${schedule.id}-${node.step.id}`
+                        ? "Salvando…"
+                        : node.estado === "feito" ? "Reabrir" : "Concluir"}
+                    </span>
                   </button>
                 ) : (
                   <p className="fio-node-title">{node.titulo}</p>
