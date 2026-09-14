@@ -35,9 +35,18 @@ test("o ministério guarda só o modelo e cada escala nasce com uma cópia próp
 
 test("marcar etapa é de quem opera, redefinir etapas é de quem gerencia", () => {
   assert.match(scheduleRoute, /if \(action === "FIO_ETAPA"\) \{/);
+  assert.match(scheduleRoute, /action !== "FIO_ETAPA"/);
   assert.match(scheduleRoute, /if \(action === "FIO_ETAPAS_DEFINIR"\) \{/);
   assert.match(scheduleRoute, /FIO_MINISTERIO_ETAPA_ATUALIZADA/);
   assert.match(scheduleRoute, /FIO_MINISTERIO_ETAPAS_DEFINIDAS/);
+});
+
+test("o Fio explica por que uma etapa não pode ser alterada", () => {
+  assert.match(workspace, /canToggleSteps/);
+  assert.match(workspace, /fio-access-note/);
+  assert.match(workspace, /fio-action-error/);
+  assert.match(workspace, /Somente a liderança ou quem está escalado pode alterar esta etapa/);
+  assert.match(styles, /\.fio-access-note,\.fio-action-error/);
 });
 
 test("o fio responde de um olhar se está tudo pronto para o dia", () => {

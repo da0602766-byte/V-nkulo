@@ -310,7 +310,11 @@ export async function PATCH(request: Request, context: Context) {
     });
   }
 
+  // A etapa do Fio tem sua própria regra logo abaixo: além da liderança,
+  // quem está escalado pode confirmar o trabalho que executou. Não deixe a
+  // guarda das ações administrativas rejeitar esse caso antes de ela rodar.
   if (
+    action !== "FIO_ETAPA" &&
     !(await canManageSchedule(
       db,
       access.context,

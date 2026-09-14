@@ -269,6 +269,11 @@ export default function SecretaryMinisterialWorkspace({
   const [agora, setAgora] = useState(0);
   const [escalasExpandidas, setEscalasExpandidas] = useState<number[]>([]);
   const [editandoFioId, setEditandoFioId] = useState<number | null>(null);
+  const [fioActionError, setFioActionError] = useState<{
+    scheduleId: number;
+    stepId: string;
+    message: string;
+  } | null>(null);
   const [shareSchedule, setShareSchedule] = useState<Schedule | null>(null);
   const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -799,6 +804,7 @@ export default function SecretaryMinisterialWorkspace({
 
     applyStepState(feito);
     setBusy(`fio-${schedule.id}-${step.id}`);
+    setFioActionError(null);
     setError("");
     setFeedback("");
     try {
@@ -813,7 +819,9 @@ export default function SecretaryMinisterialWorkspace({
       await loadData(true);
     } catch (cause) {
       applyStepState(step.feito);
-      setError((cause as Error).message);
+      const message = (cause as Error).message;
+      setError(message);
+      setFioActionError({ scheduleId: schedule.id, stepId: step.id, message });
     } finally {
       setBusy("");
     }
@@ -1477,6 +1485,15 @@ export default function SecretaryMinisterialWorkspace({
             agora={agora}
             busy={busy}
             editando={editandoFioId === schedule.id}
+            canToggleSteps={
+              Boolean(schedule.can_manage) ||
+              schedule.designacoes.some((assignment) => Boolean(assignment.is_mine))
+            }
+            actionError={
+              fioActionError?.scheduleId === schedule.id
+                ? fioActionError.message
+                : null
+            }
             onAbrirEdicao={() => setEditandoFioId(schedule.id)}
             onFecharEdicao={() => setEditandoFioId(null)}
             onAlternarEtapa={(step) => void toggleFioStep(schedule, step)}
@@ -3544,6 +3561,8 @@ function FioThread({
   agora,
   busy,
   editando,
+  canToggleSteps,
+  actionError,
   onAbrirEdicao,
   onFecharEdicao,
   onAlternarEtapa,
@@ -3553,6 +3572,8 @@ function FioThread({
   agora: number;
   busy: string;
   editando: boolean;
+  canToggleSteps: boolean;
+  actionError: string | null;
   onAbrirEdicao: () => void;
   onFecharEdicao: () => void;
   onAlternarEtapa: (step: FioStep) => void;
@@ -3582,6 +3603,17 @@ function FioThread({
         />
       ) : (
         <>
+          {!canToggleSteps && (
+            <p className="fio-access-note" role="note">
+              Você pode acompanhar o Fio, mas só a liderança ou quem está
+              escalado nesta escala pode concluir ou reabrir etapas.
+            </p>
+          )}
+          {actionError && (
+            <p className="fio-action-error" role="alert">
+              Não foi possível alterar esta etapa: {actionError}
+            </p>
+          )}
           <ol className="fio-thread">
             {nodes.map((node, index) => (
               <li className="fio-node" data-estado={node.estado} style={{ "--i": index } as CSSProperties} key={node.id}>
@@ -3589,11 +3621,17 @@ function FioThread({
                   <button
                     type="button"
                     className="fio-node-toggle"
-                    disabled={busy === `fio-${schedule.id}-${node.step.id}`}
+                    disabled={!canToggleSteps || busy === `fio-${schedule.id}-${node.step.id}`}
                     onClick={() => onAlternarEtapa(node.step as FioStep)}
                     aria-pressed={node.estado === "feito"}
                     aria-label={`${node.estado === "feito" ? "Reabrir" : "Concluir"} etapa: ${node.titulo}`}
-                    title={node.estado === "feito" ? "Toque para reabrir esta etapa" : "Toque para concluir esta etapa"}
+                    title={
+                      !canToggleSteps
+                        ? "Somente a liderança ou quem está escalado pode alterar esta etapa"
+                        : node.estado === "feito"
+                          ? "Toque para reabrir esta etapa"
+                          : "Toque para concluir esta etapa"
+                    }
                   >
                     <span className="fio-checkbox" aria-hidden="true">{node.estado === "feito" ? "✓" : ""}</span>
                     <span className="fio-node-title">{node.titulo}</span>
