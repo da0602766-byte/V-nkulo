@@ -207,11 +207,11 @@ test("visitantes mostram o funil antes da tabela", async () => {
     assert.ok(operations.includes(`["${etapa}"`) || operations.includes(`"${etapa}",`), etapa);
   }
   // O funil precisa vir antes da tabela na ordem do documento.
-  const funil = operations.indexOf('className="visitor-funnel-v5"');
-  const tabela = operations.indexOf("visitor-bulkbar-v2");
+  const funil = operations.indexOf('className="visitor-project-funnel-v6"');
+  const tabela = operations.indexOf("visitor-table-scroll-v2");
   assert.ok(funil > 0 && funil < tabela, "o funil não está antes da tabela");
   const styles = await read("app/globals.css");
-  assert.match(styles, /\.visitor-funnel-v5 article\[data-etapa="INTEGRADO"\]/);
+  assert.match(styles, /\.visitor-project-funnel-v6 button\[data-etapa="INTEGRADO"\]/);
 });
 
 test("notificações agrupam por dia e separam o que precisa de resposta", async () => {

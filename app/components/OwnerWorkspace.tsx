@@ -115,7 +115,11 @@ export default function OwnerWorkspace({
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<OwnerTab>("overview");
   const [data, setData] = useState<OwnerData | null>(null);
-  useEffect(() => { if (searchParams.get("tab") === "plans") setTab("plans"); }, [searchParams]);
+  useEffect(() => {
+    if (searchParams.get("tab") !== "plans") return;
+    const frame = window.requestAnimationFrame(() => setTab("plans"));
+    return () => window.cancelAnimationFrame(frame);
+  }, [searchParams]);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState<number | null>(null);
   const [message, setMessage] = useState("");

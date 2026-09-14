@@ -1955,6 +1955,36 @@ export const escalasMinisterio = sqliteTable(
   ],
 );
 
+// Uma assinatura pertence ao navegador/aparelho autenticado, não à
+// comunidade. O endpoint não é reutilizável entre usuários: um novo login no
+// mesmo aparelho substitui o vínculo anterior no endpoint único.
+export const notificacoesPushDispositivos = sqliteTable(
+  "notificacoes_push_dispositivos",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    usuarioId: integer("usuario_id")
+      .notNull()
+      .references(() => usuarios.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    expiracaoEm: text("expiracao_em"),
+    criadoEm: text("criado_em")
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+    atualizadoEm: text("atualizado_em")
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("notificacoes_push_dispositivos_endpoint_unique").on(table.endpoint),
+    index("notificacoes_push_dispositivos_usuario_atualizado_idx").on(
+      table.usuarioId,
+      table.atualizadoEm,
+    ),
+  ],
+);
+
 // Uma escala pode reunir várias equipes do mesmo ministério. A função/local
 // pertence à participação daquela equipe na escala (por exemplo, "Centro"),
 // não à equipe de forma permanente.

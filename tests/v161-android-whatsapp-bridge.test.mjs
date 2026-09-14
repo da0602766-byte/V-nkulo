@@ -30,9 +30,10 @@ test("the bridge opens WhatsApp directly and falls back to a WhatsApp deep link"
   assert.doesNotMatch(bridge, /navigator\.clipboard/);
 });
 
-test("Android reception offers the signed production 1.5.1 APK and hides the prompt inside the native app", async () => {
+test("Android reception prioritizes the installable PWA for background notifications and hides the prompt inside the native app", async () => {
   const install = await read("app/components/MobileAppInstall.tsx");
   assert.match(install, /Boolean\(window\.VinkuloAndroid\)/);
-  assert.match(install, /\/downloads\/VINKULO_ANDROID_1\.5\.1\.apk/);
-  assert.match(install, />\s*Baixar APK\s*</);
+  assert.match(install, /avisos mesmo com o Vínkulo fechado/);
+  assert.match(install, /beforeinstallprompt/);
+  assert.match(install, /Como instalar/);
 });

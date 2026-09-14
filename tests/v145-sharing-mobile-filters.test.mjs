@@ -45,11 +45,11 @@ test("categorias compactas filtram a lista e podem ser recolhidas", async () => 
     source("app/components/TenantOperations.tsx"),
     source("app/globals.css"),
   ]);
-  assert.match(workspace, /<details className="visitor-category-dashboards" open>/);
-  assert.match(workspace, /filterByCategory\(String\(category\.id\)\)/);
-  assert.match(workspace, /document\.getElementById\("visitor-directory"\)/);
-  assert.match(styles, /\.visitor-category-filter-cards/);
-  assert.match(styles, /\.visitor-category-dashboards\[open\]>summary>i/);
+  assert.match(workspace, /<details className="visitor-project-panel-v6" open>/);
+  assert.match(workspace, /filterByCategory\(categoryFilter === String\(category\.id\) \? "all" : String\(category\.id\)\)/);
+  assert.match(workspace, /visitor-project-categories-v6/);
+  assert.match(styles, /\.visitor-project-categories-v6/);
+  assert.match(styles, /\.visitor-project-panel-v6\[open\] > summary/);
 });
 
 test("ações móveis, comentários e inscritos usam painéis fora dos cartões", async () => {

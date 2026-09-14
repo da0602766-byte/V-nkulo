@@ -20,11 +20,17 @@ type RuntimeBindings = {
   DB?: D1Database;
   BUCKET?: R2BucketBinding;
   AUTH_SECRET?: string;
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_PRIVATE_KEY?: string;
+  VAPID_SUBJECT?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
   GOOGLE_CREDENTIALS_SECRET?: string;
   SYSTEM_OWNER_EMAIL?: string;
   SYSTEM_OWNER_LOCKED_BEFORE?: string;
+  executionContext?: {
+    waitUntil(promise: Promise<unknown>): void;
+  };
 };
 
 const runtime = new AsyncLocalStorage<RuntimeBindings>();

@@ -6,8 +6,13 @@ migração nova, leia isto.
 
 ## Próximo número livre
 
-**`0074`**. Use o próximo inteiro disponível a partir daí — não reaproveite
+**`0076`**. Use o próximo inteiro disponível a partir daí — não reaproveite
 um número já usado, mesmo que o arquivo tenha sido escrito à mão.
+
+`0075_notificacoes_push_dispositivos.sql` guarda uma assinatura Web Push por
+aparelho autenticado. O endpoint é único, então o mesmo navegador não continua
+ligado à conta anterior depois de um novo login. A chave privada VAPID fica
+somente nas variáveis seguras do Sites; nunca deve ser registrada nesta pasta.
 
 `0073_escalas_multiplas_equipes.sql` permite associar várias equipes a uma
 escala e guarda a equipe de cada designação. A coluna legada `equipe_id` da

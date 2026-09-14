@@ -11,6 +11,9 @@ interface Env {
   DB: D1Database;
   BUCKET: R2BucketBinding;
   AUTH_SECRET: string;
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_PRIVATE_KEY?: string;
+  VAPID_SUBJECT?: string;
   SYSTEM_OWNER_EMAIL?: string;
   SYSTEM_OWNER_LOCKED_BEFORE?: string;
   IMAGES: {
@@ -77,7 +80,7 @@ const worker = {
         purgeExpiredPrivateMessagesIfDue(env.DB).catch(() => undefined),
       );
 
-      const response = await runWithRuntimeEnv(env, () =>
+      const response = await runWithRuntimeEnv({ ...env, executionContext: ctx }, () =>
         handler.fetch(request, env, ctx),
       );
       return withSecurityHeaders(response, url.pathname);

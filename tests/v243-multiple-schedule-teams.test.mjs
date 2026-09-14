@@ -20,6 +20,8 @@ test("migração preserva a equipe de cada pessoa e permite várias equipes por 
       "funcao",
       "criado_em",
       "atualizado_em",
+      "ponto_encontro",
+      "horario_encontro",
     ],
   );
   database.close();

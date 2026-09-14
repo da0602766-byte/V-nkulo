@@ -4,9 +4,13 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { createPortal } from "react-dom";
 import {
   isNativeNotificationBridgeAvailable,
-  showDeviceNotification,
 } from "../lib/androidNativeBridge";
 import { showUnreadDeviceNotifications } from "../lib/device-notification-sync";
+import {
+  getWebPushSubscriptionState,
+  isWebPushSupported,
+  subscribeWebPushNotifications,
+} from "../lib/web-push-client";
 
 type Notification = {
   id: number;
@@ -44,6 +48,7 @@ export default function PilotNotificationCenter({
   const [configuring, setConfiguring] = useState(false);
   const [config, setConfig] = useState<NotificationConfig>(DEFAULT_CONFIG);
   const [devicePermission, setDevicePermission] = useState<"unsupported" | NotificationPermission>("unsupported");
+  const [webPushSubscribed, setWebPushSubscribed] = useState(false);
   const [showDevicePermissionHelp, setShowDevicePermissionHelp] = useState(false);
 
   useEffect(() => {
@@ -119,18 +124,18 @@ export default function PilotNotificationCenter({
 
   useEffect(() => {
     const initial = window.setTimeout(() => {
-      if (isNativeNotificationBridgeAvailable()) {
-        permissionRef.current = "granted";
-        setDevicePermission("granted");
-        return;
-      }
-      if (!("Notification" in window) || !("serviceWorker" in navigator)) {
+      if (!isWebPushSupported()) {
         permissionRef.current = "unsupported";
         setDevicePermission("unsupported");
         return;
       }
       permissionRef.current = Notification.permission;
       setDevicePermission(Notification.permission);
+      if (Notification.permission === "granted") {
+        void getWebPushSubscriptionState().then((state) => {
+          if (state.supported) setWebPushSubscribed(state.subscribed);
+        }).catch(() => undefined);
+      }
     }, 0);
     return () => window.clearTimeout(initial);
   }, []);
@@ -210,35 +215,32 @@ export default function PilotNotificationCenter({
   }
 
   const enableDeviceNotifications = useCallback(async () => {
-    if (isNativeNotificationBridgeAvailable()) {
+    if (!isWebPushSupported()) {
+      setDevicePermission("unsupported");
+      setMessage(isNativeNotificationBridgeAvailable()
+        ? "Esta versão do APK não oferece push em segundo plano. Instale o Vínkulo pelo navegador para receber avisos mesmo fechado."
+        : "Este navegador não oferece notificações push.");
+      return;
+    }
+    try {
+      const { registration } = await subscribeWebPushNotifications();
       permissionRef.current = "granted";
       setDevicePermission("granted");
-      showDeviceNotification({
-        title: "Notificações ativadas",
-        body: "Os avisos do Vínkulo poderão aparecer na bandeja deste celular.",
+      setWebPushSubscribed(true);
+      await registration.showNotification("Notificações ativadas", {
+        body: "Agora o Vínkulo poderá avisar você mesmo quando estiver fechado.",
+        icon: "/vinkulo-app-icon-192.png",
+        badge: "/vinkulo-app-icon-192.png",
         tag: "vinkulo-notifications-enabled",
-        url: "/painel",
+        data: { url: "/painel" },
       });
       await load();
-      return;
+    } catch (error) {
+      const permission = "Notification" in window ? Notification.permission : "unsupported";
+      permissionRef.current = permission;
+      setDevicePermission(permission);
+      setMessage(error instanceof Error ? error.message : "Não foi possível ativar as notificações push.");
     }
-    if (!("Notification" in window) || !("serviceWorker" in navigator)) {
-      setDevicePermission("unsupported");
-      return;
-    }
-    const permission = await Notification.requestPermission();
-    permissionRef.current = permission;
-    setDevicePermission(permission);
-    if (permission !== "granted") return;
-    const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
-    await registration.showNotification("Notificações ativadas", {
-      body: "Avisos, escalas, eventos, mensagens e atualizações do Vínkulo poderão aparecer neste celular.",
-      icon: "/vinkulo-app-icon-192.png",
-      badge: "/vinkulo-app-icon-192.png",
-      tag: "vinkulo-notifications-enabled",
-      data: { url: "/painel" },
-    });
-    await load();
   }, [load]);
 
   function handleDeviceNotificationPermission() {
@@ -298,8 +300,8 @@ export default function PilotNotificationCenter({
               </div>
             </header>
             <section className={`notification-device-permission status-${devicePermission}`} aria-label="Notificações neste celular">
-              <div><strong>Avisos neste celular</strong><small>{devicePermission === "granted" ? "Ativados para este aparelho" : devicePermission === "denied" ? "Bloqueados nas configurações do navegador ou aplicativo" : devicePermission === "unsupported" ? "Este navegador não oferece notificações" : "Receba escalas, eventos, mensagens e demais avisos"}</small></div>
-              {devicePermission !== "granted" && devicePermission !== "unsupported" && <button type="button" onClick={handleDeviceNotificationPermission}>{devicePermission === "denied" ? "Como liberar" : "Ativar"}</button>}
+              <div><strong>Avisos neste celular</strong><small>{webPushSubscribed ? "Ativados — você recebe avisos mesmo com o Vínkulo fechado" : devicePermission === "denied" ? "Bloqueados nas configurações do navegador ou aplicativo" : devicePermission === "unsupported" ? "Instale pelo navegador para receber avisos mesmo com o aplicativo fechado" : devicePermission === "granted" ? "Permissão liberada; conclua a ativação para receber avisos em segundo plano" : "Receba escalas, eventos, pedidos e demais avisos"}</small></div>
+              {!webPushSubscribed && devicePermission !== "unsupported" && <button type="button" onClick={handleDeviceNotificationPermission}>{devicePermission === "denied" ? "Como liberar" : "Ativar"}</button>}
             </section>
             {showDevicePermissionHelp && devicePermission === "denied" && (
               <section className="notification-device-help" aria-live="polite">

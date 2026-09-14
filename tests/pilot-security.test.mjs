@@ -299,7 +299,7 @@ test("páginas, temas e responsividade do VÍNKULO permanecem explícitos", asyn
   assert.match(ministries, /Histórico/);
   assert.match(ministries, /Editar escala/);
   assert.match(ministries, /Gerar convite/);
-  assert.match(visitors, /Informações pessoais/);
+  assert.match(visitors, /Dados pessoais/);
   assert.match(visitors, /Conexão espiritual/);
   assert.match(visitors, /Editar cadastro/);
   assert.match(visitors, /vinkulo:new-visitor/);

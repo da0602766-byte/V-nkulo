@@ -490,7 +490,8 @@ export function RelacionamentoTools({ visitantes = [], compacto = false, onAbrir
   }, []);
 
   useEffect(() => {
-    void carregarDados();
+    const frame = window.requestAnimationFrame(() => void carregarDados());
+    return () => window.cancelAnimationFrame(frame);
   }, [carregarDados]);
 
   useEffect(() => {

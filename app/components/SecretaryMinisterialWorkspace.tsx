@@ -2233,7 +2233,7 @@ export default function SecretaryMinisterialWorkspace({
                   if (!items.length) return null;
                   const done = items.filter((item) => item.status === "FEITO").length;
                   const isOpen = expandedChecklistSchedules.includes(schedule.id);
-                  const isPast = new Date(schedule.inicia_em.replace(" ", "T")).getTime() < Date.now();
+                  const isPast = agora > 0 && new Date(schedule.inicia_em.replace(" ", "T")).getTime() < agora;
                   const state = done === items.length ? "done" : isPast ? "overdue" : "pending";
                   return (
                     <section key={schedule.id} className={`secretary-checklist-group is-${state}`}>
