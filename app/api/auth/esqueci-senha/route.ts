@@ -1,8 +1,21 @@
 import { getD1 } from "../../../../db";
 import { createResetToken, normalizeEmail } from "../../../lib/local-auth";
+import { log } from "../../../lib/logger.mjs";
 import { notifyUser } from "../../../lib/pilot-notifications";
+import {
+  respostaLimiteExcedido,
+  verificarLimiteAutenticacao,
+} from "../../../lib/rate-limit";
 
 export async function POST(request: Request) {
+  // O cooldown de 2 minutos logo abaixo é por conta. Uma mesma origem
+  // percorrendo muitos e-mails continuaria notificando a liderança de várias
+  // comunidades sem nunca esbarrar nele.
+  const limiteOrigem = await verificarLimiteAutenticacao(request, "esqueci-senha");
+  if (!limiteOrigem.permitido) {
+    log.warn("esqueci_senha_limite_por_origem", { tentarEmSegundos: limiteOrigem.tentarEmSegundos });
+    return respostaLimiteExcedido(limiteOrigem);
+  }
   const { email } = await request.json() as { email?: string };
   const db = getD1();
   const user = await db.prepare("SELECT id, nome, email FROM usuarios WHERE email = ? AND ativo = 1 LIMIT 1").bind(normalizeEmail(email)).first<{ id: number; nome: string; email: string }>();

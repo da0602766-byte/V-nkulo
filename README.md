@@ -49,7 +49,27 @@ npm run dev
 
 O ambiente hospedado aplica as migrações presentes em `drizzle/` e fornece o banco conectado.
 
+## Validação
+
+```bash
+npm run lint          # ESLint
+npm run build         # gera dist/ e valida o artefato do Sites
+npm run typecheck     # tsc --noEmit (precisa do build antes)
+npm run test:nobuild  # a suíte, reaproveitando o build acima
+```
+
+`npm test` faz build e testes de uma vez. A ordem importa: o build gera os
+tipos usados pelo `tsc` e o `dist/` importado pelos testes de integração — ver
+[`CONTRIBUTING.md`](CONTRIBUTING.md). O mesmo encadeamento roda sozinho em
+`.github/workflows/ci.yml` a cada push e pull request.
+
 ## Documentação
 
 Prompts de publicação, guias, relatórios e o estado do projeto estão
 organizados em [`docs/`](docs/README.md).
+
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — ambiente, validação, testes,
+  migrações e convenções de commit.
+- [`CHANGELOG.md`](CHANGELOG.md) — histórico de versões.
+- [`docs/coordenacao/ESTADO_DO_PROJETO.md`](docs/coordenacao/ESTADO_DO_PROJETO.md)
+  — decisões vigentes e limitações.

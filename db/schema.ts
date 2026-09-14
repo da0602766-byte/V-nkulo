@@ -2942,3 +2942,22 @@ export const feedbackPlataforma = sqliteTable(
     index("feedback_plataforma_tipo_idx").on(table.tipo, table.categoria, table.criadoEm),
   ],
 );
+
+export const limitesAutenticacao = sqliteTable(
+  "limites_autenticacao",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    escopo: text("escopo").notNull(),
+    // SHA-256 do IP de origem combinado com o AUTH_SECRET do ambiente, nunca
+    // o endereço em texto. Ver app/lib/rate-limit.ts.
+    chave: text("chave").notNull(),
+    tentativas: integer("tentativas").notNull().default(0),
+    janelaInicio: text("janela_inicio").notNull().default(sql`CURRENT_TIMESTAMP`),
+    bloqueadoAte: text("bloqueado_ate"),
+    atualizadoEm: text("atualizado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("limites_autenticacao_escopo_chave_unique").on(table.escopo, table.chave),
+    index("limites_autenticacao_expiracao_idx").on(table.atualizadoEm),
+  ],
+);

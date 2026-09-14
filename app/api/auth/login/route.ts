@@ -1,5 +1,12 @@
 import { getD1 } from "../../../../db";
 import { attachSessionCookie, createFirstAccessToken, createSession, normalizeEmail, verifyPassword } from "../../../lib/local-auth";
+import { log } from "../../../lib/logger.mjs";
+import {
+  liberarLimiteAutenticacao,
+  redirecionamentoLimiteExcedido,
+  respostaLimiteExcedido,
+  verificarLimiteAutenticacao,
+} from "../../../lib/rate-limit";
 import { safeRelativeReturnPath } from "../../../lib/safe-return-path";
 
 type LoginRow = { id: number; perfil: string; senha_hash: string | null; senha_salt: string | null; tentativas_login: number; bloqueado_ate: string | null; ativo: number; primeiro_acesso_pendente: number };
@@ -7,6 +14,16 @@ type LoginRow = { id: number; perfil: string; senha_hash: string | null; senha_s
 export async function POST(request: Request) {
   const contentType = request.headers.get("content-type") || "";
   const isBrowserForm = contentType.includes("application/x-www-form-urlencoded") || contentType.includes("multipart/form-data");
+  // O bloqueio por conta (3 erros na mesma conta, mais abaixo) não enxerga
+  // uma origem varrendo muitas contas diferentes. Este limite por origem é
+  // conferido antes de ler o corpo, para que a varredura custe o mínimo.
+  const limiteOrigem = await verificarLimiteAutenticacao(request, "login");
+  if (!limiteOrigem.permitido) {
+    log.warn("login_limite_por_origem", { tentarEmSegundos: limiteOrigem.tentarEmSegundos });
+    return isBrowserForm
+      ? redirecionamentoLimiteExcedido(request, limiteOrigem, "/login")
+      : respostaLimiteExcedido(limiteOrigem);
+  }
   const payload = isBrowserForm
     ? Object.fromEntries((await request.formData()).entries())
     : await request.json() as { email?: string; senha?: string; returnTo?: string };
@@ -37,12 +54,17 @@ export async function POST(request: Request) {
     const attempts = Number(user.tentativas_login || 0) + 1;
     const blockedUntil = attempts >= 3 ? new Date(Date.now() + 15 * 60000).toISOString() : null;
     await db.prepare("UPDATE usuarios SET tentativas_login = ?, bloqueado_ate = ? WHERE id = ?").bind(attempts >= 3 ? 0 : attempts, blockedUntil, user.id).run();
+    log.warn("login_senha_invalida", { usuarioId: user.id, tentativas: attempts, contaBloqueada: attempts >= 3 });
     return fail(attempts >= 3 ? "Você errou a senha 3 vezes. Use Esqueci minha senha ou aguarde 15 minutos." : `E-mail ou senha inválidos. Restam ${3 - attempts} tentativa(s).`, 401);
   }
   if (!user.ativo) {
     return fail("Este cadastro está inativo. Solicite revisão ao suporte.", 403);
   }
   await db.prepare("UPDATE usuarios SET tentativas_login = 0, bloqueado_ate = NULL, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?").bind(user.id).run();
+  // Quem entrou não é a origem que a limitação existe para conter: devolver a
+  // cota evita punir um IP compartilhado por causa de erros de outra pessoa.
+  await liberarLimiteAutenticacao(request, "login");
+  log.info("login_concluido", { usuarioId: user.id, primeiroAcessoPendente: Boolean(user.primeiro_acesso_pendente) });
   if (user.primeiro_acesso_pendente) {
     const firstAccess = await createFirstAccessToken(user.id);
     const firstAccessPath = `/primeiro-acesso?token=${encodeURIComponent(firstAccess.token)}&login=${encodeURIComponent(cleanEmail)}`;

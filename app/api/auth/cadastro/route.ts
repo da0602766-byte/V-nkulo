@@ -6,10 +6,23 @@ import {
   normalizeEmail,
   validatePassword,
 } from "../../../lib/local-auth";
+import { log } from "../../../lib/logger.mjs";
 import { getPilotLoginConfig } from "../../../lib/pilot-login-config";
 import { PILOT_CONFIG } from "../../../lib/pilot-config";
+import {
+  respostaLimiteExcedido,
+  verificarLimiteAutenticacao,
+} from "../../../lib/rate-limit";
 
 export async function POST(request: Request) {
+  // O 409 de "já existe uma conta com este e-mail" responde se um endereço
+  // está cadastrado. Sem limite por origem, essa resposta vira uma lista de
+  // e-mails da plataforma para quem tiver paciência de iterar.
+  const limiteOrigem = await verificarLimiteAutenticacao(request, "cadastro");
+  if (!limiteOrigem.permitido) {
+    log.warn("cadastro_limite_por_origem", { tentarEmSegundos: limiteOrigem.tentarEmSegundos });
+    return respostaLimiteExcedido(limiteOrigem);
+  }
   const loginConfig = await getPilotLoginConfig();
   if (
     !PILOT_CONFIG.openRegistrationEnabled ||

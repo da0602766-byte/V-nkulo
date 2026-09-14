@@ -5,6 +5,7 @@ import { runWithRuntimeEnv } from "../db/runtime-env";
 import type { R2BucketBinding } from "../db/runtime-env";
 import { runPlatformOptimizationIfDue } from "../app/lib/platform-optimizer";
 import { purgeExpiredPrivateMessagesIfDue } from "../app/lib/chat-retention";
+import { log } from "../app/lib/logger.mjs";
 
 interface Env {
   ASSETS: Fetcher;
@@ -66,7 +67,12 @@ const worker = {
       ) {
         nextOptimizerCheckAt = Date.now() + OPTIMIZER_CHECK_INTERVAL_MS;
         ctx.waitUntil(
-          runPlatformOptimizationIfDue(env.DB).catch(() => undefined),
+          runPlatformOptimizationIfDue(env.DB).catch((erro) => {
+            // Falha de manutenção não pode derrubar a requisição do usuário,
+            // mas engolir em silêncio já escondeu problema antes: registrar
+            // é o que permite ver no painel de logs que a rotina parou.
+            log.error("otimizador_falhou", { erro });
+          }),
         );
       }
       // Limpeza semanal das mensagens privadas: não é opcional (ver
@@ -74,14 +80,24 @@ const worker = {
       // configurável acima e em toda requisição (a própria função se
       // limita a checar o banco uma vez a cada poucos minutos).
       ctx.waitUntil(
-        purgeExpiredPrivateMessagesIfDue(env.DB).catch(() => undefined),
+        purgeExpiredPrivateMessagesIfDue(env.DB).catch((erro) => {
+          log.error("retencao_mensagens_falhou", { erro });
+        }),
       );
 
       const response = await runWithRuntimeEnv(env, () =>
         handler.fetch(request, env, ctx),
       );
       return withSecurityHeaders(response, url.pathname);
-    } catch {
+    } catch (erro) {
+      // Sem este registro um 500 não deixava rastro nenhum: a página genérica
+      // ia para o usuário e o motivo se perdia. O caminho entra no log, o
+      // corpo da requisição nunca.
+      log.error("requisicao_falhou", {
+        metodo: request.method,
+        rota: url.pathname,
+        erro,
+      });
       const fallback = url.pathname.startsWith("/api/")
         ? Response.json(
             { error: "Não foi possível concluir a solicitação." },

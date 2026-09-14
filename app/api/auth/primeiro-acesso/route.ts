@@ -5,6 +5,12 @@ import {
   normalizeEmail,
   validatePassword,
 } from "../../../lib/local-auth";
+import { log } from "../../../lib/logger.mjs";
+import {
+  liberarLimiteAutenticacao,
+  respostaLimiteExcedido,
+  verificarLimiteAutenticacao,
+} from "../../../lib/rate-limit";
 
 type FirstAccessPayload = {
   token?: string;
@@ -15,6 +21,13 @@ type FirstAccessPayload = {
 };
 
 export async function POST(request: Request) {
+  // Confere token, login e senha temporária de uma vez: é o endpoint com mais
+  // superfície para tentativa e erro em toda a autenticação.
+  const limiteOrigem = await verificarLimiteAutenticacao(request, "primeiro-acesso");
+  if (!limiteOrigem.permitido) {
+    log.warn("primeiro_acesso_limite_por_origem", { tentarEmSegundos: limiteOrigem.tentarEmSegundos });
+    return respostaLimiteExcedido(limiteOrigem);
+  }
   let body: FirstAccessPayload;
   try {
     body = await request.json() as FirstAccessPayload;
@@ -46,9 +59,12 @@ export async function POST(request: Request) {
     const message = result.reason === "SAME_PASSWORD"
       ? "A nova senha precisa ser diferente da senha temporária."
       : "Link, login ou senha temporária inválidos ou expirados.";
+    log.warn("primeiro_acesso_recusado", { motivo: result.reason });
     return Response.json({ error: message }, { status: result.reason === "SAME_PASSWORD" ? 400 : 401 });
   }
 
+  await liberarLimiteAutenticacao(request, "primeiro-acesso");
+  log.info("primeiro_acesso_concluido", { usuarioId: result.userId });
   const session = await createSession(result.userId);
   return attachSessionCookie(
     Response.json(

@@ -6,8 +6,13 @@ migração nova, leia isto.
 
 ## Próximo número livre
 
-**`0071`**. Use o próximo inteiro disponível a partir daí — não reaproveite
+**`0072`**. Use o próximo inteiro disponível a partir daí — não reaproveite
 um número já usado, mesmo que o arquivo tenha sido escrito à mão.
+
+`0071_limites_autenticacao.sql` cria `limites_autenticacao`, o contador de
+requisições por origem usado pelos endpoints de autenticação. A `chave` é o
+SHA-256 do IP combinado com o `AUTH_SECRET`, nunca o endereço em texto. Ver
+app/lib/rate-limit.ts e app/lib/rate-limit-policy.mjs.
 
 `0070_chat_system_retention.sql` reconstrói `conversas_privadas` (troca o
 ciclo mensal `ciclo_mes` pelo semanal `ciclo_semana` e remove `drive_file_id`

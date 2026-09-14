@@ -1,0 +1,60 @@
+name: CI
+
+# Até aqui nada rodava sozinho: lint, verificação de tipos, build e testes
+# dependiam de alguém lembrar de executá-los antes de publicar — cada relatório
+# em docs/relatorios/ registra essa validação feita à mão. Este fluxo passa a
+# fazê-la em toda alteração proposta.
+#
+# A ordem dos passos não é arbitrária:
+#   1. `npm run install:ci` é o mesmo caminho do ambiente hospedado (npm ci
+#      único, protegido por flock, com verificação de integridade do tarball).
+#   2. O build vem antes do `tsc` porque é ele que gera `next-env.d.ts` e
+#      `.next/types`, de onde saem os tipos de `next/*` e das rotas. Rodar a
+#      verificação de tipos antes disso produz centenas de erros falsos de
+#      "módulo não encontrado".
+#   3. Os testes vêm depois do build porque `tests/pilot-integration.test.mjs`
+#      importa `dist/server/index.js`, o Worker empacotado. Por isso um job
+#      separado e "rápido" só de testes não funcionaria aqui.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  # Um push novo na mesma branch cancela a execução anterior: não adianta
+  # continuar validando um commit que já foi substituído.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verificacao:
+    name: Lint, tipos, build e testes
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm run install:ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build e validação do artefato
+        run: npm run build
+
+      - name: Verificação de tipos
+        run: npm run typecheck
+
+      # `npm test` reconstruiria o projeto; o build já rodou acima.
+      - name: Testes
+        run: npm run test:nobuild
