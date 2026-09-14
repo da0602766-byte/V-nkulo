@@ -46,6 +46,12 @@ export type SecretaryLink = {
 export type SecretaryAssignment = {
   voluntarioId: number;
   funcao: string;
+  equipeId: number | null;
+};
+
+export type SecretaryScheduleTeam = {
+  equipeId: number;
+  funcao: string;
 };
 
 export type SecretaryChecklistItem = {
@@ -114,7 +120,10 @@ type ScheduleTemplatePayload = {
 
 type SchedulePayload = {
   ministerioId: number;
+  // equipeId continua como o primeiro grupo selecionado para compatibilidade
+  // com as escalas criadas antes do suporte a múltiplas equipes.
   equipeId: number | null;
+  equipes: SecretaryScheduleTeam[];
   titulo: string;
   iniciaEm: string;
   terminaEm: string;
@@ -386,7 +395,9 @@ export function parseSchedulePayload(
 ): ValidationResult<SchedulePayload> {
   const body = asRecord(payload);
   const ministerioId = positiveInteger(body.ministerioId);
-  const equipeId = positiveInteger(body.equipeId);
+  const equipes = parseScheduleTeams(body.equipes, body.equipeId);
+  if ("error" in equipes) return { error: equipes.error };
+  const equipeId = equipes.value[0]?.equipeId || null;
   const titulo = cleanText(body.titulo, 140);
   const iniciaEm = normalizeDateTime(body.iniciaEm);
   const terminaEm = normalizeDateTime(body.terminaEm);
@@ -430,6 +441,7 @@ export function parseSchedulePayload(
   return {
     ministerioId,
     equipeId,
+    equipes: equipes.value,
     titulo,
     iniciaEm,
     terminaEm,
@@ -494,20 +506,57 @@ function parseSecretaryAssignments(
     return { error: "A escala aceita no máximo 100 integrantes." } as const;
   }
   const assignments: SecretaryAssignment[] = [];
-  const ids = new Set<number>();
+  const assignmentsByVolunteer = new Map<number, SecretaryAssignment>();
   for (const item of value) {
     const source = asRecord(item);
     const voluntarioId = positiveInteger(source.voluntarioId);
     const funcao = cleanText(source.funcao, 100);
+    const equipeId = positiveInteger(source.equipeId);
     if (!voluntarioId || !funcao) {
       return { error: "Revise os integrantes e suas funções." } as const;
     }
-    if (!ids.has(voluntarioId)) {
-      ids.add(voluntarioId);
-      assignments.push({ voluntarioId, funcao });
+    const existing = assignmentsByVolunteer.get(voluntarioId);
+    if (existing && existing.equipeId !== equipeId) {
+      return {
+        error: "Uma pessoa só pode ser designada uma vez na mesma escala.",
+      } as const;
+    }
+    if (!existing) {
+      const assignment = { voluntarioId, funcao, equipeId };
+      assignmentsByVolunteer.set(voluntarioId, assignment);
+      assignments.push(assignment);
     }
   }
   return { value: assignments } as const;
+}
+
+function parseScheduleTeams(
+  value: unknown,
+  legacyTeamId: unknown,
+): ValidationResult<{ value: SecretaryScheduleTeam[] }> {
+  const sources = Array.isArray(value)
+    ? value
+    : positiveInteger(legacyTeamId)
+      ? [{ equipeId: legacyTeamId }]
+      : [];
+  const teams: SecretaryScheduleTeam[] = [];
+  const seen = new Map<number, number>();
+  for (const item of sources) {
+    const source = asRecord(item);
+    const equipeId = positiveInteger(source.equipeId);
+    if (!equipeId) {
+      return { error: "Revise as equipes selecionadas para a escala." } as const;
+    }
+    const funcao = cleanText(source.funcao, 180);
+    const existingIndex = seen.get(equipeId);
+    if (existingIndex === undefined) {
+      seen.set(equipeId, teams.length);
+      teams.push({ equipeId, funcao });
+    } else if (funcao && !teams[existingIndex].funcao) {
+      teams[existingIndex].funcao = funcao;
+    }
+  }
+  return { value: teams } as const;
 }
 
 function parseSecretaryChecklist(
@@ -579,14 +628,14 @@ export function parseCustomFieldAnswers(
 
 export function parseAssignmentPayload(
   payload: unknown,
-): ValidationResult<{ voluntarioId: number; funcao: string }> {
+): ValidationResult<{ voluntarioId: number; funcao: string; equipeId: number | null }> {
   const body = asRecord(payload);
   const voluntarioId = positiveInteger(body.voluntarioId);
   const funcao = cleanText(body.funcao, 100);
   if (!voluntarioId || !funcao) {
     return { error: "Voluntário e função são obrigatórios." } as const;
   }
-  return { voluntarioId, funcao } as const;
+  return { voluntarioId, funcao, equipeId: positiveInteger(body.equipeId) } as const;
 }
 
 export function cleanAction(value: unknown) {

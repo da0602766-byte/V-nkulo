@@ -66,6 +66,9 @@ type Assignment = {
   id: number;
   voluntario_id: number;
   usuario_id: number;
+  equipe_id: number | null;
+  equipe_nome: string | null;
+  equipe_cor: string | null;
   nome: string;
   funcao: string;
   status: "PENDENTE" | "CONFIRMADA" | "INDISPONIVEL" | "SUBSTITUICAO_SOLICITADA" | "AUSENTE";
@@ -73,6 +76,20 @@ type Assignment = {
   telefone?: string;
   foto_perfil?: string | null;
   owner_verified?: number;
+};
+type ScheduleTeam = {
+  equipe_id: number;
+  equipe_nome: string;
+  equipe_cor: string;
+  funcao: string;
+};
+type SelectedScheduleTeam = {
+  equipeId: number;
+  funcao: string;
+};
+type SelectedScheduleAssignment = {
+  voluntarioId: number;
+  equipeId: number | null;
 };
 type ReplacementCandidate = {
   voluntarioId: number;
@@ -121,6 +138,7 @@ type Schedule = {
   ministerio_categoria: string;
   equipe_id: number | null;
   equipe_nome: string | null;
+  equipes: ScheduleTeam[];
   titulo: string;
   inicia_em: string;
   termina_em: string;
@@ -230,8 +248,10 @@ export default function SecretaryMinisterialWorkspace({
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState("");
-  const [selectedVolunteers, setSelectedVolunteers] = useState<number[]>([]);
-  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
+  const [selectedAssignments, setSelectedAssignments] = useState<
+    SelectedScheduleAssignment[]
+  >([]);
+  const [selectedTeams, setSelectedTeams] = useState<SelectedScheduleTeam[]>([]);
   const [expandedTeamId, setExpandedTeamId] = useState<number | null>(null);
   const [links, setLinks] = useState<SecretaryLink[]>([blankSecretaryLink()]);
   const [libraryItems, setLibraryItems] = useState<SecretaryLibraryItem[]>([]);
@@ -422,16 +442,22 @@ export default function SecretaryMinisterialWorkspace({
     [checklist, ministryScheduleIds],
   );
   const ownVolunteer = selectedMinistry?.voluntarios.find((item) => Boolean(item.is_mine));
-  const selectedTeam = teams.find((item) => item.id === selectedTeamId) || null;
+  const selectedTeamEntries = useMemo(
+    () => selectedTeams.flatMap((selection) => {
+      const team = teams.find((item) => item.id === selection.equipeId);
+      return team ? [{ team, funcao: selection.funcao }] : [];
+    }),
+    [selectedTeams, teams],
+  );
   const scheduleCandidates = useMemo(
-    () => selectedTeam
+    () => selectedTeamEntries.length
       ? selectedMinistry?.voluntarios.filter((volunteer) =>
-          selectedTeam.membros.some(
-            (member) => member.voluntario_id === volunteer.id,
+          selectedTeamEntries.some(({ team }) =>
+            team.membros.some((member) => member.voluntario_id === volunteer.id),
           ),
         ) || []
       : selectedMinistry?.voluntarios || [],
-    [selectedMinistry, selectedTeam],
+    [selectedMinistry, selectedTeamEntries],
   );
   const candidateAvailability = useMemo(() => {
     const start = Date.parse(scheduleStartsAt);
@@ -640,9 +666,18 @@ export default function SecretaryMinisterialWorkspace({
     event.preventDefault();
     if (!selectedMinistry) return;
     const body = formBody(event.currentTarget);
-    const assignments = scheduleCandidates
-      .filter((item) => selectedVolunteers.includes(item.id))
-      .map((item) => ({ voluntarioId: item.id, funcao: item.funcao }));
+    const assignments = selectedAssignments.flatMap((selection) => {
+      const volunteer = scheduleCandidates.find(
+        (item) => item.id === selection.voluntarioId,
+      );
+      return volunteer
+        ? [{
+            voluntarioId: volunteer.id,
+            funcao: volunteer.funcao,
+            equipeId: selection.equipeId,
+          }]
+        : [];
+    });
     const title = String(body.titulo || "").trim();
     const startsAt = String(body.iniciaEm || "");
     const endsAt = String(body.terminaEm || "");
@@ -663,8 +698,8 @@ export default function SecretaryMinisterialWorkspace({
       setError("Etapa 1 — o término precisa ser posterior ao início.");
       return;
     }
-    if (selectedTeamId && !scheduleCandidates.length) {
-      setError("Etapa 2 — a equipe selecionada ainda não possui integrantes.");
+    if (selectedTeamEntries.some(({ team }) => !team.membros.length)) {
+      setError("Etapa 2 — uma das equipes selecionadas ainda não possui integrantes.");
       return;
     }
     if (publishing && !assignments.length) {
@@ -707,7 +742,7 @@ export default function SecretaryMinisterialWorkspace({
       {
         ...body,
         ministerioId: selectedMinistry.id,
-        equipeId: selectedTeamId,
+        equipes: selectedTeams,
         designacoes: assignments,
         repertorio,
         links: scheduleLinks,
@@ -726,8 +761,8 @@ export default function SecretaryMinisterialWorkspace({
       event.currentTarget,
     );
     if (created) {
-      setSelectedVolunteers([]);
-      setSelectedTeamId(null);
+      setSelectedAssignments([]);
+      setSelectedTeams([]);
       setLinks([blankSecretaryLink()]);
       setSelectedLibraryItemIds([]);
       setChecklistDraft([]);
@@ -776,6 +811,7 @@ export default function SecretaryMinisterialWorkspace({
   async function updateSchedule(
     schedule: Schedule,
     event: FormEvent<HTMLFormElement>,
+    selectedScheduleTeams: SelectedScheduleTeam[],
   ) {
     event.preventDefault();
     const body = formBody(event.currentTarget);
@@ -790,7 +826,7 @@ export default function SecretaryMinisterialWorkspace({
       {
         acao: "ATUALIZAR",
         ministerioId: schedule.ministerio_id,
-        equipeId: Number(body.equipeId) || null,
+        equipes: selectedScheduleTeams,
         titulo: body.titulo,
         iniciaEm: body.iniciaEm,
         terminaEm: body.terminaEm,
@@ -852,7 +888,12 @@ export default function SecretaryMinisterialWorkspace({
       const payload = await readJson<{ error?: string }>(response);
       if (!response.ok) throw new Error(payload.error || "Não foi possível excluir a equipe.");
       setFeedback("Equipe removida com segurança.");
-      if (selectedTeamId === team.id) setSelectedTeamId(null);
+      setSelectedTeams((current) =>
+        current.filter((selection) => selection.equipeId !== team.id),
+      );
+      setSelectedAssignments((current) =>
+        current.filter((assignment) => assignment.equipeId !== team.id),
+      );
       await loadTeams(selectedMinistry.id);
     } catch (cause) {
       setError((cause as Error).message);
@@ -1364,6 +1405,23 @@ export default function SecretaryMinisterialWorkspace({
   // O cartão da escala vive numa função para poder ser reaproveitado nas duas
   // listas: as próximas, sempre abertas, e uma encerrada que a pessoa expandiu.
   function renderScheduleCard(schedule: Schedule) {
+    const knownTeamIds = new Set(schedule.equipes.map((team) => team.equipe_id));
+    const assignmentGroups = [
+      ...schedule.equipes.map((team) => ({
+        key: String(team.equipe_id),
+        team,
+        assignments: schedule.designacoes.filter(
+          (assignment) => assignment.equipe_id === team.equipe_id,
+        ),
+      })),
+      {
+        key: "livres",
+        team: null,
+        assignments: schedule.designacoes.filter(
+          (assignment) => !assignment.equipe_id || !knownTeamIds.has(assignment.equipe_id),
+        ),
+      },
+    ].filter((group) => group.assignments.length > 0);
     return (
       <article className="secretary-schedule-card" key={schedule.id}>
         <header>
@@ -1372,7 +1430,7 @@ export default function SecretaryMinisterialWorkspace({
         </header>
         <div className="secretary-schedule-body">
           <div><small>Responsável</small><strong>{schedule.responsavel_nome || "Não definido"}</strong></div>
-          <div><small>Equipe</small><strong>{schedule.equipe_nome || "Seleção livre"}</strong><div className="secretary-avatar-stack">{schedule.designacoes.slice(0, 5).map((item) => <span key={item.id} title={`${item.nome} · ${item.funcao}`}>{initials(item.nome)}</span>)}{schedule.designacoes.length > 5 && <b>+{schedule.designacoes.length - 5}</b>}</div></div>
+          <div><small>{schedule.equipes.length === 1 ? "Equipe" : "Equipes"}</small><strong>{schedule.equipes.length ? schedule.equipes.map((team) => team.equipe_nome).join(" · ") : "Seleção livre"}</strong><div className="secretary-avatar-stack">{schedule.designacoes.slice(0, 5).map((item) => <span key={item.id} title={`${item.equipe_nome ? `${item.equipe_nome} · ` : ""}${item.nome} · ${item.funcao}`}>{initials(item.nome)}</span>)}{schedule.designacoes.length > 5 && <b>+{schedule.designacoes.length - 5}</b>}</div></div>
           <div><small>Repertório</small><strong>{schedule.repertorio.length} itens</strong></div>
           <div><small>Checklist</small><strong>{checklist.filter((item) => item.escala_id === schedule.id).length} tarefas</strong></div>
         </div>
@@ -1391,7 +1449,18 @@ export default function SecretaryMinisterialWorkspace({
           />
         )}
         <div className="secretary-assignment-status-list">
-          {schedule.designacoes.map((assignment) => (
+          {assignmentGroups.map((group) => (
+            <section className="secretary-assignment-team" key={group.key}>
+              {group.team && (
+                <header>
+                  <div>
+                    <strong>{group.team.equipe_nome}</strong>
+                    <small>{group.team.funcao ? `Função/local: ${group.team.funcao}` : "Função/local não informado"}</small>
+                  </div>
+                  <span>{group.assignments.length}</span>
+                </header>
+              )}
+              {group.assignments.map((assignment) => (
             <article key={assignment.id} data-status={assignment.status.toLowerCase()}>
               <span className="secretary-avatar">{initials(assignment.nome)}</span>
               <div>
@@ -1459,6 +1528,8 @@ export default function SecretaryMinisterialWorkspace({
                 </div>
               )}
             </article>
+              ))}
+            </section>
           ))}
         </div>
         {Boolean(schedule.can_manage) && (
@@ -1481,6 +1552,16 @@ export default function SecretaryMinisterialWorkspace({
                   </option>
                 ))}
             </select>
+            {schedule.equipes.length > 0 && (
+              <select name="equipeId" required defaultValue="">
+                <option value="" disabled>Equipe de origem</option>
+                {schedule.equipes.map((team) => (
+                  <option key={team.equipe_id} value={team.equipe_id}>
+                    {team.equipe_nome}{team.funcao ? ` · ${team.funcao}` : ""}
+                  </option>
+                ))}
+              </select>
+            )}
             <input name="funcao" required maxLength={100} placeholder="Função na escala" />
             <button disabled={busy === `replacement-${schedule.id}`}>Adicionar</button>
           </form>
@@ -1860,7 +1941,60 @@ export default function SecretaryMinisterialWorkspace({
                       <summary><span>1</span><div><h3>Informações da escala</h3><p>Campos obrigatórios e responsável.</p></div><i aria-hidden="true">⌄</i></summary>
                       <div className="secretary-fold-content secretary-form-grid">
                         <label>Título<input name="titulo" required maxLength={140} placeholder="Ex.: Culto de celebração" /></label>
-                        <label>Equipe (opcional)<select name="equipeId" value={selectedTeamId || ""} onChange={(event) => { const value = Number(event.target.value) || null; setSelectedTeamId(value); setSelectedVolunteers([]); setChecklistDraft((current) => current.map((item) => ({ ...item, voluntarioId: "" }))); }}><option value="">Todos os integrantes</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.nome} · {team.membros.length} integrantes</option>)}</select><small>Ao escolher uma equipe, somente seus integrantes poderão ser escalados.</small></label>
+                        <fieldset className="span-2 secretary-schedule-teams">
+                          <legend>Equipes na escala</legend>
+                          <p>Selecione quantas equipes forem necessárias. Em cada uma, informe a função ou o local de atuação.</p>
+                          <div>
+                            {teams.map((team) => {
+                              const selection = selectedTeams.find((item) => item.equipeId === team.id);
+                              return (
+                                <section key={team.id} data-selected={Boolean(selection)}>
+                                  <label>
+                                    <input
+                                      type="checkbox"
+                                      checked={Boolean(selection)}
+                                      onChange={() => {
+                                        setSelectedTeams((current) =>
+                                          selection
+                                            ? current.filter((item) => item.equipeId !== team.id)
+                                            : [...current, { equipeId: team.id, funcao: "" }],
+                                        );
+                                        if (selection) {
+                                          setSelectedAssignments((current) =>
+                                            current.filter((item) => item.equipeId !== team.id),
+                                          );
+                                        }
+                                        setChecklistDraft((current) =>
+                                          current.map((item) => ({ ...item, voluntarioId: "" })),
+                                        );
+                                      }}
+                                    />
+                                    <span>{team.nome}</span>
+                                    <small>{team.membros.length} integrantes</small>
+                                  </label>
+                                  {selection && (
+                                    <label className="secretary-team-duty">
+                                      <span>Função/local desta equipe</span>
+                                      <input
+                                        value={selection.funcao}
+                                        onChange={(event) => setSelectedTeams((current) =>
+                                          current.map((item) =>
+                                            item.equipeId === team.id
+                                              ? { ...item, funcao: event.target.value }
+                                              : item,
+                                          ),
+                                        )}
+                                        maxLength={180}
+                                        placeholder="Ex.: Velha, Centro ou Recepção"
+                                      />
+                                    </label>
+                                  )}
+                                </section>
+                              );
+                            })}
+                            {!teams.length && <p className="secretary-inline-empty">Nenhuma equipe criada. Você ainda pode montar uma escala com integrantes livres.</p>}
+                          </div>
+                        </fieldset>
                         <label>Responsável<select name="responsavelUsuarioId" defaultValue=""><option value="">Definir depois</option>{selectedMinistry.voluntarios.map((item) => <option key={item.id} value={item.usuario_id}>{item.nome}</option>)}</select><small>Opcional no rascunho; escolha um integrante antes de publicar.</small></label>
                         <label>Início<input name="iniciaEm" type="datetime-local" required value={scheduleStartsAt} onChange={(event) => setScheduleStartsAt(event.target.value)} /></label>
                         <label>Término<input name="terminaEm" type="datetime-local" required value={scheduleEndsAt} onChange={(event) => setScheduleEndsAt(event.target.value)} /></label>
@@ -1868,23 +2002,55 @@ export default function SecretaryMinisterialWorkspace({
                       </div>
                     </details>
                     <details className="secretary-fold-section">
-                      <summary><span>2</span><div><h3>{selectedTeam ? selectedTeam.nome : "Equipe carregada do ministério"}</h3><p>{selectedTeam ? "Sugestões calculadas para esta equipe e data." : "Selecione uma equipe para receber sugestões mais precisas."}</p></div><i aria-hidden="true">⌄</i></summary>
+                      <summary><span>2</span><div><h3>{selectedTeamEntries.length ? `${selectedTeamEntries.length} equipe${selectedTeamEntries.length === 1 ? "" : "s"} selecionada${selectedTeamEntries.length === 1 ? "" : "s"}` : "Integrantes do ministério"}</h3><p>{selectedTeamEntries.length ? "Selecione os integrantes dentro de cada equipe, mantendo a origem de cada pessoa." : "Sem equipes selecionadas, os integrantes ficam livres nesta escala."}</p></div><i aria-hidden="true">⌄</i></summary>
                       <div className="secretary-fold-content">
                         <div className="secretary-suggestion-toolbar">
                           <p>O sistema considera dia, período, limite e conflitos reais. A validação final também acontece no servidor.</p>
-                          <button type="button" onClick={() => setSelectedVolunteers(candidateAvailability.filter((item) => item.suggested).map((item) => item.volunteer.id))} disabled={!candidateAvailability.some((item) => item.suggested)}>Selecionar sugestões disponíveis</button>
+                          <button type="button" onClick={() => setSelectedAssignments(candidateAvailability.filter((item) => item.suggested).flatMap(({ volunteer }) => {
+                            const team = selectedTeamEntries.find(({ team: candidateTeam }) => candidateTeam.membros.some((member) => member.voluntario_id === volunteer.id));
+                            return selectedTeamEntries.length && !team ? [] : [{ voluntarioId: volunteer.id, equipeId: team?.team.id || null }];
+                          }))} disabled={!candidateAvailability.some((item) => item.suggested)}>Selecionar sugestões disponíveis</button>
                         </div>
-                        <div className="secretary-team-picker">
-                        {candidateAvailability.map(({ volunteer: item, capacityReached, conflict, suggested, status }) => (
-                          <label key={item.id} className={suggested ? "suggested" : conflict || capacityReached ? "unavailable" : ""}>
-                            <input type="checkbox" disabled={capacityReached || conflict} checked={selectedVolunteers.includes(item.id)} onChange={() => setSelectedVolunteers((current) => current.includes(item.id) ? current.filter((id) => id !== item.id) : [...current, item.id])} />
-                            <span className="secretary-avatar">{initials(item.nome)}</span>
-                            <strong>{item.nome}</strong>
-                            <small>{item.funcao} · {item.escalas_ativas} ativa(s) · {Math.max(0, item.limite_escalas - item.escalas_ativas)} restante(s)</small>
-                            <em>{status}</em>
-                          </label>
-                        ))}
-                        {!scheduleCandidates.length && <p className="secretary-inline-empty">Esta equipe ainda não possui integrantes.</p>}
+                        <div className="secretary-team-assignment-groups">
+                          {(selectedTeamEntries.length
+                            ? selectedTeamEntries
+                            : [{ team: null, funcao: "" }]
+                          ).map(({ team, funcao }) => {
+                            const candidates = candidateAvailability.filter(({ volunteer }) =>
+                              !team || team.membros.some((member) => member.voluntario_id === volunteer.id),
+                            );
+                            return (
+                              <section key={team?.id || "livre"}>
+                                <header>
+                                  <div>
+                                    <strong>{team?.nome || "Integrantes livres"}</strong>
+                                    <small>{team ? (funcao ? `Função/local: ${funcao}` : "Função/local não informado") : "Sem equipe definida"}</small>
+                                  </div>
+                                  <span>{candidates.length}</span>
+                                </header>
+                                <div className="secretary-team-picker">
+                                  {candidates.map(({ volunteer: item, capacityReached, conflict, suggested, status }) => {
+                                    const selectedHere = selectedAssignments.some((assignment) =>
+                                      assignment.voluntarioId === item.id && assignment.equipeId === (team?.id || null),
+                                    );
+                                    const selectedElsewhere = selectedAssignments.some((assignment) =>
+                                      assignment.voluntarioId === item.id && assignment.equipeId !== (team?.id || null),
+                                    );
+                                    return (
+                                      <label key={item.id} className={suggested ? "suggested" : conflict || capacityReached ? "unavailable" : ""}>
+                                        <input type="checkbox" disabled={capacityReached || conflict || selectedElsewhere} checked={selectedHere} onChange={() => setSelectedAssignments((current) => selectedHere ? current.filter((assignment) => assignment.voluntarioId !== item.id) : [...current, { voluntarioId: item.id, equipeId: team?.id || null }])} />
+                                        <span className="secretary-avatar">{initials(item.nome)}</span>
+                                        <strong>{item.nome}</strong>
+                                        <small>{item.funcao} · {item.escalas_ativas} ativa(s) · {Math.max(0, item.limite_escalas - item.escalas_ativas)} restante(s)</small>
+                                        <em>{selectedElsewhere ? "Selecionado em outra equipe" : status}</em>
+                                      </label>
+                                    );
+                                  })}
+                                  {!candidates.length && <p className="secretary-inline-empty">Esta equipe ainda não possui integrantes.</p>}
+                                </div>
+                              </section>
+                            );
+                          })}
                         </div>
                       </div>
                     </details>
@@ -2431,7 +2597,11 @@ function EditScheduleDialog({
   teams: MinistryTeam[];
   busy: boolean;
   onClose: () => void;
-  onSubmit: (schedule: Schedule, event: FormEvent<HTMLFormElement>) => void;
+  onSubmit: (
+    schedule: Schedule,
+    event: FormEvent<HTMLFormElement>,
+    teams: SelectedScheduleTeam[],
+  ) => void;
 }) {
   const [repertoireValue, setRepertoireValue] = useState(
     schedule.repertorio.join("\n"),
@@ -2442,6 +2612,18 @@ function EditScheduleDialog({
       .map((item) => item.trim())
       .filter(Boolean),
     [repertoireValue],
+  );
+  const [selectedScheduleTeams, setSelectedScheduleTeams] = useState<
+    SelectedScheduleTeam[]
+  >(() =>
+    schedule.equipes.length
+      ? schedule.equipes.map((team) => ({
+          equipeId: team.equipe_id,
+          funcao: team.funcao,
+        }))
+      : schedule.equipe_id
+        ? [{ equipeId: schedule.equipe_id, funcao: "" }]
+        : [],
   );
 
   useEffect(() => {
@@ -2469,7 +2651,7 @@ function EditScheduleDialog({
           <button type="button" aria-label="Fechar editor" onClick={onClose}>×</button>
         </header>
         <p>Atualize as informações principais e revise o repertório sem alterar as confirmações dos integrantes.</p>
-        <form className="secretary-form secretary-edit-schedule-form" onSubmit={(event) => onSubmit(schedule, event)}>
+        <form className="secretary-form secretary-edit-schedule-form" onSubmit={(event) => onSubmit(schedule, event, selectedScheduleTeams)}>
           <div className="secretary-edit-repertoire-preview">
             <div>
               <strong>Repertório atual</strong>
@@ -2480,7 +2662,47 @@ function EditScheduleDialog({
           </div>
           <div className="secretary-form-grid">
             <label className="span-2">Título<input name="titulo" required maxLength={140} defaultValue={schedule.titulo} /></label>
-            <label>Equipe<select name="equipeId" defaultValue={schedule.equipe_id || ""}><option value="">Seleção livre</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.nome}</option>)}</select></label>
+            <fieldset className="span-2 secretary-schedule-teams">
+              <legend>Equipes na escala</legend>
+              <p>As equipes escolhidas aparecem separadas na escala. Remova primeiro as designações da equipe antes de retirá-la daqui.</p>
+              <div>
+                {teams.map((team) => {
+                  const selection = selectedScheduleTeams.find((item) => item.equipeId === team.id);
+                  return (
+                    <section key={team.id} data-selected={Boolean(selection)}>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(selection)}
+                          onChange={() => setSelectedScheduleTeams((current) =>
+                            selection
+                              ? current.filter((item) => item.equipeId !== team.id)
+                              : [...current, { equipeId: team.id, funcao: "" }],
+                          )}
+                        />
+                        <span>{team.nome}</span>
+                        <small>{team.membros.length} integrantes</small>
+                      </label>
+                      {selection && (
+                        <label className="secretary-team-duty">
+                          <span>Função/local desta equipe</span>
+                          <input
+                            value={selection.funcao}
+                            onChange={(event) => setSelectedScheduleTeams((current) =>
+                              current.map((item) => item.equipeId === team.id
+                                ? { ...item, funcao: event.target.value }
+                                : item),
+                            )}
+                            maxLength={180}
+                            placeholder="Ex.: Velha, Centro ou Recepção"
+                          />
+                        </label>
+                      )}
+                    </section>
+                  );
+                })}
+              </div>
+            </fieldset>
             <label>Responsável<select name="responsavelUsuarioId" defaultValue={schedule.responsavel_usuario_id || ""}><option value="">Não definido</option>{ministry.voluntarios.map((volunteer) => <option key={volunteer.id} value={volunteer.usuario_id}>{volunteer.nome}</option>)}</select></label>
             <label>Início<input name="iniciaEm" type="datetime-local" required defaultValue={toLocalDateTimeInput(schedule.inicia_em)} /></label>
             <label>Término<input name="terminaEm" type="datetime-local" required defaultValue={toLocalDateTimeInput(schedule.termina_em)} /></label>

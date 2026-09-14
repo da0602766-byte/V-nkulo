@@ -17,10 +17,12 @@ export async function listScheduleSubstitutionCandidates(
     comunidadeId,
     escalaId,
     usuarioAtualId,
+    equipeId = null,
   }: {
     comunidadeId: number;
     escalaId: number;
     usuarioAtualId: number;
+    equipeId?: number | null;
   },
 ): Promise<ScheduleSubstitutionCandidate[]> {
   const candidates = await db
@@ -37,8 +39,17 @@ export async function listScheduleSubstitutionCandidates(
          ON uc.usuario_id = mv.usuario_id
         AND uc.comunidade_id = mv.comunidade_id
         AND uc.status = 'ATIVO'
-       WHERE s.id = ? AND s.comunidade_id = ? AND s.status = 'PUBLICADA'
-         AND mv.usuario_id != ?
+         WHERE s.id = ? AND s.comunidade_id = ? AND s.status = 'PUBLICADA'
+           AND mv.usuario_id != ?
+         AND (
+           ? IS NULL OR EXISTS (
+             SELECT 1 FROM ministerio_equipe_membros team_member
+             WHERE team_member.equipe_id = ?
+               AND team_member.ministerio_id = s.ministerio_id
+               AND team_member.comunidade_id = s.comunidade_id
+               AND team_member.voluntario_id = mv.id
+           )
+         )
          AND NOT EXISTS (
            SELECT 1 FROM escala_designacoes existing
            WHERE existing.escala_id = s.id
@@ -49,7 +60,7 @@ export async function listScheduleSubstitutionCandidates(
        ORDER BY u.nome ASC
        LIMIT 100`,
     )
-    .bind(escalaId, comunidadeId, usuarioAtualId)
+    .bind(escalaId, comunidadeId, usuarioAtualId, equipeId, equipeId)
     .all<{
       voluntario_id: number;
       usuario_id: number;
@@ -159,7 +170,7 @@ export async function assignScheduleSubstitute(
 ) {
   const original = await db
     .prepare(
-      `SELECT d.id, d.funcao, s.inicia_em, s.termina_em
+      `SELECT d.id, d.funcao, d.equipe_id, s.inicia_em, s.termina_em
        FROM escala_designacoes d
        JOIN escalas_ministerio s
          ON s.id = d.escala_id AND s.comunidade_id = d.comunidade_id
@@ -177,6 +188,7 @@ export async function assignScheduleSubstitute(
     .first<{
       id: number;
       funcao: string;
+      equipe_id: number | null;
       inicia_em: string;
       termina_em: string;
     }>();
@@ -188,6 +200,7 @@ export async function assignScheduleSubstitute(
       comunidadeId,
       escalaId,
       usuarioAtualId: usuarioOriginalId,
+      equipeId: original.equipe_id,
     })
   ).find((item) => item.voluntarioId === substitutoVoluntarioId);
   if (!candidate) {
@@ -212,15 +225,16 @@ export async function assignScheduleSubstitute(
     db
       .prepare(
         `INSERT INTO escala_designacoes
-         (comunidade_id, escala_id, voluntario_id, usuario_id, funcao, status,
+         (comunidade_id, escala_id, voluntario_id, usuario_id, equipe_id, funcao, status,
           ativo, resposta_em, atualizado_em)
-         SELECT ?, ?, ?, ?, ?, 'PENDENTE', 1, NULL, CURRENT_TIMESTAMP
+         SELECT ?, ?, ?, ?, original.equipe_id, ?, 'PENDENTE', 1, NULL, CURRENT_TIMESTAMP
          FROM escala_designacoes original
          WHERE original.id = ? AND original.escala_id = ?
            AND original.comunidade_id = ? AND original.usuario_id = ?
            AND original.ativo = 1 AND original.status = 'PENDENTE'
          ON CONFLICT(escala_id, voluntario_id) DO UPDATE SET
            usuario_id = excluded.usuario_id,
+           equipe_id = excluded.equipe_id,
            funcao = excluded.funcao,
            status = 'PENDENTE',
            ativo = 1,

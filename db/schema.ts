@@ -1955,6 +1955,41 @@ export const escalasMinisterio = sqliteTable(
   ],
 );
 
+// Uma escala pode reunir várias equipes do mesmo ministério. A função/local
+// pertence à participação daquela equipe na escala (por exemplo, "Centro"),
+// não à equipe de forma permanente.
+export const escalaEquipes = sqliteTable(
+  "escala_equipes",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    comunidadeId: integer("comunidade_id")
+      .notNull()
+      .references(() => comunidades.id, { onDelete: "cascade" }),
+    escalaId: integer("escala_id")
+      .notNull()
+      .references(() => escalasMinisterio.id, { onDelete: "cascade" }),
+    equipeId: integer("equipe_id")
+      .notNull()
+      .references(() => ministerioEquipes.id, { onDelete: "cascade" }),
+    funcao: text("funcao").notNull().default(""),
+    criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+    atualizadoEm: text("atualizado_em")
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("escala_equipes_escala_equipe_unique").on(
+      table.escalaId,
+      table.equipeId,
+    ),
+    index("escala_equipes_comunidade_escala_idx").on(
+      table.comunidadeId,
+      table.escalaId,
+      table.equipeId,
+    ),
+  ],
+);
+
 export const escalaDesignacoes = sqliteTable(
   "escala_designacoes",
   {
@@ -1968,6 +2003,11 @@ export const escalaDesignacoes = sqliteTable(
     voluntarioId: integer("voluntario_id")
       .notNull()
       .references(() => ministerioVoluntarios.id, { onDelete: "cascade" }),
+    // Mantém explícita a origem da pessoa quando duas ou mais equipes servem
+    // na mesma escala. Escalas antigas e designações livres continuam nulas.
+    equipeId: integer("equipe_id").references(() => ministerioEquipes.id, {
+      onDelete: "set null",
+    }),
     usuarioId: integer("usuario_id")
       .notNull()
       .references(() => usuarios.id, { onDelete: "cascade" }),

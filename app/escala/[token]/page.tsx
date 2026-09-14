@@ -53,6 +53,10 @@ export default async function SharedSchedulePage({
     schedule.repertorio,
     schedule.links_recursos,
   );
+  const assignmentGroups = groupAssignmentsByTeam(
+    schedule.equipes,
+    schedule.designacoes,
+  );
   return (
     <SharedScheduleAccessGate
       opensAt={new Date(accessWindow.opensAt).toISOString()}
@@ -81,14 +85,25 @@ export default async function SharedSchedulePage({
           <section>
             <p className="pilot-kicker">EQUIPE</p>
             <h2>Integrantes escalados</h2>
-            <ul>
-              {schedule.designacoes.map((item) => (
-                <li key={String(item.id)}>
-                  <strong>{String(item.nome)}</strong>
-                  <span>{String(item.funcao)} · {statusLabel(item.status)}</span>
-                </li>
+            <div className="shared-secretary-team-groups">
+              {assignmentGroups.map((group) => (
+                <section key={String(group.team?.equipe_id || "livre")}>
+                  <header>
+                    <strong>{String(group.team?.equipe_nome || "Integrantes livres")}</strong>
+                    {group.team?.funcao && <span>Função/local: {group.team.funcao}</span>}
+                  </header>
+                  <ul>
+                    {group.assignments.map((item) => (
+                      <li key={String(item.id)}>
+                        <strong>{String(item.nome)}</strong>
+                        <span>{String(item.funcao)} · {statusLabel(item.status)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
               ))}
-            </ul>
+              {!assignmentGroups.length && <p>Nenhum integrante informado.</p>}
+            </div>
           </section>
           <section>
             <p className="pilot-kicker">REPERTÓRIO</p>
@@ -195,6 +210,24 @@ function statusLabel(value: unknown) {
       NAO_FEITO: "Não feito",
     }[String(value || "")] || String(value || "")
   );
+}
+
+function groupAssignmentsByTeam(
+  teams: Array<{ equipe_id: number; equipe_nome: string; equipe_cor: string; funcao: string }>,
+  assignments: Array<Record<string, unknown>>,
+) {
+  const knownIds = new Set(teams.map((team) => team.equipe_id));
+  const groups = teams.map((team) => ({
+    team,
+    assignments: assignments.filter(
+      (assignment) => Number(assignment.equipe_id || 0) === team.equipe_id,
+    ),
+  }));
+  const freeAssignments = assignments.filter(
+    (assignment) => !knownIds.has(Number(assignment.equipe_id || 0)),
+  );
+  if (freeAssignments.length) groups.push({ team: null, assignments: freeAssignments });
+  return groups.filter((group) => group.assignments.length > 0);
 }
 
 function linkTypeLabel(value: string) {

@@ -586,21 +586,21 @@ export async function PATCH(request: Request, context: Context) {
         );
       }
     }
-    if (parsed.equipeId) {
+    for (const selectedTeam of parsed.equipes) {
       const team = await db
         .prepare(
           `SELECT id FROM ministerio_equipes
            WHERE id = ? AND ministerio_id = ? AND comunidade_id = ? AND ativo = 1`,
         )
         .bind(
-          parsed.equipeId,
+          selectedTeam.equipeId,
           schedule.ministerio_id,
           access.context.comunidadeId,
         )
         .first<{ id: number }>();
       if (!team) {
         return Response.json(
-          { error: "A equipe selecionada não pertence a este ministério." },
+          { error: "Uma das equipes selecionadas não pertence a este ministério." },
           { status: 400 },
         );
       }
@@ -618,15 +618,21 @@ export async function PATCH(request: Request, context: Context) {
     }
     const assignments = await db
       .prepare(
-        `SELECT usuario_id, voluntario_id
+        `SELECT usuario_id, voluntario_id, equipe_id
         FROM escala_designacoes
         WHERE escala_id = ? AND comunidade_id = ?
           AND ativo = 1 AND status != 'INDISPONIVEL'`,
       )
       .bind(id, access.context.comunidadeId)
-      .all<{ usuario_id: number; voluntario_id: number }>();
+      .all<{ usuario_id: number; voluntario_id: number; equipe_id: number | null }>();
     for (const assignment of assignments.results) {
-      if (parsed.equipeId) {
+      if (assignment.equipe_id && !parsed.equipes.some((team) => team.equipeId === Number(assignment.equipe_id))) {
+        return Response.json(
+          { error: "Remova ou mova as pessoas da equipe antes de retirar esta equipe da escala." },
+          { status: 409 },
+        );
+      }
+      if (assignment.equipe_id) {
         const teamMember = await db
           .prepare(
             `SELECT id FROM ministerio_equipe_membros
@@ -634,7 +640,7 @@ export async function PATCH(request: Request, context: Context) {
                AND voluntario_id = ?`,
           )
           .bind(
-            parsed.equipeId,
+            assignment.equipe_id,
             schedule.ministerio_id,
             access.context.comunidadeId,
             assignment.voluntario_id,
@@ -642,7 +648,7 @@ export async function PATCH(request: Request, context: Context) {
           .first<{ id: number }>();
         if (!teamMember) {
           return Response.json(
-            { error: "Uma pessoa já designada não pertence à equipe selecionada." },
+            { error: "Uma pessoa já designada não pertence à equipe registrada para ela." },
             { status: 409 },
           );
         }
@@ -665,16 +671,15 @@ export async function PATCH(request: Request, context: Context) {
         );
       }
     }
-    await db
-      .prepare(
+    await db.batch([
+      db.prepare(
         `UPDATE escalas_ministerio
         SET titulo = ?, inicia_em = ?, termina_em = ?, local = ?,
           status = ?, observacoes = ?, repertorio = ?, links_recursos = ?,
           responsavel_usuario_id = ?, equipe_id = ?, campos_respostas = ?, atualizado_por = ?,
           atualizado_em = CURRENT_TIMESTAMP
         WHERE id = ? AND comunidade_id = ?`,
-      )
-      .bind(
+      ).bind(
         parsed.titulo,
         parsed.iniciaEm,
         parsed.terminaEm,
@@ -689,8 +694,24 @@ export async function PATCH(request: Request, context: Context) {
         access.user.id,
         id,
         access.context.comunidadeId,
-      )
-      .run();
+      ),
+      db.prepare(
+        `DELETE FROM escala_equipes
+         WHERE escala_id = ? AND comunidade_id = ?`,
+      ).bind(id, access.context.comunidadeId),
+      ...parsed.equipes.map((team) =>
+        db.prepare(
+          `INSERT INTO escala_equipes
+           (comunidade_id, escala_id, equipe_id, funcao)
+           VALUES (?, ?, ?, ?)`,
+        ).bind(
+          access.context.comunidadeId,
+          id,
+          team.equipeId,
+          team.funcao,
+        ),
+      ),
+    ]);
     await audit("ESCALA_V45_ATUALIZADA", {
       escalaId: id,
       status: parsed.status,
@@ -734,7 +755,31 @@ export async function PATCH(request: Request, context: Context) {
         { status: 404 },
       );
     }
-    if (schedule.equipe_id) {
+    const scheduleTeams = await db
+      .prepare(
+        `SELECT equipe_id FROM escala_equipes
+         WHERE escala_id = ? AND comunidade_id = ?`,
+      )
+      .bind(id, access.context.comunidadeId)
+      .all<{ equipe_id: number }>();
+    const assignmentTeamId = parsed.equipeId || (
+      scheduleTeams.results.length === 1
+        ? Number(scheduleTeams.results[0].equipe_id)
+        : null
+    );
+    if (scheduleTeams.results.length > 0 && !assignmentTeamId) {
+      return Response.json(
+        { error: "Escolha a equipe de origem desta pessoa." },
+        { status: 400 },
+      );
+    }
+    if (assignmentTeamId && !scheduleTeams.results.some((team) => Number(team.equipe_id) === assignmentTeamId)) {
+      return Response.json(
+        { error: "A equipe escolhida não participa desta escala." },
+        { status: 400 },
+      );
+    }
+    if (assignmentTeamId) {
       const teamMember = await db
         .prepare(
           `SELECT id FROM ministerio_equipe_membros
@@ -742,7 +787,7 @@ export async function PATCH(request: Request, context: Context) {
              AND voluntario_id = ?`,
         )
         .bind(
-          schedule.equipe_id,
+          assignmentTeamId,
           schedule.ministerio_id,
           access.context.comunidadeId,
           volunteer.id,
@@ -750,7 +795,7 @@ export async function PATCH(request: Request, context: Context) {
         .first<{ id: number }>();
       if (!teamMember) {
         return Response.json(
-          { error: "A pessoa não pertence à equipe definida para esta escala." },
+          { error: "A pessoa não pertence à equipe escolhida para ela." },
           { status: 409 },
         );
       }
@@ -773,10 +818,11 @@ export async function PATCH(request: Request, context: Context) {
       .prepare(
         `INSERT INTO escala_designacoes
         (comunidade_id, escala_id, voluntario_id, usuario_id,
-         funcao, status, ativo)
-        VALUES (?, ?, ?, ?, ?, 'PENDENTE', 1)
+         equipe_id, funcao, status, ativo)
+        VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE', 1)
         ON CONFLICT(escala_id, voluntario_id) DO UPDATE SET
           usuario_id = excluded.usuario_id,
+          equipe_id = excluded.equipe_id,
           funcao = excluded.funcao,
           status = 'PENDENTE',
           ativo = 1,
@@ -788,6 +834,7 @@ export async function PATCH(request: Request, context: Context) {
         id,
         volunteer.id,
         volunteer.usuario_id,
+        assignmentTeamId,
         parsed.funcao,
       )
       .run();

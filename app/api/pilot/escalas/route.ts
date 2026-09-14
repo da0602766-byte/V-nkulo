@@ -18,6 +18,7 @@ import { listScheduleSubstitutionCandidatesBatch } from "../../../lib/schedule-s
 
 type ScheduleRow = Record<string, unknown> & { id: number };
 type AssignmentRow = Record<string, unknown> & { escala_id: number };
+type ScheduleTeamRow = Record<string, unknown> & { escala_id: number };
 
 // Lote pedido a cada carregamento. O teto anterior era 150 escalas de uma vez,
 // sem forma de pedir as seguintes: passado esse número, as mais distantes
@@ -225,17 +226,22 @@ export async function GET(request: Request) {
   // com cortes em 100 noutros pontos. Blocos de 90 deixam margem para os dois
   // parâmetros fixos. Cada bloco continua filtrando por comunidade.
   const assignmentRows: AssignmentRow[] = [];
+  const scheduleTeamRows: ScheduleTeamRow[] = [];
   for (let inicio = 0; inicio < loadedScheduleIds.length; inicio += ASSIGNMENT_ID_CHUNK) {
     const bloco = loadedScheduleIds.slice(inicio, inicio + ASSIGNMENT_ID_CHUNK);
     const marcadores = bloco.map(() => "?").join(", ");
     const parcial = await db
       .prepare(
-        `SELECT d.id, d.escala_id, d.voluntario_id, d.usuario_id,
+        `SELECT d.id, d.escala_id, d.voluntario_id, d.usuario_id, d.equipe_id,
           u.nome, u.telefone, u.foto_perfil, u.email AS owner_email,
           u.criado_em AS owner_criado_em, d.funcao, d.status,
+          equipe.nome AS equipe_nome, equipe.cor AS equipe_cor,
           CASE WHEN d.usuario_id = ? THEN 1 ELSE 0 END AS is_mine
         FROM escala_designacoes d
         JOIN usuarios u ON u.id = d.usuario_id
+        LEFT JOIN ministerio_equipes equipe
+          ON equipe.id = d.equipe_id
+         AND equipe.comunidade_id = d.comunidade_id
         WHERE d.comunidade_id = ? AND d.ativo = 1
           AND d.escala_id IN (${marcadores})
         ORDER BY u.nome ASC`,
@@ -243,8 +249,44 @@ export async function GET(request: Request) {
       .bind(access.user.id, access.context.comunidadeId, ...bloco)
       .all<AssignmentRow>();
     assignmentRows.push(...parcial.results);
+    const teamsPartial = await db
+      .prepare(
+        `SELECT se.escala_id, se.equipe_id, se.funcao,
+          equipe.nome AS equipe_nome, equipe.cor AS equipe_cor, equipe.ordem AS equipe_ordem
+         FROM escala_equipes se
+         JOIN ministerio_equipes equipe
+           ON equipe.id = se.equipe_id
+          AND equipe.comunidade_id = se.comunidade_id
+         WHERE se.comunidade_id = ? AND se.escala_id IN (${marcadores})
+         ORDER BY se.escala_id ASC, equipe.ordem ASC, equipe.nome ASC`,
+      )
+      .bind(access.context.comunidadeId, ...bloco)
+      .all<ScheduleTeamRow>();
+    scheduleTeamRows.push(...teamsPartial.results);
   }
   const assignmentsResult = { results: assignmentRows };
+  const teamsBySchedule = new Map<number, ScheduleTeamRow[]>();
+  for (const team of scheduleTeamRows) {
+    const scheduleId = Number(team.escala_id);
+    const items = teamsBySchedule.get(scheduleId) || [];
+    items.push(team);
+    teamsBySchedule.set(scheduleId, items);
+  }
+  // O fallback só protege uma implantação em que a leitura chegue antes da
+  // migração terminar; registros legados são copiados pela migração 0073.
+  for (const schedule of schedulesResult.results) {
+    const scheduleId = Number(schedule.id);
+    if (!teamsBySchedule.has(scheduleId) && Number(schedule.equipe_id || 0) > 0) {
+      teamsBySchedule.set(scheduleId, [{
+        escala_id: scheduleId,
+        equipe_id: Number(schedule.equipe_id),
+        equipe_nome: schedule.equipe_nome || "Equipe",
+        equipe_cor: "#7357e8",
+        equipe_ordem: 0,
+        funcao: "",
+      }]);
+    }
+  }
   const manageableScheduleIds = new Set(
     schedulesResult.results
       .filter((schedule) => Boolean(schedule.can_manage))
@@ -340,6 +382,12 @@ export async function GET(request: Request) {
           repertorio: parseArray(schedule.repertorio),
           links_recursos: parseArray(schedule.links_recursos),
           fio_etapas: parseArray(schedule.fio_etapas),
+          equipes: (teamsBySchedule.get(Number(schedule.id)) || []).map((team) => ({
+            equipe_id: Number(team.equipe_id),
+            equipe_nome: String(team.equipe_nome || "Equipe"),
+            equipe_cor: String(team.equipe_cor || "#7357e8"),
+            funcao: String(team.funcao || ""),
+          })),
           designacoes: assignmentsBySchedule.get(Number(schedule.id)) || [],
           substitution_candidates:
             substitutionCandidatesBySchedule.get(Number(schedule.id)) || [],
@@ -399,21 +447,21 @@ async function createSchedule(request: Request) {
       { status: 403 },
     );
   }
-  if (parsed.equipeId) {
+  for (const selectedTeam of parsed.equipes) {
     const team = await db
       .prepare(
         `SELECT id FROM ministerio_equipes
          WHERE id = ? AND ministerio_id = ? AND comunidade_id = ? AND ativa = 1`,
       )
       .bind(
-        parsed.equipeId,
+        selectedTeam.equipeId,
         parsed.ministerioId,
         access.context.comunidadeId,
       )
       .first<{ id: number }>();
     if (!team) {
       return Response.json(
-        { error: "A equipe selecionada não pertence a este ministério." },
+        { error: "Uma das equipes selecionadas não pertence a este ministério." },
         { status: 400 },
       );
     }
@@ -442,6 +490,7 @@ async function createSchedule(request: Request) {
     id: number;
     usuarioId: number;
     funcao: string;
+    equipeId: number | null;
   }> = [];
   const voluntarioIds = Array.from(
     new Set(parsed.designacoes.map((assignment) => assignment.voluntarioId)),
@@ -450,7 +499,6 @@ async function createSchedule(request: Request) {
     number,
     { id: number; usuario_id: number; funcao: string; limite_escalas: number }
   >();
-  const teamMemberVoluntarioIds = new Set<number>();
   if (voluntarioIds.length > 0) {
     const placeholders = voluntarioIds.map(() => "?").join(", ");
     const volunteersResult = await db
@@ -464,24 +512,6 @@ async function createSchedule(request: Request) {
     for (const volunteer of volunteersResult.results) {
       volunteersById.set(Number(volunteer.id), volunteer);
     }
-    if (parsed.equipeId) {
-      const teamResult = await db
-        .prepare(
-          `SELECT voluntario_id FROM ministerio_equipe_membros
-           WHERE equipe_id = ? AND ministerio_id = ? AND comunidade_id = ?
-             AND voluntario_id IN (${placeholders})`,
-        )
-        .bind(
-          parsed.equipeId,
-          parsed.ministerioId,
-          access.context.comunidadeId,
-          ...voluntarioIds,
-        )
-        .all<{ voluntario_id: number }>();
-      for (const row of teamResult.results) {
-        teamMemberVoluntarioIds.add(Number(row.voluntario_id));
-      }
-    }
   }
   for (const assignment of parsed.designacoes) {
     const volunteer = volunteersById.get(assignment.voluntarioId);
@@ -491,11 +521,41 @@ async function createSchedule(request: Request) {
         { status: 400 },
       );
     }
-    if (parsed.equipeId && !teamMemberVoluntarioIds.has(volunteer.id)) {
+    const assignmentTeamId = assignment.equipeId || (
+      parsed.equipes.length === 1 ? parsed.equipes[0].equipeId : null
+    );
+    if (parsed.equipes.length > 0 && !assignmentTeamId) {
       return Response.json(
-        { error: "Todos os integrantes da escala devem pertencer à equipe selecionada." },
+        { error: "Escolha a equipe de cada integrante desta escala." },
         { status: 400 },
       );
+    }
+    if (assignmentTeamId && !parsed.equipes.some((team) => team.equipeId === assignmentTeamId)) {
+      return Response.json(
+        { error: "Um integrante foi associado a uma equipe fora desta escala." },
+        { status: 400 },
+      );
+    }
+    if (assignmentTeamId) {
+      const teamMember = await db
+        .prepare(
+          `SELECT id FROM ministerio_equipe_membros
+           WHERE equipe_id = ? AND ministerio_id = ? AND comunidade_id = ?
+             AND voluntario_id = ?`,
+        )
+        .bind(
+          assignmentTeamId,
+          parsed.ministerioId,
+          access.context.comunidadeId,
+          volunteer.id,
+        )
+        .first<{ id: number }>();
+      if (!teamMember) {
+        return Response.json(
+          { error: "Cada integrante precisa pertencer à equipe escolhida para ele." },
+          { status: 400 },
+        );
+      }
     }
     const capacity = await db
       .prepare(
@@ -535,6 +595,7 @@ async function createSchedule(request: Request) {
       id: Number(volunteer.id),
       usuarioId: Number(volunteer.usuario_id),
       funcao: assignment.funcao || String(volunteer.funcao),
+      equipeId: assignmentTeamId,
     });
   }
   const modelId = positiveInteger(payload.modeloId);
@@ -630,18 +691,34 @@ async function createSchedule(request: Request) {
   const assignmentIds = new Map<number, number>();
   const notificationRecipients: number[] = [];
   try {
+    for (const team of parsed.equipes) {
+      await db
+        .prepare(
+          `INSERT INTO escala_equipes
+           (comunidade_id, escala_id, equipe_id, funcao)
+           VALUES (?, ?, ?, ?)`,
+        )
+        .bind(
+          access.context.comunidadeId,
+          scheduleId,
+          team.equipeId,
+          team.funcao,
+        )
+        .run();
+    }
     for (const assignment of validatedAssignments) {
       const assignmentResult = await db
         .prepare(
           `INSERT INTO escala_designacoes
-           (comunidade_id, escala_id, voluntario_id, usuario_id, funcao, status, ativo)
-           VALUES (?, ?, ?, ?, ?, 'PENDENTE', 1)`,
+           (comunidade_id, escala_id, voluntario_id, usuario_id, equipe_id, funcao, status, ativo)
+           VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE', 1)`,
         )
         .bind(
           access.context.comunidadeId,
           scheduleId,
           assignment.id,
           assignment.usuarioId,
+          assignment.equipeId,
           assignment.funcao,
         )
         .run();
@@ -707,6 +784,7 @@ async function createSchedule(request: Request) {
       escalaId: scheduleId,
       ministerioId: parsed.ministerioId,
       equipeId: parsed.equipeId,
+      equipeIds: parsed.equipes.map((team) => team.equipeId),
       status: parsed.status,
       modeloId: modelId,
       checklistItens: checklist.length,

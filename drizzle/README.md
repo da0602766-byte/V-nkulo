@@ -6,8 +6,12 @@ migração nova, leia isto.
 
 ## Próximo número livre
 
-**`0073`**. Use o próximo inteiro disponível a partir daí — não reaproveite
+**`0074`**. Use o próximo inteiro disponível a partir daí — não reaproveite
 um número já usado, mesmo que o arquivo tenha sido escrito à mão.
+
+`0073_escalas_multiplas_equipes.sql` permite associar várias equipes a uma
+escala e guarda a equipe de cada designação. A coluna legada `equipe_id` da
+escala é preservada para compatibilidade com registros e integrações antigas.
 
 `0071_celulas_participacao_detalhes.sql` adiciona `rede`, `horario_texto`,
 `temas` e `foto_capa` em `celulas`, para a aba Configurações do redesenho de
