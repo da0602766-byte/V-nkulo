@@ -203,12 +203,13 @@ test("visitantes mostram o funil antes da tabela", async () => {
   for (const etapa of ["NOVO", "EM_CONTATO", "EM_ACOMPANHAMENTO", "INTEGRADO"]) {
     assert.ok(operations.includes(`["${etapa}"`) || operations.includes(`"${etapa}",`), etapa);
   }
-  // O funil precisa vir antes da tabela na ordem do documento.
-  const funil = operations.indexOf('className="visitor-funnel-v5"');
+  // O funil passou a ocupar o lugar do fluxo numerado de Ministérios: mesmo
+  // dispositivo, `secretary-flow` + `visitor-flow-v7`, e segue antes da tabela.
+  const funil = operations.indexOf('className="secretary-flow visitor-flow-v7"');
   const tabela = operations.indexOf("visitor-bulkbar-v2");
   assert.ok(funil > 0 && funil < tabela, "o funil não está antes da tabela");
-  const styles = await read("app/globals.css");
-  assert.match(styles, /\.visitor-funnel-v5 article\[data-etapa="INTEGRADO"\]/);
+  const styles = await read("app/visitors.css");
+  assert.match(styles, /\.visitor-flow-v7 div\[data-etapa="INTEGRADO"\]/);
 });
 
 test("notificações agrupam por dia e separam o que precisa de resposta", async () => {

@@ -15,7 +15,9 @@ test("Visitantes usa dashboard real, lista WhatsApp e configurações em uma eng
   // voltou ao painel de panorama, no topo da aba.
   assert.match(workspace, /CRESCIMENTO<\/p>/);
   assert.match(workspace, /visitor-growth-chart-v6/);
-  assert.match(workspace, /Configurações de visitantes/);
+  // A engrenagem virou um botão nomeado na barra de ações; o rótulo visível
+  // ("Categorias") é o nome acessível, e o title diz o que ela abre.
+  assert.match(workspace, /Categorias e responsáveis de visitantes/);
   assert.match(workspace, /visitor-settings-panel/);
   assert.match(workspace, /https:\/\/wa\.me\//);
   assert.match(workspace, /Ministério responsável/);
