@@ -168,7 +168,9 @@ export async function GET(request: Request) {
         SUM(CASE WHEN v.ativo = 1 THEN 1 ELSE 0 END) AS todos,
         SUM(CASE WHEN v.ativo = 0 THEN 1 ELSE 0 END) AS arquivados,
         SUM(CASE WHEN v.ativo = 1 AND v.status = 'NOVO' THEN 1 ELSE 0 END) AS novos,
+        SUM(CASE WHEN v.ativo = 1 AND v.status = 'EM_CONTATO' THEN 1 ELSE 0 END) AS em_contato,
         SUM(CASE WHEN v.ativo = 1 AND v.status = 'EM_ACOMPANHAMENTO' THEN 1 ELSE 0 END) AS acompanhamento,
+        SUM(CASE WHEN v.ativo = 1 AND v.status = 'INTEGRADO' THEN 1 ELSE 0 END) AS integrado,
         SUM(CASE WHEN v.ativo = 1 AND EXISTS (
           SELECT 1 FROM acompanhamentos a
           WHERE a.visitante_id = v.id AND a.comunidade_id = v.comunidade_id
@@ -196,7 +198,9 @@ export async function GET(request: Request) {
       contagens: {
         todos: Number(counts?.todos || 0),
         novos: Number(counts?.novos || 0),
+        em_contato: Number(counts?.em_contato || 0),
         acompanhamento: Number(counts?.acompanhamento || 0),
+        integrado: Number(counts?.integrado || 0),
         pendencias: Number(counts?.pendencias || 0),
         sem_contato: Number(counts?.sem_contato || 0),
         arquivados: Number(counts?.arquivados || 0),

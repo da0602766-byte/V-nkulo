@@ -122,12 +122,12 @@ test("layout compacto inclui dashboard por categoria, filtro e diálogo em porta
     source("app/api/pilot/visitante-categorias/route.ts"),
   ]);
   assert.match(workspace, /createPortal\(/);
-  assert.match(workspace, /visitor-category-dashboards/);
-  assert.match(workspace, /visitor-birthday-card/);
+  assert.match(workspace, /visitor-panorama-legend-v6/);
+  assert.match(workspace, /visitor-birthday-feed-v6/);
   assert.match(workspace, /Filtrar visitantes por categoria/);
   assert.match(workspace, /Possível cadastro duplicado/);
-  assert.match(workspace, /Excluir cadastro/);
-  assert.match(styles, /\.visitor-overview-grid/);
+  assert.match(workspace, /Excluir definitivamente a ficha de/);
+  assert.match(styles, /\.visitor-panorama-v6/);
   assert.match(styles, /max-height:690px;[^}]*overflow-y:auto/);
   assert.match(visitorsApi, /const PAGE_SIZE = 10/);
   assert.match(visitorsApi, /ORDER BY v\.id DESC/);

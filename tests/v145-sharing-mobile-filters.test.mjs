@@ -45,11 +45,13 @@ test("categorias compactas filtram a lista e podem ser recolhidas", async () => 
     source("app/components/TenantOperations.tsx"),
     source("app/globals.css"),
   ]);
-  assert.match(workspace, /<details className="visitor-category-dashboards" open>/);
+  // Os cartões recolhíveis deram lugar à faixa de categorias e à legenda do
+  // panorama; as duas filtram a lista e levam o foco até o diretório.
+  assert.match(workspace, /className="visitor-category-strip-v2"/);
   assert.match(workspace, /filterByCategory\(String\(category\.id\)\)/);
   assert.match(workspace, /document\.getElementById\("visitor-directory"\)/);
-  assert.match(styles, /\.visitor-category-filter-cards/);
-  assert.match(styles, /\.visitor-category-dashboards\[open\]>summary>i/);
+  assert.match(styles, /\.visitor-panorama-legend-v6/);
+  assert.match(styles, /\.visitor-category-strip-v2 button\.active/);
 });
 
 test("ações móveis, comentários e inscritos usam painéis fora dos cartões", async () => {

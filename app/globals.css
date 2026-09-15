@@ -15774,14 +15774,24 @@ html[data-pilot-theme="escuro"] .social-public-header .theme-control button.acti
   padding:0 18px 18px;
 }
 .visitor-registration-section { min-width:0; grid-column:1/-1; border:1px solid var(--pilot-line); border-radius:14px; background:var(--pilot-surface-2); overflow:hidden; }
-.visitor-registration-section>summary { min-height:58px; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:9px 12px; color:var(--pilot-text); cursor:pointer; list-style:none; }
+/* As seções do cadastro deixaram de ser <details> quando o formulário virou
+   passo a passo fixo, mas estas regras continuaram mirando `> summary`: o
+   cabeçalho real é um <header> e ficava sem estilo nenhum — número, título e
+   descrição saíam colados numa linha só ("1Informações pessoaisNome e formas de
+   contato"). O seletor agora cobre os dois. */
+.visitor-registration-section>:is(summary,header) { min-height:58px; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:11px 14px; color:var(--pilot-text); list-style:none; }
+.visitor-registration-section>summary { cursor:pointer; }
 .visitor-registration-section>summary::-webkit-details-marker { display:none; }
-.visitor-registration-section>summary>span { min-width:0; display:grid; grid-template-columns:34px minmax(0,1fr); align-items:center; gap:2px 10px; }
-.visitor-registration-section>summary b { grid-row:1/3; width:34px; height:34px; display:grid; place-items:center; border-radius:10px; background:color-mix(in srgb,var(--pilot-purple) 12%,var(--pilot-surface)); color:var(--pilot-purple); font-size:var(--fs-xs); }
-.visitor-registration-section>summary strong { overflow:hidden; font-size:var(--fs-sm); text-overflow:ellipsis; white-space:nowrap; }
-.visitor-registration-section>summary small { overflow:hidden; color:var(--pilot-muted); font-size:var(--fs-2xs); font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
-.visitor-registration-section>summary>i { flex:none; color:var(--pilot-muted); font-size:var(--fs-xl); font-style:normal; transition:transform .2s ease; }
+.visitor-registration-section>:is(summary,header)>span { min-width:0; display:grid; grid-template-columns:34px minmax(0,1fr); align-items:center; gap:2px 11px; }
+.visitor-registration-section>:is(summary,header) b { grid-row:1/3; width:34px; height:34px; display:grid; place-items:center; border-radius:10px; background:color-mix(in srgb,var(--pilot-purple) 12%,var(--pilot-surface)); color:var(--pilot-purple); font-size:var(--fs-xs); font-weight:900; }
+.visitor-registration-section>:is(summary,header) strong { overflow:hidden; font-size:var(--fs-md); text-overflow:ellipsis; white-space:nowrap; }
+.visitor-registration-section>:is(summary,header) small { overflow:hidden; color:var(--pilot-muted); font-size:var(--fs-2xs); font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
+.visitor-registration-section>:is(summary,header)>i { flex:none; color:var(--pilot-muted); font-size:var(--fs-xl); font-style:normal; transition:transform .2s ease; }
 .visitor-registration-section[open]>summary>i { transform:rotate(180deg); }
+/* O <header> já nomeia a seção; a legenda repetia a mesma ideia com outras
+   palavras ("Informações pessoais" / "Dados pessoais") e colidia com a borda do
+   fieldset. Fica só para leitor de tela. */
+.visitor-registration-section>fieldset>legend { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
 .visitor-registration fieldset {
   min-width:0;
   display:grid;
@@ -27623,11 +27633,18 @@ html[data-pilot-theme="escuro"] .owner-feedback-detail>aside { border-color:#4f4
 .visitor-import-dialog-v2>footer button { min-height:42px; padding:0 17px; border:1px solid var(--pilot-line); border-radius:10px; background:transparent; color:inherit; font-weight:800; }
 .visitor-import-dialog-v2>footer button:last-child { border-color:var(--pilot-primary); background:var(--pilot-primary); color:#fff; }
 .visitor-followup-details-v2 { margin:0 16px 14px; border:1px solid var(--pilot-line); border-radius:14px; background:var(--pilot-card-soft); overflow:hidden; }
-.visitor-followup-details-v2>summary { display:flex; align-items:center; justify-content:space-between; gap:16px; min-height:54px; padding:0 15px; cursor:pointer; list-style:none; font-weight:850; }
+/* O resumo tinha dois indicadores concorrendo: o ::after desta regra e o <i>⌄</i>
+   que o componente já escrevia. Os dois apareciam lado a lado no canto. O texto
+   também saía emendado ("Novo acompanhamentoRegistre o cuidado…") porque o
+   <span> interno não organizava título e descrição. */
+.visitor-followup-details-v2>summary { display:flex; align-items:center; justify-content:space-between; gap:16px; min-height:58px; padding:10px 15px; cursor:pointer; list-style:none; font-weight:850; }
 .visitor-followup-details-v2>summary::-webkit-details-marker { display:none; }
-.visitor-followup-details-v2>summary::after { content:'+'; color:var(--pilot-primary); font-size:var(--fs-2xl); }
+.visitor-followup-details-v2>summary>span { min-width:0; display:grid; gap:2px; }
+.visitor-followup-details-v2>summary strong { color:var(--pilot-text); font-size:var(--fs-sm); }
+.visitor-followup-details-v2>summary small { color:var(--pilot-muted); font-size:var(--fs-2xs); font-weight:700; line-height:1.45; }
+.visitor-followup-details-v2>summary>i { flex:none; color:var(--pilot-primary); font-size:var(--fs-2xl); font-style:normal; line-height:1; transition:transform .2s ease; }
 .visitor-followup-details-v2[open]>summary { border-bottom:1px solid var(--pilot-line); }
-.visitor-followup-details-v2[open]>summary::after { content:'−'; }
+.visitor-followup-details-v2[open]>summary>i { transform:rotate(180deg); }
 .visitor-followup-details-v2 .visitor-followup-quick-v2 { margin:0; border:0; border-radius:0; background:transparent; }
 .visitor-bulkbar-v2 .permanent { border-color:#d84c6a!important; background:#d84c6a!important; color:#fff!important; }
 .visitor-registration-actions button:last-child { border-color:var(--pilot-primary)!important; background:var(--pilot-primary)!important; color:#fff!important; opacity:1!important; }
@@ -27776,34 +27793,57 @@ html[data-pilot-theme="escuro"] .owner-feedback-detail>aside { border-color:#4f4
 .visitor-bulkbar-v2 .danger { color:#e8667b; }
 .visitor-sheet-v2>.operations-feedback { margin:10px 20px 0; }
 .visitor-table-scroll-v2 { min-width:0; overflow:auto; max-height:590px; }
-.visitor-table-v2 { width:100%; min-width:1040px; border-collapse:collapse; table-layout:fixed; }
-.visitor-table-v2 th,.visitor-table-v2 td { height:58px; padding:8px 9px; border-bottom:1px solid var(--pilot-line); color:var(--pilot-muted); font-size:.62rem; text-align:left; vertical-align:middle; }
-.visitor-table-v2 thead th { position:sticky; z-index:2; top:0; height:36px; background:var(--pilot-surface); color:var(--pilot-muted); font-size:.54rem; font-weight:850; letter-spacing:.08em; text-transform:uppercase; }
-.visitor-table-v2 th:first-child,.visitor-table-v2 td:first-child { width:38px; text-align:center; }
-.visitor-table-v2 th:nth-child(2) { width:205px; }
-.visitor-table-v2 th:nth-child(3) { width:155px; }
-.visitor-table-v2 th:nth-child(4) { width:135px; }
-.visitor-table-v2 th:nth-child(5) { width:110px; }
-.visitor-table-v2 th:nth-child(6) { width:115px; }
-.visitor-table-v2 th:nth-child(7) { width:145px; }
-.visitor-table-v2 th:nth-child(8),.visitor-table-v2 th:nth-child(9) { width:105px; }
-.visitor-table-v2 th:last-child { width:38px; }
+/* As larguras eram dez valores fixos que somavam 1151 px dentro de um cartão de
+   1060 px: com `table-layout:fixed` a tabela cresce até o maior valor pedido,
+   então as duas últimas colunas — "Próximo passo" e o botão de abrir a ficha —
+   ficavam fora da área visível mesmo num monitor de 1440 px. O `min-width` de
+   1040 px dizia outra coisa e nunca foi respeitado.
+   Agora as proporções são percentuais: a tabela ocupa exatamente a largura do
+   cartão e só rola na horizontal abaixo do min-width, onde rolar é a saída
+   certa. A soma é 100%. */
+.visitor-table-v2 { width:100%; min-width:1000px; border-collapse:collapse; table-layout:fixed; }
+.visitor-table-v2 th,.visitor-table-v2 td { height:60px; padding:9px 10px; border-bottom:1px solid var(--pilot-line); color:var(--pilot-muted); font-size:var(--fs-2xs); text-align:left; vertical-align:middle; }
+/* Os títulos eram caixa alta com espaçamento entre letras: "RESPONSÁVEL" e
+   "ÚLTIMO CONTATO" ficavam mais largos que qualquer divisão razoável de 1045 px
+   dava para a coluna. Em caixa normal cabem, e se leem melhor — a caixa alta
+   aqui não distinguia nada que o peso e a cor já não distinguissem. */
+.visitor-table-v2 thead th { position:sticky; z-index:2; top:0; height:auto; background:var(--pilot-surface); color:var(--pilot-muted); padding-block:10px; font-size:var(--fs-2xs); font-weight:800; letter-spacing:0; line-height:1.3; text-transform:none; }
+.visitor-table-v2 th:first-child,.visitor-table-v2 td:first-child { width:3.6%; min-width:34px; text-align:center; padding-inline:6px; }
+.visitor-table-v2 th:nth-child(2) { width:20.4%; }
+.visitor-table-v2 th:nth-child(3) { width:13%; }
+.visitor-table-v2 th:nth-child(4) { width:13%; }
+.visitor-table-v2 th:nth-child(5) { width:8.6%; }
+.visitor-table-v2 th:nth-child(6) { width:10.5%; }
+.visitor-table-v2 th:nth-child(7) { width:11.5%; }
+.visitor-table-v2 th:nth-child(8) { width:9.7%; }
+.visitor-table-v2 th:last-child { width:9.7%; }
 .visitor-table-v2 tbody tr { transition:background .18s ease; }
 .visitor-table-v2 tbody tr:hover { background:color-mix(in srgb,var(--pilot-primary) 5%,var(--pilot-surface)); }
 .visitor-table-v2 td>strong,.visitor-table-v2 td>small { display:block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.visitor-table-v2 td>strong { color:var(--pilot-text); font-size:.62rem; }
-.visitor-table-v2 td>small { margin-top:3px; font-size:.53rem; }
-.visitor-table-v2 td select { width:100%; min-width:0; height:30px; border:1px solid var(--pilot-line); border-radius:7px; background:var(--pilot-surface-2); color:var(--pilot-text); padding:0 6px; font-size:.58rem; }
-.visitor-table-v2 td.overdue { color:#e8667b; font-weight:800; }
-.visitor-person-cell-v2 { display:grid; grid-template-columns:34px minmax(0,1fr); align-items:center; gap:9px; width:100%; border:0; background:transparent; color:var(--pilot-text); padding:0; text-align:left; }
-.visitor-person-cell-v2>span:first-child { display:grid; place-items:center; width:34px; height:34px; border-radius:10px; background:color-mix(in srgb,var(--category-color) 16%,var(--pilot-surface-2)); color:var(--category-color); font-weight:900; }
+.visitor-table-v2 td>strong { color:var(--pilot-text); font-size:var(--fs-2xs); }
+.visitor-table-v2 td>small { margin-top:2px; color:var(--pilot-muted); font-size:var(--fs-2xs); }
+.visitor-table-v2 td select {
+  width:100%; min-width:0; height:34px; border:1px solid var(--pilot-line); border-radius:8px;
+  color:var(--pilot-text); padding:0 24px 0 9px; font-size:var(--fs-2xs); text-overflow:ellipsis;
+  appearance:none; -webkit-appearance:none;
+  background:var(--pilot-surface-2) no-repeat right 8px center/9px 6px;
+  background-image:linear-gradient(45deg,transparent 46%,currentColor 46% 54%,transparent 54%),linear-gradient(-45deg,transparent 46%,currentColor 46% 54%,transparent 54%);
+  background-position:right 13px center,right 8px center;
+  background-size:6px 6px,6px 6px;
+  background-repeat:no-repeat,no-repeat;
+}
+.visitor-table-v2 td select:focus-visible { outline:2px solid var(--pilot-primary); outline-offset:1px; }
+/* Vencido é informação, não decoração: a linha inteira ganha um selo de data em
+   vermelho, e o token de perigo garante contraste nos dois temas. */
+.visitor-table-v2 td.overdue { box-shadow:inset 3px 0 0 var(--pilot-danger); }
+.visitor-table-v2 td.overdue>strong { color:var(--pilot-danger); font-weight:850; }
+.visitor-person-cell-v2 { display:grid; grid-template-columns:30px minmax(0,1fr); align-items:center; gap:8px; width:100%; border:0; background:transparent; color:var(--pilot-text); padding:0; text-align:left; cursor:pointer; }
+.visitor-person-cell-v2>span:first-child { display:grid; place-items:center; width:30px; height:30px; border-radius:9px; background:color-mix(in srgb,var(--category-color) 16%,var(--pilot-surface-2)); color:var(--category-color); font-weight:900; }
 .visitor-person-cell-v2>span:last-child { min-width:0; display:grid; gap:3px; }
 .visitor-person-cell-v2 strong,.visitor-person-cell-v2 small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .visitor-person-cell-v2 strong { font-size:.69rem; }
 .visitor-person-cell-v2 small { color:var(--pilot-muted); font-size:.52rem; }
-.visitor-category-tag-v2 { display:inline-flex; max-width:100%; align-items:center; gap:5px; overflow:hidden; border-radius:999px; background:color-mix(in srgb,var(--category-color) 12%,var(--pilot-surface-2)); color:var(--category-color); padding:5px 7px; font-weight:800; text-overflow:ellipsis; white-space:nowrap; }
-.visitor-row-open-v2 { display:grid; place-items:center; width:28px; height:28px; border:0; border-radius:8px; background:transparent; color:var(--pilot-muted); font-size:1.2rem; }
-.visitor-row-open-v2:hover { background:var(--pilot-surface-2); color:var(--pilot-primary); transform:translateX(2px); }
+.visitor-category-tag-v2 { display:inline-block; max-width:100%; overflow:hidden; border:1px solid color-mix(in srgb,var(--category-color) 28%,transparent); border-radius:999px; background:color-mix(in srgb,var(--category-color) 11%,var(--pilot-surface-2)); color:var(--category-color); padding:5px 10px; font-weight:800; text-overflow:ellipsis; vertical-align:middle; white-space:nowrap; }
 .visitor-empty-v2 { display:grid; place-items:center; gap:4px; min-height:180px; color:var(--pilot-muted); text-align:center; }
 .visitor-empty-v2>span { font-size:1.6rem; color:var(--pilot-primary); }
 .visitor-empty-v2 strong { color:var(--pilot-text); }
@@ -27890,12 +27930,11 @@ html[data-pilot-theme="escuro"] .owner-feedback-detail>aside { border-color:#4f4
   .visitor-sheet-v2>.operations-feedback { margin:9px; }
   .visitor-table-scroll-v2 { max-height:none; overflow:hidden; }
   .visitor-table-v2 { min-width:0; table-layout:auto; }
-  .visitor-table-v2 thead th:nth-child(3),.visitor-table-v2 thead th:nth-child(4),.visitor-table-v2 thead th:nth-child(5),.visitor-table-v2 thead th:nth-child(6),.visitor-table-v2 thead th:nth-child(8),.visitor-table-v2 thead th:nth-child(9),
-  .visitor-table-v2 tbody td:nth-child(3),.visitor-table-v2 tbody td:nth-child(4),.visitor-table-v2 tbody td:nth-child(5),.visitor-table-v2 tbody td:nth-child(6),.visitor-table-v2 tbody td:nth-child(8),.visitor-table-v2 tbody td:nth-child(9) { display:none; }
+  .visitor-table-v2 :is(thead th, tbody td):is(:nth-child(3), :nth-child(4), :nth-child(5), :nth-child(6), :nth-child(8)) { display:none; }
   .visitor-table-v2 th,.visitor-table-v2 td { height:62px; padding:7px 5px; }
   .visitor-table-v2 th:nth-child(2) { width:auto; }
   .visitor-table-v2 th:nth-child(7) { width:116px; }
-  .visitor-table-v2 th:last-child { width:32px; }
+  .visitor-table-v2 th:last-child { width:92px; }
   .visitor-table-v2 td select { font-size:.55rem; }
   .visitor-person-cell-v2 { grid-template-columns:32px minmax(0,1fr); gap:7px; }
   .visitor-person-cell-v2>span:first-child { width:32px; height:32px; }
@@ -33409,4 +33448,319 @@ html[data-pilot-theme="escuro"] .request-care-status.tone-blue { background:#173
 @media (max-width: 560px) {
   .gestao-kpi-row { grid-template-columns: repeat(2, 1fr); }
   .gestao-lot-grid { grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); }
+}
+
+/* ===========================================================================
+   Visitantes · acerto do desktop (V6)
+   ---------------------------------------------------------------------------
+   Três reformas se acumularam nesta aba e cada uma deixou a anterior no lugar.
+   O que este bloco resolve, medido em 1440 px:
+
+   · a faixa de categorias escondia 177 px de conteúdo num contêiner sem barra
+     de rolagem visível — duas categorias e o filtro "Sem categoria" não tinham
+     como ser alcançados com o mouse;
+   · a faixa de aniversariantes escondia 259 px pelo mesmo motivo: das cinco
+     pessoas listadas, duas nunca apareciam;
+   · os dois indicadores do topo moravam em cartões de 180 px fixos, com o
+     rótulo quebrando em três linhas;
+   · a tipografia da aba ia de .52 rem a .72 rem (8 px a 11 px), abaixo do piso
+     de 12 px que o próprio sistema define em `--fs-2xs`.
+
+   As larguras da tabela e os cabeçalhos do cadastro foram corrigidos junto às
+   regras originais, não aqui, para que a próxima pessoa ache a explicação onde
+   procuraria pelo problema.
+   =========================================================================== */
+
+/* --- Aviso de operação ---------------------------------------------------- */
+.visitor-notice-v6 {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 32px;
+  align-items: start;
+  gap: 12px;
+  border: 1px solid var(--pilot-line);
+  border-radius: 14px;
+  background: var(--pilot-surface);
+  padding: 13px 14px;
+  box-shadow: 0 10px 26px rgb(12 18 28 / .07);
+}
+.visitor-notice-v6.is-inline { border-radius: 12px; box-shadow: none; }
+.visitor-notice-v6 > div { min-width: 0; display: grid; gap: 3px; }
+.visitor-notice-v6 strong { color: var(--pilot-text); font-size: var(--fs-sm); }
+.visitor-notice-v6 p { margin: 0; color: var(--pilot-muted); font-size: var(--fs-xs); line-height: 1.5; overflow-wrap: anywhere; }
+/* Quando a importação termina com ressalva, a confirmação vira a segunda linha:
+   o que precisa de atenção fica primeiro, o que deu certo continua à vista. */
+.visitor-notice-v6 small { color: var(--pilot-muted); font-size: var(--fs-2xs); line-height: 1.5; opacity: .85; }
+.visitor-notice-icon-v6 {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  font-size: var(--fs-lg);
+  font-weight: 900;
+  line-height: 1;
+}
+.visitor-notice-v6 > button {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--pilot-muted);
+  font-size: var(--fs-2xl);
+  line-height: 1;
+  cursor: pointer;
+}
+.visitor-notice-v6 > button:hover { border-color: var(--pilot-line); background: var(--pilot-surface-2); color: var(--pilot-text); }
+.visitor-notice-v6[data-tone="sucesso"] { border-color: color-mix(in srgb, var(--pilot-success) 40%, var(--pilot-line)); background: color-mix(in srgb, var(--pilot-success) 7%, var(--pilot-surface)); }
+.visitor-notice-v6[data-tone="sucesso"] .visitor-notice-icon-v6 { background: color-mix(in srgb, var(--pilot-success) 17%, var(--pilot-surface)); color: var(--pilot-success); }
+.visitor-notice-v6[data-tone="erro"] { border-color: color-mix(in srgb, var(--pilot-danger) 44%, var(--pilot-line)); background: color-mix(in srgb, var(--pilot-danger) 7%, var(--pilot-surface)); }
+.visitor-notice-v6[data-tone="erro"] .visitor-notice-icon-v6 { background: color-mix(in srgb, var(--pilot-danger) 17%, var(--pilot-surface)); color: var(--pilot-danger); }
+.visitor-notice-v6[data-tone="aviso"] { border-color: color-mix(in srgb, var(--amber) 46%, var(--pilot-line)); background: color-mix(in srgb, var(--amber) 8%, var(--pilot-surface)); }
+.visitor-notice-v6[data-tone="aviso"] .visitor-notice-icon-v6 { background: color-mix(in srgb, var(--amber) 18%, var(--pilot-surface)); color: var(--amber); }
+.visitor-settings-panel > .visitor-notice-v6,
+.visitor-registration .visitor-notice-v6 { flex: none; margin: 0; }
+.visitor-person-drawer-v2 > .visitor-notice-v6 { margin: 14px 20px 0; }
+.visitor-import-dialog-v2 > .visitor-notice-v6 { margin: 0 24px; }
+
+/* --- Painel de panorama --------------------------------------------------- */
+.visitor-panorama-v6 {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 12px;
+}
+.visitor-panorama-card-v6 {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  align-content: start;
+  gap: 12px;
+  border: 1px solid var(--pilot-line);
+  border-radius: 16px;
+  background: var(--pilot-surface);
+  padding: 15px 16px;
+}
+.visitor-panorama-card-v6 > header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.visitor-panorama-card-v6 > header > div { min-width: 0; display: grid; gap: 3px; }
+.visitor-panorama-card-v6 > header strong { color: var(--pilot-text); font-size: var(--fs-lg); line-height: 1.2; }
+.visitor-panorama-card-v6 > header > b {
+  min-width: 46px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--pilot-primary) 12%, var(--pilot-surface-2));
+  color: var(--pilot-primary);
+  padding: 0 10px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: var(--fs-xl);
+  font-weight: 700;
+}
+.visitor-panorama-card-v6.is-attention > header > b { background: color-mix(in srgb, var(--amber) 15%, var(--pilot-surface-2)); color: var(--amber); }
+.visitor-panorama-card-v6.is-birthday > header > b { background: color-mix(in srgb, var(--amber) 15%, var(--pilot-surface-2)); color: var(--amber); }
+
+.visitor-growth-chart-v6 {
+  min-height: 92px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  align-items: end;
+  gap: 7px;
+  border-radius: 12px;
+  background: var(--pilot-surface-2);
+  padding: 10px 11px 8px;
+}
+.visitor-growth-chart-v6 > span { min-width: 0; display: grid; grid-template-rows: 1fr auto auto; justify-items: center; gap: 4px; height: 100%; }
+.visitor-growth-chart-v6 > span > i {
+  width: min(22px, 80%);
+  min-height: 4px;
+  align-self: end;
+  border-radius: 6px 6px 3px 3px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--pilot-primary) 55%, var(--pilot-cyan)), var(--pilot-primary));
+}
+.visitor-growth-chart-v6 b { color: var(--pilot-text); font-family: var(--font-mono), ui-monospace, monospace; font-size: var(--fs-2xs); font-weight: 600; }
+.visitor-growth-chart-v6 small { color: var(--pilot-muted); font-size: var(--fs-2xs); text-transform: capitalize; }
+.visitor-growth-chart-v6.is-loading { grid-auto-flow: row; place-items: center; }
+.visitor-growth-chart-v6 > p { margin: 0; color: var(--pilot-muted); font-size: var(--fs-xs); text-align: center; }
+
+.visitor-panorama-legend-v6 { display: flex; flex-wrap: wrap; gap: 6px; }
+.visitor-panorama-legend-v6 button {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--pilot-line);
+  border-radius: 999px;
+  background: var(--pilot-surface-2);
+  color: var(--pilot-muted);
+  padding: 0 10px;
+  font-size: var(--fs-2xs);
+  font-weight: 750;
+  cursor: pointer;
+}
+.visitor-panorama-legend-v6 button:hover { border-color: color-mix(in srgb, var(--category-color) 55%, var(--pilot-line)); color: var(--pilot-text); }
+.visitor-panorama-legend-v6 i { width: 8px; height: 8px; border-radius: 50%; background: var(--category-color); }
+.visitor-panorama-legend-v6 b { color: var(--pilot-text); font-family: var(--font-mono), ui-monospace, monospace; font-weight: 600; }
+
+.visitor-panorama-facts-v6 { display: grid; gap: 0; margin: 0; align-content: start; }
+.visitor-panorama-facts-v6 > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--pilot-line); }
+.visitor-panorama-facts-v6 > div:last-child { border-bottom: 0; }
+.visitor-panorama-facts-v6 dt { min-width: 0; color: var(--pilot-muted); font-size: var(--fs-xs); }
+.visitor-panorama-facts-v6 dd { margin: 0; color: var(--pilot-text); font-family: var(--font-mono), ui-monospace, monospace; font-size: var(--fs-md); font-weight: 600; }
+.visitor-panorama-action-v6 {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid color-mix(in srgb, var(--pilot-primary) 34%, var(--pilot-line));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--pilot-primary) 8%, var(--pilot-surface));
+  color: var(--pilot-primary);
+  padding: 0 12px;
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  cursor: pointer;
+}
+.visitor-panorama-action-v6:hover { background: color-mix(in srgb, var(--pilot-primary) 14%, var(--pilot-surface)); }
+
+/* A faixa de aniversariantes rolava na horizontal e cortava as duas últimas
+   pessoas. Uma lista vertical cabe no mesmo cartão e mostra todas. */
+.visitor-birthday-feed-v6 { display: grid; align-content: start; gap: 0; margin: 0; padding: 0; list-style: none; }
+.visitor-birthday-feed-v6 > li { min-width: 0; display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--pilot-line); }
+.visitor-birthday-feed-v6 > li:last-child { border-bottom: 0; }
+.visitor-birthday-feed-v6 time {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--amber) 15%, var(--pilot-surface-2));
+  color: var(--amber);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+}
+.visitor-birthday-feed-v6 > li > span { min-width: 0; display: grid; gap: 1px; }
+.visitor-birthday-feed-v6 strong,
+.visitor-birthday-feed-v6 small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.visitor-birthday-feed-v6 strong { color: var(--pilot-text); font-size: var(--fs-xs); }
+.visitor-birthday-feed-v6 small { color: var(--pilot-muted); font-size: var(--fs-2xs); }
+.visitor-birthday-feed-v6 a { color: var(--pilot-success); font-size: var(--fs-2xs); font-weight: 800; text-decoration: none; white-space: nowrap; }
+.visitor-birthday-feed-v6 a:hover { text-decoration: underline; }
+.visitor-birthday-feed-v6 i { color: var(--pilot-muted); font-size: var(--fs-2xs); font-style: normal; white-space: nowrap; }
+.visitor-birthday-feed-v6 > li.is-empty { display: block; color: var(--pilot-muted); font-size: var(--fs-xs); padding: 14px 0; }
+
+/* --- Navegação da lista --------------------------------------------------- */
+/* As duas faixas rolavam sem barra: no desktop o conteúdo escondido era
+   inalcançável. Quebrar em linhas mostra tudo e não custa nada em altura. */
+.visitor-view-tabs-v2 { flex-wrap: wrap; overflow: visible; gap: 4px; }
+.visitor-view-tabs-v2 button { flex: 1 1 auto; min-height: 42px; font-size: var(--fs-xs); }
+.visitor-view-tabs-v2 b { font-family: var(--font-mono), ui-monospace, monospace; font-size: var(--fs-2xs); font-weight: 600; }
+.visitor-category-strip-v2 { flex-wrap: wrap; overflow: visible; }
+.visitor-category-strip-v2 button { min-height: 38px; font-size: var(--fs-xs); }
+.visitor-category-strip-v2 button b { font-family: var(--font-mono), ui-monospace, monospace; font-size: var(--fs-2xs); font-weight: 600; }
+.visitor-category-strip-v2 button:hover { border-color: color-mix(in srgb, var(--category-color, var(--pilot-primary)) 45%, var(--pilot-line)); }
+
+/* --- Diretório ------------------------------------------------------------ */
+.visitor-sheet-head-v2 h2 { font-size: var(--fs-2xl); }
+.visitor-sheet-head-v2 > div:first-child > span { font-size: var(--fs-xs); }
+.visitor-sheet-head-v2 button,
+.visitor-commandbar-v2 button,
+.visitor-filter-panel-v2 button,
+.visitor-bulkbar-v2 button { min-height: 38px; font-size: var(--fs-xs); }
+.visitor-search-v2 input { height: 36px; font-size: var(--fs-xs); }
+.visitor-commandbar-v2 button.active { background: color-mix(in srgb, var(--pilot-primary) 9%, var(--pilot-surface)); }
+.visitor-filter-panel-v2 label { font-size: var(--fs-2xs); }
+.visitor-column-panel-v2 { font-size: var(--fs-xs); }
+.visitor-bulkbar-v2 strong { font-size: var(--fs-xs); }
+.visitor-table-scroll-v2 { max-height: min(62vh, 640px); scrollbar-gutter: stable; }
+.visitor-person-cell-v2 strong { font-size: var(--fs-xs); }
+.visitor-person-cell-v2 small { font-size: var(--fs-2xs); }
+.visitor-category-tag-v2 { font-size: var(--fs-2xs); padding: 5px 9px; }
+/* O botão ficava depois da data e herdava a largura da coluna: "Registrar
+   contato" quebrava em três linhas. Agora a data vem primeiro, como dado, e a
+   ação fica numa linha só embaixo dela. */
+.visitor-next-step-v2 { min-height: 26px; margin-top: 2px; font-size: var(--fs-2xs); font-weight: 800; white-space: nowrap; }
+.visitor-next-step-v2:hover { text-decoration: underline; }
+.visitor-empty-v2 p { font-size: var(--fs-xs); }
+.visitor-load-more-v2 { font-size: var(--fs-xs); }
+
+/* --- Ficha lateral -------------------------------------------------------- */
+.visitor-person-drawer-v2 > header span { font-size: var(--fs-xs); }
+.visitor-person-actions-v2 :is(a, button) { min-height: 38px; font-size: var(--fs-xs); text-decoration: none; }
+.visitor-person-summary-v2 dt { font-size: var(--fs-2xs); }
+.visitor-person-summary-v2 dd { font-size: var(--fs-xs); white-space: normal; overflow-wrap: anywhere; }
+.visitor-edit-compact-v2 > summary { font-size: var(--fs-sm); list-style: none; }
+.visitor-edit-compact-v2 > summary::-webkit-details-marker { display: none; }
+.visitor-edit-compact-v2 > summary::after { content: "⌄"; float: right; color: var(--pilot-muted); font-size: var(--fs-xl); line-height: 1; }
+.visitor-edit-compact-v2[open] > summary::after { content: "⌃"; }
+.visitor-followup-quick-v2 label { font-size: var(--fs-2xs); }
+.visitor-followup-quick-v2 :is(input, select, textarea) { font-size: var(--fs-xs); }
+.visitor-followup-quick-v2 > button { min-height: 42px; font-size: var(--fs-sm); }
+.visitor-timeline-v2 > article header b { font-size: var(--fs-2xs); }
+.visitor-timeline-v2 > article time,
+.visitor-timeline-v2 > article small { font-size: var(--fs-2xs); }
+.visitor-timeline-v2 > article strong { font-size: var(--fs-xs); }
+.visitor-timeline-v2 > article p { font-size: var(--fs-xs); }
+
+/* --- Configurações de categorias ------------------------------------------ */
+/* O painel ocupava da linha 76 px até 38 px do rodapé, sempre: com quatro
+   categorias sobravam 500 px de vazio. Agora ele acompanha o conteúdo. */
+.visitor-settings-panel {
+  inset: auto;
+  top: 50%;
+  left: 50%;
+  width: min(940px, calc(100vw - 48px));
+  max-height: min(84dvh, 760px);
+  transform: translate(-50%, -50%);
+}
+.visitor-settings-list { overflow-y: auto; min-height: 0; }
+
+/* --- Central de relacionamento e post-its --------------------------------- */
+/* O título dividia a linha com o <dl> de indicadores e quebrava em duas alturas
+   diferentes. Empilhar acima dos números resolve sem tirar nada da tela. */
+.relationship-head-v3 { grid-template-columns: minmax(0, 1fr); align-items: start; gap: 14px; }
+.relationship-head-v3 > dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin: 0; }
+.relationship-head-v3 h2 { text-wrap: balance; }
+/* Os post-its da coluna lateral eram quadrados à força: um recado de uma linha
+   virava um cartão de 220 px com o resto em branco, e uma lista de tarefas
+   longa ganhava barra de rolagem interna. */
+.care-notes-board.is-side .care-note { aspect-ratio: auto; min-height: 0; max-height: none; overflow: visible; }
+
+/* Entre 821 px e ~1420 px de janela o cartão do diretório mede de 670 px a
+   1010 px — abaixo dos 1000 px que as dez colunas pedem. Em vez de empurrar a
+   tabela para a rolagem horizontal em qualquer notebook, a coluna menos
+   decisiva sai de cena; ela continua na ficha lateral e na planilha exportada.
+   Rolar na horizontal fica só para telas em que nenhum recorte resolveria. */
+@media (max-width: 1420px) {
+  .visitor-table-v2 { min-width: 860px; }
+  .visitor-table-v2 :is(thead th, tbody td):nth-child(5) { display: none; }
+}
+@media (max-width: 1180px) {
+  .visitor-panorama-v6 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .visitor-panorama-card-v6.is-birthday { grid-column: 1 / -1; }
+  .visitor-table-v2 { min-width: 760px; }
+  .visitor-table-v2 :is(thead th, tbody td):nth-child(8) { display: none; }
+  .visitor-table-v2 th:nth-child(6) { width: 14%; }
+  .visitor-table-v2 th:last-child { width: 13%; }
+}
+@media (max-width: 900px) {
+  .visitor-panorama-v6 { grid-template-columns: 1fr; }
+  .visitor-panorama-card-v6.is-birthday { grid-column: 1; }
+  .visitor-settings-panel { width: calc(100vw - 24px); max-height: calc(100dvh - 120px); }
+}
+@media (max-width: 680px) {
+  .visitor-notice-v6 { grid-template-columns: 30px minmax(0, 1fr) 30px; gap: 10px; padding: 11px; }
+  .visitor-notice-icon-v6 { width: 30px; height: 30px; }
+  .visitor-panorama-card-v6 { padding: 13px; }
+  /* Abaixo desta largura a faixa volta a rolar: quebrar em linhas empilharia
+     sete botões e empurraria a lista para fora da primeira tela. */
+  .visitor-category-strip-v2 { flex-wrap: nowrap; overflow-x: auto; }
+  .visitor-table-scroll-v2 { max-height: none; }
 }

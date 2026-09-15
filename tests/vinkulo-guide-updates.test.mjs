@@ -47,7 +47,11 @@ test("interface VÍNKULO oferece chat, públicos e gestão responsiva", async ()
   assert.match(chat, /Online/);
   assert.match(requests, /visibilidade\s+escolhida/);
   assert.match(requests, /Todos os membros ativos/);
-  assert.match(visitors, /Acompanhamento por categoria/);
+  // O rótulo antigo vivia no painel escondido por `display:none`; o
+  // acompanhamento por categoria hoje é a legenda do panorama e a faixa de
+  // filtros, ambas visíveis.
+  assert.match(visitors, /Categorias em destaque/);
+  assert.match(visitors, /Categorias de visitantes/);
   assert.match(secretary, /Criar equipe/);
   assert.match(secretary, /Máximo de 3 equipes por integrante/);
   assert.match(styles, /@media\s*\(max-width:\s*680px\)/);

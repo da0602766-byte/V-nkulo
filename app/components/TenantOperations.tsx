@@ -53,7 +53,15 @@ type VisitorVision =
   | "sem_contato"
   | "arquivados";
 
-type VisitorCounts = Record<VisitorVision, number>;
+// As visões da barra superior e as etapas do funil não coincidem: "Em contato"
+// e "Integrado" não são visões, mas são etapas. O funil era montado a partir da
+// página carregada — com paginação, busca e filtro ativos ele mostrava a fatia
+// visível como se fosse a comunidade inteira. Agora vem do mesmo SELECT que já
+// conta as visões, sem consulta nova.
+type VisitorCounts = Record<VisitorVision, number> & {
+  em_contato: number;
+  integrado: number;
+};
 
 type VisitorCategory = {
   id: number;
@@ -182,6 +190,10 @@ export function VisitorsWorkspace({
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  // Nem todo retorno é sucesso ou falha. Uma planilha que entra com metade das
+  // linhas ignoradas precisa de um terceiro tom: a operação foi concluída, mas
+  // alguém tem de olhar o que ficou de fora.
+  const [warning, setWarning] = useState("");
   const [registrationOpen, setRegistrationOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importFileName, setImportFileName] = useState("");
@@ -190,7 +202,9 @@ export function VisitorsWorkspace({
   const [counts, setCounts] = useState<VisitorCounts>({
     todos: 0,
     novos: 0,
+    em_contato: 0,
     acompanhamento: 0,
+    integrado: 0,
     pendencias: 0,
     sem_contato: 0,
     arquivados: 0,
@@ -332,6 +346,9 @@ export function VisitorsWorkspace({
     [categories],
   );
 
+  // O alvo do scroll era o formulário legado, removido junto com o bloco morto:
+  // clicar numa categoria filtrava a lista e não levava ninguém até ela. O id
+  // agora está no cartão do diretório, que é o que a pessoa quer ver.
   function filterByCategory(categoryId: string) {
     setSearch("");
     setCategoryFilter(categoryId);
@@ -388,6 +405,7 @@ export function VisitorsWorkspace({
     setSaving(true);
     setMessage("");
     setError("");
+    setWarning("");
     const form = event.currentTarget;
     const body = Object.fromEntries(new FormData(form).entries());
     try {
@@ -416,6 +434,7 @@ export function VisitorsWorkspace({
     setSaving(true);
     setMessage("");
     setError("");
+    setWarning("");
     try {
       await apiJson(`/api/pilot/visitante-categorias/${category.id}`, { method: "DELETE" });
       setMessage("Categoria excluída com validação de vínculos.");
@@ -438,6 +457,7 @@ export function VisitorsWorkspace({
     setSaving(true);
     setMessage("");
     setError("");
+    setWarning("");
     try {
       await apiJson("/api/pilot/visitante-categorias", {
         method: "PUT",
@@ -619,6 +639,7 @@ export function VisitorsWorkspace({
     setSaving(true);
     setMessage("");
     setError("");
+    setWarning("");
     const form = event.currentTarget;
     const body = Object.fromEntries(new FormData(form).entries());
     try {
@@ -645,6 +666,7 @@ export function VisitorsWorkspace({
     setSaving(true);
     setMessage("");
     setError("");
+    setWarning("");
     const form = event.currentTarget;
     const body = Object.fromEntries(new FormData(form).entries());
     try {
@@ -668,6 +690,7 @@ export function VisitorsWorkspace({
     setSaving(true);
     setMessage("");
     setError("");
+    setWarning("");
     try {
       await apiJson(`/api/pilot/visitantes/${visitor.id}`, {
         method: "PATCH",
@@ -727,6 +750,7 @@ export function VisitorsWorkspace({
     setSaving(true);
     setMessage("");
     setError("");
+    setWarning("");
     try {
       await apiJson(`/api/pilot/visitantes/${visitor.id}`, {
         method: "PATCH",
@@ -748,6 +772,7 @@ export function VisitorsWorkspace({
     setSaving(true);
     setMessage("");
     setError("");
+    setWarning("");
     try {
       for (const id of selectedRows) {
         await apiJson(`/api/pilot/visitantes/${id}`, { method: "DELETE" });
@@ -768,6 +793,7 @@ export function VisitorsWorkspace({
     setSaving(true);
     setMessage("");
     setError("");
+    setWarning("");
     try {
       for (const id of selectedRows) {
         await apiJson(`/api/pilot/visitantes/${id}?permanente=1`, { method: "DELETE" });
@@ -816,6 +842,7 @@ export function VisitorsWorkspace({
     setImporting(true);
     setError("");
     setMessage("");
+    setWarning("");
     try {
       const XLSX = await import("xlsx");
       const workbook = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
@@ -856,6 +883,7 @@ export function VisitorsWorkspace({
     if (!importRows.length || importing) return;
     setImporting(true);
     setError("");
+    setWarning("");
     let imported = 0;
     let ignored = 0;
     try {
@@ -877,7 +905,10 @@ export function VisitorsWorkspace({
       }
       setImportRows([]);
       setImportFileName("");
-      setMessage(`${imported} cadastro(s) importado(s). Categorias encontradas na planilha foram vinculadas ou criadas na comunidade.${ignored ? ` ${ignored} linha(s) foram ignoradas por duplicidade ou dados inválidos.` : ""}`);
+      setMessage(`${imported} cadastro(s) importado(s). Categorias encontradas na planilha foram vinculadas ou criadas na comunidade.`);
+      if (ignored) {
+        setWarning(`${ignored} linha(s) foram ignoradas por duplicidade ou dados inválidos. Confira a planilha antes de importar de novo.`);
+      }
       await Promise.all([loadVisitors(), loadCategories()]);
     } finally {
       setImporting(false);
@@ -893,6 +924,7 @@ export function VisitorsWorkspace({
     setSaving(true);
     setMessage("");
     setError("");
+    setWarning("");
     const body = Object.fromEntries(new FormData(event.currentTarget).entries());
     try {
       await apiJson(`/api/pilot/visitantes/${visitor.id}`, {
@@ -921,6 +953,7 @@ export function VisitorsWorkspace({
     setSaving(true);
     setMessage("");
     setError("");
+    setWarning("");
     try {
       await apiJson(`/api/pilot/visitantes/${visitor.id}`, {
         method: "DELETE",
@@ -948,6 +981,7 @@ export function VisitorsWorkspace({
     setSaving(true);
     setMessage("");
     setError("");
+    setWarning("");
     try {
       await apiJson(`/api/pilot/visitantes/${visitor.id}?permanente=1`, { method: "DELETE" });
       setSelectedId(null);
@@ -962,6 +996,15 @@ export function VisitorsWorkspace({
   }
 
   const selectedVisitor = visitors.find((visitor) => visitor.id === selectedId) || null;
+  // Só uma superfície mostra o aviso por vez: a que está por cima. Repetir o
+  // mesmo texto no fundo e no modal faria o leitor de tela anunciar duas vezes.
+  const overlayOpen =
+    registrationOpen || settingsOpen || Boolean(selectedVisitor) || Boolean(importRows.length);
+  const dismissNotice = () => {
+    setMessage("");
+    setError("");
+    setWarning("");
+  };
   const visibleVisitors = [...visitors].sort((left, right) => {
     const comparison = left.nome_completo.localeCompare(right.nome_completo, "pt-BR");
     return sortDirection === "asc" ? comparison : -comparison;
@@ -977,16 +1020,16 @@ export function VisitorsWorkspace({
   // O funil é o assunto da página: quantos chegaram e quantos avançaram. A
   // tabela responde "quem"; isto responde "como está indo", que é a pergunta
   // que a liderança faz primeiro. Os estágios já existem como status.
+  //
+  // Contar sobre `visitors` media a página carregada, não a comunidade: com a
+  // busca preenchida o funil dizia "100% integrados" porque só havia um nome na
+  // tela. As contagens abaixo vêm do servidor e ignoram busca, filtro e cursor.
   const funnelStages = ([
-    ["NOVO", "Recebidos"],
-    ["EM_CONTATO", "Contatados"],
-    ["EM_ACOMPANHAMENTO", "Em acompanhamento"],
-    ["INTEGRADO", "Integrados"],
-  ] as const).map(([id, label]) => ({
-    id,
-    label,
-    total: visitors.filter((visitor) => visitor.status === id).length,
-  }));
+    ["NOVO", "Recebidos", "novos"],
+    ["EM_CONTATO", "Contatados", "em_contato"],
+    ["EM_ACOMPANHAMENTO", "Em acompanhamento", "acompanhamento"],
+    ["INTEGRADO", "Integrados", "integrado"],
+  ] as const).map(([id, label, key]) => ({ id, label, total: counts[key] }));
   const funnelTotal = funnelStages.reduce((soma, etapa) => soma + etapa.total, 0);
 
   return (
@@ -1042,6 +1085,7 @@ export function VisitorsWorkspace({
                       ×
                     </button>
                   </header>
+                  <VisitorNotice message={message} error={error} warning={warning} onDismiss={dismissNotice} inline />
                   <details className="visitor-category-create">
                     <summary><span>＋</span><strong>Nova categoria</strong><small>Nome, responsável e ministério</small></summary>
                     <form onSubmit={(event) => void saveCategory(event)}>
@@ -1122,6 +1166,7 @@ export function VisitorsWorkspace({
           )}
         </div>
       </header>
+      {!overlayOpen && <VisitorNotice message={message} error={error} warning={warning} onDismiss={dismissNotice} />}
       <section className="visitor-funnel-v5" aria-label="Funil de acolhimento">
         {funnelStages.map((etapa) => {
           const proporcao = funnelTotal ? Math.round((etapa.total / funnelTotal) * 100) : 0;
@@ -1138,82 +1183,6 @@ export function VisitorsWorkspace({
         })}
       </section>
 
-      <div className="visitor-overview-grid">
-      <section className="visitor-dashboard" aria-labelledby="visitor-growth-title">
-        <header>
-          <div><p className="pilot-kicker">DASHBOARD CRESCENTE · Acompanhamento por categoria</p><h2 id="visitor-growth-title">Crescimento dos acompanhamentos</h2></div>
-          <strong>{categoriesLoaded ? growthDashboard.currentTotal : "—"}<small> visitantes ativos</small></strong>
-        </header>
-        <div className={`visitor-growth-chart ${!categoriesLoaded ? "is-loading" : ""}`} aria-label="Cadastros acumulados nos últimos seis meses" aria-busy={!categoriesLoaded}>
-          {!categoriesLoaded && <p className="visitor-dashboard-loading">Carregando crescimento…</p>}
-          {categoriesLoaded && growthDashboard.points.map((point) => (
-            <div key={point.month}>
-              <span><i style={{ height: `${Math.max(8, (point.value / growthDashboard.max) * 100)}%` }} /></span>
-              <b>{point.value}</b>
-              <small>{formatGrowthMonth(point.month)}</small>
-            </div>
-          ))}
-          {categoriesLoaded && !growthDashboard.points.length && <p>O gráfico aparecerá após o primeiro cadastro.</p>}
-        </div>
-        <details className="visitor-category-dashboards" open>
-          <summary>
-            <span><strong>Categorias</strong><small>Clique para filtrar a lista</small></span>
-            <b>{categoryDashboards.length}</b>
-            <i aria-hidden="true">⌄</i>
-          </summary>
-          <div className="visitor-category-filter-cards" aria-label="Filtros por categoria">
-            <button
-              type="button"
-              className={categoryFilter === "all" ? "selected" : ""}
-              onClick={() => filterByCategory("all")}
-            >
-              <span className="visitor-category-icon" aria-hidden="true">◎</span>
-              <span><strong>Todas</strong><small>Todos os cadastros</small></span>
-              <b>{growthDashboard.currentTotal}</b>
-            </button>
-            {!categoriesLoaded && <p className="visitor-dashboard-loading">Carregando categorias…</p>}
-            {categoriesLoaded && categoryDashboards.map((category) => (
-              <button
-                type="button"
-                key={category.id}
-                className={categoryFilter === String(category.id) ? "selected" : ""}
-                style={{ "--category-color": category.cor } as CSSProperties}
-                onClick={() => filterByCategory(String(category.id))}
-              >
-                <span className="visitor-category-icon" aria-hidden="true">{category.icone}</span>
-                <span><strong>{category.nome}</strong><small>{category.ministerio_nome || "Sem ministério"}</small></span>
-                <b>{category.total_visitantes}</b>
-              </button>
-            ))}
-            {categoriesLoaded && !categories.length && <div className="pilot-empty-state"><strong>Nenhuma categoria criada</strong><p>Crie a primeira categoria nas configurações de visitantes.</p></div>}
-            {categoriesLoaded && categories.length > 0 && !categoryDashboards.length && <div className="pilot-empty-state"><strong>Nenhum cartão de categoria ativo</strong><p>Ative os cartões nas configurações de visitantes.</p></div>}
-          </div>
-        </details>
-      </section>
-
-      <section className="visitor-birthday-card" aria-labelledby="visitor-birthday-title">
-        <header>
-          <div><p className="pilot-kicker">ANIVERSÁRIOS DO MÊS</p><h2 id="visitor-birthday-title">Celebre com carinho</h2></div>
-          <span>{birthdays.length}</span>
-        </header>
-        <div className="visitor-birthday-list">
-          {birthdays.map((visitor) => (
-            <article key={visitor.id}>
-              <time dateTime={visitor.data_nascimento || ""}>{birthdayDay(visitor.data_nascimento)}</time>
-              <div><strong>{visitor.nome_completo}</strong><small>{formatBirthday(visitor.data_nascimento)}</small></div>
-              {visitor.telefone && birthdayWhatsappHref(visitor) ? (
-                <a href={birthdayWhatsappHref(visitor) || undefined} target="_blank" rel="noreferrer" aria-label={`Enviar parabéns para ${visitor.nome_completo} pelo WhatsApp`}>WhatsApp</a>
-              ) : <span>Sem contato</span>}
-            </article>
-          ))}
-          {!birthdays.length && <p className="operations-muted">Nenhum aniversariante cadastrado neste mês.</p>}
-        </div>
-        <small>Exibindo até 5 pessoas com mensagem de parabéns pronta para envio.</small>
-      </section>
-      </div>
-
-      {canCreate && <button type="button" className="visitor-registration-launch" onClick={() => setRegistrationOpen(true)}><span aria-hidden="true">＋</span><span><strong>Cadastrar novo visitante</strong><small>Abrir ficha completa em uma janela protegida</small></span><i aria-hidden="true">›</i></button>}
-      <details className="visitor-registration-compat" aria-hidden="true"><summary>Cadastrar novo visitante</summary></details>
       {canCreate && registrationOpen && createPortal(
         <div className="visitor-registration-backdrop" role="presentation">
         <section id="visitor-registration-card" className="visitor-registration-dialog" role="dialog" aria-modal="true" aria-labelledby="visitor-registration-title">
@@ -1270,6 +1239,7 @@ export function VisitorsWorkspace({
                 <label className="visitor-wide-field">Observações<textarea name="observacoes" maxLength={1000} rows={3} /></label>
               </fieldset>
             </section>
+            <VisitorNotice message={message} error={error} warning={warning} onDismiss={dismissNotice} inline />
             <footer className="visitor-registration-actions"><p className="form-consequence-v5"><span aria-hidden="true">◉</span>Só o nome é obrigatório. O visitante entra no fio do dia na hora e abre um acompanhamento para o contato.</p><button type="button" onClick={() => setRegistrationOpen(false)} disabled={saving}>Cancelar</button><button disabled={saving}>{saving ? "Salvando…" : "Salvar visitante"}</button></footer>
           </form>
         </section>
@@ -1297,7 +1267,7 @@ export function VisitorsWorkspace({
         </nav>
 
         <div className="visitor-category-strip-v2" aria-label="Categorias de visitantes">
-          <button type="button" className={categoryFilter === "all" ? "active" : ""} onClick={() => setCategoryFilter("all")}>
+          <button type="button" className={categoryFilter === "all" ? "active" : ""} aria-pressed={categoryFilter === "all"} onClick={() => filterByCategory("all")}>
             <span aria-hidden="true">◎</span><strong>Todos</strong><b>{counts.todos}</b>
           </button>
           {categories.map((category) => (
@@ -1305,38 +1275,86 @@ export function VisitorsWorkspace({
               type="button"
               key={category.id}
               className={categoryFilter === String(category.id) ? "active" : ""}
+              aria-pressed={categoryFilter === String(category.id)}
               style={{ "--category-color": category.cor } as CSSProperties}
-              onClick={() => setCategoryFilter(String(category.id))}
+              onClick={() => filterByCategory(String(category.id))}
             >
               <span aria-hidden="true">{category.icone}</span><strong>{category.nome}</strong><b>{category.total_visitantes}</b>
             </button>
           ))}
-          <button type="button" className={categoryFilter === "sem-categoria" ? "active" : ""} onClick={() => setCategoryFilter("sem-categoria")}>
+          <button type="button" className={categoryFilter === "sem-categoria" ? "active" : ""} aria-pressed={categoryFilter === "sem-categoria"} onClick={() => filterByCategory("sem-categoria")}>
             <span aria-hidden="true">○</span><strong>Sem categoria</strong>
           </button>
         </div>
 
-        <div className="visitor-insights-v2">
-          <article>
-            <span className="visitor-insight-icon-v2" aria-hidden="true">◫</span>
-            <div><small>Pessoas ativas</small><strong>{counts.todos}</strong><span>Cadastro central da comunidade</span></div>
-          </article>
-          <article>
-            <span className="visitor-insight-icon-v2 is-warning" aria-hidden="true">!</span>
-            <div><small>Próximas ações</small><strong>{counts.pendencias}</strong><span>Contatos que pedem atenção</span></div>
-          </article>
-          <section className="visitor-birthdays-compact-v2" aria-labelledby="birthday-compact-title">
-            <header><div><small>ANIVERSÁRIOS DO MÊS</small><strong id="birthday-compact-title">Celebre com carinho</strong></div><b>{birthdays.length}</b></header>
-            <div>
-              {birthdays.slice(0, 5).map((visitor) => (
-                <span key={visitor.id}>
-                  <time dateTime={visitor.data_nascimento || ""}>{birthdayDay(visitor.data_nascimento)}</time>
-                  <span><strong>{visitor.nome_completo}</strong><small>{formatBirthday(visitor.data_nascimento)}</small></span>
-                  {visitor.telefone && birthdayWhatsappHref(visitor) ? <a href={birthdayWhatsappHref(visitor) || undefined} target="_blank" rel="noreferrer">WhatsApp</a> : <i>Sem contato</i>}
+        {/* Panorama. Os dois indicadores ficavam em cartões de 180 px fixos e os
+            aniversariantes numa faixa que rolava na horizontal sem barra
+            visível: das cinco pessoas, duas nunca apareciam no desktop. Agora
+            são três colunas fluidas e a lista cresce para baixo. O gráfico de
+            crescimento voltou: ele existia no componente, mas o bloco inteiro
+            estava escondido por `display:none` desde a reforma anterior. */}
+        <div className="visitor-panorama-v6">
+          <article className="visitor-panorama-card-v6" aria-labelledby="visitor-panorama-growth">
+            <header>
+              <div><p className="pilot-kicker">CRESCIMENTO</p><strong id="visitor-panorama-growth">Pessoas ativas</strong></div>
+              <b>{counts.todos}</b>
+            </header>
+            <div className={`visitor-growth-chart-v6 ${!categoriesLoaded ? "is-loading" : ""}`} aria-busy={!categoriesLoaded}>
+              {!categoriesLoaded && <p>Carregando crescimento…</p>}
+              {categoriesLoaded && growthDashboard.points.map((point) => (
+                <span key={point.month}>
+                  <i style={{ height: `${Math.max(6, Math.round((point.value / growthDashboard.max) * 100))}%` }} aria-hidden="true" />
+                  <b>{point.value}</b>
+                  <small>{formatGrowthMonth(point.month)}</small>
                 </span>
               ))}
-              {!birthdays.length && <p>Nenhum aniversariante neste mês.</p>}
+              {categoriesLoaded && !growthDashboard.points.length && <p>O gráfico aparece depois do primeiro cadastro.</p>}
             </div>
+            {Boolean(categoryDashboards.length) && (
+              <ul className="visitor-panorama-legend-v6" aria-label="Categorias em destaque">
+                {categoryDashboards.slice(0, 4).map((category) => (
+                  <li key={category.id} style={{ "--category-color": category.cor } as CSSProperties}>
+                    <button type="button" onClick={() => filterByCategory(String(category.id))}>
+                      <i aria-hidden="true" />{category.nome}<b>{category.total_visitantes}</b>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </article>
+
+          <article className="visitor-panorama-card-v6 is-attention" aria-labelledby="visitor-panorama-actions">
+            <header>
+              <div><p className="pilot-kicker">CUIDADO PENDENTE</p><strong id="visitor-panorama-actions">Próximas ações</strong></div>
+              <b>{counts.pendencias}</b>
+            </header>
+            <dl className="visitor-panorama-facts-v6">
+              <div><dt>Contatos vencidos</dt><dd>{counts.pendencias}</dd></div>
+              <div><dt>Sem contato há 15 dias</dt><dd>{counts.sem_contato}</dd></div>
+              <div><dt>Recebidos aguardando</dt><dd>{counts.novos}</dd></div>
+            </dl>
+            <button type="button" className="visitor-panorama-action-v6" onClick={() => changeVision("pendencias")}>
+              Ver quem precisa de contato <span aria-hidden="true">→</span>
+            </button>
+          </article>
+
+          <section className="visitor-panorama-card-v6 is-birthday" aria-labelledby="visitor-panorama-birthday">
+            <header>
+              <div><p className="pilot-kicker">ANIVERSÁRIOS DO MÊS</p><strong id="visitor-panorama-birthday">Celebre com carinho</strong></div>
+              <b>{birthdays.length}</b>
+            </header>
+            <ul className="visitor-birthday-feed-v6">
+              {birthdays.map((visitor) => (
+                <li key={visitor.id}>
+                  <time dateTime={visitor.data_nascimento || ""}>{birthdayDay(visitor.data_nascimento)}</time>
+                  <span><strong>{visitor.nome_completo}</strong><small>{formatBirthday(visitor.data_nascimento)}</small></span>
+                  {visitor.telefone && birthdayWhatsappHref(visitor)
+                    ? <a href={birthdayWhatsappHref(visitor) || undefined} target="_blank" rel="noreferrer" aria-label={`Enviar parabéns para ${visitor.nome_completo} pelo WhatsApp`}>WhatsApp</a>
+                    : <i>Sem contato</i>}
+                </li>
+              ))}
+              {!birthdays.length && <li className="is-empty">Nenhum aniversariante neste mês.</li>}
+            </ul>
           </section>
         </div>
 
@@ -1347,7 +1365,7 @@ export function VisitorsWorkspace({
           <CareNotesBoard side />
         </div>
 
-        <section className="visitor-sheet-v2" aria-labelledby="visitor-sheet-title">
+        <section id="visitor-directory" className="visitor-sheet-v2" aria-labelledby="visitor-sheet-title">
           <header className="visitor-sheet-head-v2">
             <div><p className="pilot-kicker">DIRETÓRIO CENTRAL</p><h2 id="visitor-sheet-title">Pessoas e próximos cuidados</h2><span>Uma ficha por pessoa, em todas as visões.</span></div>
             <div>
@@ -1377,7 +1395,7 @@ export function VisitorsWorkspace({
 
           {filtersOpen && (
             <div className="visitor-filter-panel-v2">
-              <label>Categoria<select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option value="all">Todas</option><option value="sem-categoria">Sem categoria</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.nome}</option>)}</select></label>
+              <label>Categoria<select aria-label="Filtrar visitantes por categoria" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option value="all">Todas</option><option value="sem-categoria">Sem categoria</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.nome}</option>)}</select></label>
               <button type="button" onClick={() => { setSearch(""); setCategoryFilter("all"); }}>Limpar filtros</button>
               <button type="button" onClick={() => changeVision("arquivados")}>Ver arquivados ({counts.arquivados})</button>
             </div>
@@ -1389,18 +1407,17 @@ export function VisitorsWorkspace({
               {activeVision === "arquivados" && <button type="button" onClick={() => changeVision("todos")}>Arquivados <span aria-hidden="true">×</span></button>}
             </div>
           )}
-          {columnsOpen && <div className="visitor-column-panel-v2"><span>Colunas essenciais do Figma</span><b>Nome</b><b>Contato</b><b>Categoria</b><b>Responsável</b><b>Status</b><b>Próxima ação</b></div>}
+          {columnsOpen && <div className="visitor-column-panel-v2"><span>Colunas sempre visíveis nesta tabela</span><b>Nome</b><b>Contato</b><b>Categoria</b><b>Ministério</b><b>Responsável</b><b>Status</b><b>Último contato</b><b>Próximo passo</b></div>}
 
           {Boolean(selectedRows.length) && (
             <div className="visitor-bulkbar-v2"><strong>{selectedRows.length} selecionado(s)</strong><button type="button" onClick={() => setSelectedRows([])}>Limpar seleção</button>{canDeactivate && activeVision !== "arquivados" && <button type="button" className="danger" onClick={() => void archiveSelectedVisitors()}>Arquivar</button>}{canDeactivate && <button type="button" className="danger permanent" onClick={() => void permanentlyDeleteSelectedVisitors()}>Excluir</button>}</div>
           )}
-          <OperationFeedback message={message} error={error} />
 
           <div className="visitor-table-scroll-v2" aria-busy={loading}>
             <table className="visitor-table-v2">
               <thead><tr>
                 <th><input type="checkbox" aria-label="Selecionar página" checked={Boolean(visibleVisitors.length && selectedRows.length === visibleVisitors.length)} onChange={(event) => setSelectedRows(event.target.checked ? visibleVisitors.map((visitor) => visitor.id) : [])} /></th>
-                <th>Nome</th><th>Contato</th><th>Categoria</th><th>Ministério</th><th>Responsável</th><th>Status</th><th>Último contato</th><th>Próximo passo</th><th aria-label="Ações" />
+                <th>Nome</th><th>Contato</th><th>Categoria</th><th>Ministério</th><th>Responsável</th><th>Status</th><th>Último contato</th><th>Próximo passo</th>
               </tr></thead>
               <tbody>
                 {visibleVisitors.map((visitor) => (
@@ -1408,13 +1425,12 @@ export function VisitorsWorkspace({
                     <td><input type="checkbox" aria-label={`Selecionar ${visitor.nome_completo}`} checked={selectedRows.includes(visitor.id)} onChange={(event) => setSelectedRows((current) => event.target.checked ? [...current, visitor.id] : current.filter((id) => id !== visitor.id))} /></td>
                     <th scope="row"><button type="button" className="visitor-person-cell-v2" onClick={() => void loadFollowups(visitor.id)}><span style={{ "--category-color": visitor.categoria_cor || "var(--pilot-blue)" } as CSSProperties}>{visitor.nome_completo.slice(0, 1).toLocaleUpperCase("pt-BR")}</span><span><strong>{visitor.nome_completo}</strong><small>Entrada {formatDate(visitor.data_entrada)}</small></span></button></th>
                     <td><strong>{visitor.telefone || "Sem telefone"}</strong><small>{visitor.email || "Sem e-mail"}</small></td>
-                    <td><span className="visitor-category-tag-v2" style={{ "--category-color": visitor.categoria_cor || "var(--pilot-blue)" } as CSSProperties}>{visitor.categoria_icone || "○"} {visitor.categoria_nome || "Sem categoria"}</span></td>
+                    <td><span className="visitor-category-tag-v2" style={{ "--category-color": visitor.categoria_cor || "var(--pilot-blue)" } as CSSProperties} title={visitor.categoria_nome || "Sem categoria"}>{visitor.categoria_nome || "Sem categoria"}</span></td>
                     <td>{visitor.ministerio || "—"}</td>
                     <td><strong>{visitor.responsavel_email?.split("@")[0] || visitor.acompanhante || "A definir"}</strong></td>
                     <td>{canEdit && activeVision !== "arquivados" ? <select aria-label={`Status de ${visitor.nome_completo}`} value={visitor.status} onChange={(event) => void updateVisitorField(visitor, { status: event.target.value })}><option value="NOVO">Novo</option><option value="EM_CONTATO">Em contato</option><option value="EM_ACOMPANHAMENTO">Em acompanhamento</option><option value="INTEGRADO">Integrado</option></select> : <span className={`status-pill status-${visitor.status.toLowerCase()}`}>{activeVision === "arquivados" ? "Arquivado" : statusLabel(visitor.status)}</span>}</td>
-                    <td>{visitor.ultimo_contato ? formatDateTime(visitor.ultimo_contato) : "Sem contato"}</td>
-                    <td className={visitor.proximo_contato && visitor.proximo_contato <= hojeLocal() ? "overdue" : ""}><button type="button" className="visitor-next-step-v2" onClick={() => void loadFollowups(visitor.id)}>{canFollowup ? "Registrar contato" : "Abrir ficha"}</button>{visitor.proximo_contato && <small>{formatDate(visitor.proximo_contato)}</small>}</td>
-                    <td><button type="button" className="visitor-row-open-v2" aria-label={`Abrir ficha de ${visitor.nome_completo}`} onClick={() => void loadFollowups(visitor.id)}>›</button></td>
+                    <td>{visitor.ultimo_contato ? <><strong>{splitStamp(visitor.ultimo_contato).date}</strong><small>{splitStamp(visitor.ultimo_contato).time}</small></> : <small>Sem contato</small>}</td>
+                    <td className={visitor.proximo_contato && visitor.proximo_contato <= hojeLocal() ? "overdue" : ""}>{visitor.proximo_contato ? <strong>{formatDate(visitor.proximo_contato)}</strong> : <small>Sem data</small>}<button type="button" className="visitor-next-step-v2" onClick={() => void loadFollowups(visitor.id)}>{canFollowup ? "Registrar" : "Abrir ficha"}</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -1430,6 +1446,7 @@ export function VisitorsWorkspace({
           <section className="visitor-import-dialog-v2" role="dialog" aria-modal="true" aria-labelledby="visitor-import-title">
             <header><div><p className="pilot-kicker">MIGRAÇÃO DE DADOS</p><h2 id="visitor-import-title">Revisar planilha</h2><p>{importFileName} · {importRows.length} cadastro(s) reconhecido(s)</p></div><button type="button" aria-label="Fechar importação" onClick={() => setImportRows([])}>×</button></header>
             <div className="visitor-import-table-v2"><table><thead><tr><th>Nome</th><th>Contato</th><th>Categoria</th><th>Ministério</th><th>Status</th></tr></thead><tbody>{importRows.slice(0, 10).map((row, index) => <tr key={`${row.nomeCompleto}-${index}`}><th>{row.nomeCompleto}</th><td>{row.telefone || row.email || "—"}</td><td>{row.categoriaNome || "Sem categoria"}</td><td>{row.ministerio || "—"}</td><td>{statusLabel(row.status)}</td></tr>)}</tbody></table>{importRows.length > 10 && <p>Mais {importRows.length - 10} linha(s) serão processadas.</p>}</div>
+            <VisitorNotice message={message} error={error} warning={warning} onDismiss={dismissNotice} inline />
             <footer><button type="button" onClick={() => setImportRows([])} disabled={importing}>Cancelar</button><button type="button" className="primary" onClick={() => void confirmVisitorImport()} disabled={importing}>{importing ? "Importando…" : `Importar ${importRows.length} cadastro(s)`}</button></footer>
           </section>
         </div>, document.body)}
@@ -1448,6 +1465,7 @@ export function VisitorsWorkspace({
               {canDeactivate && activeVision !== "arquivados" && <button type="button" className="danger" onClick={() => void deactivateVisitor(selectedVisitor)}>Arquivar</button>}
               {canDeactivate && <button type="button" className="danger" onClick={() => void permanentlyDeleteVisitor(selectedVisitor)}>Excluir</button>}
             </div>
+            <VisitorNotice message={message} error={error} warning={warning} onDismiss={dismissNotice} inline />
             <dl className="visitor-person-summary-v2">
               <div><dt>Telefone</dt><dd>{selectedVisitor.telefone || "Não informado"}</dd></div>
               <div><dt>E-mail</dt><dd>{selectedVisitor.email || "Não informado"}</dd></div>
@@ -1462,199 +1480,6 @@ export function VisitorsWorkspace({
           </aside>
         </div>, document.body)}
 
-      {false && <>
-      <form
-        id="visitor-directory"
-        className="operations-toolbar"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void loadVisitors();
-        }}
-      >
-        <label htmlFor="visitor-search">Lista de cadastros</label>
-        <input
-          id="visitor-search"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Nome, telefone ou e-mail"
-        />
-        <select
-          value={categoryFilter}
-          onChange={(event) => setCategoryFilter(event.target.value)}
-          aria-label="Filtrar visitantes por categoria"
-        >
-          <option value="all">Todas as categorias</option>
-          <option value="sem-categoria">Sem categoria</option>
-          {categories.map((category) => <option key={category.id} value={category.id}>{category.nome}</option>)}
-        </select>
-        <button disabled={loading}>{loading ? "Buscando…" : "Buscar"}</button>
-      </form>
-      <OperationFeedback message={message} error={error} />
-
-      <div className="visitor-directory">
-        <div className="operations-list" aria-busy={loading}>
-          {!loading && !visitors.length && (
-            <div className="pilot-empty-state">
-              <strong>Nenhum visitante encontrado</strong>
-              <p>Use o cadastro acima para iniciar o acompanhamento nesta comunidade.</p>
-            </div>
-          )}
-          {visitors.map((visitor) => (
-            <details
-              className={selectedId === visitor.id ? "selected" : ""}
-              name="visitor-directory"
-              key={visitor.id}
-              style={{ "--category-color": visitor.categoria_cor || "var(--pilot-purple)" } as CSSProperties}
-            >
-              <summary
-                className="operation-card-main"
-                onClick={() => loadFollowups(visitor.id)}
-                aria-label={`Abrir acompanhamento de ${visitor.nome_completo}`}
-              >
-                <span className="visitor-card-topline">
-                  <span className={`status-pill status-${visitor.status.toLowerCase()}`}>
-                    {statusLabel(visitor.status)}
-                  </span>
-                  <time dateTime={visitor.data_entrada}>Entrada em {formatDate(visitor.data_entrada)}</time>
-                </span>
-                <span className="visitor-card-identity">
-                  <span className="visitor-card-avatar" aria-hidden="true">{visitor.categoria_icone || "○"}</span>
-                  <strong>{visitor.nome_completo}</strong>
-                </span>
-                <span className="visitor-card-summary-meta">
-                  {visitor.categoria_nome || "Sem categoria"} · {visitor.celula_nome || "Sem célula"}
-                </span>
-                <span className="visitor-card-chevron" aria-hidden="true">⌄</span>
-              </summary>
-              <div className="visitor-card-collapsible" role="dialog" aria-modal="true" aria-label={`Ficha de ${visitor.nome_completo}`}>
-                <header className="visitor-profile-dialog-header">
-                  <div><small>FICHA DO VISITANTE</small><strong>{visitor.nome_completo}</strong></div>
-                  <button
-                    type="button"
-                    className="visitor-profile-close"
-                    aria-label={`Fechar ficha de ${visitor.nome_completo}`}
-                    onClick={(event) => {
-                      event.currentTarget.closest("details")?.removeAttribute("open");
-                      setSelectedId(null);
-                    }}
-                  >×</button>
-                </header>
-                <div className="visitor-inline-contact">
-                  <span><b>Categoria</b><small>{visitor.categoria_nome || "Sem categoria"}</small></span>
-                  <span><b>Célula</b><small>{visitor.celula_nome || "Sem célula"}</small></span>
-                  <span><b>E-mail</b><small>{visitor.email || "Não informado"}</small></span>
-                  <span><b>Telefone</b><small>{visitor.telefone || "Não informado"}</small></span>
-                  {visitor.parente && <span><b>Parente</b><small>{visitor.parente}</small></span>}
-                </div>
-                <div className="operation-card-actions">
-                  {visitor.telefone && whatsappHref(visitor.telefone) && (
-                    <a
-                      className="visitor-card-action visitor-whatsapp-link"
-                      href={whatsappHref(visitor.telefone) || undefined}
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label={`Conversar com ${visitor.nome_completo} pelo WhatsApp`}
-                    >
-                      <span className="visitor-whatsapp-icon" aria-hidden="true">●</span>
-                      <span><b>WhatsApp</b><small>Abrir conversa</small></span>
-                    </a>
-                  )}
-                  {canEdit && visitor.status !== "INTEGRADO" && (
-                    <button type="button" className="visitor-card-action visitor-card-action-primary" onClick={() => markIntegrated(visitor)}>
-                      Integrar
-                    </button>
-                  )}
-                  {canDeactivate && (
-                    <button
-                      type="button"
-                      className="visitor-card-action visitor-card-action-danger"
-                      onClick={() => deactivateVisitor(visitor)}
-                    >
-                      Desativar
-                    </button>
-                  )}
-                  {canDeactivate && (
-                    <button
-                      type="button"
-                      className="visitor-card-action visitor-card-action-delete"
-                      onClick={() => permanentlyDeleteVisitor(visitor)}
-                    >
-                      Excluir cadastro
-                    </button>
-                  )}
-                </div>
-                {canEdit && (
-                  <details className="visitor-edit-panel visitor-inline-section">
-                    <summary>Editar cadastro</summary>
-                    <form
-                      className="pilot-form visitor-edit-form"
-                      onSubmit={(event) => updateVisitor(event, visitor)}
-                    >
-                      <label>Nome completo*<input name="nomeCompleto" required maxLength={120} defaultValue={visitor.nome_completo} /></label>
-                      <label>Data de nascimento<input name="dataNascimento" type="date" defaultValue={visitor.data_nascimento || ""} /></label>
-                      <label>Telefone<input name="telefone" maxLength={30} defaultValue={visitor.telefone || ""} /></label>
-                      <label>E-mail<input name="email" type="email" maxLength={180} defaultValue={visitor.email || ""} /></label>
-                      <label>Endereço<input name="endereco" maxLength={250} defaultValue={visitor.endereco || ""} /></label>
-                      <label>Quem recebeu<input name="acompanhante" maxLength={120} defaultValue={visitor.acompanhante || ""} /></label>
-                      <label>Parente ou responsável<input name="parente" maxLength={120} defaultValue={visitor.parente || ""} /></label>
-                      <label>Ministério<input name="ministerio" maxLength={120} defaultValue={visitor.ministerio || ""} /></label>
-                      <label>Célula<select name="celulaId" defaultValue={visitor.celula_id || ""}><option value="">Sem célula</option>{cells.map((cell) => <option key={cell.id} value={cell.id}>{cell.nome}</option>)}</select></label>
-                      <label>Categoria<select name="categoriaId" defaultValue={visitor.categoria_id || ""}><option value="">Sem categoria</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.nome}</option>)}</select><small>Faixas etárias automáticas têm prioridade quando a data de nascimento está preenchida.</small></label>
-                      <label>Batismo<select name="batizado" defaultValue={visitor.batizado}><option value="NAO_INFORMADO">Não informado</option><option value="SIM">Sim</option><option value="NAO">Não</option></select></label>
-                      <label>Status<select name="status" defaultValue={visitor.status}><option value="NOVO">Novo</option><option value="EM_CONTATO">Em contato</option><option value="EM_ACOMPANHAMENTO">Em acompanhamento</option><option value="INTEGRADO">Integrado</option></select></label>
-                      <label>Entrada<input name="dataEntrada" type="date" required defaultValue={visitor.data_entrada} /></label>
-                      <label className="visitor-check"><input name="encontroComDeus" type="checkbox" defaultChecked={Boolean(visitor.encontro_com_deus)} />Encontro com Deus</label>
-                      <label className="visitor-check"><input name="cursoMembros" type="checkbox" defaultChecked={Boolean(visitor.curso_membros)} />Curso de membros</label>
-                      <label className="visitor-wide-field">Observações<textarea name="observacoes" rows={3} maxLength={1000} defaultValue={visitor.observacoes || ""} /></label>
-                      <button disabled={saving}>Salvar alterações</button>
-                    </form>
-                  </details>
-                )}
-                {selectedId === visitor.id && (
-                  <section className="visitor-inline-followup" aria-label={`Acompanhamento de ${visitor.nome_completo}`}>
-                    <header>
-                      <div><strong>Acompanhamento</strong><small>Histórico e próximo cuidado desta pessoa</small></div>
-                      <span>{followups.length}</span>
-                    </header>
-                    {canFollowup && (
-                      <details className="visitor-inline-section visitor-followup-editor">
-                        <summary>Registrar novo acompanhamento</summary>
-                        <form className="pilot-form followup-form" onSubmit={createFollowup}>
-                          <label>Canal<select name="tipo" defaultValue="WHATSAPP"><option value="WHATSAPP">WhatsApp</option><option value="TELEFONE">Telefone</option><option value="PRESENCIAL">Presencial</option><option value="EMAIL">E-mail</option><option value="OUTRO">Outro</option></select></label>
-                          <label>Resultado<input name="resultado" required maxLength={160} /></label>
-                          <label>Próximo contato<input name="proximoContato" type="date" /></label>
-                          <label className="visitor-wide-field">Descrição<textarea name="descricao" rows={3} maxLength={1500} /></label>
-                          <button disabled={saving}>Registrar acompanhamento</button>
-                        </form>
-                      </details>
-                    )}
-                    <div className="followup-history">
-                      {followups.length ? followups.map((item) => (
-                        <article key={item.id}>
-                          <div><span>{item.tipo}</span><time>{formatDateTime(item.criado_em)}</time></div>
-                          <strong>{item.resultado}</strong>
-                          {item.descricao && <p>{item.descricao}</p>}
-                          {item.proximo_contato && <small>Próximo: {formatDate(item.proximo_contato)}</small>}
-                        </article>
-                      )) : <p className="operations-muted">Sem acompanhamentos registrados.</p>}
-                    </div>
-                  </section>
-                )}
-              </div>
-            </details>
-          ))}
-          {nextCursor && (
-            <button
-              className="load-more-button"
-              disabled={loading}
-              onClick={() => loadVisitors(nextCursor, true)}
-            >
-              Carregar mais
-            </button>
-          )}
-        </div>
-      </div>
-      </>}
     </section>
   );
 }
@@ -2058,6 +1883,66 @@ function OperationFeedback({
   );
 }
 
+// Aviso de operação dos Visitantes.
+//
+// A versão anterior era um <p> preso dentro do cartão do diretório. Toda ação
+// desta aba, porém, sai de uma camada sobreposta — a ficha, o cadastro e as
+// configurações são portais montados em document.body. O resultado prático:
+// salvar uma categoria com nome repetido, ou perder a conexão ao cadastrar,
+// não mostrava nada; o erro era escrito atrás do modal aberto. Agora o aviso é
+// renderizado na superfície que está em primeiro plano, diz o que aconteceu,
+// pode ser fechado e é anunciado por leitor de tela (alert para erro, status
+// para o resto).
+type VisitorNoticeTone = "sucesso" | "erro" | "aviso";
+
+const VISITOR_NOTICE_LABEL: Record<VisitorNoticeTone, string> = {
+  sucesso: "Tudo certo",
+  erro: "Não foi possível concluir",
+  aviso: "Atenção",
+};
+
+const VISITOR_NOTICE_ICON: Record<VisitorNoticeTone, string> = {
+  sucesso: "✓",
+  erro: "!",
+  aviso: "▲",
+};
+
+function VisitorNotice({
+  message,
+  error,
+  warning,
+  onDismiss,
+  inline,
+}: {
+  message: string;
+  error: string;
+  warning: string;
+  onDismiss: () => void;
+  inline?: boolean;
+}) {
+  if (!message && !error && !warning) return null;
+  // O erro ganha da ressalva, que ganha da confirmação: quem lê primeiro
+  // precisa do que impede de seguir.
+  const tone: VisitorNoticeTone = error ? "erro" : warning ? "aviso" : "sucesso";
+  const text = error || warning || message;
+  return (
+    <div
+      className={`visitor-notice-v6${inline ? " is-inline" : ""}`}
+      data-tone={tone}
+      role={error ? "alert" : "status"}
+      aria-live={error ? "assertive" : "polite"}
+    >
+      <span className="visitor-notice-icon-v6" aria-hidden="true">{VISITOR_NOTICE_ICON[tone]}</span>
+      <div>
+        <strong>{VISITOR_NOTICE_LABEL[tone]}</strong>
+        <p>{text}</p>
+        {Boolean(warning && message) && <small>{message}</small>}
+      </div>
+      <button type="button" onClick={onDismiss} aria-label="Fechar aviso">×</button>
+    </div>
+  );
+}
+
 function CategoryFields({
   category,
   responsibles,
@@ -2210,6 +2095,21 @@ function formatAgeRule(category: VisitorCategory) {
   }
   if (category.idade_minima !== null) return `${category.idade_minima}+ anos`;
   return `Até ${category.idade_maxima} anos`;
+}
+
+// A coluna "Último contato" imprimia data e hora na mesma string: em 105 px a
+// linha quebrava em duas e a hora caía sozinha embaixo. Separar deixa a data em
+// destaque e a hora como apoio, cada uma numa linha por escolha e não por falta
+// de espaço. As duas saem do mesmo Date convertido para o fuso local — partir a
+// string devolveria o dia em UTC ao lado da hora local, e às 21h de sábado a
+// tabela mostraria domingo às 21h.
+function splitStamp(value: string) {
+  const parsed = new Date(value.includes("T") ? value : `${value.replace(" ", "T")}Z`);
+  if (Number.isNaN(parsed.getTime())) return { date: value, time: "" };
+  return {
+    date: parsed.toLocaleDateString("pt-BR"),
+    time: parsed.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+  };
 }
 
 function formatDateTime(value: string) {

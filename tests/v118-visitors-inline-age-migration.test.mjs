@@ -27,9 +27,15 @@ test("acompanhamento fica dentro da pessoa em lista plana e responsiva", async (
     source("app/components/TenantOperations.tsx"),
     source("app/globals.css"),
   ]);
-  assert.match(workspace, /name="visitor-directory"/);
-  assert.match(workspace, /className="visitor-inline-followup"/);
-  assert.match(workspace, /Histórico e próximo cuidado desta pessoa/);
+  // A ficha do visitante deixou de ser um <details> dentro da lista e virou a
+  // gaveta lateral montada em portal. As asserções abaixo miravam o cartão
+  // antigo, que desde então vivia atrás de `{false && …}` e nunca chegava à
+  // tela — passavam contra código inalcançável. Agora apontam para a superfície
+  // que realmente entrega a mesma garantia.
+  assert.match(workspace, /id="visitor-directory"/);
+  assert.match(workspace, /className="visitor-followup-details-v2"/);
+  assert.match(workspace, /className="visitor-timeline-v2"/);
+  assert.match(workspace, /Registre o cuidado sem sair da ficha\./);
   assert.doesNotMatch(workspace, /<aside className="followup-panel">/);
   assert.match(styles, /diretório plano: sem cartões aninhados/);
   assert.match(styles, /\.visitor-inline-contact/);
