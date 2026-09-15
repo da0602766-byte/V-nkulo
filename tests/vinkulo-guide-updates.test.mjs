@@ -28,7 +28,7 @@ test("guia VÍNKULO persiste categorias, equipes e públicos por comunidade", as
   assert.match(requests, /resolveAudience/);
   assert.match(requests, /TODOS_MEMBROS/);
   assert.match(schedules, /equipe_id/);
-  assert.match(schedules, /equipes selecionadas não pertence a este ministério/i);
+  assert.match(schedules, /equipe selecionada não pertence a este ministério/i);
 });
 
 test("interface VÍNKULO oferece chat, públicos e gestão responsiva", async () => {
@@ -47,25 +47,27 @@ test("interface VÍNKULO oferece chat, públicos e gestão responsiva", async ()
   assert.match(chat, /Online/);
   assert.match(requests, /visibilidade\s+escolhida/);
   assert.match(requests, /Todos os membros ativos/);
-  assert.match(visitors, /Central de Relacionamento/);
+  // O rótulo antigo vivia no painel escondido por `display:none`; o
+  // acompanhamento por categoria hoje é a legenda do panorama e a faixa de
+  // filtros, ambas visíveis.
+  assert.match(visitors, /Categorias em destaque/);
+  assert.match(visitors, /Categorias de visitantes/);
   assert.match(secretary, /Criar equipe/);
   assert.match(secretary, /Máximo de 3 equipes por integrante/);
   assert.match(styles, /@media\s*\(max-width:\s*680px\)/);
 });
 
 test("navegação pública usa links estáveis compatíveis com a hospedagem", async () => {
-  const [stableLink, publicHeader, publicHome, landing, communities] = await Promise.all([
+  const [stableLink, publicHeader, publicHome, communities] = await Promise.all([
     source("../app/components/StableLink.tsx"),
     source("../app/components/PublicHeader.tsx"),
     source("../app/page.tsx"),
-    source("../app/components/LandingPageExperience.tsx"),
     source("../app/comunidades/page.tsx"),
   ]);
 
   assert.match(stableLink, /<a href=\{href\}/);
   assert.match(publicHeader, /from "\.\/StableLink"/);
-  assert.match(publicHome, /LandingPageExperience/);
-  assert.match(landing, /from "\.\/StableLink"/);
+  assert.match(publicHome, /from "\.\/components\/StableLink"/);
   assert.match(communities, /from "\.\.\/components\/StableLink"/);
 });
 
@@ -145,7 +147,7 @@ test("ajustes operacionais V4.7.4 conectam estacionamento, escalas, pessoas e ev
   assert.match(scheduleUi, /Pessoa autorizada/);
   assert.match(scheduleUi, /Aba ou recurso permitido/);
   assert.match(scheduleUi, /Marcar ausente/);
-  assert.match(scheduleUi, /Esta equipe ainda não possui integrantes/);
+  assert.match(scheduleUi, /Etapa 2 — a equipe selecionada ainda não possui integrantes/);
   assert.match(sharedSchedule, /Acesso temporário encerrado/);
   assert.match(peopleApi, /json_each\(c\.membros\)/);
   assert.match(peopleUi, /Você ainda não está em uma célula/);

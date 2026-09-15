@@ -12,7 +12,6 @@ import {
 import { createPortal } from "react-dom";
 import { RelacionamentoTools } from "./RelacionamentoTools";
 import CareNotesBoard from "./CareNotesBoard";
-import { getVisitorAttention, visitorDaysWithoutContact, visitorToday } from "../lib/visitor-attention";
 
 type Visitor = {
   id: number;
@@ -54,7 +53,15 @@ type VisitorVision =
   | "sem_contato"
   | "arquivados";
 
-type VisitorCounts = Record<VisitorVision, number>;
+// As visões da barra superior e as etapas do funil não coincidem: "Em contato"
+// e "Integrado" não são visões, mas são etapas. O funil era montado a partir da
+// página carregada — com paginação, busca e filtro ativos ele mostrava a fatia
+// visível como se fosse a comunidade inteira. Agora vem do mesmo SELECT que já
+// conta as visões, sem consulta nova.
+type VisitorCounts = Record<VisitorVision, number> & {
+  em_contato: number;
+  integrado: number;
+};
 
 type VisitorCategory = {
   id: number;
@@ -82,12 +89,6 @@ type VisitorGrowth = { categoria_id: number; mes: string; novos: number };
 
 const VISITOR_CATEGORY_ICONS = ["◎", "◇", "♡", "✦", "♙", "▣", "○", "△"];
 const VISITOR_CATEGORY_COLORS = ["#7357e8", "#2f80ed", "#12a879", "#e09a21", "#df5b72", "#8d5bd2"];
-const VISITOR_REGISTRATION_STEPS = [
-  { number: "01", title: "Dados pessoais", shortTitle: "Pessoa", description: "O essencial para identificar e encontrar essa pessoa." },
-  { number: "02", title: "Conexão espiritual", shortTitle: "Caminhada", description: "Um pouco do momento atual da sua caminhada." },
-  { number: "03", title: "Vínculo com a igreja", shortTitle: "Vínculo", description: "Onde ela pode se conectar e ser acolhida." },
-  { number: "04", title: "Finalização", shortTitle: "Revisão", description: "Organize a entrada e deixe uma observação." },
-] as const;
 
 // A data de hoje em fuso local. toISOString() devolve UTC: no Brasil, das 21h
 // em diante a data já virou, e um visitante recebido no culto de domingo à
@@ -99,13 +100,39 @@ function hojeLocal() {
   return `${agora.getFullYear()}-${mes}-${dia}`;
 }
 
-// A ficha completa da célula (integrantes, agenda, relatórios, saúde) mora
-// em app/components/cells/types.ts desde o redesenho de Gestão/Participação
-// — aqui só sobra o mínimo que o formulário de visitante usa para o campo
-// "Célula" (id + nome).
 type Cell = {
   id: number;
   nome: string;
+  responsavel: string;
+  observacoes: string | null;
+  visitantes_ativos: number;
+  dias_reuniao: string[];
+  endereco_publico: string;
+  descricao_publica: string;
+  lider_usuario_id: number | null;
+  lider_nome: string | null;
+  vice_lider_usuario_id: number | null;
+  vice_lider_nome: string | null;
+  ultimo_relatorio_em: string | null;
+  arquivada_em: string | null;
+  ativo: number;
+  can_operate: boolean;
+  membros_total: number;
+  membros: Array<{
+    id: string;
+    kind: "COMMUNITY" | "EXTERNAL";
+    userId?: number;
+    name: string;
+    note?: string;
+    role?: "LEADER" | "VICE_LEADER" | "MEMBER";
+    email?: string;
+    telefone?: string | null;
+    fotoPerfil?: string | null;
+    papelComunidade?: string;
+  }>;
+  agenda: Array<{ id: number; titulo: string; inicia_em: string; termina_em: string; lembrete: string; visibilidade: "PUBLICO" | "PRIVADO" }>;
+  relatorios: Array<{ id: number; data_reuniao: string; aconteceu: number; presentes: number; visitantes: number; observacoes: string; enviado_por_nome: string | null }>;
+  solicitacoes: Array<{ id: number; nome: string; contato: string; mensagem: string; criado_em: string }>;
 };
 
 type Followup = {
@@ -163,8 +190,11 @@ export function VisitorsWorkspace({
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  // Nem todo retorno é sucesso ou falha. Uma planilha que entra com metade das
+  // linhas ignoradas precisa de um terceiro tom: a operação foi concluída, mas
+  // alguém tem de olhar o que ficou de fora.
+  const [warning, setWarning] = useState("");
   const [registrationOpen, setRegistrationOpen] = useState(false);
-  const [registrationStep, setRegistrationStep] = useState(0);
   const [importing, setImporting] = useState(false);
   const [importFileName, setImportFileName] = useState("");
   const [importRows, setImportRows] = useState<VisitorImportRow[]>([]);
@@ -172,7 +202,9 @@ export function VisitorsWorkspace({
   const [counts, setCounts] = useState<VisitorCounts>({
     todos: 0,
     novos: 0,
+    em_contato: 0,
     acompanhamento: 0,
+    integrado: 0,
     pendencias: 0,
     sem_contato: 0,
     arquivados: 0,
@@ -181,7 +213,6 @@ export function VisitorsWorkspace({
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [exportReviewOpen, setExportReviewOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [relationshipCenterOpen, setRelationshipCenterOpen] = useState(false);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const categoriesRef = useRef<VisitorCategory[]>([]);
   const categoryDragTimerRef = useRef<number | null>(null);
@@ -201,21 +232,6 @@ export function VisitorsWorkspace({
   const canEdit = permissions.includes("visitors.edit");
   const canDeactivate = permissions.includes("visitors.deactivate");
   const canFollowup = permissions.includes("followups.manage");
-  const openRegistrationDialog = useCallback(() => {
-    setRegistrationStep(0);
-    setDuplicateMatches([]);
-    setDuplicateChecking(false);
-    setError("");
-    setRegistrationOpen(true);
-  }, []);
-  const closeRegistrationDialog = useCallback(() => {
-    if (saving) return;
-    setRegistrationOpen(false);
-    setRegistrationStep(0);
-    setDuplicateMatches([]);
-    setDuplicateChecking(false);
-    setError("");
-  }, [saving]);
   const visibleCategories = useMemo(() => {
     const term = categorySearch.trim().toLocaleLowerCase("pt-BR");
     if (!term) return categories;
@@ -330,6 +346,9 @@ export function VisitorsWorkspace({
     [categories],
   );
 
+  // O alvo do scroll era o formulário legado, removido junto com o bloco morto:
+  // clicar numa categoria filtrava a lista e não levava ninguém até ela. O id
+  // agora está no cartão do diretório, que é o que a pessoa quer ver.
   function filterByCategory(categoryId: string) {
     setSearch("");
     setCategoryFilter(categoryId);
@@ -386,6 +405,7 @@ export function VisitorsWorkspace({
     setSaving(true);
     setMessage("");
     setError("");
+    setWarning("");
     const form = event.currentTarget;
     const body = Object.fromEntries(new FormData(form).entries());
     try {
@@ -414,6 +434,7 @@ export function VisitorsWorkspace({
     setSaving(true);
     setMessage("");
     setError("");
+    setWarning("");
     try {
       await apiJson(`/api/pilot/visitante-categorias/${category.id}`, { method: "DELETE" });
       setMessage("Categoria excluída com validação de vínculos.");
@@ -436,6 +457,7 @@ export function VisitorsWorkspace({
     setSaving(true);
     setMessage("");
     setError("");
+    setWarning("");
     try {
       await apiJson("/api/pilot/visitante-categorias", {
         method: "PUT",
@@ -556,25 +578,11 @@ export function VisitorsWorkspace({
 
   useEffect(() => {
     if (!canCreate) return;
-    const openRegistration = () => openRegistrationDialog();
+    const openRegistration = () => setRegistrationOpen(true);
     window.addEventListener("vinkulo:new-visitor", openRegistration);
     return () =>
       window.removeEventListener("vinkulo:new-visitor", openRegistration);
-  }, [canCreate, openRegistrationDialog]);
-
-  useEffect(() => {
-    if (!registrationOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeRegistrationDialog();
-    };
-    document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [closeRegistrationDialog, registrationOpen]);
+  }, [canCreate]);
 
   async function loadFollowups(visitorId: number) {
     setSelectedId(visitorId);
@@ -614,45 +622,6 @@ export function VisitorsWorkspace({
     }, 380);
   }
 
-  function scrollRegistrationToTop() {
-    window.requestAnimationFrame(() => {
-      document
-        .querySelector<HTMLFormElement>("#visitor-registration-card .visitor-registration")
-        ?.scrollTo({ top: 0, behavior: "smooth" });
-    });
-  }
-
-  function continueRegistration(form: HTMLFormElement) {
-    if (saving) return;
-    if (registrationStep === 0) {
-      const nameInput = form.elements.namedItem("nomeCompleto") as HTMLInputElement | null;
-      if (!nameInput?.checkValidity()) {
-        form.reportValidity();
-        return;
-      }
-      if (duplicateChecking) {
-        setError("Aguarde a verificação de cadastro duplicado terminar.");
-        return;
-      }
-      if (duplicateMatches.length) {
-        setError("Revise o cadastro parecido encontrado antes de continuar.");
-        return;
-      }
-    }
-    setError("");
-    setRegistrationStep((current) => Math.min(VISITOR_REGISTRATION_STEPS.length - 1, current + 1));
-    scrollRegistrationToTop();
-  }
-
-  function handleRegistrationSubmit(event: FormEvent<HTMLFormElement>) {
-    if (registrationStep < VISITOR_REGISTRATION_STEPS.length - 1) {
-      event.preventDefault();
-      continueRegistration(event.currentTarget);
-      return;
-    }
-    void createVisitor(event);
-  }
-
   function openExistingVisitor(visitor: Visitor) {
     setSearch(visitor.nome_completo);
     setCategoryFilter("all");
@@ -670,6 +639,7 @@ export function VisitorsWorkspace({
     setSaving(true);
     setMessage("");
     setError("");
+    setWarning("");
     const form = event.currentTarget;
     const body = Object.fromEntries(new FormData(form).entries());
     try {
@@ -680,8 +650,6 @@ export function VisitorsWorkspace({
       });
       form.reset();
       setDuplicateMatches([]);
-      setDuplicateChecking(false);
-      setRegistrationStep(0);
       setRegistrationOpen(false);
       setMessage("Cadastro salvo somente na comunidade ativa.");
       await Promise.all([loadVisitors(), loadCategories()]);
@@ -698,6 +666,7 @@ export function VisitorsWorkspace({
     setSaving(true);
     setMessage("");
     setError("");
+    setWarning("");
     const form = event.currentTarget;
     const body = Object.fromEntries(new FormData(form).entries());
     try {
@@ -721,6 +690,7 @@ export function VisitorsWorkspace({
     setSaving(true);
     setMessage("");
     setError("");
+    setWarning("");
     try {
       await apiJson(`/api/pilot/visitantes/${visitor.id}`, {
         method: "PATCH",
@@ -780,6 +750,7 @@ export function VisitorsWorkspace({
     setSaving(true);
     setMessage("");
     setError("");
+    setWarning("");
     try {
       await apiJson(`/api/pilot/visitantes/${visitor.id}`, {
         method: "PATCH",
@@ -801,6 +772,7 @@ export function VisitorsWorkspace({
     setSaving(true);
     setMessage("");
     setError("");
+    setWarning("");
     try {
       for (const id of selectedRows) {
         await apiJson(`/api/pilot/visitantes/${id}`, { method: "DELETE" });
@@ -821,6 +793,7 @@ export function VisitorsWorkspace({
     setSaving(true);
     setMessage("");
     setError("");
+    setWarning("");
     try {
       for (const id of selectedRows) {
         await apiJson(`/api/pilot/visitantes/${id}?permanente=1`, { method: "DELETE" });
@@ -869,6 +842,7 @@ export function VisitorsWorkspace({
     setImporting(true);
     setError("");
     setMessage("");
+    setWarning("");
     try {
       const XLSX = await import("xlsx");
       const workbook = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
@@ -909,6 +883,7 @@ export function VisitorsWorkspace({
     if (!importRows.length || importing) return;
     setImporting(true);
     setError("");
+    setWarning("");
     let imported = 0;
     let ignored = 0;
     try {
@@ -930,7 +905,10 @@ export function VisitorsWorkspace({
       }
       setImportRows([]);
       setImportFileName("");
-      setMessage(`${imported} cadastro(s) importado(s). Categorias encontradas na planilha foram vinculadas ou criadas na comunidade.${ignored ? ` ${ignored} linha(s) foram ignoradas por duplicidade ou dados inválidos.` : ""}`);
+      setMessage(`${imported} cadastro(s) importado(s). Categorias encontradas na planilha foram vinculadas ou criadas na comunidade.`);
+      if (ignored) {
+        setWarning(`${ignored} linha(s) foram ignoradas por duplicidade ou dados inválidos. Confira a planilha antes de importar de novo.`);
+      }
       await Promise.all([loadVisitors(), loadCategories()]);
     } finally {
       setImporting(false);
@@ -946,6 +924,7 @@ export function VisitorsWorkspace({
     setSaving(true);
     setMessage("");
     setError("");
+    setWarning("");
     const body = Object.fromEntries(new FormData(event.currentTarget).entries());
     try {
       await apiJson(`/api/pilot/visitantes/${visitor.id}`, {
@@ -974,6 +953,7 @@ export function VisitorsWorkspace({
     setSaving(true);
     setMessage("");
     setError("");
+    setWarning("");
     try {
       await apiJson(`/api/pilot/visitantes/${visitor.id}`, {
         method: "DELETE",
@@ -1001,6 +981,7 @@ export function VisitorsWorkspace({
     setSaving(true);
     setMessage("");
     setError("");
+    setWarning("");
     try {
       await apiJson(`/api/pilot/visitantes/${visitor.id}?permanente=1`, { method: "DELETE" });
       setSelectedId(null);
@@ -1015,6 +996,15 @@ export function VisitorsWorkspace({
   }
 
   const selectedVisitor = visitors.find((visitor) => visitor.id === selectedId) || null;
+  // Só uma superfície mostra o aviso por vez: a que está por cima. Repetir o
+  // mesmo texto no fundo e no modal faria o leitor de tela anunciar duas vezes.
+  const overlayOpen =
+    registrationOpen || settingsOpen || Boolean(selectedVisitor) || Boolean(importRows.length);
+  const dismissNotice = () => {
+    setMessage("");
+    setError("");
+    setWarning("");
+  };
   const visibleVisitors = [...visitors].sort((left, right) => {
     const comparison = left.nome_completo.localeCompare(right.nome_completo, "pt-BR");
     return sortDirection === "asc" ? comparison : -comparison;
@@ -1030,41 +1020,28 @@ export function VisitorsWorkspace({
   // O funil é o assunto da página: quantos chegaram e quantos avançaram. A
   // tabela responde "quem"; isto responde "como está indo", que é a pergunta
   // que a liderança faz primeiro. Os estágios já existem como status.
+  //
+  // Contar sobre `visitors` media a página carregada, não a comunidade: com a
+  // busca preenchida o funil dizia "100% integrados" porque só havia um nome na
+  // tela. As contagens abaixo vêm do servidor e ignoram busca, filtro e cursor.
   const funnelStages = ([
-    ["NOVO", "Recebidos"],
-    ["EM_CONTATO", "Contatados"],
-    ["EM_ACOMPANHAMENTO", "Em acompanhamento"],
-    ["INTEGRADO", "Integrados"],
-  ] as const).map(([id, label]) => ({
-    id,
-    label,
-    total: visitors.filter((visitor) => visitor.status === id).length,
-  }));
-  const previousGrowthTotal = growthDashboard.points.at(-2)?.value ?? growthDashboard.currentTotal;
-  const monthlyGrowth = Math.max(0, growthDashboard.currentTotal - previousGrowthTotal);
-  const monthlyGrowthPercentage = previousGrowthTotal
-    ? Math.round((monthlyGrowth / previousGrowthTotal) * 100)
-    : monthlyGrowth > 0 ? 100 : 0;
-  const relationshipPriorities = [...visitors]
-    .filter((visitor) => visitor.ativo && visitor.status !== "INTEGRADO")
-    .map((visitor) => ({
-      visitor,
-      daysWithoutContact: visitorDaysWithoutContact(visitor),
-    }))
-    .sort((left, right) => right.daysWithoutContact - left.daysWithoutContact);
-  const urgentRelationshipCount = relationshipPriorities.filter(
-    (item) => item.daysWithoutContact >= 15,
-  ).length;
+    ["NOVO", "Recebidos", "novos"],
+    ["EM_CONTATO", "Contatados", "em_contato"],
+    ["EM_ACOMPANHAMENTO", "Em acompanhamento", "acompanhamento"],
+    ["INTEGRADO", "Integrados", "integrado"],
+  ] as const).map(([id, label, key]) => ({ id, label, total: counts[key] }));
+  const funnelTotal = funnelStages.reduce((soma, etapa) => soma + etapa.total, 0);
 
   return (
     <section className="visitor-workspace-redesign">
-      <header className="visitor-hero visitor-project-header-v6">
+      <header className="visitor-hero">
         <div>
-          <h1>{communityName}</h1>
-          <p>Gestão de Visitantes</p>
+          <p className="pilot-kicker">VISITANTES · {communityName}</p>
+          <h1>Relacionamento</h1>
+          <p>Acompanhe pessoas, contatos e próximos cuidados em uma única ficha.</p>
         </div>
         <div className="visitor-hero-actions-v2">
-          {canCreate && <button type="button" className="visitor-hero-new-v2" onClick={openRegistrationDialog}>＋ Novo visitante</button>}
+          {canCreate && <button type="button" className="visitor-hero-new-v2" onClick={() => setRegistrationOpen(true)}>＋ Novo visitante</button>}
           {canManageCategories && (
           <div className="visitor-settings">
             <button
@@ -1108,6 +1085,7 @@ export function VisitorsWorkspace({
                       ×
                     </button>
                   </header>
+                  <VisitorNotice message={message} error={error} warning={warning} onDismiss={dismissNotice} inline />
                   <details className="visitor-category-create">
                     <summary><span>＋</span><strong>Nova categoria</strong><small>Nome, responsável e ministério</small></summary>
                     <form onSubmit={(event) => void saveCategory(event)}>
@@ -1188,87 +1166,43 @@ export function VisitorsWorkspace({
           )}
         </div>
       </header>
-      <div className="visitor-command-layout-v4">
-      <aside className="visitor-reference-left-v4 visitor-project-left-v6" aria-label="Resumo e filtros de visitantes">
-        <details className="visitor-project-panel-v6" open>
-          <summary><span aria-hidden="true">↗</span><strong>Painel de Crescimento</strong><i aria-hidden="true">›</i></summary>
-          <div className="visitor-project-panel-body-v6">
-            <article className="visitor-project-growth-v6">
-              <span>Visitantes Ativos</span>
-              <strong>{categoriesLoaded ? growthDashboard.currentTotal : "—"}</strong>
-              <small>{monthlyGrowthPercentage > 0 ? `+${monthlyGrowthPercentage}% no mês` : "Sem variação no mês"}</small>
+      {!overlayOpen && <VisitorNotice message={message} error={error} warning={warning} onDismiss={dismissNotice} />}
+      <section className="visitor-funnel-v5" aria-label="Funil de acolhimento">
+        {funnelStages.map((etapa) => {
+          const proporcao = funnelTotal ? Math.round((etapa.total / funnelTotal) * 100) : 0;
+          return (
+            <article key={etapa.id} data-etapa={etapa.id}>
+              <small>{etapa.label}</small>
+              <strong>{etapa.total}</strong>
+              <span className="visitor-funnel-bar-v5" aria-hidden="true">
+                <i style={{ width: `${proporcao}%` }} />
+              </span>
+              <em>{proporcao}% do total</em>
             </article>
-          </div>
-        </details>
+          );
+        })}
+      </section>
 
-        <details className="visitor-project-panel-v6" open>
-          <summary><span aria-hidden="true">⌁</span><strong>Funil de Acolhimento</strong><i aria-hidden="true">›</i></summary>
-          <nav className="visitor-project-funnel-v6" aria-label="Funil de acolhimento">
-            {funnelStages.map((etapa, index) => (
-              <button type="button" key={etapa.id} data-etapa={etapa.id} onClick={() => changeVision(index === 0 ? "novos" : index === 2 ? "acompanhamento" : "todos")}>
-                <span aria-hidden="true">{index === 0 ? "＋" : index === 1 ? "◌" : index === 2 ? "♡" : "✓"}</span>
-                <strong>{etapa.label}</strong>
-                <b>{etapa.total}</b>
-              </button>
-            ))}
-          </nav>
-        </details>
-
-        <details className="visitor-project-panel-v6" open>
-          <summary><span aria-hidden="true">◫</span><strong>Categorias</strong><i aria-hidden="true">›</i></summary>
-          <nav className="visitor-project-categories-v6" aria-label="Filtros por categoria">
-            {!categoriesLoaded && <p>Carregando categorias…</p>}
-            {categoriesLoaded && categoryDashboards.map((category) => (
-              <button
-                type="button"
-                key={category.id}
-                className={categoryFilter === String(category.id) ? "active" : ""}
-                style={{ "--category-color": category.cor } as CSSProperties}
-                onClick={() => filterByCategory(categoryFilter === String(category.id) ? "all" : String(category.id))}
-              >
-                <span aria-hidden="true" />
-                <strong>{category.nome}</strong>
-                <b>{category.total_visitantes}</b>
-              </button>
-            ))}
-            {categoriesLoaded && !categoryDashboards.length && <p>Nenhuma categoria ativa.</p>}
-          </nav>
-        </details>
-      </aside>
-
-      {canCreate && <button type="button" className="visitor-registration-launch" onClick={openRegistrationDialog}><span aria-hidden="true">＋</span><span><strong>Cadastrar novo visitante</strong><small>Abrir ficha completa em uma janela protegida</small></span><i aria-hidden="true">›</i></button>}
-      <details className="visitor-registration-compat" aria-hidden="true"><summary>Cadastrar novo visitante</summary></details>
       {canCreate && registrationOpen && createPortal(
         <div className="visitor-registration-backdrop" role="presentation">
         <section id="visitor-registration-card" className="visitor-registration-dialog" role="dialog" aria-modal="true" aria-labelledby="visitor-registration-title">
-          <header className="visitor-registration-dialog-header"><div><p className="pilot-kicker">NOVO VISITANTE · ETAPA {registrationStep + 1} DE {VISITOR_REGISTRATION_STEPS.length}</p><h2 id="visitor-registration-title">Cadastrar visitante</h2><p>{VISITOR_REGISTRATION_STEPS[registrationStep].description}</p></div><button type="button" aria-label="Fechar cadastro" onClick={closeRegistrationDialog}>×</button></header>
-          <nav className="visitor-registration-progress" aria-label="Etapas do cadastro">
-            <div className="visitor-registration-progress-copy"><span>Cadastro guiado</span><strong>{VISITOR_REGISTRATION_STEPS[registrationStep].title}</strong><small>{registrationStep === 0 ? "Comece pelo essencial" : "Você pode voltar e ajustar"}</small></div>
-            <div className="visitor-registration-progress-track" aria-hidden="true"><i style={{ width: `${((registrationStep + 1) / VISITOR_REGISTRATION_STEPS.length) * 100}%` }} /></div>
-            <div className="visitor-registration-step-list">
-              {VISITOR_REGISTRATION_STEPS.map((step, index) => (
-                <button key={step.number} type="button" className={index === registrationStep ? "active" : index < registrationStep ? "complete" : ""} aria-current={index === registrationStep ? "step" : undefined} disabled={index > registrationStep} onClick={() => { setError(""); setRegistrationStep(index); scrollRegistrationToTop(); }}>
-                  <span>{index < registrationStep ? "✓" : step.number}</span><strong>{step.shortTitle}</strong>
-                </button>
-              ))}
-            </div>
-          </nav>
-          <form className="pilot-form visitor-registration" onSubmit={handleRegistrationSubmit} onInput={(event) => scheduleDuplicateCheck(event.currentTarget)}>
-            <section className={`visitor-registration-section visitor-registration-form-section ${registrationStep === 0 ? "is-active" : "is-hidden"}`} aria-labelledby="visitor-registration-person-title" hidden={registrationStep !== 0}>
-              <header className="visitor-registration-section-heading"><div><span className="visitor-registration-number">01</span><div><p>ETAPA 1 · ESSENCIAL</p><h3 id="visitor-registration-person-title">Quem chegou?</h3><small>Comece com o dado que ajuda a equipe a reconhecer essa pessoa.</small></div></div><span className="visitor-registration-field-note">Nome obrigatório</span></header>
+          <header><div><p className="pilot-kicker">NOVO VISITANTE</p><h2 id="visitor-registration-title">Cadastrar visitante</h2><p>Preencha a ficha sem perder o contexto da lista.</p></div><button type="button" aria-label="Fechar cadastro" onClick={() => !saving && setRegistrationOpen(false)}>×</button></header>
+          <form className="pilot-form visitor-registration" onSubmit={createVisitor} onInput={(event) => scheduleDuplicateCheck(event.currentTarget)}>
+            <section className="visitor-registration-section visitor-registration-form-section">
+              <header><span><b>1</b><strong>Informações pessoais</strong><small>Nome e formas de contato</small></span></header>
               <fieldset>
                 <legend>Dados pessoais</legend>
-                <label className="visitor-registration-field visitor-registration-field-wide"><span>Nome completo <em>obrigatório</em></span><input name="nomeCompleto" required maxLength={120} autoFocus={registrationStep === 0} placeholder="Ex.: Ana Clara Souza" /><small>O restante da ficha pode ser completado depois.</small></label>
-                <label className="visitor-registration-field"><span>Data de nascimento <em>opcional</em></span><input name="dataNascimento" type="date" /></label>
-                <label className="visitor-registration-field"><span>Telefone ou WhatsApp <em>opcional</em></span><input name="telefone" inputMode="tel" maxLength={30} placeholder="(00) 00000-0000" /></label>
-                <label className="visitor-registration-field"><span>E-mail <em>opcional</em></span><input name="email" type="email" maxLength={180} placeholder="nome@email.com" /></label>
-                <label className="visitor-registration-field"><span>Parente ou responsável <em>opcional</em></span><input name="parente" maxLength={120} placeholder="Nome do familiar ou responsável" /></label>
-                <label className="visitor-registration-field visitor-registration-field-wide"><span>Endereço <em>opcional</em></span><input name="endereco" maxLength={250} placeholder="Rua, número e bairro" /></label>
+                <label>Nome completo*<input name="nomeCompleto" required maxLength={120} /></label>
+                <label>Data de nascimento<input name="dataNascimento" type="date" /></label>
+                <label>Telefone/WhatsApp<input name="telefone" inputMode="tel" maxLength={30} /></label>
+                <label>E-mail<input name="email" type="email" maxLength={180} /></label>
+                <label className="visitor-wide-field">Parente ou responsável<input name="parente" maxLength={120} placeholder="Nome do familiar ou responsável" /></label>
+                <label className="visitor-wide-field">Endereço<input name="endereco" maxLength={250} /></label>
               </fieldset>
             </section>
-            {registrationStep === 0 && (duplicateChecking || duplicateMatches.length > 0) && (
+            {(duplicateChecking || duplicateMatches.length > 0) && (
               <section className={`visitor-duplicate-check ${duplicateMatches.length ? "has-matches" : ""}`} aria-live="polite">
-                <header><strong>{duplicateChecking ? "Só um instante…" : "Possível cadastro duplicado"}</strong><small>{duplicateChecking ? "Estamos conferindo se essa pessoa já está cadastrada." : "Encontramos uma ficha parecida. Confira antes de criar outro cadastro."}</small></header>
+                <header><strong>{duplicateChecking ? "Verificando fichas…" : "Possível cadastro duplicado"}</strong><small>Comparamos nome, e-mail, telefone e parente.</small></header>
                 {duplicateMatches.map((visitor) => (
                   <button key={visitor.id} type="button" onClick={() => openExistingVisitor(visitor)}>
                     <span><b>{visitor.nome_completo}</b><small>{visitor.email || visitor.telefone || visitor.parente || "Sem contato informado"}</small></span>
@@ -1277,57 +1211,41 @@ export function VisitorsWorkspace({
                 ))}
               </section>
             )}
-            <section className={`visitor-registration-section visitor-registration-form-section ${registrationStep === 1 ? "is-active" : "is-hidden"}`} aria-labelledby="visitor-registration-spiritual-title" hidden={registrationStep !== 1}>
-              <header className="visitor-registration-section-heading"><div><span className="visitor-registration-number">02</span><div><p>ETAPA 2 · CAMINHADA</p><h3 id="visitor-registration-spiritual-title">Como está a caminhada?</h3><small>Essas informações ajudam a escolher uma conversa mais cuidadosa.</small></div></div><span className="visitor-registration-field-note">Tudo opcional</span></header>
+            <section className="visitor-registration-section visitor-registration-form-section">
+              <header><span><b>2</b><strong>Conexão espiritual</strong><small>Batismo e formação</small></span></header>
               <fieldset>
-                <legend>Batismo</legend>
-                <p className="visitor-registration-field-help">Se não souber agora, escolha “Ainda não informado”.</p>
-                <div className="visitor-choice-grid" role="radiogroup" aria-label="Situação do batismo">
-                  <label className="visitor-choice-card"><input type="radio" name="batizado" value="NAO_INFORMADO" defaultChecked /><span className="visitor-choice-mark">?</span><span><strong>Ainda não informado</strong><small>Preencher depois</small></span></label>
-                  <label className="visitor-choice-card"><input type="radio" name="batizado" value="SIM" /><span className="visitor-choice-mark">✓</span><span><strong>Já foi batizado</strong><small>Sim, já passou pelo batismo</small></span></label>
-                  <label className="visitor-choice-card"><input type="radio" name="batizado" value="NAO" /><span className="visitor-choice-mark">—</span><span><strong>Ainda não</strong><small>Não foi batizado</small></span></label>
-                </div>
-                <div className="visitor-toggle-list">
-                  <label className="visitor-toggle-card"><input name="encontroComDeus" type="checkbox" /><span className="visitor-toggle-mark">✦</span><span><strong>Encontro com Deus</strong><small>Já participou dessa experiência</small></span><i>opcional</i></label>
-                  <label className="visitor-toggle-card"><input name="cursoMembros" type="checkbox" /><span className="visitor-toggle-mark">＋</span><span><strong>Curso de membros</strong><small>Já concluiu ou está fazendo o curso</small></span><i>opcional</i></label>
-                </div>
+                <legend>Informações espirituais</legend>
+                <label>Batismo<select name="batizado" defaultValue="NAO_INFORMADO"><option value="NAO_INFORMADO">Não informado</option><option value="SIM">Sim</option><option value="NAO">Não</option></select></label>
+                <label className="visitor-check"><input name="encontroComDeus" type="checkbox" />Já participou do Encontro com Deus</label>
+                <label className="visitor-check"><input name="cursoMembros" type="checkbox" />Já concluiu o curso de membros</label>
               </fieldset>
             </section>
-            <section className={`visitor-registration-section visitor-registration-form-section ${registrationStep === 2 ? "is-active" : "is-hidden"}`} aria-labelledby="visitor-registration-connection-title" hidden={registrationStep !== 2}>
-              <header className="visitor-registration-section-heading"><div><span className="visitor-registration-number">03</span><div><p>ETAPA 3 · VÍNCULO</p><h3 id="visitor-registration-connection-title">Onde ela pode se conectar?</h3><small>Organize o próximo passo de acolhimento sem perder tempo.</small></div></div><span className="visitor-registration-field-note">Você pode completar depois</span></header>
+            <section className="visitor-registration-section visitor-registration-form-section">
+              <header><span><b>3</b><strong>Vínculo com a igreja</strong><small>Célula, categoria e ministério</small></span></header>
               <fieldset>
                 <legend>Conexão com a igreja</legend>
-                <div className="visitor-registration-field-grid">
-                  <label className="visitor-registration-field"><span>Célula <em>opcional</em></span><select name="celulaId" defaultValue=""><option value="">Ainda não definida</option>{cells.map((cell) => <option key={cell.id} value={cell.id}>{cell.nome}</option>)}</select></label>
-                  <label className="visitor-registration-field"><span>Categoria de acompanhamento <em>opcional</em></span><select name="categoriaId" defaultValue=""><option value="">Ainda não definida</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.nome}</option>)}</select><small>Se houver data de nascimento, uma faixa automática terá prioridade.</small></label>
-                  <label className="visitor-registration-field"><span>Quem recebeu <em>opcional</em></span><input name="acompanhante" maxLength={120} placeholder="Nome de quem acolheu" /></label>
-                  <label className="visitor-registration-field"><span>Ministério de interesse <em>opcional</em></span><input name="ministerio" maxLength={120} placeholder="Ex.: Música, infantil, ação social" /></label>
-                </div>
+                <label>Célula<select name="celulaId" defaultValue=""><option value="">Sem célula</option>{cells.map((cell) => <option key={cell.id} value={cell.id}>{cell.nome}</option>)}</select></label>
+                <label>Categoria de acompanhamento<select name="categoriaId" defaultValue=""><option value="">Sem categoria</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.nome}</option>)}</select><small>Com data de nascimento, uma faixa automática configurada terá prioridade.</small></label>
+                <label>Quem recebeu<input name="acompanhante" maxLength={120} /></label>
+                <label>Ministério de interesse<input name="ministerio" maxLength={120} /></label>
               </fieldset>
             </section>
-            <section className={`visitor-registration-section visitor-registration-form-section ${registrationStep === 3 ? "is-active" : "is-hidden"}`} aria-labelledby="visitor-registration-finish-title" hidden={registrationStep !== 3}>
-              <header className="visitor-registration-section-heading"><div><span className="visitor-registration-number">04</span><div><p>ETAPA 4 · REVISÃO</p><h3 id="visitor-registration-finish-title">Só falta organizar a entrada</h3><small>Revise o básico e deixe uma pista para o próximo contato.</small></div></div><span className="visitor-registration-field-note">Quase pronto</span></header>
+            <section className="visitor-registration-section visitor-registration-form-section">
+              <header><span><b>4</b><strong>Finalização</strong><small>Entrada, status e observações</small></span></header>
               <fieldset>
-                <legend>Entrada e próximo passo</legend>
-                <div className="visitor-registration-field-grid visitor-registration-finish-grid">
-                  <label className="visitor-registration-field"><span>Data de entrada <em>obrigatório</em></span><input name="dataEntrada" type="date" required defaultValue={hojeLocal()} /></label>
-                  <div className="visitor-registration-field"><span>Status inicial</span><div className="visitor-status-grid" role="radiogroup" aria-label="Status inicial do visitante">
-                    <label className="visitor-status-card"><input type="radio" name="status" value="NOVO" defaultChecked /><span><strong>Novo</strong><small>Começar acolhimento</small></span></label>
-                    <label className="visitor-status-card"><input type="radio" name="status" value="EM_CONTATO" /><span><strong>Em contato</strong><small>Já conversamos</small></span></label>
-                    <label className="visitor-status-card"><input type="radio" name="status" value="EM_ACOMPANHAMENTO" /><span><strong>Acompanhamento</strong><small>Próximo cuidado definido</small></span></label>
-                  </div></div>
-                  <label className="visitor-registration-field visitor-registration-field-wide"><span>Observações <em>opcional</em></span><textarea name="observacoes" maxLength={1000} rows={4} placeholder="Como foi a chegada? Existe algum cuidado ou combinado para o próximo contato?" /></label>
-                </div>
+                <legend>Observações e finalização</legend>
+                <label>Entrada<input name="dataEntrada" type="date" required defaultValue={hojeLocal()} /></label>
+                <label>Status<select name="status" defaultValue="NOVO"><option value="NOVO">Novo</option><option value="EM_CONTATO">Em contato</option><option value="EM_ACOMPANHAMENTO">Em acompanhamento</option><option value="INTEGRADO">Integrado</option></select></label>
+                <label className="visitor-wide-field">Observações<textarea name="observacoes" maxLength={1000} rows={3} /></label>
               </fieldset>
             </section>
-            {registrationStep > 0 && duplicateMatches.length > 0 && <button type="button" className="visitor-registration-duplicate-back" onClick={() => { setRegistrationStep(0); setError(""); scrollRegistrationToTop(); }}>Voltar aos dados pessoais para revisar o cadastro parecido</button>}
-            {error && <p className="visitor-registration-error" role="alert">{error}</p>}
-            <footer className="visitor-registration-actions"><p className="form-consequence-v5"><span aria-hidden="true">◉</span>{registrationStep === VISITOR_REGISTRATION_STEPS.length - 1 ? "Ao salvar, a pessoa entra na lista de visitantes e fica pronta para acompanhamento." : "Só o nome é obrigatório. Você pode avançar e completar o restante depois."}</p><div className="visitor-registration-action-buttons"><button type="button" className="visitor-registration-secondary" onClick={() => registrationStep === 0 ? closeRegistrationDialog() : (setError(""), setRegistrationStep((current) => Math.max(0, current - 1)), scrollRegistrationToTop())} disabled={saving}>{registrationStep === 0 ? "Cancelar" : "Voltar"}</button><button type="submit" className="visitor-registration-primary" disabled={saving}>{saving ? "Salvando…" : registrationStep === VISITOR_REGISTRATION_STEPS.length - 1 ? "Salvar visitante" : "Continuar →"}</button></div></footer>
+            <VisitorNotice message={message} error={error} warning={warning} onDismiss={dismissNotice} inline />
+            <footer className="visitor-registration-actions"><p className="form-consequence-v5"><span aria-hidden="true">◉</span>Só o nome é obrigatório. O visitante entra no fio do dia na hora e abre um acompanhamento para o contato.</p><button type="button" onClick={() => setRegistrationOpen(false)} disabled={saving}>Cancelar</button><button disabled={saving}>{saving ? "Salvando…" : "Salvar visitante"}</button></footer>
           </form>
         </section>
         </div>, document.body)}
 
-      <main className="visitor-reference-main-v4 visitor-project-main-v6" aria-label="Diretório de visitantes">
+      <section className="visitor-relations-v2" aria-label="Relacionamento com visitantes">
         <nav className="visitor-view-tabs-v2" aria-label="Visões de visitantes">
           {([
             ["todos", "Todos"],
@@ -1343,38 +1261,141 @@ export function VisitorsWorkspace({
               aria-current={activeVision === vision ? "page" : undefined}
               onClick={() => changeVision(vision)}
             >
-              <span>{label === "Sem contato há 15 dias" ? "Sem contato" : label}</span>
+              <span>{label}</span><b>{counts[vision]}</b>
             </button>
           ))}
         </nav>
-        <section className="visitor-sheet-v2" aria-label="Lista de visitantes">
-          <div className="visitor-project-toolbar-v6">
-            <form className="visitor-commandbar-v2" onSubmit={(event) => { event.preventDefault(); void loadVisitors(); }}>
-              <label className="visitor-search-v2"><span aria-hidden="true">⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar visitante por nome, telefone..." aria-label="Buscar visitante" /></label>
-              <button type="button" className={filtersOpen ? "active" : ""} onClick={() => setFiltersOpen((current) => !current)}>☷ Filtros</button>
-              <button type="button" className={columnsOpen ? "active" : ""} onClick={() => setColumnsOpen((current) => !current)}>▦ Colunas</button>
-              <button type="button" className="visitor-project-sort-v6" onClick={() => setSortDirection((current) => current === "asc" ? "desc" : "asc")}>↕ {sortDirection === "asc" ? "A–Z" : "Z–A"}</button>
-              <button type="submit" className="visitor-project-refresh-v6" disabled={loading} aria-label="Atualizar lista">↻</button>
-            </form>
-            <div className="visitor-project-transfer-v6">
-              {canCreate && <><input ref={importInputRef} className="visitor-import-input-v2" type="file" accept=".xlsx,.xls,.csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) void prepareVisitorImport(file); }} /><button type="button" disabled={importing} onClick={() => importInputRef.current?.click()}>⇧ Importar Excel</button></>}
-              <button type="button" onClick={() => setExportReviewOpen(true)}>⇩ Exportar</button>
+
+        <div className="visitor-category-strip-v2" aria-label="Categorias de visitantes">
+          <button type="button" className={categoryFilter === "all" ? "active" : ""} aria-pressed={categoryFilter === "all"} onClick={() => filterByCategory("all")}>
+            <span aria-hidden="true">◎</span><strong>Todos</strong><b>{counts.todos}</b>
+          </button>
+          {categories.map((category) => (
+            <button
+              type="button"
+              key={category.id}
+              className={categoryFilter === String(category.id) ? "active" : ""}
+              aria-pressed={categoryFilter === String(category.id)}
+              style={{ "--category-color": category.cor } as CSSProperties}
+              onClick={() => filterByCategory(String(category.id))}
+            >
+              <span aria-hidden="true">{category.icone}</span><strong>{category.nome}</strong><b>{category.total_visitantes}</b>
+            </button>
+          ))}
+          <button type="button" className={categoryFilter === "sem-categoria" ? "active" : ""} aria-pressed={categoryFilter === "sem-categoria"} onClick={() => filterByCategory("sem-categoria")}>
+            <span aria-hidden="true">○</span><strong>Sem categoria</strong>
+          </button>
+        </div>
+
+        {/* Panorama. Os dois indicadores ficavam em cartões de 180 px fixos e os
+            aniversariantes numa faixa que rolava na horizontal sem barra
+            visível: das cinco pessoas, duas nunca apareciam no desktop. Agora
+            são três colunas fluidas e a lista cresce para baixo. O gráfico de
+            crescimento voltou: ele existia no componente, mas o bloco inteiro
+            estava escondido por `display:none` desde a reforma anterior. */}
+        <div className="visitor-panorama-v6">
+          <article className="visitor-panorama-card-v6" aria-labelledby="visitor-panorama-growth">
+            <header>
+              <div><p className="pilot-kicker">CRESCIMENTO</p><strong id="visitor-panorama-growth">Pessoas ativas</strong></div>
+              <b>{counts.todos}</b>
+            </header>
+            <div className={`visitor-growth-chart-v6 ${!categoriesLoaded ? "is-loading" : ""}`} aria-busy={!categoriesLoaded}>
+              {!categoriesLoaded && <p>Carregando crescimento…</p>}
+              {categoriesLoaded && growthDashboard.points.map((point) => (
+                <span key={point.month}>
+                  <i style={{ height: `${Math.max(6, Math.round((point.value / growthDashboard.max) * 100))}%` }} aria-hidden="true" />
+                  <b>{point.value}</b>
+                  <small>{formatGrowthMonth(point.month)}</small>
+                </span>
+              ))}
+              {categoriesLoaded && !growthDashboard.points.length && <p>O gráfico aparece depois do primeiro cadastro.</p>}
             </div>
-          </div>
+            {Boolean(categoryDashboards.length) && (
+              <ul className="visitor-panorama-legend-v6" aria-label="Categorias em destaque">
+                {categoryDashboards.slice(0, 4).map((category) => (
+                  <li key={category.id} style={{ "--category-color": category.cor } as CSSProperties}>
+                    <button type="button" onClick={() => filterByCategory(String(category.id))}>
+                      <i aria-hidden="true" />{category.nome}<b>{category.total_visitantes}</b>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </article>
+
+          <article className="visitor-panorama-card-v6 is-attention" aria-labelledby="visitor-panorama-actions">
+            <header>
+              <div><p className="pilot-kicker">CUIDADO PENDENTE</p><strong id="visitor-panorama-actions">Próximas ações</strong></div>
+              <b>{counts.pendencias}</b>
+            </header>
+            <dl className="visitor-panorama-facts-v6">
+              <div><dt>Contatos vencidos</dt><dd>{counts.pendencias}</dd></div>
+              <div><dt>Sem contato há 15 dias</dt><dd>{counts.sem_contato}</dd></div>
+              <div><dt>Recebidos aguardando</dt><dd>{counts.novos}</dd></div>
+            </dl>
+            <button type="button" className="visitor-panorama-action-v6" onClick={() => changeVision("pendencias")}>
+              Ver quem precisa de contato <span aria-hidden="true">→</span>
+            </button>
+          </article>
+
+          <section className="visitor-panorama-card-v6 is-birthday" aria-labelledby="visitor-panorama-birthday">
+            <header>
+              <div><p className="pilot-kicker">ANIVERSÁRIOS DO MÊS</p><strong id="visitor-panorama-birthday">Celebre com carinho</strong></div>
+              <b>{birthdays.length}</b>
+            </header>
+            <ul className="visitor-birthday-feed-v6">
+              {birthdays.map((visitor) => (
+                <li key={visitor.id}>
+                  <time dateTime={visitor.data_nascimento || ""}>{birthdayDay(visitor.data_nascimento)}</time>
+                  <span><strong>{visitor.nome_completo}</strong><small>{formatBirthday(visitor.data_nascimento)}</small></span>
+                  {visitor.telefone && birthdayWhatsappHref(visitor)
+                    ? <a href={birthdayWhatsappHref(visitor) || undefined} target="_blank" rel="noreferrer" aria-label={`Enviar parabéns para ${visitor.nome_completo} pelo WhatsApp`}>WhatsApp</a>
+                    : <i>Sem contato</i>}
+                </li>
+              ))}
+              {!birthdays.length && <li className="is-empty">Nenhum aniversariante neste mês.</li>}
+            </ul>
+          </section>
+        </div>
+
+        <div className="visitor-care-workspace-v3">
+          {/* A central usa os mesmos dados do funil, mas organiza as decisões por
+              prioridade, pessoa e próximo cuidado. */}
+          <RelacionamentoTools visitantes={visitors} compacto={false} onAbrirVisitante={(visitorId) => void loadFollowups(visitorId)} />
+          <CareNotesBoard side />
+        </div>
+
+        <section id="visitor-directory" className="visitor-sheet-v2" aria-labelledby="visitor-sheet-title">
+          <header className="visitor-sheet-head-v2">
+            <div><p className="pilot-kicker">DIRETÓRIO CENTRAL</p><h2 id="visitor-sheet-title">Pessoas e próximos cuidados</h2><span>Uma ficha por pessoa, em todas as visões.</span></div>
+            <div>
+              {canCreate && <><input ref={importInputRef} className="visitor-import-input-v2" type="file" accept=".xlsx,.xls,.csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) void prepareVisitorImport(file); }} /><button type="button" disabled={importing} onClick={() => importInputRef.current?.click()}>⇧ Importar Excel</button></>}
+              <button type="button" onClick={() => setExportReviewOpen(true)}>⇩ Revisar e exportar</button>
+            </div>
+          </header>
 
           {exportReviewOpen && <section className="visitor-export-review-v2" aria-label="Revisão antes da exportação">
-            <div><p className="pilot-kicker">ANTES DE EXPORTAR</p><h3>Revise e organize as informações</h3><p>A revisão e a planilha incluem os {visitors.length} cadastros carregados nesta lista.{nextCursor ? " Use Carregar mais pessoas para incluir os demais." : ""} Abra uma ficha para corrigir os dados.</p></div>
+            <div><p className="pilot-kicker">ANTES DE EXPORTAR</p><h3>Revise e organize as informações</h3><p>Abra a ficha de qualquer pessoa para editar dados. A planilha só deve sair depois dessa conferência.</p></div>
             <dl>
-              <div><dt>Sem categoria</dt><dd>{visitors.filter((item) => !item.categoria_nome?.trim()).length}</dd></div>
-              <div><dt>Sem telefone</dt><dd>{visitors.filter((item) => !item.telefone?.trim()).length}</dd></div>
-              <div><dt>Sem responsável</dt><dd>{visitors.filter((item) => !item.responsavel_email?.trim() && !item.acompanhante?.trim()).length}</dd></div>
+              <div><dt>Sem categoria</dt><dd>{visitors.filter((item) => !item.categoria_id).length}</dd></div>
+              <div><dt>Sem telefone</dt><dd>{visitors.filter((item) => !item.telefone).length}</dd></div>
+              <div><dt>Sem responsável</dt><dd>{visitors.filter((item) => !item.responsavel_email && !item.acompanhante).length}</dd></div>
             </dl>
+            <div className="visitor-export-suggestions-v2"><strong>Categorias sugeridas</strong><span>Novo visitante</span><span>Primeiro contato</span><span>Em acompanhamento</span><span>Integrado</span><span>Sem contato há 15 dias</span></div>
             <footer><button type="button" onClick={() => setExportReviewOpen(false)}>Continuar editando</button><button type="button" className="primary" onClick={() => { setExportReviewOpen(false); void exportVisitors(); }}>Exportar informações revisadas</button></footer>
           </section>}
 
+          <form className="visitor-commandbar-v2" onSubmit={(event) => { event.preventDefault(); void loadVisitors(); }}>
+            <label className="visitor-search-v2"><span aria-hidden="true">⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nome, telefone ou e-mail" /></label>
+            <button type="button" className={filtersOpen ? "active" : ""} onClick={() => setFiltersOpen((current) => !current)}>☷ Filtros</button>
+            <button type="button" className={columnsOpen ? "active" : ""} onClick={() => setColumnsOpen((current) => !current)}>▦ Colunas</button>
+            <button type="button" onClick={() => setSortDirection((current) => current === "asc" ? "desc" : "asc")}>↕ Nome {sortDirection === "asc" ? "A–Z" : "Z–A"}</button>
+            <button type="submit" disabled={loading}>{loading ? "Atualizando…" : "Atualizar"}</button>
+          </form>
+
           {filtersOpen && (
             <div className="visitor-filter-panel-v2">
-              <label>Categoria<select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option value="all">Todas</option><option value="sem-categoria">Sem categoria</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.nome}</option>)}</select></label>
+              <label>Categoria<select aria-label="Filtrar visitantes por categoria" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option value="all">Todas</option><option value="sem-categoria">Sem categoria</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.nome}</option>)}</select></label>
               <button type="button" onClick={() => { setSearch(""); setCategoryFilter("all"); }}>Limpar filtros</button>
               <button type="button" onClick={() => changeVision("arquivados")}>Ver arquivados ({counts.arquivados})</button>
             </div>
@@ -1386,96 +1407,46 @@ export function VisitorsWorkspace({
               {activeVision === "arquivados" && <button type="button" onClick={() => changeVision("todos")}>Arquivados <span aria-hidden="true">×</span></button>}
             </div>
           )}
-          {columnsOpen && <div className="visitor-column-panel-v2"><span>No celular: nome, entrada, categoria e alertas. Toque no nome para abrir os demais dados.</span><b>Contato</b><b>Status</b><b>Último contato</b><b>Próximo passo</b></div>}
+          {columnsOpen && <div className="visitor-column-panel-v2"><span>Colunas sempre visíveis nesta tabela</span><b>Nome</b><b>Contato</b><b>Categoria</b><b>Ministério</b><b>Responsável</b><b>Status</b><b>Último contato</b><b>Próximo passo</b></div>}
 
           {Boolean(selectedRows.length) && (
             <div className="visitor-bulkbar-v2"><strong>{selectedRows.length} selecionado(s)</strong><button type="button" onClick={() => setSelectedRows([])}>Limpar seleção</button>{canDeactivate && activeVision !== "arquivados" && <button type="button" className="danger" onClick={() => void archiveSelectedVisitors()}>Arquivar</button>}{canDeactivate && <button type="button" className="danger permanent" onClick={() => void permanentlyDeleteSelectedVisitors()}>Excluir</button>}</div>
           )}
-          <OperationFeedback message={message} error={error} />
-          <div className="visitor-attention-legend" aria-label="Legenda dos alertas"><span data-tone="attention">Atenção ou dados incompletos</span><span data-tone="overdue">Retorno atrasado</span></div>
 
           <div className="visitor-table-scroll-v2" aria-busy={loading}>
             <table className="visitor-table-v2">
               <thead><tr>
                 <th><input type="checkbox" aria-label="Selecionar página" checked={Boolean(visibleVisitors.length && selectedRows.length === visibleVisitors.length)} onChange={(event) => setSelectedRows(event.target.checked ? visibleVisitors.map((visitor) => visitor.id) : [])} /></th>
-                <th>Nome / Entrada</th><th>Contato</th><th>Categoria</th><th>Status</th><th>Último contato</th><th>Próximo passo</th>
+                <th>Nome</th><th>Contato</th><th>Categoria</th><th>Ministério</th><th>Responsável</th><th>Status</th><th>Último contato</th><th>Próximo passo</th>
               </tr></thead>
               <tbody>
-                {visibleVisitors.map((visitor) => {
-                  const attention = getVisitorAttention(visitor);
-                  return (
-                  <tr key={visitor.id} data-attention={attention.tone} onDoubleClick={() => void loadFollowups(visitor.id)}>
+                {visibleVisitors.map((visitor) => (
+                  <tr key={visitor.id} onDoubleClick={() => void loadFollowups(visitor.id)}>
                     <td><input type="checkbox" aria-label={`Selecionar ${visitor.nome_completo}`} checked={selectedRows.includes(visitor.id)} onChange={(event) => setSelectedRows((current) => event.target.checked ? [...current, visitor.id] : current.filter((id) => id !== visitor.id))} /></td>
-                    <th scope="row"><button type="button" className="visitor-person-cell-v2" onClick={() => void loadFollowups(visitor.id)}><span aria-hidden="true" style={{ "--category-color": visitor.categoria_cor || "var(--pilot-blue)" } as CSSProperties}>{visitor.nome_completo.slice(0, 1).toLocaleUpperCase("pt-BR")}</span><span><strong>{visitor.nome_completo}</strong><span className="visitor-person-meta"><span className="visitor-person-category" style={{ "--category-color": visitor.categoria_cor || "var(--pilot-blue)" } as CSSProperties}><span aria-hidden="true">{visitor.categoria_icone || "○"}</span> {visitor.categoria_nome || "Sem categoria"}</span><small>Entrada <time dateTime={visitor.data_entrada}>{formatDate(visitor.data_entrada)}</time></small></span>{attention.reasons.length > 0 && <span className="visitor-person-attention"><span aria-hidden="true">⚠ </span>{attention.reasons.join(" · ")}</span>}</span></button></th>
+                    <th scope="row"><button type="button" className="visitor-person-cell-v2" onClick={() => void loadFollowups(visitor.id)}><span style={{ "--category-color": visitor.categoria_cor || "var(--pilot-blue)" } as CSSProperties}>{visitor.nome_completo.slice(0, 1).toLocaleUpperCase("pt-BR")}</span><span><strong>{visitor.nome_completo}</strong><small>Entrada {formatDate(visitor.data_entrada)}</small></span></button></th>
                     <td><strong>{visitor.telefone || "Sem telefone"}</strong><small>{visitor.email || "Sem e-mail"}</small></td>
-                    <td><span className="visitor-category-tag-v2" style={{ "--category-color": visitor.categoria_cor || "var(--pilot-blue)" } as CSSProperties}>{visitor.categoria_icone || "○"} {visitor.categoria_nome || "Sem categoria"}</span></td>
-                    <td><span className={`visitor-project-status-v6 status-${visitor.status.toLowerCase()}`} aria-hidden="true" />{canEdit && activeVision !== "arquivados" ? <select aria-label={`Status de ${visitor.nome_completo}`} value={visitor.status} onChange={(event) => void updateVisitorField(visitor, { status: event.target.value })}><option value="NOVO">Recebido</option><option value="EM_CONTATO">Contatado</option><option value="EM_ACOMPANHAMENTO">Em acompanhamento</option><option value="INTEGRADO">Integrado</option></select> : <span>{activeVision === "arquivados" ? "Arquivado" : statusLabel(visitor.status)}</span>}</td>
-                    <td>{visitor.ultimo_contato ? formatDateTime(visitor.ultimo_contato) : "Sem contato"}</td>
-                    <td className={visitor.ativo && visitor.proximo_contato && visitor.proximo_contato < visitorToday() ? "overdue" : ""}><div className="visitor-project-next-v6"><button type="button" className="visitor-next-step-v2" onClick={() => void loadFollowups(visitor.id)}>{canFollowup && visitor.ativo ? "Registrar contato" : "Abrir ficha"}</button>{visitor.proximo_contato && <small>{formatDate(visitor.proximo_contato)}</small>}<button type="button" className="visitor-row-open-v2" aria-label={`Abrir ficha de ${visitor.nome_completo}`} onClick={() => void loadFollowups(visitor.id)}>⋮</button></div></td>
+                    <td><span className="visitor-category-tag-v2" style={{ "--category-color": visitor.categoria_cor || "var(--pilot-blue)" } as CSSProperties} title={visitor.categoria_nome || "Sem categoria"}>{visitor.categoria_nome || "Sem categoria"}</span></td>
+                    <td>{visitor.ministerio || "—"}</td>
+                    <td><strong>{visitor.responsavel_email?.split("@")[0] || visitor.acompanhante || "A definir"}</strong></td>
+                    <td>{canEdit && activeVision !== "arquivados" ? <select aria-label={`Status de ${visitor.nome_completo}`} value={visitor.status} onChange={(event) => void updateVisitorField(visitor, { status: event.target.value })}><option value="NOVO">Novo</option><option value="EM_CONTATO">Em contato</option><option value="EM_ACOMPANHAMENTO">Em acompanhamento</option><option value="INTEGRADO">Integrado</option></select> : <span className={`status-pill status-${visitor.status.toLowerCase()}`}>{activeVision === "arquivados" ? "Arquivado" : statusLabel(visitor.status)}</span>}</td>
+                    <td>{visitor.ultimo_contato ? <><strong>{splitStamp(visitor.ultimo_contato).date}</strong><small>{splitStamp(visitor.ultimo_contato).time}</small></> : <small>Sem contato</small>}</td>
+                    <td className={visitor.proximo_contato && visitor.proximo_contato <= hojeLocal() ? "overdue" : ""}>{visitor.proximo_contato ? <strong>{formatDate(visitor.proximo_contato)}</strong> : <small>Sem data</small>}<button type="button" className="visitor-next-step-v2" onClick={() => void loadFollowups(visitor.id)}>{canFollowup ? "Registrar" : "Abrir ficha"}</button></td>
                   </tr>
-                ); })}
+                ))}
               </tbody>
             </table>
             {!loading && !visibleVisitors.length && <div className="visitor-empty-v2"><span aria-hidden="true">◎</span><strong>Nenhuma pessoa nesta visão</strong><p>Ajuste os filtros ou cadastre um novo visitante.</p></div>}
           </div>
           {nextCursor && <button type="button" className="visitor-load-more-v2" disabled={loading} onClick={() => void loadVisitors(nextCursor, true)}>Carregar mais pessoas</button>}
         </section>
-      </main>
-
-      <aside className="visitor-reference-right-v4 visitor-project-right-v6" aria-label="Relacionamento e datas importantes">
-        <details className="visitor-project-panel-v6" open>
-          <summary><span aria-hidden="true">♡</span><strong>Central de Relacionamento</strong><i aria-hidden="true">›</i></summary>
-          <div className="visitor-project-relationship-v6">
-            <div className={urgentRelationshipCount ? "is-urgent" : "is-ok"}>
-              <strong><i aria-hidden="true" />{urgentRelationshipCount ? `${urgentRelationshipCount} ${urgentRelationshipCount === 1 ? "pessoa urgente" : "pessoas urgentes"}` : "Nenhuma urgência agora"}</strong>
-              <small>{urgentRelationshipCount ? "Sem contato há mais de 15 dias" : "Os contatos estão dentro do prazo"}</small>
-            </div>
-            <h3>Ordem de cuidado</h3>
-            <div className="visitor-project-priority-list-v6">
-              {relationshipPriorities.slice(0, 2).map(({ visitor, daysWithoutContact }) => (
-                <button type="button" key={visitor.id} onClick={() => void loadFollowups(visitor.id)}>
-                  <span><strong>{visitor.nome_completo}</strong><b>{visitor.ultimo_contato ? `${daysWithoutContact} dias` : "Nenhum"}</b></span>
-                  <small><i aria-hidden="true" />{visitor.ultimo_contato ? "Retomar o acompanhamento" : "Dar as boas-vindas"}</small>
-                </button>
-              ))}
-              {!relationshipPriorities.length && <p>Nenhuma pessoa aguardando cuidado nesta visão.</p>}
-            </div>
-            <button type="button" className="visitor-project-open-center-v6" onClick={() => setRelationshipCenterOpen(true)}>Abrir central completa</button>
-          </div>
-        </details>
-
-        <details className="visitor-project-panel-v6" open>
-          <summary><span aria-hidden="true">□</span><strong>Aniversariantes</strong><i aria-hidden="true">›</i></summary>
-          <div className="visitor-project-birthdays-v6">
-            {birthdays.slice(0, 5).map((visitor) => (
-              <article key={visitor.id}>
-                <time dateTime={visitor.data_nascimento || ""}>{birthdayDay(visitor.data_nascimento)}</time>
-                <div><strong>{visitor.nome_completo}</strong><small>{formatBirthday(visitor.data_nascimento)}</small></div>
-                {visitor.telefone && birthdayWhatsappHref(visitor) ? <a href={birthdayWhatsappHref(visitor) || undefined} target="_blank" rel="noreferrer" aria-label={`Enviar parabéns para ${visitor.nome_completo} pelo WhatsApp`}>◌</a> : null}
-              </article>
-            ))}
-            {!birthdays.length && <p>Nenhum aniversariante neste mês.</p>}
-          </div>
-        </details>
-      </aside>
-      </div>
-
-      {relationshipCenterOpen && createPortal(
-        <div className="visitor-project-center-backdrop-v6" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setRelationshipCenterOpen(false); }}>
-          <aside className="visitor-project-center-drawer-v6" role="dialog" aria-modal="true" aria-labelledby="visitor-project-center-title-v6">
-            <header><div><p>GESTÃO DE VISITANTES</p><h2 id="visitor-project-center-title-v6">Central completa de relacionamento</h2></div><button type="button" onClick={() => setRelationshipCenterOpen(false)} aria-label="Fechar central de relacionamento">×</button></header>
-            <RelacionamentoTools visitantes={visitors} compacto={false} onAbrirVisitante={(visitorId) => void loadFollowups(visitorId)} />
-            <CareNotesBoard />
-          </aside>
-        </div>,
-        document.body,
-      )}
+      </section>
 
       {Boolean(importRows.length) && createPortal(
         <div className="visitor-import-backdrop-v2" role="presentation">
           <section className="visitor-import-dialog-v2" role="dialog" aria-modal="true" aria-labelledby="visitor-import-title">
             <header><div><p className="pilot-kicker">MIGRAÇÃO DE DADOS</p><h2 id="visitor-import-title">Revisar planilha</h2><p>{importFileName} · {importRows.length} cadastro(s) reconhecido(s)</p></div><button type="button" aria-label="Fechar importação" onClick={() => setImportRows([])}>×</button></header>
             <div className="visitor-import-table-v2"><table><thead><tr><th>Nome</th><th>Contato</th><th>Categoria</th><th>Ministério</th><th>Status</th></tr></thead><tbody>{importRows.slice(0, 10).map((row, index) => <tr key={`${row.nomeCompleto}-${index}`}><th>{row.nomeCompleto}</th><td>{row.telefone || row.email || "—"}</td><td>{row.categoriaNome || "Sem categoria"}</td><td>{row.ministerio || "—"}</td><td>{statusLabel(row.status)}</td></tr>)}</tbody></table>{importRows.length > 10 && <p>Mais {importRows.length - 10} linha(s) serão processadas.</p>}</div>
+            <VisitorNotice message={message} error={error} warning={warning} onDismiss={dismissNotice} inline />
             <footer><button type="button" onClick={() => setImportRows([])} disabled={importing}>Cancelar</button><button type="button" className="primary" onClick={() => void confirmVisitorImport()} disabled={importing}>{importing ? "Importando…" : `Importar ${importRows.length} cadastro(s)`}</button></footer>
           </section>
         </div>, document.body)}
@@ -1494,6 +1465,7 @@ export function VisitorsWorkspace({
               {canDeactivate && activeVision !== "arquivados" && <button type="button" className="danger" onClick={() => void deactivateVisitor(selectedVisitor)}>Arquivar</button>}
               {canDeactivate && <button type="button" className="danger" onClick={() => void permanentlyDeleteVisitor(selectedVisitor)}>Excluir</button>}
             </div>
+            <VisitorNotice message={message} error={error} warning={warning} onDismiss={dismissNotice} inline />
             <dl className="visitor-person-summary-v2">
               <div><dt>Telefone</dt><dd>{selectedVisitor.telefone || "Não informado"}</dd></div>
               <div><dt>E-mail</dt><dd>{selectedVisitor.email || "Não informado"}</dd></div>
@@ -1508,199 +1480,387 @@ export function VisitorsWorkspace({
           </aside>
         </div>, document.body)}
 
-      {false && <>
-      <form
-        id="visitor-directory"
-        className="operations-toolbar"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void loadVisitors();
-        }}
-      >
-        <label htmlFor="visitor-search">Lista de cadastros</label>
-        <input
-          id="visitor-search"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Nome, telefone ou e-mail"
-        />
-        <select
-          value={categoryFilter}
-          onChange={(event) => setCategoryFilter(event.target.value)}
-          aria-label="Filtrar visitantes por categoria"
-        >
-          <option value="all">Todas as categorias</option>
-          <option value="sem-categoria">Sem categoria</option>
-          {categories.map((category) => <option key={category.id} value={category.id}>{category.nome}</option>)}
-        </select>
-        <button disabled={loading}>{loading ? "Buscando…" : "Buscar"}</button>
-      </form>
-      <OperationFeedback message={message} error={error} />
+    </section>
+  );
+}
 
-      <div className="visitor-directory">
-        <div className="operations-list" aria-busy={loading}>
-          {!loading && !visitors.length && (
-            <div className="pilot-empty-state">
-              <strong>Nenhum visitante encontrado</strong>
-              <p>Use o cadastro acima para iniciar o acompanhamento nesta comunidade.</p>
+// Saúde da célula. O diretório listava nome, dia e liderança — dados que não
+// respondem à pergunta que a liderança faz de fato: qual célula parou de
+// reportar, qual está encolhendo e qual já tem gente para multiplicar. Tudo
+// abaixo sai dos relatórios que a rota já devolve; nada de consulta nova.
+type CellHealth = {
+  id: "AGUARDANDO" | "SEM_RELATORIO" | "ATENCAO" | "MULTIPLICAR" | "SAUDAVEL";
+  label: string;
+  weeks: number[];
+  semanasEmDia: number;
+  mediaPresentes: number;
+};
+
+const CELL_HEALTH_WEEKS = 8;
+const CELL_REPORT_GRACE_DAYS = 21;
+
+function cellHealth(cell: Cell, agora: number): CellHealth {
+  // Antes do relógio acertar no cliente não dá para julgar atraso sem chutar
+  // uma data, e chutar aqui pintaria célula saudável de vermelho.
+  if (!agora) {
+    return {
+      id: "AGUARDANDO",
+      label: "Calculando",
+      weeks: [],
+      semanasEmDia: 0,
+      mediaPresentes: 0,
+    };
+  }
+  // Os relatórios chegam da rota em ordem decrescente de data.
+  const recentes = cell.relatorios.slice(0, CELL_HEALTH_WEEKS);
+  const weeks = [...recentes]
+    .reverse()
+    .map((item) => (item.aconteceu ? Number(item.presentes) || 0 : 0));
+  const semanasEmDia = recentes.filter((item) => item.aconteceu).length;
+  const comPresenca = weeks.filter((valor) => valor > 0);
+  const mediaPresentes = comPresenca.length
+    ? Math.round(comPresenca.reduce((soma, valor) => soma + valor, 0) / comPresenca.length)
+    : 0;
+
+  const ultimo = cell.ultimo_relatorio_em
+    ? Date.parse(cell.ultimo_relatorio_em)
+    : Number.NaN;
+  const diasSemReportar = Number.isNaN(ultimo)
+    ? Number.POSITIVE_INFINITY
+    : Math.floor((agora - ultimo) / 86400000);
+
+  if (diasSemReportar > CELL_REPORT_GRACE_DAYS) {
+    const semanas = Number.isFinite(diasSemReportar)
+      ? Math.floor(diasSemReportar / 7)
+      : 0;
+    return {
+      id: "SEM_RELATORIO",
+      label: semanas
+        ? `Sem relatório há ${semanas} ${semanas === 1 ? "semana" : "semanas"}`
+        : "Sem relatório",
+      weeks,
+      semanasEmDia,
+      mediaPresentes,
+    };
+  }
+
+  // Encolhendo: a média das duas últimas semanas caiu abaixo de 70% da média
+  // das quatro anteriores. Uma semana ruim sozinha não acusa nada.
+  const ultimas = weeks.slice(-2).filter((valor) => valor > 0);
+  const anteriores = weeks.slice(-6, -2).filter((valor) => valor > 0);
+  const mediaUltimas = ultimas.length
+    ? ultimas.reduce((soma, valor) => soma + valor, 0) / ultimas.length
+    : 0;
+  const mediaAnteriores = anteriores.length
+    ? anteriores.reduce((soma, valor) => soma + valor, 0) / anteriores.length
+    : 0;
+  const encolhendo = mediaAnteriores > 0 && mediaUltimas < mediaAnteriores * 0.7;
+
+  if (encolhendo) {
+    return { id: "ATENCAO", label: "Atenção", weeks, semanasEmDia, mediaPresentes };
+  }
+  if (mediaPresentes >= 15 && semanasEmDia >= 6) {
+    return {
+      id: "MULTIPLICAR",
+      label: "Pronta p/ multiplicar",
+      weeks,
+      semanasEmDia,
+      mediaPresentes,
+    };
+  }
+  return { id: "SAUDAVEL", label: "Saudável", weeks, semanasEmDia, mediaPresentes };
+}
+
+export function CellsWorkspace({
+  permissions,
+  communityName,
+}: {
+  permissions: string[];
+  communityName: string;
+}) {
+  const [cells, setCells] = useState<Cell[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [availableUsers, setAvailableUsers] = useState<Array<{ id: number; nome: string; papel: string }>>([]);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [tab, setTab] = useState<"visao" | "integrantes" | "agenda" | "relatorio" | "solicitacoes" | "entrar">("visao");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [selectedMemberProfile, setSelectedMemberProfile] = useState<Cell["membros"][number] | null>(null);
+  const [cellSearch, setCellSearch] = useState("");
+  const [cellStatus, setCellStatus] = useState<"all" | "active" | "archived">("all");
+  const [cellHealthFilter, setCellHealthFilter] = useState<"all" | CellHealth["id"]>("all");
+  // O relógio vem de estado: lê-lo durante a renderização daria valores
+  // diferentes no servidor e no cliente e quebraria a hidratação.
+  const [agora, setAgora] = useState(0);
+  const canManage = permissions.includes("cells.manage");
+
+  const loadCells = useCallback(async (quiet = false) => {
+    if (!quiet) setLoading(true);
+    setError("");
+    try {
+      const result = await apiJson<{ celulas: Cell[]; availableUsers?: Array<{ id: number; nome: string; papel: string }> }>("/api/pilot/celulas");
+      setCells(result.celulas);
+      setAvailableUsers(result.availableUsers || []);
+      setSelectedId((current) => current && result.celulas.some((cell) => cell.id === current) ? current : null);
+    } catch (caught) {
+      setError((caught as Error).message);
+    } finally {
+      if (!quiet) setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadCells();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadCells]);
+
+  useEffect(() => {
+    const acertar = () => setAgora(Date.now());
+    const primeiro = window.setTimeout(acertar, 0);
+    const relogio = window.setInterval(acertar, 3600000);
+    return () => {
+      window.clearTimeout(primeiro);
+      window.clearInterval(relogio);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSelectedId(null);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [selectedId]);
+
+  async function createCell(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (saving) return;
+    setSaving(true);
+    setMessage("");
+    setError("");
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const body = { ...Object.fromEntries(data.entries()), diasReuniao: data.getAll("diasReuniao") };
+    try {
+      await apiJson("/api/pilot/celulas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      form.reset();
+      setCreateOpen(false);
+      setMessage("Célula criada com os dias e a liderança definidos.");
+      await loadCells(true);
+    } catch (caught) {
+      setError((caught as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deactivateCell(cell: Cell) {
+    if (
+      saving ||
+      !window.confirm(
+        `Arquivar ${cell.nome}? A gestão pastoral poderá reativá-la depois.`,
+      )
+    ) {
+      return;
+    }
+    setSaving(true);
+    setMessage("");
+    setError("");
+    try {
+      await apiJson(`/api/pilot/celulas/${cell.id}`, { method: "DELETE" });
+      setMessage("Célula arquivada.");
+      await loadCells(true);
+    } catch (caught) {
+      setError((caught as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function updateCellMember(
+    cell: Cell,
+    action: "MEMBRO_ADICIONAR_INTERNO" | "MEMBRO_ADICIONAR_EXTERNO" | "MEMBRO_REMOVER",
+    body: Record<string, unknown>,
+    form?: HTMLFormElement,
+  ) {
+    if (saving) return;
+    setSaving(true);
+    setMessage("");
+    setError("");
+    try {
+      await apiJson(`/api/pilot/celulas/${cell.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acao: action, ...body }),
+      });
+      form?.reset();
+      setMessage("Integrantes da célula atualizados sem recarregar a página.");
+      await loadCells(true);
+    } catch (caught) {
+      setError((caught as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function cellAction(cell: Cell, body: Record<string, unknown>, form?: HTMLFormElement) {
+    if (saving) return;
+    setSaving(true); setMessage(""); setError("");
+    try {
+      await apiJson(`/api/pilot/celulas/${cell.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      form?.reset();
+      setMessage(body.acao === "RELATORIO_CRIAR" ? "Relatório enviado ao acompanhamento pastoral." : "Alteração salva.");
+      await loadCells(true);
+    } catch (caught) {
+      setError((caught as Error).message);
+    } finally { setSaving(false); }
+  }
+
+  async function requestCellEntry(cell: Cell, event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (saving) return;
+    setSaving(true); setMessage(""); setError("");
+    const form = event.currentTarget;
+    const data = Object.fromEntries(new FormData(form).entries());
+    try {
+      await apiJson(`/api/public/celulas/${cell.id}/solicitar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      form.reset();
+      setMessage(`Solicitação enviada à liderança da célula ${cell.nome}.`);
+      setTab("visao");
+    } catch (caught) {
+      setError((caught as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const selected = cells.find((cell) => cell.id === selectedId) || null;
+  const dayLabels: Record<string, string> = { DOM: "Dom", SEG: "Seg", TER: "Ter", QUA: "Qua", QUI: "Qui", SEX: "Sex", SAB: "Sáb" };
+  const activeCells = cells.filter((cell) => cell.ativo);
+  const membersTotal = activeCells.reduce((total, cell) => total + cell.membros_total, 0);
+  const meetingsTotal = activeCells.reduce((total, cell) => total + cell.agenda.length, 0);
+  const normalizedCellSearch = cellSearch.trim().toLocaleLowerCase("pt-BR");
+  const healthById = new Map(cells.map((cell) => [cell.id, cellHealth(cell, agora)]));
+  const healthCounts = cells.reduce<Record<string, number>>((acc, cell) => {
+    if (!cell.ativo) return acc;
+    const id = healthById.get(cell.id)!.id;
+    acc[id] = (acc[id] || 0) + 1;
+    return acc;
+  }, {});
+  const visibleCells = cells.filter((cell) => {
+    if (cellStatus === "active" && !cell.ativo) return false;
+    if (cellStatus === "archived" && cell.ativo) return false;
+    if (cellHealthFilter !== "all" && healthById.get(cell.id)!.id !== cellHealthFilter) return false;
+    if (!normalizedCellSearch) return true;
+    return [cell.nome, cell.descricao_publica, cell.endereco_publico, cell.lider_nome, cell.responsavel]
+      .filter(Boolean)
+      .some((value) => String(value).toLocaleLowerCase("pt-BR").includes(normalizedCellSearch));
+  });
+
+  return (
+    <section className="cells-workspace-v2" aria-busy={loading}>
+      <header className="cells-hero-v2 cells-hero-v4">
+        <div><p className="pilot-kicker">CÉLULAS · {communityName}</p><h1>Grupos que aproximam pessoas</h1><p>Acompanhe líderes, encontros e relatórios sem perder a visão de cada célula.</p></div>
+        {canManage && <button className="cell-create-trigger-v4" type="button" onClick={() => setCreateOpen(true)}><span aria-hidden="true">＋</span> Criar célula</button>}
+      </header>
+      <OperationFeedback message={message} error={error} />
+      <section className="cells-summary-v4" aria-label="Resumo das células">
+        <article><small>Ativas</small><strong>{activeCells.length}</strong></article>
+        <article><small>Pessoas</small><strong>{membersTotal}</strong></article>
+        <article><small>Próximos encontros</small><strong>{meetingsTotal}</strong></article>
+        <article><small>Relatórios em dia</small><strong>{activeCells.filter((cell) => cell.ultimo_relatorio_em).length}<span> de {activeCells.length}</span></strong></article>
+        <article data-alerta={(healthCounts.SEM_RELATORIO || 0) > 0 ? "1" : undefined}><small>Sem relatório</small><strong>{healthCounts.SEM_RELATORIO || 0}<span> há mais de 3 semanas</span></strong></article>
+      </section>
+      <div className="cell-shell-v2 cell-shell-v4">
+        <aside className="cell-index-v2" aria-label="Células da comunidade">
+          <header><div><p className="pilot-kicker">DIRETÓRIO</p><h2>Células da comunidade</h2><small>Abra uma célula para consultar ou administrar suas informações.</small></div><span>{activeCells.length} ativas · {cells.filter((cell) => !cell.ativo).length} arquivadas</span></header>
+          <div className="cell-directory-toolbar-v4">
+            <label className="cell-directory-search-v4"><span aria-hidden="true">⌕</span><input value={cellSearch} onChange={(event) => setCellSearch(event.target.value)} placeholder="Buscar célula, líder ou bairro" aria-label="Buscar célula, líder ou bairro" /></label>
+            <div className="cell-directory-status-v4" role="group" aria-label="Filtrar células por situação">
+              {([['all','Todas'],['active','Ativas'],['archived','Arquivadas']] as const).map(([value, label]) => <button key={value} type="button" className={cellStatus === value ? "active" : ""} aria-pressed={cellStatus === value} onClick={() => setCellStatus(value)}>{label}</button>)}
             </div>
-          )}
-          {visitors.map((visitor) => (
-            <details
-              className={selectedId === visitor.id ? "selected" : ""}
-              name="visitor-directory"
-              key={visitor.id}
-              style={{ "--category-color": visitor.categoria_cor || "var(--pilot-purple)" } as CSSProperties}
-            >
-              <summary
-                className="operation-card-main"
-                onClick={() => loadFollowups(visitor.id)}
-                aria-label={`Abrir acompanhamento de ${visitor.nome_completo}`}
-              >
-                <span className="visitor-card-topline">
-                  <span className={`status-pill status-${visitor.status.toLowerCase()}`}>
-                    {statusLabel(visitor.status)}
-                  </span>
-                  <time dateTime={visitor.data_entrada}>Entrada em {formatDate(visitor.data_entrada)}</time>
-                </span>
-                <span className="visitor-card-identity">
-                  <span className="visitor-card-avatar" aria-hidden="true">{visitor.categoria_icone || "○"}</span>
-                  <strong>{visitor.nome_completo}</strong>
-                </span>
-                <span className="visitor-card-summary-meta">
-                  {visitor.categoria_nome || "Sem categoria"} · {visitor.celula_nome || "Sem célula"}
-                </span>
-                <span className="visitor-card-chevron" aria-hidden="true">⌄</span>
-              </summary>
-              <div className="visitor-card-collapsible" role="dialog" aria-modal="true" aria-label={`Ficha de ${visitor.nome_completo}`}>
-                <header className="visitor-profile-dialog-header">
-                  <div><small>FICHA DO VISITANTE</small><strong>{visitor.nome_completo}</strong></div>
-                  <button
-                    type="button"
-                    className="visitor-profile-close"
-                    aria-label={`Fechar ficha de ${visitor.nome_completo}`}
-                    onClick={(event) => {
-                      event.currentTarget.closest("details")?.removeAttribute("open");
-                      setSelectedId(null);
-                    }}
-                  >×</button>
-                </header>
-                <div className="visitor-inline-contact">
-                  <span><b>Categoria</b><small>{visitor.categoria_nome || "Sem categoria"}</small></span>
-                  <span><b>Célula</b><small>{visitor.celula_nome || "Sem célula"}</small></span>
-                  <span><b>E-mail</b><small>{visitor.email || "Não informado"}</small></span>
-                  <span><b>Telefone</b><small>{visitor.telefone || "Não informado"}</small></span>
-                  {visitor.parente && <span><b>Parente</b><small>{visitor.parente}</small></span>}
-                </div>
-                <div className="operation-card-actions">
-                  {visitor.telefone && whatsappHref(visitor.telefone) && (
-                    <a
-                      className="visitor-card-action visitor-whatsapp-link"
-                      href={whatsappHref(visitor.telefone) || undefined}
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label={`Conversar com ${visitor.nome_completo} pelo WhatsApp`}
-                    >
-                      <span className="visitor-whatsapp-icon" aria-hidden="true">●</span>
-                      <span><b>WhatsApp</b><small>Abrir conversa</small></span>
-                    </a>
-                  )}
-                  {canEdit && visitor.status !== "INTEGRADO" && (
-                    <button type="button" className="visitor-card-action visitor-card-action-primary" onClick={() => markIntegrated(visitor)}>
-                      Integrar
-                    </button>
-                  )}
-                  {canDeactivate && (
-                    <button
-                      type="button"
-                      className="visitor-card-action visitor-card-action-danger"
-                      onClick={() => deactivateVisitor(visitor)}
-                    >
-                      Desativar
-                    </button>
-                  )}
-                  {canDeactivate && (
-                    <button
-                      type="button"
-                      className="visitor-card-action visitor-card-action-delete"
-                      onClick={() => permanentlyDeleteVisitor(visitor)}
-                    >
-                      Excluir cadastro
-                    </button>
-                  )}
-                </div>
-                {canEdit && (
-                  <details className="visitor-edit-panel visitor-inline-section">
-                    <summary>Editar cadastro</summary>
-                    <form
-                      className="pilot-form visitor-edit-form"
-                      onSubmit={(event) => updateVisitor(event, visitor)}
-                    >
-                      <label>Nome completo*<input name="nomeCompleto" required maxLength={120} defaultValue={visitor.nome_completo} /></label>
-                      <label>Data de nascimento<input name="dataNascimento" type="date" defaultValue={visitor.data_nascimento || ""} /></label>
-                      <label>Telefone<input name="telefone" maxLength={30} defaultValue={visitor.telefone || ""} /></label>
-                      <label>E-mail<input name="email" type="email" maxLength={180} defaultValue={visitor.email || ""} /></label>
-                      <label>Endereço<input name="endereco" maxLength={250} defaultValue={visitor.endereco || ""} /></label>
-                      <label>Quem recebeu<input name="acompanhante" maxLength={120} defaultValue={visitor.acompanhante || ""} /></label>
-                      <label>Parente ou responsável<input name="parente" maxLength={120} defaultValue={visitor.parente || ""} /></label>
-                      <label>Ministério<input name="ministerio" maxLength={120} defaultValue={visitor.ministerio || ""} /></label>
-                      <label>Célula<select name="celulaId" defaultValue={visitor.celula_id || ""}><option value="">Sem célula</option>{cells.map((cell) => <option key={cell.id} value={cell.id}>{cell.nome}</option>)}</select></label>
-                      <label>Categoria<select name="categoriaId" defaultValue={visitor.categoria_id || ""}><option value="">Sem categoria</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.nome}</option>)}</select><small>Faixas etárias automáticas têm prioridade quando a data de nascimento está preenchida.</small></label>
-                      <label>Batismo<select name="batizado" defaultValue={visitor.batizado}><option value="NAO_INFORMADO">Não informado</option><option value="SIM">Sim</option><option value="NAO">Não</option></select></label>
-                      <label>Status<select name="status" defaultValue={visitor.status}><option value="NOVO">Novo</option><option value="EM_CONTATO">Em contato</option><option value="EM_ACOMPANHAMENTO">Em acompanhamento</option><option value="INTEGRADO">Integrado</option></select></label>
-                      <label>Entrada<input name="dataEntrada" type="date" required defaultValue={visitor.data_entrada} /></label>
-                      <label className="visitor-check"><input name="encontroComDeus" type="checkbox" defaultChecked={Boolean(visitor.encontro_com_deus)} />Encontro com Deus</label>
-                      <label className="visitor-check"><input name="cursoMembros" type="checkbox" defaultChecked={Boolean(visitor.curso_membros)} />Curso de membros</label>
-                      <label className="visitor-wide-field">Observações<textarea name="observacoes" rows={3} maxLength={1000} defaultValue={visitor.observacoes || ""} /></label>
-                      <button disabled={saving}>Salvar alterações</button>
-                    </form>
-                  </details>
-                )}
-                {selectedId === visitor.id && (
-                  <section className="visitor-inline-followup" aria-label={`Acompanhamento de ${visitor.nome_completo}`}>
-                    <header>
-                      <div><strong>Acompanhamento</strong><small>Histórico e próximo cuidado desta pessoa</small></div>
-                      <span>{followups.length}</span>
-                    </header>
-                    {canFollowup && (
-                      <details className="visitor-inline-section visitor-followup-editor">
-                        <summary>Registrar novo acompanhamento</summary>
-                        <form className="pilot-form followup-form" onSubmit={createFollowup}>
-                          <label>Canal<select name="tipo" defaultValue="WHATSAPP"><option value="WHATSAPP">WhatsApp</option><option value="TELEFONE">Telefone</option><option value="PRESENCIAL">Presencial</option><option value="EMAIL">E-mail</option><option value="OUTRO">Outro</option></select></label>
-                          <label>Resultado<input name="resultado" required maxLength={160} /></label>
-                          <label>Próximo contato<input name="proximoContato" type="date" /></label>
-                          <label className="visitor-wide-field">Descrição<textarea name="descricao" rows={3} maxLength={1500} /></label>
-                          <button disabled={saving}>Registrar acompanhamento</button>
-                        </form>
-                      </details>
-                    )}
-                    <div className="followup-history">
-                      {followups.length ? followups.map((item) => (
-                        <article key={item.id}>
-                          <div><span>{item.tipo}</span><time>{formatDateTime(item.criado_em)}</time></div>
-                          <strong>{item.resultado}</strong>
-                          {item.descricao && <p>{item.descricao}</p>}
-                          {item.proximo_contato && <small>Próximo: {formatDate(item.proximo_contato)}</small>}
-                        </article>
-                      )) : <p className="operations-muted">Sem acompanhamentos registrados.</p>}
-                    </div>
-                  </section>
-                )}
-              </div>
-            </details>
-          ))}
-          {nextCursor && (
-            <button
-              className="load-more-button"
-              disabled={loading}
-              onClick={() => loadVisitors(nextCursor, true)}
-            >
-              Carregar mais
-            </button>
-          )}
-        </div>
+            <div className="cell-health-filter-v5" role="group" aria-label="Filtrar células por saúde">
+              {([
+                ['all', 'Saúde: todas', 0],
+                ['SEM_RELATORIO', 'Sem relatório', healthCounts.SEM_RELATORIO || 0],
+                ['ATENCAO', 'Atenção', healthCounts.ATENCAO || 0],
+                ['MULTIPLICAR', 'Prontas p/ multiplicar', healthCounts.MULTIPLICAR || 0],
+                ['SAUDAVEL', 'Saudáveis', healthCounts.SAUDAVEL || 0],
+              ] as const).map(([value, label, count]) => (
+                <button
+                  key={value}
+                  type="button"
+                  data-saude={value}
+                  className={cellHealthFilter === value ? "active" : ""}
+                  aria-pressed={cellHealthFilter === value}
+                  onClick={() => setCellHealthFilter(value as "all" | CellHealth["id"])}
+                >
+                  {label}{value !== 'all' && <span>{count}</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="cell-directory-v4">
+            {visibleCells.map((cell) => <button type="button" key={cell.id} className={`${selectedId === cell.id ? "active" : ""}${!cell.ativo ? " archived" : ""}`} onClick={() => { setSelectedId(cell.id); setTab("visao"); }}><span className="cell-row-avatar-v4" aria-hidden="true">{cell.nome.slice(0, 1)}</span><span className="cell-row-copy-v4"><span><i>{cell.ativo ? "Ativa" : "Arquivada"}</i><strong>{cell.nome}</strong></span><small>{cell.descricao_publica || "Descrição pública ainda não informada."}</small><span className="cell-row-health-v5">{(() => { const saude = healthById.get(cell.id)!; const teto = Math.max(1, ...saude.weeks); return (<><i className="cell-health-pill-v5" data-saude={saude.id}>{saude.label}</i><span className="cell-health-weeks-v5" aria-hidden="true">{saude.weeks.map((valor, indice) => <i key={indice} data-vazio={valor === 0 ? "1" : undefined} style={{ height: `${Math.max(12, Math.round((valor / teto) * 100))}%` }} />)}</span><small>{saude.semanasEmDia}/8 relatórios</small></>); })()}</span></span><span className="cell-row-fact-v4"><small>Encontros</small><strong>{cell.dias_reuniao.map((day) => dayLabels[day] || day).join(", ") || "A definir"}</strong></span><span className="cell-row-fact-v4"><small>Pessoas</small><strong>{cell.membros_total + cell.visitantes_ativos}</strong></span><span className="cell-row-fact-v4"><small>Liderança</small><strong>{cell.lider_nome || cell.responsavel || "A definir"}</strong></span><span className="cell-row-arrow-v4" aria-hidden="true">›</span></button>)}
+            {!loading && !visibleCells.length && <p className="cell-directory-empty-v4">Nenhuma célula encontrada com esses filtros.</p>}
+          </div>
+        </aside>
+        {selected && <div className="cell-detail-overlay-v2" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedId(null); }}>
+        <main className="cell-detail-v2 cell-detail-v4" role="dialog" aria-modal="true" aria-label={`Detalhes da célula ${selected.nome}`}>
+          <button className="cell-detail-close-v2" type="button" aria-label="Fechar detalhes" onClick={() => setSelectedId(null)}>×</button>
+          <>
+            <header className="cell-detail-head-v2"><div><small>DETALHES DA CÉLULA</small><div className="cell-detail-title-v4"><h2>{selected.nome}</h2><span>{selected.ativo ? "Ativa" : "Arquivada"}</span></div><p>{selected.descricao_publica || "Descrição pública ainda não informada."}</p><div className="cell-day-pills"><small>Encontros</small>{selected.dias_reuniao.map((day) => <span key={day}>{dayLabels[day] || day}</span>)}</div></div></header>
+            <dl className="cell-metrics-v2"><div><dt>Membros</dt><dd>{selected.membros_total}</dd></div><div><dt>Visitantes</dt><dd>{selected.visitantes_ativos + selected.membros.filter((member) => member.kind === "EXTERNAL").length}</dd></div><div><dt>Liderança</dt><dd>{selected.vice_lider_nome ? "2" : "1"}</dd></div><div><dt>Próximos encontros</dt><dd>{selected.agenda.length}</dd></div></dl>
+            <div className="cell-detail-body-v4">
+            <nav className="cell-tabs-v2" aria-label="Seções da célula">{(selected.can_operate ? [["visao","Visão geral"],["integrantes","Integrantes"],["agenda","Agenda"],["relatorio","Relatório semanal"],["solicitacoes",`Solicitações ${selected.solicitacoes.length || ""}`]] : [["visao","Informações"],["agenda","Próximos encontros"],["entrar","Solicitar entrada"]]).map(([id,label], index) => <button key={id} type="button" className={tab === id ? "active" : ""} onClick={() => setTab(id as typeof tab)}><span>{String(index + 1).padStart(2,"0")}</span>{label}</button>)}</nav>
+            <div className="cell-detail-content-v4">
+            {tab === "visao" && <section className="cell-overview-v2"><article><span aria-hidden="true">♙</span><div><small>LIDERANÇA</small><strong>{selected.lider_nome || selected.responsavel}</strong><p>{selected.vice_lider_nome ? `Vice-líder: ${selected.vice_lider_nome}` : "Vice-líder ainda não definido"}</p></div></article><article><span aria-hidden="true">⌖</span><div><small>LOCAL PÚBLICO</small><strong>{selected.endereco_publico || "A definir"}</strong><p>Visível para quem procura uma célula.</p></div></article><article><span aria-hidden="true">✓</span><div><small>ÚLTIMO RELATÓRIO</small><strong>{selected.ultimo_relatorio_em ? new Date(selected.ultimo_relatorio_em).toLocaleDateString("pt-BR") : "Pendente"}</strong><p>Após 60 dias sem relatório, a célula é arquivada.</p></div></article>{canManage && <article className="cell-danger-v2"><span aria-hidden="true">⚙</span><div><small>GESTÃO PASTORAL</small><strong>{selected.ativo ? "Célula em atividade" : "Célula arquivada"}</strong>{selected.ativo ? <button type="button" onClick={() => void deactivateCell(selected)}>Arquivar célula</button> : <button type="button" onClick={() => void cellAction(selected, { acao: "REATIVAR" })}>Reativar célula</button>}</div></article>}</section>}
+            {tab === "integrantes" && <section className="cell-members-v2">
+              <div className="cell-member-list">{selected.membros.map((member) => <article key={member.id}>
+                <span aria-hidden="true">{member.name.slice(0,1)}</span>
+                <div><strong>{member.name}</strong><small>{member.role === "LEADER" ? "Líder" : member.role === "VICE_LEADER" ? "Vice-líder" : member.kind === "EXTERNAL" ? `Visitante${member.note ? ` · ${member.note}` : ""}` : "Membro"}</small>{member.kind === "COMMUNITY" && <button type="button" className="cell-member-profile-open" onClick={() => setSelectedMemberProfile(member)}>Ver perfil</button>}</div>
+                {selected.can_operate && member.role !== "LEADER" && <div className="cell-member-actions">{member.kind === "COMMUNITY" && member.role !== "VICE_LEADER" && <button type="button" onClick={() => void cellAction(selected, { acao: "MEMBRO_PROMOVER_VICE", membroId: member.id })}>Promover</button>}<button type="button" className="danger-link" onClick={() => void updateCellMember(selected, "MEMBRO_REMOVER", { membroId: member.id })}>Remover</button></div>}
+              </article>)}</div>
+              {selected.can_operate && <div className="cell-add-members-v2"><form onSubmit={(event) => { event.preventDefault(); const form=event.currentTarget; const data=new FormData(form); void updateCellMember(selected,"MEMBRO_ADICIONAR_INTERNO",{usuarioId:Number(data.get("usuarioId"))},form); }}><label>Membro da comunidade<select name="usuarioId" required defaultValue=""><option value="" disabled>Selecione</option>{availableUsers.map((user)=><option value={user.id} key={user.id}>{user.nome} · {user.papel}</option>)}</select></label><button disabled={saving}>Adicionar</button></form><form onSubmit={(event) => { event.preventDefault(); const form=event.currentTarget; const data=new FormData(form); void updateCellMember(selected,"MEMBRO_ADICIONAR_EXTERNO",{nomeExterno:data.get("nomeExterno"),descricaoExterna:data.get("descricaoExterna")},form); }}><label>Visitante de fora<input name="nomeExterno" required placeholder="Nome completo" /></label><label>Observação<input name="descricaoExterna" placeholder="Contato ou contexto" /></label><button disabled={saving}>Registrar</button></form></div>}
+            </section>}
+            {tab === "agenda" && <section className="cell-agenda-v2"><div className="cell-agenda-list-v2">{selected.agenda.map((item) => <article key={item.id}><time>{new Date(item.inicia_em).toLocaleDateString("pt-BR", { day:"2-digit", month:"short" })}</time><div><strong>{item.titulo}</strong><small>{new Date(item.inicia_em).toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" })}–{new Date(item.termina_em).toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" })} · {item.visibilidade === "PUBLICO" ? "Público" : "Só liderança"}</small><p>{item.lembrete}</p></div></article>)}{!selected.agenda.length && <p>Nenhum encontro programado.</p>}</div>{selected.can_operate && <form className="pilot-form cell-agenda-form-v2" onSubmit={(event) => { event.preventDefault(); const form=event.currentTarget; const data=Object.fromEntries(new FormData(form)); void cellAction(selected,{acao:"AGENDA_CRIAR",...data},form); }}><h3>Programar sem publicar no feed</h3><label>Título<input name="titulo" required /></label><label>Início<input name="iniciaEm" type="datetime-local" required /></label><label>Término<input name="terminaEm" type="datetime-local" required /></label><label>Visibilidade<select name="visibilidade"><option value="PUBLICO">Público para a célula</option><option value="PRIVADO">Privado para liderança</option></select></label><label className="cell-wide-field">Lembrete<textarea name="lembrete" rows={2} /></label><button disabled={saving}>Verificar horários e salvar</button></form>}</section>}
+            {tab === "relatorio" && <section className="cell-reports-v2">{selected.can_operate && <form className="pilot-form cell-report-form-v2" onSubmit={(event) => { event.preventDefault(); const form=event.currentTarget; const data=Object.fromEntries(new FormData(form)); void cellAction(selected,{acao:"RELATORIO_CRIAR",...data,aconteceu:data.aconteceu === "true"},form); }}><h3>Formulário do encontro</h3><label>Data<input name="dataReuniao" type="date" required /></label><label>Aconteceu?<select name="aconteceu"><option value="true">Sim</option><option value="false">Não</option></select></label><label>Presentes<input name="presentes" type="number" min="0" defaultValue="0" /></label><label>Visitantes<input name="visitantes" type="number" min="0" defaultValue="0" /></label><label className="cell-wide-field">Observações<textarea name="observacoes" rows={2} /></label><button disabled={saving}>Enviar ao pastor</button></form>}<div className="cell-report-history-v2">{selected.relatorios.map((report) => <article key={report.id}><time>{new Date(`${report.data_reuniao}T12:00:00`).toLocaleDateString("pt-BR")}</time><strong>{report.aconteceu ? `${report.presentes} pessoas · ${report.visitantes} visitantes` : "Encontro não realizado"}</strong><small>{report.enviado_por_nome ? `Enviado por ${report.enviado_por_nome}` : "Relatório registrado"}</small></article>)}</div></section>}
+            {tab === "solicitacoes" && <section className="cell-requests-v2">{!selected.can_operate && <p>As solicitações ficam disponíveis somente para a liderança.</p>}{selected.solicitacoes.map((request) => <article key={request.id}><div><strong>{request.nome}</strong><small>{request.contato || "Sem contato"}</small><p>{request.mensagem}</p></div><div><button type="button" onClick={() => void cellAction(selected,{acao:"SOLICITACAO_DECIDIR",solicitacaoId:request.id,status:"APROVADA"})}>Aprovar</button><button type="button" className="danger-link" onClick={() => void cellAction(selected,{acao:"SOLICITACAO_DECIDIR",solicitacaoId:request.id,status:"RECUSADA"})}>Recusar</button></div></article>)}</section>}
+            {tab === "entrar" && !selected.can_operate && <section className="cell-entry-request-v2"><header><small>ENTRAR NESTA CÉLULA</small><h3>Envie seus dados à liderança</h3><p>As informações serão usadas somente para analisar seu pedido e entrar em contato.</p></header><form className="pilot-form" onSubmit={(event) => void requestCellEntry(selected, event)}><label>Nome completo<input name="nome" required minLength={5} maxLength={120} autoComplete="name" /></label><label>WhatsApp ou e-mail<input name="contato" required maxLength={160} autoComplete="email" /></label><label className="cell-wide-field">Mensagem para a liderança<textarea name="mensagem" rows={3} maxLength={500} placeholder="Conte um pouco sobre você e o melhor horário para contato." /></label><label className="cell-request-consent"><input type="checkbox" required />Autorizo o envio destes dados à liderança desta célula.</label><button disabled={saving}>{saving ? "Enviando…" : "Solicitar entrada"}</button></form></section>}
+            </div>
+            </div>
+          </>
+        </main>
+        </div>}
       </div>
-      </>}
+      {selectedMemberProfile && typeof document !== "undefined" && createPortal(
+        <div className="cell-member-profile-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedMemberProfile(null); }}>
+          <section className="cell-member-profile-dialog" role="dialog" aria-modal="true" aria-label={`Perfil de ${selectedMemberProfile.name}`}>
+            <header><span>{selectedMemberProfile.fotoPerfil ? <img loading="lazy" src={selectedMemberProfile.fotoPerfil} alt="" /> : selectedMemberProfile.name.slice(0,1)}</span><div><small>PERFIL DO MEMBRO</small><h2>{selectedMemberProfile.name}</h2><p>{selectedMemberProfile.papelComunidade || "Membro da comunidade"}</p></div><button type="button" onClick={() => setSelectedMemberProfile(null)} aria-label="Fechar perfil">×</button></header>
+            <dl><div><dt>Função na célula</dt><dd>{selectedMemberProfile.role === "LEADER" ? "Líder" : selectedMemberProfile.role === "VICE_LEADER" ? "Vice-líder" : "Membro"}</dd></div><div><dt>E-mail</dt><dd>{selectedMemberProfile.email || "Não informado"}</dd></div><div><dt>WhatsApp</dt><dd>{selectedMemberProfile.telefone || "Não informado"}</dd></div></dl>
+            {selectedMemberProfile.telefone && whatsappHref(selectedMemberProfile.telefone) && <a href={whatsappHref(selectedMemberProfile.telefone) || undefined} target="_blank" rel="noreferrer">Conversar pelo WhatsApp</a>}
+          </section>
+        </div>, document.body,
+      )}
+      {createOpen && createPortal(<div className="cell-create-overlay-v2" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setCreateOpen(false); }}><form className="pilot-form cell-create-dialog-v2" role="dialog" aria-modal="true" aria-label="Criar célula" onSubmit={createCell}><header><div><small>NOVA CÉLULA</small><h2>Informações essenciais</h2></div><button type="button" aria-label="Fechar" onClick={() => setCreateOpen(false)}>×</button></header><label>Nome da célula<input name="nome" required maxLength={100} /></label><label>Líder<select name="liderUsuarioId" required defaultValue=""><option value="" disabled>Selecione</option>{availableUsers.map((user)=><option value={user.id} key={user.id}>{user.nome} · {user.papel}</option>)}</select></label><fieldset className="cell-days-field-v2"><legend>Dias de encontro (obrigatório)</legend>{Object.entries(dayLabels).map(([value,label]) => <label key={value}><input type="checkbox" name="diasReuniao" value={value} />{label}</label>)}</fieldset><label className="cell-wide-field">Observações internas <small>só a liderança vê</small><textarea name="observacoes" rows={2} maxLength={1000} /></label><fieldset className="form-public-block-v5"><legend>Página pública</legend><p className="form-public-warning-v5"><span aria-hidden="true">◉</span>O que for preenchido aqui aparece na internet, no perfil público da comunidade. Deixe em branco para manter a célula fora do diretório.</p><label>Endereço público<input name="enderecoPublico" maxLength={240} placeholder="Rua e bairro do encontro" /><small>Não use o endereço da casa de alguém sem permissão.</small></label><label className="cell-wide-field">Descrição pública<textarea name="descricaoPublica" rows={2} maxLength={700} placeholder="Uma frase para quem procura uma célula perto de casa" /></label></fieldset><footer><p className="form-consequence-v5"><span aria-hidden="true">◉</span>Cria a célula, dá acesso de líder a quem você escolheu e abre o primeiro ciclo de relatórios semanais.</p><button type="button" onClick={() => setCreateOpen(false)}>Cancelar</button><button disabled={saving}>{saving ? "Criando…" : "Criar célula"}</button></footer></form></div>, document.body)}
     </section>
   );
 }
@@ -1720,6 +1880,66 @@ function OperationFeedback({
     >
       {error || message}
     </p>
+  );
+}
+
+// Aviso de operação dos Visitantes.
+//
+// A versão anterior era um <p> preso dentro do cartão do diretório. Toda ação
+// desta aba, porém, sai de uma camada sobreposta — a ficha, o cadastro e as
+// configurações são portais montados em document.body. O resultado prático:
+// salvar uma categoria com nome repetido, ou perder a conexão ao cadastrar,
+// não mostrava nada; o erro era escrito atrás do modal aberto. Agora o aviso é
+// renderizado na superfície que está em primeiro plano, diz o que aconteceu,
+// pode ser fechado e é anunciado por leitor de tela (alert para erro, status
+// para o resto).
+type VisitorNoticeTone = "sucesso" | "erro" | "aviso";
+
+const VISITOR_NOTICE_LABEL: Record<VisitorNoticeTone, string> = {
+  sucesso: "Tudo certo",
+  erro: "Não foi possível concluir",
+  aviso: "Atenção",
+};
+
+const VISITOR_NOTICE_ICON: Record<VisitorNoticeTone, string> = {
+  sucesso: "✓",
+  erro: "!",
+  aviso: "▲",
+};
+
+function VisitorNotice({
+  message,
+  error,
+  warning,
+  onDismiss,
+  inline,
+}: {
+  message: string;
+  error: string;
+  warning: string;
+  onDismiss: () => void;
+  inline?: boolean;
+}) {
+  if (!message && !error && !warning) return null;
+  // O erro ganha da ressalva, que ganha da confirmação: quem lê primeiro
+  // precisa do que impede de seguir.
+  const tone: VisitorNoticeTone = error ? "erro" : warning ? "aviso" : "sucesso";
+  const text = error || warning || message;
+  return (
+    <div
+      className={`visitor-notice-v6${inline ? " is-inline" : ""}`}
+      data-tone={tone}
+      role={error ? "alert" : "status"}
+      aria-live={error ? "assertive" : "polite"}
+    >
+      <span className="visitor-notice-icon-v6" aria-hidden="true">{VISITOR_NOTICE_ICON[tone]}</span>
+      <div>
+        <strong>{VISITOR_NOTICE_LABEL[tone]}</strong>
+        <p>{text}</p>
+        {Boolean(warning && message) && <small>{message}</small>}
+      </div>
+      <button type="button" onClick={onDismiss} aria-label="Fechar aviso">×</button>
+    </div>
   );
 }
 
@@ -1877,6 +2097,21 @@ function formatAgeRule(category: VisitorCategory) {
   return `Até ${category.idade_maxima} anos`;
 }
 
+// A coluna "Último contato" imprimia data e hora na mesma string: em 105 px a
+// linha quebrava em duas e a hora caía sozinha embaixo. Separar deixa a data em
+// destaque e a hora como apoio, cada uma numa linha por escolha e não por falta
+// de espaço. As duas saem do mesmo Date convertido para o fuso local — partir a
+// string devolveria o dia em UTC ao lado da hora local, e às 21h de sábado a
+// tabela mostraria domingo às 21h.
+function splitStamp(value: string) {
+  const parsed = new Date(value.includes("T") ? value : `${value.replace(" ", "T")}Z`);
+  if (Number.isNaN(parsed.getTime())) return { date: value, time: "" };
+  return {
+    date: parsed.toLocaleDateString("pt-BR"),
+    time: parsed.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+  };
+}
+
 function formatDateTime(value: string) {
   const date = new Date(value.includes("T") ? value : `${value.replace(" ", "T")}Z`);
   return Number.isNaN(date.getTime())
@@ -1912,4 +2147,12 @@ function formatBirthday(value: string | null) {
   if (!value) return "Data não informada";
   const [, month, day] = value.slice(0, 10).split("-");
   return day && month ? `${day}/${month}` : value;
+}
+
+function formatGrowthMonth(value: string) {
+  const [year, month] = value.split("-").map(Number);
+  if (!year || !month) return value;
+  return new Intl.DateTimeFormat("pt-BR", { month: "short" })
+    .format(new Date(Date.UTC(year, month - 1, 1)))
+    .replace(".", "");
 }

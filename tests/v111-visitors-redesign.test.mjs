@@ -4,26 +4,24 @@ import test from "node:test";
 
 const source = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("Visitantes usa o layout de três colunas do projeto com dados reais e configurações", async () => {
+test("Visitantes usa dashboard real, lista WhatsApp e configurações em uma engrenagem", async () => {
   const [workspace, categoriesApi, styles] = await Promise.all([
     source("app/components/TenantOperations.tsx"),
     source("app/api/pilot/visitante-categorias/route.ts"),
     source("app/globals.css"),
   ]);
 
-  assert.match(workspace, /visitor-project-header-v6/);
-  assert.match(workspace, /Painel de Crescimento/);
-  assert.match(workspace, /Funil de Acolhimento/);
-  assert.match(workspace, /Central de Relacionamento/);
-  assert.match(workspace, /Nome \/ Entrada<\/th><th>Contato<\/th><th>Categoria<\/th><th>Status<\/th><th>Último contato<\/th><th>Próximo passo/);
+  // O gráfico de crescimento saiu do bloco escondido por `display:none` e
+  // voltou ao painel de panorama, no topo da aba.
+  assert.match(workspace, /CRESCIMENTO<\/p>/);
+  assert.match(workspace, /visitor-growth-chart-v6/);
   assert.match(workspace, /Configurações de visitantes/);
   assert.match(workspace, /visitor-settings-panel/);
   assert.match(workspace, /https:\/\/wa\.me\//);
   assert.match(workspace, /Ministério responsável/);
   assert.match(categoriesApi, /COUNT\(\*\) AS novos/);
   assert.match(categoriesApi, /vc\.ministerio_id, m\.nome AS ministerio_nome/);
-  assert.match(styles, /\.visitor-workspace-redesign \.visitor-command-layout-v4[^}]*grid-template-columns:\s*256px minmax\(0,\s*1fr\) 320px/);
-  assert.match(styles, /\.visitor-project-main-v6 \.visitor-table-v2/);
+  assert.match(styles, /\.visitor-growth-chart/);
   assert.match(styles, /@media \(max-width:680px\)[\s\S]*\.visitor-settings-panel/);
 });
 
