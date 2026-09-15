@@ -108,6 +108,8 @@ interface RelacionamentoToolsProps {
   visitantes?: Array<Pick<EngagementData, "id" | "nome_completo" | "status">>;
   compacto?: boolean;
   onAbrirVisitante?: (visitanteId: number) => void;
+  /** Leva da visão geral para a aba Acompanhamento, onde a lista é completa. */
+  onVerTodos?: () => void;
 }
 
 // ============================================
@@ -434,7 +436,7 @@ function RegionalGrouping({ items }: { items: RegionalItem[] }) {
  * RelacionamentoTools
  * Componente integrado que exibe todas as ferramentas de relacionamento
  */
-export function RelacionamentoTools({ visitantes = [], compacto = false, onAbrirVisitante }: RelacionamentoToolsProps) {
+export function RelacionamentoTools({ visitantes = [], compacto = false, onAbrirVisitante, onVerTodos }: RelacionamentoToolsProps) {
   const [engagement, setEngagement] = useState<EngagementData[]>([]);
   const [cadencia, setCadencia] = useState<CadenciaItem[]>([]);
   const [cadenciaAvancada, setCadenciaAvancada] = useState<CadenciaAvancadaItem[]>([]);
@@ -544,45 +546,6 @@ export function RelacionamentoTools({ visitantes = [], compacto = false, onAbrir
     };
   }, [visitanteHistoricoId, refreshTick]);
 
-  if (compacto) {
-    // Versão compacta: mostra apenas resumo
-    return (
-      <div
-        style={{
-          padding: "12px",
-          background: "var(--color-surface, #f9fafb)",
-          borderRadius: "6px",
-          fontSize: "13px",
-        }}
-      >
-        {carregando ? (
-          <span style={{ color: "var(--color-text-muted)" }}>Carregando ferramentas...</span>
-        ) : (
-          <div style={{ display: "flex", gap: "24px", flexWrap: "wrap" }}>
-            <div>
-              <strong>👥 Visitantes:</strong> {engagement.length}
-            </div>
-            <div>
-              <strong>📞 Para Contatar:</strong> {cadenciaAvancada.filter((c) => c.prioridade === "urgente").length}
-            </div>
-            <div>
-              <strong>🗺️ Regiões Ativas:</strong> {regional.length}
-            </div>
-            <div>
-              <strong>🚨 Conflitos:</strong> {conflitos.length}
-            </div>
-            {engagement.length > 0 && (
-              <div>
-                <strong>📈 Engajamento Médio:</strong>{" "}
-                {Math.round(engagement.reduce((sum, v) => sum + v.engagement_score, 0) / engagement.length)}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  }
-
   const termo = busca.trim().toLocaleLowerCase("pt-BR");
   const engagementVisivel = engagement.filter((item) => !termo || item.nome_completo.toLocaleLowerCase("pt-BR").includes(termo));
   const prioridades = (cadenciaAvancada.length ? cadenciaAvancada : cadencia.map((item) => ({
@@ -595,6 +558,66 @@ export function RelacionamentoTools({ visitantes = [], compacto = false, onAbrir
   const urgentes = prioridades.filter((item) => item.prioridade === "urgente").length;
   const semContato = engagement.filter((item) => !item.ultimo_contato).length;
   const media = engagement.length ? Math.round(engagement.reduce((sum, item) => sum + item.engagement_score, 0) / engagement.length) : 0;
+
+  // Modo compacto: o cartão "Ordem de cuidado" da visão geral. Antes era uma
+  // linha de emojis com quatro contagens soltas — dizia quantos, nunca quem.
+  // Agora traz as pessoas na ordem em que precisam de contato, no mesmo formato
+  // de cartão das outras áreas do painel.
+  if (compacto) {
+    return (
+      <article className="secretary-card relationship-compact-v7" aria-labelledby="relationship-compact-title">
+        <header>
+          <div>
+            <p className="pilot-kicker">ORDEM DE CUIDADO</p>
+            <h2 id="relationship-compact-title">Comece por estas pessoas</h2>
+          </div>
+          <span>{carregando ? "…" : `${urgentes} urgente${urgentes === 1 ? "" : "s"}`}</span>
+        </header>
+        {carregando ? (
+          <div className="relationship-loading-v3"><span /><span /><span /><p>Organizando prioridades…</p></div>
+        ) : (
+          <>
+            <dl className="relationship-compact-facts-v7">
+              <div><dt>Sem primeiro contato</dt><dd>{semContato}</dd></div>
+              <div><dt>Engajamento médio</dt><dd>{media}</dd></div>
+              <div><dt>Pessoas acompanhadas</dt><dd>{engagement.length}</dd></div>
+            </dl>
+            <div className="relationship-compact-list-v7">
+              {prioridades.slice(0, 6).map((item) => (
+                <button
+                  type="button"
+                  key={item.id}
+                  data-priority={item.prioridade}
+                  aria-label={`Abrir ficha de ${item.nome_completo}`}
+                  onClick={() => abrirVisitante(item.id)}
+                >
+                  <i aria-hidden="true" />
+                  <span>
+                    <strong>{item.nome_completo}</strong>
+                    <small>{rotuloTempoSemContato(item)}{item.responsavel ? ` · ${item.responsavel}` : ""}</small>
+                  </span>
+                  <b>{item.prioridade}</b>
+                </button>
+              ))}
+              {!prioridades.length && (
+                <div className="secretary-card-empty">
+                  <strong>Nenhuma prioridade pendente</strong>
+                  <p>Os próximos cuidados aparecem aqui conforme o histórico de contato.</p>
+                </div>
+              )}
+            </div>
+            {Boolean(onVerTodos && prioridades.length > 6) && (
+              <div className="secretary-card-actions">
+                <button type="button" onClick={onVerTodos}>
+                  Ver todas as {prioridades.length} prioridades →
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </article>
+    );
+  }
 
   return (
     <section className="relationship-command-center-v3" aria-labelledby="relacionamento-tools-title" data-mobile-view={mobileView}>

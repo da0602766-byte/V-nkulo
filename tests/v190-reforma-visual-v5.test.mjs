@@ -175,26 +175,23 @@ test("o fio não lê o relógio durante a renderização nem escreve estado dire
 });
 
 test("células ganham mapa de saúde calculado dos relatórios já carregados", async () => {
-  // Desde o redesenho de Gestão/Participação (app/components/cells/), a
-  // saúde da célula mora em format.ts — compartilhada pelas duas telas.
-  const format = await read("app/components/cells/format.ts");
-  assert.match(format, /export function cellHealth\(cell: Cell, agora: number\): CellHealth/);
+  const operations = await read("app/components/TenantOperations.tsx");
+  assert.match(operations, /function cellHealth\(cell: Cell, agora: number\): CellHealth/);
   for (const estado of ["SEM_RELATORIO", "ATENCAO", "MULTIPLICAR", "SAUDAVEL"]) {
-    assert.ok(format.includes(`"${estado}"`), `estado ${estado} ausente`);
+    assert.ok(operations.includes(`"${estado}"`), `estado ${estado} ausente`);
   }
   // Nenhuma consulta nova: a saúde sai dos relatórios que a rota já devolve.
-  assert.match(format, /cell\.relatorios\.slice\(0, CELL_HEALTH_WEEKS\)/);
-  const managementConsole = await read("app/components/cells/CellManagementConsole.tsx");
-  assert.match(managementConsole, /healthFilter/);
+  assert.match(operations, /cell\.relatorios\.slice\(0, CELL_HEALTH_WEEKS\)/);
+  assert.match(operations, /cellHealthFilter/);
   const styles = await read("app/globals.css");
-  assert.match(styles, /\.cgestao-health-pill\[data-saude="SEM_RELATORIO"\]/);
-  assert.match(styles, /\.cgestao-minibars/);
+  assert.match(styles, /\.cell-health-pill-v5\[data-saude="SEM_RELATORIO"\]/);
+  assert.match(styles, /\.cell-health-weeks-v5/);
 });
 
 test("a saúde da célula não julga atraso antes do relógio acertar", async () => {
-  const format = await read("app/components/cells/format.ts");
-  const inicio = format.indexOf("export function cellHealth");
-  const corpo = format.slice(inicio, inicio + 900);
+  const operations = await read("app/components/TenantOperations.tsx");
+  const inicio = operations.indexOf("function cellHealth");
+  const corpo = operations.slice(inicio, inicio + 900);
   // Sem isso, uma célula em dia apareceria vermelha no primeiro quadro.
   assert.match(corpo, /if \(!agora\) \{/);
   assert.match(corpo, /id: "AGUARDANDO"/);
@@ -206,12 +203,13 @@ test("visitantes mostram o funil antes da tabela", async () => {
   for (const etapa of ["NOVO", "EM_CONTATO", "EM_ACOMPANHAMENTO", "INTEGRADO"]) {
     assert.ok(operations.includes(`["${etapa}"`) || operations.includes(`"${etapa}",`), etapa);
   }
-  // O funil precisa vir antes da tabela na ordem do documento.
-  const funil = operations.indexOf('className="visitor-project-funnel-v6"');
-  const tabela = operations.indexOf("visitor-table-scroll-v2");
+  // O funil passou a ocupar o lugar do fluxo numerado de Ministérios: mesmo
+  // dispositivo, `secretary-flow` + `visitor-flow-v7`, e segue antes da tabela.
+  const funil = operations.indexOf('className="secretary-flow visitor-flow-v7"');
+  const tabela = operations.indexOf("visitor-bulkbar-v2");
   assert.ok(funil > 0 && funil < tabela, "o funil não está antes da tabela");
-  const styles = await read("app/globals.css");
-  assert.match(styles, /\.visitor-project-funnel-v6 button\[data-etapa="INTEGRADO"\]/);
+  const styles = await read("app/visitors.css");
+  assert.match(styles, /\.visitor-flow-v7 div\[data-etapa="INTEGRADO"\]/);
 });
 
 test("notificações agrupam por dia e separam o que precisa de resposta", async () => {
@@ -329,12 +327,12 @@ test("o fio devolve o resumo do dia e a página o exibe", async () => {
 });
 
 test("o diálogo de célula separa o que vai para a internet do que é interno", async () => {
-  const managementConsole = await read("app/components/cells/CellManagementConsole.tsx");
-  const dialogo = managementConsole.slice(managementConsole.indexOf("function CreateCellDialog"));
+  const operations = await read("app/components/TenantOperations.tsx");
+  const dialogo = operations.slice(operations.indexOf("cell-create-dialog-v2"));
   // Endereço e descrição públicos ficam num bloco avisado, não soltos na lista.
-  assert.match(dialogo, /cgestao-public-block/);
+  assert.match(dialogo, /form-public-block-v5/);
   assert.match(dialogo, /aparece na internet/);
-  const bloco = dialogo.slice(dialogo.indexOf("cgestao-public-block"), dialogo.indexOf("</fieldset>", dialogo.indexOf("cgestao-public-block")));
+  const bloco = dialogo.slice(dialogo.indexOf("form-public-block-v5"), dialogo.indexOf("</fieldset>", dialogo.indexOf("form-public-block-v5")));
   assert.match(bloco, /name="enderecoPublico"/);
   assert.match(bloco, /name="descricaoPublica"/);
   // Observações internas ficam de fora do bloco público.
@@ -342,20 +340,12 @@ test("o diálogo de célula separa o que vai para a internet do que é interno",
 });
 
 test("os diálogos dizem a consequência no rodapé", async () => {
-  // Um rodapé no cadastro de visitante (TenantOperations.tsx) e outro na
-  // criação de célula (CellManagementConsole.tsx) — telas diferentes, mesma
-  // classe abandonada por nome mas mesmo princípio de UX.
-  const [operations, managementConsole, styles] = await Promise.all([
-    read("app/components/TenantOperations.tsx"),
-    read("app/components/cells/CellManagementConsole.tsx"),
-    read("app/globals.css"),
-  ]);
-  assert.match(operations, /form-consequence-v5/);
+  const operations = await read("app/components/TenantOperations.tsx");
+  const rodapes = operations.match(/form-consequence-v5/g) || [];
+  assert.ok(rodapes.length >= 2, `esperava ao menos 2 rodapés, achei ${rodapes.length}`);
   assert.match(operations, /Só o nome é obrigatório/);
-  assert.match(managementConsole, /cgestao-consequence/);
-  assert.match(managementConsole, /Só o nome é obrigatório/);
+  const styles = await read("app/globals.css");
   assert.match(styles, /\.form-consequence-v5/);
-  assert.match(styles, /\.cgestao-consequence/);
 });
 
 test("a data de entrada do visitante usa o fuso local, não UTC", async () => {
@@ -369,15 +359,10 @@ test("a data de entrada do visitante usa o fuso local, não UTC", async () => {
 
 test("o diálogo portalizado carrega os tokens que perde ao sair do escopo", async () => {
   const styles = await read("app/globals.css");
-  // createPortal monta os diálogos no body, fora de .cgestao-shell, onde os
-  // tokens de cor são declarados. Sem eles o botão de confirmar ficava
-  // branco no branco — por isso a lista de seletores que declara --acc
-  // inclui .cgestao-create-overlay e .cgestao-member-overlay diretamente.
-  const tokenBlock = styles.slice(styles.indexOf(".cgestao-shell,"), styles.indexOf("}", styles.indexOf(".cgestao-shell,")) + 1);
-  assert.match(tokenBlock, /\.cgestao-create-overlay,/);
-  assert.match(tokenBlock, /\.cgestao-member-overlay \{/);
-  assert.match(tokenBlock, /--acc:/);
-  assert.match(styles, /\.cgestao-create-dialog footer button:not\(:last-child\)/);
+  // createPortal monta o diálogo no body, fora de .cells-workspace-v2, onde os
+  // --v2-* são declarados. Sem eles o botão de confirmar ficava branco no branco.
+  assert.match(styles, /\.cell-create-overlay-v2 \{[^}]*--v2-accent:/);
+  assert.match(styles, /\.cell-create-dialog-v2 footer button:not\(:last-child\)/);
 });
 
 // --------------------------------------------------------------------------
