@@ -6,8 +6,19 @@ migração nova, leia isto.
 
 ## Próximo número livre
 
-**`0072`**. Use o próximo inteiro disponível a partir daí — não reaproveite
+**`0074`**. Use o próximo inteiro disponível a partir daí — não reaproveite
 um número já usado, mesmo que o arquivo tenha sido escrito à mão.
+
+`0073_metricas_requisicao.sql` cria `metricas_requisicao`, a contagem de
+respostas por hora, rota normalizada e classe de status que alimenta a aba
+Saúde técnica da Área do Proprietário. Guarda contagem, nunca conteúdo: a
+rota entra com os identificadores trocados por `:id`. Ver
+app/lib/request-metrics.ts.
+
+`0072_mfa_totp.sql` cria `usuario_mfa` e `usuario_mfa_recuperacao`, o segundo
+fator TOTP das operações críticas. O segredo é cifrado em AES-GCM com chave
+derivada do `AUTH_SECRET` e os códigos de recuperação viram SHA-256. Ver
+app/lib/mfa.ts e app/lib/totp.mjs.
 
 `0071_limites_autenticacao.sql` cria `limites_autenticacao`, o contador de
 requisições por origem usado pelos endpoints de autenticação. A `chave` é o

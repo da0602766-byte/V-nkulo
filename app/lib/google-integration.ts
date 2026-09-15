@@ -1,5 +1,6 @@
 import { getD1 } from "../../db";
 import { getRuntimeEnv } from "../../db/runtime-env";
+import { fromBase64Url, toBase64Url } from "./base64url.mjs";
 
 const GOOGLE_AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
@@ -462,17 +463,4 @@ function safeEqual(a: string, b: string) {
   let difference = 0;
   for (let index = 0; index < a.length; index += 1) difference |= a.charCodeAt(index) ^ b.charCodeAt(index);
   return difference === 0;
-}
-
-function toBase64Url(bytes: Uint8Array) {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/g, "");
-}
-
-function fromBase64Url(value: string) {
-  const normalized = value.replaceAll("-", "+").replaceAll("_", "/");
-  const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
-  const binary = atob(padded);
-  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }

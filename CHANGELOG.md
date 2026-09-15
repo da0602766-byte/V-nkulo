@@ -19,6 +19,30 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ### Adicionado
 
+- **Verificação em duas etapas (TOTP), sem serviço externo.** O projeto
+  registrava MFA como dependência de terceiro e a aprovação crítica de
+  continuidade devolvia 423 por causa disso. O TOTP do RFC 6238 é HMAC-SHA1
+  sobre um contador de tempo, calculado no próprio Worker
+  (`app/lib/totp.mjs`, validado contra os vetores oficiais do RFC), e
+  funciona com qualquer aplicativo autenticador. Inclui cadastro por QR Code,
+  dez códigos de recuperação de uso único, anti-replay por passo e segredo
+  cifrado em AES-GCM (migração `0072`). Nova API em `/api/conta/mfa`.
+- **Aprovação de reativação de comunidade**, agora protegida pelo segundo
+  fator. Cancelamento e desativação continuam bloqueados, mas pelo motivo
+  real: não existe estado de destino definido para uma comunidade cancelada e
+  a política de retenção proíbe exclusão automática de denúncias, evidências e
+  auditorias. Definir esse desfecho é decisão do proprietário.
+- **Aba "Saúde técnica" na Área do Proprietário**: taxa de erro, volume por
+  hora e as rotas que mais falham, nas últimas 24 horas ou 7 dias. O log
+  estruturado tornou visível uma falha por vez; esta é a contagem consultável
+  que responde "a taxa de erro subiu?" (migração `0073`). Guarda contagem,
+  nunca conteúdo — a rota entra com os identificadores trocados por `:id`,
+  então a tabela não vira rastro de navegação.
+- `app/lib/base64url.mjs` e `app/lib/owner-access.ts`, extraídos de cópias que
+  estavam embutidas em `google-integration.ts` e `api/proprietario/route.ts`.
+
+### Anterior nesta rodada
+
 - **Limite de requisições por origem na autenticação.** Nova tabela
   `limites_autenticacao` (migração `0071`) e `app/lib/rate-limit.ts`, aplicados
   em login, cadastro, esqueci-senha, redefinir-senha e primeiro-acesso. O

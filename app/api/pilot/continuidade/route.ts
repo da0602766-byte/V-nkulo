@@ -1,5 +1,6 @@
 import { getD1 } from "../../../../db";
 import { verifyPassword } from "../../../lib/local-auth";
+import { mfaAtivo, verificarMfa } from "../../../lib/mfa";
 import { recordTenantAudit } from "../../../lib/tenant-audit";
 import { requireTenantPermission } from "../../../lib/tenant";
 
@@ -92,9 +93,12 @@ export async function GET() {
       permanentDeletionAvailable: false,
       mfa: {
         required: true,
-        available: false,
-        dependency:
-          "Provedor de MFA e canal seguro de evidências fora do ChatGPT Sites.",
+        // Deixou de ser dependência externa: o segundo fator é TOTP conferido
+        // no próprio Worker. `enrolled` diz se este analista já configurou o
+        // dele, para a tela pedir o cadastro antes de oferecer a aprovação.
+        available: true,
+        enrolled: await mfaAtivo(access.user.id),
+        setupPath: "/painel?view=conta&mfa=1",
       },
     },
     { headers: { "Cache-Control": "no-store" } },
@@ -337,22 +341,110 @@ async function reviewRequest(
     return badRequest("Informe uma justificativa de análise com pelo menos 10 caracteres.");
   }
   if (action === "APROVAR") {
+    // Esta aprovação ficava bloqueada em 423 "dependência externa" porque o
+    // MFA era tratado como serviço de terceiro. Passou a ser conferido aqui
+    // mesmo, com TOTP calculado no próprio Worker (ver app/lib/mfa.ts).
+    if (!(await mfaAtivo(access.user.id))) {
+      await auditForCommunity(
+        access,
+        row.comunidade_id,
+        "CONTINUIDADE_APROVACAO",
+        "NEGADO",
+        { requestId, reason: "Verificação em duas etapas não configurada" },
+      );
+      return Response.json(
+        {
+          error:
+            "Ative a verificação em duas etapas na sua conta antes de aprovar uma decisão crítica.",
+          mfaRequired: true,
+          mfaSetupRequired: true,
+        },
+        { status: 423 },
+      );
+    }
+    const segundoFator = await verificarMfa(access.user.id, String(payload.mfaCode || ""));
+    if (!segundoFator.ok) {
+      await auditForCommunity(
+        access,
+        row.comunidade_id,
+        "CONTINUIDADE_APROVACAO",
+        "NEGADO",
+        { requestId, reason: `Segundo fator recusado: ${segundoFator.motivo}` },
+      );
+      return Response.json(
+        {
+          error:
+            segundoFator.motivo === "REUTILIZADO"
+              ? "Este código já foi usado. Aguarde o próximo no aplicativo."
+              : "Código de verificação incorreto.",
+          mfaRequired: true,
+        },
+        { status: 401 },
+      );
+    }
+
+    // Reativação é o único desfecho de aprovação com estado definido: a
+    // comunidade volta de SUSPENSA/DESATIVADA_POR_INATIVIDADE para REATIVADA.
+    //
+    // Cancelamento e desativação continuam bloqueados, mas agora pelo motivo
+    // real: não existe status de destino para uma comunidade cancelada (o
+    // valor 'CANCELADA' é usado por escalas e reservas, nunca por comunidade)
+    // e a política de retenção do projeto proíbe exclusão automática de
+    // denúncias, evidências e auditorias. Definir esse desfecho é decisão do
+    // proprietário, não do código — antes disso a aprovação destruiria dado
+    // sem regra escrita.
+    if (row.tipo !== "REATIVACAO") {
+      await auditForCommunity(
+        access,
+        row.comunidade_id,
+        "CONTINUIDADE_APROVACAO",
+        "NEGADO",
+        { requestId, reason: "Desfecho destrutivo sem estado de destino definido" },
+      );
+      return Response.json(
+        {
+          error:
+            "A aprovação de cancelamento e desativação depende de o proprietário definir o estado final da comunidade e o tratamento dos dados retidos. A verificação em duas etapas já foi validada.",
+          mfaRequired: false,
+          pendingPolicy: true,
+        },
+        { status: 423 },
+      );
+    }
+
+    await db
+      .prepare(
+        `UPDATE solicitacoes_ciclo_comunidade
+         SET status = 'REATIVADA', decisao = 'APROVADA', analista_id = ?,
+           justificativa_analise = ?, mfa_status = 'VALIDADO',
+           analisado_em = CURRENT_TIMESTAMP, atualizado_em = CURRENT_TIMESTAMP
+         WHERE id = ? AND decisao = 'PENDENTE'`,
+      )
+      .bind(access.user.id, reason, requestId)
+      .run();
+    await db
+      .prepare(
+        // `comunidades` não tem coluna de atualização; o histórico da mudança
+        // fica na auditoria logo abaixo.
+        "UPDATE comunidades SET status = 'REATIVADA' WHERE id = ?",
+      )
+      .bind(row.comunidade_id)
+      .run();
+    await notifyRequester(
+      db,
+      row.solicitante_id,
+      requestId,
+      row.comunidade_nome,
+      "A reativação foi aprovada após análise do suporte.",
+    );
     await auditForCommunity(
       access,
       row.comunidade_id,
-      "CONTINUIDADE_APROVACAO",
-      "NEGADO",
-      { requestId, reason: "MFA externo não homologado" },
+      "CONTINUIDADE_REATIVACAO_APROVADA",
+      "SUCESSO",
+      { requestId, segundoFator: segundoFator.motivo },
     );
-    return Response.json(
-      {
-        error:
-          "A aprovação crítica permanece bloqueada até a validação de MFA pelo backend externo.",
-        mfaRequired: true,
-        externalDependency: true,
-      },
-      { status: 423 },
-    );
+    return Response.json({ ok: true, status: "REATIVADA" });
   }
 
   if (action === "INICIAR_ANALISE") {

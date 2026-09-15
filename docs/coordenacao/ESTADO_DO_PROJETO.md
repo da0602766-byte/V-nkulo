@@ -44,6 +44,7 @@
 - Área autenticada da comunidade em `/painel`, mantendo isolamento lógico por `comunidade_id`.
 - Área exclusiva e independente do proprietário em `/proprietario`.
 - Central de Otimização exclusiva do proprietário, com diagnóstico, agendamento diário/semanal/mensal, execução manual e relatório antes/depois.
+- Aba Saúde técnica na Área do Proprietário, com taxa de erro, volume por hora e as rotas de API que mais falham em 24 horas ou 7 dias.
 - Login, cadastro individual, recuperação de acesso, páginas legais, acesso negado e tratamento de erro.
 - Painéis de membro, líder, pastoral e administração comunitária.
 - Ministérios com integrantes, equipes, funções, recursos, escalas, checklists, relatórios e configurações.
@@ -104,6 +105,7 @@
 ## Funcionalidades existentes
 
 - Autenticação por e-mail e senha, sessões persistentes e revogáveis.
+- Verificação em duas etapas por TOTP, compatível com qualquer aplicativo autenticador, com códigos de recuperação de uso único e segredo cifrado no banco. Exigida na aprovação crítica de continuidade.
 - Papéis e permissões validados no backend.
 - Isolamento por comunidade em consultas e mutações.
 - Troca de comunidade apenas para vínculos autorizados; o proprietário global recebe vínculo sintético seguro para todas as ativas.
@@ -132,13 +134,12 @@
 
 - Valores comerciais de redes/afiliadas são apenas preparação; não processam cobrança.
 - Geração livre de conteúdo por IA não é simulada no frontend.
-- Algumas ações críticas de continuidade permanecem bloqueadas até MFA homologado.
+- A aprovação de cancelamento e desativação de comunidade permanece bloqueada — não por MFA, que passou a existir na plataforma, mas porque não há estado de destino definido para uma comunidade cancelada e a política de retenção proíbe exclusão automática de denúncias, evidências e auditorias. Definir esse desfecho é decisão do proprietário. A aprovação de reativação já funciona, protegida pelo segundo fator.
 - Indicadores demonstrativos dependem da qualidade e quantidade dos dados inseridos.
 
 ## Funcionalidades pendentes ou dependências externas
 
 - Provedor de IA executado no backend para gerar conteúdo novo.
-- MFA homologado para operações críticas.
 - E-mail, WhatsApp, push e outras notificações externas automáticas.
 - Criação segura de credencial temporária e validação automática do número de WhatsApp para convidados sem conta; a versão atual usa link temporário individual, somente leitura e com prazo configurável.
 - Gateway de pagamento e cobrança real.
@@ -166,8 +167,10 @@
 - **Risco editorial:** toda programação exige autorização humana e é convertida para visibilidade `COMUNIDADE`.
 - **Risco de chat lento:** mitigado por busca incremental, polling condicional e atualização local após envio.
 - **Risco de arquivamento indevido:** mitigado por migração corretiva auditada, que restaura apenas comunidades reais gerenciadas e mantém as sementes piloto arquivadas.
-- **Risco de regressão:** coberto pela suíte automatizada de 374 testes, incluindo isolamento, segurança, armazenamento externo, estacionamento móvel, remoções e sincronização sem bloqueio integral da tela. Desde 14/09/2026 a suíte, o lint, o build e a verificação de tipos rodam sozinhos em `.github/workflows/ci.yml` a cada push e pull request, em vez de dependerem de execução manual.
+- **Risco de regressão:** coberto pela suíte automatizada de 403 testes, incluindo isolamento, segurança, armazenamento externo, estacionamento móvel, remoções e sincronização sem bloqueio integral da tela. Desde 14/09/2026 a suíte, o lint, o build e a verificação de tipos rodam sozinhos em `.github/workflows/ci.yml` a cada push e pull request, em vez de dependerem de execução manual.
 - **Risco de varredura de credenciais:** o bloqueio por conta (3 erros de senha) não enxergava uma mesma origem tentando muitas contas diferentes. Desde 14/09/2026 há limite por origem em login, cadastro, esqueci-senha, redefinir-senha e primeiro-acesso (`limites_autenticacao`, migração `0071`). O IP é gravado apenas como SHA-256 combinado com o `AUTH_SECRET`, então a tabela não constitui registro de endereços de acesso.
+- **Risco de aprovação crítica sem segundo fator:** a aprovação de continuidade devolvia 423 alegando dependência externa de MFA. Desde 14/09/2026 exige TOTP conferido no próprio Worker, com anti-replay por passo e auditoria da recusa. A aprovação destrutiva (cancelamento/desativação) continua bloqueada por falta de política, não por falta de MFA.
+- **Risco de cegueira operacional:** o log estruturado torna visível uma falha por vez, mas não responde se a taxa de erro subiu. A tabela `metricas_requisicao` (migração `0073`) guarda a contagem por hora, rota e classe de status; a rota entra com identificadores trocados por `:id`, então a medição não vira rastro de navegação de ninguém.
 - **Risco de falha silenciosa:** o `catch` global do Worker descartava o motivo dos erros 500 e as rotinas de manutenção falhavam sem deixar rastro. Desde 14/09/2026 ambos registram em log estruturado (`app/lib/logger.mjs`), que redige e-mail, senha, token, cookie, telefone e IP antes de escrever.
 - **Risco de exclusão indevida pelo otimizador:** mitigado por lista fechada de seis tarefas, bloqueio de concorrência, auditoria e testes que preservam sessão ativa e solicitação pendente.
 - **Risco de perda durante a migração:** mitigado por cópia para o Drive antes da exclusão, estado persistente de migração, processamento em lotes e interrupção segura em caso de falha.
@@ -358,7 +361,7 @@
 
 - Mensagens não possuem WebSocket; usam atualização periódica otimizada.
 - IA não gera conteúdo sem provedor externo, mas revisão e programação do conteúdo preparado funcionam.
-- Notificações externas, MFA homologado e pagamentos continuam dependentes de integrações.
+- Notificações externas e pagamentos continuam dependentes de integrações. O MFA saiu desta lista em 14/09/2026: o segundo fator é TOTP (RFC 6238) calculado no próprio Worker, sem provedor de terceiro.
 - O envio totalmente automático de WhatsApp em segundo plano continua dependente de provedor oficial, consentimento, modelos aprovados e credenciais no backend. O sistema oferece compartilhamento assistido por número cadastrado e escolha explícita do líder.
 - Convidados sem conta recebem acesso por link temporário somente leitura; login e senha aleatórios não são criados no frontend. Esse fluxo completo exige serviço de identidade, entrega de WhatsApp e verificação do número no backend.
 - Homologação visual final em aparelhos físicos continua recomendada após cada publicação relevante.

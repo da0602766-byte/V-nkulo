@@ -1348,7 +1348,10 @@ test("continuidade V4.5 protege solicitações, tenants e decisões críticas", 
   assert.equal(northBody.requests.length, 1);
   assert.equal(northBody.requests[0].communityId, 1);
   assert.equal(northBody.permanentDeletionAvailable, false);
-  assert.equal(northBody.mfa.available, false);
+  // O MFA deixou de ser dependência externa: está disponível na plataforma, e
+  // `enrolled` diz se este analista já cadastrou o dele.
+  assert.equal(northBody.mfa.available, true);
+  assert.equal(northBody.mfa.enrolled, false);
 
   const southList = await worker.fetch(
     new Request(endpoint, { headers: { cookie: southCookie } }),
@@ -1371,8 +1374,12 @@ test("continuidade V4.5 protege solicitações, tenants e decisões críticas", 
     requestId,
     reviewReason: "Aprovação crítica aguardando o segundo fator.",
   });
+  // Continua barrada sem o segundo fator, mas agora pedindo o cadastro em vez
+  // de alegar um provedor externo que nunca chegou.
   assert.equal(approvalBlocked.status, 423);
-  assert.equal((await approvalBlocked.json()).externalDependency, true);
+  const approvalBlockedBody = await approvalBlocked.json();
+  assert.equal(approvalBlockedBody.mfaSetupRequired, true);
+  assert.equal(approvalBlockedBody.externalDependency, undefined);
 
   const deleteBlocked = await worker.fetch(
     new Request(endpoint, {
@@ -1394,6 +1401,8 @@ test("continuidade V4.5 protege solicitações, tenants e decisões críticas", 
   assert.equal(requestRow.status, "EM_ANALISE");
   assert.equal(requestRow.decisao, "PENDENTE");
   assert.equal(requestRow.senha_reconfirmada, 1);
+  // A aprovação não concluiu, então a marca da linha continua como estava; ela
+  // só vira VALIDADO quando o segundo fator é aceito.
   assert.equal(requestRow.mfa_status, "PENDENTE_EXTERNO");
   assert.equal(
     database

@@ -3,6 +3,7 @@ import { getRuntimeEnv } from "../../../db/runtime-env";
 import { deleteDriveFile, getDriveAccessToken, readStorageReference } from "../../lib/google-integration";
 import { DEFAULT_COMMUNITY_THEME } from "../../lib/community-theme";
 import { getSessionUser, isSystemOwnerAccount } from "../../lib/local-auth";
+import { requireOwner } from "../../lib/owner-access";
 import { createSystemNotification } from "../../lib/system-notifications";
 import {
   AUDIT_RETENTION_DAYS,
@@ -35,22 +36,6 @@ function slugify(value: string) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 72);
-}
-
-async function requireOwner() {
-  const user = await getSessionUser();
-  if (!user) {
-    return { error: Response.json({ error: "Faça login para continuar." }, { status: 401 }) } as const;
-  }
-  if (!user.ativo || !user.system_owner) {
-    return {
-      error: Response.json(
-        { error: "Esta área é exclusiva do proprietário do sistema." },
-        { status: 403 },
-      ),
-    } as const;
-  }
-  return { user } as const;
 }
 
 export async function GET() {

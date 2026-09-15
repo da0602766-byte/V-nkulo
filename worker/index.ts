@@ -6,6 +6,11 @@ import type { R2BucketBinding } from "../db/runtime-env";
 import { runPlatformOptimizationIfDue } from "../app/lib/platform-optimizer";
 import { purgeExpiredPrivateMessagesIfDue } from "../app/lib/chat-retention";
 import { log } from "../app/lib/logger.mjs";
+import {
+  descarregarMetricas,
+  precisaDescarregar,
+  registrarRequisicao,
+} from "../app/lib/request-metrics";
 
 interface Env {
   ASSETS: Fetcher;
@@ -45,6 +50,7 @@ const worker = {
     const url = new URL(request.url);
     const blockedRequest = validateApiRequest(request, url);
     if (blockedRequest) {
+      contabilizar(env, ctx, url.pathname, blockedRequest.status);
       return withSecurityHeaders(blockedRequest, url.pathname);
     }
 
@@ -88,6 +94,7 @@ const worker = {
       const response = await runWithRuntimeEnv(env, () =>
         handler.fetch(request, env, ctx),
       );
+      contabilizar(env, ctx, url.pathname, response.status);
       return withSecurityHeaders(response, url.pathname);
     } catch (erro) {
       // Sem este registro um 500 não deixava rastro nenhum: a página genérica
@@ -98,6 +105,7 @@ const worker = {
         rota: url.pathname,
         erro,
       });
+      contabilizar(env, ctx, url.pathname, 500);
       const fallback = url.pathname.startsWith("/api/")
         ? Response.json(
             { error: "Não foi possível concluir a solicitação." },
@@ -113,6 +121,25 @@ const worker = {
 };
 
 export default worker;
+
+/**
+ * Acumula a requisição no buffer e, quando vale a escrita, descarrega depois
+ * da resposta ter saído. `waitUntil` garante que o lote não atrasa ninguém.
+ */
+function contabilizar(
+  env: Env,
+  ctx: ExecutionContext,
+  pathname: string,
+  status: number,
+) {
+  registrarRequisicao(pathname, status);
+  if (!env.DB || !precisaDescarregar()) return;
+  ctx.waitUntil(
+    descarregarMetricas(env.DB).catch((erro) => {
+      log.error("metricas_descarga_falhou", { erro });
+    }),
+  );
+}
 
 function withSecurityHeaders(response: Response, pathname: string) {
   const headers = new Headers(response.headers);

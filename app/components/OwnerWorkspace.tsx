@@ -9,6 +9,7 @@ import VerifiedOwnerName from "./VerifiedOwnerName";
 import PlatformControlsWorkspace from "./PlatformControlsWorkspace";
 import EditorialAutomationWorkspace from "./EditorialAutomationWorkspace";
 import StatisticsWorkspace from "./StatisticsWorkspace";
+import PlatformHealthWorkspace from "./PlatformHealthWorkspace";
 import PlatformOptimizerWorkspace from "./PlatformOptimizerWorkspace";
 import OwnerLaboratoryWorkspace from "./OwnerLaboratoryWorkspace";
 import OwnerAppearanceWorkspace from "./OwnerAppearanceWorkspace";
@@ -39,6 +40,7 @@ type OwnerTab =
   | "communities"
   | "users"
   | "audit"
+  | "health"
   | "feedback"
   | "editorial"
   | "statistics"
@@ -61,6 +63,7 @@ const TABS: { id: OwnerTab; label: string; icon: string }[] = [
   { id: "communities", label: "Comunidades", icon: "◇" },
   { id: "users", label: "Pessoas", icon: "◎" },
   { id: "audit", label: "Segurança e auditoria", icon: "✓" },
+  { id: "health", label: "Saúde técnica", icon: "⌁" },
   { id: "feedback", label: "Feedback e denúncias", icon: "!" },
   { id: "editorial", label: "IA Editorial", icon: "✦" },
   { id: "statistics", label: "Estatísticas", icon: "▥" },
@@ -552,6 +555,7 @@ export default function OwnerWorkspace({
 
           {tab === "audit" && data && <section className="owner-audit-panel"><header><div><h2>Trilha de auditoria</h2><p>Pesquise e abra um registro para conferir os detalhes preservados.</p></div><div className="owner-audit-filters"><input type="search" value={auditSearch} onChange={(event) => setAuditSearch(event.target.value)} placeholder="Pesquisar ação, pessoa ou comunidade" /><select value={auditResult} onChange={(event) => setAuditResult(event.target.value)} aria-label="Filtrar por resultado"><option value="TODOS">Todos os resultados</option><option value="SUCESSO">Sucesso</option><option value="NEGADO">Negado</option><option value="ERRO">Erro</option></select></div></header><p className="owner-audit-retention" role="note">Retenção automática: registros com mais de {data.auditRetention?.days || 14} dias são excluídos. Esta tela mostra somente as {data.auditRetention?.visibleLimit || 20} ações mais recentes.</p><div className="owner-audit-list">{filteredAudit.map((item) => <details key={Number(item.id)}><summary><span>{String(item.resultado) === "SUCESSO" ? "✓" : "!"}</span><div><strong>{humanize(String(item.evento))}</strong><p>{String(item.comunidade_nome || "Plataforma")} · {String(item.usuario_nome || "Sistema")}</p></div><time>{formatDate(String(item.criado_em))}</time></summary><div className="owner-audit-detail"><span><small>Resultado</small><strong>{String(item.resultado || "NÃO INFORMADO")}</strong></span><span><small>Registro</small><strong>#{Number(item.id)}</strong></span><span><small>Responsável</small><strong>{String(item.usuario_nome || "Sistema")}</strong></span><span><small>Contexto</small><strong>{String(item.comunidade_nome || "Plataforma")}</strong></span><AuditMetadata value={item.metadados} /></div></details>)}{!filteredAudit.length && <Empty title="Nenhum registro encontrado" text="Ajuste a pesquisa ou o filtro de resultado." />}</div></section>}
           {tab === "feedback" && data && <FeedbackRepository items={data.feedback || []} working={working} onAction={feedbackAction} onOpenPost={(communityId, postId) => openCommunity(communityId, postId)} />}
+          {tab === "health" && <PlatformHealthWorkspace />}
           {tab === "editorial" && <EditorialAutomationWorkspace />}
           {tab === "statistics" && <StatisticsWorkspace />}
           {tab === "optimization" && <PlatformOptimizerWorkspace />}
@@ -800,6 +804,7 @@ function tabDescription(tab: OwnerTab) {
     communities: "Acompanhe status, responsáveis, membros e acesso integral.",
     users: "Consulte pessoas, vínculos e perfis globais.",
     audit: "Investigue ações, resultados e contexto de segurança.",
+    health: "Acompanhe a taxa de erro das rotas de API e identifique o que está falhando.",
     feedback: "Analise problemas, sugestões, melhorias e denúncias enviadas em todo o sistema.",
     editorial: "Revise e programe conteúdos da plataforma fora do contexto comunitário.",
     statistics: "Consulte indicadores globais sem expor ferramentas da plataforma nos menus comunitários.",

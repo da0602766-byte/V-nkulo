@@ -2961,3 +2961,36 @@ export const limitesAutenticacao = sqliteTable(
     index("limites_autenticacao_expiracao_idx").on(table.atualizadoEm),
   ],
 );
+
+export const usuarioMfa = sqliteTable("usuario_mfa", {
+  usuarioId: integer("usuario_id")
+    .primaryKey()
+    .references(() => usuarios.id, { onDelete: "cascade" }),
+  // Segredo TOTP cifrado em AES-GCM com chave derivada do AUTH_SECRET; nunca
+  // em claro. Ver app/lib/mfa.ts.
+  segredoCiphertext: text("segredo_ciphertext").notNull(),
+  segredoIv: text("segredo_iv").notNull(),
+  // Nulo enquanto o cadastro não foi confirmado pelo aplicativo autenticador.
+  confirmadoEm: text("confirmado_em"),
+  // Anti-replay: último passo TOTP consumido por este usuário.
+  ultimoPasso: integer("ultimo_passo"),
+  criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+  atualizadoEm: text("atualizado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const usuarioMfaRecuperacao = sqliteTable(
+  "usuario_mfa_recuperacao",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    usuarioId: integer("usuario_id")
+      .notNull()
+      .references(() => usuarios.id, { onDelete: "cascade" }),
+    codigoHash: text("codigo_hash").notNull(),
+    usadoEm: text("usado_em"),
+    criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("usuario_mfa_recuperacao_codigo_unique").on(table.usuarioId, table.codigoHash),
+    index("usuario_mfa_recuperacao_usuario_idx").on(table.usuarioId, table.usadoEm),
+  ],
+);

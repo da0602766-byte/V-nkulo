@@ -458,13 +458,14 @@ test("comunidades novas exigem solicitação ao proprietário, ficha rígida e a
 });
 
 test("padrão global evita divergência, dá acesso total ao proprietário e restringe gráficos pastorais", async () => {
-  const [tenant, migration, dashboardApi, leadership, shell, ownerApi, ownerPage] = await Promise.all([
+  const [tenant, migration, dashboardApi, leadership, shell, ownerApi, ownerAccess, ownerPage] = await Promise.all([
     readFile(new URL("../app/lib/tenant.ts", import.meta.url), "utf8"),
     readFile(new URL("../drizzle/0035_thick_stark_industries.sql", import.meta.url), "utf8"),
     readFile(new URL("../app/api/pilot/pastoral-dashboard/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/components/LeadershipWorkspace.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/components/PilotDashboard.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/proprietario/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/lib/owner-access.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/components/OwnerWorkspace.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(tenant, /'SUPERADMIN' AS papel/);
@@ -481,7 +482,13 @@ test("padrão global evita divergência, dá acesso total ao proprietário e res
   assert.match(ownerApi, /COMUNIDADE_CRIADA_PELO_PROPRIETARIO/);
   assert.match(ownerApi, /ALTERAR_STATUS_COMUNIDADE/);
   assert.match(ownerApi, /COMUNIDADE_RESTAURADA_PELO_PROPRIETARIO/);
-  assert.match(ownerApi, /Esta área é exclusiva do proprietário do sistema/);
+  // A checagem de dono saiu de dentro da rota e virou app/lib/owner-access.ts,
+  // compartilhada com o painel de saúde. A garantia continua a mesma: a rota
+  // usa a checagem, e a checagem recusa quem não é o proprietário.
+  assert.match(ownerApi, /import \{ requireOwner \} from "\.\.\/\.\.\/lib\/owner-access"/);
+  assert.match(ownerApi, /const access = await requireOwner\(\)/);
+  assert.match(ownerAccess, /Esta área é exclusiva do proprietário do sistema/);
+  assert.match(ownerAccess, /!user\.ativo \|\| !user\.system_owner/);
   assert.match(ownerPage, /Escopo global/);
   assert.match(ownerPage, /Abrir com acesso integral/);
   assert.match(ownerPage, /Restaurar e ativar/);
