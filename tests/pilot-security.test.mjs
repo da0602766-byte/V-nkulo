@@ -426,7 +426,8 @@ test("comunidades novas exigem solicitação ao proprietário, ficha rígida e a
   assert.doesNotMatch(communities, /pastorEmail/);
   assert.match(publicData, /c\.status = 'ATIVA'/);
   assert.doesNotMatch(publicData, /c\.ambiente_demo = 1/);
-  assert.match(publicData, /NAO_APLICAVEL/);
+  assert.doesNotMatch(publicData, /getPublicPlatformFeed/);
+  assert.doesNotMatch(publicData, /getPublicCommunityFeed/);
   assert.match(creation, /ficha institucional/i);
   assert.match(creation, /ficha-criacao-comunidade-v2/);
   assert.match(creation, /createPortal/);
