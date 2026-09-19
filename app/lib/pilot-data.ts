@@ -1,9 +1,4 @@
 import { getD1 } from "../../db";
-import {
-  decodeFeedCursor,
-  normalizeFeedLimit,
-  pageFeedRows,
-} from "./feed-cursor";
 import { parseCommunityTheme } from "./community-theme";
 
 export type PublicCommunity = {
@@ -41,37 +36,6 @@ export type PublicCommunityCell = {
   lider: string;
   membros: number;
   proximoEncontro: string | null;
-};
-
-export type PublicFeedPost = {
-  id: number;
-  titulo: string;
-  resumo: string;
-  conteudo: string;
-  categoria: string;
-  origem: string;
-  criado_por?: number | null;
-  comentarios_habilitados?: number;
-  can_edit?: number;
-  can_hide?: number;
-  criadoEm: string;
-  comunidadeId: number | null;
-  comunidadeNome: string;
-  comunidadeSlug: string;
-  isPlatform: boolean;
-  comentariosHabilitados: boolean;
-  totalComentarios: number;
-  imagemUrl: string;
-  imagemThumbnailUrl: string;
-  imagemAlt: string;
-  imagemWidth: number;
-  imagemHeight: number;
-};
-
-export type PublicFeedPage = {
-  posts: PublicFeedPost[];
-  nextCursor: string | null;
-  hasMore: boolean;
 };
 
 export type CommunityJoinState = {
@@ -185,142 +149,6 @@ export async function getPublicCommunityBySlug(
 function isUninitializedPreviewDatabase(error: unknown) {
   const message = error instanceof Error ? error.message : String(error || "");
   return /no such table:\s*comunidades/i.test(message);
-}
-
-export async function getPublicPlatformFeed(
-  limit = 10,
-): Promise<PublicFeedPost[]> {
-  return (await getPublicPlatformFeedPage({ limit })).posts;
-}
-
-export async function getPublicPlatformFeedPage({
-  limit = 10,
-  cursor,
-}: {
-  limit?: number;
-  cursor?: string | null;
-} = {}): Promise<PublicFeedPage> {
-  const pageLimit = normalizeFeedLimit(limit);
-  const decodedCursor = decodeFeedCursor(cursor || null);
-  if (cursor && !decodedCursor) throw new Error("CURSOR_INVALIDO");
-  const cursorSql = decodedCursor
-    ? `AND (p.criado_em < ? OR (p.criado_em = ? AND p.id < ?))`
-    : "";
-  const statement = getD1()
-    .prepare(
-      `SELECT p.id, p.titulo, p.resumo, p.conteudo, p.categoria, p.origem,
-        p.comentarios_habilitados, p.criado_em, p.imagem_url,
-        p.imagem_thumbnail_url, p.imagem_alt, p.imagem_width, p.imagem_height,
-        c.id AS comunidade_id, c.nome AS comunidade_nome,
-        c.slug AS comunidade_slug,
-        (SELECT COUNT(*) FROM comentarios_publicacao cp
-          WHERE cp.publicacao_id = p.id AND cp.status = 'PUBLICADO')
-          AS total_comentarios
-      FROM publicacoes_piloto p
-      LEFT JOIN comunidades c ON c.id = p.comunidade_id
-      WHERE p.status = 'PUBLICADA'
-        AND p.visibilidade = 'PLATAFORMA'
-        AND (
-          (p.comunidade_id IS NULL AND p.origem = 'PLATAFORMA')
-          OR (
-            c.status = 'ATIVA'
-            AND c.feed_publico_habilitado = 1
-            AND c.selo_pastoral_status IN ('APROVADO', 'NAO_APLICAVEL')
-          )
-        )
-        ${cursorSql}
-      ORDER BY p.criado_em DESC, p.id DESC
-      LIMIT ?`,
-    );
-  const bound = decodedCursor
-    ? statement.bind(
-        decodedCursor.criadoEm,
-        decodedCursor.criadoEm,
-        decodedCursor.id,
-        pageLimit + 1,
-      )
-    : statement.bind(pageLimit + 1);
-  const result = await bound.all<Record<string, unknown>>();
-  const page = pageFeedRows(
-    result.results.map((row) => ({
-      ...row,
-      id: Number(row.id),
-      criado_em: String(row.criado_em),
-    })),
-    pageLimit,
-  );
-  return {
-    posts: page.items.map(mapPublicPost),
-    nextCursor: page.nextCursor,
-    hasMore: page.hasMore,
-  };
-}
-
-export async function getPublicCommunityFeed(
-  comunidadeId: number,
-  limit = 10,
-): Promise<PublicFeedPost[]> {
-  return (await getPublicCommunityFeedPage(comunidadeId, { limit })).posts;
-}
-
-export async function getPublicCommunityFeedPage(
-  comunidadeId: number,
-  {
-    limit = 10,
-    cursor,
-  }: { limit?: number; cursor?: string | null } = {},
-): Promise<PublicFeedPage> {
-  const pageLimit = normalizeFeedLimit(limit);
-  const decodedCursor = decodeFeedCursor(cursor || null);
-  if (cursor && !decodedCursor) throw new Error("CURSOR_INVALIDO");
-  const cursorSql = decodedCursor
-    ? `AND (p.criado_em < ? OR (p.criado_em = ? AND p.id < ?))`
-    : "";
-  const statement = getD1()
-    .prepare(
-      `SELECT p.id, p.titulo, p.resumo, p.conteudo, p.categoria, p.origem,
-        p.comentarios_habilitados, p.criado_em, p.imagem_url,
-        p.imagem_thumbnail_url, p.imagem_alt, p.imagem_width, p.imagem_height,
-        c.id AS comunidade_id, c.nome AS comunidade_nome,
-        c.slug AS comunidade_slug,
-        (SELECT COUNT(*) FROM comentarios_publicacao cp
-          WHERE cp.publicacao_id = p.id AND cp.status = 'PUBLICADO')
-          AS total_comentarios
-      FROM publicacoes_piloto p
-      JOIN comunidades c ON c.id = p.comunidade_id
-      WHERE p.comunidade_id = ?
-        AND p.status = 'PUBLICADA'
-        AND p.visibilidade = 'PLATAFORMA'
-        AND c.status = 'ATIVA'
-        AND c.feed_publico_habilitado = 1
-        AND c.selo_pastoral_status IN ('APROVADO', 'NAO_APLICAVEL')
-        ${cursorSql}
-      ORDER BY p.criado_em DESC, p.id DESC
-      LIMIT ?`,
-    );
-  const bound = decodedCursor
-    ? statement.bind(
-        comunidadeId,
-        decodedCursor.criadoEm,
-        decodedCursor.criadoEm,
-        decodedCursor.id,
-        pageLimit + 1,
-      )
-    : statement.bind(comunidadeId, pageLimit + 1);
-  const result = await bound.all<Record<string, unknown>>();
-  const page = pageFeedRows(
-    result.results.map((row) => ({
-      ...row,
-      id: Number(row.id),
-      criado_em: String(row.criado_em),
-    })),
-    pageLimit,
-  );
-  return {
-    posts: page.items.map(mapPublicPost),
-    nextCursor: page.nextCursor,
-    hasMore: page.hasMore,
-  };
 }
 
 export async function getPublicPlatformEvents(
@@ -543,35 +371,6 @@ function mapCommunity(row: CommunityRow): PublicCommunity {
     eventosPublicos: Number(row.eventos_publicos || 0),
     logoUrl: theme.logoUrl,
     bannerUrl: theme.bannerUrl,
-  };
-}
-
-function mapPublicPost(row: Record<string, unknown>): PublicFeedPost {
-  return {
-    id: Number(row.id),
-    titulo: String(row.titulo || ""),
-    resumo: String(row.resumo || ""),
-    conteudo: String(row.conteudo || row.resumo || ""),
-    categoria: String(row.categoria || "COMUNIDADE"),
-    origem: String(row.origem || "COMUNIDADE"),
-    criadoEm: String(row.criado_em || ""),
-    comunidadeId:
-      row.comunidade_id === null || row.comunidade_id === undefined
-        ? null
-        : Number(row.comunidade_id),
-    comunidadeNome:
-      String(row.origem || "") === "PLATAFORMA"
-        ? "VÍNKULO — Plataforma"
-        : String(row.comunidade_nome || ""),
-    comunidadeSlug: String(row.comunidade_slug || ""),
-    isPlatform: String(row.origem || "") === "PLATAFORMA",
-    comentariosHabilitados: Boolean(row.comentarios_habilitados),
-    totalComentarios: Number(row.total_comentarios || 0),
-    imagemUrl: String(row.imagem_url || ""),
-    imagemThumbnailUrl: String(row.imagem_thumbnail_url || ""),
-    imagemAlt: String(row.imagem_alt || ""),
-    imagemWidth: Number(row.imagem_width || 0),
-    imagemHeight: Number(row.imagem_height || 0),
   };
 }
 
