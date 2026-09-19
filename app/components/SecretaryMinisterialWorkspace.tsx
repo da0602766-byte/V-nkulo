@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import MinistriesWorkspace from "./MinistriesWorkspace";
+import MinistryScheduleWizard from "./MinistryScheduleWizard";
 import NativeImageUpload from "./NativeImageUpload";
 import VerifiedOwnerName from "./VerifiedOwnerName";
 import {
@@ -263,6 +264,15 @@ export default function SecretaryMinisterialWorkspace({
   const [scheduleStartsAt, setScheduleStartsAt] = useState("");
   const [scheduleEndsAt, setScheduleEndsAt] = useState("");
   const [scheduleCreatorOpen, setScheduleCreatorOpen] = useState(false);
+  const [desktopMinistry, setDesktopMinistry] = useState(false);
+  const [desktopScheduleId, setDesktopScheduleId] = useState<number | null>(null);
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 1100px)");
+    const sync = () => setDesktopMinistry(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
   const [checklistDraft, setChecklistDraft] = useState<ChecklistDraft[]>([]);
   // O relógio vem de estado: lê-lo na renderização daria valores diferentes no
   // servidor e no cliente e quebraria a hidratação.
@@ -674,6 +684,7 @@ export default function SecretaryMinisterialWorkspace({
     event.preventDefault();
     if (!selectedMinistry) return;
     const body = formBody(event.currentTarget);
+    if (((event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null)?.value === "RASCUNHO") body.status = "RASCUNHO";
     const assignments = selectedAssignments.flatMap((selection) => {
       const volunteer = scheduleCandidates.find(
         (item) => item.id === selection.voluntarioId,
@@ -1270,7 +1281,7 @@ export default function SecretaryMinisterialWorkspace({
 
   if (loading) {
     return (
-      <section className="secretary-workspace" aria-busy="true">
+      <section className="secretary-workspace ministry-project" aria-busy="true">
         <div className="secretary-skeleton secretary-skeleton-hero" />
         <div className="secretary-summary-grid">
           {[1, 2, 3, 4].map((item) => <div className="secretary-skeleton" key={item} />)}
@@ -1283,7 +1294,7 @@ export default function SecretaryMinisterialWorkspace({
     return (
       <section
         key="ministerios-catalogo"
-        className="secretary-workspace secretary-catalog"
+        className="secretary-workspace secretary-catalog ministry-project"
         data-editor-key="ministerios-catalogo"
       >
         <header
@@ -1465,7 +1476,7 @@ export default function SecretaryMinisterialWorkspace({
         ),
       },
     ].filter((group) => group.team || group.assignments.length > 0);
-    return (
+    const card = (
       <article className="secretary-schedule-card" key={schedule.id}>
         <header>
           <time dateTime={schedule.inicia_em}><strong>{formatDay(schedule.inicia_em)}</strong><span>{formatMonth(schedule.inicia_em)}</span></time>
@@ -1649,12 +1660,18 @@ export default function SecretaryMinisterialWorkspace({
         </div>
       </article>
     );
+    return desktopMinistry ? (
+      <details className="ministry-schedule-row" key={schedule.id} open={desktopScheduleId === schedule.id} onToggle={(event) => { if (event.currentTarget.open) setDesktopScheduleId(schedule.id); else setDesktopScheduleId(current => current === schedule.id ? null : current); }}>
+        <summary><time dateTime={schedule.inicia_em}><strong>{formatDay(schedule.inicia_em)}</strong><span>{formatMonth(schedule.inicia_em)}</span></time><div><strong>{schedule.titulo}</strong><small>{schedule.equipes?.map(team => team.equipe_nome).join(" · ") || schedule.equipe_nome || selectedMinistry?.nome} · {schedule.designacoes.length} integrantes</small></div><span className="ministry-row-date">{formatDate(schedule.inicia_em)}</span><span className={"ministry-row-status is-" + schedule.status.toLowerCase()}>{({ RASCUNHO: "Rascunho", PUBLICADA: "Publicada", AGENDADA: "Agendada", ENCERRADA: "Encerrada", CANCELADA: "Cancelada", AGUARDANDO_CHECKLIST: "Aguardando checklist" }[schedule.status])}</span><b aria-hidden="true">⌄</b></summary>
+        {card}
+      </details>
+    ) : card;
   }
 
   return (
     <section
       key={`ministerio-detalhe-${selectedMinistry.id}`}
-      className="secretary-workspace"
+      className="secretary-workspace ministry-project"
       data-editor-key={`ministerio-detalhe-${selectedMinistry.id}`}
     >
       <header
@@ -1769,6 +1786,7 @@ export default function SecretaryMinisterialWorkspace({
                 <SummaryCard label="Próximas escalas" value={upcoming.length} detail="Em preparação ou publicadas" icon="▣" tone="green" />
                 <SummaryCard label="Pendências" value={pendingChecklist.length} detail="Itens de checklist" icon="✓" tone="amber" />
               </div>
+              {desktopMinistry && <section className="ministry-recent-schedules"><header><h2>Escalas recentes</h2><button type="button" onClick={() => setTab("escalas")}>Ver todas</button></header>{ministrySchedules.slice(0,5).map(schedule => <button className="ministry-recent-row" type="button" key={schedule.id} onClick={() => { setDesktopScheduleId(schedule.id); setTab("escalas"); }}><time dateTime={schedule.inicia_em}><strong>{formatDay(schedule.inicia_em)}</strong><span>{formatMonth(schedule.inicia_em)}</span></time><span><strong>{schedule.titulo}</strong><small>{schedule.designacoes.length} integrantes · {schedule.equipes?.length || (schedule.equipe_id ? 1 : 0)} equipe(s)</small></span><small>{formatDate(schedule.inicia_em)}</small><em className={"ministry-row-status is-" + schedule.status.toLowerCase()}>{({ RASCUNHO: "Rascunho", PUBLICADA: "Publicada", AGENDADA: "Agendada", ENCERRADA: "Encerrada", CANCELADA: "Cancelada", AGUARDANDO_CHECKLIST: "Aguardando checklist" }[schedule.status])}</em></button>)}{!ministrySchedules.length && <p className="secretary-card-empty">Nenhuma escala cadastrada neste ministério.</p>}</section>}
               <div className="secretary-dashboard-grid">
                 <article className="secretary-card secretary-ministry-card">
                   <header><div><p className="pilot-kicker">MINISTÉRIO SELECIONADO</p><h2>{selectedMinistry.nome}</h2></div><span>{CATEGORY_LABELS[selectedMinistry.categoria] || selectedMinistry.categoria}</span></header>
@@ -1980,6 +1998,179 @@ export default function SecretaryMinisterialWorkspace({
           {tab === "escalas" && selectedMinistry && (
             <div className="secretary-schedules">
               {canManage && (
+                desktopMinistry ? <>
+                  <button type="button" className="ministry-new-schedule" onClick={() => setScheduleCreatorOpen(true)}><b>+</b><strong>Criar nova escala</strong><span>Iniciar o assistente de criação</span></button>
+                  {scheduleCreatorOpen && <MinistryScheduleWizard
+                    key={selectedMinistry.id}
+                    teams={selectedTeamEntries.map(({ team, funcao }) => ({ nome: team.nome, total: team.membros.length, funcao, encontro: selectedTeams.filter(t => t.equipeId === team.id).map(t => [t.pontoEncontro, t.horarioEncontro].filter(Boolean).join(" · ")).join("") }))}
+                    people={selectedAssignments.length}
+                    tasks={checklistDraft.filter(item => item.tarefa.trim()).length}
+                    materials={selectedLibraryItems.length + links.filter(item => item.url.trim()).length}
+                    busy={busy === "creating-schedule"}
+                    error={error}
+                    onClose={() => { setScheduleCreatorOpen(false); setSelectedAssignments([]); setSelectedTeams([]); setLinks([blankSecretaryLink()]); setSelectedLibraryItemIds([]); setChecklistDraft([]); setScheduleStartsAt(""); setScheduleEndsAt(""); }}
+                    onSubmit={createSchedule}
+                    sections={[
+                      <div className="ministry-wizard-fields" key="identificacao"><label>Título<input name="titulo" required maxLength={140} placeholder="Ex.: Culto de celebração" /></label><label>Ministério<input value={selectedMinistry.nome} readOnly /></label><label className="span-2">Observações<textarea name="observacoes" rows={4} maxLength={1200} /></label></div>,
+                      <div className="ministry-wizard-fields" key="equipes"><fieldset className="span-2 secretary-schedule-teams">
+                          <legend>Equipes na escala</legend>
+                          <p>Selecione quantas equipes forem necessárias. Em cada uma, informe a função ou o local de atuação.</p>
+                          <div>
+                            {teams.map((team) => {
+                              const selection = selectedTeams.find((item) => item.equipeId === team.id);
+                              return (
+                                <section key={team.id} data-selected={Boolean(selection)}>
+                                  <label>
+                                    <input
+                                      type="checkbox"
+                                      checked={Boolean(selection)}
+                                      onChange={() => {
+                                        setSelectedTeams((current) =>
+                                          selection
+                                            ? current.filter((item) => item.equipeId !== team.id)
+                                            : [...current, { equipeId: team.id, funcao: "", pontoEncontro: "", horarioEncontro: "" }],
+                                        );
+                                        if (selection) {
+                                          setSelectedAssignments((current) =>
+                                            current.filter((item) => item.equipeId !== team.id),
+                                          );
+                                        }
+                                        setChecklistDraft((current) =>
+                                          current.map((item) => ({ ...item, voluntarioId: "" })),
+                                        );
+                                      }}
+                                    />
+                                    <span>{team.nome}</span>
+                                    <small>{team.membros.length} integrantes</small>
+                                  </label>
+                                  {selection && (
+                                    <div className="secretary-team-duty">
+                                      <label><span>Função/local desta equipe</span><input value={selection.funcao} onChange={(event) => setSelectedTeams((current) => current.map((item) => item.equipeId === team.id ? { ...item, funcao: event.target.value } : item))} maxLength={180} placeholder="Ex.: Velha, Centro ou Recepção" /></label>
+                                      <label><span>Ponto de encontro</span><input value={selection.pontoEncontro} onChange={(event) => setSelectedTeams((current) => current.map((item) => item.equipeId === team.id ? { ...item, pontoEncontro: event.target.value } : item))} maxLength={180} placeholder="Ex.: Portão principal" /></label>
+                                      <label><span>Horário de encontro</span><input type="time" value={selection.horarioEncontro} onChange={(event) => setSelectedTeams((current) => current.map((item) => item.equipeId === team.id ? { ...item, horarioEncontro: event.target.value } : item))} /></label>
+                                    </div>
+                                  )}
+                                </section>
+                              );
+                            })}
+                            {!teams.length && <p className="secretary-inline-empty">Nenhuma equipe criada. Você ainda pode montar uma escala com integrantes livres.</p>}
+                          </div>
+                        </fieldset></div>,
+                      <div className="ministry-wizard-fields" key="responsabilidades"><label>Responsável<select name="responsavelUsuarioId" defaultValue=""><option value="">Definir depois</option>{selectedMinistry.voluntarios.map((item) => <option key={item.id} value={item.usuario_id}>{item.nome}</option>)}</select><small>Opcional no rascunho; escolha um integrante antes de publicar.</small></label><h3>Integrantes escalados</h3>
+                      <div className="secretary-fold-content">
+                        <div className="secretary-suggestion-toolbar">
+                          <p>O sistema considera dia, período, limite e conflitos reais. A validação final também acontece no servidor.</p>
+                          <button type="button" onClick={() => setSelectedAssignments(candidateAvailability.filter((item) => item.suggested).flatMap(({ volunteer }) => {
+                            const team = selectedTeamEntries.find(({ team: candidateTeam }) => candidateTeam.membros.some((member) => member.voluntario_id === volunteer.id));
+                            return selectedTeamEntries.length && !team ? [] : [{ voluntarioId: volunteer.id, equipeId: team?.team.id || null }];
+                          }))} disabled={!candidateAvailability.some((item) => item.suggested)}>Selecionar sugestões disponíveis</button>
+                        </div>
+                        <div className="secretary-team-assignment-groups">
+                          {(selectedTeamEntries.length
+                            ? selectedTeamEntries
+                            : [{ team: null, funcao: "" }]
+                          ).map(({ team, funcao }) => {
+                            const candidates = candidateAvailability.filter(({ volunteer }) =>
+                              !team || team.membros.some((member) => member.voluntario_id === volunteer.id),
+                            );
+                            return (
+                              <section key={team?.id || "livre"}>
+                                <header>
+                                  <div>
+                                    <strong>{team?.nome || "Integrantes livres"}</strong>
+                                    <small>{team ? (funcao ? `Função/local: ${funcao}` : "Função/local não informado") : "Sem equipe definida"}</small>
+                                  </div>
+                                  <span>{candidates.length}</span>
+                                </header>
+                                <div className="secretary-team-picker">
+                                  {candidates.map(({ volunteer: item, capacityReached, conflict, suggested, status }) => {
+                                    const selectedHere = selectedAssignments.some((assignment) =>
+                                      assignment.voluntarioId === item.id && assignment.equipeId === (team?.id || null),
+                                    );
+                                    const selectedElsewhere = selectedAssignments.some((assignment) =>
+                                      assignment.voluntarioId === item.id && assignment.equipeId !== (team?.id || null),
+                                    );
+                                    return (
+                                      <label key={item.id} className={suggested ? "suggested" : conflict || capacityReached ? "unavailable" : ""}>
+                                        <input type="checkbox" disabled={capacityReached || conflict || selectedElsewhere} checked={selectedHere} onChange={() => setSelectedAssignments((current) => selectedHere ? current.filter((assignment) => assignment.voluntarioId !== item.id) : [...current, { voluntarioId: item.id, equipeId: team?.id || null }])} />
+                                        <span className="secretary-avatar">{initials(item.nome)}</span>
+                                        <strong>{item.nome}</strong>
+                                        <small>{item.funcao} · {item.escalas_ativas} ativa(s) · {Math.max(0, item.limite_escalas - item.escalas_ativas)} restante(s)</small>
+                                        <em>{selectedElsewhere ? "Selecionado em outra equipe" : status}</em>
+                                      </label>
+                                    );
+                                  })}
+                                  {!candidates.length && <p className="secretary-inline-empty">Esta equipe ainda não possui integrantes.</p>}
+                                </div>
+                              </section>
+                            );
+                          })}
+                        </div>
+                      </div><h3>Checklist de responsabilidades</h3>
+                      <div className="secretary-fold-content secretary-checklist-builder">
+                        <div className="secretary-checklist-tools">
+                          <p>Comece do zero ou reaproveite as tarefas da escala mais recente.</p>
+                          <button
+                            type="button"
+                            disabled={!previousChecklistTemplate.length}
+                            onClick={() => {
+                              setChecklistDraft(previousChecklistTemplate.map((item) => ({
+                                id: crypto.randomUUID(),
+                                tarefa: item.tarefa,
+                                voluntarioId: scheduleCandidates.some((candidate) => String(candidate.id) === item.voluntarioId)
+                                  ? item.voluntarioId
+                                  : "",
+                              })));
+                              setFeedback("Checklist anterior aplicado. Revise os responsáveis antes de salvar.");
+                            }}
+                          >Usar checklist anterior</button>
+                        </div>
+                        {checklistDraft.map((item) => (
+                          <div className="secretary-checklist-draft" key={item.id}>
+                            <input aria-label="Tarefa" value={item.tarefa} onChange={(event) => setChecklistDraft((current) => current.map((draft) => draft.id === item.id ? { ...draft, tarefa: event.target.value } : draft))} placeholder="Ex.: Testar microfones" maxLength={180} />
+                            <select aria-label="Responsável" value={item.voluntarioId} onChange={(event) => setChecklistDraft((current) => current.map((draft) => draft.id === item.id ? { ...draft, voluntarioId: event.target.value } : draft))}>
+                              <option value="">Equipe</option>
+                              {scheduleCandidates
+                                .filter((volunteer) =>
+                                  String(volunteer.id) === item.voluntarioId ||
+                                  !checklistDraft.some(
+                                    (draft) => draft.id !== item.id && draft.voluntarioId === String(volunteer.id),
+                                  ),
+                                )
+                                .map((volunteer) => <option key={volunteer.id} value={volunteer.id}>{volunteer.nome}</option>)}
+                            </select>
+                            <button type="button" aria-label="Remover responsabilidade" onClick={() => setChecklistDraft((current) => current.filter((draft) => draft.id !== item.id))}>×</button>
+                          </div>
+                        ))}
+                        <button type="button" onClick={() => setChecklistDraft((current) => [...current, { id: crypto.randomUUID(), tarefa: "", voluntarioId: "" }])}>+ Adicionar responsabilidade</button>
+                      </div></div>,
+                      <div className="ministry-wizard-fields secretary-form-grid" key="data"><label>Início<input name="iniciaEm" type="datetime-local" required value={scheduleStartsAt} onInput={(event) => setScheduleStartsAt(event.currentTarget.value)} onChange={(event) => setScheduleStartsAt(event.target.value)} /></label><label>Término<input name="terminaEm" type="datetime-local" required value={scheduleEndsAt} onInput={(event) => setScheduleEndsAt(event.currentTarget.value)} onChange={(event) => setScheduleEndsAt(event.target.value)} /></label><p className="span-2 secretary-form-help">Ao alterar o período, revise as sugestões e os conflitos na etapa Responsabilidades.</p></div>,
+                      <div className="ministry-wizard-fields" key="local"><label className="span-2">Local<input name="local" maxLength={180} placeholder="Templo, sala ou endereço" /></label>{selectedTeamEntries.length > 0 && <section className="ministry-meeting-review"><h3>Encontro das equipes</h3>{selectedTeams.map(item => <article key={item.equipeId}><strong>{teams.find(team => team.id === item.equipeId)?.nome}</strong><span>{item.pontoEncontro || "Ponto de encontro não definido"}</span><span>{item.horarioEncontro || "Horário não definido"}</span></article>)}<p>Os encontros são definidos na etapa Equipes.</p></section>}</div>,
+                      <div className="ministry-wizard-fields" key="revisao"><h3>Repertório e materiais</h3>
+                      <div className="secretary-fold-content">
+                        <label>Repertório<textarea name="repertorio" rows={6} maxLength={8000} placeholder={"Música ou conteúdo 1\nMúsica ou conteúdo 2"} /></label>
+                        <LinkBuilder
+                          links={links}
+                          setLinks={setLinks}
+                          libraryItems={ministryLibrary}
+                          selectedItemIds={selectedLibraryItemIds}
+                          onToggleItem={toggleLibraryItem}
+                          onUseSaved={useReusableLink}
+                          onRemoveSaved={(link) => void removeReusableLink(link)}
+                          onRenameItem={(item, titulo) => void renameLibraryItem(item, titulo)}
+                          onRemoveItem={(item) => void removeLibraryItem(item)}
+                          onSaveCurrent={(titulo) => void saveReusableLinks(titulo)}
+                          busy={busy}
+                        />
+                      </div><h3>Publicação</h3>
+                      <div className="secretary-fold-content secretary-form-grid">
+                        <label>Status<select name="status" defaultValue="RASCUNHO"><option value="RASCUNHO">Salvar como rascunho</option><option value="AGENDADA">Agendar publicação</option><option value="PUBLICADA">Publicar e notificar agora</option></select></label>
+                        <label>Publicar em<input name="publicarEm" type="datetime-local" /><small>Obrigatório apenas para publicação agendada.</small></label>
+
+                      </div></div>,
+                    ]}
+                  />}
+                </> : (
                 <details
                   className="secretary-create-schedule"
                   ref={scheduleDetails}
@@ -2170,6 +2361,7 @@ export default function SecretaryMinisterialWorkspace({
                     <footer><button type="submit" disabled={busy === "creating-schedule"}>{busy === "creating-schedule" ? "Salvando…" : "Salvar escala"}</button></footer>
                   </form>
                 </details>
+                )
               )}
               <div className="secretary-schedule-list">
                 {escalasSeparadas.proximas.map((schedule) => renderScheduleCard(schedule))}
