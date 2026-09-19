@@ -47,7 +47,7 @@ test("reading mode offers signup and cell profiles render above the page", async
 
 test("publication copy remains readable and preserves authored line breaks", async () => {
   const styles = await read("app/globals.css");
-  assert.match(styles, /\.social-post-copy\s*\{[^}]*padding:/s);
-  assert.match(styles, /\.social-post-copy p\s*\{[^}]*white-space:pre-wrap/s);
-  assert.match(styles, /\.social-post-copy p\s*\{[^}]*line-height:1\.65/s);
+  assert.match(styles, /\.shared-publication-copy\s*\{[^}]*padding:/s);
+  assert.match(styles, /\.shared-publication-copy p\s*\{[^}]*white-space:pre-wrap/s);
+  assert.match(styles, /\.shared-publication-copy p\s*\{[^}]*line-height:1\.65/s);
 });
