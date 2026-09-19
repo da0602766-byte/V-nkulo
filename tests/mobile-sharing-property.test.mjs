@@ -31,7 +31,8 @@ test("compartilhamento e cartões do proprietário respeitam a largura do celula
   assert.match(secretaryCss, /grid-template-columns:\s*1fr 1fr/);
   assert.match(secretaryCss, /\.secretary-share-actions\s*\{\s*position:\s*static/);
   assert.match(secretaryCss, /\.secretary-share-dialog > header \{ position: static/);
-  assert.match(secretaryCss, /\.secretary-share-dialog-v2 > header \{ position: static !important/);
+  assert.match(secretaryCss, /\.secretary-share-dialog-v2 > header \{ position: static;/);
+  assert.doesNotMatch(secretaryCss, /\.secretary-share-dialog-v2 > header \{[^}]*!important/);
   assert.match(secretaryCss, /\.secretary-share-person-grid \{ grid-template-columns: repeat\(2,minmax\(0,1fr\)\)/);
   assert.match(secretaryCss, /\.secretary-whatsapp-avatar img \{[^}]*object-fit: cover/);
   assert.match(secretaryCss, /\.secretary-whatsapp-recipient-name > span:first-child/);

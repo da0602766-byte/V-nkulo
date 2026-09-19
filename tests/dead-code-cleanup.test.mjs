@@ -38,3 +38,14 @@ test("Diaconia permanece alcançável e pastoral usa a view de liderança", asyn
   assert.doesNotMatch(dashboard, /\| "pastoral"/);
   assert.doesNotMatch(panel, /^\s*"pastoral",$/m);
 });
+
+test("estilos exclusivos dos componentes aposentados não permanecem globais", async () => {
+  const styles = await source("app/globals.css");
+
+  assert.doesNotMatch(styles, /\.landing-feature-(?:backdrop|dialog|close)/);
+  assert.doesNotMatch(styles, /\.(?:social-feed-card|public-post-interactions|public-comments-list|public-comment-form)\b/);
+  assert.doesNotMatch(styles, /\.(?:chart-summary|bar-chart|bar-column|period-tabs)\b/);
+  assert.doesNotMatch(styles, /\.(?:display-message-banner|display-control-panel)\b/);
+  assert.match(styles, /\.community-comments\s*\{/);
+  assert.match(styles, /\.shared-publication-copy p\s*\{[^}]*white-space:pre-wrap/s);
+});
