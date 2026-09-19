@@ -27,6 +27,7 @@ const AccountProfileWorkspace = dynamic(() => import("./AccountProfileWorkspace"
 const CommunityAdminWorkspace = dynamic(() => import("./CommunityAdminWorkspace"), { loading: moduleLoading });
 const CommunityLifecycleWorkspace = dynamic(() => import("./CommunityLifecycleWorkspace"), { loading: moduleLoading });
 const DayThreadWorkspace = dynamic(() => import("./DayThreadWorkspace"), { loading: moduleLoading });
+const DiaconiaWorkspace = dynamic(() => import("./DiaconiaWorkspace"), { loading: moduleLoading });
 const EditorialSidebarSchedule = dynamic(() => import("./EditorialSidebarSchedule"), { loading: () => null });
 const EventsWorkspace = dynamic(() => import("./EventsWorkspace"), { loading: moduleLoading });
 const LeadershipWorkspace = dynamic(() => import("./LeadershipWorkspace"), { loading: moduleLoading });
@@ -69,7 +70,6 @@ type View =
   | "redes"
   | "membro"
   | "lider"
-  | "pastoral"
   | "comunidade"
   | "continuidade"
   | "visual-editor"
@@ -87,6 +87,7 @@ const MENU: { id: View; label: string; permission: string }[] = [
   { id: "visitantes", label: "Visitantes", permission: "visitors.view" },
   { id: "celulas", label: "Células", permission: "cells.view" },
   { id: "estacionamento", label: "Gestão", permission: "parking.view" },
+  { id: "diaconia", label: "Diaconia", permission: "diaconia.view" },
   { id: "redes", label: "Redes e unidades", permission: "networks.view" },
   { id: "membro", label: "Painel do membro", permission: "dashboard.view" },
   { id: "lider", label: "Painel de liderança", permission: "leadership.panel.view" },
@@ -115,6 +116,7 @@ const VIEW_MODULE: Partial<Record<View, TenantContext["modules"][number]>> = {
   visitantes: "visitors",
   celulas: "cells",
   estacionamento: "parking",
+  diaconia: "diaconia",
   redes: "networks",
   pessoas: "people",
 };
@@ -1367,6 +1369,9 @@ export default function PilotDashboard({
           )}
           {visibleView === "estacionamento" && (
             <ParkingWorkspace communityName={active.comunidadeNome} memberMode={!active.permissions.includes("parking.view")} />
+          )}
+          {visibleView === "diaconia" && (
+            <DiaconiaWorkspace communityName={active.comunidadeNome} />
           )}
           {visibleView === "redes" && features.networkModuleEnabled && (
             <NetworkWorkspace />

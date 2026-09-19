@@ -32,7 +32,6 @@ const VALID_VIEWS = new Set([
   "redes",
   "membro",
   "lider",
-  "pastoral",
   "comunidade",
   "continuidade",
   "pessoas",
