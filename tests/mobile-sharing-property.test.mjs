@@ -48,7 +48,9 @@ test("compartilhamento e cartões do proprietário respeitam a largura do celula
   assert.match(schedulesApi, /u\.nome, u\.telefone, u\.foto_perfil/);
   assert.doesNotMatch(secretaryCss, /renascer/i);
   assert.match(secretaryCss, /contain:\s*inline-size/);
+  assert.match(secretaryCss, /\.secretary-create-schedule\{scroll-margin-top:64px/);
   assert.match(secretaryCss, /\.secretary-generated-links article/);
+  assert.match(secretaryCss, /\.secretary-generated-links :is\(input,button\) \{ min-height: calc\(44px \* var\(--vinkulo-ui-scale-inverse,1\)\) !important; \}/);
   assert.match(globalCss, /data-grid-preset="2x2"[\s\S]{0,180}repeat\(2,minmax\(0,1fr\)\) !important/);
   assert.match(globalCss, /data-grid-preset="4x2"[\s\S]{0,180}repeat\(4,minmax\(0,1fr\)\) !important/);
   assert.match(globalCss, /data-grid-preset="4x4"[\s\S]{0,700}\) p \{ display: none; \}/);

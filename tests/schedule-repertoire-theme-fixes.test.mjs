@@ -20,6 +20,8 @@ test("selecionar uma música mantém um item de repertório com seus sublinks", 
   assert.match(workspace, /“\$\{item\.titulo\}” selecionada para o repertório/);
   assert.match(workspace, /titulo: item\.titulo/);
   assert.match(workspace, /<ScheduleRepertoire schedule=\{schedule\}/);
+  assert.match(workspace, /key=\{`repertoire:\$\{group\.title\}`\}/);
+  assert.match(workspace, /key="repertoire:unmatched"/);
   assert.match(resources, /groupScheduleResources/);
   assert.match(resources, /mergeScheduleResourceLinks/);
 });
@@ -52,6 +54,19 @@ test("troca de tema é imediata e bloqueia apenas toques simultâneos", () => {
   assert.match(control, /applyTheme\(theme\)/);
   assert.match(control, /setTimeout\(resolve, 180\)/);
   assert.doesNotMatch(control, /startViewTransition/);
+});
+
+test("tema automático escuro preserva as superfícies do painel do proprietário", () => {
+  const styles = read("app/globals.css");
+
+  assert.match(
+    styles,
+    /:is\(html\[data-theme="dark"\],html\[data-pilot-theme="escuro"\]\) :is\(\.owner-grid-toolbar,\.owner-metric-grid article\)/,
+  );
+  assert.match(
+    styles,
+    /:is\(html\[data-theme="dark"\],html\[data-pilot-theme="escuro"\]\) :is\(\.owner-page-quick-actions>button,\.owner-insights-grid>article/,
+  );
 });
 
 test("menu público usa superfície opaca e ícones vetoriais", () => {
