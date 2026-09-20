@@ -464,7 +464,11 @@ async function createSchedule(request: Request) {
       .first<{ id: number }>();
     if (!team) {
       return Response.json(
-        { error: "Uma das equipes selecionadas não pertence a este ministério." },
+        {
+          error: parsed.equipes.length === 1
+            ? "A equipe selecionada não pertence a este ministério."
+            : "Uma das equipes selecionadas não pertence a este ministério.",
+        },
         { status: 400 },
       );
     }

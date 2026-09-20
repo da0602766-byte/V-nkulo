@@ -718,7 +718,9 @@ export default function SecretaryMinisterialWorkspace({
       return;
     }
     if (selectedTeamEntries.some(({ team }) => !team.membros.length)) {
-      setError("Etapa 2 — uma das equipes selecionadas ainda não possui integrantes.");
+      setError(selectedTeamEntries.length === 1
+        ? "Etapa 2 — a equipe selecionada ainda não possui integrantes."
+        : "Etapa 2 — uma das equipes selecionadas ainda não possui integrantes.");
       return;
     }
     if (publishing && !assignments.length) {

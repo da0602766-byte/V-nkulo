@@ -1,5 +1,6 @@
 import GlobalVisualEditor from "./components/GlobalVisualEditorLazy";
 import LandingPageExperience from "./components/LandingPageExperience";
+import StableLink from "./components/StableLink";
 import { getSessionUser } from "./lib/local-auth";
 import { getLandingPlans } from "./lib/platform-plans";
 import { redirect } from "next/navigation";
@@ -18,6 +19,7 @@ export default async function Home() {
       : "/login";
   const plans = await getLandingPlans();
   return <>
+    <StableLink className="sr-only" href={panelHref}>Abrir painel</StableLink>
     <LandingPageExperience
       signedIn={Boolean(user)}
       panelHref={panelHref}
