@@ -31195,6 +31195,13 @@ html[data-theme="dark"] .pilot-dashboard[data-ui-version="v2"][data-community-pa
     var(--community-dark-bg) !important;
 }
 
+/* A opção "Sem tema" remove os halos cromáticos sem retirar os tokens de
+   contraste, acessibilidade e estados funcionais do painel. */
+.pilot-dashboard[data-ui-version="v2"][data-community-palette="neutro"],
+html[data-theme="dark"] .pilot-dashboard[data-ui-version="v2"][data-community-palette="neutro"] {
+  background: var(--pilot-bg) !important;
+}
+
 .global-navigation-loading {
   width: 100vw;
   width: 100dvw;

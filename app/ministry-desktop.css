@@ -226,3 +226,76 @@
   .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-catalog-layout { grid-template-columns: minmax(0,1fr) 270px; }
   .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-tabs button { padding-inline: 9px; font-size: 13px; }
 }
+
+/* Compact desktop pass: ministries are navigational rows, not oversized cards. */
+@media (min-width:1100px) {
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-catalog {
+    grid-template-columns: minmax(0,1fr);
+    gap: 0;
+    border-top: 1px solid var(--mp-line);
+  }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-tile-wrap { border-bottom: 1px solid var(--mp-line); }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-tile {
+    display: grid;
+    grid-template-columns: 44px minmax(0,1fr) minmax(190px,auto);
+    gap: 14px;
+    align-items: center;
+    min-height: 0;
+    height: auto;
+    padding: 14px 6px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    overflow: visible;
+  }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-tile:hover { transform: none; box-shadow: none; background: var(--mp-soft); }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-copy { gap: 3px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-copy strong { font-size: 16px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-copy :is(small,span) { font-size: 12px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-meta {
+    grid-template-columns: minmax(100px,1fr) auto;
+    gap: 3px 12px;
+    margin: 0;
+    padding: 0 0 0 16px;
+    border: 0;
+    border-left: 1px solid var(--mp-line);
+  }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-tile.has-banner .secretary-ministry-tile-media {
+    grid-column: 1;
+    grid-row: 1;
+    display: block;
+    width: 44px;
+    height: 44px;
+    margin: 0;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-tile.has-banner .secretary-ministry-symbol { display: none; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .ministry-schedule-row > summary { padding: 14px 16px; gap: 14px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .ministry-schedule-row > .secretary-schedule-card { padding: 16px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-schedule-card {
+    grid-template-columns: minmax(220px,.8fr) minmax(0,1.2fr);
+    grid-template-areas:
+      "schedule-heading schedule-summary"
+      "schedule-repertoire schedule-people"
+      "schedule-fio schedule-people"
+      "schedule-replacement schedule-actions";
+    align-items: start;
+    gap: 12px 16px;
+  }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-schedule-card > .fio-thread-card { grid-area: schedule-fio; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-schedule-card > header { margin-bottom: 12px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-schedule-body { gap: 8px; margin: 10px 0; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-schedule-body > div { padding: 10px; min-width: 0; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-assignment-status-list { gap: 0; margin: 10px 0 0; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-assignment-team {
+    min-width: 0;
+    padding: 12px 0;
+    border: 0;
+    border-top: 1px solid var(--mp-line);
+    border-radius: 0;
+    background: transparent;
+  }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-assignment-team > article { min-width: 0; padding: 9px 0; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-assignment-team > article > div { min-width: 0; overflow-wrap: anywhere; }
+}

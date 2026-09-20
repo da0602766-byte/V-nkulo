@@ -1,5 +1,6 @@
 
 export type CommunityPaletteId =
+  | "NEUTRO"
   | "CLASSICO"
   | "MODERNO"
   | "CORPORATIVO"
@@ -39,6 +40,35 @@ export type CommunityTheme = {
 };
 
 export const COMMUNITY_PALETTES: CommunityPalette[] = [
+  {
+    id: "NEUTRO",
+    name: "Sem tema",
+    description: "Branco simples no modo claro e preto no modo escuro, sem cores decorativas.",
+    light: {
+      background: "#ffffff",
+      surface: "#ffffff",
+      surface2: "#f4f4f5",
+      text: "#09090b",
+      muted: "#52525b",
+      line: "#e4e4e7",
+      primary: "#18181b",
+      secondary: "#3f3f46",
+      accent: "#27272a",
+      shadow: "0 16px 40px rgba(0, 0, 0, 0.08)",
+    },
+    dark: {
+      background: "#000000",
+      surface: "#09090b",
+      surface2: "#18181b",
+      text: "#fafafa",
+      muted: "#a1a1aa",
+      line: "#27272a",
+      primary: "#71717a",
+      secondary: "#52525b",
+      accent: "#a1a1aa",
+      shadow: "0 20px 60px rgba(0, 0, 0, 0.58)",
+    },
+  },
   {
     id: "CLASSICO",
     name: "Clássico",
@@ -315,7 +345,8 @@ export const DEFAULT_COMMUNITY_THEME: CommunityTheme = {
 export function getCommunityPalette(id: CommunityPaletteId) {
   return (
     COMMUNITY_PALETTES.find((palette) => palette.id === id) ||
-    COMMUNITY_PALETTES[1]
+    COMMUNITY_PALETTES.find((palette) => palette.id === DEFAULT_COMMUNITY_THEME.paletteId) ||
+    COMMUNITY_PALETTES[0]
   );
 }
 
