@@ -14,14 +14,22 @@ test("mobile navigation keeps compact captions and teams open as accordions", as
   assert.match(ministries, /ministry-team-collapse-trigger/);
 });
 
-test("event actions and cell details use blocking, scroll-safe overlays", async () => {
+test("event actions use blocking, scroll-safe overlays", async () => {
   const events = await read("app/components/EventsWorkspace.tsx");
-  const cells = await read("app/components/TenantOperations.tsx");
-  const styles = await read("app/globals.css");
   assert.match(events, /event-action-overlay/);
   assert.match(events, /document\.body\.style\.overflow = "hidden"/);
-  assert.match(cells, /selected && <div className="cell-detail-overlay-v2"/);
-  assert.match(styles, /\.cell-detail-content-v4[^}]*overflow-y:auto!important/s);
+});
+
+test("célula em Gestão abre como página cheia, não como modal", async () => {
+  // O design aprovado é explícito: "Página inteira, não um modal" (Frame 2).
+  // O antigo overlay .cell-detail-overlay-v2 saiu com o redesenho de
+  // Gestão/Participação — ver app/components/cells/CellManagementConsole.tsx.
+  const managementConsole = await read("app/components/cells/CellManagementConsole.tsx");
+  const styles = await read("app/globals.css");
+  assert.match(managementConsole, /function CellDetailPage/);
+  assert.match(managementConsole, /cgestao-back/);
+  assert.doesNotMatch(managementConsole, /cell-detail-overlay-v2/);
+  assert.match(styles, /\.cgestao-back \{/);
 });
 
 test("publication comments and composer controls are compact and readable", async () => {

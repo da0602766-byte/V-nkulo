@@ -210,6 +210,7 @@ export async function PATCH(request: Request, context: Context) {
           `UPDATE ministerios_comunidade
           SET nome = ?, descricao = ?, categoria = ?, status = ?,
             youtube_url = ?, spotify_url = ?, banner_url = ?,
+            fio_habilitado = ?, fio_etapas = ?,
             responsavel_usuario_id = ?,
             atualizado_por = ?, atualizado_em = CURRENT_TIMESTAMP
           WHERE id = ? AND comunidade_id = ?`,
@@ -222,6 +223,8 @@ export async function PATCH(request: Request, context: Context) {
           parsed.youtubeUrl,
           parsed.spotifyUrl,
           parsed.bannerUrl,
+          parsed.fioHabilitado ? 1 : 0,
+          JSON.stringify(parsed.fioEtapas),
           parsed.responsavelUsuarioId,
           access.user.id,
           id,

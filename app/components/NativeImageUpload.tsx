@@ -7,6 +7,7 @@ type UploadPurpose =
   | "community-logo"
   | "community-banner"
   | "ministry-banner"
+  | "cell-cover"
   | "login-logo"
   | "login-background"
   | "visual-editor-image"

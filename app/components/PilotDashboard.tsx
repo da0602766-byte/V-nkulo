@@ -37,7 +37,7 @@ const PeopleWorkspace = dynamic(() => import("./PeopleWorkspace"), { loading: mo
 const PrivateChatWorkspace = dynamic(() => import("./PrivateChatWorkspace"), { loading: moduleLoading });
 const RequestsWorkspace = dynamic(() => import("./RequestsWorkspace"), { loading: moduleLoading });
 const SecretaryMinisterialWorkspace = dynamic(() => import("./SecretaryMinisterialWorkspace"), { loading: moduleLoading });
-const CellsWorkspace = dynamic(() => import("./TenantOperations").then((module) => module.CellsWorkspace), { loading: moduleLoading });
+const CellsWorkspace = dynamic(() => import("./CellsWorkspace"), { loading: moduleLoading });
 const VisitorsWorkspace = dynamic(() => import("./TenantOperations").then((module) => module.VisitorsWorkspace), { loading: moduleLoading });
 
 type FeedItem = {

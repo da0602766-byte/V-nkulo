@@ -7,6 +7,7 @@ import {
   cleanAction,
   parseAssignmentPayload,
   parseCustomFieldAnswers,
+  parseFioSteps,
   parseSchedulePayload,
   type MinistryCustomField,
 } from "../../../../lib/ministry-validation";
@@ -35,7 +36,7 @@ export async function PATCH(request: Request, context: Context) {
     .prepare(
       `SELECT id, ministerio_id, equipe_id, titulo, inicia_em, termina_em,
         status, responsavel_usuario_id, criado_por, modelo_snapshot,
-        campos_respostas, share_token
+        campos_respostas, share_token, fio_etapas
       FROM escalas_ministerio
       WHERE id = ? AND comunidade_id = ?`,
     )
@@ -53,6 +54,7 @@ export async function PATCH(request: Request, context: Context) {
       modelo_snapshot: string;
       campos_respostas: string;
       share_token: string | null;
+      fio_etapas: string;
     }>();
   if (!schedule) {
     return Response.json({ error: "Escala não encontrada." }, { status: 404 });
@@ -838,6 +840,116 @@ export async function PATCH(request: Request, context: Context) {
       "DESIGNACAO_REMOVIDA",
     );
     return Response.json({ ok: true });
+  }
+
+  // ── Fio do Ministério ───────────────────────────────────────────────────
+  // Marcar uma etapa é trabalho de quem está na escala, não só de quem a
+  // administra: o som quem testa é quem opera o som. Por isso a permissão
+  // aqui aceita tanto quem gerencia a escala quanto quem está escalado nela.
+  if (action === "FIO_ETAPA") {
+    const stepId = String(payload.etapaId || "").trim().slice(0, 60);
+    const done = payload.feito === true || payload.feito === "true";
+    if (!stepId) {
+      return Response.json({ error: "Etapa do fio inválida." }, { status: 400 });
+    }
+    const manages = await canManageSchedule(
+      db,
+      access.context,
+      access.user.id,
+      id,
+    );
+    let allowed = manages;
+    if (!allowed) {
+      const assignment = await db
+        .prepare(
+          `SELECT id FROM escala_designacoes
+           WHERE escala_id = ? AND comunidade_id = ? AND usuario_id = ? AND ativo = 1`,
+        )
+        .bind(id, access.context.comunidadeId, access.user.id)
+        .first<{ id: number }>();
+      allowed = Boolean(assignment);
+    }
+    if (!allowed) {
+      return Response.json(
+        { error: "Somente a liderança ou quem está escalado pode mexer no fio." },
+        { status: 403 },
+      );
+    }
+    const steps = parseFioSteps(schedule.fio_etapas);
+    if ("error" in steps) {
+      return Response.json({ error: steps.error }, { status: 400 });
+    }
+    const target = steps.value.find((step) => step.id === stepId);
+    if (!target) {
+      return Response.json(
+        { error: "Esta etapa não existe nesta escala." },
+        { status: 404 },
+      );
+    }
+    target.feito = done;
+    target.feitoEm = done ? new Date().toISOString() : null;
+    target.feitoPor = done ? access.user.id : null;
+    await db
+      .prepare(
+        `UPDATE escalas_ministerio
+         SET fio_etapas = ?, atualizado_por = ?, atualizado_em = CURRENT_TIMESTAMP
+         WHERE id = ? AND comunidade_id = ?`,
+      )
+      .bind(
+        JSON.stringify(steps.value),
+        access.user.id,
+        id,
+        access.context.comunidadeId,
+      )
+      .run();
+    await audit("FIO_MINISTERIO_ETAPA_ATUALIZADA", {
+      escalaId: id,
+      etapaId: stepId,
+      feito: done,
+    });
+    return Response.json({ ok: true, fioEtapas: steps.value });
+  }
+
+  // Redefinir as etapas é da liderança, e preserva o que já foi marcado nas
+  // etapas que permanecem — editar o fio no meio da semana não apaga progresso.
+  if (action === "FIO_ETAPAS_DEFINIR") {
+    if (!(await canManageSchedule(db, access.context, access.user.id, id))) {
+      return Response.json(
+        { error: "Somente a liderança do ministério pode redefinir o fio." },
+        { status: 403 },
+      );
+    }
+    const incoming = parseFioSteps(payload.fioEtapas);
+    if ("error" in incoming) {
+      return Response.json({ error: incoming.error }, { status: 400 });
+    }
+    const current = parseFioSteps(schedule.fio_etapas);
+    const previous = new Map(
+      ("error" in current ? [] : current.value).map((step) => [step.id, step]),
+    );
+    const merged = incoming.value.map((step) => {
+      const before = previous.get(step.id);
+      if (!before || step.feito) return step;
+      return { ...step, feito: before.feito, feitoEm: before.feitoEm, feitoPor: before.feitoPor };
+    });
+    await db
+      .prepare(
+        `UPDATE escalas_ministerio
+         SET fio_etapas = ?, atualizado_por = ?, atualizado_em = CURRENT_TIMESTAMP
+         WHERE id = ? AND comunidade_id = ?`,
+      )
+      .bind(
+        JSON.stringify(merged),
+        access.user.id,
+        id,
+        access.context.comunidadeId,
+      )
+      .run();
+    await audit("FIO_MINISTERIO_ETAPAS_DEFINIDAS", {
+      escalaId: id,
+      etapas: merged.length,
+    });
+    return Response.json({ ok: true, fioEtapas: merged });
   }
 
   return Response.json({ error: "Ação inválida." }, { status: 400 });

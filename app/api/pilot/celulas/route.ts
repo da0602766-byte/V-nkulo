@@ -49,6 +49,7 @@ export async function GET(request: Request) {
   const result = await db.prepare(
     `SELECT c.id, c.nome, c.responsavel, c.membros, c.observacoes,
       c.dias_reuniao, c.endereco_publico, c.descricao_publica,
+      c.rede, c.horario_texto, c.temas, c.foto_capa,
       c.lider_usuario_id, c.vice_lider_usuario_id, c.ultimo_relatorio_em,
       c.arquivada_em, c.ativo, c.criado_em,
       lider.nome AS lider_nome, vice.nome AS vice_lider_nome,
@@ -133,9 +134,16 @@ export async function GET(request: Request) {
   const cells = result.results.map((cell) => {
     const canOperate = canManage || Number(cell.lider_usuario_id) === access.user.id || Number(cell.vice_lider_usuario_id) === access.user.id;
     const members = parseArray(cell.membros);
+    // Só quem opera a célula vê a lista completa de integrantes (contato de
+    // todo mundo). Mas a própria pessoa precisa saber se já participa — daí
+    // este campo, calculado sem expor ninguém além de quem está perguntando.
+    const ownMembership = members.find(
+      (member) => Number((member as Record<string, unknown>).userId) === access.user.id,
+    ) as Record<string, unknown> | undefined;
     return {
       ...cell,
       membros_total: members.filter((member) => String((member as Record<string, unknown>).kind) === "COMMUNITY").length,
+      minha_participacao: (ownMembership?.role as string | undefined) || (ownMembership ? "MEMBER" : null),
       membros: canOperate ? members.map((member) => {
         const source = member as Record<string, unknown>;
         const profile = usersById.get(Number(source.userId));
@@ -148,6 +156,7 @@ export async function GET(request: Request) {
         } : source;
       }) : [],
       dias_reuniao: parseArray(cell.dias_reuniao),
+      temas: parseArray(cell.temas),
       can_operate: canOperate,
       agenda: agenda.results.filter((item) => Number(item.celula_id) === Number(cell.id) && (canOperate || item.visibilidade === "PUBLICO")),
       relatorios: canOperate ? reports.results.filter((item) => Number(item.celula_id) === Number(cell.id)).slice(0, 12) : [],
@@ -182,6 +191,7 @@ export async function POST(request: Request) {
   const observacoes = String(payload.observacoes || "").trim().slice(0, 1000);
   const endereco = String(payload.enderecoPublico || "").trim().slice(0, 240);
   const descricao = String(payload.descricaoPublica || "").trim().slice(0, 700);
+  const rede = String(payload.rede || "").trim().slice(0, 80);
   const dias = Array.isArray(payload.diasReuniao)
     ? payload.diasReuniao.map(String).filter((day) => ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"].includes(day))
     : String(payload.diasReuniao || "").split(",").filter(Boolean);
@@ -206,10 +216,10 @@ export async function POST(request: Request) {
   const result = await db.prepare(
     `INSERT INTO celulas
      (comunidade_id, nome, responsavel, membros, observacoes, dias_reuniao,
-      endereco_publico, descricao_publica, lider_usuario_id, ativo,
+      endereco_publico, descricao_publica, rede, lider_usuario_id, ativo,
       escopo_confirmado, criado_por)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?)`,
-  ).bind(access.context.comunidadeId, nome, responsibleName, JSON.stringify(members), observacoes || null, JSON.stringify([...new Set(dias)]), endereco, descricao, leader.id, access.user.email).run();
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?)`,
+  ).bind(access.context.comunidadeId, nome, responsibleName, JSON.stringify(members), observacoes || null, JSON.stringify([...new Set(dias)]), endereco, descricao, rede, leader.id, access.user.email).run();
   const cellId = Number(result.meta.last_row_id);
   await recordTenantAudit(db, access.context, access.user.id, "CELULA_V45_CRIADA", "SUCESSO", { celulaId: cellId, dias });
   return Response.json({ id: cellId }, { status: 201 });

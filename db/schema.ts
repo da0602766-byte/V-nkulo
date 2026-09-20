@@ -111,6 +111,10 @@ export const celulas = sqliteTable(
     diasReuniao: text("dias_reuniao").notNull().default("[]"),
     enderecoPublico: text("endereco_publico").notNull().default(""),
     descricaoPublica: text("descricao_publica").notNull().default(""),
+    rede: text("rede").notNull().default(""),
+    horarioTexto: text("horario_texto").notNull().default(""),
+    temas: text("temas").notNull().default("[]"),
+    fotoCapa: text("foto_capa"),
     liderUsuarioId: integer("lider_usuario_id").references(() => usuarios.id, {
       onDelete: "set null",
     }),
@@ -1465,6 +1469,12 @@ export const ministeriosComunidade = sqliteTable(
     youtubeUrl: text("youtube_url").notNull().default(""),
     spotifyUrl: text("spotify_url").notNull().default(""),
     bannerUrl: text("banner_url").notNull().default(""),
+    // Modelo do Fio do Ministério: lista de títulos de etapa que cada escala
+    // nova deste ministério herda. O estado de cada etapa vive na escala.
+    fioHabilitado: integer("fio_habilitado", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    fioEtapas: text("fio_etapas").notNull().default("[]"),
     responsavelUsuarioId: integer("responsavel_usuario_id").references(
       () => usuarios.id,
       { onDelete: "set null" },
@@ -1908,6 +1918,9 @@ export const escalasMinisterio = sqliteTable(
     publicarEm: text("publicar_em"),
     modeloSnapshot: text("modelo_snapshot").notNull().default("{}"),
     camposRespostas: text("campos_respostas").notNull().default("{}"),
+    // Etapas do Fio desta escala: nascem do modelo do ministério e variam
+    // escala a escala. Cada item guarda o próprio estado (feito, quando, quem).
+    fioEtapas: text("fio_etapas").notNull().default("[]"),
     criadoPor: integer("criado_por").references(() => usuarios.id, {
       onDelete: "set null",
     }),
