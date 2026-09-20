@@ -2791,11 +2791,11 @@ function ScheduleRepertoire({ schedule }: { schedule: Schedule }) {
       <header><strong>Repertório</strong><span>{schedule.repertorio.length} música(s)</span></header>
       <div>
         {resources.groups.map((group) => (
-          <article key={group.title}>
+          <article key={`repertoire:${group.title}`}>
             <strong>{group.title}</strong>
             <div className="secretary-resource-links">
               {group.links.map((link) => (
-                <a key={link.id} href={link.url} target="_blank" rel="noreferrer" title={`${linkTypeLabel(link.tipo as SecretaryLink["tipo"])} · ${group.title}`}>
+                <a key={`${group.title}:${link.id ?? "resource"}:${link.url}`} href={link.url} target="_blank" rel="noreferrer" title={`${linkTypeLabel(link.tipo as SecretaryLink["tipo"])} · ${group.title}`}>
                   <span className={`platform-icon ${LINK_ICONS[link.tipo as SecretaryLink["tipo"]]?.classe || "lk"} static`}><PlatformIcon tipo={link.tipo as SecretaryLink["tipo"]} /></span>
                   <span>{linkTypeLabel(link.tipo as SecretaryLink["tipo"])}</span>
                 </a>
@@ -2805,11 +2805,11 @@ function ScheduleRepertoire({ schedule }: { schedule: Schedule }) {
           </article>
         ))}
         {resources.unmatched.length > 0 && (
-          <article>
+          <article key="repertoire:unmatched">
             <strong>Outros materiais</strong>
             <div className="secretary-resource-links">
               {resources.unmatched.map((link) => (
-                <a key={link.id} href={link.url} target="_blank" rel="noreferrer">
+                <a key={`unmatched:${link.id ?? "resource"}:${link.url}`} href={link.url} target="_blank" rel="noreferrer">
                   <span className={`platform-icon ${LINK_ICONS[link.tipo as SecretaryLink["tipo"]]?.classe || "lk"} static`}><PlatformIcon tipo={link.tipo as SecretaryLink["tipo"]} /></span>
                   <span>{link.titulo || linkTypeLabel(link.tipo as SecretaryLink["tipo"])}</span>
                 </a>
