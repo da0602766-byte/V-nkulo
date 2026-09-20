@@ -20,6 +20,8 @@ test("selecionar uma música mantém um item de repertório com seus sublinks", 
   assert.match(workspace, /“\$\{item\.titulo\}” selecionada para o repertório/);
   assert.match(workspace, /titulo: item\.titulo/);
   assert.match(workspace, /<ScheduleRepertoire schedule=\{schedule\}/);
+  assert.match(workspace, /key=\{`repertoire:\$\{group\.title\}`\}/);
+  assert.match(workspace, /key="repertoire:unmatched"/);
   assert.match(resources, /groupScheduleResources/);
   assert.match(resources, /mergeScheduleResourceLinks/);
 });

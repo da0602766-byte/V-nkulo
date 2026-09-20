@@ -31,6 +31,7 @@ test("criação, leitura e compartilhamento mantêm a separação por equipe", (
   const createRoute = read("app/api/pilot/escalas/route.ts");
   const updateRoute = read("app/api/pilot/escalas/[id]/route.ts");
   const workspace = read("app/components/SecretaryMinisterialWorkspace.tsx");
+  const styles = read("app/secretary.css");
   const sharedPage = read("app/escala/[token]/page.tsx");
   const pdfRoute = read("app/api/pilot/escalas/[id]/pdf/route.ts");
 
@@ -41,6 +42,21 @@ test("criação, leitura e compartilhamento mantêm a separação por equipe", (
   assert.match(updateRoute, /Escolha a equipe de origem desta pessoa/);
   assert.match(workspace, /Selecione quantas equipes forem necessárias/);
   assert.match(workspace, /secretary-assignment-team/);
+  assert.match(styles, /@media\(min-width:1181px\) and \(max-width:1500px\)/);
+  assert.match(styles, /secretary-schedule-card \.secretary-assignment-team>article\{grid-template-columns:38px minmax\(0,1fr\)\}/);
   assert.match(sharedPage, /groupAssignmentsByTeam/);
   assert.match(pdfRoute, /formatAssignmentsByTeam/);
+});
+
+test("tema automático escuro preserva as superfícies do painel do proprietário", () => {
+  const styles = read("app/globals.css");
+
+  assert.match(
+    styles,
+    /:is\(html\[data-theme="dark"\],html\[data-pilot-theme="escuro"\]\) :is\(\.owner-grid-toolbar,\.owner-metric-grid article\)/,
+  );
+  assert.match(
+    styles,
+    /:is\(html\[data-theme="dark"\],html\[data-pilot-theme="escuro"\]\) :is\(\.owner-page-quick-actions>button,\.owner-insights-grid>article/,
+  );
 });
