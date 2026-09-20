@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import "./cells/cells.css";
 import CellManagementConsole from "./cells/CellManagementConsole";
 import CellMemberPortal from "./cells/CellMemberPortal";
 import { useCellsData } from "./cells/useCellsData";
