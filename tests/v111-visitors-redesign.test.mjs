@@ -11,8 +11,13 @@ test("Visitantes usa dashboard real, lista WhatsApp e configurações em uma eng
     source("app/globals.css"),
   ]);
 
-  assert.match(workspace, /DASHBOARD CRESCENTE/);
-  assert.match(workspace, /Configurações de visitantes/);
+  // O gráfico de crescimento saiu do bloco escondido por `display:none` e
+  // voltou ao painel de panorama, no topo da aba.
+  assert.match(workspace, /CRESCIMENTO<\/p>/);
+  assert.match(workspace, /visitor-growth-chart-v6/);
+  // A engrenagem virou um botão nomeado na barra de ações; o rótulo visível
+  // ("Categorias") é o nome acessível, e o title diz o que ela abre.
+  assert.match(workspace, /Categorias e responsáveis de visitantes/);
   assert.match(workspace, /visitor-settings-panel/);
   assert.match(workspace, /https:\/\/wa\.me\//);
   assert.match(workspace, /Ministério responsável/);

@@ -197,7 +197,7 @@
 - O painel desktop recebeu barra superior de 60 px, busca de áreas por `⌘K`, sidebar de 236 px recolhível e agrupada por Principal, Comunidade e Gestão, sempre filtrada pelas permissões reais do usuário.
 - A navegação móvel agora possui os cinco destinos oficiais — Início, Comunidade, Agenda, Pedidos e Menu — com alvos de toque adequados e decisões de escala nomeadas por extenso.
 - A tela inicial foi convertida em “fio do dia”, com horários monoespaçados, linha contínua, marcador do momento atual, ação por item e coluna lateral de 316 px para próxima escala, pendências e eventos.
-- Visitantes mantém uma base única e uma tabela central. As visões agora são Todos, Novos, Em acompanhamento, Pendências e Sem contato há 15 dias; filtros ativos podem ser removidos e a última coluna informa o próximo passo.
+- Visitantes mantém uma base única e uma tabela central, organizada em quatro abas: Visão geral, Pessoas, Acompanhamento e Aniversários. As visões (Todos, Novos, Em acompanhamento, Pendências e Sem contato há 15 dias) passaram a filtrar a lista dentro de Pessoas; filtros ativos podem ser removidos e a coluna "Próximo passo" continua na tabela.
 - Validação V4.8.0: TypeScript com zero erros, lint com zero erros, build e artefato Sites aprovados e **199/199 testes automatizados aprovados**.
 
 - Estabilidade V4.7.5: a dívida central de tipagem do tenant, validações e D1 foi eliminada; a checagem TypeScript passou de 1.128 ocorrências para zero sem remover dados, páginas ou permissões.

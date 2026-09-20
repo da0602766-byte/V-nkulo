@@ -18,18 +18,24 @@ test("cadastro novo usa a data real de entrada e nunca inventa 999 dias sem cont
   assert.match(tools, /rotuloTempoSemContato\(item\)/);
 });
 
-test("post-its ficam em uma coluna lateral compacta com cartões quadrados", async () => {
-  const [operations, notes, css] = await Promise.all([
+test("post-its ficam na coluna lateral da visão geral", async () => {
+  const [operations, notes, secretaryCss, visitorsCss] = await Promise.all([
     read("app/components/TenantOperations.tsx"),
     read("app/components/CareNotesBoard.tsx"),
-    read("app/globals.css"),
+    read("app/secretary.css"),
+    read("app/visitors.css"),
   ]);
 
-  assert.match(operations, /visitor-care-workspace-v3/);
+  // A coluna lateral agora é a coluna estreita da grade de cartões que a aba
+  // divide com Ministérios, e não mais uma grade só dos visitantes.
+  assert.match(operations, /visitor-dashboard-v7/);
   assert.match(operations, /<CareNotesBoard side \/>/);
   assert.match(notes, /side\?: boolean/);
-  assert.match(css, /\.visitor-care-workspace-v3[^}]*grid-template-columns:minmax\(0,1fr\) minmax\(250px,300px\)/);
-  assert.match(css, /\.care-notes-board\.is-side \.care-note[^}]*aspect-ratio:1/);
+  assert.match(secretaryCss, /\.secretary-dashboard-grid\{display:grid;grid-template-columns:1\.35fr 1fr/);
+  assert.match(visitorsCss, /\.visitor-dashboard-v7 > \.care-notes-board\.is-side/);
+  // O quadrado forçado saiu de propósito: um recado de uma linha virava um
+  // cartão de 220 px com o resto em branco.
+  assert.match(visitorsCss, /\.care-notes-board\.is-side \.care-notes-grid \{ align-items: start/);
 });
 
 test("APK usa a ponte nativa e mantém Service Worker como fallback do navegador", async () => {

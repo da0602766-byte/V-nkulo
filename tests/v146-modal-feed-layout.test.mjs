@@ -15,8 +15,8 @@ test("a criação de publicação abre em cartão modal", () => {
 
 test("a ficha do visitante tem fechamento e semântica de diálogo", () => {
   const source = read("app/components/TenantOperations.tsx");
-  assert.match(source, /visitor-profile-dialog-header/);
-  assert.match(source, /visitor-profile-close/);
+  assert.match(source, /className="visitor-person-drawer-v2"/);
+  assert.match(source, /aria-label="Fechar ficha"/);
   assert.match(source, /role="dialog" aria-modal="true"/);
 });
 
