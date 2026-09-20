@@ -1375,6 +1375,31 @@ export const comentariosPublicacao = sqliteTable(
   ],
 );
 
+export const reacoesPublicacao = sqliteTable(
+  "reacoes_publicacao",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    publicacaoId: integer("publicacao_id")
+      .notNull()
+      .references(() => publicacoesPiloto.id, { onDelete: "cascade" }),
+    usuarioId: integer("usuario_id")
+      .notNull()
+      .references(() => usuarios.id, { onDelete: "cascade" }),
+    tipo: text("tipo").notNull(),
+    criadoEm: text("criado_em")
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("reacoes_publicacao_unica_idx").on(
+      table.publicacaoId,
+      table.usuarioId,
+      table.tipo,
+    ),
+    index("reacoes_publicacao_post_idx").on(table.publicacaoId, table.tipo),
+  ],
+);
+
 export const eventosComunidade = sqliteTable(
   "eventos_comunidade",
   {

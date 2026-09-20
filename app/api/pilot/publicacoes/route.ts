@@ -46,6 +46,12 @@ export async function GET(request: Request) {
          AND uc.status = 'ATIVO' LIMIT 1) AS autor_papel,
       (SELECT COUNT(*) FROM comentarios_publicacao cp
        WHERE cp.publicacao_id = p.id AND cp.status = 'PUBLICADO') AS total_comentarios,
+      COALESCE((SELECT json_group_object(tipo, total) FROM (
+        SELECT tipo, COUNT(*) AS total FROM reacoes_publicacao
+        WHERE publicacao_id = p.id GROUP BY tipo
+      )), '{}') AS reacoes_json,
+      COALESCE((SELECT json_group_array(tipo) FROM reacoes_publicacao
+        WHERE publicacao_id = p.id AND usuario_id = ?), '[]') AS minhas_reacoes_json,
       CASE WHEN p.criado_por = ? THEN 1 ELSE 0 END AS can_edit,
       CASE WHEN p.criado_por = ? OR ? = 1 THEN 1 ELSE 0 END AS can_hide,
       CASE WHEN ? = 1 THEN 1 ELSE 0 END AS can_delete
@@ -69,6 +75,7 @@ export async function GET(request: Request) {
         .bind(
           access.user.id,
           access.user.id,
+          access.user.id,
           canModerate ? 1 : 0,
           canDelete ? 1 : 0,
           access.context.comunidadeId,
@@ -84,6 +91,7 @@ export async function GET(request: Request) {
         .all<Record<string, unknown>>()
     : postStatement
         .bind(
+          access.user.id,
           access.user.id,
           access.user.id,
           canModerate ? 1 : 0,

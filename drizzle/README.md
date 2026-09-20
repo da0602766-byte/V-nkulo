@@ -6,13 +6,17 @@ migração nova, leia isto.
 
 ## Próximo número livre
 
-**`0076`**. Use o próximo inteiro disponível a partir daí — não reaproveite
+**`0077`**. Use o próximo inteiro disponível a partir daí — não reaproveite
 um número já usado, mesmo que o arquivo tenha sido escrito à mão.
 
 `0075_notificacoes_push_dispositivos.sql` guarda uma assinatura Web Push por
 aparelho autenticado. O endpoint é único, então o mesmo navegador não continua
 ligado à conta anterior depois de um novo login. A chave privada VAPID fica
 somente nas variáveis seguras do Sites; nunca deve ser registrada nesta pasta.
+
+`0076_feed_reactions.sql` cria as reações persistentes do feed interno. Cada
+reação é vinculada à publicação, ao usuário e à comunidade da publicação no
+servidor, com unicidade por tipo para impedir duplicação acidental.
 
 `0073_escalas_multiplas_equipes.sql` permite associar várias equipes a uma
 escala e guarda a equipe de cada designação. A coluna legada `equipe_id` da
