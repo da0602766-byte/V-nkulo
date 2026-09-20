@@ -34028,3 +34028,45 @@ html[data-pilot-theme="escuro"] .request-care-status.tone-blue { background:#173
   .community-reaction-picker { position: fixed; right: 14px; bottom: calc(78px + env(safe-area-inset-bottom)); left: 14px; width: auto; }
   .community-feed-redesign .community-home-rail { grid-template-columns: 1fr; gap: 0; }
 }
+
+/* V260.1 — o mural móvel usa apenas o compositor compacto. Regras legadas
+   do Início tinham maior especificidade e zeravam a altura desse bloco,
+   fazendo seu conteúdo atravessar o título e as abas do feed. */
+@media (max-width: 680px) {
+  .pilot-dashboard[data-ui-version="v2"] .community-feed-redesign .community-home-actions {
+    display: none !important;
+  }
+  .pilot-dashboard[data-ui-version="v2"] .community-feed-redesign .community-composer {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 13px 0 0 !important;
+    overflow: visible !important;
+  }
+  .pilot-dashboard[data-ui-version="v2"] .community-feed-redesign .community-composer-compact {
+    width: 100% !important;
+    min-height: 60px;
+    grid-template-columns: 38px minmax(0, 1fr) !important;
+    border: 1px solid var(--feed-line) !important;
+    border-radius: 14px !important;
+    background: var(--pilot-surface) !important;
+  }
+  .pilot-dashboard[data-ui-version="v2"] .community-feed-redesign .community-composer-compact strong {
+    overflow: hidden;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pilot-dashboard[data-ui-version="v2"] .community-feed-redesign .community-composer-compact small {
+    display: none;
+  }
+  .pilot-dashboard[data-ui-version="v2"] .community-feed-redesign .community-home-grid {
+    display: flex !important;
+    flex-direction: column;
+    gap: 24px !important;
+    margin-top: 18px !important;
+  }
+  .pilot-dashboard[data-ui-version="v2"] .community-feed-redesign .community-feed-panel {
+    width: 100% !important;
+  }
+}
