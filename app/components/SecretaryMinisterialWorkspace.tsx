@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import MinistriesWorkspace from "./MinistriesWorkspace";
+import MinistryScheduleWizard from "./MinistryScheduleWizard";
 import NativeImageUpload from "./NativeImageUpload";
 import VerifiedOwnerName from "./VerifiedOwnerName";
 import {
@@ -50,6 +51,8 @@ type Ministry = {
   can_manage: number;
   can_archive?: number;
   can_delete: number;
+  fio_habilitado: number;
+  fio_etapas: string[];
   voluntarios: Volunteer[];
   categorias_visitantes: Array<{
     id: number;
@@ -64,6 +67,9 @@ type Assignment = {
   id: number;
   voluntario_id: number;
   usuario_id: number;
+  equipe_id: number | null;
+  equipe_nome: string | null;
+  equipe_cor: string | null;
   nome: string;
   funcao: string;
   status: "PENDENTE" | "CONFIRMADA" | "INDISPONIVEL" | "SUBSTITUICAO_SOLICITADA" | "AUSENTE";
@@ -71,6 +77,24 @@ type Assignment = {
   telefone?: string;
   foto_perfil?: string | null;
   owner_verified?: number;
+};
+type ScheduleTeam = {
+  equipe_id: number;
+  equipe_nome: string;
+  equipe_cor: string;
+  funcao: string;
+  ponto_encontro: string;
+  horario_encontro: string;
+};
+type SelectedScheduleTeam = {
+  equipeId: number;
+  funcao: string;
+  pontoEncontro: string;
+  horarioEncontro: string;
+};
+type SelectedScheduleAssignment = {
+  voluntarioId: number;
+  equipeId: number | null;
 };
 type ReplacementCandidate = {
   voluntarioId: number;
@@ -104,6 +128,14 @@ function blankSecretaryLink(): SecretaryLink {
     url: "",
   };
 }
+/** Etapa do Fio do Ministério dentro de uma escala (ver ministry-validation.ts). */
+type FioStep = {
+  id: string;
+  titulo: string;
+  feito: boolean;
+  feitoEm: string | null;
+  feitoPor: number | null;
+};
 type Schedule = {
   id: number;
   ministerio_id: number;
@@ -111,6 +143,7 @@ type Schedule = {
   ministerio_categoria: string;
   equipe_id: number | null;
   equipe_nome: string | null;
+  equipes: ScheduleTeam[];
   titulo: string;
   inicia_em: string;
   termina_em: string;
@@ -122,6 +155,8 @@ type Schedule = {
   responsavel_nome: string | null;
   repertorio: string[];
   links_recursos: SecretaryLink[];
+  fio_etapas: FioStep[];
+  criado_em: string;
   campos_respostas?: Record<string, unknown>;
   can_manage: number;
   can_delete: number;
@@ -209,6 +244,7 @@ export default function SecretaryMinisterialWorkspace({
   const [availableUsers, setAvailableUsers] = useState<AvailableUser[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
+  const [expandedChecklistSchedules, setExpandedChecklistSchedules] = useState<number[]>([]);
   const [teams, setTeams] = useState<MinistryTeam[]>([]);
   const [canCreate, setCanCreate] = useState(false);
   const [selectedMinistryId, setSelectedMinistryId] = useState<number | null>(null);
@@ -217,8 +253,10 @@ export default function SecretaryMinisterialWorkspace({
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState("");
-  const [selectedVolunteers, setSelectedVolunteers] = useState<number[]>([]);
-  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
+  const [selectedAssignments, setSelectedAssignments] = useState<
+    SelectedScheduleAssignment[]
+  >([]);
+  const [selectedTeams, setSelectedTeams] = useState<SelectedScheduleTeam[]>([]);
   const [expandedTeamId, setExpandedTeamId] = useState<number | null>(null);
   const [links, setLinks] = useState<SecretaryLink[]>([blankSecretaryLink()]);
   const [libraryItems, setLibraryItems] = useState<SecretaryLibraryItem[]>([]);
@@ -226,7 +264,26 @@ export default function SecretaryMinisterialWorkspace({
   const [scheduleStartsAt, setScheduleStartsAt] = useState("");
   const [scheduleEndsAt, setScheduleEndsAt] = useState("");
   const [scheduleCreatorOpen, setScheduleCreatorOpen] = useState(false);
+  const [desktopMinistry, setDesktopMinistry] = useState(false);
+  const [desktopScheduleId, setDesktopScheduleId] = useState<number | null>(null);
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 1100px)");
+    const sync = () => setDesktopMinistry(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
   const [checklistDraft, setChecklistDraft] = useState<ChecklistDraft[]>([]);
+  // O relógio vem de estado: lê-lo na renderização daria valores diferentes no
+  // servidor e no cliente e quebraria a hidratação.
+  const [agora, setAgora] = useState(0);
+  const [escalasExpandidas, setEscalasExpandidas] = useState<number[]>([]);
+  const [editandoFioId, setEditandoFioId] = useState<number | null>(null);
+  const [fioActionError, setFioActionError] = useState<{
+    scheduleId: number;
+    stepId: string;
+    message: string;
+  } | null>(null);
   const [shareSchedule, setShareSchedule] = useState<Schedule | null>(null);
   const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -353,6 +410,16 @@ export default function SecretaryMinisterialWorkspace({
     return () => window.removeEventListener("vinkulo:new-schedule", openSchedule);
   }, [ministries]);
 
+  useEffect(() => {
+    const acertar = () => setAgora(Date.now());
+    const primeiro = window.setTimeout(acertar, 0);
+    const relogio = window.setInterval(acertar, 600000);
+    return () => {
+      window.clearTimeout(primeiro);
+      window.clearInterval(relogio);
+    };
+  }, []);
+
   const selectedMinistry = useMemo(
     () => ministries.find((item) => item.id === selectedMinistryId) || null,
     [ministries, selectedMinistryId],
@@ -365,21 +432,51 @@ export default function SecretaryMinisterialWorkspace({
     () => new Set(ministrySchedules.map((item) => item.id)),
     [ministrySchedules],
   );
+  // Escala encerrada não precisa ocupar a tela inteira para sempre: o que já
+  // passou (ou foi encerrado/cancelado) vira uma linha recolhida, e a lista
+  // para de crescer sem necessidade. Antes do relógio acertar, nada é dado
+  // como passado — senão a primeira renderização recolheria escalas de hoje.
+  const escalasSeparadas = useMemo(() => {
+    const proximas: Schedule[] = [];
+    const encerradas: Schedule[] = [];
+    for (const schedule of ministrySchedules) {
+      const passou =
+        agora > 0 &&
+        (["ENCERRADA", "CANCELADA", "ARQUIVADA"].includes(schedule.status) ||
+          Date.parse(schedule.termina_em) < agora);
+      if (passou) encerradas.push(schedule);
+      else proximas.push(schedule);
+    }
+    return { proximas, encerradas };
+  }, [ministrySchedules, agora]);
+  // O Fio só aparece nas escalas de ministérios que o ligaram — e continua
+  // aparecendo numa escala que já tem etapas, para o ministério não perder de
+  // vista o que ficou marcado se alguém desligar a opção depois.
+  const ministeriosComFio = useMemo(
+    () => new Set(ministries.filter((item) => Boolean(item.fio_habilitado)).map((item) => item.id)),
+    [ministries],
+  );
   const ministryChecklist = useMemo(
     () => checklist.filter((item) => ministryScheduleIds.has(item.escala_id)),
     [checklist, ministryScheduleIds],
   );
   const ownVolunteer = selectedMinistry?.voluntarios.find((item) => Boolean(item.is_mine));
-  const selectedTeam = teams.find((item) => item.id === selectedTeamId) || null;
+  const selectedTeamEntries = useMemo(
+    () => selectedTeams.flatMap((selection) => {
+      const team = teams.find((item) => item.id === selection.equipeId);
+      return team ? [{ team, funcao: selection.funcao }] : [];
+    }),
+    [selectedTeams, teams],
+  );
   const scheduleCandidates = useMemo(
-    () => selectedTeam
+    () => selectedTeamEntries.length
       ? selectedMinistry?.voluntarios.filter((volunteer) =>
-          selectedTeam.membros.some(
-            (member) => member.voluntario_id === volunteer.id,
+          selectedTeamEntries.some(({ team }) =>
+            team.membros.some((member) => member.voluntario_id === volunteer.id),
           ),
         ) || []
       : selectedMinistry?.voluntarios || [],
-    [selectedMinistry, selectedTeam],
+    [selectedMinistry, selectedTeamEntries],
   );
   const candidateAvailability = useMemo(() => {
     const start = Date.parse(scheduleStartsAt);
@@ -491,7 +588,6 @@ export default function SecretaryMinisterialWorkspace({
     setLinks([blankSecretaryLink()]);
     setSelectedLibraryItemIds([]);
     setTeams([]);
-    setSelectedTeamId(null);
     setExpandedTeamId(null);
     setScheduleCreatorOpen(false);
     setTab("painel");
@@ -499,13 +595,20 @@ export default function SecretaryMinisterialWorkspace({
     setFeedback("");
   }
 
-  async function createMinistry(event: FormEvent<HTMLFormElement>) {
+  async function createMinistry(
+    event: FormEvent<HTMLFormElement>,
+    fio: FioTemplateValue,
+  ) {
     event.preventDefault();
     const created = await submit(
       "creating-ministry",
       "/api/pilot/ministerios",
       "POST",
-      formBody(event.currentTarget),
+      {
+        ...formBody(event.currentTarget),
+        fioHabilitado: fio.habilitado,
+        fioEtapas: fio.habilitado ? fio.etapas : [],
+      },
       "Ministério criado e pronto para receber integrantes.",
       event.currentTarget,
     );
@@ -581,9 +684,19 @@ export default function SecretaryMinisterialWorkspace({
     event.preventDefault();
     if (!selectedMinistry) return;
     const body = formBody(event.currentTarget);
-    const assignments = scheduleCandidates
-      .filter((item) => selectedVolunteers.includes(item.id))
-      .map((item) => ({ voluntarioId: item.id, funcao: item.funcao }));
+    if (((event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null)?.value === "RASCUNHO") body.status = "RASCUNHO";
+    const assignments = selectedAssignments.flatMap((selection) => {
+      const volunteer = scheduleCandidates.find(
+        (item) => item.id === selection.voluntarioId,
+      );
+      return volunteer
+        ? [{
+            voluntarioId: volunteer.id,
+            funcao: volunteer.funcao,
+            equipeId: selection.equipeId,
+          }]
+        : [];
+    });
     const title = String(body.titulo || "").trim();
     const startsAt = String(body.iniciaEm || "");
     const endsAt = String(body.terminaEm || "");
@@ -604,8 +717,10 @@ export default function SecretaryMinisterialWorkspace({
       setError("Etapa 1 — o término precisa ser posterior ao início.");
       return;
     }
-    if (selectedTeamId && !scheduleCandidates.length) {
-      setError("Etapa 2 — a equipe selecionada ainda não possui integrantes.");
+    if (selectedTeamEntries.some(({ team }) => !team.membros.length)) {
+      setError(selectedTeamEntries.length === 1
+        ? "Etapa 2 — a equipe selecionada ainda não possui integrantes."
+        : "Etapa 2 — uma das equipes selecionadas ainda não possui integrantes.");
       return;
     }
     if (publishing && !assignments.length) {
@@ -648,7 +763,7 @@ export default function SecretaryMinisterialWorkspace({
       {
         ...body,
         ministerioId: selectedMinistry.id,
-        equipeId: selectedTeamId,
+        equipes: selectedTeams,
         designacoes: assignments,
         repertorio,
         links: scheduleLinks,
@@ -667,8 +782,8 @@ export default function SecretaryMinisterialWorkspace({
       event.currentTarget,
     );
     if (created) {
-      setSelectedVolunteers([]);
-      setSelectedTeamId(null);
+      setSelectedAssignments([]);
+      setSelectedTeams([]);
       setLinks([blankSecretaryLink()]);
       setSelectedLibraryItemIds([]);
       setChecklistDraft([]);
@@ -678,9 +793,81 @@ export default function SecretaryMinisterialWorkspace({
     }
   }
 
+  // Marcar uma etapa do fio. Vale para quem lidera e para quem está escalado —
+  // a rota decide; aqui só mandamos a intenção. A marca aparece de imediato;
+  // assim, no celular, o toque sempre produz uma resposta visível mesmo antes
+  // de a recarga silenciosa terminar.
+  async function toggleFioStep(schedule: Schedule, step: FioStep) {
+    const feito = !step.feito;
+    const applyStepState = (nextFeito: boolean) => {
+      setSchedules((current) => current.map((item) => item.id !== schedule.id
+        ? item
+        : {
+            ...item,
+            fio_etapas: item.fio_etapas.map((itemStep) => itemStep.id !== step.id
+              ? itemStep
+              : {
+                  ...itemStep,
+                  feito: nextFeito,
+                  feitoEm: nextFeito ? new Date().toISOString() : null,
+                  feitoPor: nextFeito ? itemStep.feitoPor || -1 : null,
+                }),
+          }));
+    };
+
+    applyStepState(feito);
+    setBusy(`fio-${schedule.id}-${step.id}`);
+    setFioActionError(null);
+    setError("");
+    setFeedback("");
+    try {
+      const response = await fetch(`/api/pilot/escalas/${schedule.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acao: "FIO_ETAPA", etapaId: step.id, feito }),
+      });
+      const result = await readJson<{ error?: string }>(response);
+      if (!response.ok) throw new Error(result.error || "Não foi possível atualizar esta etapa.");
+      setFeedback(feito ? "Etapa concluída no fio." : "Etapa reaberta no fio.");
+      await loadData(true);
+    } catch (cause) {
+      applyStepState(step.feito);
+      const message = (cause as Error).message;
+      setError(message);
+      setFioActionError({ scheduleId: schedule.id, stepId: step.id, message });
+    } finally {
+      setBusy("");
+    }
+  }
+
+  // Cada escala pode variar as próprias etapas: o modelo do ministério é só o
+  // ponto de partida. O que já estava marcado continua marcado.
+  async function saveFioSteps(schedule: Schedule, titulos: string[]) {
+    const anteriores = new Map(schedule.fio_etapas.map((step) => [step.titulo, step]));
+    const etapas = titulos.map((titulo, index) => {
+      const anterior = anteriores.get(titulo);
+      return {
+        id: anterior?.id || `etapa-${index + 1}-${Date.now().toString(36)}`,
+        titulo,
+        feito: anterior?.feito ?? false,
+        feitoEm: anterior?.feitoEm ?? null,
+        feitoPor: anterior?.feitoPor ?? null,
+      };
+    });
+    const salvo = await submit(
+      `fio-etapas-${schedule.id}`,
+      `/api/pilot/escalas/${schedule.id}`,
+      "PATCH",
+      { acao: "FIO_ETAPAS_DEFINIR", fioEtapas: etapas },
+      "Etapas do fio atualizadas nesta escala.",
+    );
+    if (salvo) setEditandoFioId(null);
+  }
+
   async function updateSchedule(
     schedule: Schedule,
     event: FormEvent<HTMLFormElement>,
+    selectedScheduleTeams: SelectedScheduleTeam[],
   ) {
     event.preventDefault();
     const body = formBody(event.currentTarget);
@@ -695,7 +882,7 @@ export default function SecretaryMinisterialWorkspace({
       {
         acao: "ATUALIZAR",
         ministerioId: schedule.ministerio_id,
-        equipeId: Number(body.equipeId) || null,
+        equipes: selectedScheduleTeams,
         titulo: body.titulo,
         iniciaEm: body.iniciaEm,
         terminaEm: body.terminaEm,
@@ -757,7 +944,12 @@ export default function SecretaryMinisterialWorkspace({
       const payload = await readJson<{ error?: string }>(response);
       if (!response.ok) throw new Error(payload.error || "Não foi possível excluir a equipe.");
       setFeedback("Equipe removida com segurança.");
-      if (selectedTeamId === team.id) setSelectedTeamId(null);
+      setSelectedTeams((current) =>
+        current.filter((selection) => selection.equipeId !== team.id),
+      );
+      setSelectedAssignments((current) =>
+        current.filter((assignment) => assignment.equipeId !== team.id),
+      );
       await loadTeams(selectedMinistry.id);
     } catch (cause) {
       setError((cause as Error).message);
@@ -961,6 +1153,7 @@ export default function SecretaryMinisterialWorkspace({
   async function updateMinistrySettings(
     event: FormEvent<HTMLFormElement>,
     bannerUrl: string,
+    fio: FioTemplateValue,
   ) {
     event.preventDefault();
     if (!selectedMinistry) return;
@@ -972,6 +1165,8 @@ export default function SecretaryMinisterialWorkspace({
         acao: "ATUALIZAR",
         ...formBody(event.currentTarget),
         bannerUrl,
+        fioHabilitado: fio.habilitado,
+        fioEtapas: fio.habilitado ? fio.etapas : [],
         status: selectedMinistry.status,
       },
       "Configurações do ministério atualizadas.",
@@ -1088,7 +1283,7 @@ export default function SecretaryMinisterialWorkspace({
 
   if (loading) {
     return (
-      <section className="secretary-workspace" aria-busy="true">
+      <section className="secretary-workspace ministry-project" aria-busy="true">
         <div className="secretary-skeleton secretary-skeleton-hero" />
         <div className="secretary-summary-grid">
           {[1, 2, 3, 4].map((item) => <div className="secretary-skeleton" key={item} />)}
@@ -1101,7 +1296,7 @@ export default function SecretaryMinisterialWorkspace({
     return (
       <section
         key="ministerios-catalogo"
-        className="secretary-workspace secretary-catalog"
+        className="secretary-workspace secretary-catalog ministry-project"
         data-editor-key="ministerios-catalogo"
       >
         <header
@@ -1263,10 +1458,222 @@ export default function SecretaryMinisterialWorkspace({
     );
   }
 
+  // O cartão da escala vive numa função para poder ser reaproveitado nas duas
+  // listas: as próximas, sempre abertas, e uma encerrada que a pessoa expandiu.
+  function renderScheduleCard(schedule: Schedule) {
+    const knownTeamIds = new Set(schedule.equipes.map((team) => team.equipe_id));
+    const assignmentGroups = [
+      ...schedule.equipes.map((team) => ({
+        key: String(team.equipe_id),
+        team,
+        assignments: schedule.designacoes.filter(
+          (assignment) => assignment.equipe_id === team.equipe_id,
+        ),
+      })),
+      {
+        key: "livres",
+        team: null,
+        assignments: schedule.designacoes.filter(
+          (assignment) => !assignment.equipe_id || !knownTeamIds.has(assignment.equipe_id),
+        ),
+      },
+    ].filter((group) => group.team || group.assignments.length > 0);
+    const card = (
+      <article className="secretary-schedule-card" key={schedule.id}>
+        <header>
+          <time dateTime={schedule.inicia_em}><strong>{formatDay(schedule.inicia_em)}</strong><span>{formatMonth(schedule.inicia_em)}</span></time>
+          <div><span className={`secretary-status ${schedule.status.toLowerCase()}`}>{schedule.status.replaceAll("_", " ")}</span><h2>{schedule.titulo}</h2><p>{formatDate(schedule.inicia_em)} · {schedule.local || "Local não informado"}</p>{schedule.status === "AGENDADA" && schedule.publicar_em && <SchedulePublicationCountdown opensAt={schedule.publicar_em} />}</div>
+        </header>
+        <div className="secretary-schedule-body">
+          <div><small>Responsável</small><strong>{schedule.responsavel_nome || "Não definido"}</strong></div>
+          <div><small>{schedule.equipes.length === 1 ? "Equipe" : "Equipes"}</small><strong>{schedule.equipes.length ? schedule.equipes.map((team) => team.equipe_nome).join(" · ") : "Seleção livre"}</strong><div className="secretary-avatar-stack">{schedule.designacoes.slice(0, 5).map((item) => <span key={item.id} title={`${item.equipe_nome ? `${item.equipe_nome} · ` : ""}${item.nome} · ${item.funcao}`}>{initials(item.nome)}</span>)}{schedule.designacoes.length > 5 && <b>+{schedule.designacoes.length - 5}</b>}</div></div>
+          <div><small>Repertório</small><strong>{schedule.repertorio.length} itens</strong></div>
+          <div><small>Checklist</small><strong>{checklist.filter((item) => item.escala_id === schedule.id).length} tarefas</strong></div>
+        </div>
+        <ScheduleRepertoire schedule={schedule} />
+        {(schedule.fio_etapas.length > 0 ||
+          (ministeriosComFio.has(schedule.ministerio_id) && Boolean(schedule.can_manage))) && (
+          <FioThread
+            schedule={schedule}
+            agora={agora}
+            busy={busy}
+            editando={editandoFioId === schedule.id}
+            canToggleSteps={
+              Boolean(schedule.can_manage) ||
+              schedule.designacoes.some((assignment) => Boolean(assignment.is_mine))
+            }
+            actionError={
+              fioActionError?.scheduleId === schedule.id
+                ? fioActionError.message
+                : null
+            }
+            onAbrirEdicao={() => setEditandoFioId(schedule.id)}
+            onFecharEdicao={() => setEditandoFioId(null)}
+            onAlternarEtapa={(step) => void toggleFioStep(schedule, step)}
+            onSalvarEtapas={(titulos) => void saveFioSteps(schedule, titulos)}
+          />
+        )}
+        <div className="secretary-assignment-status-list">
+          {assignmentGroups.map((group) => (
+            <section className="secretary-assignment-team" key={group.key}>
+              {group.team && (
+                <header>
+                  <div>
+                    <strong>{group.team.equipe_nome}</strong>
+                    <small>{teamMeetingSummary(group.team, schedule.local)}</small>
+                  </div>
+                  <div className="secretary-team-readiness" data-tone={teamReadiness(group.assignments).tone}>
+                    <em>{teamReadiness(group.assignments).label}</em>
+                    <span>{group.assignments.length}</span>
+                  </div>
+                </header>
+              )}
+              {group.team && !group.assignments.length && <p className="secretary-team-empty">Inclua integrantes para deixar esta equipe pronta.</p>}
+              {group.assignments.map((assignment) => (
+            <article key={assignment.id} data-status={assignment.status.toLowerCase()}>
+              <span className="secretary-avatar">{initials(assignment.nome)}</span>
+              <div>
+                <VerifiedOwnerName name={assignment.nome} verified={Boolean(assignment.owner_verified)} />
+                <small>{assignment.funcao} · {assignmentStatusLabel(assignment.status)}</small>
+              </div>
+              {Boolean(assignment.is_mine) && assignment.status === "PENDENTE" && schedule.status === "PUBLICADA" && (
+                <div className="secretary-response-actions">
+                  <button
+                    type="button"
+                    disabled={busy === `response-${schedule.id}`}
+                    onClick={() => void respondToSchedule(schedule, "CONFIRMADA")}
+                  >
+                    Confirmar
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={busy === `response-${schedule.id}`}
+                    onClick={() => {
+                      setReplacementScheduleId(schedule.id);
+                      setReplacementVolunteerId(0);
+                    }}
+                  >
+                    Não posso
+                  </button>
+                </div>
+              )}
+              {Boolean(assignment.is_mine) && assignment.status === "PENDENTE" && replacementScheduleId === schedule.id && (
+                <div className="secretary-self-substitute-picker">
+                  <strong>Quem pode ficar no seu lugar?</strong>
+                  <p>Escolha uma pessoa ativa deste ministério.</p>
+                  {schedule.substitution_candidates?.length ? (
+                    <select value={replacementVolunteerId || ""} onChange={(event) => setReplacementVolunteerId(Number(event.target.value))}>
+                      <option value="" disabled>Selecione uma pessoa</option>
+                      {schedule.substitution_candidates.map((candidate) => (
+                        <option key={candidate.voluntarioId} value={candidate.voluntarioId}>{candidate.nome} · {candidate.funcao}</option>
+                      ))}
+                    </select>
+                  ) : <small>Não há outra pessoa disponível. Fale com a liderança.</small>}
+                  <div>
+                    <button type="button" disabled={!replacementVolunteerId || busy === `response-${schedule.id}`} onClick={() => void respondToSchedule(schedule, "INDISPONIVEL", replacementVolunteerId)}>Confirmar substituição</button>
+                    <button type="button" className="secondary" onClick={() => setReplacementScheduleId(null)}>Cancelar</button>
+                  </div>
+                </div>
+              )}
+              {Boolean(schedule.can_manage) && (
+                <div className="secretary-manager-assignment-actions">
+                  <button
+                    type="button"
+                    disabled={busy === `assignment-${assignment.id}`}
+                    onClick={() => void setAssignmentStatus(schedule, assignment, "AUSENTE")}
+                  >
+                    Marcar ausente
+                  </button>
+                  {assignment.status !== "PENDENTE" && (
+                    <button
+                      type="button"
+                      disabled={busy === `assignment-${assignment.id}`}
+                      onClick={() => void setAssignmentStatus(schedule, assignment, "PENDENTE")}
+                    >
+                      Reabrir
+                    </button>
+                  )}
+                </div>
+              )}
+            </article>
+              ))}
+            </section>
+          ))}
+        </div>
+        {Boolean(schedule.can_manage) && (
+          <form
+            className="secretary-replacement-form"
+            onSubmit={(event) => void addReplacement(schedule, event)}
+          >
+            <strong>Adicionar substituto</strong>
+            <select name="voluntarioId" required defaultValue="">
+              <option value="" disabled>Selecione um integrante</option>
+              {scheduleCandidates
+                .filter((candidate) =>
+                  !schedule.designacoes.some(
+                    (assignment) => assignment.voluntario_id === candidate.id,
+                  ),
+                )
+                .map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {candidate.nome} · {candidate.funcao}
+                  </option>
+                ))}
+            </select>
+            {schedule.equipes.length > 0 && (
+              <select name="equipeId" required defaultValue="">
+                <option value="" disabled>Equipe de origem</option>
+                {schedule.equipes.map((team) => (
+                  <option key={team.equipe_id} value={team.equipe_id}>
+                    {team.equipe_nome}{team.funcao ? ` · ${team.funcao}` : ""}
+                  </option>
+                ))}
+              </select>
+            )}
+            <input name="funcao" required maxLength={100} placeholder="Função na escala" />
+            <button disabled={busy === `replacement-${schedule.id}`}>Adicionar</button>
+          </form>
+        )}
+        <div className="secretary-schedule-actions">
+          {Boolean(schedule.can_manage) && schedule.status === "RASCUNHO" && (
+            <button type="button" className="publish" onClick={() => void publishSchedule(schedule)} disabled={busy === `publish-${schedule.id}`}>
+              {busy === `publish-${schedule.id}` ? "Publicando…" : "Publicar"}
+            </button>
+          )}
+          <button type="button" onClick={() => void downloadSchedulePdf(schedule)} disabled={busy === `pdf-${schedule.id}`}>{busy === `pdf-${schedule.id}` ? "Preparando…" : "PDF"}</button>
+          <button type="button" onClick={() => addScheduleToCalendar(schedule)}>Adicionar ao calendário</button>
+          <button type="button" className="share" onClick={() => setShareSchedule(schedule)} disabled={!schedule.can_manage || schedule.status !== "PUBLICADA" || busy === `share-${schedule.id}`}>Compartilhar</button>
+          {Boolean(schedule.can_manage) && ["RASCUNHO", "AGENDADA", "PUBLICADA"].includes(schedule.status) && (
+            <button type="button" className="edit" onClick={() => setEditingSchedule(schedule)}>
+              Editar escala
+            </button>
+          )}
+          {Boolean(schedule.can_delete) && (
+            <button
+              type="button"
+              className="danger"
+              onClick={() => void deleteSchedule(schedule)}
+              disabled={busy === `delete-${schedule.id}`}
+            >
+              Excluir
+            </button>
+          )}
+        </div>
+      </article>
+    );
+    return desktopMinistry ? (
+      <details className="ministry-schedule-row" key={schedule.id} open={desktopScheduleId === schedule.id} onToggle={(event) => { if (event.currentTarget.open) setDesktopScheduleId(schedule.id); else setDesktopScheduleId(current => current === schedule.id ? null : current); }}>
+        <summary><time dateTime={schedule.inicia_em}><strong>{formatDay(schedule.inicia_em)}</strong><span>{formatMonth(schedule.inicia_em)}</span></time><div><strong>{schedule.titulo}</strong><small>{schedule.equipes?.map(team => team.equipe_nome).join(" · ") || schedule.equipe_nome || selectedMinistry?.nome} · {schedule.designacoes.length} integrantes</small></div><span className="ministry-row-date">{formatDate(schedule.inicia_em)}</span><span className={"ministry-row-status is-" + schedule.status.toLowerCase()}>{({ RASCUNHO: "Rascunho", PUBLICADA: "Publicada", AGENDADA: "Agendada", ENCERRADA: "Encerrada", CANCELADA: "Cancelada", AGUARDANDO_CHECKLIST: "Aguardando checklist" }[schedule.status])}</span><b aria-hidden="true">⌄</b></summary>
+        {card}
+      </details>
+    ) : card;
+  }
+
   return (
     <section
       key={`ministerio-detalhe-${selectedMinistry.id}`}
-      className="secretary-workspace"
+      className="secretary-workspace ministry-project"
       data-editor-key={`ministerio-detalhe-${selectedMinistry.id}`}
     >
       <header
@@ -1381,6 +1788,7 @@ export default function SecretaryMinisterialWorkspace({
                 <SummaryCard label="Próximas escalas" value={upcoming.length} detail="Em preparação ou publicadas" icon="▣" tone="green" />
                 <SummaryCard label="Pendências" value={pendingChecklist.length} detail="Itens de checklist" icon="✓" tone="amber" />
               </div>
+              {desktopMinistry && <section className="ministry-recent-schedules"><header><h2>Escalas recentes</h2><button type="button" onClick={() => setTab("escalas")}>Ver todas</button></header>{ministrySchedules.slice(0,5).map(schedule => <button className="ministry-recent-row" type="button" key={schedule.id} onClick={() => { setDesktopScheduleId(schedule.id); setTab("escalas"); }}><time dateTime={schedule.inicia_em}><strong>{formatDay(schedule.inicia_em)}</strong><span>{formatMonth(schedule.inicia_em)}</span></time><span><strong>{schedule.titulo}</strong><small>{schedule.designacoes.length} integrantes · {schedule.equipes?.length || (schedule.equipe_id ? 1 : 0)} equipe(s)</small></span><small>{formatDate(schedule.inicia_em)}</small><em className={"ministry-row-status is-" + schedule.status.toLowerCase()}>{({ RASCUNHO: "Rascunho", PUBLICADA: "Publicada", AGENDADA: "Agendada", ENCERRADA: "Encerrada", CANCELADA: "Cancelada", AGUARDANDO_CHECKLIST: "Aguardando checklist" }[schedule.status])}</em></button>)}{!ministrySchedules.length && <p className="secretary-card-empty">Nenhuma escala cadastrada neste ministério.</p>}</section>}
               <div className="secretary-dashboard-grid">
                 <article className="secretary-card secretary-ministry-card">
                   <header><div><p className="pilot-kicker">MINISTÉRIO SELECIONADO</p><h2>{selectedMinistry.nome}</h2></div><span>{CATEGORY_LABELS[selectedMinistry.categoria] || selectedMinistry.categoria}</span></header>
@@ -1592,6 +2000,179 @@ export default function SecretaryMinisterialWorkspace({
           {tab === "escalas" && selectedMinistry && (
             <div className="secretary-schedules">
               {canManage && (
+                desktopMinistry ? <>
+                  <button type="button" className="ministry-new-schedule" onClick={() => setScheduleCreatorOpen(true)}><b>+</b><strong>Criar nova escala</strong><span>Iniciar o assistente de criação</span></button>
+                  {scheduleCreatorOpen && <MinistryScheduleWizard
+                    key={selectedMinistry.id}
+                    teams={selectedTeamEntries.map(({ team, funcao }) => ({ nome: team.nome, total: team.membros.length, funcao, encontro: selectedTeams.filter(t => t.equipeId === team.id).map(t => [t.pontoEncontro, t.horarioEncontro].filter(Boolean).join(" · ")).join("") }))}
+                    people={selectedAssignments.length}
+                    tasks={checklistDraft.filter(item => item.tarefa.trim()).length}
+                    materials={selectedLibraryItems.length + links.filter(item => item.url.trim()).length}
+                    busy={busy === "creating-schedule"}
+                    error={error}
+                    onClose={() => { setScheduleCreatorOpen(false); setSelectedAssignments([]); setSelectedTeams([]); setLinks([blankSecretaryLink()]); setSelectedLibraryItemIds([]); setChecklistDraft([]); setScheduleStartsAt(""); setScheduleEndsAt(""); }}
+                    onSubmit={createSchedule}
+                    sections={[
+                      <div className="ministry-wizard-fields" key="identificacao"><label>Título<input name="titulo" required maxLength={140} placeholder="Ex.: Culto de celebração" /></label><label>Ministério<input value={selectedMinistry.nome} readOnly /></label><label className="span-2">Observações<textarea name="observacoes" rows={4} maxLength={1200} /></label></div>,
+                      <div className="ministry-wizard-fields" key="equipes"><fieldset className="span-2 secretary-schedule-teams">
+                          <legend>Equipes na escala</legend>
+                          <p>Selecione quantas equipes forem necessárias. Em cada uma, informe a função ou o local de atuação.</p>
+                          <div>
+                            {teams.map((team) => {
+                              const selection = selectedTeams.find((item) => item.equipeId === team.id);
+                              return (
+                                <section key={team.id} data-selected={Boolean(selection)}>
+                                  <label>
+                                    <input
+                                      type="checkbox"
+                                      checked={Boolean(selection)}
+                                      onChange={() => {
+                                        setSelectedTeams((current) =>
+                                          selection
+                                            ? current.filter((item) => item.equipeId !== team.id)
+                                            : [...current, { equipeId: team.id, funcao: "", pontoEncontro: "", horarioEncontro: "" }],
+                                        );
+                                        if (selection) {
+                                          setSelectedAssignments((current) =>
+                                            current.filter((item) => item.equipeId !== team.id),
+                                          );
+                                        }
+                                        setChecklistDraft((current) =>
+                                          current.map((item) => ({ ...item, voluntarioId: "" })),
+                                        );
+                                      }}
+                                    />
+                                    <span>{team.nome}</span>
+                                    <small>{team.membros.length} integrantes</small>
+                                  </label>
+                                  {selection && (
+                                    <div className="secretary-team-duty">
+                                      <label><span>Função/local desta equipe</span><input value={selection.funcao} onChange={(event) => setSelectedTeams((current) => current.map((item) => item.equipeId === team.id ? { ...item, funcao: event.target.value } : item))} maxLength={180} placeholder="Ex.: Velha, Centro ou Recepção" /></label>
+                                      <label><span>Ponto de encontro</span><input value={selection.pontoEncontro} onChange={(event) => setSelectedTeams((current) => current.map((item) => item.equipeId === team.id ? { ...item, pontoEncontro: event.target.value } : item))} maxLength={180} placeholder="Ex.: Portão principal" /></label>
+                                      <label><span>Horário de encontro</span><input type="time" value={selection.horarioEncontro} onChange={(event) => setSelectedTeams((current) => current.map((item) => item.equipeId === team.id ? { ...item, horarioEncontro: event.target.value } : item))} /></label>
+                                    </div>
+                                  )}
+                                </section>
+                              );
+                            })}
+                            {!teams.length && <p className="secretary-inline-empty">Nenhuma equipe criada. Você ainda pode montar uma escala com integrantes livres.</p>}
+                          </div>
+                        </fieldset></div>,
+                      <div className="ministry-wizard-fields" key="responsabilidades"><label>Responsável<select name="responsavelUsuarioId" defaultValue=""><option value="">Definir depois</option>{selectedMinistry.voluntarios.map((item) => <option key={item.id} value={item.usuario_id}>{item.nome}</option>)}</select><small>Opcional no rascunho; escolha um integrante antes de publicar.</small></label><h3>Integrantes escalados</h3>
+                      <div className="secretary-fold-content">
+                        <div className="secretary-suggestion-toolbar">
+                          <p>O sistema considera dia, período, limite e conflitos reais. A validação final também acontece no servidor.</p>
+                          <button type="button" onClick={() => setSelectedAssignments(candidateAvailability.filter((item) => item.suggested).flatMap(({ volunteer }) => {
+                            const team = selectedTeamEntries.find(({ team: candidateTeam }) => candidateTeam.membros.some((member) => member.voluntario_id === volunteer.id));
+                            return selectedTeamEntries.length && !team ? [] : [{ voluntarioId: volunteer.id, equipeId: team?.team.id || null }];
+                          }))} disabled={!candidateAvailability.some((item) => item.suggested)}>Selecionar sugestões disponíveis</button>
+                        </div>
+                        <div className="secretary-team-assignment-groups">
+                          {(selectedTeamEntries.length
+                            ? selectedTeamEntries
+                            : [{ team: null, funcao: "" }]
+                          ).map(({ team, funcao }) => {
+                            const candidates = candidateAvailability.filter(({ volunteer }) =>
+                              !team || team.membros.some((member) => member.voluntario_id === volunteer.id),
+                            );
+                            return (
+                              <section key={team?.id || "livre"}>
+                                <header>
+                                  <div>
+                                    <strong>{team?.nome || "Integrantes livres"}</strong>
+                                    <small>{team ? (funcao ? `Função/local: ${funcao}` : "Função/local não informado") : "Sem equipe definida"}</small>
+                                  </div>
+                                  <span>{candidates.length}</span>
+                                </header>
+                                <div className="secretary-team-picker">
+                                  {candidates.map(({ volunteer: item, capacityReached, conflict, suggested, status }) => {
+                                    const selectedHere = selectedAssignments.some((assignment) =>
+                                      assignment.voluntarioId === item.id && assignment.equipeId === (team?.id || null),
+                                    );
+                                    const selectedElsewhere = selectedAssignments.some((assignment) =>
+                                      assignment.voluntarioId === item.id && assignment.equipeId !== (team?.id || null),
+                                    );
+                                    return (
+                                      <label key={item.id} className={suggested ? "suggested" : conflict || capacityReached ? "unavailable" : ""}>
+                                        <input type="checkbox" disabled={capacityReached || conflict || selectedElsewhere} checked={selectedHere} onChange={() => setSelectedAssignments((current) => selectedHere ? current.filter((assignment) => assignment.voluntarioId !== item.id) : [...current, { voluntarioId: item.id, equipeId: team?.id || null }])} />
+                                        <span className="secretary-avatar">{initials(item.nome)}</span>
+                                        <strong>{item.nome}</strong>
+                                        <small>{item.funcao} · {item.escalas_ativas} ativa(s) · {Math.max(0, item.limite_escalas - item.escalas_ativas)} restante(s)</small>
+                                        <em>{selectedElsewhere ? "Selecionado em outra equipe" : status}</em>
+                                      </label>
+                                    );
+                                  })}
+                                  {!candidates.length && <p className="secretary-inline-empty">Esta equipe ainda não possui integrantes.</p>}
+                                </div>
+                              </section>
+                            );
+                          })}
+                        </div>
+                      </div><h3>Checklist de responsabilidades</h3>
+                      <div className="secretary-fold-content secretary-checklist-builder">
+                        <div className="secretary-checklist-tools">
+                          <p>Comece do zero ou reaproveite as tarefas da escala mais recente.</p>
+                          <button
+                            type="button"
+                            disabled={!previousChecklistTemplate.length}
+                            onClick={() => {
+                              setChecklistDraft(previousChecklistTemplate.map((item) => ({
+                                id: crypto.randomUUID(),
+                                tarefa: item.tarefa,
+                                voluntarioId: scheduleCandidates.some((candidate) => String(candidate.id) === item.voluntarioId)
+                                  ? item.voluntarioId
+                                  : "",
+                              })));
+                              setFeedback("Checklist anterior aplicado. Revise os responsáveis antes de salvar.");
+                            }}
+                          >Usar checklist anterior</button>
+                        </div>
+                        {checklistDraft.map((item) => (
+                          <div className="secretary-checklist-draft" key={item.id}>
+                            <input aria-label="Tarefa" value={item.tarefa} onChange={(event) => setChecklistDraft((current) => current.map((draft) => draft.id === item.id ? { ...draft, tarefa: event.target.value } : draft))} placeholder="Ex.: Testar microfones" maxLength={180} />
+                            <select aria-label="Responsável" value={item.voluntarioId} onChange={(event) => setChecklistDraft((current) => current.map((draft) => draft.id === item.id ? { ...draft, voluntarioId: event.target.value } : draft))}>
+                              <option value="">Equipe</option>
+                              {scheduleCandidates
+                                .filter((volunteer) =>
+                                  String(volunteer.id) === item.voluntarioId ||
+                                  !checklistDraft.some(
+                                    (draft) => draft.id !== item.id && draft.voluntarioId === String(volunteer.id),
+                                  ),
+                                )
+                                .map((volunteer) => <option key={volunteer.id} value={volunteer.id}>{volunteer.nome}</option>)}
+                            </select>
+                            <button type="button" aria-label="Remover responsabilidade" onClick={() => setChecklistDraft((current) => current.filter((draft) => draft.id !== item.id))}>×</button>
+                          </div>
+                        ))}
+                        <button type="button" onClick={() => setChecklistDraft((current) => [...current, { id: crypto.randomUUID(), tarefa: "", voluntarioId: "" }])}>+ Adicionar responsabilidade</button>
+                      </div></div>,
+                      <div className="ministry-wizard-fields secretary-form-grid" key="data"><label>Início<input name="iniciaEm" type="datetime-local" required value={scheduleStartsAt} onInput={(event) => setScheduleStartsAt(event.currentTarget.value)} onChange={(event) => setScheduleStartsAt(event.target.value)} /></label><label>Término<input name="terminaEm" type="datetime-local" required value={scheduleEndsAt} onInput={(event) => setScheduleEndsAt(event.currentTarget.value)} onChange={(event) => setScheduleEndsAt(event.target.value)} /></label><p className="span-2 secretary-form-help">Ao alterar o período, revise as sugestões e os conflitos na etapa Responsabilidades.</p></div>,
+                      <div className="ministry-wizard-fields" key="local"><label className="span-2">Local<input name="local" maxLength={180} placeholder="Templo, sala ou endereço" /></label>{selectedTeamEntries.length > 0 && <section className="ministry-meeting-review"><h3>Encontro das equipes</h3>{selectedTeams.map(item => <article key={item.equipeId}><strong>{teams.find(team => team.id === item.equipeId)?.nome}</strong><span>{item.pontoEncontro || "Ponto de encontro não definido"}</span><span>{item.horarioEncontro || "Horário não definido"}</span></article>)}<p>Os encontros são definidos na etapa Equipes.</p></section>}</div>,
+                      <div className="ministry-wizard-fields" key="revisao"><h3>Repertório e materiais</h3>
+                      <div className="secretary-fold-content">
+                        <label>Repertório<textarea name="repertorio" rows={6} maxLength={8000} placeholder={"Música ou conteúdo 1\nMúsica ou conteúdo 2"} /></label>
+                        <LinkBuilder
+                          links={links}
+                          setLinks={setLinks}
+                          libraryItems={ministryLibrary}
+                          selectedItemIds={selectedLibraryItemIds}
+                          onToggleItem={toggleLibraryItem}
+                          onUseSaved={useReusableLink}
+                          onRemoveSaved={(link) => void removeReusableLink(link)}
+                          onRenameItem={(item, titulo) => void renameLibraryItem(item, titulo)}
+                          onRemoveItem={(item) => void removeLibraryItem(item)}
+                          onSaveCurrent={(titulo) => void saveReusableLinks(titulo)}
+                          busy={busy}
+                        />
+                      </div><h3>Publicação</h3>
+                      <div className="secretary-fold-content secretary-form-grid">
+                        <label>Status<select name="status" defaultValue="RASCUNHO"><option value="RASCUNHO">Salvar como rascunho</option><option value="AGENDADA">Agendar publicação</option><option value="PUBLICADA">Publicar e notificar agora</option></select></label>
+                        <label>Publicar em<input name="publicarEm" type="datetime-local" /><small>Obrigatório apenas para publicação agendada.</small></label>
+
+                      </div></div>,
+                    ]}
+                  />}
+                </> : (
                 <details
                   className="secretary-create-schedule"
                   ref={scheduleDetails}
@@ -1609,7 +2190,50 @@ export default function SecretaryMinisterialWorkspace({
                       <summary><span>1</span><div><h3>Informações da escala</h3><p>Campos obrigatórios e responsável.</p></div><i aria-hidden="true">⌄</i></summary>
                       <div className="secretary-fold-content secretary-form-grid">
                         <label>Título<input name="titulo" required maxLength={140} placeholder="Ex.: Culto de celebração" /></label>
-                        <label>Equipe (opcional)<select name="equipeId" value={selectedTeamId || ""} onChange={(event) => { const value = Number(event.target.value) || null; setSelectedTeamId(value); setSelectedVolunteers([]); setChecklistDraft((current) => current.map((item) => ({ ...item, voluntarioId: "" }))); }}><option value="">Todos os integrantes</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.nome} · {team.membros.length} integrantes</option>)}</select><small>Ao escolher uma equipe, somente seus integrantes poderão ser escalados.</small></label>
+                        <fieldset className="span-2 secretary-schedule-teams">
+                          <legend>Equipes na escala</legend>
+                          <p>Selecione quantas equipes forem necessárias. Em cada uma, informe a função ou o local de atuação.</p>
+                          <div>
+                            {teams.map((team) => {
+                              const selection = selectedTeams.find((item) => item.equipeId === team.id);
+                              return (
+                                <section key={team.id} data-selected={Boolean(selection)}>
+                                  <label>
+                                    <input
+                                      type="checkbox"
+                                      checked={Boolean(selection)}
+                                      onChange={() => {
+                                        setSelectedTeams((current) =>
+                                          selection
+                                            ? current.filter((item) => item.equipeId !== team.id)
+                                            : [...current, { equipeId: team.id, funcao: "", pontoEncontro: "", horarioEncontro: "" }],
+                                        );
+                                        if (selection) {
+                                          setSelectedAssignments((current) =>
+                                            current.filter((item) => item.equipeId !== team.id),
+                                          );
+                                        }
+                                        setChecklistDraft((current) =>
+                                          current.map((item) => ({ ...item, voluntarioId: "" })),
+                                        );
+                                      }}
+                                    />
+                                    <span>{team.nome}</span>
+                                    <small>{team.membros.length} integrantes</small>
+                                  </label>
+                                  {selection && (
+                                    <div className="secretary-team-duty">
+                                      <label><span>Função/local desta equipe</span><input value={selection.funcao} onChange={(event) => setSelectedTeams((current) => current.map((item) => item.equipeId === team.id ? { ...item, funcao: event.target.value } : item))} maxLength={180} placeholder="Ex.: Velha, Centro ou Recepção" /></label>
+                                      <label><span>Ponto de encontro</span><input value={selection.pontoEncontro} onChange={(event) => setSelectedTeams((current) => current.map((item) => item.equipeId === team.id ? { ...item, pontoEncontro: event.target.value } : item))} maxLength={180} placeholder="Ex.: Portão principal" /></label>
+                                      <label><span>Horário de encontro</span><input type="time" value={selection.horarioEncontro} onChange={(event) => setSelectedTeams((current) => current.map((item) => item.equipeId === team.id ? { ...item, horarioEncontro: event.target.value } : item))} /></label>
+                                    </div>
+                                  )}
+                                </section>
+                              );
+                            })}
+                            {!teams.length && <p className="secretary-inline-empty">Nenhuma equipe criada. Você ainda pode montar uma escala com integrantes livres.</p>}
+                          </div>
+                        </fieldset>
                         <label>Responsável<select name="responsavelUsuarioId" defaultValue=""><option value="">Definir depois</option>{selectedMinistry.voluntarios.map((item) => <option key={item.id} value={item.usuario_id}>{item.nome}</option>)}</select><small>Opcional no rascunho; escolha um integrante antes de publicar.</small></label>
                         <label>Início<input name="iniciaEm" type="datetime-local" required value={scheduleStartsAt} onChange={(event) => setScheduleStartsAt(event.target.value)} /></label>
                         <label>Término<input name="terminaEm" type="datetime-local" required value={scheduleEndsAt} onChange={(event) => setScheduleEndsAt(event.target.value)} /></label>
@@ -1617,23 +2241,55 @@ export default function SecretaryMinisterialWorkspace({
                       </div>
                     </details>
                     <details className="secretary-fold-section">
-                      <summary><span>2</span><div><h3>{selectedTeam ? selectedTeam.nome : "Equipe carregada do ministério"}</h3><p>{selectedTeam ? "Sugestões calculadas para esta equipe e data." : "Selecione uma equipe para receber sugestões mais precisas."}</p></div><i aria-hidden="true">⌄</i></summary>
+                      <summary><span>2</span><div><h3>{selectedTeamEntries.length ? `${selectedTeamEntries.length} equipe${selectedTeamEntries.length === 1 ? "" : "s"} selecionada${selectedTeamEntries.length === 1 ? "" : "s"}` : "Integrantes do ministério"}</h3><p>{selectedTeamEntries.length ? "Selecione os integrantes dentro de cada equipe, mantendo a origem de cada pessoa." : "Sem equipes selecionadas, os integrantes ficam livres nesta escala."}</p></div><i aria-hidden="true">⌄</i></summary>
                       <div className="secretary-fold-content">
                         <div className="secretary-suggestion-toolbar">
                           <p>O sistema considera dia, período, limite e conflitos reais. A validação final também acontece no servidor.</p>
-                          <button type="button" onClick={() => setSelectedVolunteers(candidateAvailability.filter((item) => item.suggested).map((item) => item.volunteer.id))} disabled={!candidateAvailability.some((item) => item.suggested)}>Selecionar sugestões disponíveis</button>
+                          <button type="button" onClick={() => setSelectedAssignments(candidateAvailability.filter((item) => item.suggested).flatMap(({ volunteer }) => {
+                            const team = selectedTeamEntries.find(({ team: candidateTeam }) => candidateTeam.membros.some((member) => member.voluntario_id === volunteer.id));
+                            return selectedTeamEntries.length && !team ? [] : [{ voluntarioId: volunteer.id, equipeId: team?.team.id || null }];
+                          }))} disabled={!candidateAvailability.some((item) => item.suggested)}>Selecionar sugestões disponíveis</button>
                         </div>
-                        <div className="secretary-team-picker">
-                        {candidateAvailability.map(({ volunteer: item, capacityReached, conflict, suggested, status }) => (
-                          <label key={item.id} className={suggested ? "suggested" : conflict || capacityReached ? "unavailable" : ""}>
-                            <input type="checkbox" disabled={capacityReached || conflict} checked={selectedVolunteers.includes(item.id)} onChange={() => setSelectedVolunteers((current) => current.includes(item.id) ? current.filter((id) => id !== item.id) : [...current, item.id])} />
-                            <span className="secretary-avatar">{initials(item.nome)}</span>
-                            <strong>{item.nome}</strong>
-                            <small>{item.funcao} · {item.escalas_ativas} ativa(s) · {Math.max(0, item.limite_escalas - item.escalas_ativas)} restante(s)</small>
-                            <em>{status}</em>
-                          </label>
-                        ))}
-                        {!scheduleCandidates.length && <p className="secretary-inline-empty">Esta equipe ainda não possui integrantes.</p>}
+                        <div className="secretary-team-assignment-groups">
+                          {(selectedTeamEntries.length
+                            ? selectedTeamEntries
+                            : [{ team: null, funcao: "" }]
+                          ).map(({ team, funcao }) => {
+                            const candidates = candidateAvailability.filter(({ volunteer }) =>
+                              !team || team.membros.some((member) => member.voluntario_id === volunteer.id),
+                            );
+                            return (
+                              <section key={team?.id || "livre"}>
+                                <header>
+                                  <div>
+                                    <strong>{team?.nome || "Integrantes livres"}</strong>
+                                    <small>{team ? (funcao ? `Função/local: ${funcao}` : "Função/local não informado") : "Sem equipe definida"}</small>
+                                  </div>
+                                  <span>{candidates.length}</span>
+                                </header>
+                                <div className="secretary-team-picker">
+                                  {candidates.map(({ volunteer: item, capacityReached, conflict, suggested, status }) => {
+                                    const selectedHere = selectedAssignments.some((assignment) =>
+                                      assignment.voluntarioId === item.id && assignment.equipeId === (team?.id || null),
+                                    );
+                                    const selectedElsewhere = selectedAssignments.some((assignment) =>
+                                      assignment.voluntarioId === item.id && assignment.equipeId !== (team?.id || null),
+                                    );
+                                    return (
+                                      <label key={item.id} className={suggested ? "suggested" : conflict || capacityReached ? "unavailable" : ""}>
+                                        <input type="checkbox" disabled={capacityReached || conflict || selectedElsewhere} checked={selectedHere} onChange={() => setSelectedAssignments((current) => selectedHere ? current.filter((assignment) => assignment.voluntarioId !== item.id) : [...current, { voluntarioId: item.id, equipeId: team?.id || null }])} />
+                                        <span className="secretary-avatar">{initials(item.nome)}</span>
+                                        <strong>{item.nome}</strong>
+                                        <small>{item.funcao} · {item.escalas_ativas} ativa(s) · {Math.max(0, item.limite_escalas - item.escalas_ativas)} restante(s)</small>
+                                        <em>{selectedElsewhere ? "Selecionado em outra equipe" : status}</em>
+                                      </label>
+                                    );
+                                  })}
+                                  {!candidates.length && <p className="secretary-inline-empty">Esta equipe ainda não possui integrantes.</p>}
+                                </div>
+                              </section>
+                            );
+                          })}
                         </div>
                       </div>
                     </details>
@@ -1707,143 +2363,56 @@ export default function SecretaryMinisterialWorkspace({
                     <footer><button type="submit" disabled={busy === "creating-schedule"}>{busy === "creating-schedule" ? "Salvando…" : "Salvar escala"}</button></footer>
                   </form>
                 </details>
+                )
               )}
               <div className="secretary-schedule-list">
-                {ministrySchedules.map((schedule) => (
-                  <article className="secretary-schedule-card" key={schedule.id}>
+                {escalasSeparadas.proximas.map((schedule) => renderScheduleCard(schedule))}
+                {escalasSeparadas.encerradas.length > 0 && (
+                  <section className="fio-encerradas">
                     <header>
-                      <time dateTime={schedule.inicia_em}><strong>{formatDay(schedule.inicia_em)}</strong><span>{formatMonth(schedule.inicia_em)}</span></time>
-                      <div><span className={`secretary-status ${schedule.status.toLowerCase()}`}>{schedule.status.replaceAll("_", " ")}</span><h2>{schedule.titulo}</h2><p>{formatDate(schedule.inicia_em)} · {schedule.local || "Local não informado"}</p>{schedule.status === "AGENDADA" && schedule.publicar_em && <SchedulePublicationCountdown opensAt={schedule.publicar_em} />}</div>
-                    </header>
-                    <div className="secretary-schedule-body">
-                      <div><small>Responsável</small><strong>{schedule.responsavel_nome || "Não definido"}</strong></div>
-                      <div><small>Equipe</small><strong>{schedule.equipe_nome || "Seleção livre"}</strong><div className="secretary-avatar-stack">{schedule.designacoes.slice(0, 5).map((item) => <span key={item.id} title={`${item.nome} · ${item.funcao}`}>{initials(item.nome)}</span>)}{schedule.designacoes.length > 5 && <b>+{schedule.designacoes.length - 5}</b>}</div></div>
-                      <div><small>Repertório</small><strong>{schedule.repertorio.length} itens</strong></div>
-                      <div><small>Checklist</small><strong>{checklist.filter((item) => item.escala_id === schedule.id).length} tarefas</strong></div>
-                    </div>
-                    <ScheduleRepertoire schedule={schedule} />
-                    <div className="secretary-assignment-status-list">
-                      {schedule.designacoes.map((assignment) => (
-                        <article key={assignment.id} data-status={assignment.status.toLowerCase()}>
-                          <span className="secretary-avatar">{initials(assignment.nome)}</span>
-                          <div>
-                            <VerifiedOwnerName name={assignment.nome} verified={Boolean(assignment.owner_verified)} />
-                            <small>{assignment.funcao} · {assignmentStatusLabel(assignment.status)}</small>
-                          </div>
-                          {Boolean(assignment.is_mine) && assignment.status === "PENDENTE" && schedule.status === "PUBLICADA" && (
-                            <div className="secretary-response-actions">
-                              <button
-                                type="button"
-                                disabled={busy === `response-${schedule.id}`}
-                                onClick={() => void respondToSchedule(schedule, "CONFIRMADA")}
-                              >
-                                Confirmar
-                              </button>
-                              <button
-                                type="button"
-                                className="secondary"
-                                disabled={busy === `response-${schedule.id}`}
-                                onClick={() => {
-                                  setReplacementScheduleId(schedule.id);
-                                  setReplacementVolunteerId(0);
-                                }}
-                              >
-                                Não posso
-                              </button>
-                            </div>
-                          )}
-                          {Boolean(assignment.is_mine) && assignment.status === "PENDENTE" && replacementScheduleId === schedule.id && (
-                            <div className="secretary-self-substitute-picker">
-                              <strong>Quem pode ficar no seu lugar?</strong>
-                              <p>Escolha uma pessoa ativa deste ministério.</p>
-                              {schedule.substitution_candidates?.length ? (
-                                <select value={replacementVolunteerId || ""} onChange={(event) => setReplacementVolunteerId(Number(event.target.value))}>
-                                  <option value="" disabled>Selecione uma pessoa</option>
-                                  {schedule.substitution_candidates.map((candidate) => (
-                                    <option key={candidate.voluntarioId} value={candidate.voluntarioId}>{candidate.nome} · {candidate.funcao}</option>
-                                  ))}
-                                </select>
-                              ) : <small>Não há outra pessoa disponível. Fale com a liderança.</small>}
-                              <div>
-                                <button type="button" disabled={!replacementVolunteerId || busy === `response-${schedule.id}`} onClick={() => void respondToSchedule(schedule, "INDISPONIVEL", replacementVolunteerId)}>Confirmar substituição</button>
-                                <button type="button" className="secondary" onClick={() => setReplacementScheduleId(null)}>Cancelar</button>
-                              </div>
-                            </div>
-                          )}
-                          {Boolean(schedule.can_manage) && (
-                            <div className="secretary-manager-assignment-actions">
-                              <button
-                                type="button"
-                                disabled={busy === `assignment-${assignment.id}`}
-                                onClick={() => void setAssignmentStatus(schedule, assignment, "AUSENTE")}
-                              >
-                                Marcar ausente
-                              </button>
-                              {assignment.status !== "PENDENTE" && (
-                                <button
-                                  type="button"
-                                  disabled={busy === `assignment-${assignment.id}`}
-                                  onClick={() => void setAssignmentStatus(schedule, assignment, "PENDENTE")}
-                                >
-                                  Reabrir
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </article>
-                      ))}
-                    </div>
-                    {Boolean(schedule.can_manage) && (
-                      <form
-                        className="secretary-replacement-form"
-                        onSubmit={(event) => void addReplacement(schedule, event)}
+                      <p>
+                        {escalasSeparadas.encerradas.length}
+                        {escalasSeparadas.encerradas.length === 1
+                          ? " escala encerrada recolhida automaticamente"
+                          : " escalas encerradas recolhidas automaticamente"}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEscalasExpandidas((atual) =>
+                            atual.length
+                              ? []
+                              : escalasSeparadas.encerradas.map((item) => item.id),
+                          )
+                        }
                       >
-                        <strong>Adicionar substituto</strong>
-                        <select name="voluntarioId" required defaultValue="">
-                          <option value="" disabled>Selecione um integrante</option>
-                          {scheduleCandidates
-                            .filter((candidate) =>
-                              !schedule.designacoes.some(
-                                (assignment) => assignment.voluntario_id === candidate.id,
-                              ),
-                            )
-                            .map((candidate) => (
-                              <option key={candidate.id} value={candidate.id}>
-                                {candidate.nome} · {candidate.funcao}
-                              </option>
-                            ))}
-                        </select>
-                        <input name="funcao" required maxLength={100} placeholder="Função na escala" />
-                        <button disabled={busy === `replacement-${schedule.id}`}>Adicionar</button>
-                      </form>
-                    )}
-                    <div className="secretary-schedule-actions">
-                      {Boolean(schedule.can_manage) && schedule.status === "RASCUNHO" && (
-                        <button type="button" className="publish" onClick={() => void publishSchedule(schedule)} disabled={busy === `publish-${schedule.id}`}>
-                          {busy === `publish-${schedule.id}` ? "Publicando…" : "Publicar"}
-                        </button>
-                      )}
-                      <button type="button" onClick={() => void downloadSchedulePdf(schedule)} disabled={busy === `pdf-${schedule.id}`}>{busy === `pdf-${schedule.id}` ? "Preparando…" : "PDF"}</button>
-                      <button type="button" onClick={() => addScheduleToCalendar(schedule)}>Adicionar ao calendário</button>
-                      <button type="button" className="share" onClick={() => setShareSchedule(schedule)} disabled={!schedule.can_manage || schedule.status !== "PUBLICADA" || busy === `share-${schedule.id}`}>Compartilhar</button>
-                      {Boolean(schedule.can_manage) && ["RASCUNHO", "AGENDADA", "PUBLICADA"].includes(schedule.status) && (
-                        <button type="button" className="edit" onClick={() => setEditingSchedule(schedule)}>
-                          Editar escala
-                        </button>
-                      )}
-                      {Boolean(schedule.can_delete) && (
+                        {escalasExpandidas.length ? "Recolher tudo" : "Expandir tudo"}
+                      </button>
+                    </header>
+                    {escalasSeparadas.encerradas.map((schedule) =>
+                      escalasExpandidas.includes(schedule.id) ? (
+                        <div key={schedule.id}>{renderScheduleCard(schedule)}</div>
+                      ) : (
                         <button
                           type="button"
-                          className="danger"
-                          onClick={() => void deleteSchedule(schedule)}
-                          disabled={busy === `delete-${schedule.id}`}
+                          className="fio-encerrada-linha"
+                          key={schedule.id}
+                          onClick={() => setEscalasExpandidas((atual) => [...atual, schedule.id])}
                         >
-                          Excluir
+                          <time dateTime={schedule.inicia_em}>
+                            <strong>{formatDay(schedule.inicia_em)}</strong>
+                            <span>{formatMonth(schedule.inicia_em)}</span>
+                          </time>
+                          <span className="fio-encerrada-copy">
+                            <strong>{schedule.titulo}</strong>
+                            <small>{formatDate(schedule.inicia_em)} · {schedule.local || "Local não informado"}</small>
+                          </span>
+                          <FioVerdict schedule={schedule} agora={agora} />
                         </button>
-                      )}
-                    </div>
-                  </article>
-                ))}
+                      ),
+                    )}
+                  </section>
+                )}
                 {!ministrySchedules.length && <div className="secretary-empty compact"><span>▣</span><h2>Nenhuma escala cadastrada</h2><p>Crie a primeira escala deste ministério.</p></div>}
               </div>
             </div>
@@ -1856,10 +2425,14 @@ export default function SecretaryMinisterialWorkspace({
                 {ministrySchedules.map((schedule) => {
                   const items = ministryChecklist.filter((item) => item.escala_id === schedule.id);
                   if (!items.length) return null;
+                  const done = items.filter((item) => item.status === "FEITO").length;
+                  const isOpen = expandedChecklistSchedules.includes(schedule.id);
+                  const isPast = agora > 0 && new Date(schedule.inicia_em.replace(" ", "T")).getTime() < agora;
+                  const state = done === items.length ? "done" : isPast ? "overdue" : "pending";
                   return (
-                    <section key={schedule.id}>
-                      <header><div><strong>{schedule.titulo}</strong><small>{formatDate(schedule.inicia_em)}</small></div><span>{items.filter((item) => item.status === "FEITO").length}/{items.length}</span></header>
-                      {items.map((item) => (
+                    <section key={schedule.id} className={`secretary-checklist-group is-${state}`}>
+                      <header><button type="button" className="secretary-checklist-collapse" aria-expanded={isOpen} onClick={() => setExpandedChecklistSchedules((current) => current.includes(schedule.id) ? current.filter((id) => id !== schedule.id) : [...current, schedule.id])}><div><strong>{schedule.titulo}</strong><small>{formatDate(schedule.inicia_em)}</small></div><span><b>{done}/{items.length}</b><i aria-hidden="true">⌄</i></span></button><em>{state === "done" ? "Concluído" : state === "overdue" ? "Atenção: pendente" : "Pendente"}</em></header>
+                      {isOpen && items.map((item) => (
                         <div key={item.id}>
                           <button type="button" onClick={() => void updateChecklist(item, item.status === "FEITO" ? "PENDENTE" : "FEITO")} disabled={busy === `checklist-${item.id}`} aria-label={item.status === "FEITO" ? "Reabrir item" : "Concluir item"}>{item.status === "FEITO" ? "✓" : "○"}</button>
                           <strong>{item.tarefa}</strong>
@@ -1967,13 +2540,19 @@ function MinistrySettingsForm({
   onSubmit: (
     event: FormEvent<HTMLFormElement>,
     bannerUrl: string,
+    fio: FioTemplateValue,
   ) => Promise<void>;
 }) {
   const [bannerUrl, setBannerUrl] = useState(ministry.banner_url || "");
+  const [categoria, setCategoria] = useState(ministry.categoria);
+  const [fio, setFio] = useState<FioTemplateValue>({
+    habilitado: Boolean(ministry.fio_habilitado),
+    etapas: ministry.fio_etapas,
+  });
   return (
     <form
       className="secretary-ministry-settings"
-      onSubmit={(event) => void onSubmit(event, bannerUrl)}
+      onSubmit={(event) => void onSubmit(event, bannerUrl, fio)}
     >
       <header className="secretary-settings-hero">
         <span className="secretary-settings-icon" aria-hidden="true">
@@ -2015,7 +2594,11 @@ function MinistrySettingsForm({
           <header><span>2</span><div><strong>Liderança e categoria</strong><small>Responsabilidade isolada por ministério</small></div></header>
           <label>
             Categoria
-            <select name="categoria" defaultValue={ministry.categoria}>
+            <select
+              name="categoria"
+              value={categoria}
+              onChange={(event) => setCategoria(event.target.value)}
+            >
               {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
                 <option value={value} key={value}>{label}</option>
               ))}
@@ -2048,8 +2631,13 @@ function MinistrySettingsForm({
           </label>
         </section>
 
+        <section className="secretary-settings-section secretary-settings-fio">
+          <header><span>4</span><div><strong>Fio do Ministério</strong><small>O modelo de checkpoints que cada escala nova recebe</small></div></header>
+          <FioTemplateFields categoria={categoria} value={fio} onChange={setFio} />
+        </section>
+
         <section className="secretary-settings-section secretary-settings-banner">
-          <header><span>4</span><div><strong>Imagem de capa</strong><small>Banner responsivo para celular e computador</small></div></header>
+          <header><span>5</span><div><strong>Imagem de capa</strong><small>Banner responsivo para celular e computador</small></div></header>
           <NativeImageUpload
             label="Banner do ministério"
             value={bannerUrl}
@@ -2078,12 +2666,17 @@ function MinistryForm({
   users: AvailableUser[];
   loadingUsers: boolean;
   busy: boolean;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>, fio: FioTemplateValue) => void;
 }) {
+  const [categoria, setCategoria] = useState("OUTRO");
+  const [fio, setFio] = useState<FioTemplateValue>({ habilitado: false, etapas: [] });
   return (
-    <form className="secretary-form secretary-ministry-form" onSubmit={onSubmit}>
+    <form
+      className="secretary-form secretary-ministry-form"
+      onSubmit={(event) => onSubmit(event, fio)}
+    >
       <label>Nome do ministério<input name="nome" required maxLength={120} /></label>
-      <label>Categoria<select name="categoria" defaultValue="OUTRO">{Object.entries(CATEGORY_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
+      <label>Categoria<select name="categoria" value={categoria} onChange={(event) => setCategoria(event.target.value)}>{Object.entries(CATEGORY_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
       <label>
         Líder responsável
         <select name="responsavelUsuarioId" required defaultValue="">
@@ -2105,6 +2698,9 @@ function MinistryForm({
         )}
       </label>
       <label className="span-2">Descrição<textarea name="descricao" rows={4} maxLength={1200} /></label>
+      <div className="span-2">
+        <FioTemplateFields categoria={categoria} value={fio} onChange={setFio} />
+      </div>
       <input type="hidden" name="status" value="ATIVO" />
       <button disabled={busy || loadingUsers || !users.length}>{busy ? "Criando…" : "Criar ministério"}</button>
     </form>
@@ -2241,7 +2837,11 @@ function EditScheduleDialog({
   teams: MinistryTeam[];
   busy: boolean;
   onClose: () => void;
-  onSubmit: (schedule: Schedule, event: FormEvent<HTMLFormElement>) => void;
+  onSubmit: (
+    schedule: Schedule,
+    event: FormEvent<HTMLFormElement>,
+    teams: SelectedScheduleTeam[],
+  ) => void;
 }) {
   const [repertoireValue, setRepertoireValue] = useState(
     schedule.repertorio.join("\n"),
@@ -2252,6 +2852,20 @@ function EditScheduleDialog({
       .map((item) => item.trim())
       .filter(Boolean),
     [repertoireValue],
+  );
+  const [selectedScheduleTeams, setSelectedScheduleTeams] = useState<
+    SelectedScheduleTeam[]
+  >(() =>
+    schedule.equipes.length
+      ? schedule.equipes.map((team) => ({
+          equipeId: team.equipe_id,
+          funcao: team.funcao,
+          pontoEncontro: team.ponto_encontro || "",
+          horarioEncontro: team.horario_encontro || "",
+        }))
+      : schedule.equipe_id
+        ? [{ equipeId: schedule.equipe_id, funcao: "", pontoEncontro: "", horarioEncontro: "" }]
+        : [],
   );
 
   useEffect(() => {
@@ -2279,7 +2893,7 @@ function EditScheduleDialog({
           <button type="button" aria-label="Fechar editor" onClick={onClose}>×</button>
         </header>
         <p>Atualize as informações principais e revise o repertório sem alterar as confirmações dos integrantes.</p>
-        <form className="secretary-form secretary-edit-schedule-form" onSubmit={(event) => onSubmit(schedule, event)}>
+        <form className="secretary-form secretary-edit-schedule-form" onSubmit={(event) => onSubmit(schedule, event, selectedScheduleTeams)}>
           <div className="secretary-edit-repertoire-preview">
             <div>
               <strong>Repertório atual</strong>
@@ -2290,7 +2904,39 @@ function EditScheduleDialog({
           </div>
           <div className="secretary-form-grid">
             <label className="span-2">Título<input name="titulo" required maxLength={140} defaultValue={schedule.titulo} /></label>
-            <label>Equipe<select name="equipeId" defaultValue={schedule.equipe_id || ""}><option value="">Seleção livre</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.nome}</option>)}</select></label>
+            <fieldset className="span-2 secretary-schedule-teams">
+              <legend>Equipes na escala</legend>
+              <p>As equipes escolhidas aparecem separadas na escala. Remova primeiro as designações da equipe antes de retirá-la daqui.</p>
+              <div>
+                {teams.map((team) => {
+                  const selection = selectedScheduleTeams.find((item) => item.equipeId === team.id);
+                  return (
+                    <section key={team.id} data-selected={Boolean(selection)}>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(selection)}
+                          onChange={() => setSelectedScheduleTeams((current) =>
+                            selection
+                              ? current.filter((item) => item.equipeId !== team.id)
+                              : [...current, { equipeId: team.id, funcao: "", pontoEncontro: "", horarioEncontro: "" }],
+                          )}
+                        />
+                        <span>{team.nome}</span>
+                        <small>{team.membros.length} integrantes</small>
+                      </label>
+                      {selection && (
+                        <div className="secretary-team-duty">
+                          <label><span>Função/local desta equipe</span><input value={selection.funcao} onChange={(event) => setSelectedScheduleTeams((current) => current.map((item) => item.equipeId === team.id ? { ...item, funcao: event.target.value } : item))} maxLength={180} placeholder="Ex.: Velha, Centro ou Recepção" /></label>
+                          <label><span>Ponto de encontro</span><input value={selection.pontoEncontro} onChange={(event) => setSelectedScheduleTeams((current) => current.map((item) => item.equipeId === team.id ? { ...item, pontoEncontro: event.target.value } : item))} maxLength={180} placeholder="Ex.: Portão principal" /></label>
+                          <label><span>Horário de encontro</span><input type="time" value={selection.horarioEncontro} onChange={(event) => setSelectedScheduleTeams((current) => current.map((item) => item.equipeId === team.id ? { ...item, horarioEncontro: event.target.value } : item))} /></label>
+                        </div>
+                      )}
+                    </section>
+                  );
+                })}
+              </div>
+            </fieldset>
             <label>Responsável<select name="responsavelUsuarioId" defaultValue={schedule.responsavel_usuario_id || ""}><option value="">Não definido</option>{ministry.voluntarios.map((volunteer) => <option key={volunteer.id} value={volunteer.usuario_id}>{volunteer.nome}</option>)}</select></label>
             <label>Início<input name="iniciaEm" type="datetime-local" required defaultValue={toLocalDateTimeInput(schedule.inicia_em)} /></label>
             <label>Término<input name="terminaEm" type="datetime-local" required defaultValue={toLocalDateTimeInput(schedule.termina_em)} /></label>
@@ -2351,12 +2997,12 @@ function LinkBuilder({ links, setLinks, libraryItems, selectedItemIds, onToggleI
                     {item.links.map((link) => <button key={link.id} type="button" className={`platform-icon ${LINK_ICONS[link.tipo]?.classe || "lk"}`} title={`Usar ${linkTypeLabel(link.tipo)}`} onClick={() => onUseSaved(link)}><PlatformIcon tipo={link.tipo} /><span className="sr-only">{linkTypeLabel(link.tipo)}</span></button>)}
                     <button type="button" className="platform-icon add" title="Adicionar outro link a este item" onClick={() => { setItemTitle(item.titulo); setLinks((current) => [...current, { id: crypto.randomUUID(), tipo: "YOUTUBE", titulo: item.titulo, url: "" }]); }}><LibraryActionIcon name="add" /></button>
                   </div>
-                  <button type="button" className={`ministry-library-select${selected ? " selected" : ""}`} aria-pressed={selected} onClick={() => onToggleItem(item)}><LibraryActionIcon name="check" /><span>{selected ? "Selecionada" : "Selecionar"}</span></button>
+                  <button type="button" className={`ministry-library-select${selected ? " selected" : ""}`} aria-pressed={selected} title={selected ? "Remover do repertório" : "Adicionar ao repertório"} onClick={() => onToggleItem(item)}><LibraryActionIcon name="check" /><span>{selected ? "Selecionada" : "Selecionar"}</span></button>
                   <button type="button" className="ministry-library-rename-action" title="Renomear item" aria-label={`Renomear ${item.titulo}`} onClick={() => setRenamingId(item.id)}><LibraryActionIcon name="edit" /></button>
                   <button type="button" className="ministry-library-delete" title="Excluir item" aria-label={`Excluir ${item.titulo}`} disabled={busy === `removing-library-item-${item.id}`} onClick={() => onRemoveItem(item)}><LibraryActionIcon name="remove" /></button>
                 </div>
               </div>
-              {openItemId === item.id && <div className="ministry-library-detail">{item.links.map((link) => <div key={link.id}><span className={`platform-icon ${LINK_ICONS[link.tipo]?.classe || "lk"} static`}><PlatformIcon tipo={link.tipo} /></span><small>{link.url}</small><button type="button" onClick={() => onUseSaved(link)}>Usar</button><button type="button" className="danger" disabled={busy === `removing-reusable-link-${link.id}`} onClick={() => onRemoveSaved(link)}>Remover</button></div>)}{!item.links.length && <p>Este item ainda não tem links salvos.</p>}</div>}
+              {openItemId === item.id && <div className="ministry-library-detail">{item.links.map((link) => <div key={link.id}><span className={`platform-icon ${LINK_ICONS[link.tipo]?.classe || "lk"} static`}><PlatformIcon tipo={link.tipo} /></span><small>{link.url}</small><button type="button" onClick={() => onUseSaved(link)}>Usar</button><button type="button" className="danger" disabled={busy === `removing-reusable-link-${link.id}`} onClick={() => onRemoveSaved(link)}>Remover</button></div>)}{!item.links.length && <p>Este item ainda não tem links salvos.</p>}<div className="ministry-library-item-management"><button type="button" onClick={() => setRenamingId(item.id)}>Renomear item</button><button type="button" className="danger" disabled={busy === `removing-library-item-${item.id}`} onClick={() => onRemoveItem(item)}>Excluir item</button></div></div>}
             </div>
           );})}
           {!libraryItems.length && <p className="ministry-library-empty">Nenhum item salvo neste ministério.</p>}
@@ -3014,6 +3660,355 @@ async function readJson<T>(response: Response) {
   }
 }
 
+/**
+ * Fio do Ministério: a linha de checkpoints de uma escala, da criação até o dia
+ * do culto. Mistura o que o sistema já sabe sozinho (publicação agendada,
+ * confirmações da equipe) com as etapas que o ministério definiu.
+ */
+type FioNode = {
+  id: string;
+  titulo: string;
+  estado: "feito" | "pronto" | "aguardando" | "pendente";
+  detalhe?: React.ReactNode;
+  step?: FioStep;
+};
+
+function fioNodes(schedule: Schedule, agora: number): FioNode[] {
+  const confirmados = schedule.designacoes.filter((item) => item.status === "CONFIRMADA").length;
+  const total = schedule.designacoes.length;
+  const publicada = ["PUBLICADA", "AGUARDANDO_CHECKLIST", "ENCERRADA"].includes(schedule.status);
+  const passou = agora > 0 && Date.parse(schedule.termina_em) < agora;
+  const nodes: FioNode[] = [
+    { id: "criada", titulo: "Escala criada", estado: "feito", detalhe: formatDate(schedule.criado_em) },
+  ];
+  if (schedule.status === "AGENDADA" && schedule.publicar_em) {
+    nodes.push({
+      id: "publicacao",
+      titulo: "Publicação para a equipe",
+      estado: "aguardando",
+      detalhe: <SchedulePublicationCountdown opensAt={schedule.publicar_em} />,
+    });
+  } else {
+    nodes.push({
+      id: "publicacao",
+      titulo: "Publicação para a equipe",
+      estado: publicada ? "feito" : "pendente",
+      detalhe: publicada ? "Publicada e equipe notificada" : "Ainda é rascunho",
+    });
+  }
+  for (const step of schedule.fio_etapas) {
+    nodes.push({
+      id: step.id,
+      titulo: step.titulo,
+      estado: step.feito ? "feito" : "pendente",
+      step,
+    });
+  }
+  if (total > 0) {
+    nodes.push({
+      id: "equipe",
+      titulo: "Equipe confirmada",
+      estado: confirmados === total ? "feito" : "pendente",
+      detalhe: `${confirmados}/${total} confirmaram presença`,
+    });
+  }
+  const tudoPronto =
+    schedule.fio_etapas.every((step) => step.feito) && (!total || confirmados === total);
+  nodes.push({
+    id: "dia",
+    titulo: "Dia do culto",
+    estado: passou ? "feito" : tudoPronto && publicada ? "pronto" : "pendente",
+    detalhe: formatDate(schedule.inicia_em),
+  });
+  return nodes;
+}
+
+function fioVerdict(schedule: Schedule, agora: number) {
+  const confirmados = schedule.designacoes.filter((item) => item.status === "CONFIRMADA").length;
+  const total = schedule.designacoes.length;
+  const pendentesEtapas = schedule.fio_etapas.filter((step) => !step.feito).length;
+  const equipePendente = total > 0 && confirmados < total ? 1 : 0;
+  const pendencias = pendentesEtapas + equipePendente;
+  if (schedule.status === "RASCUNHO") return { tom: "muted", label: "Rascunho" };
+  if (schedule.status === "CANCELADA") return { tom: "muted", label: "Cancelada" };
+  if (schedule.status === "AGENDADA") return { tom: "info", label: "Aguardando liberação" };
+  const passou = agora > 0 && Date.parse(schedule.termina_em) < agora;
+  if (!pendencias) {
+    return passou
+      ? { tom: "muted", label: "Concluída sem pendências" }
+      : { tom: "ok", label: "Tudo pronto" };
+  }
+  if (passou) return { tom: "bad", label: "Encerrada com pendências" };
+  return {
+    tom: "warn",
+    label: pendencias === 1 ? "Falta 1 item" : `Faltam ${pendencias} itens`,
+  };
+}
+
+function FioVerdict({ schedule, agora }: { schedule: Schedule; agora: number }) {
+  const verdict = fioVerdict(schedule, agora);
+  return <span className="fio-verdict" data-tom={verdict.tom}>{verdict.label}</span>;
+}
+
+function FioThread({
+  schedule,
+  agora,
+  busy,
+  editando,
+  canToggleSteps,
+  actionError,
+  onAbrirEdicao,
+  onFecharEdicao,
+  onAlternarEtapa,
+  onSalvarEtapas,
+}: {
+  schedule: Schedule;
+  agora: number;
+  busy: string;
+  editando: boolean;
+  canToggleSteps: boolean;
+  actionError: string | null;
+  onAbrirEdicao: () => void;
+  onFecharEdicao: () => void;
+  onAlternarEtapa: (step: FioStep) => void;
+  onSalvarEtapas: (titulos: string[]) => void;
+}) {
+  const nodes = fioNodes(schedule, agora);
+  const prontas = schedule.fio_etapas.filter((step) => step.feito).length;
+  return (
+    <section className="fio-thread-card" aria-label={`Fio da escala ${schedule.titulo}`}>
+      <header>
+        <div>
+          <p className="pilot-kicker">FIO DO MINISTÉRIO</p>
+          <strong>
+            {schedule.fio_etapas.length
+              ? `${prontas}/${schedule.fio_etapas.length} etapas prontas`
+              : "Sem etapas definidas nesta escala"}
+          </strong>
+        </div>
+        <FioVerdict schedule={schedule} agora={agora} />
+      </header>
+      {editando ? (
+        <FioStepEditor
+          titulosIniciais={schedule.fio_etapas.map((step) => step.titulo)}
+          salvando={busy === `fio-etapas-${schedule.id}`}
+          onCancelar={onFecharEdicao}
+          onSalvar={onSalvarEtapas}
+        />
+      ) : (
+        <>
+          {!canToggleSteps && (
+            <p className="fio-access-note" role="note">
+              Você pode acompanhar o Fio, mas só a liderança ou quem está
+              escalado nesta escala pode concluir ou reabrir etapas.
+            </p>
+          )}
+          {actionError && (
+            <p className="fio-action-error" role="alert">
+              Não foi possível alterar esta etapa: {actionError}
+            </p>
+          )}
+          <ol className="fio-thread">
+            {nodes.map((node, index) => (
+              <li className="fio-node" data-estado={node.estado} style={{ "--i": index } as CSSProperties} key={node.id}>
+                {node.step ? (
+                  <button
+                    type="button"
+                    className="fio-node-toggle"
+                    disabled={!canToggleSteps || busy === `fio-${schedule.id}-${node.step.id}`}
+                    onClick={() => onAlternarEtapa(node.step as FioStep)}
+                    aria-pressed={node.estado === "feito"}
+                    aria-label={`${node.estado === "feito" ? "Reabrir" : "Concluir"} etapa: ${node.titulo}`}
+                    title={
+                      !canToggleSteps
+                        ? "Somente a liderança ou quem está escalado pode alterar esta etapa"
+                        : node.estado === "feito"
+                          ? "Toque para reabrir esta etapa"
+                          : "Toque para concluir esta etapa"
+                    }
+                  >
+                    <span className="fio-checkbox" aria-hidden="true">{node.estado === "feito" ? "✓" : ""}</span>
+                    <span className="fio-node-title">{node.titulo}</span>
+                    <span className="fio-node-action" aria-hidden="true">
+                      {busy === `fio-${schedule.id}-${node.step.id}`
+                        ? "Salvando…"
+                        : node.estado === "feito" ? "Reabrir" : "Concluir"}
+                    </span>
+                  </button>
+                ) : (
+                  <p className="fio-node-title">{node.titulo}</p>
+                )}
+                {node.detalhe && <div className="fio-node-detail">{node.detalhe}</div>}
+              </li>
+            ))}
+          </ol>
+          {Boolean(schedule.can_manage) && (
+            <button type="button" className="fio-edit-trigger" onClick={onAbrirEdicao}>
+              {schedule.fio_etapas.length ? "Ajustar etapas desta escala" : "Definir etapas desta escala"}
+            </button>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+type FioTemplateValue = { habilitado: boolean; etapas: string[] };
+
+/**
+ * Modelo do Fio guardado no ministério. Ele não é a lista de uma escala: é o
+ * ponto de partida que cada escala nova recebe e depois varia por conta
+ * própria. As sugestões mudam com a categoria porque o caso que originou o Fio
+ * é o louvor ("o som está testado?"), mas recepção e mídia têm a mesma rotina.
+ */
+const FIO_SUGESTOES: Record<string, string[]> = {
+  LOUVOR: [
+    "Repertório fechado",
+    "Tons e cifras enviados",
+    "Ensaio confirmado",
+    "Som e retornos testados",
+    "Slides prontos",
+  ],
+  MIDIA: ["Roteiro definido", "Câmeras e transmissão testadas", "Slides prontos"],
+  RECEPCAO: ["Escala de portas definida", "Materiais separados", "Equipe orientada"],
+};
+const FIO_SUGESTAO_PADRAO = ["Equipe avisada", "Materiais separados", "Tudo testado no local"];
+
+function FioTemplateFields({
+  categoria,
+  value,
+  onChange,
+}: {
+  categoria: string;
+  value: FioTemplateValue;
+  onChange: (next: FioTemplateValue) => void;
+}) {
+  const sugestoes = FIO_SUGESTOES[categoria] || FIO_SUGESTAO_PADRAO;
+  return (
+    <div className="fio-template">
+      <label className="fio-template-toggle">
+        <input
+          type="checkbox"
+          checked={value.habilitado}
+          onChange={(event) =>
+            onChange({
+              habilitado: event.target.checked,
+              etapas:
+                event.target.checked && !value.etapas.length ? sugestoes : value.etapas,
+            })
+          }
+        />
+        <span>
+          <strong>Ativar o Fio do Ministério</strong>
+          <small>
+            Cada escala ganha um fio de checkpoints para responder, num olhar, se
+            está tudo pronto para o dia.
+          </small>
+        </span>
+      </label>
+      {value.habilitado && (
+        <>
+          <FioStepEditor
+            titulosIniciais={value.etapas}
+            salvando={false}
+            modo="embutido"
+            onSalvar={(etapas) => onChange({ ...value, etapas })}
+          />
+          <small className="fio-template-help">
+            Estas etapas são o ponto de partida. Cada escala pode acrescentar ou
+            tirar as suas depois, sem mexer neste modelo.
+          </small>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Editor de etapas — usado tanto na escala quanto no modelo do ministério. */
+function FioStepEditor({
+  titulosIniciais,
+  salvando,
+  modo = "escala",
+  onCancelar,
+  onSalvar,
+}: {
+  titulosIniciais: string[];
+  salvando: boolean;
+  /**
+   * "escala" tem botões próprios e só grava quando o usuário confirma;
+   * "embutido" vive dentro de outro formulário e devolve a lista a cada
+   * digitada, porque quem grava é o formulário de fora.
+   */
+  modo?: "escala" | "embutido";
+  onCancelar?: () => void;
+  onSalvar: (titulos: string[]) => void;
+}) {
+  const [titulos, setTitulos] = useState<string[]>(
+    titulosIniciais.length ? titulosIniciais : [""],
+  );
+  function aplicar(proximos: string[]) {
+    setTitulos(proximos);
+    if (modo === "embutido") onSalvar(limpar(proximos));
+  }
+  return (
+    <div className="fio-editor" data-modo={modo}>
+      {titulos.map((titulo, index) => (
+        <div className="fio-editor-row" key={index}>
+          <span className="fio-editor-bullet" aria-hidden="true" />
+          <input
+            value={titulo}
+            maxLength={120}
+            placeholder="Ex.: Som e slides testados"
+            aria-label={`Etapa ${index + 1}`}
+            onChange={(event) =>
+              aplicar(titulos.map((item, position) => (position === index ? event.target.value : item)))
+            }
+          />
+          <button
+            type="button"
+            className="fio-editor-remove"
+            aria-label={`Remover etapa ${index + 1}`}
+            onClick={() => aplicar(titulos.filter((_, position) => position !== index))}
+          >
+            ×
+          </button>
+        </div>
+      ))}
+      <div className="fio-editor-actions">
+        <button
+          type="button"
+          className="fio-add"
+          disabled={titulos.length >= 12}
+          onClick={() => aplicar([...titulos, ""])}
+        >
+          + Adicionar etapa
+        </button>
+        <span className="fio-editor-spacer" />
+        {modo === "escala" && onCancelar && (
+          <button type="button" className="fio-cancel" onClick={onCancelar}>
+            Cancelar
+          </button>
+        )}
+        {modo === "escala" && (
+          <button
+            type="button"
+            className="fio-save"
+            disabled={salvando}
+            onClick={() => onSalvar(limpar(titulos))}
+          >
+            {salvando ? "Salvando…" : "Salvar etapas"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Tira espaços sobrando e linhas em branco antes de enviar as etapas. */
+function limpar(titulos: string[]) {
+  return titulos.map((item) => item.trim()).filter(Boolean);
+}
+
 function SchedulePublicationCountdown({ opensAt }: { opensAt: string }) {
   const [remaining, setRemaining] = useState(() => Math.max(0, Date.parse(opensAt) - Date.now()));
   useEffect(() => {
@@ -3034,6 +4029,22 @@ function SchedulePublicationCountdown({ opensAt }: { opensAt: string }) {
 
 function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+}
+
+function teamMeetingSummary(team: ScheduleTeam, scheduleLocal: string) {
+  const destination = team.funcao || scheduleLocal || "Destino/local não informado";
+  const meetingPoint = team.ponto_encontro ? ` · Encontro: ${team.ponto_encontro}` : "";
+  const meetingTime = team.horario_encontro ? ` às ${team.horario_encontro}` : "";
+  return `Destino/local: ${destination}${meetingPoint}${meetingTime}`;
+}
+
+function teamReadiness(assignments: Assignment[]) {
+  const missing = assignments.filter((item) => ["INDISPONIVEL", "SUBSTITUICAO_SOLICITADA", "AUSENTE"].includes(item.status)).length;
+  if (!assignments.length) return { tone: "muted", label: "Sem integrantes" };
+  if (missing) return { tone: "danger", label: missing === 1 ? "Precisa de substituto" : `${missing} substituições` };
+  const pending = assignments.filter((item) => item.status === "PENDENTE").length;
+  if (pending) return { tone: "warning", label: pending === 1 ? "1 confirmação pendente" : `${pending} confirmações pendentes` };
+  return { tone: "success", label: "Equipe confirmada" };
 }
 
 function assignmentStatusLabel(status: Assignment["status"]) {

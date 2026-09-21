@@ -34,6 +34,9 @@ export async function GET(_request: Request, context: Context) {
   const description = [
     `Ministério: ${schedule.ministerio_nome}`,
     `Responsável: ${schedule.responsavel_nome || "Não definido"}`,
+    ...schedule.equipes.map(
+      (team) => `Equipe ${team.equipe_nome}${team.funcao ? `: ${team.funcao}` : ""}`,
+    ),
     schedule.observacoes || "",
   ]
     .filter(Boolean)

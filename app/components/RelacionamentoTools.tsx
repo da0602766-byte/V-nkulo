@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 // ============================================
 // TIPOS
@@ -451,6 +451,8 @@ export function RelacionamentoTools({ visitantes = [], compacto = false, onAbrir
   const [selecionadoVisitanteId, setSelecionadoVisitanteId] = useState<number | null>(null);
   const [busca, setBusca] = useState("");
   const [mobileView, setMobileView] = useState<"prioridades" | "pessoas" | "historico">("prioridades");
+  const [refreshTick, setRefreshTick] = useState(0);
+  const refreshInFlight = useRef(false);
   const visitanteHistoricoId = selecionadoVisitanteId ?? visitantes[0]?.id ?? null;
 
   function abrirVisitante(visitanteId: number) {
@@ -458,10 +460,11 @@ export function RelacionamentoTools({ visitantes = [], compacto = false, onAbrir
     onAbrirVisitante?.(visitanteId);
   }
 
-  useEffect(() => {
-    const carregarDados = async () => {
+  const carregarDados = useCallback(async (quiet = false) => {
+      if (refreshInFlight.current) return;
+      refreshInFlight.current = true;
       try {
-        setCarregando(true);
+        if (!quiet) setCarregando(true);
 
         // Carregar todas as ferramentas em paralelo
         const [resEngagement, resCadencia, resCarga, resRegional, resConflitos, resCadenciaAvancada] = await Promise.all([
@@ -479,15 +482,33 @@ export function RelacionamentoTools({ visitantes = [], compacto = false, onAbrir
         setRegional(resRegional.dados || []);
         setConflitos(resConflitos.dados || []);
         setCadenciaAvancada(resCadenciaAvancada.dados || []);
+        setRefreshTick((current) => current + 1);
       } catch (erro) {
         console.error("Erro ao carregar ferramentas de relacionamento:", erro);
       } finally {
-        setCarregando(false);
+        refreshInFlight.current = false;
+        if (!quiet) setCarregando(false);
       }
-    };
-
-    carregarDados();
   }, []);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => void carregarDados());
+    return () => window.cancelAnimationFrame(frame);
+  }, [carregarDados]);
+
+  useEffect(() => {
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") void carregarDados(true);
+    };
+    const interval = window.setInterval(refreshWhenVisible, 5_000);
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [carregarDados]);
 
   useEffect(() => {
     if (!visitanteHistoricoId) return;
@@ -523,7 +544,7 @@ export function RelacionamentoTools({ visitantes = [], compacto = false, onAbrir
     return () => {
       active = false;
     };
-  }, [visitanteHistoricoId]);
+  }, [visitanteHistoricoId, refreshTick]);
 
   const termo = busca.trim().toLocaleLowerCase("pt-BR");
   const engagementVisivel = engagement.filter((item) => !termo || item.nome_completo.toLocaleLowerCase("pt-BR").includes(termo));

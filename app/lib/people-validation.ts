@@ -14,6 +14,12 @@ const OFFICIAL_TITLES = [
   "PASTORA",
   "SECRETÁRIO",
   "SECRETÁRIA",
+  "COORDENADOR DE MINISTÉRIO",
+  "COORDENADORA DE MINISTÉRIO",
+  "SUPERVISOR DE CÉLULAS",
+  "SUPERVISORA DE CÉLULAS",
+  "GESTOR DE CUIDADO",
+  "GESTORA DE CUIDADO",
 ] as const;
 
 export function parseOfficialUpdate(value: unknown) {

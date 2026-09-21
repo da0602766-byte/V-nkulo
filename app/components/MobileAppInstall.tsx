@@ -96,17 +96,11 @@ export default function MobileAppInstall() {
       <div className="mobile-app-install__icon" aria-hidden="true">✦</div>
       <div>
         <strong>Use o Vínkulo como aplicativo</strong>
-        <p>{androidDevice ? "Android 1.5.1 de produção, com avisos de novos pedidos e conteúdo protegido da câmera frontal." : "Abra mais rápido pelo ícone na tela do seu celular."}</p>
+        <p>{androidDevice ? "Instale pelo navegador para receber avisos mesmo com o Vínkulo fechado." : "Abra mais rápido pelo ícone na tela do seu celular."}</p>
       </div>
-      {androidDevice ? (
-        <a className="mobile-app-install__download" href="/downloads/VINKULO_ANDROID_1.5.1.apk" download>
-          Baixar APK
-        </a>
-      ) : (
-        <button type="button" onClick={() => void install()}>
-          Instalar
-        </button>
-      )}
+      <button type="button" onClick={() => void install()}>
+        {installEvent ? "Instalar" : "Como instalar"}
+      </button>
       <button
         type="button"
         className="mobile-app-install__close"

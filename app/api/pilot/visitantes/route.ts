@@ -108,15 +108,18 @@ export async function GET(request: Request) {
             SELECT 1 FROM acompanhamentos ax
             WHERE ax.visitante_id = v.id AND ax.comunidade_id = v.comunidade_id
               AND ax.escopo_confirmado = 1 AND ax.proximo_contato IS NOT NULL
-              AND ax.proximo_contato <= date('now')
+              AND ax.id = (SELECT MAX(latest.id) FROM acompanhamentos latest
+                WHERE latest.visitante_id = v.id AND latest.comunidade_id = v.comunidade_id
+                  AND latest.escopo_confirmado = 1)
+              AND ax.proximo_contato <= date('now', '-3 hours')
           ))
           OR (? = 'sem_contato'
-            AND date(v.data_entrada) <= date('now', '-15 days')
+            AND date(v.data_entrada) <= date('now', '-3 hours', '-15 days')
             AND NOT EXISTS (
               SELECT 1 FROM acompanhamentos ax
               WHERE ax.visitante_id = v.id AND ax.comunidade_id = v.comunidade_id
                 AND ax.escopo_confirmado = 1
-                AND datetime(ax.criado_em) > datetime('now', '-15 days')
+                AND date(ax.criado_em, '-3 hours') > date('now', '-3 hours', '-15 days')
             ))
         )
         AND (? = 0 OR v.id < ?)
@@ -175,15 +178,18 @@ export async function GET(request: Request) {
           SELECT 1 FROM acompanhamentos a
           WHERE a.visitante_id = v.id AND a.comunidade_id = v.comunidade_id
             AND a.escopo_confirmado = 1 AND a.proximo_contato IS NOT NULL
-            AND a.proximo_contato <= date('now')
+            AND a.id = (SELECT MAX(latest.id) FROM acompanhamentos latest
+              WHERE latest.visitante_id = v.id AND latest.comunidade_id = v.comunidade_id
+                AND latest.escopo_confirmado = 1)
+            AND a.proximo_contato <= date('now', '-3 hours')
         ) THEN 1 ELSE 0 END) AS pendencias,
         SUM(CASE WHEN v.ativo = 1
-          AND date(v.data_entrada) <= date('now', '-15 days')
+          AND date(v.data_entrada) <= date('now', '-3 hours', '-15 days')
           AND NOT EXISTS (
             SELECT 1 FROM acompanhamentos a
             WHERE a.visitante_id = v.id AND a.comunidade_id = v.comunidade_id
               AND a.escopo_confirmado = 1
-              AND datetime(a.criado_em) > datetime('now', '-15 days')
+              AND date(a.criado_em, '-3 hours') > date('now', '-3 hours', '-15 days')
           ) THEN 1 ELSE 0 END) AS sem_contato
       FROM visitantes v
       WHERE v.comunidade_id = ? AND v.escopo_confirmado = 1`,

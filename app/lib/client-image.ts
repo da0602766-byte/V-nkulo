@@ -4,6 +4,7 @@ export type ImagePurpose =
   | "community-logo"
   | "community-banner"
   | "ministry-banner"
+  | "cell-cover"
   | "login-logo"
   | "login-background"
   | "visual-editor-image"
@@ -16,6 +17,7 @@ export type ImagePurpose =
 const LARGE_BACKGROUNDS = new Set<ImagePurpose>([
   "community-banner",
   "ministry-banner",
+  "cell-cover",
   "login-background",
   "platform-feed-banner",
 ]);

@@ -16,6 +16,7 @@ import ResponsiveFeedImage from "./ResponsiveFeedImage";
 import NativeImageUpload from "./NativeImageUpload";
 import CommunityPostInteractions from "./CommunityPostInteractions";
 import CommunityPostShare from "./CommunityPostShare";
+import CommunityPostReactions from "./CommunityPostReactions";
 import VerifiedOwnerName from "./VerifiedOwnerName";
 
 type FeedItem = {
@@ -38,6 +39,8 @@ type FeedItem = {
   autor_papel?: string | null;
   autor_verificado?: number;
   total_comentarios?: number;
+  reacoes_json?: string;
+  minhas_reacoes_json?: string;
   imagem_url?: string;
   imagem_thumbnail_url?: string;
   imagem_alt?: string;
@@ -128,6 +131,7 @@ export default function CommunityHome({
   const [feedHasMore, setFeedHasMore] = useState(false);
   const [feedLoadingMore, setFeedLoadingMore] = useState(false);
   const [feedLoadError, setFeedLoadError] = useState("");
+  const [feedFilter, setFeedFilter] = useState<"TODOS" | "COMUNICADOS" | "EVENTOS" | "MINISTERIOS">("TODOS");
   const [scheduleWorkingId, setScheduleWorkingId] = useState<number | null>(null);
   const [scheduleFeedback, setScheduleFeedback] = useState("");
   const [replacementScheduleId, setReplacementScheduleId] = useState<number | null>(null);
@@ -340,6 +344,13 @@ export default function CommunityHome({
     ),
   ).length;
 
+  const visiblePosts = useMemo(() => posts.filter((post) => {
+    if (feedFilter === "TODOS") return true;
+    if (feedFilter === "EVENTOS") return post.categoria === "EVENTO";
+    if (feedFilter === "MINISTERIOS") return post.audiencia_tipo === "MINISTERIOS" || ["JUVENTUDE", "ACAO_SOCIAL"].includes(post.categoria);
+    return post.categoria !== "EVENTO" && post.audiencia_tipo !== "MINISTERIOS";
+  }), [feedFilter, posts]);
+
   async function respondToSchedule(
     scheduleId: number,
     status: "CONFIRMADA" | "INDISPONIVEL",
@@ -548,15 +559,16 @@ export default function CommunityHome({
   }
 
   return (
-    <section className="community-home" aria-busy={loading}>
+    <section className="community-home community-feed-redesign" aria-busy={loading}>
       <header className="community-home-welcome community-home-command">
         <div className="community-home-intro">
-          <h1>Seu dia no Vínkulo</h1>
+          <p className="community-feed-eyebrow">COMUNIDADE</p>
+          <h1>O que acontece por aqui.</h1>
           <p>
             {/* A quebra de linha depois da expressão não vira espaço no JSX:
                 a saudação lia "…em Comunidade Nova Aliançae resolva…". */}
-            Olá, {userName.split(/\s+/)[0]}. Veja o que acontece hoje em {communityName}{" "}
-            e resolva cada pendência no contexto certo.
+            Olá, {userName.split(/\s+/)[0]}. Acompanhe as pessoas, os avisos e os próximos momentos de {communityName}{" "}
+            em um só lugar.
           </p>
         </div>
         <div className="community-home-actions">
@@ -581,6 +593,11 @@ export default function CommunityHome({
 
       {canPublish && (
         <section className="community-composer">
+          <button type="button" className="community-composer-compact" onClick={() => setComposerOpen(true)}>
+            <span aria-hidden="true">{getInitials(userName)}</span>
+            <strong>Compartilhe algo com a comunidade…</strong>
+            <small>Foto · Evento · Mensagem</small>
+          </button>
           {composerOpen && typeof document !== "undefined" && createPortal(
             <div
               className="community-composer-overlay"
@@ -710,8 +727,8 @@ export default function CommunityHome({
         <div className="community-feed-panel">
           <header id="mural">
             <div>
-              <p className="pilot-kicker">MURAL</p>
-              <h2>Atualizações da comunidade</h2>
+              <p className="pilot-kicker">MURAL DA COMUNIDADE</p>
+              <h2>Atualizações</h2>
             </div>
             <div className="community-feed-heading-actions">
               {canPublish && (
@@ -730,13 +747,23 @@ export default function CommunityHome({
               </span>
             </div>
           </header>
+          <nav className="community-feed-tabs" aria-label="Filtrar atualizações">
+            {([
+              ["TODOS", "Para você"],
+              ["COMUNICADOS", "Comunicados"],
+              ["EVENTOS", "Eventos"],
+              ["MINISTERIOS", "Ministérios"],
+            ] as const).map(([filter, label]) => (
+              <button key={filter} type="button" aria-pressed={feedFilter === filter} onClick={() => setFeedFilter(filter)}>{label}</button>
+            ))}
+          </nav>
           {loading && !posts.length ? (
             <div className="community-feed-loading" role="status" aria-label="Carregando publicações">
               <span /><span /><span /><small>Carregando publicações…</small>
             </div>
-          ) : posts.length ? (
+          ) : visiblePosts.length ? (
             <div className="community-feed-list">
-              {posts.map((post) => (
+              {visiblePosts.map((post) => (
                 <article
                   key={post.id}
                   id={`publicacao-${post.id}`}
@@ -973,6 +1000,7 @@ export default function CommunityHome({
                     <span>
                       {post.status === "RASCUNHO" ? "Rascunho" : post.status === "EM_ANALISE" ? "Aguardando aprovação" : "Publicada"}
                     </span>
+                    {post.status === "PUBLICADA" && <CommunityPostReactions postId={post.id} initialCounts={post.reacoes_json} initialMine={post.minhas_reacoes_json} />}
                     {post.status === "PUBLICADA" && (
                       <CommunityPostShare
                         postId={post.id}
@@ -999,8 +1027,8 @@ export default function CommunityHome({
             </div>
           ) : (
             <div className="pilot-empty-state">
-              <strong>Nenhuma publicação nesta comunidade</strong>
-              <p>O estado vazio não busca dados de outra comunidade.</p>
+              <strong>{posts.length ? "Nenhuma publicação neste filtro" : "Nenhuma publicação nesta comunidade"}</strong>
+              <p>{posts.length ? "Tente escolher outra categoria para ver mais atualizações." : "O estado vazio não busca dados de outra comunidade."}</p>
             </div>
           )}
           <div className="feed-pagination-controls">

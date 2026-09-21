@@ -46,12 +46,36 @@ export type SecretaryLink = {
 export type SecretaryAssignment = {
   voluntarioId: number;
   funcao: string;
+  equipeId: number | null;
+};
+
+export type SecretaryScheduleTeam = {
+  equipeId: number;
+  funcao: string;
+  pontoEncontro: string;
+  horarioEncontro: string;
 };
 
 export type SecretaryChecklistItem = {
   tarefa: string;
   voluntarioId: number | null;
 };
+
+/**
+ * Etapa do Fio do Ministério dentro de uma escala. O ministério guarda só os
+ * títulos (o modelo); a escala guarda a etapa inteira, com estado, porque
+ * cada escala varia — o modelo é ponto de partida, não camisa de força.
+ */
+export type FioStep = {
+  id: string;
+  titulo: string;
+  feito: boolean;
+  feitoEm: string | null;
+  feitoPor: number | null;
+};
+
+export const FIO_MAX_STEPS = 12;
+export const FIO_MAX_TITLE = 120;
 
 export type MinistryCustomField = {
   id: string;
@@ -81,6 +105,8 @@ type MinistryPayload = {
   spotifyUrl: string;
   bannerUrl: string;
   responsavelUsuarioId: number | null;
+  fioHabilitado: boolean;
+  fioEtapas: string[];
 };
 
 type ScheduleTemplatePayload = {
@@ -96,7 +122,10 @@ type ScheduleTemplatePayload = {
 
 type SchedulePayload = {
   ministerioId: number;
+  // equipeId continua como o primeiro grupo selecionado para compatibilidade
+  // com as escalas criadas antes do suporte a múltiplas equipes.
   equipeId: number | null;
+  equipes: SecretaryScheduleTeam[];
   titulo: string;
   iniciaEm: string;
   terminaEm: string;
@@ -110,6 +139,7 @@ type SchedulePayload = {
   designacoes: SecretaryAssignment[];
   checklist: SecretaryChecklistItem[];
   camposRespostas: Record<string, unknown>;
+  fioEtapas: FioStep[];
 };
 
 export function parseMinistryPayload(
@@ -125,6 +155,9 @@ export function parseMinistryPayload(
   const spotifyUrl = parseOptionalMediaUrl(body.spotifyUrl, "SPOTIFY");
   const bannerUrl = parseMinistryAssetUrl(body.bannerUrl);
   const responsavelUsuarioId = positiveInteger(body.responsavelUsuarioId);
+  const fioHabilitado = body.fioHabilitado === true || body.fioHabilitado === "true" || body.fioHabilitado === "on";
+  const fioEtapas = parseFioTemplate(body.fioEtapas);
+  if ("error" in fioEtapas) return { error: fioEtapas.error };
   if (!nome) return { error: "O nome do ministério é obrigatório." } as const;
   if (!MINISTRY_CATEGORIES.has(categoria) || !MINISTRY_STATUSES.has(status)) {
     return { error: "Categoria ou status do ministério inválido." } as const;
@@ -141,7 +174,76 @@ export function parseMinistryPayload(
     spotifyUrl: spotifyUrl.value,
     bannerUrl: bannerUrl.value,
     responsavelUsuarioId,
+    fioHabilitado,
+    fioEtapas: fioEtapas.value,
   } as const;
+}
+
+/**
+ * O modelo do ministério é só a lista de títulos. Vazio é válido: um
+ * ministério pode ligar o Fio e definir as etapas escala a escala.
+ */
+export function parseFioTemplate(
+  value: unknown,
+): ValidationResult<{ value: string[] }> {
+  if (!Array.isArray(value)) return { value: [] as string[] } as const;
+  if (value.length > FIO_MAX_STEPS) {
+    return {
+      error: `O Fio do Ministério aceita no máximo ${FIO_MAX_STEPS} etapas.`,
+    } as const;
+  }
+  const titles = [
+    ...new Set(
+      value.map((item) => cleanText(item, FIO_MAX_TITLE)).filter(Boolean),
+    ),
+  ];
+  return { value: titles } as const;
+}
+
+/**
+ * As etapas de uma escala. Preserva o estado já registrado (feito/quando/quem)
+ * quando ele vem junto, para uma edição de etapas não apagar o progresso.
+ */
+export function parseFioSteps(
+  value: unknown,
+): ValidationResult<{ value: FioStep[] }> {
+  if (!Array.isArray(value)) return { value: [] as FioStep[] } as const;
+  if (value.length > FIO_MAX_STEPS) {
+    return {
+      error: `O Fio da escala aceita no máximo ${FIO_MAX_STEPS} etapas.`,
+    } as const;
+  }
+  const steps: FioStep[] = [];
+  const usedIds = new Set<string>();
+  for (let index = 0; index < value.length; index += 1) {
+    const source = asRecord(value[index]);
+    const titulo = cleanText(source.titulo, FIO_MAX_TITLE);
+    if (!titulo) continue;
+    let id = cleanText(source.id, 60).replace(/[^A-Za-z0-9_-]/g, "");
+    if (!id || usedIds.has(id)) id = `etapa-${index + 1}`;
+    while (usedIds.has(id)) id = `${id}-x`;
+    usedIds.add(id);
+    const feito = source.feito === true || source.feito === "true";
+    steps.push({
+      id,
+      titulo,
+      feito,
+      feitoEm: feito ? normalizeDateTime(source.feitoEm) : null,
+      feitoPor: feito ? positiveInteger(source.feitoPor) : null,
+    });
+  }
+  return { value: steps } as const;
+}
+
+/** Converte o modelo do ministério nas etapas iniciais de uma escala. */
+export function seedFioSteps(template: string[]): FioStep[] {
+  return template.slice(0, FIO_MAX_STEPS).map((titulo, index) => ({
+    id: `etapa-${index + 1}`,
+    titulo,
+    feito: false,
+    feitoEm: null,
+    feitoPor: null,
+  }));
 }
 
 export function parseMinistryAssetUrl(
@@ -295,7 +397,9 @@ export function parseSchedulePayload(
 ): ValidationResult<SchedulePayload> {
   const body = asRecord(payload);
   const ministerioId = positiveInteger(body.ministerioId);
-  const equipeId = positiveInteger(body.equipeId);
+  const equipes = parseScheduleTeams(body.equipes, body.equipeId);
+  if ("error" in equipes) return { error: equipes.error };
+  const equipeId = equipes.value[0]?.equipeId || null;
   const titulo = cleanText(body.titulo, 140);
   const iniciaEm = normalizeDateTime(body.iniciaEm);
   const terminaEm = normalizeDateTime(body.terminaEm);
@@ -320,6 +424,8 @@ export function parseSchedulePayload(
   if ("error" in designacoes) return { error: designacoes.error };
   const checklist = parseSecretaryChecklist(body.checklist);
   if ("error" in checklist) return { error: checklist.error };
+  const fioEtapas = parseFioSteps(body.fioEtapas);
+  if ("error" in fioEtapas) return { error: fioEtapas.error };
   if (!ministerioId || !titulo || !iniciaEm || !terminaEm) {
     return {
       error: "Ministério, título, início e término são obrigatórios.",
@@ -337,6 +443,7 @@ export function parseSchedulePayload(
   return {
     ministerioId,
     equipeId,
+    equipes: equipes.value,
     titulo,
     iniciaEm,
     terminaEm,
@@ -353,6 +460,7 @@ export function parseSchedulePayload(
       body.camposRespostas && typeof body.camposRespostas === "object"
         ? (body.camposRespostas as Record<string, unknown>)
         : {},
+    fioEtapas: fioEtapas.value,
   } as const;
 }
 
@@ -400,20 +508,62 @@ function parseSecretaryAssignments(
     return { error: "A escala aceita no máximo 100 integrantes." } as const;
   }
   const assignments: SecretaryAssignment[] = [];
-  const ids = new Set<number>();
+  const assignmentsByVolunteer = new Map<number, SecretaryAssignment>();
   for (const item of value) {
     const source = asRecord(item);
     const voluntarioId = positiveInteger(source.voluntarioId);
     const funcao = cleanText(source.funcao, 100);
+    const equipeId = positiveInteger(source.equipeId);
     if (!voluntarioId || !funcao) {
       return { error: "Revise os integrantes e suas funções." } as const;
     }
-    if (!ids.has(voluntarioId)) {
-      ids.add(voluntarioId);
-      assignments.push({ voluntarioId, funcao });
+    const existing = assignmentsByVolunteer.get(voluntarioId);
+    if (existing && existing.equipeId !== equipeId) {
+      return {
+        error: "Uma pessoa só pode ser designada uma vez na mesma escala.",
+      } as const;
+    }
+    if (!existing) {
+      const assignment = { voluntarioId, funcao, equipeId };
+      assignmentsByVolunteer.set(voluntarioId, assignment);
+      assignments.push(assignment);
     }
   }
   return { value: assignments } as const;
+}
+
+function parseScheduleTeams(
+  value: unknown,
+  legacyTeamId: unknown,
+): ValidationResult<{ value: SecretaryScheduleTeam[] }> {
+  const sources = Array.isArray(value)
+    ? value
+    : positiveInteger(legacyTeamId)
+      ? [{ equipeId: legacyTeamId }]
+      : [];
+  const teams: SecretaryScheduleTeam[] = [];
+  const seen = new Map<number, number>();
+  for (const item of sources) {
+    const source = asRecord(item);
+    const equipeId = positiveInteger(source.equipeId);
+    if (!equipeId) {
+      return { error: "Revise as equipes selecionadas para a escala." } as const;
+    }
+    const funcao = cleanText(source.funcao, 180);
+    const existingIndex = seen.get(equipeId);
+    if (existingIndex === undefined) {
+      seen.set(equipeId, teams.length);
+      teams.push({
+        equipeId,
+        funcao,
+        pontoEncontro: cleanText(source.pontoEncontro, 180),
+        horarioEncontro: cleanText(source.horarioEncontro, 10),
+      });
+    } else if (funcao && !teams[existingIndex].funcao) {
+      teams[existingIndex].funcao = funcao;
+    }
+  }
+  return { value: teams } as const;
 }
 
 function parseSecretaryChecklist(
@@ -485,14 +635,14 @@ export function parseCustomFieldAnswers(
 
 export function parseAssignmentPayload(
   payload: unknown,
-): ValidationResult<{ voluntarioId: number; funcao: string }> {
+): ValidationResult<{ voluntarioId: number; funcao: string; equipeId: number | null }> {
   const body = asRecord(payload);
   const voluntarioId = positiveInteger(body.voluntarioId);
   const funcao = cleanText(body.funcao, 100);
   if (!voluntarioId || !funcao) {
     return { error: "Voluntário e função são obrigatórios." } as const;
   }
-  return { voluntarioId, funcao } as const;
+  return { voluntarioId, funcao, equipeId: positiveInteger(body.equipeId) } as const;
 }
 
 export function cleanAction(value: unknown) {

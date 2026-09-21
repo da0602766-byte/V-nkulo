@@ -1,3 +1,5 @@
+import { scheduleWebPushDelivery } from "./web-push";
+
 type NotificationInput = {
   tipo?: "INFO" | "NOVO" | "IMPORTANTE";
   titulo: string;
@@ -17,7 +19,7 @@ export async function createSystemNotification(
   db: D1Database,
   input: NotificationInput,
 ) {
-  await db
+  const created = await db
     .prepare(
       `INSERT INTO notificacoes_sistema
        (tipo, titulo, mensagem, area, entidade_id, usuario_id, comunidade_id,
@@ -39,6 +41,17 @@ export async function createSystemNotification(
       input.criadoPor,
     )
     .run();
+
+  const notificationId = Number(created.meta.last_row_id || 0);
+  if (input.usuarioId && notificationId > 0) {
+    scheduleWebPushDelivery(db, {
+      userId: input.usuarioId,
+      notificationId,
+      title: input.titulo,
+      message: input.mensagem,
+      destination: normalizeInternalDestination(input.destinoRota),
+    });
+  }
 }
 
 function normalizeInternalDestination(value?: string) {

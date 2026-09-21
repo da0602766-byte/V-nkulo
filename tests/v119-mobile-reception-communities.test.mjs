@@ -5,14 +5,15 @@ import test from "node:test";
 const root = new URL("../", import.meta.url);
 const source = (path) => readFile(new URL(path, root), "utf8");
 
-test("recepção móvel usa a identidade real e mantém conteúdo fora do banner", async () => {
-  const [page, header, styles] = await Promise.all([source("app/page.tsx"), source("app/components/PublicHeader.tsx"), source("app/globals.css")]);
-  assert.match(page, /className="landing-banner-stage"/);
-  assert.doesNotMatch(page, /landing-banner-brand/);
+test("landing móvel usa a identidade real e mantém a página sem overflow", async () => {
+  const [page, landing, header, styles, landingStyles] = await Promise.all([source("app/page.tsx"), source("app/components/LandingPageExperience.tsx"), source("app/components/PublicHeader.tsx"), source("app/globals.css"), source("app/landing-vinkulo.css")]);
+  assert.match(page, /LandingPageExperience/);
+  assert.match(landing, /className="lp-brand"/);
+  assert.match(landing, /className="lp-hero"/);
   assert.match(header, /branding\.logoUrl \|\| "\/adote-symbol\.svg"/);
-  assert.match(styles, /\.landing-banner-stage \.landing-top-banner img \{ object-position:86% center; \}/);
-  assert.match(styles, /\.landing-product-preview \{ display:none; \}/);
-  assert.match(styles, /\.commercial-landing \.landing-hero \{[\s\S]*?background:var\(--reception-bg\)/);
+  assert.match(landingStyles, /overflow-x:clip/);
+  assert.match(landingStyles, /@media \(max-width:620px\)/);
+  assert.match(styles, /overflow-x:clip/);
 });
 
 test("configuração de categorias permanece rolável e não corta campos", async () => {

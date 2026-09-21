@@ -12,13 +12,46 @@ export async function PATCH(request: Request, context: Context) {
   const payload = await request.json() as Record<string, unknown>;
   const db = getD1();
   const existing = await db.prepare(
-    `SELECT id, nome, membros, lider_usuario_id, vice_lider_usuario_id, ativo
+    `SELECT id, nome, membros, lider_usuario_id, vice_lider_usuario_id, ativo, criado_por
      FROM celulas WHERE id = ? AND comunidade_id = ? AND escopo_confirmado = 1`,
-  ).bind(id, access.context.comunidadeId).first<{ id: number; nome: string; membros: string; lider_usuario_id: number | null; vice_lider_usuario_id: number | null; ativo: number }>();
+  ).bind(id, access.context.comunidadeId).first<{ id: number; nome: string; membros: string; lider_usuario_id: number | null; vice_lider_usuario_id: number | null; ativo: number; criado_por: string }>();
   if (!existing) return Response.json({ error: "Célula não encontrada." }, { status: 404 });
   const manager = access.context.permissions.includes("cells.manage");
-  const operator = manager || existing.lider_usuario_id === access.user.id || existing.vice_lider_usuario_id === access.user.id;
+  const operator = manager || existing.criado_por.trim().toLocaleLowerCase("pt-BR") === access.user.email.trim().toLocaleLowerCase("pt-BR") || existing.lider_usuario_id === access.user.id || existing.vice_lider_usuario_id === access.user.id;
   const action = String(payload.acao || "").trim().toUpperCase();
+
+  if (action === "SOLICITACAO_CANCELAR") {
+    const result = await db.prepare(
+      `UPDATE celula_solicitacoes SET status = 'CANCELADA', atualizado_em = CURRENT_TIMESTAMP
+       WHERE id = ? AND celula_id = ? AND comunidade_id = ? AND usuario_id = ? AND status = 'PENDENTE'`,
+    ).bind(Number(payload.solicitacaoId), id, access.context.comunidadeId, access.user.id).run();
+    if (!result.meta.changes) return Response.json({ error: "Essa solicitação não está mais pendente." }, { status: 409 });
+    return audited(db, access.context, access.user.id, id, "SOLICITACAO_CANCELADA_PELO_MEMBRO");
+  }
+
+  if (action === "SOLICITACAO_CRIAR") {
+    if (!existing.ativo) return Response.json({ error: "Esta célula não está recebendo solicitações." }, { status: 409 });
+    const members = parseMembers(existing.membros);
+    if (members.some((member) => member.kind === "COMMUNITY" && member.userId === access.user.id)) {
+      return Response.json({ error: "Você já participa desta célula." }, { status: 409 });
+    }
+    const consent = payload.autorizacaoContato === true || payload.autorizacaoContato === "true";
+    if (!consent) return Response.json({ error: "Confirme a autorização para compartilhar seus dados com a liderança." }, { status: 400 });
+    const contact = String(payload.contato || access.user.email || "").trim().slice(0, 160);
+    const message = String(payload.mensagem || "").trim().slice(0, 500);
+    if (!contact) return Response.json({ error: "Informe um telefone, WhatsApp ou e-mail para contato." }, { status: 400 });
+    const duplicate = await db.prepare(
+      `SELECT id FROM celula_solicitacoes WHERE celula_id = ? AND comunidade_id = ? AND usuario_id = ? AND status = 'PENDENTE' LIMIT 1`,
+    ).bind(id, access.context.comunidadeId, access.user.id).first();
+    if (duplicate) return Response.json({ error: "Você já possui uma solicitação pendente para esta célula." }, { status: 409 });
+    const created = await db.prepare(
+      `INSERT INTO celula_solicitacoes (comunidade_id, celula_id, usuario_id, nome, contato, mensagem)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).bind(access.context.comunidadeId, id, access.user.id, access.user.nome, contact, message).run();
+    await recordTenantAudit(db, access.context, access.user.id, "CELULA_SOLICITACAO_CRIADA", "SUCESSO", { celulaId: id, solicitacaoId: created.meta.last_row_id });
+    return Response.json({ ok: true, id: created.meta.last_row_id }, { status: 201 });
+  }
+
   if (!operator) return Response.json({ error: "Somente líder, vice-líder ou gestão podem alterar esta célula." }, { status: 403 });
 
   if (action.startsWith("MEMBRO_")) {
@@ -106,6 +139,48 @@ export async function PATCH(request: Request, context: Context) {
     await db.prepare(`UPDATE celula_solicitacoes SET status = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ? AND celula_id = ? AND comunidade_id = ? AND status = 'PENDENTE'`)
       .bind(status, requestId, id, access.context.comunidadeId).run();
     return audited(db, access.context, access.user.id, id, `SOLICITACAO_${status}`);
+  }
+
+  if (action === "CONFIGURACOES_ATUALIZAR") {
+    const nome = String(payload.nome || "").trim().slice(0, 100);
+    const dias = Array.isArray(payload.diasReuniao)
+      ? payload.diasReuniao.map(String).filter((day) => ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"].includes(day))
+      : [];
+    if (!nome || !dias.length) {
+      return Response.json({ error: "Informe nome e ao menos um dia de encontro." }, { status: 400 });
+    }
+    const rede = String(payload.rede || "").trim().slice(0, 80);
+    const horarioTexto = String(payload.horarioTexto || "").trim().slice(0, 120);
+    const enderecoPublico = String(payload.enderecoPublico || "").trim().slice(0, 240);
+    const descricaoPublica = String(payload.descricaoPublica || "").trim().slice(0, 700);
+    const observacoes = String(payload.observacoes || "").trim().slice(0, 1000);
+    const temas = Array.isArray(payload.temas)
+      ? [...new Set(payload.temas.map((item) => String(item).trim().slice(0, 40)).filter(Boolean))].slice(0, 12)
+      : [];
+    const fotoCapa = String(payload.fotoCapa || "").trim().slice(0, 500) || null;
+    const duplicate = await db.prepare(
+      `SELECT id FROM celulas WHERE comunidade_id = ? AND nome = ? COLLATE NOCASE AND ativo = 1 AND id != ?`,
+    ).bind(access.context.comunidadeId, nome, id).first();
+    if (duplicate) return Response.json({ error: "Já existe uma célula ativa com esse nome." }, { status: 409 });
+    await db.prepare(
+      `UPDATE celulas SET nome = ?, dias_reuniao = ?, rede = ?, horario_texto = ?,
+        endereco_publico = ?, descricao_publica = ?, observacoes = ?, temas = ?,
+        foto_capa = ?, atualizado_em = CURRENT_TIMESTAMP
+       WHERE id = ? AND comunidade_id = ?`,
+    ).bind(
+      nome,
+      JSON.stringify([...new Set(dias)]),
+      rede,
+      horarioTexto,
+      enderecoPublico,
+      descricaoPublica,
+      observacoes || null,
+      JSON.stringify(temas),
+      fotoCapa,
+      id,
+      access.context.comunidadeId,
+    ).run();
+    return audited(db, access.context, access.user.id, id, "CONFIGURACOES_ATUALIZADAS");
   }
 
   if (action === "REATIVAR") {

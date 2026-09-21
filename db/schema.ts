@@ -111,6 +111,10 @@ export const celulas = sqliteTable(
     diasReuniao: text("dias_reuniao").notNull().default("[]"),
     enderecoPublico: text("endereco_publico").notNull().default(""),
     descricaoPublica: text("descricao_publica").notNull().default(""),
+    rede: text("rede").notNull().default(""),
+    horarioTexto: text("horario_texto").notNull().default(""),
+    temas: text("temas").notNull().default("[]"),
+    fotoCapa: text("foto_capa"),
     liderUsuarioId: integer("lider_usuario_id").references(() => usuarios.id, {
       onDelete: "set null",
     }),
@@ -1371,6 +1375,31 @@ export const comentariosPublicacao = sqliteTable(
   ],
 );
 
+export const reacoesPublicacao = sqliteTable(
+  "reacoes_publicacao",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    publicacaoId: integer("publicacao_id")
+      .notNull()
+      .references(() => publicacoesPiloto.id, { onDelete: "cascade" }),
+    usuarioId: integer("usuario_id")
+      .notNull()
+      .references(() => usuarios.id, { onDelete: "cascade" }),
+    tipo: text("tipo").notNull(),
+    criadoEm: text("criado_em")
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("reacoes_publicacao_unica_idx").on(
+      table.publicacaoId,
+      table.usuarioId,
+      table.tipo,
+    ),
+    index("reacoes_publicacao_post_idx").on(table.publicacaoId, table.tipo),
+  ],
+);
+
 export const eventosComunidade = sqliteTable(
   "eventos_comunidade",
   {
@@ -1465,6 +1494,12 @@ export const ministeriosComunidade = sqliteTable(
     youtubeUrl: text("youtube_url").notNull().default(""),
     spotifyUrl: text("spotify_url").notNull().default(""),
     bannerUrl: text("banner_url").notNull().default(""),
+    // Modelo do Fio do Ministério: lista de títulos de etapa que cada escala
+    // nova deste ministério herda. O estado de cada etapa vive na escala.
+    fioHabilitado: integer("fio_habilitado", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    fioEtapas: text("fio_etapas").notNull().default("[]"),
     responsavelUsuarioId: integer("responsavel_usuario_id").references(
       () => usuarios.id,
       { onDelete: "set null" },
@@ -1908,6 +1943,9 @@ export const escalasMinisterio = sqliteTable(
     publicarEm: text("publicar_em"),
     modeloSnapshot: text("modelo_snapshot").notNull().default("{}"),
     camposRespostas: text("campos_respostas").notNull().default("{}"),
+    // Etapas do Fio desta escala: nascem do modelo do ministério e variam
+    // escala a escala. Cada item guarda o próprio estado (feito, quando, quem).
+    fioEtapas: text("fio_etapas").notNull().default("[]"),
     criadoPor: integer("criado_por").references(() => usuarios.id, {
       onDelete: "set null",
     }),
@@ -1942,6 +1980,73 @@ export const escalasMinisterio = sqliteTable(
   ],
 );
 
+// Uma assinatura pertence ao navegador/aparelho autenticado, não à
+// comunidade. O endpoint não é reutilizável entre usuários: um novo login no
+// mesmo aparelho substitui o vínculo anterior no endpoint único.
+export const notificacoesPushDispositivos = sqliteTable(
+  "notificacoes_push_dispositivos",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    usuarioId: integer("usuario_id")
+      .notNull()
+      .references(() => usuarios.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    expiracaoEm: text("expiracao_em"),
+    criadoEm: text("criado_em")
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+    atualizadoEm: text("atualizado_em")
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("notificacoes_push_dispositivos_endpoint_unique").on(table.endpoint),
+    index("notificacoes_push_dispositivos_usuario_atualizado_idx").on(
+      table.usuarioId,
+      table.atualizadoEm,
+    ),
+  ],
+);
+
+// Uma escala pode reunir várias equipes do mesmo ministério. A função/local
+// pertence à participação daquela equipe na escala (por exemplo, "Centro"),
+// não à equipe de forma permanente.
+export const escalaEquipes = sqliteTable(
+  "escala_equipes",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    comunidadeId: integer("comunidade_id")
+      .notNull()
+      .references(() => comunidades.id, { onDelete: "cascade" }),
+    escalaId: integer("escala_id")
+      .notNull()
+      .references(() => escalasMinisterio.id, { onDelete: "cascade" }),
+    equipeId: integer("equipe_id")
+      .notNull()
+      .references(() => ministerioEquipes.id, { onDelete: "cascade" }),
+    funcao: text("funcao").notNull().default(""),
+    pontoEncontro: text("ponto_encontro").notNull().default(""),
+    horarioEncontro: text("horario_encontro").notNull().default(""),
+    criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+    atualizadoEm: text("atualizado_em")
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("escala_equipes_escala_equipe_unique").on(
+      table.escalaId,
+      table.equipeId,
+    ),
+    index("escala_equipes_comunidade_escala_idx").on(
+      table.comunidadeId,
+      table.escalaId,
+      table.equipeId,
+    ),
+  ],
+);
+
 export const escalaDesignacoes = sqliteTable(
   "escala_designacoes",
   {
@@ -1955,6 +2060,11 @@ export const escalaDesignacoes = sqliteTable(
     voluntarioId: integer("voluntario_id")
       .notNull()
       .references(() => ministerioVoluntarios.id, { onDelete: "cascade" }),
+    // Mantém explícita a origem da pessoa quando duas ou mais equipes servem
+    // na mesma escala. Escalas antigas e designações livres continuam nulas.
+    equipeId: integer("equipe_id").references(() => ministerioEquipes.id, {
+      onDelete: "set null",
+    }),
     usuarioId: integer("usuario_id")
       .notNull()
       .references(() => usuarios.id, { onDelete: "cascade" }),

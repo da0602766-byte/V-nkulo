@@ -14,12 +14,7 @@ export default function ThemeControl({
   storageId?: string;
 }) {
   const [theme, setTheme] = useState<Theme>("AUTO");
-  // No tema automático, saber se o sistema está no escuro exige consultar o
-  // navegador — informação que o servidor não tem. Ler isso durante a
-  // renderização fazia o servidor desenhar o sol e o cliente a lua, quebrando
-  // a hidratação. A resposta passa a vir do estado, acertada num efeito depois
-  // da montagem, como o projeto já faz para o tema salvo logo abaixo.
-  const [autoIsDark, setAutoIsDark] = useState(false);
+  const [resolvedDark, setResolvedDark] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const transitionInProgress = useRef(false);
   const individualKey = themeStorageKey(storageId);
@@ -31,8 +26,8 @@ export default function ThemeControl({
         window.localStorage.getItem("vinkulo-theme"),
       );
       setTheme(saved);
-      setAutoIsDark(systemPrefersDark());
       applyTheme(saved);
+      setResolvedDark(currentThemeIsDark(saved));
     }, 0);
     return () => window.clearTimeout(timer);
   }, [individualKey]);
@@ -41,8 +36,8 @@ export default function ThemeControl({
     if (theme !== "AUTO") return;
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     const syncAutomaticTheme = () => {
-      setAutoIsDark(media.matches);
       applyTheme("AUTO");
+      setResolvedDark(media.matches);
     };
     media.addEventListener("change", syncAutomaticTheme);
     return () => media.removeEventListener("change", syncAutomaticTheme);
@@ -53,7 +48,7 @@ export default function ThemeControl({
     transitionInProgress.current = true;
     setIsTransitioning(true);
     setTheme(next);
-    setAutoIsDark(systemPrefersDark());
+    setResolvedDark(currentThemeIsDark(next));
     window.localStorage.setItem("vinkulo-theme", next);
     if (individualKey) window.localStorage.setItem(individualKey, next);
     animateThemeChange(next).finally(() => {
@@ -63,7 +58,7 @@ export default function ThemeControl({
   }
 
   if (cycle) {
-    const isDark = currentThemeIsDark(theme, autoIsDark);
+    const isDark = resolvedDark;
     const nextTheme = isDark ? THEMES[0] : THEMES[1];
     return (
       <div className={`theme-control theme-control-cycle ${compact ? "compact" : ""}${isTransitioning ? " is-transitioning" : ""}`}>
@@ -132,16 +127,12 @@ function themeStorageKey(storageId: string) {
   return normalized ? `vinkulo:theme:${normalized}` : "";
 }
 
-function systemPrefersDark() {
+function currentThemeIsDark(theme: Theme) {
+  if (theme === "ESCURO") return true;
+  if (theme === "CLARO") return false;
   if (typeof window === "undefined") return false;
   return document.documentElement.dataset.theme === "dark" ||
     window.matchMedia("(prefers-color-scheme: dark)").matches;
-}
-
-function currentThemeIsDark(theme: Theme, autoIsDark: boolean) {
-  if (theme === "ESCURO") return true;
-  if (theme === "CLARO") return false;
-  return autoIsDark;
 }
 
 async function animateThemeChange(theme: Theme) {

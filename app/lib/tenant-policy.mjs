@@ -17,6 +17,7 @@ const ROLE_PERMISSIONS = Object.freeze({
     "ministries.view",
     "schedules.view",
     "schedules.respond",
+    "cells.view",
     "parking.reserve",
     "profile.self.view",
     "profile.self.update",

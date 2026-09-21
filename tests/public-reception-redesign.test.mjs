@@ -4,20 +4,23 @@ import test from "node:test";
 
 const source = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("recepção pública usa cabeçalho compacto, conta e ícones responsivos", async () => {
-  const [page, experience, header, mobile, icons, styles] = await Promise.all([
+test("landing pública usa navegação compacta, tema e ícones responsivos", async () => {
+  const [page, experience, header, mobile, icons, styles, landingStyles] = await Promise.all([
     source("app/page.tsx"),
-    source("app/components/ReceptionExperience.tsx"),
+    source("app/components/LandingPageExperience.tsx"),
     source("app/components/PublicHeader.tsx"),
     source("app/components/PublicMobileNav.tsx"),
     source("app/components/PublicIcon.tsx"),
     source("app/globals.css"),
+    source("app/landing-vinkulo.css"),
   ]);
 
-  assert.match(page, /className="vinkulo-reception"/);
-  assert.match(experience, /className="rc-kicker"/);
-  assert.match(experience, /className="rc-stack"/);
+  assert.match(page, /LandingPageExperience/);
+  assert.match(experience, /className="lp-nav"/);
+  assert.match(experience, /className="lp-social-proof"/);
   assert.match(experience, /id="recursos"/);
+  assert.match(experience, /ThemeControl compact cycle/);
+  assert.match(experience, /IntersectionObserver/);
   assert.match(header, /public-search-menu/);
   assert.match(header, /public-account-menu/);
   assert.match(header, /Sair da plataforma/);
@@ -28,4 +31,5 @@ test("recepção pública usa cabeçalho compacto, conta e ícones responsivos",
   assert.match(styles, /V8\.2 — recepção pública profissional/);
   assert.match(styles, /@media \(max-width: 680px\)/);
   assert.match(styles, /html\[data-pilot-theme="escuro"\] \.commercial-landing/);
+  assert.match(landingStyles, /@media \(max-width:620px\)/);
 });

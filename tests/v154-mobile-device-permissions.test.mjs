@@ -18,9 +18,10 @@ test("installed PWA hides the install prompt and respects the phone safe area", 
 });
 
 test("camera and notification permissions have explicit mobile flows", async () => {
-  const [qr, notifications, serviceWorker, edgeWorker] = await Promise.all([
+  const [qr, notifications, webPushClient, serviceWorker, edgeWorker] = await Promise.all([
     read("app/components/ParkingReservationQr.tsx"),
     read("app/components/PilotNotificationCenter.tsx"),
+    read("app/lib/web-push-client.ts"),
     read("public/sw.js"),
     read("worker/index.ts"),
   ]);
@@ -29,7 +30,9 @@ test("camera and notification permissions have explicit mobile flows", async () 
   assert.match(qr, /onClick=\{openScanner\}/);
   assert.match(qr, /Permitir câmera/);
   assert.match(qr, /Tentar novamente/);
-  assert.match(notifications, /Notification\.requestPermission/);
+  assert.match(webPushClient, /Notification\.requestPermission/);
+  assert.match(webPushClient, /pushManager\.subscribe/);
+  assert.match(notifications, /subscribeWebPushNotifications/);
   assert.match(notifications, /showNotification/);
   assert.match(notifications, /Liberar notificações do aplicativo/);
   assert.match(notifications, /Configurações › Aplicativos › Vínkulo › Notificações/);

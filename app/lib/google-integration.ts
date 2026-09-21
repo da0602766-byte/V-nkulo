@@ -238,8 +238,24 @@ export async function getDriveAccessToken(userId: number) {
       grant_type: "refresh_token",
     }),
   });
-  const body = await response.json() as { access_token?: string; error_description?: string };
+  const body = await response.json() as {
+    access_token?: string;
+    error?: string;
+    error_description?: string;
+  };
   if (!response.ok || !body.access_token) {
+    // Um refresh token revogado não volta a funcionar com novas tentativas.
+    // Marcamos a conexão como desconectada e apagamos o segredo inválido para
+    // que a tela ofereça a nova autorização em vez de parecer conectada.
+    if (body.error === "invalid_grant") {
+      await getD1().prepare(
+        `UPDATE google_connections
+         SET refresh_token_ciphertext = NULL, refresh_token_iv = NULL,
+             drive_enabled = 0, revoked_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+         WHERE usuario_id = ?`,
+      ).bind(userId).run();
+      throw new Error("A autorização do Google Drive expirou ou foi revogada. Conecte o Drive novamente para continuar.");
+    }
     throw new Error(body.error_description || "A autorização do Google Drive expirou.");
   }
   return body.access_token;

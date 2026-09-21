@@ -13,7 +13,12 @@ test("tema é persistido por comunidade, protegido no servidor e aplicado na cas
   assert.match(route, /requireTenantPermission\("community\.theme\.manage"\)/);
   assert.match(route, /community_theme:\$\{access\.context\.comunidadeId\}/);
   assert.match(theme, /NOITE_CARMESIM/);
+  assert.match(theme, /id: "NEUTRO"/);
+  assert.match(theme, /name: "Sem tema"/);
+  assert.match(theme, /background: "#ffffff"/);
+  assert.match(theme, /background: "#000000"/);
   assert.match(styles, /V198 — paleta real por comunidade/);
+  assert.match(styles, /data-community-palette="neutro"/);
   assert.match(styles, /--bg: var\(--community-light-bg\)/);
   assert.match(styles, /--bg: var\(--community-dark-bg\)/);
 });

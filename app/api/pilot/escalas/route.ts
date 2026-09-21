@@ -7,6 +7,7 @@ import {
 import {
   parseCustomFieldAnswers,
   parseSchedulePayload,
+  seedFioSteps,
   type MinistryCustomField,
 } from "../../../lib/ministry-validation";
 import { recordTenantAudit } from "../../../lib/tenant-audit";
@@ -17,6 +18,7 @@ import { listScheduleSubstitutionCandidatesBatch } from "../../../lib/schedule-s
 
 type ScheduleRow = Record<string, unknown> & { id: number };
 type AssignmentRow = Record<string, unknown> & { escala_id: number };
+type ScheduleTeamRow = Record<string, unknown> & { escala_id: number };
 
 // Lote pedido a cada carregamento. O teto anterior era 150 escalas de uma vez,
 // sem forma de pedir as seguintes: passado esse número, as mais distantes
@@ -56,6 +58,7 @@ export async function GET(request: Request) {
   if ("error" in access) return access.error;
   const db = getD1();
   await publishDueSchedules(db, access.context.comunidadeId);
+  await notifyUpcomingPendingConfirmations(db, access.context.comunidadeId);
   const scheduleAddress = new URL(request.url);
   const scheduleCursor = decodeScheduleCursor(
     scheduleAddress.searchParams.get("cursor"),
@@ -108,7 +111,7 @@ export async function GET(request: Request) {
         s.equipe_id, equipe.nome AS equipe_nome,
         s.titulo, s.inicia_em, s.termina_em, s.local, s.status, s.publicar_em,
         s.observacoes, s.modelo_snapshot, s.campos_respostas,
-        s.repertorio, s.links_recursos, s.responsavel_usuario_id,
+        s.repertorio, s.links_recursos, s.fio_etapas, s.responsavel_usuario_id,
         responsavel.nome AS responsavel_nome, s.share_token,
         (SELECT configuracao.valor
          FROM configuracoes configuracao
@@ -224,17 +227,22 @@ export async function GET(request: Request) {
   // com cortes em 100 noutros pontos. Blocos de 90 deixam margem para os dois
   // parâmetros fixos. Cada bloco continua filtrando por comunidade.
   const assignmentRows: AssignmentRow[] = [];
+  const scheduleTeamRows: ScheduleTeamRow[] = [];
   for (let inicio = 0; inicio < loadedScheduleIds.length; inicio += ASSIGNMENT_ID_CHUNK) {
     const bloco = loadedScheduleIds.slice(inicio, inicio + ASSIGNMENT_ID_CHUNK);
     const marcadores = bloco.map(() => "?").join(", ");
     const parcial = await db
       .prepare(
-        `SELECT d.id, d.escala_id, d.voluntario_id, d.usuario_id,
+        `SELECT d.id, d.escala_id, d.voluntario_id, d.usuario_id, d.equipe_id,
           u.nome, u.telefone, u.foto_perfil, u.email AS owner_email,
           u.criado_em AS owner_criado_em, d.funcao, d.status,
+          equipe.nome AS equipe_nome, equipe.cor AS equipe_cor,
           CASE WHEN d.usuario_id = ? THEN 1 ELSE 0 END AS is_mine
         FROM escala_designacoes d
         JOIN usuarios u ON u.id = d.usuario_id
+        LEFT JOIN ministerio_equipes equipe
+          ON equipe.id = d.equipe_id
+         AND equipe.comunidade_id = d.comunidade_id
         WHERE d.comunidade_id = ? AND d.ativo = 1
           AND d.escala_id IN (${marcadores})
         ORDER BY u.nome ASC`,
@@ -242,8 +250,46 @@ export async function GET(request: Request) {
       .bind(access.user.id, access.context.comunidadeId, ...bloco)
       .all<AssignmentRow>();
     assignmentRows.push(...parcial.results);
+    const teamsPartial = await db
+      .prepare(
+        `SELECT se.escala_id, se.equipe_id, se.funcao, se.ponto_encontro, se.horario_encontro,
+          equipe.nome AS equipe_nome, equipe.cor AS equipe_cor, equipe.ordem AS equipe_ordem
+         FROM escala_equipes se
+         JOIN ministerio_equipes equipe
+           ON equipe.id = se.equipe_id
+          AND equipe.comunidade_id = se.comunidade_id
+         WHERE se.comunidade_id = ? AND se.escala_id IN (${marcadores})
+         ORDER BY se.escala_id ASC, equipe.ordem ASC, equipe.nome ASC`,
+      )
+      .bind(access.context.comunidadeId, ...bloco)
+      .all<ScheduleTeamRow>();
+    scheduleTeamRows.push(...teamsPartial.results);
   }
   const assignmentsResult = { results: assignmentRows };
+  const teamsBySchedule = new Map<number, ScheduleTeamRow[]>();
+  for (const team of scheduleTeamRows) {
+    const scheduleId = Number(team.escala_id);
+    const items = teamsBySchedule.get(scheduleId) || [];
+    items.push(team);
+    teamsBySchedule.set(scheduleId, items);
+  }
+  // O fallback só protege uma implantação em que a leitura chegue antes da
+  // migração terminar; registros legados são copiados pela migração 0073.
+  for (const schedule of schedulesResult.results) {
+    const scheduleId = Number(schedule.id);
+    if (!teamsBySchedule.has(scheduleId) && Number(schedule.equipe_id || 0) > 0) {
+      teamsBySchedule.set(scheduleId, [{
+        escala_id: scheduleId,
+        equipe_id: Number(schedule.equipe_id),
+        equipe_nome: schedule.equipe_nome || "Equipe",
+        equipe_cor: "#7357e8",
+        equipe_ordem: 0,
+        funcao: "",
+        ponto_encontro: "",
+        horario_encontro: "",
+      }]);
+    }
+  }
   const manageableScheduleIds = new Set(
     schedulesResult.results
       .filter((schedule) => Boolean(schedule.can_manage))
@@ -338,6 +384,13 @@ export async function GET(request: Request) {
           campos_respostas: parseObject(schedule.campos_respostas),
           repertorio: parseArray(schedule.repertorio),
           links_recursos: parseArray(schedule.links_recursos),
+          fio_etapas: parseArray(schedule.fio_etapas),
+          equipes: (teamsBySchedule.get(Number(schedule.id)) || []).map((team) => ({
+            equipe_id: Number(team.equipe_id),
+            equipe_nome: String(team.equipe_nome || "Equipe"),
+            equipe_cor: String(team.equipe_cor || "#7357e8"),
+            funcao: String(team.funcao || ""),
+          })),
           designacoes: assignmentsBySchedule.get(Number(schedule.id)) || [],
           substitution_candidates:
             substitutionCandidatesBySchedule.get(Number(schedule.id)) || [],
@@ -397,21 +450,25 @@ async function createSchedule(request: Request) {
       { status: 403 },
     );
   }
-  if (parsed.equipeId) {
+  for (const selectedTeam of parsed.equipes) {
     const team = await db
       .prepare(
         `SELECT id FROM ministerio_equipes
          WHERE id = ? AND ministerio_id = ? AND comunidade_id = ? AND ativa = 1`,
       )
       .bind(
-        parsed.equipeId,
+        selectedTeam.equipeId,
         parsed.ministerioId,
         access.context.comunidadeId,
       )
       .first<{ id: number }>();
     if (!team) {
       return Response.json(
-        { error: "A equipe selecionada não pertence a este ministério." },
+        {
+          error: parsed.equipes.length === 1
+            ? "A equipe selecionada não pertence a este ministério."
+            : "Uma das equipes selecionadas não pertence a este ministério.",
+        },
         { status: 400 },
       );
     }
@@ -440,6 +497,7 @@ async function createSchedule(request: Request) {
     id: number;
     usuarioId: number;
     funcao: string;
+    equipeId: number | null;
   }> = [];
   const voluntarioIds = Array.from(
     new Set(parsed.designacoes.map((assignment) => assignment.voluntarioId)),
@@ -448,7 +506,6 @@ async function createSchedule(request: Request) {
     number,
     { id: number; usuario_id: number; funcao: string; limite_escalas: number }
   >();
-  const teamMemberVoluntarioIds = new Set<number>();
   if (voluntarioIds.length > 0) {
     const placeholders = voluntarioIds.map(() => "?").join(", ");
     const volunteersResult = await db
@@ -462,24 +519,6 @@ async function createSchedule(request: Request) {
     for (const volunteer of volunteersResult.results) {
       volunteersById.set(Number(volunteer.id), volunteer);
     }
-    if (parsed.equipeId) {
-      const teamResult = await db
-        .prepare(
-          `SELECT voluntario_id FROM ministerio_equipe_membros
-           WHERE equipe_id = ? AND ministerio_id = ? AND comunidade_id = ?
-             AND voluntario_id IN (${placeholders})`,
-        )
-        .bind(
-          parsed.equipeId,
-          parsed.ministerioId,
-          access.context.comunidadeId,
-          ...voluntarioIds,
-        )
-        .all<{ voluntario_id: number }>();
-      for (const row of teamResult.results) {
-        teamMemberVoluntarioIds.add(Number(row.voluntario_id));
-      }
-    }
   }
   for (const assignment of parsed.designacoes) {
     const volunteer = volunteersById.get(assignment.voluntarioId);
@@ -489,11 +528,41 @@ async function createSchedule(request: Request) {
         { status: 400 },
       );
     }
-    if (parsed.equipeId && !teamMemberVoluntarioIds.has(volunteer.id)) {
+    const assignmentTeamId = assignment.equipeId || (
+      parsed.equipes.length === 1 ? parsed.equipes[0].equipeId : null
+    );
+    if (parsed.equipes.length > 0 && !assignmentTeamId) {
       return Response.json(
-        { error: "Todos os integrantes da escala devem pertencer à equipe selecionada." },
+        { error: "Escolha a equipe de cada integrante desta escala." },
         { status: 400 },
       );
+    }
+    if (assignmentTeamId && !parsed.equipes.some((team) => team.equipeId === assignmentTeamId)) {
+      return Response.json(
+        { error: "Um integrante foi associado a uma equipe fora desta escala." },
+        { status: 400 },
+      );
+    }
+    if (assignmentTeamId) {
+      const teamMember = await db
+        .prepare(
+          `SELECT id FROM ministerio_equipe_membros
+           WHERE equipe_id = ? AND ministerio_id = ? AND comunidade_id = ?
+             AND voluntario_id = ?`,
+        )
+        .bind(
+          assignmentTeamId,
+          parsed.ministerioId,
+          access.context.comunidadeId,
+          volunteer.id,
+        )
+        .first<{ id: number }>();
+      if (!teamMember) {
+        return Response.json(
+          { error: "Cada integrante precisa pertencer à equipe escolhida para ele." },
+          { status: 400 },
+        );
+      }
     }
     const capacity = await db
       .prepare(
@@ -533,6 +602,7 @@ async function createSchedule(request: Request) {
       id: Number(volunteer.id),
       usuarioId: Number(volunteer.usuario_id),
       funcao: assignment.funcao || String(volunteer.funcao),
+      equipeId: assignmentTeamId,
     });
   }
   const modelId = positiveInteger(payload.modeloId);
@@ -578,14 +648,30 @@ async function createSchedule(request: Request) {
       versao: Number(template.versao) || 1,
     };
   }
+  // O Fio da escala: usa o que veio do formulário (cada escala pode variar) e,
+  // quando o formulário não mandou nada, cai no modelo do próprio ministério.
+  let fioEtapas = parsed.fioEtapas;
+  if (!fioEtapas.length) {
+    const ministry = await db
+      .prepare(
+        `SELECT fio_habilitado, fio_etapas FROM ministerios_comunidade
+         WHERE id = ? AND comunidade_id = ?`,
+      )
+      .bind(parsed.ministerioId, access.context.comunidadeId)
+      .first<{ fio_habilitado: number; fio_etapas: string }>();
+    if (ministry && Number(ministry.fio_habilitado) === 1) {
+      const template = parseArray(ministry.fio_etapas).map(String);
+      fioEtapas = seedFioSteps(template);
+    }
+  }
   const result = await db
     .prepare(
       `INSERT INTO escalas_ministerio
       (comunidade_id, ministerio_id, equipe_id, titulo, inicia_em, termina_em,
-       local, status, observacoes, repertorio, links_recursos,
+       local, status, observacoes, repertorio, links_recursos, fio_etapas,
        responsavel_usuario_id, publicar_em, modelo_snapshot, campos_respostas,
        criado_por, atualizado_por)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       access.context.comunidadeId,
@@ -599,6 +685,7 @@ async function createSchedule(request: Request) {
       parsed.observacoes,
       JSON.stringify(parsed.repertorio),
       JSON.stringify(parsed.links),
+      JSON.stringify(fioEtapas),
       parsed.responsavelUsuarioId,
       parsed.publicarEm,
       JSON.stringify(modelSnapshot),
@@ -611,18 +698,36 @@ async function createSchedule(request: Request) {
   const assignmentIds = new Map<number, number>();
   const notificationRecipients: number[] = [];
   try {
+    for (const team of parsed.equipes) {
+      await db
+        .prepare(
+          `INSERT INTO escala_equipes
+           (comunidade_id, escala_id, equipe_id, funcao, ponto_encontro, horario_encontro)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          access.context.comunidadeId,
+          scheduleId,
+          team.equipeId,
+          team.funcao,
+          team.pontoEncontro,
+          team.horarioEncontro,
+        )
+        .run();
+    }
     for (const assignment of validatedAssignments) {
       const assignmentResult = await db
         .prepare(
           `INSERT INTO escala_designacoes
-           (comunidade_id, escala_id, voluntario_id, usuario_id, funcao, status, ativo)
-           VALUES (?, ?, ?, ?, ?, 'PENDENTE', 1)`,
+           (comunidade_id, escala_id, voluntario_id, usuario_id, equipe_id, funcao, status, ativo)
+           VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE', 1)`,
         )
         .bind(
           access.context.comunidadeId,
           scheduleId,
           assignment.id,
           assignment.usuarioId,
+          assignment.equipeId,
           assignment.funcao,
         )
         .run();
@@ -688,6 +793,7 @@ async function createSchedule(request: Request) {
       escalaId: scheduleId,
       ministerioId: parsed.ministerioId,
       equipeId: parsed.equipeId,
+      equipeIds: parsed.equipes.map((team) => team.equipeId),
       status: parsed.status,
       modeloId: modelId,
       checklistItens: checklist.length,
@@ -726,6 +832,73 @@ async function publishDueSchedules(db: D1Database, communityId: number) {
     })));
     if (notificationResults.some((item) => item.status === "rejected")) {
       console.error(`Escala agendada ${schedule.id} publicada, mas uma ou mais notificações falharam.`);
+    }
+  }
+}
+
+// A listagem das escalas é carregada pela liderança durante a preparação.
+// Nela reservamos, uma única vez, o lembrete de aproximadamente 24h antes do
+// início, sem depender do navegador da pessoa que ainda não respondeu.
+async function notifyUpcomingPendingConfirmations(db: D1Database, communityId: number) {
+  const upcoming = await db.prepare(
+    `SELECT s.id, s.titulo, COUNT(d.id) AS pendentes
+     FROM escalas_ministerio s
+     JOIN escala_designacoes d
+       ON d.escala_id = s.id
+      AND d.comunidade_id = s.comunidade_id
+      AND d.ativo = 1
+      AND d.status = 'PENDENTE'
+     WHERE s.comunidade_id = ?
+       AND s.status = 'PUBLICADA'
+       AND datetime(s.inicia_em) BETWEEN datetime('now', '+18 hours') AND datetime('now', '+30 hours')
+     GROUP BY s.id, s.titulo
+     LIMIT 40`,
+  ).bind(communityId).all<{ id: number; titulo: string; pendentes: number }>();
+
+  for (const schedule of upcoming.results) {
+    const recipients = await db.prepare(
+      `SELECT DISTINCT usuario_id FROM (
+        SELECT responsavel_usuario_id AS usuario_id
+        FROM escalas_ministerio
+        WHERE id = ? AND comunidade_id = ?
+        UNION
+        SELECT responsavel_usuario_id AS usuario_id
+        FROM ministerios_comunidade
+        WHERE id = (SELECT ministerio_id FROM escalas_ministerio WHERE id = ? AND comunidade_id = ?)
+          AND comunidade_id = ?
+        UNION
+        SELECT usuario_id
+        FROM ministerio_voluntarios
+        WHERE ministerio_id = (SELECT ministerio_id FROM escalas_ministerio WHERE id = ? AND comunidade_id = ?)
+          AND comunidade_id = ? AND ativo = 1 AND papel = 'LIDER'
+      ) WHERE usuario_id IS NOT NULL`,
+    ).bind(
+      schedule.id, communityId,
+      schedule.id, communityId, communityId,
+      schedule.id, communityId, communityId,
+    ).all<{ usuario_id: number }>();
+    if (!recipients.results.length) continue;
+
+    const reminderKey = `schedule_pending_reminder:${communityId}:${schedule.id}`;
+    const reserved = await db.prepare(
+      `INSERT OR IGNORE INTO configuracoes (chave, valor, atualizado_por, atualizado_em)
+       VALUES (?, ?, 'lembrete-escala', CURRENT_TIMESTAMP)`,
+    ).bind(reminderKey, JSON.stringify({ pendentes: Number(schedule.pendentes) })).run();
+    if (!Number((reserved.meta as { changes?: number }).changes || 0)) continue;
+
+    const pendingLabel = Number(schedule.pendentes) === 1 ? "1 confirmação pendente" : `${schedule.pendentes} confirmações pendentes`;
+    const results = await Promise.allSettled(recipients.results.map((recipient) => notifyUser(db, {
+      userId: Number(recipient.usuario_id),
+      title: "Confirmações pendentes para amanhã",
+      message: `A escala “${schedule.titulo}” começa em aproximadamente 24 horas e tem ${pendingLabel}.`,
+      entityId: Number(schedule.id),
+      area: "ESCALAS",
+      destination: "/painel?view=ministerios",
+      createdBy: "lembrete-escala",
+    })));
+    if (results.every((result) => result.status === "rejected")) {
+      await db.prepare("DELETE FROM configuracoes WHERE chave = ?").bind(reminderKey).run();
+      console.error(`Lembrete da escala ${schedule.id} não pôde ser entregue; ele será tentado novamente.`);
     }
   }
 }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DragEvent } from "react";
+import { useSearchParams } from "next/navigation";
 import type { PilotFeatureState } from "../lib/pilot-data";
 import GlobalVisualEditor from "./GlobalVisualEditorLazy";
 import PilotNotificationCenter from "./PilotNotificationCenter";
@@ -12,6 +13,8 @@ import StatisticsWorkspace from "./StatisticsWorkspace";
 import PlatformOptimizerWorkspace from "./PlatformOptimizerWorkspace";
 import OwnerLaboratoryWorkspace from "./OwnerLaboratoryWorkspace";
 import OwnerAppearanceWorkspace from "./OwnerAppearanceWorkspace";
+import PlatformPlansWorkspace from "./PlatformPlansWorkspace";
+import OwnerOperationsWorkspace, { type OwnerOperationsScreen } from "./OwnerOperationsWorkspace";
 import Link from "./StableLink";
 import ThemeControl from "./ThemeControl";
 import {
@@ -44,8 +47,10 @@ type OwnerTab =
   | "statistics"
   | "optimization"
   | "appearance"
+  | "plans"
   | "controls"
-  | "laboratory";
+  | "laboratory"
+  | OwnerOperationsScreen;
 type OwnerGridPreset = "2x2" | "2x4" | "4x2" | "4x4";
 type OwnerMetricKey =
   | "comunidades_ativas"
@@ -66,7 +71,15 @@ const TABS: { id: OwnerTab; label: string; icon: string }[] = [
   { id: "statistics", label: "Estatísticas", icon: "▥" },
   { id: "optimization", label: "Otimização", icon: "↻" },
   { id: "appearance", label: "Aparência", icon: "◐" },
+  { id: "plans", label: "Planos", icon: "¤" },
   { id: "laboratory", label: "Laboratório", icon: "◈" },
+  { id: "passwords", label: "Redefinições de senha", icon: "⌁" },
+  { id: "deleted", label: "Contas excluídas", icon: "⊘" },
+  { id: "finance", label: "Financeiro", icon: "¤" },
+  { id: "realtime", label: "Tempo real", icon: "◉" },
+  { id: "performance", label: "Desempenho", icon: "↗" },
+  { id: "publication", label: "Publicação do sistema", icon: "⇧" },
+  { id: "incidents", label: "Incidentes", icon: "!" },
   { id: "controls", label: "Configurações", icon: "⚙" },
 ];
 
@@ -99,8 +112,14 @@ export default function OwnerWorkspace({
   features: PilotFeatureState;
   currentCommunityId: number;
 }) {
+  const searchParams = useSearchParams();
   const [tab, setTab] = useState<OwnerTab>("overview");
   const [data, setData] = useState<OwnerData | null>(null);
+  useEffect(() => {
+    if (searchParams.get("tab") !== "plans") return;
+    const frame = window.requestAnimationFrame(() => setTab("plans"));
+    return () => window.cancelAnimationFrame(frame);
+  }, [searchParams]);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState<number | null>(null);
   const [message, setMessage] = useState("");
@@ -377,13 +396,13 @@ export default function OwnerWorkspace({
   return (
     <main className="owner-area" data-ui-version="v2" data-visual-editor-root data-editor-key="area-proprietario">
       <header className="owner-topbar" data-editor-key="cabecalho-proprietario" data-smart-scroll-header>
-        <Link href="/" className="owner-brand"><span>{brandLogo ? <img loading="lazy" src={brandLogo} alt="" /> : brandName.slice(0, 1)}</span><div><strong>{brandName}</strong><small>Propriedade do sistema</small></div></Link>
+        <Link href="/" className="owner-brand"><span><OwnerImage src={brandLogo} fallback={brandName.slice(0, 1)} /></span><div><strong>{brandName}</strong><small>Propriedade do sistema</small></div></Link>
         <div className="owner-top-actions">
           <ThemeControl compact />
           <PilotNotificationCenter />
           <span id="global-editor-toolbar-slot" className="global-editor-toolbar-slot" aria-label="Aparência" />
           <Link href="/painel?view=conta" className="owner-profile-link" showLoading loadingLabel="Abrindo seu perfil…">
-            <span>{ownerPhoto ? <img loading="lazy" src={ownerPhoto} alt="" /> : initials(ownerName)}</span>
+            <span><OwnerImage src={ownerPhoto} fallback={initials(ownerName)} /></span>
             <div><VerifiedOwnerName name={ownerName} verified /><small>Proprietário global</small></div>
           </Link>
         </div>
@@ -470,6 +489,7 @@ export default function OwnerWorkspace({
             </>
           )}
           {tab === "laboratory" && <OwnerLaboratoryWorkspace />}
+          {(["passwords", "deleted", "finance", "realtime", "performance", "publication", "incidents"] as OwnerOperationsScreen[]).includes(tab as OwnerOperationsScreen) && <OwnerOperationsWorkspace screen={tab as OwnerOperationsScreen} />}
 
           {tab === "requests" && data && (
             <section className="owner-request-board">
@@ -556,6 +576,7 @@ export default function OwnerWorkspace({
           {tab === "statistics" && <StatisticsWorkspace />}
           {tab === "optimization" && <PlatformOptimizerWorkspace />}
           {tab === "appearance" && <OwnerAppearanceWorkspace />}
+          {tab === "plans" && <PlatformPlansWorkspace />}
           {tab === "controls" && <PlatformControlsWorkspace features={features} currentCommunityId={currentCommunityId} />}
         </section>
       </div>
@@ -785,8 +806,13 @@ function Metric({
   ><span className="owner-metric-grip" aria-hidden="true">⋮⋮</span><div className="owner-metric-touch-actions" aria-label={`Reordenar ${label}`}><button type="button" onClick={onMoveUp} disabled={!onMoveUp} aria-label={`Mover ${label} para cima`}>↑</button><button type="button" onClick={onMoveDown} disabled={!onMoveDown} aria-label={`Mover ${label} para baixo`}>↓</button></div><small>{label}</small><strong>{Number(value || 0)}</strong><p>{detail}</p></article>;
 }
 function Empty({ title, text }: { title: string; text: string }) { return <div className="owner-empty"><span>◇</span><strong>{title}</strong><p>{text}</p></div>; }
+function OwnerImage({ src, fallback }: { src?: string | null; fallback: string }) {
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) return <>{fallback}</>;
+  return <img loading="lazy" src={src} alt="" onError={() => setFailed(true)} />;
+}
 function OwnerAvatar({ image = "", name }: { image?: string; name: string }) {
-  return <span className="owner-profile-avatar">{image ? <img loading="lazy" src={image} alt="" /> : initials(name)}</span>;
+  return <span className="owner-profile-avatar"><OwnerImage src={image} fallback={initials(name)} /></span>;
 }
 function communityLogo(item: Record<string, unknown>) {
   const theme = safeObject(item.tema);
@@ -805,7 +831,15 @@ function tabDescription(tab: OwnerTab) {
     statistics: "Consulte indicadores globais sem expor ferramentas da plataforma nos menus comunitários.",
     optimization: "Diagnostique e execute retenções seguras sem remover dados ativos.",
     appearance: "Aplique paleta, logotipo, banner e papel de parede a uma comunidade ou a todas de uma vez.",
+    plans: "Defina os planos e chamadas comerciais da prévia exclusiva do proprietário.",
     laboratory: "Crie e valide protótipos isolados, sem modificar páginas ou dados reais.",
+    passwords: "Acompanhe redefinições com links de uso único e prazo curto.",
+    deleted: "Consulte contas anonimizadas e restaure somente dentro do prazo.",
+    finance: "Acompanhe cobranças administrativas, vencimentos e renovações.",
+    realtime: "Monitore presença e atividade agregada sem expor conteúdo.",
+    performance: "Investigue falhas, incidentes e lacunas de observabilidade.",
+    publication: "Aprove e acompanhe cada etapa antes de liberar uma versão.",
+    incidents: "Priorize ocorrências, acompanhe impacto e registre resoluções.",
     controls: "Configure identidade, módulos e regras globais da plataforma.",
   }[tab];
 }

@@ -55,10 +55,7 @@ export async function GET(request: Request, context: Context) {
       `Status: ${schedule.status}`,
       "",
       "EQUIPE",
-      ...schedule.designacoes.map(
-        (item, index) =>
-          `${index + 1}. ${item.nome} — ${item.funcao} (${item.status})`,
-      ),
+      ...formatAssignmentsByTeam(schedule),
       "",
       "REPERTÓRIO",
       ...(schedule.repertorio.length
@@ -91,4 +88,31 @@ function formatDate(value: unknown) {
   return Number.isNaN(date.getTime())
     ? String(value || "")
     : date.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
+}
+
+function formatAssignmentsByTeam(schedule: Awaited<ReturnType<typeof getSecretaryScheduleDetail>>) {
+  if (!schedule) return ["Nenhum integrante informado."];
+  const knownTeamIds = new Set(schedule.equipes.map((team) => team.equipe_id));
+  const groups = [
+    ...schedule.equipes.map((team) => ({
+      title: `${team.equipe_nome}${team.funcao ? ` — Função/local: ${team.funcao}` : ""}`,
+      assignments: schedule.designacoes.filter(
+        (assignment) => Number(assignment.equipe_id || 0) === team.equipe_id,
+      ),
+    })),
+    {
+      title: "Integrantes livres",
+      assignments: schedule.designacoes.filter(
+        (assignment) => !knownTeamIds.has(Number(assignment.equipe_id || 0)),
+      ),
+    },
+  ].filter((group) => group.assignments.length > 0);
+  return groups.length
+    ? groups.flatMap((group) => [
+        group.title,
+        ...group.assignments.map(
+          (item, index) => `  ${index + 1}. ${item.nome} — ${item.funcao} (${item.status})`,
+        ),
+      ])
+    : ["Nenhum integrante informado."];
 }

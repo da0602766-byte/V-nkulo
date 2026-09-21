@@ -1,0 +1,301 @@
+/* Desktop adaptation of the supplied ministry project. Mobile rules stay intact. */
+@media (min-width:1100px) {
+  .pilot-dashboard[data-ui-version="v2"] .secretary-workspace.ministry-project { grid-template-columns: minmax(0,1fr); box-sizing: border-box; overflow: visible; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project > * { max-width: 100%; box-sizing: border-box; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project :is(h1,h2,h3,h4,button,input,select,textarea) { font-family: inherit; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-summary { min-height: 150px; grid-template-columns: minmax(0,1fr); align-content: start; gap: 12px; padding: 20px; background: var(--mp-card); border: 1px solid var(--mp-line); border-radius: 16px; box-shadow: none; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-summary > span { height: 32px; width: 32px; border-radius: 8px; font-size: 16px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-summary div { display: flex; flex-direction: column; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-summary strong { order: -1; font-size: 28px; line-height: 1.2; margin: 0 0 8px; color: var(--mp-accent); }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-summary small { text-transform: none; letter-spacing: normal; font-size: 14px; font-weight: 500; color: var(--mp-muted); }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-summary p { font-size: 12px; color: var(--mp-muted); }
+  .ministry-recent-schedules { border: 1px solid var(--mp-line); border-radius: 16px; background: var(--mp-card); overflow: hidden; margin-bottom: 24px; }
+  .ministry-recent-schedules > header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid var(--mp-line); }
+  .ministry-recent-schedules > header h2 { margin: 0; font-size: 16px; }
+  .ministry-recent-schedules > header button { background: transparent; border: 0; color: var(--mp-accent); font-size: 14px; }
+  .ministry-recent-schedules .ministry-recent-row { display: grid; grid-template-columns: 42px minmax(0,1fr) auto auto; width: 100%; gap: 18px; align-items: center; background: transparent; border: 0; border-bottom: 1px solid var(--mp-line); padding: 20px 24px; border-radius: 0; text-align: left; color: var(--mp-ink); }
+  .ministry-recent-row:last-child { border-bottom: 0; }
+  .ministry-recent-row:hover { background: var(--mp-soft); }
+  .ministry-recent-row > span { display: grid; gap: 6px; }
+  .ministry-recent-row small { color: var(--mp-muted); font-size: 13px; }
+  :is(.ministry-recent-row,.ministry-schedule-row > summary) time { display: grid; gap: 2px; place-items: center; width: 42px; min-height: 45px; color: var(--mp-accent); background: var(--mp-soft); border-radius: 10px; }
+  :is(.ministry-recent-row,.ministry-schedule-row > summary) time strong { font-size: 18px; line-height: 1.3; }
+  :is(.ministry-recent-row,.ministry-schedule-row > summary) time span { font-size: 12px; }
+  .ministry-row-status { display: inline-flex; white-space: nowrap; align-items: center; justify-content: center; border-radius: 30px; padding: 5px 10px; font-size: 12px; color: var(--mp-muted); background: var(--mp-canvas); font-style: normal; font-weight: 500; }
+  .ministry-row-status.is-publicada { color: #047857; background: #ecfdf5; }
+  .ministry-row-status.is-rascunho { color: #a16207; background: #fffbeb; }
+  .ministry-row-status.is-agendada { color: #4338ca; background: #eef2ff; }
+  .ministry-schedule-row { border: 1px solid var(--mp-line); border-radius: 14px; background: var(--mp-card); }
+  .ministry-schedule-row > summary { display: grid; grid-template-columns: 42px minmax(0,1fr) auto auto 18px; align-items: center; gap: 18px; list-style: none; padding: 22px; cursor: pointer; }
+  .ministry-schedule-row > summary::-webkit-details-marker { display: none; }
+  .ministry-schedule-row > summary > div { display: grid; gap: 7px; }
+  .ministry-schedule-row > summary > div > strong { font-size: 16px; }
+  .ministry-schedule-row > summary small, .ministry-row-date { font-size: 13px; color: var(--mp-muted); }
+  .ministry-schedule-row[open] > summary { border-bottom: 1px solid var(--mp-line); }
+  .ministry-schedule-row[open] > summary > b { transform: rotate(180deg); }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .ministry-schedule-row > .secretary-schedule-card { border: 0; background: transparent; margin: 0; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-members > article { grid-template-columns: 40px minmax(110px,1fr) auto; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-members > article > small { grid-column: 2; font-size: 13px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-capacity-form { grid-column: 3; grid-row: 2; }
+}
+@media (min-width: 1100px) {
+  .pilot-dashboard[data-ui-version="v2"] .secretary-workspace.ministry-project {
+    --mp-accent: #4f46e5;
+    --mp-soft: #eef2ff;
+    --mp-canvas: #fafaf9;
+    --mp-card: #fff;
+    --mp-line: #e8e8ed;
+    --mp-ink: #1a1a2e;
+    --mp-muted: #656574;
+    --violet: var(--mp-accent);
+    --violet-deep: #4338ca;
+    --violet-soft: var(--mp-soft);
+    --ink: var(--mp-ink);
+    --muted: var(--mp-muted);
+    --line: var(--mp-line);
+    --surface: var(--mp-card);
+    --canvas: var(--mp-canvas);
+    background: var(--mp-canvas);
+    color: var(--mp-ink);
+    border: 1px solid var(--mp-line);
+    border-radius: 18px;
+    padding: 28px;
+    gap: 24px;
+    width: 100%;
+    max-width: none;
+    font-family: 'DM Sans', 'Inter', system-ui, sans-serif;
+  }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project :is(h1,h2,h3,h4,p) { letter-spacing: normal; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project h1 { font-size: 26px; line-height: 1.3; color: var(--mp-ink); }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project h2 { font-size: 18px; line-height: 1.4; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project h3 { font-size: 16px; line-height: 1.5; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project :is(input,select,textarea,button) { font-family: inherit; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project button { font-size: 14px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project :is(button,input,select,textarea,a):focus-visible { outline: 3px solid #818cf8; outline-offset: 3px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .pilot-kicker { color: var(--mp-muted); font-size: 12px; font-weight: 600; letter-spacing: .04em; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-catalog-header { border: 0; padding: 0 0 22px; box-shadow: none; background: none; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-catalog-header p { max-width: 760px; color: var(--mp-muted); }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-catalog-layout { display: grid; grid-template-columns: minmax(0,1fr) 300px; gap: 24px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-catalog { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; align-content: start; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-tile-wrap { min-width: 0; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-tile { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 16px; text-align: left; min-height: 250px; height: 100%; padding: 24px; border: 1px solid var(--mp-line); border-radius: 16px; background: var(--mp-card); box-shadow: none; color: var(--mp-ink); overflow: hidden; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-tile:hover { border-color: #a5b4fc; box-shadow: 0 4px 18px #4f46e50a; transform: translateY(-2px); }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-tile::before, .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-tile::after { display: none; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-symbol { background: var(--mp-soft); color: var(--mp-accent); width: 38px; height: 38px; border-radius: 10px; font-size: 22px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-copy { display: grid; gap: 7px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-copy strong { font-size: 20px; color: var(--mp-ink); }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-copy :is(small,span) { color: var(--mp-muted); font-size: 14px; line-height: 1.5; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-meta { display: grid; grid-template-columns: 1fr auto; border-top: 1px solid var(--mp-line); padding-top: 16px; margin-top: auto; gap: 5px 10px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-meta > small { color: var(--mp-muted); font-size: 12px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-meta > strong { grid-row: 2; font-size: 14px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-meta > span { grid-column: 2; grid-row: 1 / 3; align-self: center; color: var(--mp-accent); font-size: 14px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-tile.has-banner .secretary-ministry-tile-media { position: relative; inset: auto; display: block; height: 110px; margin: -24px -24px 0; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-tile.has-banner img { width: 100%; height: 100%; object-fit: cover; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-my-schedules { position: sticky; top: 90px; align-self: start; background: var(--mp-card); border: 1px solid var(--mp-line); border-radius: 16px; box-shadow: none; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-my-schedules h2 { font-size: 16px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-hero { min-height: 0; padding: 0 0 24px; border: 0; border-radius: 0; box-shadow: none; background: none; color: var(--mp-ink); display: flex; gap: 24px; align-items: center; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-hero::before, .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-hero::after { display: none; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-hero-copy { padding: 0; flex: 1; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-hero-copy > :is(h1,p) { color: var(--mp-ink); }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-hero-copy > p { color: var(--mp-muted); font-size: 14px; max-width: 750px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-hero.has-banner { overflow: visible; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-hero-media { position: relative; inset: auto; flex: 0 0 100px; width: 100px; height: 84px; border-radius: 12px; overflow: hidden; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-hero-media::after { display: none; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-hero-media img { height: 100%; width: 100%; object-fit: cover; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-community { background: var(--mp-card); border: 1px solid var(--mp-line); color: var(--mp-ink); padding: 14px 18px; border-radius: 12px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-community :is(span,small) { color: var(--mp-muted); }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-flow { display: none; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-toolbar { margin: 0 0 20px; padding: 0; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project :is(.secretary-primary-action,.secretary-toolbar-actions > button:last-child,.secretary-form > button) { background: var(--mp-accent); color: white; border: 1px solid var(--mp-accent); border-radius: 10px; box-shadow: none; padding: 10px 18px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project :is(.secretary-toolbar-secondary,.secretary-back-button) { color: var(--mp-muted); background: var(--mp-card); border: 1px solid var(--mp-line); border-radius: 10px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-tabs { display: flex; gap: 4px; padding: 6px; margin: 0 0 24px; border: 1px solid var(--mp-line); background: var(--mp-card); border-radius: 12px; box-shadow: none; overflow: auto; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-tabs button { flex: 1; white-space: nowrap; border: 0; padding: 11px 13px; color: var(--mp-muted); border-radius: 8px; background: transparent; box-shadow: none; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-tabs button.active { background: var(--mp-accent); color: white; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project :is(.secretary-summary-card,.secretary-card,.secretary-schedule-card,.ministry-team-card,.secretary-ministry-settings,.secretary-settings-section,.secretary-access-history) { background: var(--mp-card); border: 1px solid var(--mp-line); border-radius: 16px; box-shadow: none; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-summary-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 16px; margin-bottom: 24px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-summary-card { padding: 20px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-summary-card > strong { font-size: 28px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-card { padding: 24px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-dashboard-grid { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 20px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-section-grid { grid-template-columns: minmax(0,1fr) 320px; gap: 24px; align-items: start; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-section-grid > .secretary-wide-card { grid-column: 1; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-section-grid > .secretary-form { grid-column: 2; position: sticky; top: 90px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project :is(input:not([type=checkbox]):not([type=color]),select,textarea) { background: var(--mp-card); color: var(--mp-ink); border: 1px solid var(--mp-line); border-radius: 9px; min-height: 42px; padding: 10px 12px; font-size: 14px; box-shadow: none; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project textarea { line-height: 1.6; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project input[type=checkbox] { accent-color: var(--mp-accent); }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project label { color: var(--mp-ink); font-size: 14px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-schedules { display: flex; flex-direction: column; gap: 20px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-schedule-list { display: grid; grid-template-columns: minmax(0,1fr); gap: 16px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-schedule-card { padding: 24px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-members > article { border-bottom: 1px solid var(--mp-line); gap: 14px; padding: 18px 0; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .ministry-team-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-checklist-group { border-color: var(--mp-line); background: var(--mp-card); border-radius: 12px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-schedule-actions button { border: 1px solid var(--mp-line); background: var(--mp-card); color: var(--mp-muted); box-shadow: none; border-radius: 8px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .ministry-new-schedule { display: flex; align-items: center; gap: 12px; width: 100%; border: 2px dashed var(--mp-line); border-radius: 14px; background: transparent; color: var(--mp-ink); padding: 20px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .ministry-new-schedule:hover { border-color: #a5b4fc; background: var(--mp-soft); }
+  .ministry-new-schedule b { display: grid; place-items: center; height: 32px; width: 32px; background: var(--mp-soft); color: var(--mp-accent); border-radius: 9px; font-size: 22px; }
+  .ministry-new-schedule span { color: var(--mp-muted); margin-left: auto; font-size: 14px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .ministry-wizard { position: fixed; inset: 12px; z-index: 1600; border: 1px solid var(--mp-line); border-radius: 16px; overflow: hidden; background: var(--mp-canvas); box-shadow: 0 0 0 100vmax #13132955; text-align: left; }
+  .ministry-wizard > form { display: flex; flex-direction: column; height: 100%; }
+  .ministry-wizard .ministry-wizard-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 24px; background: var(--mp-card); border-bottom: 1px solid var(--mp-line); flex-wrap: wrap; }
+  .ministry-wizard-header button { min-height: 34px; border-radius: 8px; padding: 8px 12px; background: transparent; border: 1px solid var(--mp-line); color: var(--mp-muted); }
+  .ministry-wizard-identity { display: flex; align-items: center; gap: 12px; min-width: 170px; max-width: 270px; }
+  .ministry-wizard-identity button { font-size: 26px; border: 0; padding: 0 12px; }
+  .ministry-wizard-identity div { display: grid; gap: 3px; min-width: 0; }
+  .ministry-wizard-identity small { color: var(--mp-muted); font-size: 12px; }
+  .ministry-wizard-identity strong { font-size: 14px; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+  .ministry-wizard-header nav { display: flex; gap: 4px; }
+  .ministry-wizard-header nav button { display: flex; align-items: center; gap: 7px; border: 0; font-size: 13px; font-weight: 500; }
+  .ministry-wizard-header nav b { display: grid; place-items: center; height: 20px; width: 20px; border-radius: 50%; background: var(--mp-canvas); color: var(--mp-muted); font-size: 12px; }
+  .ministry-wizard-header nav button.active { color: #fff; background: var(--mp-accent); }
+  .ministry-wizard-header nav button.active b { color: white; background: #ffffff26; }
+  .ministry-wizard-header nav button.complete { background: var(--mp-soft); color: var(--mp-accent); }
+  .ministry-wizard-header-actions { display: flex; align-items: center; gap: 8px; }
+  .ministry-wizard-progress { height: 3px; background: var(--mp-line); }
+  .ministry-wizard-progress > div { height: 100%; background: linear-gradient(90deg,#4f46e5,#7c3aed); transition: width .2s; }
+  .ministry-wizard-body { display: grid; grid-template-columns: minmax(0,1fr) 288px; flex: 1; min-height: 0; }
+  .ministry-wizard-body.without-summary { grid-template-columns: 1fr; }
+  .ministry-wizard-main { min-width: 0; overflow-y: auto; padding: 34px max(24px,calc((100% - 770px)/2)); }
+  .ministry-wizard-step-heading { margin-bottom: 30px; }
+  .ministry-wizard-step-heading > p:first-child { display: flex; gap: 12px; align-items: center; margin: 0 0 14px; font-size: 13px; color: var(--mp-muted); }
+  .ministry-wizard-step-heading b { background: var(--mp-soft); color: var(--mp-accent); padding: 4px 8px; border-radius: 5px; font-size: 12px; }
+  .ministry-wizard-step-heading h2 { font-size: 24px; margin: 0 0 8px; outline: 0; }
+  .ministry-wizard-step-heading > p:last-child { font-size: 14px; color: var(--mp-muted); line-height: 1.6; }
+  .ministry-wizard [hidden] { display: none !important; }
+  .ministry-wizard-fields { display: grid; gap: 22px; }
+  .ministry-wizard-fields > label { display: grid; gap: 8px; font-weight: 600; font-size: 14px; }
+  .ministry-wizard-fields label small { font-weight: 400; color: var(--mp-muted); font-size: 13px; }
+  .ministry-wizard-fields input[readonly] { background: var(--mp-soft); color: var(--mp-accent); }
+  .ministry-wizard-fields .secretary-fold-content { padding: 0; background: transparent; }
+  .ministry-wizard-fields .secretary-fold-content > label { display: grid; gap: 8px; min-width: 0; font-size: 14px; }
+  .ministry-wizard-fields .secretary-fold-content > label > :is(input,select,textarea) { width: 100%; min-width: 0; box-sizing: border-box; }
+  .ministry-wizard-fields h3 { margin: 4px 0 0; padding-top: 4px; }
+  .ministry-wizard-review { border: 1px solid var(--mp-line); border-radius: 14px; padding: 22px; background: var(--mp-card); margin-bottom: 24px; }
+  .ministry-wizard-review h3 { margin: 0 0 16px; }
+  .ministry-wizard-review dl { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; margin: 0; }
+  .ministry-wizard-review dt { color: var(--mp-muted); font-size: 12px; margin-bottom: 5px; }
+  .ministry-wizard-review dd { font-size: 14px; margin: 0; line-height: 1.5; }
+  .ministry-wizard .secretary-schedule-teams { border: 0; padding: 0; }
+  .ministry-wizard .secretary-schedule-teams legend { font-size: 14px; margin-bottom: 6px; }
+  .ministry-wizard .secretary-schedule-teams > div { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; }
+  .ministry-wizard .secretary-schedule-teams > div > section { border: 1px solid var(--mp-line); border-radius: 12px; padding: 16px; background: var(--mp-card); }
+  .ministry-wizard .secretary-schedule-teams > div > section[data-selected=true] { border-color: #a5b4fc; background: var(--mp-soft); }
+  .ministry-wizard .secretary-team-duty { display: grid; gap: 12px; }
+  .ministry-wizard .secretary-team-duty label { display: grid; gap: 5px; }
+  .ministry-wizard .secretary-team-picker { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .ministry-wizard .secretary-team-picker > label { border: 1px solid var(--mp-line); background: var(--mp-card); border-radius: 12px; padding: 14px; min-width: 0; }
+  .ministry-wizard .secretary-team-picker > label:has(input:checked) { border-color: #a5b4fc; background: var(--mp-soft); }
+  .ministry-wizard .secretary-suggestion-toolbar { border-radius: 12px; background: var(--mp-soft); border: 1px solid #c7d2fe; padding: 14px; margin-bottom: 16px; }
+  .ministry-wizard .secretary-suggestion-toolbar p { font-size: 13px; }
+  .ministry-wizard .secretary-suggestion-toolbar button { background: var(--mp-card); color: var(--mp-accent); border: 1px solid #c7d2fe; font-size: 13px; }
+  .ministry-wizard .secretary-team-assignment-groups > section { border: 1px solid var(--mp-line); background: var(--mp-card); padding: 16px; border-radius: 12px; }
+  .ministry-wizard .secretary-checklist-draft { grid-template-columns: minmax(0,1.3fr) minmax(0,1fr) 36px; }
+  .ministry-wizard .secretary-checklist-draft input, .ministry-wizard .secretary-checklist-draft select { min-width: 0; width: 100%; }
+  .ministry-wizard-summary { border-left: 1px solid var(--mp-line); background: var(--mp-card); padding: 24px 20px; overflow-y: auto; }
+  .ministry-wizard-summary > h3 { color: var(--mp-muted); font-size: 12px; text-transform: uppercase; letter-spacing: .1em; margin: 0 0 18px; }
+  .ministry-wizard-summary > button { display: grid; gap: 9px; width: 100%; text-align: left; border: 1px solid var(--mp-line); background: var(--mp-card); border-radius: 12px; padding: 14px; margin-bottom: 12px; color: var(--mp-ink); }
+  .ministry-wizard-summary > button.active { border-color: #c7d2fe; background: var(--mp-soft); }
+  .ministry-wizard-summary > button > span { display: flex; justify-content: space-between; align-items: center; gap: 4px; color: var(--mp-muted); font-size: 13px; font-weight: 600; }
+  .ministry-wizard-summary > button.active > span { color: var(--mp-accent); }
+  .ministry-wizard-summary em { font-size: 12px; color: var(--mp-muted); font-style: normal; font-weight: 400; }
+  .ministry-wizard-summary strong { font-size: 14px; overflow-wrap: anywhere; }
+  .ministry-wizard-summary small { font-size: 12px; color: var(--mp-muted); font-weight: 400; line-height: 1.6; white-space: pre-line; }
+  .ministry-wizard-completion { display: grid; gap: 8px; margin-top: 20px; }
+  .ministry-wizard-completion > span { display: flex; justify-content: space-between; font-size: 12px; color: var(--mp-muted); }
+  .ministry-wizard-completion b { color: var(--mp-accent); }
+  .ministry-wizard-completion progress { width: 100%; height: 6px; accent-color: var(--mp-accent); border-radius: 10px; }
+  .ministry-wizard-draft-note { font-size: 12px; color: var(--mp-muted); line-height: 1.65; border-top: 1px solid var(--mp-line); padding-top: 16px; margin-top: 20px; }
+  .ministry-wizard-footer { display: flex; justify-content: space-between; gap: 16px; margin-top: 32px; padding: 24px 0 4px; border-top: 1px solid var(--mp-line); }
+  .ministry-wizard :is(.ministry-wizard-footer,.ministry-wizard-confirm) button { padding: 12px 22px; border-radius: 10px; border: 1px solid var(--mp-line); background: var(--mp-card); color: var(--mp-muted); font-weight: 600; }
+  .ministry-wizard button.primary { color: white; background: var(--mp-accent); border-color: var(--mp-accent); }
+  .ministry-wizard button:disabled { opacity: .45; cursor: not-allowed; }
+  .ministry-meeting-review { border: 1px solid var(--mp-line); border-radius: 14px; background: var(--mp-card); padding: 20px; }
+  .ministry-meeting-review article { display: grid; gap: 5px; border-bottom: 1px solid var(--mp-line); padding: 14px 0; font-size: 14px; }
+  .ministry-meeting-review p, .ministry-meeting-review span { font-size: 13px; color: var(--mp-muted); }
+  .ministry-wizard-confirm-backdrop { position: absolute; inset: 0; display: grid; place-items: center; background: #16162c66; padding: 24px; z-index: 5; }
+  .ministry-wizard-confirm { width: 440px; max-width: 100%; padding: 32px; border-radius: 20px; background: var(--mp-card); box-shadow: 0 20px 100px #1113; }
+  .ministry-wizard-confirm-icon { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 14px; background: var(--mp-soft); color: var(--mp-accent); font-size: 26px; margin-bottom: 20px; }
+  .ministry-wizard-confirm p { color: var(--mp-muted); font-size: 14px; line-height: 1.7; }
+  .ministry-wizard-confirm > div { display: flex; gap: 12px; margin-top: 22px; justify-content: flex-end; }
+  :is(html[data-theme=dark],html[data-pilot-theme=escuro]) .pilot-dashboard[data-ui-version="v2"] .secretary-workspace.ministry-project { --mp-accent: #a5b4fc; --mp-soft: #232745; --mp-canvas: #14151d; --mp-card: #1c1d28; --mp-line: #343547; --mp-ink: #f0f0f7; --mp-muted: #b4b4c8; --violet-deep: #c7d2fe; }
+  :is(html[data-theme=dark],html[data-pilot-theme=escuro]) .pilot-dashboard[data-ui-version="v2"] .ministry-project :is(.secretary-tabs button.active,.secretary-primary-action,.secretary-toolbar-actions > button:last-child,.ministry-wizard button.primary,.ministry-wizard-header nav button.active) { background: #4f46e5; color: #fff; }
+}
+@media (min-width:1100px) and (max-width:1400px) {
+  .ministry-wizard .ministry-wizard-header nav { order: 3; width: 100%; justify-content: center; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-dashboard-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-catalog-layout { grid-template-columns: minmax(0,1fr) 270px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-tabs button { padding-inline: 9px; font-size: 13px; }
+}
+
+/* Compact desktop pass: ministries are navigational rows, not oversized cards. */
+@media (min-width:1100px) {
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-catalog {
+    grid-template-columns: minmax(0,1fr);
+    gap: 0;
+    border-top: 1px solid var(--mp-line);
+  }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-tile-wrap { border-bottom: 1px solid var(--mp-line); }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-tile {
+    display: grid;
+    grid-template-columns: 44px minmax(0,1fr) minmax(190px,auto);
+    gap: 14px;
+    align-items: center;
+    min-height: 0;
+    height: auto;
+    padding: 14px 6px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    overflow: visible;
+  }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-tile:hover { transform: none; box-shadow: none; background: var(--mp-soft); }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-copy { gap: 3px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-copy strong { font-size: 16px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-copy :is(small,span) { font-size: 12px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-meta {
+    grid-template-columns: minmax(100px,1fr) auto;
+    gap: 3px 12px;
+    margin: 0;
+    padding: 0 0 0 16px;
+    border: 0;
+    border-left: 1px solid var(--mp-line);
+  }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-tile.has-banner .secretary-ministry-tile-media {
+    grid-column: 1;
+    grid-row: 1;
+    display: block;
+    width: 44px;
+    height: 44px;
+    margin: 0;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-ministry-tile.has-banner .secretary-ministry-symbol { display: none; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .ministry-schedule-row > summary { padding: 14px 16px; gap: 14px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .ministry-schedule-row > .secretary-schedule-card { padding: 16px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-schedule-card {
+    grid-template-columns: minmax(220px,.8fr) minmax(0,1.2fr);
+    grid-template-areas:
+      "schedule-heading schedule-summary"
+      "schedule-repertoire schedule-people"
+      "schedule-fio schedule-people"
+      "schedule-replacement schedule-actions";
+    align-items: start;
+    gap: 12px 16px;
+  }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-schedule-card > .fio-thread-card { grid-area: schedule-fio; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-schedule-card > header { margin-bottom: 12px; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-schedule-body { gap: 8px; margin: 10px 0; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-schedule-body > div { padding: 10px; min-width: 0; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-assignment-status-list { gap: 0; margin: 10px 0 0; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-assignment-team {
+    min-width: 0;
+    padding: 12px 0;
+    border: 0;
+    border-top: 1px solid var(--mp-line);
+    border-radius: 0;
+    background: transparent;
+  }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-assignment-team > article { min-width: 0; padding: 9px 0; }
+  .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-assignment-team > article > div { min-width: 0; overflow-wrap: anywhere; }
+}

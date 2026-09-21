@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { CSSProperties } from "react";
 import { getD1 } from "../../../db";
 import SharedScheduleAccessGate from "../../components/SharedScheduleAccessGate";
 import SharedSchedulePendingState from "../../components/SharedSchedulePendingState";
@@ -53,6 +54,10 @@ export default async function SharedSchedulePage({
     schedule.repertorio,
     schedule.links_recursos,
   );
+  const assignmentGroups = groupAssignmentsByTeam(
+    schedule.equipes,
+    schedule.designacoes,
+  );
   return (
     <SharedScheduleAccessGate
       opensAt={new Date(accessWindow.opensAt).toISOString()}
@@ -65,6 +70,7 @@ export default async function SharedSchedulePage({
             <p>VÍNKULO · SECRETARIA MINISTERIAL</p>
             <strong>Escala compartilhada</strong>
           </div>
+          <Link className="shared-secretary-home" href="/">Ir para tela inicial</Link>
         </header>
         <section className="shared-secretary-hero">
           <p>{schedule.comunidade_nome}</p>
@@ -80,15 +86,42 @@ export default async function SharedSchedulePage({
         <div className="shared-secretary-grid">
           <section>
             <p className="pilot-kicker">EQUIPE</p>
-            <h2>Integrantes escalados</h2>
-            <ul>
-              {schedule.designacoes.map((item) => (
-                <li key={String(item.id)}>
-                  <strong>{String(item.nome)}</strong>
-                  <span>{String(item.funcao)} · {statusLabel(item.status)}</span>
-                </li>
+            <h2>Equipes e integrantes</h2>
+            <div className="shared-secretary-team-groups">
+              {assignmentGroups.map((group) => (
+                <section
+                  className="shared-secretary-team-card"
+                  data-has-members={group.assignments.length > 0}
+                  key={String(group.team?.equipe_id || "livre")}
+                  style={{ "--team-color": String(group.team?.equipe_cor || "#6f46e8") } as CSSProperties}
+                >
+                  <header>
+                    <span className="shared-secretary-team-marker" aria-hidden="true" />
+                    <div>
+                      <strong>{String(group.team?.equipe_nome || "Sem equipe definida")}</strong>
+                      <small>{group.team?.horario_encontro ? `Destino/local · encontro às ${group.team.horario_encontro}` : "Destino/local"}</small>
+                      <span>{teamMeetingDetail(group.team, schedule.local)}</span>
+                    </div>
+                    <b aria-label={`${group.assignments.length} integrante${group.assignments.length === 1 ? "" : "s"}`}>
+                      {group.assignments.length}
+                    </b>
+                  </header>
+                  {group.assignments.length ? (
+                    <ul>
+                      {group.assignments.map((item) => (
+                        <li key={String(item.id)}>
+                          <strong>{String(item.nome)}</strong>
+                          <span>{String(item.funcao)} · {statusLabel(item.status)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="shared-secretary-team-empty">Nenhum integrante escalado nesta equipe.</p>
+                  )}
+                </section>
               ))}
-            </ul>
+              {!assignmentGroups.length && <p>Nenhum integrante informado.</p>}
+            </div>
           </section>
           <section>
             <p className="pilot-kicker">REPERTÓRIO</p>
@@ -136,7 +169,10 @@ export default async function SharedSchedulePage({
             </div>
           </section>}
         </div>
-        <footer>Visualização somente leitura · nenhum dado de contato é exibido.</footer>
+        <footer>
+          <span>Visualização somente leitura · nenhum dado de contato é exibido.</span>
+          <Link className="shared-secretary-footer-home" href="/">Ir para tela inicial</Link>
+        </footer>
       </main>
     </SharedScheduleAccessGate>
   );
@@ -150,6 +186,7 @@ function SharedAccessState({ title, detail }: { title: string; detail: string })
         <p>VÍNKULO · ACESSO TEMPORÁRIO</p>
         <h1>{title}</h1>
         <p>{detail}</p>
+        <Link className="shared-secretary-home" href="/">Ir para tela inicial</Link>
       </section>
     </main>
   );
@@ -195,6 +232,36 @@ function statusLabel(value: unknown) {
       NAO_FEITO: "Não feito",
     }[String(value || "")] || String(value || "")
   );
+}
+
+function teamMeetingDetail(
+  team: { funcao: string; ponto_encontro: string; horario_encontro: string } | null,
+  scheduleLocal: string,
+) {
+  const destination = team?.funcao || scheduleLocal || "Não informado";
+  return team?.ponto_encontro ? `${destination} · encontro: ${team.ponto_encontro}` : destination;
+}
+
+function groupAssignmentsByTeam(
+  teams: Array<{ equipe_id: number; equipe_nome: string; equipe_cor: string; funcao: string; ponto_encontro: string; horario_encontro: string }>,
+  assignments: Array<Record<string, unknown>>,
+) {
+  const knownIds = new Set(teams.map((team) => team.equipe_id));
+  const groups = teams.map((team) => ({
+    team,
+    assignments: assignments.filter(
+      (assignment) => Number(assignment.equipe_id || 0) === team.equipe_id,
+    ),
+  }));
+  const freeAssignments = assignments.filter(
+    (assignment) => !knownIds.has(Number(assignment.equipe_id || 0)),
+  );
+  // A leitura compartilhada deve refletir a formação da escala, inclusive a
+  // equipe que ainda não recebeu alguém. Assim fica claro onde há uma vaga,
+  // sem misturar os integrantes das outras equipes.
+  return freeAssignments.length
+    ? [...groups, { team: null, assignments: freeAssignments }]
+    : groups;
 }
 
 function linkTypeLabel(value: string) {

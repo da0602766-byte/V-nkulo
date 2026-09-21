@@ -20,6 +20,14 @@ export type SecretaryScheduleDetail = Record<string, unknown> & {
     titulo: string;
     url: string;
   }>;
+  equipes: Array<{
+    equipe_id: number;
+    equipe_nome: string;
+    equipe_cor: string;
+    funcao: string;
+    ponto_encontro: string;
+    horario_encontro: string;
+  }>;
   designacoes: Array<Record<string, unknown>>;
   checklist: Array<Record<string, unknown>>;
 };
@@ -51,11 +59,15 @@ export async function getSecretaryScheduleDetail(
   const community = Number(schedule.comunidade_id);
   const assignments = await db
     .prepare(
-      `SELECT d.id, d.usuario_id, u.nome, d.funcao, d.status
+      `SELECT d.id, d.usuario_id, u.nome, d.funcao, d.status,
+        d.equipe_id, equipe.nome AS equipe_nome, equipe.cor AS equipe_cor
        FROM escala_designacoes d
        JOIN usuarios u ON u.id = d.usuario_id
+       LEFT JOIN ministerio_equipes equipe
+         ON equipe.id = d.equipe_id
+        AND equipe.comunidade_id = d.comunidade_id
        WHERE d.escala_id = ? AND d.comunidade_id = ? AND d.ativo = 1
-       ORDER BY u.nome ASC`,
+       ORDER BY equipe.ordem ASC, equipe.nome ASC, u.nome ASC`,
     )
     .bind(scheduleId, community)
     .all<Record<string, unknown>>();
@@ -73,10 +85,24 @@ export async function getSecretaryScheduleDetail(
     )
     .bind(scheduleId, community)
     .all<Record<string, unknown>>();
+  const teams = await db
+    .prepare(
+      `SELECT se.equipe_id, equipe.nome AS equipe_nome, equipe.cor AS equipe_cor,
+        se.funcao, se.ponto_encontro, se.horario_encontro
+       FROM escala_equipes se
+       JOIN ministerio_equipes equipe
+         ON equipe.id = se.equipe_id
+        AND equipe.comunidade_id = se.comunidade_id
+       WHERE se.escala_id = ? AND se.comunidade_id = ?
+       ORDER BY equipe.ordem ASC, equipe.nome ASC`,
+    )
+    .bind(scheduleId, community)
+    .all<SecretaryScheduleDetail["equipes"][number]>();
   return {
     ...schedule,
     repertorio: parseList(schedule.repertorio) as string[],
     links_recursos: parseList(schedule.links_recursos) as SecretaryScheduleDetail["links_recursos"],
+    equipes: teams.results,
     designacoes: assignments.results,
     checklist: checklist.results,
   } as SecretaryScheduleDetail;

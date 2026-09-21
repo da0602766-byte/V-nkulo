@@ -2,6 +2,7 @@ import { getD1 } from "../../../../db";
 import { getRuntimeEnv } from "../../../../db/runtime-env";
 import { getSessionUser } from "../../../lib/local-auth";
 import { canManageMinistry } from "../../../lib/ministry-access";
+import { canManageCell } from "../../../lib/cell-membership";
 import { getActiveTenantContext } from "../../../lib/tenant";
 import { UPLOAD_PURPOSES } from "../../../lib/upload-key-policy.mjs";
 import {
@@ -46,6 +47,7 @@ export async function POST(request: Request) {
   const isCommunityAsset =
     purpose === "community-logo" || purpose === "community-banner";
   const isMinistryAsset = purpose === "ministry-banner";
+  const isCellAsset = purpose === "cell-cover";
   const isPlatformAsset = [
     "login-logo",
     "login-background",
@@ -64,6 +66,17 @@ export async function POST(request: Request) {
           context,
           user.id,
           resourceId,
+        )))) ||
+    (isCellAsset &&
+      (!context ||
+        !Number.isInteger(resourceId) ||
+        resourceId <= 0 ||
+        !(await canManageCell(
+          getD1(),
+          context,
+          user.id,
+          resourceId,
+          user.email,
         )))) ||
     (purpose === "post-image" && !canPublish) ||
     (isPlatformAsset && !canEditPlatform)

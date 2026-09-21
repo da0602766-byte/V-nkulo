@@ -49,8 +49,9 @@ export async function GET(request: Request) {
   const result = await db.prepare(
     `SELECT c.id, c.nome, c.responsavel, c.membros, c.observacoes,
       c.dias_reuniao, c.endereco_publico, c.descricao_publica,
+      c.rede, c.horario_texto, c.temas, c.foto_capa,
       c.lider_usuario_id, c.vice_lider_usuario_id, c.ultimo_relatorio_em,
-      c.arquivada_em, c.ativo, c.criado_em,
+      c.arquivada_em, c.ativo, c.criado_em, c.criado_por,
       lider.nome AS lider_nome, vice.nome AS vice_lider_nome,
       COUNT(v.id) AS visitantes_ativos
      FROM celulas c
@@ -74,7 +75,7 @@ export async function GET(request: Request) {
     Number.isInteger(requestedReportSize) && requestedReportSize > 0
       ? Math.min(requestedReportSize, 250)
       : 250;
-  const [agenda, reports, requests, users] = await Promise.all([
+  const [agenda, reports, requests, users, requestsForUser] = await Promise.all([
     db.prepare(
       `SELECT id, celula_id, titulo, inicia_em, termina_em, lembrete,
         visibilidade, criado_por_usuario_id FROM celula_agenda
@@ -115,7 +116,19 @@ export async function GET(request: Request) {
       email: string;
       telefone: string | null;
       foto_perfil: string | null;
-      papel: string;
+        papel: string;
+      }>(),
+    db.prepare(
+      `SELECT id, celula_id, status, criado_em, atualizado_em
+       FROM celula_solicitacoes
+       WHERE comunidade_id = ? AND usuario_id = ?
+       ORDER BY atualizado_em DESC, id DESC LIMIT 100`,
+    ).bind(access.context.comunidadeId, access.user.id).all<{
+      id: number;
+      celula_id: number;
+      status: string;
+      criado_em: string;
+      atualizado_em: string;
     }>(),
   ]);
 
@@ -131,11 +144,27 @@ export async function GET(request: Request) {
       : null;
   const usersById = new Map(users.results.map((user) => [Number(user.id), user]));
   const cells = result.results.map((cell) => {
-    const canOperate = canManage || Number(cell.lider_usuario_id) === access.user.id || Number(cell.vice_lider_usuario_id) === access.user.id;
+    const creatorEmail = String(cell.criado_por || "").trim().toLocaleLowerCase("pt-BR");
+    const canOperate = canManage || creatorEmail === access.user.email.trim().toLocaleLowerCase("pt-BR") || Number(cell.lider_usuario_id) === access.user.id || Number(cell.vice_lider_usuario_id) === access.user.id;
     const members = parseArray(cell.membros);
+    const ownRequest = requestsForUser.results.find((request) => Number(request.celula_id) === Number(cell.id));
+    const memberOfCell = members.some((member) => {
+      const source = member as Record<string, unknown>;
+      return source.kind === "COMMUNITY" && Number(source.userId) === access.user.id;
+    });
+    // Só quem opera a célula vê a lista completa de integrantes (contato de
+    // todo mundo). Mas a própria pessoa precisa saber se já participa — daí
+    // este campo, calculado sem expor ninguém além de quem está perguntando.
+    const ownMembership = members.find(
+      (member) => Number((member as Record<string, unknown>).userId) === access.user.id,
+    ) as Record<string, unknown> | undefined;
+    const cellData = { ...cell };
+    delete cellData.criado_por;
     return {
-      ...cell,
+      ...cellData,
+      observacoes: canOperate ? cell.observacoes : null,
       membros_total: members.filter((member) => String((member as Record<string, unknown>).kind) === "COMMUNITY").length,
+      minha_participacao: (ownMembership?.role as string | undefined) || (ownMembership ? "MEMBER" : null),
       membros: canOperate ? members.map((member) => {
         const source = member as Record<string, unknown>;
         const profile = usersById.get(Number(source.userId));
@@ -148,14 +177,20 @@ export async function GET(request: Request) {
         } : source;
       }) : [],
       dias_reuniao: parseArray(cell.dias_reuniao),
+      temas: parseArray(cell.temas),
       can_operate: canOperate,
       agenda: agenda.results.filter((item) => Number(item.celula_id) === Number(cell.id) && (canOperate || item.visibilidade === "PUBLICO")),
       relatorios: canOperate ? reports.results.filter((item) => Number(item.celula_id) === Number(cell.id)).slice(0, 12) : [],
       solicitacoes: canOperate ? requests.results.filter((item) => Number(item.celula_id) === Number(cell.id) && item.status === "PENDENTE") : [],
+      membro_atual: memberOfCell,
+      solicitacao_id: ownRequest?.id ?? null,
+      solicitacao_status: ownRequest?.status ?? null,
+      solicitacao_criada_em: ownRequest?.criado_em ?? null,
     };
   });
   return Response.json({
     celulas: cells,
+    minhasSolicitacoes: requestsForUser.results,
     // Nulo quando o histórico de relatórios chegou ao fim.
     nextReportCursor,
     availableUsers: canManage ? users.results.map((user) => ({ id: user.id, nome: user.nome, papel: user.papel })) : [],
@@ -182,6 +217,7 @@ export async function POST(request: Request) {
   const observacoes = String(payload.observacoes || "").trim().slice(0, 1000);
   const endereco = String(payload.enderecoPublico || "").trim().slice(0, 240);
   const descricao = String(payload.descricaoPublica || "").trim().slice(0, 700);
+  const rede = String(payload.rede || "").trim().slice(0, 80);
   const dias = Array.isArray(payload.diasReuniao)
     ? payload.diasReuniao.map(String).filter((day) => ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"].includes(day))
     : String(payload.diasReuniao || "").split(",").filter(Boolean);
@@ -206,10 +242,10 @@ export async function POST(request: Request) {
   const result = await db.prepare(
     `INSERT INTO celulas
      (comunidade_id, nome, responsavel, membros, observacoes, dias_reuniao,
-      endereco_publico, descricao_publica, lider_usuario_id, ativo,
+      endereco_publico, descricao_publica, rede, lider_usuario_id, ativo,
       escopo_confirmado, criado_por)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?)`,
-  ).bind(access.context.comunidadeId, nome, responsibleName, JSON.stringify(members), observacoes || null, JSON.stringify([...new Set(dias)]), endereco, descricao, leader.id, access.user.email).run();
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?)`,
+  ).bind(access.context.comunidadeId, nome, responsibleName, JSON.stringify(members), observacoes || null, JSON.stringify([...new Set(dias)]), endereco, descricao, rede, leader.id, access.user.email).run();
   const cellId = Number(result.meta.last_row_id);
   await recordTenantAudit(db, access.context, access.user.id, "CELULA_V45_CRIADA", "SUCESSO", { celulaId: cellId, dias });
   return Response.json({ id: cellId }, { status: 201 });

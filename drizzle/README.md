@@ -6,8 +6,33 @@ migração nova, leia isto.
 
 ## Próximo número livre
 
-**`0071`**. Use o próximo inteiro disponível a partir daí — não reaproveite
+**`0077`**. Use o próximo inteiro disponível a partir daí — não reaproveite
 um número já usado, mesmo que o arquivo tenha sido escrito à mão.
+
+`0075_notificacoes_push_dispositivos.sql` guarda uma assinatura Web Push por
+aparelho autenticado. O endpoint é único, então o mesmo navegador não continua
+ligado à conta anterior depois de um novo login. A chave privada VAPID fica
+somente nas variáveis seguras do Sites; nunca deve ser registrada nesta pasta.
+
+`0076_feed_reactions.sql` cria as reações persistentes do feed interno. Cada
+reação é vinculada à publicação, ao usuário e à comunidade da publicação no
+servidor, com unicidade por tipo para impedir duplicação acidental.
+
+`0073_escalas_multiplas_equipes.sql` permite associar várias equipes a uma
+escala e guarda a equipe de cada designação. A coluna legada `equipe_id` da
+escala é preservada para compatibilidade com registros e integrações antigas.
+
+`0071_celulas_participacao_detalhes.sql` adiciona `rede`, `horario_texto`,
+`temas` e `foto_capa` em `celulas`, para a aba Configurações do redesenho de
+Gestão/Participação de Células (ver app/components/cells/). A mensagem de
+destaque editável pela liderança na Participação **não** usa migração — ela
+reaproveita a tabela `configuracoes` (chave `cell_highlight_message:<comunidadeId>`),
+o mesmo padrão de `community_theme:<comunidadeId>`.
+
+`0072_fio_ministerio.sql` adiciona `fio_habilitado` e `fio_etapas` em
+`ministerios_comunidade` (o modelo do Fio do Ministério) e `fio_etapas` em
+`escalas_ministerio` (as etapas daquela escala, com estado). Ver
+`app/components/SecretaryMinisterialWorkspace.tsx`.
 
 `0070_chat_system_retention.sql` reconstrói `conversas_privadas` (troca o
 ciclo mensal `ciclo_mes` pelo semanal `ciclo_semana` e remove `drive_file_id`

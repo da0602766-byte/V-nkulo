@@ -44,7 +44,7 @@ test("gestão, visitantes, notificações e mensagens seguem o novo layout", () 
   const people = read("app/components/PeopleWorkspace.tsx");
   assert.match(styles, /scrollbar-width:none/);
   assert.match(styles, /community-central-workspace/);
-  assert.match(visitors, /Revisar e exportar/);
+  assert.match(visitors, /Exportar informações revisadas/);
   assert.match(visitors, /Categorias sugeridas/);
   assert.match(dashboard, /pilot-message-popover/);
   assert.match(people, /HIERARCHY_PERMISSION_PRESETS/);
