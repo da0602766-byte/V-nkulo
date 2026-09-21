@@ -17,7 +17,7 @@ export async function purgeExpiredAudit(db: D1Database) {
 
 export async function recordTenantAudit(
   db: D1Database,
-  context: TenantContext,
+  context: Pick<TenantContext, never> & { comunidadeId: number | null },
   userId: number,
   event: string,
   result: "SUCESSO" | "NEGADO" | "ERRO",

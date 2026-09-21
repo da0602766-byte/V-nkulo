@@ -25,3 +25,11 @@ Diagnóstico baseado em leitura do código e comparação com a versão publicad
 ## Etapa 1 — redesenho
 
 Removidos histórico fictício, aprovações locais e botões inertes. Extraída a área de publicação do arquivo compartilhado, com consulta à auditoria existente, estados de carregamento/vazio/erro, cartões e explicação da diferença entre editorial e deploy. Layout revisado em harness local com o componente e CSS reais em 360 e 1440 px, dois temas e três estados; sem transbordamento horizontal. Ajustado fundo do cabeçalho escuro e espaçamento herdado. Lint: 0 erros e 41 avisos preexistentes de imagens. Build: concluído, artefato validado. Próxima etapa: formulário e persistência segura.
+
+## Etapa 2 — configuração protegida
+
+Criada a rota exclusiva do proprietário com GET, PATCH e DELETE. A configuração usa a chave existente supabase_integration em configuracoes, sem alteração de schema. Chave secreta e segredo JWT são cifrados com AES-GCM e uma chave derivada de AUTH_SECRET; o navegador recebe somente máscara, comprimento e estado. Campo secreto vazio preserva o valor anterior, troca de URL exige novos segredos, e a remoção exige confirmação literal. Toda escrita registra auditoria sem segredos. O formulário tem labels associados, confirmação para salvar/remover, alvos de 44px e indicação específica de carregamento, ausência e falha. O teste novo comprovou 401/403, validação da URL, cifra, máscara e preservação. Próxima etapa: diagnóstico de conexão.
+
+## Etapa 3 — conexão verificável
+
+Criada verificação somente de leitura, com timeout de 8s, no máximo uma repetição e cache desativado: Auth health, validação da chave pública em Auth settings, OpenAPI REST com chave de servidor, lista de buckets e conferência do bucket informado. O formulário exibe resultado, latência, códigos HTTP e data; integração desligada interrompe o teste antes de qualquer chamada externa. Teste automatizado percorreu o resultado de sucesso e confirmou auditoria sem segredo. Verificação externa do projeto informado em 21/09/2026: Auth health 200 e Auth settings 200; a raiz REST devolveu 401 “Secret API key required”, comportamento esperado sem a chave secreta. A verificação completa de REST/Storage ficará disponível ao proprietário assim que a chave secreta for preenchida no formulário.

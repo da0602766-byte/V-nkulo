@@ -34109,5 +34109,10 @@ html[data-pilot-theme="escuro"] .owner-publication :is(.publication-panel,.contr
 .owner-publication .publication-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); gap:16px; }
 .owner-publication label { display:grid; gap:8px; }
 .owner-publication .publication-actions { display:flex; flex-wrap:wrap; gap:12px; margin-top:20px; }
+.owner-publication .publication-check { margin:14px 0; padding:14px; border:1px solid currentColor; border-radius:12px; }
+.owner-publication .publication-check.success { color:#166534; background:#f0fdf4; }
+.owner-publication .publication-check.danger { color:#991b1b; background:#fff1f2; }
+html[data-pilot-theme="escuro"] .owner-publication .publication-check.success { color:#bbf7d0; background:#12321f; }
+html[data-pilot-theme="escuro"] .owner-publication .publication-check.danger { color:#fecaca; background:#3b171b; }
 .owner-publication .publication-toggle { display:flex; align-items:center; gap:12px; }
 .owner-publication .publication-toggle input { width:24px; }

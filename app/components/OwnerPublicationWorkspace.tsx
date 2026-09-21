@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import SupabaseIntegrationForm from "./SupabaseIntegrationForm";
 
 type Audit = { id: number; evento: string; resultado: string; criado_em: string; usuario_nome?: string };
 
@@ -29,7 +30,7 @@ export default function OwnerPublicationWorkspace() {
     </header>
     <article className="control-summary-card"><h3>Estado atual</h3><p>A publicação de novas versões é realizada pela hospedagem, após a validação do código.</p><p>Esta tela não tem uma fila de versões conectada. Nenhuma aprovação ou publicação é simulada aqui.</p></article>
     <article className="feature-flag-card"><h3>Publicações da comunidade</h3><p>A automação editorial cuida do conteúdo das comunidades. Ela é administrada na aba IA Editorial e não publica novas versões do sistema.</p></article>
-    <section className="publication-panel"><h3>Integrações</h3><p>A conexão com o Supabase será configurada neste espaço. O banco e o acesso do Vínkulo continuam operando com os serviços atuais.</p></section>
+    <SupabaseIntegrationForm />
     <footer className="publication-panel" aria-busy={loading}>
       <h3>Auditoria de publicação e integrações</h3>
       <div aria-live="polite">
