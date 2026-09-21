@@ -32,7 +32,7 @@ Criada a rota exclusiva do proprietário com GET, PATCH e DELETE. A configuraç�
 
 ## Etapa 3 — conexão verificável
 
-Criada verificação somente de leitura, com timeout de 8s, no máximo uma repetição e cache desativado: Auth health, validação da chave pública em Auth settings, OpenAPI REST com chave de servidor, lista de buckets e conferência do bucket informado. O formulário exibe resultado, latência, códigos HTTP e data; integração desligada interrompe o teste antes de qualquer chamada externa. Teste automatizado percorreu o resultado de sucesso e confirmou auditoria sem segredo. Verificação externa do projeto informado em 21/09/2026: Auth health 200 e Auth settings 200; a raiz REST devolveu 401 “Secret API key required”, comportamento esperado sem a chave secreta. A verificação completa de REST/Storage ficará disponível ao proprietário assim que a chave secreta for preenchida no formulário.
+Criada verificação somente de leitura, com timeout de 8s, no máximo uma repetição e cache desativado: Auth health, validação da chave pública em Auth settings, OpenAPI REST com chave de servidor, lista de buckets e conferência do bucket informado. O formulário exibe resultado, latência, códigos HTTP e data; integração desligada interrompe o teste antes de qualquer chamada externa. Teste automatizado percorreu o resultado de sucesso e confirmou auditoria sem segredo. Verificação real concluída em produção em 21/09/2026: Auth 200, REST 200 e Storage 200, em 1681 ms. A chave dedicada `vinkulo_integracao` foi criada no Supabase, transmitida somente ao formulário protegido e persistida cifrada; seu valor não foi registrado em código, relatórios ou logs.
 
 ## Etapa 4 — testes e validação
 
@@ -40,7 +40,7 @@ Não houve alteração de schema e, portanto, nenhuma migração foi criada nem 
 
 ## Etapa 5 — entrega
 
-Branch claude/gallant-davinci-advdu2 enviada ao GitHub. Código publicado no Sites como versão 283, commit 28a5f87ad0e11a427a8337827d08a7b0a0ac38d7, em https://adote-gestao.da0602766.chatgpt.site. A página publicada foi recarregada com a sessão do proprietário; a nova área e o formulário vazio foram confirmados. O projeto Supabase possui uma chave secreta existente, mas o painel não devolveu seu valor integral para cópia. A conexão persistida aguarda uma chave secreta nova ou recuperável; criar uma nova credencial é uma ação separada e não foi feita automaticamente.
+Branch claude/gallant-davinci-advdu2 enviada ao GitHub. Código publicado no Sites como versão 283, commit 28a5f87ad0e11a427a8337827d08a7b0a0ac38d7, em https://adote-gestao.da0602766.chatgpt.site. A página publicada foi recarregada com a sessão do proprietário; a nova área e o formulário foram confirmados. Após autorização explícita do proprietário, foi criada uma chave secreta dedicada, a configuração foi salva com a integração ativa e o diagnóstico final exibiu `Tudo certo`: Auth 200, REST 200 e Storage 200. O site permanece na versão 283 porque a conclusão ocorreu por configuração protegida, sem nova alteração de código.
 
 ### Como configurar
 
