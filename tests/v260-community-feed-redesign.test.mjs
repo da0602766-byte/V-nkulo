@@ -52,3 +52,11 @@ test("o estilo do feed é delimitado e adapta a composição para celular", () =
   assert.match(styles, /\.community-reaction-picker/);
   assert.match(styles, /@media \(max-width: 680px\)/);
 });
+
+test("o compositor do mural mantém largura e altura próprias em telas maiores", () => {
+  const styles = read("app/globals.css");
+  assert.match(
+    styles,
+    /\.pilot-dashboard\[data-ui-version="v2"\] \.community-feed-redesign > \.community-composer\s*\{[^}]*width:\s*100%\s*!important;[^}]*height:\s*auto\s*!important;/s,
+  );
+});

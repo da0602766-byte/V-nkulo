@@ -34039,6 +34039,14 @@ html[data-pilot-theme="escuro"] .request-care-status.tone-blue { background:#173
 /* V260.1 — o mural móvel usa apenas o compositor compacto. Regras legadas
    do Início tinham maior especificidade e zeravam a altura desse bloco,
    fazendo seu conteúdo atravessar o título e as abas do feed. */
+.pilot-dashboard[data-ui-version="v2"] .community-feed-redesign > .community-composer {
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  overflow: visible !important;
+}
+
 @media (max-width: 680px) {
   .pilot-dashboard[data-ui-version="v2"] .community-feed-redesign .community-home-actions {
     display: none !important;
