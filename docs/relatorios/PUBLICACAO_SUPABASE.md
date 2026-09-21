@@ -37,3 +37,16 @@ Criada verificação somente de leitura, com timeout de 8s, no máximo uma repet
 ## Etapa 4 — testes e validação
 
 Não houve alteração de schema e, portanto, nenhuma migração foi criada nem db:generate foi executado. TypeScript passou sem erro. npm run lint terminou com 0 erros e 41 avisos preexistentes (40 usos de img e uma constante sem uso fora do escopo). npm test passou com 396/396 casos e executou o build/validação do artefato. A rodada dirigida de pilot-security, tenant-isolation-guard e integração Supabase passou com 19/19 casos. O build final reconheceu as duas novas rotas e validou o Worker ESM e o manifesto da hospedagem.
+
+## Etapa 5 — entrega
+
+Branch claude/gallant-davinci-advdu2 enviada ao GitHub. Código publicado no Sites como versão 283, commit 28a5f87ad0e11a427a8337827d08a7b0a0ac38d7, em https://adote-gestao.da0602766.chatgpt.site. A página publicada foi recarregada com a sessão do proprietário; a nova área e o formulário vazio foram confirmados. O projeto Supabase possui uma chave secreta existente, mas o painel não devolveu seu valor integral para cópia. A conexão persistida aguarda uma chave secreta nova ou recuperável; criar uma nova credencial é uma ação separada e não foi feita automaticamente.
+
+### Como configurar
+
+1. Abra Proprietário > Publicação do sistema.
+2. Informe a URL HTTPS, a chave pública e a chave secreta do servidor do mesmo projeto.
+3. Deixe o schema como public; informe o bucket somente se quiser verificar um bucket específico.
+4. Ative a integração, salve e execute Testar conexão.
+
+Não houve sincronização, migração D1/Postgres, troca de autenticação ou upload. O vínculo implementado é somente configuração protegida, leitura de diagnóstico e observabilidade.
