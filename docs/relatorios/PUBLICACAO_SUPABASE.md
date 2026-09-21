@@ -21,3 +21,7 @@ Sem alterações de schema previstas. Credenciais reais não serão incluídas e
 ## Validação
 
 Diagnóstico baseado em leitura do código e comparação com a versão publicada. Testes de interface e comandos de validação serão registrados nas etapas seguintes.
+
+## Etapa 1 — redesenho
+
+Removidos histórico fictício, aprovações locais e botões inertes. Extraída a área de publicação do arquivo compartilhado, com consulta à auditoria existente, estados de carregamento/vazio/erro, cartões e explicação da diferença entre editorial e deploy. Layout revisado em harness local com o componente e CSS reais em 360 e 1440 px, dois temas e três estados; sem transbordamento horizontal. Ajustado fundo do cabeçalho escuro e espaçamento herdado. Lint: 0 erros e 41 avisos preexistentes de imagens. Build: concluído, artefato validado. Próxima etapa: formulário e persistência segura.

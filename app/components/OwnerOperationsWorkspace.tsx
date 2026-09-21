@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import OwnerPublicationWorkspace from "./OwnerPublicationWorkspace";
 
 export type OwnerOperationsScreen =
   | "passwords"
@@ -38,9 +39,6 @@ const incidentRows = [
   { id: 3, gravidade: "MEDIA", titulo: "Imagem de perfil rejeitada", area: "Armazenamento", ocorrencias: 1, comunidades: 1, ultima: "12/09 · 14:02", status: "RESOLVIDO", descricao: "Formato HEIC não era aceito no fluxo de prévia.", historico: ["14:02 · correção aplicada"] },
 ];
 
-const publishStages = [
-  ["COMMIT", "sucesso", "18s"], ["VALIDACAO", "sucesso", "42s"], ["BUILD", "sucesso", "1m 12s"], ["TESTES", "sucesso", "2m 08s"], ["PREVIA", "sucesso", "36s"], ["APROVACAO", "critica", "aguardando"], ["PUBLICACAO", "pendente", "—"], ["HEALTH_CHECK", "pendente", "—"], ["CONCLUIDO", "pendente", "—"],
-] as const;
 
 function money(cents: number) { return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100); }
 function statusLabel(status: string) { return status.replaceAll("_", " "); }
@@ -60,7 +58,7 @@ export default function OwnerOperationsWorkspace({ screen }: { screen: OwnerOper
   if (screen === "finance") return <FinanceWorkspace />;
   if (screen === "realtime") return <RealtimeWorkspace />;
   if (screen === "performance") return <PerformanceWorkspace />;
-  if (screen === "publication") return <PublicationWorkspace />;
+  if (screen === "publication") return <OwnerPublicationWorkspace />;
   return <IncidentWorkspace />;
 }
 
@@ -93,13 +91,6 @@ function PerformanceWorkspace() {
   return <div className="ops-stack"><Section eyebrow="SAÚDE DA PLATAFORMA" title="Desempenho" text="Falhas conhecidas, tendência e incidentes em um mesmo contexto."><label className="ops-select-label">Período<select value={period} onChange={(event) => setPeriod(event.target.value)}>{["7 dias", "14 dias", "30 dias", "90 dias"].map((item) => <option key={item}>{item}</option>)}</select></label></Section><Metrics items={[["Falhas", "23", "−18% vs. período anterior"], ["Taxa de falhas", "0,42%", period], ["Incidentes abertos", "3", "1 crítico"], ["Bloqueados agora", "11", "autenticação"]]} /><section className="ops-panel"><div className="ops-panel-title"><div><h3>Tendência de falhas</h3><p>O ponto em vermelho indica uma anomalia detectada.</p></div></div><Chart values={[18, 22, 14, 19, 11, 13, 8, 9, 12, 7, 6, 5]} labels={["01", "05", "10", "15", "20", "25", "30"]} /><div className="ops-anomaly"><i /> 08/09 · pico de falhas no login após expiração de sessão</div></section><div className="ops-two-col"><section className="ops-panel"><div className="ops-panel-title"><div><h3>Onde as falhas acontecem</h3><p>Eventos com erro ou acesso negado.</p></div></div><div className="ops-list">{[["Login · token expirado", "ERRO", "12", "13/09 · 09:18"], ["Upload · formato inválido", "NEGADO", "7", "12/09 · 14:02"], ["Convite · limite atingido", "ERRO", "4", "11/09 · 18:31"]].map(([event, result, total, last]) => <div key={event}><span><strong>{event}</strong><small>{last}</small></span><Status value={result} tone={toneFor(result)} /><b>{total}</b></div>)}</div></section><section className="ops-panel"><div className="ops-panel-title"><div><h3>Incidentes por área</h3><p>Gravidade atual.</p></div></div><div className="ops-list">{[["Autenticação", "CRITICA", "1"], ["Notificações", "ALTA", "1"], ["Armazenamento", "MEDIA", "1"]].map(([area, severity, total]) => <div key={area}><span><strong>{area}</strong><small>em acompanhamento</small></span><Status value={severity} tone={toneFor(severity)} /><b>{total}</b></div>)}</div></section></div><section className="ops-panel"><div className="ops-panel-title"><div><h3>Lacunas conhecidas</h3><p>O painel deixa claro quando a fonte ainda não está conectada.</p></div></div><div className="ops-gap-grid">{[["Latência", "APM necessário"], ["Uptime", "monitor externo necessário"], ["Erros 4xx/5xx", "telemetria HTTP necessária"], ["CPU / memória", "métrica do runtime necessária"], ["Consultas lentas", "profiling do banco necessário"], ["Comparação entre versões", "histórico de releases necessário"]].map(([name, source]) => <article key={name}><strong>{name}</strong><small>fonte necessária: {source}</small></article>)}</div></section></div>;
 }
 
-function PublicationWorkspace() {
-  const [approval, setApproval] = useState("PENDENTE");
-  const [reason, setReason] = useState("");
-  const [notice, setNotice] = useState("");
-  const releaseDisabled = approval !== "APROVADO";
-  return <div className="ops-stack"><Section eyebrow="ENTREGA CONTROLADA" title="Publicação do sistema" text="Cada versão passa por validação, aprovação e health check antes de chegar à Produção."><Status value="Produção protegida" tone="info" /></Section><Metrics items={[["Última publicada", "v2.18.4", "há 2h · Produção"], ["Aguardando aprovação", "1", "sua decisão"], ["Falhas em 30 dias", "2", "−33%"], ["Reversões automáticas", "1", "últimos 30 dias"]]} /><section className="ops-panel ops-publication-selected"><div><div><p className="pilot-kicker">PUBLICAÇÃO SELECIONADA</p><h3>v2.18.5 · correção do fluxo de convites</h3><p><code>8f3a91c2</code> · <strong>main</strong> · Marina Costa · iniciada 13/09/2026 08:12 · duração 4m 38s</p></div><Status value="AGUARDANDO_APROVACAO" tone="warning" /></div><div className="ops-stage-track">{publishStages.map(([name, state, duration], index) => <div className={`ops-stage ${state}`} key={name}><b>{index + 1}</b><strong>{statusLabel(name)}</strong><small>{duration}</small><button type="button">Ver logs</button>{state === "critica" && <em>crítica</em>}</div>)}</div></section>{approval === "PENDENTE" && <section className="ops-alert warning ops-approval-alert"><strong>Esta publicação está parada esperando sua decisão</strong><span>Produção só pode ser liberada depois de uma aprovação explícita.</span><label>Motivo da decisão<textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Registre o que foi conferido…" rows={3} /></label><div><button type="button" disabled={!reason.trim()} onClick={() => { setApproval("APROVADO"); setNotice("Publicação aprovada. A liberação está disponível."); }}>Aprovar publicação</button><button type="button" className="danger" disabled={!reason.trim()} onClick={() => { setApproval("RECUSADO"); setNotice("Publicação recusada e devolvida para ajustes."); }}>Recusar</button></div></section>}{notice && <div className="ops-alert success">{notice}</div>}<div className="ops-release-row"><button type="button" disabled={releaseDisabled} title={releaseDisabled ? "A aprovação é obrigatória para liberar em Produção" : "Liberar publicação em Produção"}>Liberar publicação</button>{releaseDisabled && <small>Disponível somente após aprovação — a regra também está aplicada ao botão.</small>}</div><section className="ops-panel"><div className="ops-panel-title"><div><h3>Histórico de publicações</h3><p>Etapas concluídas, ambiente e autoria de cada release.</p></div></div><div className="ops-table-wrap"><table className="ops-table"><thead><tr><th>Versão</th><th>Ambiente</th><th>Status</th><th>Commit</th><th>Autor</th><th>Iniciado em</th><th>Duração</th><th>Etapas</th></tr></thead><tbody>{[["v2.18.4", "Produção", "CONCLUIDO", "3aa71f4e", "Rafael Lima", "13/09 · 06:10", "4m 12s", "9/9"], ["v2.18.3", "Produção", "REVERSAO_AUTOMATICA", "91f0c2bd", "Sistema", "08/09 · 21:44", "2m 03s", "9/9"], ["v2.18.2", "Homologação", "CONCLUIDO", "a77b109e", "Marina Costa", "07/09 · 15:30", "3m 51s", "9/9"]].map((row) => <tr key={row[0]}>{row.map((cell, index) => <td key={`${row[0]}-${index}`} data-label={["Versão", "Ambiente", "Status", "Commit", "Autor", "Iniciado em", "Duração", "Etapas"][index]}>{index === 2 ? <Status value={cell} tone={toneFor(cell)} /> : index === 3 ? <code>{cell}</code> : cell}</td>)}</tr>)}</tbody></table></div></section></div>;
-}
 
 function IncidentWorkspace() {
   const [status, setStatus] = useState("TODOS");

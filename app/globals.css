@@ -34085,3 +34085,29 @@ html[data-pilot-theme="escuro"] .request-care-status.tone-blue { background:#173
     width: 100% !important;
   }
 }
+/* Publicação do proprietário: cartões e campos contidos em telas de 360px. */
+.owner-publication { display:grid; gap:20px; min-width:0; padding:16px; border-radius:16px; background:#f5f7fb; color:#233047; font:15px/1.6 Arial,sans-serif; }
+html[data-pilot-theme="escuro"] .owner-publication { color:#edf2fa; background:#101827; }
+.owner-publication .workspace-heading > div > p { color:inherit; }
+.owner-publication > *, .owner-publication .workspace-heading > div { min-width:0; }
+.owner-publication .workspace-heading { display:flex; flex-wrap:wrap; gap:16px; align-items:start; min-height:0; padding:0; margin:0; }
+.owner-publication .workspace-heading > div { flex:1 1 240px; }
+.owner-publication :is(p,li,label,code) { overflow-wrap:anywhere; }
+.owner-publication :is(.publication-panel,.control-summary-card,.feature-flag-card) { display:block; padding:20px; border:1px solid #cbd5e1; border-radius:16px; background:#fff; color:inherit; }
+html[data-pilot-theme="escuro"] .owner-publication :is(.publication-panel,.control-summary-card,.feature-flag-card) { background:#182235; border-color:#526078; }
+.owner-publication :is(h2,h3,.pilot-kicker) { color:inherit; margin:0 0 10px; }
+.owner-publication h2 { font-size:26px; line-height:1.25; }
+.owner-publication h3 { font-size:18px; }
+.owner-publication .pilot-kicker { font-size:12px; letter-spacing:.08em; }
+.owner-publication p { line-height:1.6; color:inherit; }
+.owner-publication .publication-status { border:1px solid currentColor; border-radius:999px; padding:8px 14px; }
+.owner-publication :is(button,input,select) { min-height:44px; max-width:100%; }
+.owner-publication button { white-space:normal; }
+.owner-publication input,.owner-publication select { width:100%; }
+.owner-publication ul { padding-left:20px; }
+.owner-publication li + li { margin-top:14px; }
+.owner-publication .publication-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); gap:16px; }
+.owner-publication label { display:grid; gap:8px; }
+.owner-publication .publication-actions { display:flex; flex-wrap:wrap; gap:12px; margin-top:20px; }
+.owner-publication .publication-toggle { display:flex; align-items:center; gap:12px; }
+.owner-publication .publication-toggle input { width:24px; }
