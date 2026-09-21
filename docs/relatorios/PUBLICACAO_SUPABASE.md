@@ -33,3 +33,7 @@ Criada a rota exclusiva do proprietário com GET, PATCH e DELETE. A configuraç�
 ## Etapa 3 — conexão verificável
 
 Criada verificação somente de leitura, com timeout de 8s, no máximo uma repetição e cache desativado: Auth health, validação da chave pública em Auth settings, OpenAPI REST com chave de servidor, lista de buckets e conferência do bucket informado. O formulário exibe resultado, latência, códigos HTTP e data; integração desligada interrompe o teste antes de qualquer chamada externa. Teste automatizado percorreu o resultado de sucesso e confirmou auditoria sem segredo. Verificação externa do projeto informado em 21/09/2026: Auth health 200 e Auth settings 200; a raiz REST devolveu 401 “Secret API key required”, comportamento esperado sem a chave secreta. A verificação completa de REST/Storage ficará disponível ao proprietário assim que a chave secreta for preenchida no formulário.
+
+## Etapa 4 — testes e validação
+
+Não houve alteração de schema e, portanto, nenhuma migração foi criada nem db:generate foi executado. TypeScript passou sem erro. npm run lint terminou com 0 erros e 41 avisos preexistentes (40 usos de img e uma constante sem uso fora do escopo). npm test passou com 396/396 casos e executou o build/validação do artefato. A rodada dirigida de pilot-security, tenant-isolation-guard e integração Supabase passou com 19/19 casos. O build final reconheceu as duas novas rotas e validou o Worker ESM e o manifesto da hospedagem.

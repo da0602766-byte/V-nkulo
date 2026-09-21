@@ -18,6 +18,7 @@ export default function SupabaseIntegrationForm() {
     setForm(data.integration ? {...data.integration,serviceRoleKey:"",jwtSecret:""} : empty);
     setUpdated(data.updatedAt ? data.updatedAt + " · usuário " + data.updatedBy : "");
     setCheck(data.integration?.lastCheck || null);
+    window.dispatchEvent(new CustomEvent("vinkulo:supabase-status",{detail:data.integration}));
   },[]);
   const load = useCallback(async () => {
     setLoading(true); setError("");
@@ -59,6 +60,7 @@ export default function SupabaseIntegrationForm() {
       const response=await fetch("/api/proprietario/integracoes/supabase/test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({confirm:true})});
       const data=await response.json();
       if (data.check) setCheck(data.check);
+      if (data.check) window.dispatchEvent(new CustomEvent("vinkulo:supabase-status",{detail:{ativa:saved?.ativa,lastCheck:data.check}}));
       if (!response.ok) throw new Error(data.check?.message || data.error || "A conexão não foi validada.");
       setNotice(data.check.message);
     } catch(failure){setError(failure instanceof Error ? failure.message : "O teste da conexão não pôde ser concluído.");}

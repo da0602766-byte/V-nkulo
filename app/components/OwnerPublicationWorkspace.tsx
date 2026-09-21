@@ -4,11 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import SupabaseIntegrationForm from "./SupabaseIntegrationForm";
 
 type Audit = { id: number; evento: string; resultado: string; criado_em: string; usuario_nome?: string };
+type ConnectionState = { ativa?: boolean; lastCheck?: { ok: boolean; checkedAt: string } | null } | null;
 
 export default function OwnerPublicationWorkspace() {
   const [audit, setAudit] = useState<Audit[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [connection, setConnection] = useState<ConnectionState>(null);
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -21,12 +23,18 @@ export default function OwnerPublicationWorkspace() {
       setError(failure instanceof Error ? failure.message : "A conexão com o Vínkulo foi interrompida. Tente novamente.");
     } finally { setLoading(false); }
   }, []);
-  useEffect(() => { const timer = setTimeout(() => { void load(); }, 0); return () => clearTimeout(timer); }, [load]);
+  useEffect(() => {
+    const timer = setTimeout(() => { void load(); }, 0);
+    const update=(event:Event)=>setConnection((event as CustomEvent<ConnectionState>).detail);
+    window.addEventListener("vinkulo:supabase-status",update);
+    return () => {clearTimeout(timer);window.removeEventListener("vinkulo:supabase-status",update);};
+  }, [load]);
+  const generalStatus=error || connection?.lastCheck?.ok===false ? "Falha" : connection?.lastCheck?.ok ? "Tudo certo" : "Atenção";
 
   return <section className="owner-publication">
     <header className="workspace-heading">
       <div><p className="pilot-kicker">PUBLICAÇÃO E INTEGRAÇÕES</p><h2>Publicação do sistema</h2><p>Acompanhe a conexão dos serviços e os registros de alterações da plataforma.</p></div>
-      <span className="publication-status" role="status">{error ? "Falha" : "Atenção"}</span>
+      <div><span className="publication-status" role="status">{generalStatus}</span>{connection?.lastCheck?.ok && <small>Última verificação: {new Date(connection.lastCheck.checkedAt).toLocaleString("pt-BR")}</small>}</div>
     </header>
     <article className="control-summary-card"><h3>Estado atual</h3><p>A publicação de novas versões é realizada pela hospedagem, após a validação do código.</p><p>Esta tela não tem uma fila de versões conectada. Nenhuma aprovação ou publicação é simulada aqui.</p></article>
     <article className="feature-flag-card"><h3>Publicações da comunidade</h3><p>A automação editorial cuida do conteúdo das comunidades. Ela é administrada na aba IA Editorial e não publica novas versões do sistema.</p></article>
