@@ -17,4 +17,4 @@ O estado histórico `REMOVIDO` é preservado, não convertido para `ATIVO`. A im
 
 ## Estado da cópia de produção
 
-Aguardando confirmação específica do proprietário para transmitir ao Supabase os vínculos entre pessoas e comunidades, que podem revelar participação religiosa. Até a confirmação, os 21 vínculos permanecem somente no D1.
+Após confirmação específica do proprietário, os 21 vínculos foram copiados. A comparação protegida retornou D1 21, Supabase 21, iguais 21 e pendentes 0. Consulta SQL independente confirmou 16 ativos, 5 removidos, nenhuma referência quebrada, nenhuma conta vinculada a Supabase Auth e 1 execução bem-sucedida. O D1 continua como fonte de autorização e o login permanece inalterado.
