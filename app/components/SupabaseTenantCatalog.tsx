@@ -61,7 +61,7 @@ export default function SupabaseTenantCatalog() {
 
   return <article className="publication-panel" aria-busy={loading}>
     <h3>Catálogo de comunidades</h3>
-    <p>Compare e sincronize somente os dados básicos das comunidades entre D1 e Supabase. Cadastros de pessoas, vínculos, arquivos e logins seguem no Vínkulo atual.</p>
+    <p>Compare e sincronize somente os dados básicos das comunidades entre D1 e Supabase. A cópia do catálogo não altera perfis, vínculos, arquivos nem logins.</p>
     <div aria-live="polite">
       {loading && <p>Conferindo comunidades nos dois bancos.</p>}
       {error && <p role="alert">{error}</p>}

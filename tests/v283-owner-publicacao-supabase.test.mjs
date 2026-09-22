@@ -93,7 +93,7 @@ test("fundação Supabase de comunidades usa isolamento e nunca copia dados no n
   for (const text of ["vinkulo_tenants","vinkulo_profiles","vinkulo_memberships","vinkulo_migration_runs","enable row level security","Nenhuma política de escrita de cliente"]) assert.match(sql,new RegExp(text));
   for (const text of ["vinkulo_tenant_foundation_health","rls_enabled","grant execute","service_role"]) assert.match(healthSql,new RegExp(text));
   const source=await readFile(new URL("../app/components/SupabaseTenantFoundation.tsx",import.meta.url),"utf8");
-  for (const text of ["Fundação de comunidades","Pessoas, vínculos, arquivos e logins seguem onde estão","Verificar fundação","aria-live"]) assert.match(source,new RegExp(text));
+  for (const text of ["Fundação de comunidades","Os perfis podem ser copiados em etapa própria; vínculos, arquivos e logins seguem onde estão","Verificar fundação","aria-live"]) assert.match(source,new RegExp(text));
 
   const {database,d1}=await createPilotD1();
   await createPilotUser(database,{nome:"Proprietário da fundação",email:"owner.supabase@example.test",senha:"Owner123",memberships:[{comunidadeId:1,papel:"ADMIN_COMUNIDADE"}]});
