@@ -17,3 +17,5 @@ O painel Proprietário > Publicação do sistema passa a verificar as quatro tab
 ## Aplicação e verificação
 
 Em 21/09/2026, a migração foi aplicada ao projeto Supabase configurado do Vínkulo. A conferência direta no banco confirmou as quatro tabelas (`vinkulo_tenants`, `vinkulo_profiles`, `vinkulo_memberships` e `vinkulo_migration_runs`) e RLS ativo em todas elas. A fundação está pronta para receber uma migração futura, deliberada e auditável; ela permanece vazia nesta etapa.
+
+O painel publicado na versão 285 confirmou a fundação como pronta por HTTP 200, com os quatro controles positivos. Nenhum registro foi consultado nessa confirmação.
