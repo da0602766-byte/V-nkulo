@@ -86,3 +86,35 @@ test("área de publicação trata configuração ausente e todos os estados vis�
   assert.equal((await response.json()).integration,null);
   database.close();
 });
+
+test("fundação Supabase de comunidades usa isolamento e nunca copia dados no navegador",async()=>{
+  const sql=await readFile(new URL("../supabase/migrations/0001_tenant_foundation.sql",import.meta.url),"utf8");
+  for (const text of ["vinkulo_tenants","vinkulo_profiles","vinkulo_memberships","vinkulo_migration_runs","enable row level security","Nenhuma política de escrita de cliente"]) assert.match(sql,new RegExp(text));
+  const source=await readFile(new URL("../app/components/SupabaseTenantFoundation.tsx",import.meta.url),"utf8");
+  for (const text of ["Fundação de comunidades","Nenhum dado do Vínkulo foi copiado ainda","Verificar fundação","aria-live"]) assert.match(source,new RegExp(text));
+
+  const {database,d1}=await createPilotD1();
+  await createPilotUser(database,{nome:"Proprietário da fundação",email:"owner.supabase@example.test",senha:"Owner123",memberships:[{comunidadeId:1,papel:"ADMIN_COMUNIDADE"}]});
+  const worker=await loadWorker(); const runtime=env(d1);
+  const cookie=await login(worker,runtime,"owner.supabase@example.test","Owner123");
+  const saved=await worker.fetch(new Request(endpoint,{method:"PATCH",headers:{cookie,"content-type":"application/json"},body:JSON.stringify({...configuration,ativa:true})}),runtime,context);
+  assert.equal(saved.status,200);
+  const nativeFetch=globalThis.fetch;
+  globalThis.fetch=async request=>{
+    const url=String(request);
+    if (["vinkulo_tenants","vinkulo_profiles","vinkulo_memberships","vinkulo_migration_runs"].some(table=>url.includes(`/rest/v1/${table}?`))) return Response.json([]);
+    throw new Error(`Rota Supabase inesperada: ${url}`);
+  };
+  try {
+    const foundation=await worker.fetch(new Request(endpoint+"/tenant-foundation",{headers:{cookie}}),runtime,context);
+    assert.equal(foundation.status,200);
+    const body=await foundation.json();
+    assert.equal(body.check.ready,true);
+    assert.deepEqual(body.check.tables,{tenants:true,profiles:true,memberships:true,migrationRuns:true});
+    assert.equal(database.prepare("SELECT COUNT(*) AS total FROM auditoria_piloto WHERE evento='INTEGRACAO_SUPABASE_TENANCY_VERIFICADA'").get().total,0);
+    const audited=await worker.fetch(new Request(endpoint+"/tenant-foundation",{method:"POST",headers:{cookie,"content-type":"application/json"}}),runtime,context);
+    assert.equal(audited.status,200);
+    assert.equal(database.prepare("SELECT COUNT(*) AS total FROM auditoria_piloto WHERE evento='INTEGRACAO_SUPABASE_TENANCY_VERIFICADA'").get().total,1);
+  } finally { globalThis.fetch=nativeFetch; }
+  database.close();
+});

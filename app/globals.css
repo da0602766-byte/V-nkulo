@@ -34114,5 +34114,7 @@ html[data-pilot-theme="escuro"] .owner-publication :is(.publication-panel,.contr
 .owner-publication .publication-check.danger { color:#991b1b; background:#fff1f2; }
 html[data-pilot-theme="escuro"] .owner-publication .publication-check.success { color:#bbf7d0; background:#12321f; }
 html[data-pilot-theme="escuro"] .owner-publication .publication-check.danger { color:#fecaca; background:#3b171b; }
+.owner-publication .publication-foundation-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px 16px; padding:0; list-style:none; }
+.owner-publication .publication-foundation-list li + li { margin-top:0; }
 .owner-publication .publication-toggle { display:flex; align-items:center; gap:12px; }
 .owner-publication .publication-toggle input { width:24px; }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import SupabaseIntegrationForm from "./SupabaseIntegrationForm";
+import SupabaseTenantFoundation from "./SupabaseTenantFoundation";
 
 type Audit = { id: number; evento: string; resultado: string; criado_em: string; usuario_nome?: string };
 type ConnectionState = { ativa?: boolean; lastCheck?: { ok: boolean; checkedAt: string } | null } | null;
@@ -39,6 +40,7 @@ export default function OwnerPublicationWorkspace() {
     <article className="control-summary-card"><h3>Estado atual</h3><p>A publicação de novas versões é realizada pela hospedagem, após a validação do código.</p><p>Esta tela não tem uma fila de versões conectada. Nenhuma aprovação ou publicação é simulada aqui.</p></article>
     <article className="feature-flag-card"><h3>Publicações da comunidade</h3><p>A automação editorial cuida do conteúdo das comunidades. Ela é administrada na aba IA Editorial e não publica novas versões do sistema.</p></article>
     <SupabaseIntegrationForm />
+    <SupabaseTenantFoundation />
     <footer className="publication-panel" aria-busy={loading}>
       <h3>Auditoria de publicação e integrações</h3>
       <div aria-live="polite">
