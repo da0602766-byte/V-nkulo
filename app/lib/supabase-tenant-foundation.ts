@@ -54,7 +54,7 @@ export async function verifyTenantFoundation(): Promise<TenantFoundationCheck> {
       latencyMs: Date.now() - started,
       status,
       message: ready
-        ? "Fundação de comunidades pronta: isolamento por tenant protegido por RLS. Nenhum dado do Vínkulo foi copiado ainda."
+        ? "Fundação de comunidades pronta: isolamento por tenant protegido por RLS."
         : "A fundação de comunidades ainda não está disponível no Supabase. Aplique a migração administrativa antes de transferir dados.",
       tables,
     };
