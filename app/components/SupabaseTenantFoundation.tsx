@@ -34,7 +34,7 @@ export default function SupabaseTenantFoundation() {
   useEffect(() => { const timer = setTimeout(() => void load(), 0); return () => clearTimeout(timer); }, [load]);
   return <article className="publication-panel" aria-busy={loading}>
     <h3>Fundação de comunidades</h3>
-    <p>Estrutura paralela para migrar dados por comunidade com isolamento no banco. Os perfis podem ser copiados em etapa própria; vínculos, arquivos e logins seguem onde estão.</p>
+    <p>Estrutura paralela para migrar dados por comunidade com isolamento no banco. Perfis e vínculos são comparados em etapas próprias; arquivos e logins seguem onde estão.</p>
     <div aria-live="polite">
       {loading && <p>Verificando as tabelas protegidas no Supabase.</p>}
       {error && <p role="alert">{error}</p>}
