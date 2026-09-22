@@ -3,6 +3,7 @@ import { readIntegration } from "./supabase-integration";
 import { loadSourceTenantCatalog, previewTenantCatalog, syncTenantCatalog } from "./supabase-tenant-catalog";
 import { loadSourceProfiles, previewProfiles, syncProfiles } from "./supabase-profile-catalog";
 import { loadSourceMemberships, previewMemberships, syncMemberships } from "./supabase-membership-catalog";
+import { createSystemNotification } from "./system-notifications";
 
 const KEY = "supabase_auto_sync";
 const INTERVAL_MS = 5 * 60_000;
@@ -20,12 +21,12 @@ export type AutoSyncStatus = {
   lastError: string | null;
   lastResult: { tenants: CatalogResult; profiles: CatalogResult; memberships: CatalogResult } | null;
 };
-type StoredStatus = AutoSyncStatus & { lockUntil: string | null; lockToken: string | null };
+type StoredStatus = AutoSyncStatus & { lockUntil: string | null; lockToken: string | null; lastAlertAt: string | null };
 type StatusRow = { valor: string };
 
 function initialStatus(): StoredStatus {
   return { enabled: false, running: false, lastAttemptAt: null, lastSuccessAt: null,
-    nextRunAt: null, lastError: null, lastResult: null, lockUntil: null, lockToken: null };
+    nextRunAt: null, lastError: null, lastResult: null, lockUntil: null, lockToken: null, lastAlertAt: null };
 }
 function parseStatus(raw: string | null): StoredStatus {
   if (!raw) return initialStatus();
@@ -35,8 +36,9 @@ function parseStatus(raw: string | null): StoredStatus {
   } catch { return initialStatus(); }
 }
 function publicStatus(status: StoredStatus): AutoSyncStatus {
-  const { lockToken: _token, lockUntil, ...rest } = status;
+  const { lockToken: _token, lockUntil, lastAlertAt: _alert, ...rest } = status;
   void _token;
+  void _alert;
   return { ...rest, running: Boolean(lockUntil && Date.parse(lockUntil) > Date.now()) };
 }
 async function loadStatus(db: D1Database) {
@@ -112,7 +114,7 @@ async function reconcile(actorId: number): Promise<NonNullable<AutoSyncStatus["l
   };
 }
 
-/** Conciliação oportunista: após alterações relevantes e, com tráfego, a cada 5 minutos. */
+/** Conciliação por mutação, tráfego e webhook agendado no Supabase. */
 export async function runAutoSyncIfDue(db: D1Database, options: { force?: boolean; actorId?: number } = {}): Promise<AutoSyncStatus> {
   const { raw, status } = await loadStatus(db);
   if (!status.enabled) return publicStatus(status);
@@ -138,8 +140,17 @@ export async function runAutoSyncIfDue(db: D1Database, options: { force?: boolea
   } catch (error) {
     const failed = new Date();
     const message = error instanceof Error ? error.message : "Falha de sincronização indisponível.";
+    let lastAlertAt = locked.lastAlertAt;
+    if (!lastAlertAt || failed.getTime() - Date.parse(lastAlertAt) >= 6 * 60 * 60_000) {
+      try {
+        await createSystemNotification(db, { tipo: "IMPORTANTE", titulo: "Falha na sincronização Supabase",
+          mensagem: "A cópia de comunidades, perfis ou vínculos precisa de revisão. Abra Publicação do sistema para ver o motivo.",
+          area: "MENU", usuarioId: await automaticActorId(db), destinoRota: "/proprietario", criadoPor: "sistema" });
+        lastAlertAt = failed.toISOString();
+      } catch { /* O alerta não pode impedir o registro da falha. */ }
+    }
     const next: StoredStatus = { ...locked, running: false, lockToken: null, lockUntil: null,
-      nextRunAt: new Date(failed.getTime() + RETRY_MS).toISOString(), lastError: message.slice(0, 240) };
+      nextRunAt: new Date(failed.getTime() + RETRY_MS).toISOString(), lastError: message.slice(0, 240), lastAlertAt };
     await replaceStatus(db, JSON.stringify(locked), next);
   }
   return getAutoSyncStatus(db);
