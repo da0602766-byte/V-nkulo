@@ -36,7 +36,7 @@ export default function SupabaseReadBenchmark() {
         <p>D1: {result.sourceCount} · Supabase: {result.destinationCount} · Mediana D1: {result.d1MedianMs} ms · Mediana Supabase: {result.supabaseMedianMs} ms.</p>
         <p>{!result.matching ? "Não use a réplica para leitura até reconciliar os vínculos."
           : result.recommendation === "KEEP_D1" ? "Neste teste, o D1 foi mais rápido. A leitura de autorização permanece nele."
-            : "O Supabase respondeu mais rápido neste teste, mas ainda não tem sessões e permissões adicionais nem sincronização contínua. A autorização permanece no D1."}</p>
+            : "O Supabase respondeu mais rápido neste teste, mas ainda não tem sessões nem permissões adicionais. A autorização permanece no D1."}</p>
         <small>Medido em {result.measuredAt} (UTC).</small>
       </div>}
     </div>

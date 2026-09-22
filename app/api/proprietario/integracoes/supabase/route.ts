@@ -2,6 +2,7 @@ import { getD1 } from "../../../../../db";
 import { getSessionUser } from "../../../../lib/local-auth";
 import { recordTenantAudit } from "../../../../lib/tenant-audit";
 import { IntegrationInputError, parseIntegration, publicIntegration, readIntegration, writeIntegration } from "../../../../lib/supabase-integration";
+import { getAutoSyncStatus } from "../../../../lib/supabase-auto-sync";
 
 export const reply = (value: unknown, status=200) => Response.json(value,{status,headers:{"Cache-Control":"no-store"}});
 export async function requireIntegrationOwner(request?: Request) {
@@ -30,6 +31,9 @@ export async function PATCH(request: Request) {
     if (!payload || Array.isArray(payload) || typeof payload !== "object" || payload.confirm !== true) return reply({error:"Confirme explicitamente a alteração da integração."},400);
     const saved = await readIntegration();
     const config = await parseIntegration(payload,saved?.config || null);
+    if (saved?.config.url !== config.url && (await getAutoSyncStatus(getD1())).enabled) {
+      return reply({error:"Pause a sincronização automática antes de trocar o projeto Supabase."},409);
+    }
     await writeIntegration(config,access.user.id);
     await recordTenantAudit(getD1(),{comunidadeId:null},access.user.id,"INTEGRACAO_SUPABASE_ATUALIZADA","SUCESSO",{ambiente:config.ambiente,host:new URL(config.url).hostname,campos:Object.keys(config).filter(key=>JSON.stringify(saved?.config[key as keyof typeof config]) !== JSON.stringify(config[key as keyof typeof config]))});
     return GET();

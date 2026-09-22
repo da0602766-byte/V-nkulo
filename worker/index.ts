@@ -5,6 +5,7 @@ import { runWithRuntimeEnv } from "../db/runtime-env";
 import type { R2BucketBinding } from "../db/runtime-env";
 import { runPlatformOptimizationIfDue } from "../app/lib/platform-optimizer";
 import { purgeExpiredPrivateMessagesIfDue } from "../app/lib/chat-retention";
+import { runAutoSyncIfDue } from "../app/lib/supabase-auto-sync";
 
 interface Env {
   ASSETS: Fetcher;
@@ -35,6 +36,20 @@ const MAX_UPLOAD_BODY_BYTES = 7 * 1024 * 1024;
 const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const OPTIMIZER_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 let nextOptimizerCheckAt = 0;
+let nextAutoSyncCheckAt = 0;
+const AUTO_SYNC_CHECK_MS = 60_000;
+const AUTO_SYNC_MUTATION_PATHS = [
+  "/api/auth/cadastro", "/api/conta/perfil", "/api/pilot/pessoas",
+  "/api/pilot/comunidades", "/api/pilot/solicitacoes-entrada/",
+  "/api/pilot/usuarios-cadastro", "/api/pilot/convites/aceitar",
+  "/api/proprietario", "/api/public/cadastro-membro/",
+];
+
+function relevantCatalogMutation(pathname: string, method: string) {
+  if (!UNSAFE_METHODS.has(method) || pathname.startsWith("/api/proprietario/integracoes/")) return false;
+  return AUTO_SYNC_MUTATION_PATHS.some(path => pathname === path || (path.endsWith("/") && pathname.startsWith(path))
+    || (["/api/pilot/pessoas", "/api/pilot/comunidades"].includes(path) && pathname.startsWith(`${path}/`)));
+}
 
 // Image security config. SVG sources with .svg extension auto-skip the
 // optimization endpoint on the client side (served directly, no proxy).
@@ -83,6 +98,13 @@ const worker = {
       const response = await runWithRuntimeEnv({ ...env, executionContext: ctx }, () =>
         handler.fetch(request, env, ctx),
       );
+      const now = Date.now();
+      const forced = response.status < 400 && relevantCatalogMutation(url.pathname, request.method);
+      if (forced || (now >= nextAutoSyncCheckAt && (url.pathname === "/painel" || url.pathname === "/proprietario" || url.pathname.startsWith("/api/")))) {
+        nextAutoSyncCheckAt = now + AUTO_SYNC_CHECK_MS;
+        ctx.waitUntil(runWithRuntimeEnv({ ...env, executionContext: ctx }, () =>
+          runAutoSyncIfDue(env.DB, { force: forced }).catch(() => undefined)));
+      }
       return withSecurityHeaders(response, url.pathname);
     } catch {
       const fallback = url.pathname.startsWith("/api/")
