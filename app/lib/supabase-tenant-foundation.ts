@@ -16,11 +16,11 @@ const entries = [
   ["migrationRuns", "vinkulo_migration_runs"],
 ] as const;
 
-async function checkFetch(url: string, headers: HeadersInit) {
+async function checkFetch(url: string, init: RequestInit) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8000);
   try {
-    return await fetch(url, { headers, cache: "no-store", signal: controller.signal });
+    return await fetch(url, { ...init, cache: "no-store", signal: controller.signal });
   } finally {
     clearTimeout(timer);
   }
@@ -36,11 +36,18 @@ export async function verifyTenantFoundation(): Promise<TenantFoundationCheck> {
   }
   try {
     const secret = await reveal(saved.config.serviceRoleKey, saved.config.url + ":serviceRoleKey");
-    const headers = { apikey: secret, Authorization: `Bearer ${secret}`, "Accept-Profile": saved.config.schema };
-    const responses = await Promise.all(entries.map(([, table]) => checkFetch(`${saved.config.url}/rest/v1/${table}?select=id&limit=1`, headers)));
-    const tables = Object.fromEntries(entries.map(([key], index) => [key, responses[index].ok])) as TenantFoundationCheck["tables"];
+    const response = await checkFetch(`${saved.config.url}/rest/v1/rpc/vinkulo_tenant_foundation_health`, {
+      method: "POST",
+      headers: { apikey: secret, Authorization: `Bearer ${secret}`, "Accept-Profile": saved.config.schema, "Content-Type": "application/json" },
+      body: "{}",
+    });
+    const rows = response.ok ? await response.json() as Array<{ table_key?: string; present?: boolean; rls_enabled?: boolean }> : [];
+    const tables = Object.fromEntries(entries.map(([key]) => {
+      const row = rows.find(candidate => candidate.table_key === key);
+      return [key, Boolean(row?.present && row.rls_enabled)];
+    })) as TenantFoundationCheck["tables"];
     const ready = Object.values(tables).every(Boolean);
-    const status = responses.find(response => !response.ok)?.status || responses[0]?.status || 0;
+    const status = response.status || 0;
     return {
       ready,
       checkedAt,

@@ -89,7 +89,9 @@ test("área de publicação trata configuração ausente e todos os estados vis�
 
 test("fundação Supabase de comunidades usa isolamento e nunca copia dados no navegador",async()=>{
   const sql=await readFile(new URL("../supabase/migrations/0001_tenant_foundation.sql",import.meta.url),"utf8");
+  const healthSql=await readFile(new URL("../supabase/migrations/0002_tenant_foundation_health.sql",import.meta.url),"utf8");
   for (const text of ["vinkulo_tenants","vinkulo_profiles","vinkulo_memberships","vinkulo_migration_runs","enable row level security","Nenhuma política de escrita de cliente"]) assert.match(sql,new RegExp(text));
+  for (const text of ["vinkulo_tenant_foundation_health","rls_enabled","grant execute","service_role"]) assert.match(healthSql,new RegExp(text));
   const source=await readFile(new URL("../app/components/SupabaseTenantFoundation.tsx",import.meta.url),"utf8");
   for (const text of ["Fundação de comunidades","Nenhum dado do Vínkulo foi copiado ainda","Verificar fundação","aria-live"]) assert.match(source,new RegExp(text));
 
@@ -102,7 +104,12 @@ test("fundação Supabase de comunidades usa isolamento e nunca copia dados no n
   const nativeFetch=globalThis.fetch;
   globalThis.fetch=async request=>{
     const url=String(request);
-    if (["vinkulo_tenants","vinkulo_profiles","vinkulo_memberships","vinkulo_migration_runs"].some(table=>url.includes(`/rest/v1/${table}?`))) return Response.json([]);
+    if (url.endsWith("/rest/v1/rpc/vinkulo_tenant_foundation_health")) return Response.json([
+      {table_key:"tenants",present:true,rls_enabled:true},
+      {table_key:"profiles",present:true,rls_enabled:true},
+      {table_key:"memberships",present:true,rls_enabled:true},
+      {table_key:"migrationRuns",present:true,rls_enabled:true},
+    ]);
     throw new Error(`Rota Supabase inesperada: ${url}`);
   };
   try {

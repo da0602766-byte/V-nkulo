@@ -12,7 +12,7 @@ Nenhum nome, e-mail, senha, documento, arquivo, foto, sessão ou histórico foi 
 
 ## Operação
 
-O painel Proprietário > Publicação do sistema passa a verificar as quatro tabelas da fundação por uma rota exclusiva do proprietário. A verificação usa a chave de serviço somente no servidor, não retorna o segredo ao navegador e registra o resultado na auditoria do Vínkulo.
+O painel Proprietário > Publicação do sistema passa a verificar as quatro tabelas da fundação por uma rota exclusiva do proprietário. A verificação usa uma RPC de saúde que devolve somente a existência das tabelas e o estado do RLS, usa a chave de serviço somente no servidor, não retorna o segredo ao navegador e registra o resultado na auditoria do Vínkulo.
 
 ## Aplicação e verificação
 
