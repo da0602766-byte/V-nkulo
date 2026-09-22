@@ -16,4 +16,8 @@ As funções de leitura e escrita do catálogo têm execução concedida apenas 
 
 TypeScript e build aprovados; lint com zero erros e 41 avisos preexistentes; suíte completa com 398/398 testes. No Supabase, a função de leitura retornou zero comunidades antes da carga. A permissão de execução da função de escrita foi conferida diretamente: `anon=false`, `authenticated=false`, `service_role=true`.
 
-O resultado da sincronização em produção e a versão publicada serão registrados após a conferência final no painel.
+## Resultado em produção
+
+A versão 286 foi publicada em `https://adote-gestao.da0602766.chatgpt.site`. O proprietário executou a sincronização pelo painel em 22/09/2026. Resultado: 4 inseridas, 0 atualizadas e 0 inalteradas. A comparação posterior mostrou D1 4, Supabase 4, iguais 4 e pendentes 0. A auditoria do D1 registrou `INTEGRACAO_SUPABASE_TENANTS_SINCRONIZADOS` com resultado `SUCESSO`.
+
+Uma consulta independente no Supabase confirmou 4 comunidades, sendo 3 ativas, 1 arquivada e 2 de demonstração. `vinkulo_profiles` e `vinkulo_memberships` continuam com zero registros. Há uma execução bem-sucedida de escopo `TENANTS` em `vinkulo_migration_runs`.
