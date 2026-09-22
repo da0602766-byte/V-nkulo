@@ -32,4 +32,12 @@
 
 ## Medição após publicação
 
-A preencher após a publicação validada; não afirmar ganho percentual antes de repetir a medição em produção.
+Versão **293** publicada em `https://adote-gestao.da0602766.chatgpt.site`, commit `811fd3d14a9207f07fac6e5985d7b9af02f25544`. Repetido o mesmo procedimento de três navegações aquecidas:
+
+| Tela | Navegação após (ms) | Conteúdo visível após (ms) | Comparação das medianas |
+| --- | --- | --- | --- |
+| Painel inicial | 2933, 4720, 2951 | 5991, 7350, 5332 | navegação 3246 → 2951 ms (**9% menor**); mural 5771 → 5991 ms (**4% maior**) |
+| Pedidos | 2978, 2880, 2926 | 5271, 5280, 5427 | navegação 3359 → 2926 ms (**13% menor**); “Meus pedidos” 6207 → 5280 ms (**15% menor**) |
+| Visitantes | 2851, 3580, 3345 | 2887, 3609, 3379 | navegação 3682 → 3345 ms (**9% menor**); conteúdo 3859 → 3379 ms (**12% menor**) |
+
+O modo **Atendimento** abriu após Pedidos, exibiu as contagens e a fila existentes; nenhuma escrita de dados foi feita no teste. A amostra é pequena e houve um valor atípico no painel (7350 ms). Portanto, o ganho em Pedidos e Visitantes é um sinal útil, não uma garantia de latência futura. O painel inicial **não** ficou mais rápido até o mural terminar; essa parte continua dependendo de leituras client-side não modificadas nesta rodada. Falta telemetria contínua para atribuir tempo individual às consultas, hidratação e imagens em produção.
