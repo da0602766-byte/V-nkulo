@@ -25,4 +25,4 @@ Esta cópia ainda não melhora a fluidez das telas: leitura e escrita do cadastr
 
 ## Estado da cópia de produção
 
-Aguardando confirmação do proprietário para transmitir nomes e e-mails dos 16 perfis ao projeto Supabase. Até a confirmação, nenhum perfil foi copiado; a fundação e o catálogo de comunidades permanecem intactos.
+Após confirmação expressa do proprietário, os 16 perfis foram copiados. A comparação protegida retornou D1 16, Supabase 16, iguais 16, pendentes 0. Consulta SQL independente confirmou 16 ativos, 0 vinculados a Supabase Auth, 0 vínculos e 1 execução bem-sucedida. O D1, as senhas e as sessões seguem inalterados.
