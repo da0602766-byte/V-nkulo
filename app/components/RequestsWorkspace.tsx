@@ -160,29 +160,38 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
   const load = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
     setError("");
-    try {
-      const [requestsResponse, centralResponse] = await Promise.all([
-        fetch("/api/pilot/solicitacoes", { cache: "no-store" }),
-        fetch("/api/pilot/solicitacoes/central", { cache: "no-store" }),
-      ]);
-      const requestsPayload = await requestsResponse.json() as { solicitacoes?: CommunityRequest[]; nextCursor?: string | null; canManage?: boolean; audienceOptions?: AudienceOptions; metrics?: typeof EMPTY_REQUESTS_METRICS; error?: string };
-      const centralPayload = await centralResponse.json() as CentralData & { itemsNextCursor?: string | null; error?: string };
-      if (!requestsResponse.ok) throw new Error(requestsPayload.error || "Não foi possível carregar os pedidos. Tente novamente.");
-      if (!centralResponse.ok) throw new Error(centralPayload.error || "Não foi possível carregar os pedidos. Tente novamente.");
-      setItems(requestsPayload.solicitacoes || []);
-      setRequestsCursor(requestsPayload.nextCursor || null);
-      setCanManage(Boolean(requestsPayload.canManage));
-      setAudienceOptions(requestsPayload.audienceOptions || { usuarios: [], ministerios: [], papeis: [], allowAllMembers: false });
-      setRequestsMetrics(requestsPayload.metrics || EMPTY_REQUESTS_METRICS);
-      setCentral(centralPayload);
-      setCentralItemsCursor(centralPayload.itemsNextCursor || null);
-      setRepositoryMinistries((current) => {
-        const next = { ...current };
-        for (const repository of centralPayload.repositories || []) if (repository.ministerio_id && !next[repository.id]) next[repository.id] = String(repository.ministerio_id);
-        return next;
-      });
-    } catch (caught) { setError((caught as Error).message); }
-    finally { if (!quiet) setLoading(false); }
+    // As duas leituras continuam paralelas, mas o espaço do membro não precisa
+    // esperar a Central operacional (fila, métricas e responsáveis) para abrir.
+    // Cada tarefa trata a própria falha; Promise.all ainda mantém a semântica
+    // de aguardar ambas nos recarregamentos após uma alteração.
+    const requestsTask = (async () => {
+      try {
+        const requestsResponse = await fetch("/api/pilot/solicitacoes", { cache: "no-store" });
+        const requestsPayload = await requestsResponse.json() as { solicitacoes?: CommunityRequest[]; nextCursor?: string | null; canManage?: boolean; audienceOptions?: AudienceOptions; metrics?: typeof EMPTY_REQUESTS_METRICS; error?: string };
+        if (!requestsResponse.ok) throw new Error(requestsPayload.error || "Não foi possível carregar os pedidos. Tente novamente.");
+        setItems(requestsPayload.solicitacoes || []);
+        setRequestsCursor(requestsPayload.nextCursor || null);
+        setCanManage(Boolean(requestsPayload.canManage));
+        setAudienceOptions(requestsPayload.audienceOptions || { usuarios: [], ministerios: [], papeis: [], allowAllMembers: false });
+        setRequestsMetrics(requestsPayload.metrics || EMPTY_REQUESTS_METRICS);
+      } catch (caught) { setError((caught as Error).message); }
+      finally { if (!quiet) setLoading(false); }
+    })();
+    const centralTask = (async () => {
+      try {
+        const centralResponse = await fetch("/api/pilot/solicitacoes/central", { cache: "no-store" });
+        const centralPayload = await centralResponse.json() as CentralData & { itemsNextCursor?: string | null; error?: string };
+        if (!centralResponse.ok) throw new Error(centralPayload.error || "Não foi possível carregar a Central de atendimento. Tente novamente.");
+        setCentral(centralPayload);
+        setCentralItemsCursor(centralPayload.itemsNextCursor || null);
+        setRepositoryMinistries((current) => {
+          const next = { ...current };
+          for (const repository of centralPayload.repositories || []) if (repository.ministerio_id && !next[repository.id]) next[repository.id] = String(repository.ministerio_id);
+          return next;
+        });
+      } catch (caught) { setError((caught as Error).message); }
+    })();
+    await Promise.all([requestsTask, centralTask]);
   }, []);
 
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
