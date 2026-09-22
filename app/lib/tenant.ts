@@ -193,24 +193,21 @@ export async function getActiveTenantContext(
     for (const permission of membership.customPermissions) {
       if (!permissions.includes(permission)) permissions.push(permission);
     }
-    const diaconiaPermissions = await getDiaconiaPermissions(
-      user.id,
-      membership.comunidadeId,
-    );
+    // As quatro consultas são somente leitura e dependem do mesmo par
+    // usuário/comunidade, nunca do resultado umas das outras. Mantemos a
+    // aplicação das permissões na ordem anterior depois da leitura paralela.
+    const [diaconiaPermissions, networkPermissions, parkingAssignment, parkingLeaderPermissions] = await Promise.all([
+      getDiaconiaPermissions(user.id, membership.comunidadeId),
+      getNetworkPermissions(user.id, membership.comunidadeId),
+      getActiveParkingAssignment(user.id, membership.comunidadeId),
+      getParkingLeaderPermissions(user.id, membership.comunidadeId),
+    ]);
     for (const permission of diaconiaPermissions) {
       if (!permissions.includes(permission)) permissions.push(permission);
     }
-    const networkPermissions = await getNetworkPermissions(
-      user.id,
-      membership.comunidadeId,
-    );
     for (const permission of networkPermissions) {
       if (!permissions.includes(permission)) permissions.push(permission);
     }
-    const parkingAssignment = await getActiveParkingAssignment(
-      user.id,
-      membership.comunidadeId,
-    );
     if (parkingAssignment) {
       for (const permission of [
         "parking.view",
@@ -226,10 +223,6 @@ export async function getActiveTenantContext(
     // voluntário com papel LIDER) tem acesso permanente à Gestão, sem
     // depender de uma escala ativa. Auxiliares comuns continuam dependendo
     // da escala confirmada acima.
-    const parkingLeaderPermissions = await getParkingLeaderPermissions(
-      user.id,
-      membership.comunidadeId,
-    );
     for (const permission of parkingLeaderPermissions) {
       if (!permissions.includes(permission)) permissions.push(permission);
     }

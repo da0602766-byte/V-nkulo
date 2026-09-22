@@ -82,17 +82,13 @@ export async function previewMemberships(sourceInput?: MembershipItem[]): Promis
   const source = sourceInput ?? await loadSourceMemberships();
   const [profiles, tenants] = await Promise.all([previewProfiles(), previewTenantCatalog()]);
   if (!profiles.ready || !tenants.ready) throw new MembershipCatalogError("Sincronize primeiro todos os perfis e comunidades antes dos vínculos.", 409);
-  const destination = await rpc<MembershipItem[]>("vinkulo_membership_snapshot", {});
-  if (!Array.isArray(destination) || destination.length > 1000) throw new MembershipCatalogError("O Supabase devolveu uma lista de vínculos incompatível.");
+  const destination = await loadDestinationMemberships();
   const sourceById = new Map(source.map(item => [item.legacy_d1_id, item]));
   const destinationById = new Map(destination.map(item => [Number(item.legacy_d1_id), item]));
   if (destinationById.size !== destination.length) throw new MembershipCatalogError("Há IDs de vínculos duplicados no destino.");
   const matchedCount = source.filter(item => {
     const remote = destinationById.get(item.legacy_d1_id);
-    return remote && Number(remote.legacy_user_id) === item.legacy_user_id
-      && Number(remote.legacy_tenant_id) === item.legacy_tenant_id
-      && remote.role === item.role && remote.status === item.status
-      && normalizeTimestamp(remote.created_at) === item.created_at;
+    return remote && sameMembership(item, remote);
   }).length;
   const extraDestinationCount = destination.filter(item => !sourceById.has(Number(item.legacy_d1_id))).length;
   return { sourceCount: source.length, destinationCount: destination.length, matchedCount,
@@ -100,6 +96,21 @@ export async function previewMemberships(sourceInput?: MembershipItem[]): Promis
     activeCount: source.filter(item => item.status === "ATIVO").length,
     removedCount: source.filter(item => item.status === "REMOVIDO").length,
     ready: matchedCount === source.length && extraDestinationCount === 0 };
+}
+
+export async function loadDestinationMemberships(): Promise<MembershipItem[]> {
+  const destination = await rpc<MembershipItem[]>("vinkulo_membership_snapshot", {});
+  if (!Array.isArray(destination) || destination.length > 1000) throw new MembershipCatalogError("O Supabase devolveu uma lista de vínculos incompatível.");
+  return destination;
+}
+
+export function sameMembership(source: MembershipItem, remote: MembershipItem): boolean {
+  const remoteCreatedAt = Date.parse(remote.created_at);
+  return Number(remote.legacy_d1_id) === source.legacy_d1_id
+    && Number(remote.legacy_user_id) === source.legacy_user_id
+    && Number(remote.legacy_tenant_id) === source.legacy_tenant_id
+    && remote.role === source.role && remote.status === source.status
+    && Number.isFinite(remoteCreatedAt) && remoteCreatedAt === Date.parse(source.created_at);
 }
 
 export async function syncMemberships(source: MembershipItem[], actorId: number) {

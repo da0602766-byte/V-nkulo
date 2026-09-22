@@ -6,6 +6,7 @@ import SupabaseTenantFoundation from "./SupabaseTenantFoundation";
 import SupabaseTenantCatalog from "./SupabaseTenantCatalog";
 import SupabaseProfileCatalog from "./SupabaseProfileCatalog";
 import SupabaseMembershipCatalog from "./SupabaseMembershipCatalog";
+import SupabaseReadBenchmark from "./SupabaseReadBenchmark";
 
 type Audit = { id: number; evento: string; resultado: string; criado_em: string; usuario_nome?: string };
 type ConnectionState = { ativa?: boolean; lastCheck?: { ok: boolean; checkedAt: string } | null } | null;
@@ -47,6 +48,7 @@ export default function OwnerPublicationWorkspace() {
     <SupabaseTenantCatalog />
     <SupabaseProfileCatalog />
     <SupabaseMembershipCatalog />
+    <SupabaseReadBenchmark />
     <footer className="publication-panel" aria-busy={loading}>
       <h3>Auditoria de publicação e integrações</h3>
       <div aria-live="polite">
