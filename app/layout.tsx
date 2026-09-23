@@ -12,6 +12,7 @@ import "./recepcao.css";
 import "./landing-vinkulo.css";
 import "./mobile-quick-actions.css";
 import "./ministry-desktop.css";
+import "./owner-workspace.css";
 import SmartScrollHeader from "./components/SmartScrollHeader";
 import MobileAppInstall from "./components/MobileAppInstall";
 import GlobalFeedbackLauncher from "./components/GlobalFeedbackLauncher";

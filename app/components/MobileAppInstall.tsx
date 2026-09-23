@@ -66,7 +66,9 @@ export default function MobileAppInstall() {
     // aplicativo já instalado. No iOS, onde esse evento não existe, mostramos
     // as instruções apenas no Safari móvel e fora do modo standalone.
     if ("serviceWorker" in navigator) {
-      void navigator.serviceWorker.register("/sw.js", { scope: "/" });
+      void navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" })
+        .then((registration) => registration.update())
+        .catch((error: unknown) => console.warn("Não foi possível atualizar o modo offline.", error));
     }
 
     return () => {

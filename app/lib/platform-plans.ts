@@ -24,25 +24,39 @@ function text(value: unknown, maximum: number) {
 }
 
 export function parseLandingPlans(value: unknown): LandingPlan[] {
-  if (!Array.isArray(value) || value.length !== DEFAULT_LANDING_PLANS.length) return DEFAULT_LANDING_PLANS;
-  return DEFAULT_LANDING_PLANS.map((fallback, index) => {
-    const source = value[index];
-    if (!source || typeof source !== "object" || Array.isArray(source)) return fallback;
+  return parseConfiguredLandingPlans(value) ?? DEFAULT_LANDING_PLANS;
+}
+
+// Administrative reads and writes must never invent commercial values.
+export function parseConfiguredLandingPlans(value: unknown): LandingPlan[] | null {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 12) return null;
+  if (value.some((source) => !source || typeof source !== "object" || Array.isArray(source)
+    || typeof source.name !== "string" || !source.name.trim()
+    || typeof source.price !== "string" || !source.price.trim()
+    || typeof source.cta !== "string" || !source.cta.trim()
+    || !Array.isArray(source.items))) return null;
+  return value.map((source) => {
     const item = source as Record<string, unknown>;
-    const items = Array.isArray(item.items)
-      ? item.items.map((entry) => text(entry, 100)).filter(Boolean).slice(1, 8)
-      : fallback.items;
+    const items = (item.items as unknown[]).map((entry) => text(entry, 100)).filter(Boolean).slice(0, 8);
     return {
-      name: text(item.name, 50) || fallback.name,
-      price: text(item.price, 50) || fallback.price,
+      name: text(item.name, 50),
+      price: text(item.price, 50),
       period: text(item.period, 20),
-      description: text(item.description, 180) || fallback.description,
-      items: items.length ? items : fallback.items,
-      cta: text(item.cta, 70) || fallback.cta,
+      description: text(item.description, 180),
+      items,
+      cta: text(item.cta, 70),
       featured: Boolean(item.featured),
       contact: Boolean(item.contact),
     };
   });
+}
+
+export async function getConfiguredLandingPlans() {
+  const row = await getD1().prepare("SELECT valor FROM configuracoes WHERE chave = ? LIMIT 1").bind(CONFIG_KEY).first<{ valor: string }>();
+  if (!row) return [];
+  const plans = parseConfiguredLandingPlans(JSON.parse(row.valor));
+  if (!plans) throw new Error("Configuração de planos inválida.");
+  return plans;
 }
 
 export async function getLandingPlans() {

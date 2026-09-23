@@ -1,5 +1,6 @@
-const CACHE = "vinkulo-shell-v4";
-const RUNTIME_CACHE = "vinkulo-static-v4";
+const CACHE = "vinkulo-shell-v5";
+const RUNTIME_CACHE = "vinkulo-static-v5";
+const IS_LOCAL_PREVIEW = ["localhost", "127.0.0.1", "[::1]"].includes(self.location.hostname);
 const APP_SHELL = ["/", "/offline.html", "/manifest.webmanifest", "/vinkulo-app-icon-192.png", "/vinkulo-app-icon-512.png"];
 
 self.addEventListener("install", (event) => {
@@ -9,7 +10,7 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((key) => ![CACHE, RUNTIME_CACHE].includes(key)).map((key) => caches.delete(key)))),
+    caches.keys().then((keys) => Promise.all(keys.filter((key) => /^vinkulo-(shell|static)-/.test(key) && ![CACHE, RUNTIME_CACHE].includes(key)).map((key) => caches.delete(key)))),
   );
   self.clients.claim();
 });
@@ -22,6 +23,10 @@ self.addEventListener("fetch", (event) => {
     return;
   }
   if (request.method !== "GET" || url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
+
+  // Vite serves changing modules at stable URLs. Never mix a cached stylesheet
+  // with a fresh component tree. Local media above still works offline.
+  if (IS_LOCAL_PREVIEW) return;
 
   if (request.mode === "navigate") {
     event.respondWith(fetch(request).catch(() => caches.match("/offline.html")));
@@ -36,7 +41,9 @@ self.addEventListener("fetch", (event) => {
           if (response.ok && response.type === "basic") void cache.put(request, response.clone());
           return response;
         }).catch(() => cached);
-        return cached || fresh;
+        // HTML and unversioned code must agree after a deployment. Keep the
+        // cached copy only as an offline fallback for scripts and styles.
+        return ["script", "style"].includes(request.destination) ? fresh : cached || fresh;
       }),
     );
   }

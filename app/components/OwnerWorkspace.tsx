@@ -422,6 +422,7 @@ export default function OwnerWorkspace({
     setDirectoryPage(0);
     setMobileNavOpen(false);
     setGlobalSearch("");
+    window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "instant" }));
   }
 
   function toggleMobileNavigation() {
@@ -456,7 +457,7 @@ export default function OwnerWorkspace({
           <Link href="/painel?view=conta" className="owner-sidebar-profile"><OwnerAvatar image={ownerPhoto} name={ownerName} /><span><VerifiedOwnerName name={ownerName} verified /><small>Proprietário global</small></span></Link>
         </aside>
         <div className="owner-main-v4">
-          <header className="owner-topbar" data-editor-key="cabecalho-proprietario" data-smart-scroll-header>
+          <header className="owner-topbar" data-editor-key="cabecalho-proprietario">
             <button className="owner-mobile-menu" type="button" aria-label="Abrir menu" aria-expanded={mobileNavOpen} onClick={toggleMobileNavigation}>☰</button>
             <Link href="/" className="owner-brand owner-brand-mobile"><span><OwnerImage src={brandLogo} fallback={brandName.slice(0, 1)} /></span></Link>
             <div className="owner-breadcrumb"><small>ADMINISTRAÇÃO GLOBAL</small><strong>{activeSection.label} <span>/</span> {tabLabel(tab)}</strong></div>
@@ -587,7 +588,7 @@ export default function OwnerWorkspace({
         </div>
       </div>
       <nav className="owner-mobile-nav" aria-label="Navegação rápida do proprietário">
-        {["overview", "requests", "communities", "audit"].map((id) => { const item = TABS.find((candidate) => candidate.id === id)!; const mobileLabel = { overview: "Início", requests: "Pedidos", communities: "Comunidades", audit: "Auditoria" }[id]; return <button type="button" key={id} className={tab === id ? "active" : ""} onClick={() => selectTab(id as OwnerTab)}><span>{item.icon}</span>{mobileLabel}{id === "requests" && pending.length > 0 ? <b>{pending.length}</b> : null}</button>; })}
+        {["overview", "requests", "communities", "audit"].map((id) => { const item = TABS.find((candidate) => candidate.id === id)!; const mobileLabel = { overview: "Início", requests: "Pedidos", communities: "Rede", audit: "Auditoria" }[id]; return <button type="button" key={id} className={tab === id ? "active" : ""} onClick={() => selectTab(id as OwnerTab)}><span>{item.icon}</span>{mobileLabel}{id === "requests" && pending.length > 0 ? <b>{pending.length}</b> : null}</button>; })}
         <button type="button" className={mobileNavOpen ? "active" : ""} onClick={toggleMobileNavigation}><span>☷</span>Mais</button>
       </nav>
       <GlobalVisualEditor canEdit communityName="Área do Proprietário" screenId={`owner:${tab}`} rootSelector=".owner-area" />
@@ -902,13 +903,13 @@ function tabDescription(tab: OwnerTab) {
     appearance: "Aplique paleta, logotipo, banner e papel de parede a uma comunidade ou a todas de uma vez.",
     plans: "Defina os planos e chamadas comerciais da prévia exclusiva do proprietário.",
     laboratory: "Crie e valide protótipos isolados, sem modificar páginas ou dados reais.",
-    passwords: "Acompanhe redefinições com links de uso único e prazo curto.",
-    deleted: "Consulte contas anonimizadas e restaure somente dentro do prazo.",
-    finance: "Acompanhe cobranças administrativas, vencimentos e renovações.",
-    realtime: "Monitore presença e atividade agregada sem expor conteúdo.",
+    passwords: "Consulte os eventos de credenciais disponíveis na auditoria.",
+    deleted: "Confira cadastros inativos e eventos de desativação disponíveis.",
+    finance: "Confira a disponibilidade da integração financeira.",
+    realtime: "Consulte o último retrato administrativo disponível.",
     performance: "Investigue falhas, incidentes e lacunas de observabilidade.",
-    publication: "Aprove e acompanhe cada etapa antes de liberar uma versão.",
-    incidents: "Priorize ocorrências, acompanhe impacto e registre resoluções.",
+    publication: "Consulte eventos de publicação registrados na auditoria.",
+    incidents: "Investigue os resultados com falha na auditoria disponível.",
     controls: "Configure identidade, módulos e regras globais da plataforma.",
   }[tab];
 }
