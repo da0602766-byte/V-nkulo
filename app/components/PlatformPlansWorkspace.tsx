@@ -1,33 +1,61 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { DEFAULT_LANDING_PLANS, type LandingPlan } from "../lib/platform-plans";
+import type { LandingPlan } from "../lib/platform-plans";
 
 export default function PlatformPlansWorkspace() {
-  const [plans, setPlans] = useState<LandingPlan[]>(DEFAULT_LANDING_PLANS);
+  const [plans, setPlans] = useState<LandingPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+
   useEffect(() => {
     fetch("/api/pilot/platform-plans", { cache: "no-store" }).then(async (response) => {
       const result = await response.json() as { plans?: LandingPlan[]; error?: string };
       if (!response.ok) throw new Error(result.error || "Não foi possível carregar os planos.");
-      setPlans(result.plans || DEFAULT_LANDING_PLANS);
+      if (!Array.isArray(result.plans)) throw new Error("A fonte de planos não retornou uma configuração válida.");
+      setPlans(result.plans);
     }).catch((error: Error) => setMessage(error.message)).finally(() => setLoading(false));
   }, []);
+
   function update(index: number, key: keyof LandingPlan, value: string | boolean | string[]) {
     setPlans((current) => current.map((plan, planIndex) => planIndex === index ? { ...plan, [key]: value } : plan));
   }
+
   async function save() {
-    setSaving(true); setMessage("");
+    setSaving(true);
+    setMessage("");
     try {
       const response = await fetch("/api/pilot/platform-plans", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ plans }) });
       const result = await response.json() as { plans?: LandingPlan[]; error?: string };
       if (!response.ok) throw new Error(result.error || "Não foi possível salvar os planos.");
-      setPlans(result.plans || plans); setMessage("Planos publicados na prévia exclusiva do proprietário.");
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Não foi possível salvar os planos."); }
-    finally { setSaving(false); }
+      if (result.plans) setPlans(result.plans);
+      setMessage("Configuração de planos salva com sucesso.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Não foi possível salvar os planos.");
+    } finally {
+      setSaving(false);
+    }
   }
-  if (loading) return <div className="owner-loading">Carregando configuração dos planos…</div>;
-  return <section className="owner-plans-workspace"><header><div><p className="pilot-kicker">CONFIGURAÇÃO EXCLUSIVA</p><h2>Planos da plataforma</h2><p>Esta área e a prévia dos planos são visíveis somente para você, proprietário do sistema.</p></div><button type="button" onClick={() => void save()} disabled={saving}>{saving ? "Salvando…" : "Salvar planos"}</button></header>{message && <p className="operations-feedback" role="status">{message}</p>}<div>{plans.map((plan, index) => <article key={`${plan.name}-${index}`}><header><strong>Plano {index + 1}</strong><label><input type="checkbox" checked={Boolean(plan.featured)} onChange={(event) => update(index, "featured", event.target.checked)} /> Destacar como popular</label></header><div className="owner-plans-grid"><label>Nome<input value={plan.name} maxLength={50} onChange={(event) => update(index, "name", event.target.value)} /></label><label>Preço<input value={plan.price} maxLength={50} onChange={(event) => update(index, "price", event.target.value)} /></label><label>Período<input value={plan.period || ""} maxLength={20} placeholder="/mês" onChange={(event) => update(index, "period", event.target.value)} /></label><label className="wide">Descrição<textarea value={plan.description} maxLength={180} rows={2} onChange={(event) => update(index, "description", event.target.value)} /></label><label className="wide">Itens (um por linha)<textarea value={plan.items.join("\n")} maxLength={800} rows={5} onChange={(event) => update(index, "items", event.target.value.split("\n").filter(Boolean))} /></label><label className="wide">Chamada do botão<input value={plan.cta} maxLength={70} onChange={(event) => update(index, "cta", event.target.value)} /></label></div></article>)}</div></section>;
+
+  if (loading) return <div className="owner-loading">Carregando configuração real dos planos…</div>;
+  if (!plans.length) return <section className="owner-plans-workspace"><header className="owner-plans-hero"><div><p className="pilot-kicker">CONFIGURAÇÃO COMERCIAL</p><p>Edite apenas o conteúdo que será apresentado na página pública.</p></div></header><div className="owner-plans-empty"><span aria-hidden="true">◇</span><strong>Planos indisponíveis</strong><p>{message || "A fonte atual não retornou planos para edição."}</p></div></section>;
+
+  return <section className="owner-plans-workspace">
+    <header className="owner-plans-hero"><div><p className="pilot-kicker">CONFIGURAÇÃO COMERCIAL</p><p>Edite a configuração carregada da fonte oficial. As alterações só entram em vigor após salvar.</p></div><button type="button" onClick={() => void save()} disabled={saving}>{saving ? "Salvando…" : "Salvar alterações"}</button></header>
+    <div className="owner-plans-source"><span aria-hidden="true">i</span><p>Os campos abaixo vieram de <strong>/api/pilot/platform-plans</strong>. Nenhum preço, benefício ou condição é calculado nesta tela.</p></div>
+    {message && <p className="operations-feedback" role="status">{message}</p>}
+    <div className="owner-plans-list">{plans.map((plan, index) => <article className="owner-plan-card" key={`plan-${index}`}>
+      <header><div><small>PLANO {String(index + 1).padStart(2, "0")}</small><h3>{plan.name || "Sem nome"}</h3></div><label className="owner-plan-toggle"><input type="checkbox" checked={Boolean(plan.featured)} onChange={(event) => update(index, "featured", event.target.checked)} /><span />Destacar na página</label></header>
+      <div className="owner-plans-grid">
+        <label>Nome do plano<input value={plan.name} maxLength={50} onChange={(event) => update(index, "name", event.target.value)} /></label>
+        <label>Preço exibido<input value={plan.price} maxLength={50} onChange={(event) => update(index, "price", event.target.value)} /></label>
+        <label>Período<input value={plan.period || ""} maxLength={20} placeholder="Ex.: /mês" onChange={(event) => update(index, "period", event.target.value)} /></label>
+        <label className="wide">Descrição<textarea value={plan.description} maxLength={180} rows={3} onChange={(event) => update(index, "description", event.target.value)} /></label>
+        <label className="wide">Benefícios <small>Um item por linha</small><textarea value={plan.items.join("\n")} maxLength={800} rows={6} onChange={(event) => update(index, "items", event.target.value.split("\n").map((item) => item.trim()).filter(Boolean))} /></label>
+        <label className="wide">Texto do botão<input value={plan.cta} maxLength={70} onChange={(event) => update(index, "cta", event.target.value)} /></label>
+      </div>
+    </article>)}</div>
+    <div className="owner-plans-savebar"><span>{plans.length} {plans.length === 1 ? "plano carregado" : "planos carregados"}</span><button type="button" onClick={() => void save()} disabled={saving}>{saving ? "Salvando…" : "Salvar alterações"}</button></div>
+  </section>;
 }

@@ -510,7 +510,7 @@ export default function OwnerWorkspace({
 
           {tab === "overview" && data && <OwnerOverviewV3 data={data} pending={pending} pendingFeedback={pendingFeedback} ownerName={ownerName} brandName={brandName} gridPreset={gridPreset} metricOrder={metricOrder} draggingMetric={draggingMetric} onSelectTab={selectTab} onOpenCommunity={openCommunity} onSaveLayout={saveOwnerLayout} onDragStart={setDraggingMetric} onDragEnd={() => setDraggingMetric(null)} onDropMetric={reorderMetric} onMoveMetric={moveMetric} />}
           {tab === "laboratory" && <OwnerLaboratoryWorkspace />}
-          {(["passwords", "deleted", "finance", "realtime", "performance", "publication", "incidents"] as OwnerOperationsScreen[]).includes(tab as OwnerOperationsScreen) && <OwnerOperationsWorkspace screen={tab as OwnerOperationsScreen} />}
+          {data && (["passwords", "deleted", "finance", "realtime", "performance", "publication", "incidents"] as OwnerOperationsScreen[]).includes(tab as OwnerOperationsScreen) && <OwnerOperationsWorkspace screen={tab as OwnerOperationsScreen} data={data} />}
 
           {tab === "requests" && data && (
             <section className="owner-request-board">
@@ -602,7 +602,7 @@ export default function OwnerWorkspace({
         </section>
       </div>
       <nav className="owner-mobile-nav" aria-label="Navegação rápida do proprietário">
-        {["overview", "requests", "communities", "audit"].map((id) => { const item = TABS.find((candidate) => candidate.id === id)!; return <button type="button" key={id} className={tab === id ? "active" : ""} onClick={() => selectTab(id as OwnerTab)}><span>{item.icon}</span>{item.label.replace("Segurança e ", "")}{id === "requests" && pending.length > 0 ? <b>{pending.length}</b> : null}</button>; })}
+        {["overview", "requests", "communities", "audit"].map((id) => { const item = TABS.find((candidate) => candidate.id === id)!; const mobileLabel = { overview: "Início", requests: "Pedidos", communities: "Comunidades", audit: "Auditoria" }[id]; return <button type="button" key={id} className={tab === id ? "active" : ""} onClick={() => selectTab(id as OwnerTab)}><span>{item.icon}</span>{mobileLabel}{id === "requests" && pending.length > 0 ? <b>{pending.length}</b> : null}</button>; })}
         <button type="button" className={mobileNavOpen ? "active" : ""} onClick={toggleMobileNavigation}><span>☷</span>Mais</button>
       </nav>
       <GlobalVisualEditor canEdit communityName="Área do Proprietário" screenId={`owner:${tab}`} rootSelector=".owner-area" />

@@ -2,110 +2,129 @@
 
 import { useMemo, useState } from "react";
 
-export type OwnerOperationsScreen =
-  | "passwords"
-  | "deleted"
-  | "finance"
-  | "realtime"
-  | "performance"
-  | "publication"
-  | "incidents";
+export type OwnerOperationsScreen = "passwords" | "deleted" | "finance" | "realtime" | "performance" | "publication" | "incidents";
 
-const communityNames = ["Comunidade Aurora", "Vila Esperança", "São Miguel", "Caminho Vivo"];
+export type OwnerOperationsData = {
+  metrics: Record<string, number>;
+  communities: Record<string, unknown>[];
+  users: Record<string, unknown>[];
+  audit: Record<string, unknown>[];
+  requests: Record<string, unknown>[];
+  feedback: Record<string, unknown>[];
+  auditRetention?: { days: number; visibleLimit: number };
+};
 
-const passwordRows = [
-  { id: 1, solicitante: "Marina Costa", comunidade: communityNames[0], solicitado: "13/09/2026 08:42", status: "EM_ANALISE", expira: "—", tentativas: 1, analisado: "Você" },
-  { id: 2, solicitante: "Rafael Lima", comunidade: communityNames[1], solicitado: "12/09/2026 17:10", status: "LINK_ENVIADO", expira: "13/09 · 17:40", tentativas: 2, analisado: "Ana Souza" },
-  { id: 3, solicitante: "Bianca Alves", comunidade: communityNames[2], solicitado: "12/09/2026 11:06", status: "CONCLUIDO", expira: "—", tentativas: 1, analisado: "Você" },
-];
+const SCREEN_COPY: Record<OwnerOperationsScreen, { eyebrow: string; title: string; description: string }> = {
+  passwords: { eyebrow: "ACESSO SEGURO", title: "Redefinições de senha", description: "Consulte os eventos de segurança registrados pela plataforma, sem expor credenciais." },
+  deleted: { eyebrow: "CICLO DE VIDA", title: "Contas excluídas", description: "Veja contas inativas e eventos de desativação que existem na fonte atual." },
+  finance: { eyebrow: "CONTROLE FINANCEIRO", title: "Financeiro", description: "Acompanhe a disponibilidade da fonte financeira da plataforma." },
+  realtime: { eyebrow: "OBSERVABILIDADE", title: "Tempo real", description: "Diferencie dados atuais de telemetria verdadeiramente contínua." },
+  performance: { eyebrow: "SAÚDE DA PLATAFORMA", title: "Desempenho", description: "Investigue resultados diferentes de sucesso na auditoria disponível." },
+  publication: { eyebrow: "ENTREGA CONTROLADA", title: "Publicação do sistema", description: "Consulte somente os eventos de publicação registrados na auditoria." },
+  incidents: { eyebrow: "RESPOSTA OPERACIONAL", title: "Incidentes", description: "Priorize ocorrências reais derivadas de registros com falha ou negação." },
+};
 
-const deletedRows = [
-  { id: 1, ref: "usr_7f3a91c2", comunidade: communityNames[0], perfil: "MEMBRO", motivo: "Solicitado pela pessoa", origem: "AUTOATENDIMENTO", excluido: "11/09/2026", restauravel: "25/09/2026" },
-  { id: 2, ref: "usr_55bd20a1", comunidade: communityNames[3], perfil: "LÍDER", motivo: "Conta duplicada", origem: "PROPRIETÁRIO", excluido: "03/09/2026", restauravel: "17/09/2026" },
-  { id: 3, ref: "usr_1ca8d441", comunidade: "Sem vínculo", perfil: "MEMBRO", motivo: "Solicitado pela pessoa", origem: "AUTOATENDIMENTO", excluido: "18/08/2026", restauravel: "01/09/2026" },
-];
+const SEARCH_TERMS: Record<"passwords" | "deleted" | "publication", string[]> = {
+  passwords: ["SENHA", "PASSWORD", "REDEFIN", "CREDENCIAL"],
+  deleted: ["EXCLU", "DESATIV", "REMOVID", "PURG"],
+  publication: ["PUBLIC", "DEPLOY", "RELEASE", "BUILD", "VERSAO", "VERSÃO"],
+};
 
-const charges = [
-  { id: 1, comunidade: communityNames[0], plano: "Comunidade Plus", competencia: "Set/2026", valor: 18990, desconto: 0, status: "PENDENTE", vence: "20/09/2026" },
-  { id: 2, comunidade: communityNames[1], plano: "Essencial", competencia: "Set/2026", valor: 9900, desconto: 990, status: "PAGA", vence: "10/09/2026" },
-  { id: 3, comunidade: communityNames[2], plano: "Comunidade Plus", competencia: "Ago/2026", valor: 18990, desconto: 0, status: "VENCIDA", vence: "20/08/2026" },
-  { id: 4, comunidade: communityNames[3], plano: "Essencial", competencia: "Set/2026", valor: 9900, desconto: 0, status: "PENDENTE", vence: "28/09/2026" },
-];
-
-const incidentRows = [
-  { id: 1, gravidade: "CRITICA", titulo: "Falhas intermitentes no login", area: "Autenticação", ocorrencias: 4, comunidades: 7, ultima: "13/09 · 09:18", status: "EM_TRATAMENTO", descricao: "Aumento de recusas após a rotação do token de sessão.", historico: ["09:18 · token expirado", "08:57 · pico de recusas", "08:41 · primeiro alerta"] },
-  { id: 2, gravidade: "ALTA", titulo: "Fila de notificações atrasada", area: "Notificações", ocorrencias: 2, comunidades: 3, ultima: "12/09 · 18:24", status: "ABERTO", descricao: "Entrega acima do limite de 90 segundos para parte dos dispositivos.", historico: ["18:24 · atraso detectado", "17:59 · fila cresceu"] },
-  { id: 3, gravidade: "MEDIA", titulo: "Imagem de perfil rejeitada", area: "Armazenamento", ocorrencias: 1, comunidades: 1, ultima: "12/09 · 14:02", status: "RESOLVIDO", descricao: "Formato HEIC não era aceito no fluxo de prévia.", historico: ["14:02 · correção aplicada"] },
-];
-
-const publishStages = [
-  ["COMMIT", "sucesso", "18s"], ["VALIDACAO", "sucesso", "42s"], ["BUILD", "sucesso", "1m 12s"], ["TESTES", "sucesso", "2m 08s"], ["PREVIA", "sucesso", "36s"], ["APROVACAO", "critica", "aguardando"], ["PUBLICACAO", "pendente", "—"], ["HEALTH_CHECK", "pendente", "—"], ["CONCLUIDO", "pendente", "—"],
-] as const;
-
-function money(cents: number) { return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100); }
-function statusLabel(status: string) { return status.replaceAll("_", " "); }
-function Status({ value, tone = "neutral" }: { value: string; tone?: string }) { return <span className={`ops-status ${tone}`}>{statusLabel(value)}</span>; }
-function toneFor(value: string) { return ["PAGA", "CONCLUIDO", "RESOLVIDO", "SUCESSO"].includes(value) ? "success" : ["VENCIDA", "CRITICA", "ERRO", "NEGADO"].includes(value) ? "danger" : ["PENDENTE", "ABERTO", "ALTA"].includes(value) ? "warning" : "info"; }
-function Section({ eyebrow, title, text, children }: { eyebrow: string; title: string; text: string; children?: React.ReactNode }) { return <section className="ops-section"><header className="ops-section-heading"><div><p className="pilot-kicker">{eyebrow}</p><h2>{title}</h2><p>{text}</p></div>{children}</header></section>; }
-function Metrics({ items }: { items: Array<[string, string, string?]> }) { return <div className="ops-metrics">{items.map(([label, value, detail]) => <article key={label}><small>{label}</small><strong>{value}</strong>{detail && <p>{detail}</p>}</article>)}</div>; }
-function Chart({ values, second, labels = ["Abr", "Mai", "Jun", "Jul", "Ago", "Set"] }: { values: number[]; second?: number[]; labels?: string[] }) {
-  const width = 680; const height = 180; const all = second ? [...values, ...second] : values; const max = Math.max(...all, 1); const points = (series: number[]) => series.map((value, index) => `${(index / Math.max(series.length - 1, 1)) * width},${height - (value / max) * (height - 22) - 8}`).join(" ");
-  return <div className="ops-chart"><svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Gráfico de tendência"><polyline className="ops-chart-area" points={`0,${height} ${points(values)} ${width},${height}`} /><polyline className="ops-chart-line" points={points(values)} />{second && <polyline className="ops-chart-line ops-chart-line-second" points={points(second)} />}</svg><div className="ops-chart-labels">{labels.map((label) => <span key={label}>{label}</span>)}</div></div>;
-}
-function TableNote({ children }: { children: React.ReactNode }) { return <p className="ops-table-note">{children}</p>; }
-
-export default function OwnerOperationsWorkspace({ screen }: { screen: OwnerOperationsScreen }) {
-  if (screen === "passwords") return <PasswordWorkspace />;
-  if (screen === "deleted") return <DeletedWorkspace />;
-  if (screen === "finance") return <FinanceWorkspace />;
-  if (screen === "realtime") return <RealtimeWorkspace />;
-  if (screen === "performance") return <PerformanceWorkspace />;
-  if (screen === "publication") return <PublicationWorkspace />;
-  return <IncidentWorkspace />;
+function read(row: Record<string, unknown>, key: string, fallback = "—") {
+  const current = row[key];
+  return current === null || current === undefined || String(current).trim() === "" ? fallback : String(current);
 }
 
-function PasswordWorkspace() {
-  const [rows, setRows] = useState(passwordRows);
-  const [link, setLink] = useState("");
-  return <div className="ops-stack"><Section eyebrow="ACESSO SEGURO" title="Redefinições de senha" text="Acompanhe cada solicitação sem expor credenciais ou links permanentes."><Status value="atualizado agora" tone="success" /></Section><div className="ops-stepper">{["Solicitado", "Em análise", "Aprovado / recusado", "Link enviado", "Concluído / expirado"].map((label, index) => <div className={index < 2 ? "done" : index === 2 ? "current" : ""} key={label}><b>{index + 1}</b><span>{label}</span></div>)}</div>{link && <div className="ops-alert success"><strong>Link gerado uma única vez</strong><span>{link}</span><small>Este link expira em 30 minutos. Copie-o agora e não o reutilize.</small></div>}<section className="ops-panel"><div className="ops-panel-title"><div><h3>Fila de solicitações</h3><p>As ações ficam registradas na auditoria do sistema.</p></div></div><div className="ops-table-wrap"><table className="ops-table"><thead><tr><th>Solicitante</th><th>Comunidade</th><th>Solicitado em</th><th>Status</th><th>Expira em</th><th>Tentativas</th><th>Analisado por</th><th /></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td data-label="Solicitante"><strong>{row.solicitante}</strong></td><td data-label="Comunidade">{row.comunidade}</td><td data-label="Solicitado em">{row.solicitado}</td><td data-label="Status"><Status value={row.status} tone={toneFor(row.status)} /></td><td data-label="Expira em">{row.expira}</td><td data-label="Tentativas">{row.tentativas}</td><td data-label="Analisado por">{row.analisado}</td><td className="ops-actions">{row.status === "EM_ANALISE" && <button type="button" onClick={() => setRows((current) => current.map((item) => item.id === row.id ? { ...item, status: "LINK_ENVIADO", expira: "13/09 · 18:30" } : item))}>Aprovar e gerar</button>}{row.status === "LINK_ENVIADO" && <button type="button" className="secondary" onClick={() => setLink(`https://vinkulo.app/redefinir/${row.id}-8f2a`)}>Ver link uma vez</button>}</td></tr>)}</tbody></table></div><TableNote>Links nunca aparecem novamente depois de visualizados.</TableNote></section></div>;
+function formatDate(input: unknown) {
+  if (!input) return "—";
+  const raw = String(input);
+  const parsed = new Date(raw.replace(" ", "T") + (raw.includes("Z") ? "" : "Z"));
+  if (Number.isNaN(parsed.getTime())) return raw;
+  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(parsed);
 }
 
-function DeletedWorkspace() {
-  const [confirming, setConfirming] = useState<number | null>(null);
-  const [removed, setRemoved] = useState<number[]>([]);
-  const visible = deletedRows.filter((row) => !removed.includes(row.id));
-  return <div className="ops-stack"><Section eyebrow="CICLO DE VIDA" title="Contas excluídas" text="Referências técnicas preservam a privacidade durante o período de restauração." /><Metrics items={[["Total", "27", "últimos 90 dias"], ["Restauráveis", "8", "dentro do prazo legal"]]} /><section className="ops-panel"><div className="ops-panel-title"><div><h3>Registros anonimizados</h3><p>Nunca exibimos nome ou e-mail nesta área.</p></div><Status value="retenção controlada" tone="info" /></div><div className="ops-table-wrap"><table className="ops-table"><thead><tr><th>Referência técnica</th><th>Comunidade</th><th>Perfil</th><th>Motivo</th><th>Origem</th><th>Excluído em</th><th>Restaurável até</th><th /></tr></thead><tbody>{visible.map((row) => <tr key={row.id}><td data-label="Referência"><code>{row.ref}</code></td><td data-label="Comunidade">{row.comunidade}</td><td data-label="Perfil">{row.perfil}</td><td data-label="Motivo">{row.motivo}</td><td data-label="Origem">{row.origem}</td><td data-label="Excluído em">{row.excluido}</td><td data-label="Restaurável até">{row.restauravel}</td><td className="ops-actions">{row.id < 3 && confirming !== row.id && <button type="button" onClick={() => setConfirming(row.id)}>Restaurar</button>}{confirming === row.id && <span className="ops-inline-confirm"><small>Confirmar restauração?</small><button type="button" onClick={() => { setRemoved((current) => [...current, row.id]); setConfirming(null); }}>Sim</button><button type="button" className="secondary" onClick={() => setConfirming(null)}>Não</button></span>}{confirming !== row.id && <button type="button" className="danger" onClick={() => setConfirming(row.id)}>Purgar</button>}</td></tr>)}</tbody></table></div><TableNote>Purgar é definitivo e remove qualquer possibilidade de restauração.</TableNote></section></div>;
+function humanize(input: unknown) {
+  return String(input || "Não informado").replaceAll("_", " ").toLocaleLowerCase("pt-BR").replace(/(^|\s)\p{L}/gu, (letter) => letter.toLocaleUpperCase("pt-BR"));
 }
 
-function FinanceWorkspace() {
-  const [filter, setFilter] = useState("TODOS");
-  const [paid, setPaid] = useState<number[]>([]);
-  const visible = charges.filter((row) => filter === "TODOS" || row.status === filter).filter((row) => !paid.includes(row.id));
-  return <div className="ops-stack"><Section eyebrow="CONTROLE FINANCEIRO" title="Financeiro" text="Cobranças administrativas por comunidade, plano e competência."><Status value="sem gateway conectado" tone="warning" /></Section><Metrics items={[["Receita do período", "R$ 42.680", "paga em setembro"], ["A receber", "R$ 29.790", "3 cobranças pendentes"], ["Vencido", "R$ 18.990", "1 comunidade inadimplente"], ["Inadimplentes", "1", "ação recomendada"]]} /><section className="ops-panel"><div className="ops-panel-title"><div><h3>Cobranças</h3><p>Pagamentos registrados administrativamente — sem gateway conectado.</p></div><label className="ops-select-label">Status<select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="TODOS">Todos</option><option value="PENDENTE">Pendentes</option><option value="PAGA">Pagas</option><option value="VENCIDA">Vencidas</option></select></label></div><div className="ops-table-wrap"><table className="ops-table"><thead><tr><th>Comunidade</th><th>Plano</th><th>Competência</th><th>Valor</th><th>Desconto</th><th>Status</th><th>Vence em</th><th /></tr></thead><tbody>{visible.map((row) => <tr key={row.id}><td data-label="Comunidade"><strong>{row.comunidade}</strong></td><td data-label="Plano">{row.plano}</td><td data-label="Competência">{row.competencia}</td><td data-label="Valor">{money(row.valor)}</td><td data-label="Desconto">{money(row.desconto)}</td><td data-label="Status"><Status value={row.status} tone={toneFor(row.status)} /></td><td data-label="Vence em">{row.vence}</td><td className="ops-actions">{row.status === "PENDENTE" && <button type="button" onClick={() => setPaid((current) => [...current, row.id])}>Marcar paga</button>}{row.status === "VENCIDA" && <button type="button" className="danger" onClick={() => setPaid((current) => [...current, row.id])}>Cancelar / estornar</button>}</td></tr>)}</tbody></table></div></section><section className="ops-panel"><div className="ops-panel-title"><div><h3>Renovações próximas</h3><p>45 dias de visibilidade para planejar a comunicação.</p></div></div><div className="ops-renewals">{[[communityNames[0], "20/09/2026", "Comunidade Plus"], [communityNames[3], "28/09/2026", "Essencial"], [communityNames[1], "10/10/2026", "Essencial"]].map(([name, date, plan]) => <article key={name}><span>↻</span><div><strong>{name}</strong><small>{plan}</small></div><time>{date}</time></article>)}</div></section></div>;
+function isFailure(row: Record<string, unknown>) {
+  return !["SUCESSO", "OK"].includes(read(row, "resultado", "").toUpperCase());
 }
 
-function RealtimeWorkspace() {
-  return <div className="ops-stack"><Section eyebrow="OBSERVABILIDADE" title="Tempo real" text="Presença e atividade agregadas, sem conteúdo de publicações."><span className="ops-live"><i /> AO VIVO · atualiza a cada 30s</span></Section><Metrics items={[["Online agora", "186", "presença ativa"], ["Sessões ativas", "142", "em todos os dispositivos"], ["Pico simultâneo", "231", "últimas 24 horas"], ["Duração média", "18 min", "aproximada"]]} /><div className="ops-chart-grid"><section className="ops-panel"><div className="ops-panel-title"><div><h3>Ativos por hora</h3><p>Janela móvel de 24 horas.</p></div><button type="button" className="secondary">Atualizar</button></div><Chart values={[72, 61, 48, 39, 34, 41, 64, 88, 122, 151, 174, 186, 179, 164, 158, 171, 189, 201, 182, 148, 121, 108, 94, 82]} labels={["00h", "04h", "08h", "12h", "16h", "20h", "24h"]} /></section><section className="ops-panel"><div className="ops-panel-title"><div><h3>Ativos por dia</h3><p>Últimos 14 dias.</p></div></div><Chart values={[113, 129, 121, 144, 151, 138, 164, 172, 158, 181, 176, 192, 186, 186]} labels={["D−13", "D−10", "D−7", "D−4", "Hoje"]} /></section></div><section className="ops-panel"><div className="ops-panel-title"><div><h3>Atividade por comunidade</h3><p>Somente contagem agregada.</p></div></div><div className="ops-community-bars">{[[communityNames[0], 64], [communityNames[1], 47], [communityNames[2], 38], [communityNames[3], 21]].map(([name, count]) => <div key={String(name)}><span><strong>{name}</strong><b>{count}</b></span><i><em style={{ width: `${Number(count) / 64 * 100}%` }} /></i></div>)}</div></section></div>;
+function matchesEvent(row: Record<string, unknown>, terms: string[]) {
+  const event = read(row, "evento", "").toUpperCase();
+  return terms.some((term) => event.includes(term));
 }
 
-function PerformanceWorkspace() {
-  const [period, setPeriod] = useState("30 dias");
-  return <div className="ops-stack"><Section eyebrow="SAÚDE DA PLATAFORMA" title="Desempenho" text="Falhas conhecidas, tendência e incidentes em um mesmo contexto."><label className="ops-select-label">Período<select value={period} onChange={(event) => setPeriod(event.target.value)}>{["7 dias", "14 dias", "30 dias", "90 dias"].map((item) => <option key={item}>{item}</option>)}</select></label></Section><Metrics items={[["Falhas", "23", "−18% vs. período anterior"], ["Taxa de falhas", "0,42%", period], ["Incidentes abertos", "3", "1 crítico"], ["Bloqueados agora", "11", "autenticação"]]} /><section className="ops-panel"><div className="ops-panel-title"><div><h3>Tendência de falhas</h3><p>O ponto em vermelho indica uma anomalia detectada.</p></div></div><Chart values={[18, 22, 14, 19, 11, 13, 8, 9, 12, 7, 6, 5]} labels={["01", "05", "10", "15", "20", "25", "30"]} /><div className="ops-anomaly"><i /> 08/09 · pico de falhas no login após expiração de sessão</div></section><div className="ops-two-col"><section className="ops-panel"><div className="ops-panel-title"><div><h3>Onde as falhas acontecem</h3><p>Eventos com erro ou acesso negado.</p></div></div><div className="ops-list">{[["Login · token expirado", "ERRO", "12", "13/09 · 09:18"], ["Upload · formato inválido", "NEGADO", "7", "12/09 · 14:02"], ["Convite · limite atingido", "ERRO", "4", "11/09 · 18:31"]].map(([event, result, total, last]) => <div key={event}><span><strong>{event}</strong><small>{last}</small></span><Status value={result} tone={toneFor(result)} /><b>{total}</b></div>)}</div></section><section className="ops-panel"><div className="ops-panel-title"><div><h3>Incidentes por área</h3><p>Gravidade atual.</p></div></div><div className="ops-list">{[["Autenticação", "CRITICA", "1"], ["Notificações", "ALTA", "1"], ["Armazenamento", "MEDIA", "1"]].map(([area, severity, total]) => <div key={area}><span><strong>{area}</strong><small>em acompanhamento</small></span><Status value={severity} tone={toneFor(severity)} /><b>{total}</b></div>)}</div></section></div><section className="ops-panel"><div className="ops-panel-title"><div><h3>Lacunas conhecidas</h3><p>O painel deixa claro quando a fonte ainda não está conectada.</p></div></div><div className="ops-gap-grid">{[["Latência", "APM necessário"], ["Uptime", "monitor externo necessário"], ["Erros 4xx/5xx", "telemetria HTTP necessária"], ["CPU / memória", "métrica do runtime necessária"], ["Consultas lentas", "profiling do banco necessário"], ["Comparação entre versões", "histórico de releases necessário"]].map(([name, source]) => <article key={name}><strong>{name}</strong><small>fonte necessária: {source}</small></article>)}</div></section></div>;
+function WorkspaceHeader({ screen, source }: { screen: OwnerOperationsScreen; source: string }) {
+  const copy = SCREEN_COPY[screen];
+  return <header className="ops-hero"><div><p className="pilot-kicker">{copy.eyebrow}</p><p>{copy.description}</p></div><span className="ops-source-chip">{source}</span></header>;
 }
 
-function PublicationWorkspace() {
-  const [approval, setApproval] = useState("PENDENTE");
-  const [reason, setReason] = useState("");
-  const [notice, setNotice] = useState("");
-  const releaseDisabled = approval !== "APROVADO";
-  return <div className="ops-stack"><Section eyebrow="ENTREGA CONTROLADA" title="Publicação do sistema" text="Cada versão passa por validação, aprovação e health check antes de chegar à Produção."><Status value="Produção protegida" tone="info" /></Section><Metrics items={[["Última publicada", "v2.18.4", "há 2h · Produção"], ["Aguardando aprovação", "1", "sua decisão"], ["Falhas em 30 dias", "2", "−33%"], ["Reversões automáticas", "1", "últimos 30 dias"]]} /><section className="ops-panel ops-publication-selected"><div><div><p className="pilot-kicker">PUBLICAÇÃO SELECIONADA</p><h3>v2.18.5 · correção do fluxo de convites</h3><p><code>8f3a91c2</code> · <strong>main</strong> · Marina Costa · iniciada 13/09/2026 08:12 · duração 4m 38s</p></div><Status value="AGUARDANDO_APROVACAO" tone="warning" /></div><div className="ops-stage-track">{publishStages.map(([name, state, duration], index) => <div className={`ops-stage ${state}`} key={name}><b>{index + 1}</b><strong>{statusLabel(name)}</strong><small>{duration}</small><button type="button">Ver logs</button>{state === "critica" && <em>crítica</em>}</div>)}</div></section>{approval === "PENDENTE" && <section className="ops-alert warning ops-approval-alert"><strong>Esta publicação está parada esperando sua decisão</strong><span>Produção só pode ser liberada depois de uma aprovação explícita.</span><label>Motivo da decisão<textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Registre o que foi conferido…" rows={3} /></label><div><button type="button" disabled={!reason.trim()} onClick={() => { setApproval("APROVADO"); setNotice("Publicação aprovada. A liberação está disponível."); }}>Aprovar publicação</button><button type="button" className="danger" disabled={!reason.trim()} onClick={() => { setApproval("RECUSADO"); setNotice("Publicação recusada e devolvida para ajustes."); }}>Recusar</button></div></section>}{notice && <div className="ops-alert success">{notice}</div>}<div className="ops-release-row"><button type="button" disabled={releaseDisabled} title={releaseDisabled ? "A aprovação é obrigatória para liberar em Produção" : "Liberar publicação em Produção"}>Liberar publicação</button>{releaseDisabled && <small>Disponível somente após aprovação — a regra também está aplicada ao botão.</small>}</div><section className="ops-panel"><div className="ops-panel-title"><div><h3>Histórico de publicações</h3><p>Etapas concluídas, ambiente e autoria de cada release.</p></div></div><div className="ops-table-wrap"><table className="ops-table"><thead><tr><th>Versão</th><th>Ambiente</th><th>Status</th><th>Commit</th><th>Autor</th><th>Iniciado em</th><th>Duração</th><th>Etapas</th></tr></thead><tbody>{[["v2.18.4", "Produção", "CONCLUIDO", "3aa71f4e", "Rafael Lima", "13/09 · 06:10", "4m 12s", "9/9"], ["v2.18.3", "Produção", "REVERSAO_AUTOMATICA", "91f0c2bd", "Sistema", "08/09 · 21:44", "2m 03s", "9/9"], ["v2.18.2", "Homologação", "CONCLUIDO", "a77b109e", "Marina Costa", "07/09 · 15:30", "3m 51s", "9/9"]].map((row) => <tr key={row[0]}>{row.map((cell, index) => <td key={`${row[0]}-${index}`} data-label={["Versão", "Ambiente", "Status", "Commit", "Autor", "Iniciado em", "Duração", "Etapas"][index]}>{index === 2 ? <Status value={cell} tone={toneFor(cell)} /> : index === 3 ? <code>{cell}</code> : cell}</td>)}</tr>)}</tbody></table></div></section></div>;
+function SourceNote({ children }: { children: React.ReactNode }) {
+  return <div className="ops-source-banner" role="note"><span aria-hidden="true">i</span><p>{children}</p></div>;
 }
 
-function IncidentWorkspace() {
-  const [status, setStatus] = useState("TODOS");
-  const [severity, setSeverity] = useState("TODOS");
-  const [resolving, setResolving] = useState<number | null>(null);
-  const [resolved, setResolved] = useState<number[]>([]);
-  const filtered = useMemo(() => incidentRows.filter((row) => !resolved.includes(row.id)).filter((row) => status === "TODOS" || row.status === status).filter((row) => severity === "TODOS" || row.gravidade === severity), [resolved, severity, status]);
-  return <div className="ops-stack"><Section eyebrow="RESPOSTA OPERACIONAL" title="Incidentes" text="Priorize impacto, acompanhe recorrência e deixe a resolução registrada." /><Metrics items={[["Críticos em aberto", "1", "ação imediata"], ["Altos em aberto", "1", "em acompanhamento"], ["Em tratamento", "2", "com responsável"], ["Recorrentes", "2", "mais de uma ocorrência"]]} /><section className="ops-panel"><div className="ops-filter-row"><label>Status<select value={status} onChange={(event) => setStatus(event.target.value)}><option>TODOS</option><option>ABERTO</option><option>EM_TRATAMENTO</option><option>RESOLVIDO</option></select></label><label>Gravidade<select value={severity} onChange={(event) => setSeverity(event.target.value)}><option>TODOS</option><option>CRITICA</option><option>ALTA</option><option>MEDIA</option></select></label><label className="ops-search">Buscar<input placeholder="Área ou título" /></label></div><div className="ops-incident-list">{filtered.map((row) => <details className={`ops-incident ${row.gravidade === "CRITICA" ? "critical" : ""}`} key={row.id}><summary><span className="ops-severity">{row.gravidade.slice(0, 1)}</span><div><strong>{row.titulo}</strong><small>{row.area} · {row.comunidades} comunidades afetadas · {row.ultima}</small></div><Status value={row.status} tone={toneFor(row.status)} /><b>{row.ocorrencias > 1 ? `${row.ocorrencias} · recorrente` : row.ocorrencias}</b></summary><div className="ops-incident-detail"><p>{row.descricao}</p><div className="ops-history">{row.historico.map((event) => <span key={event}>{event}</span>)}</div>{resolving === row.id ? <div className="ops-resolution"><label>Resolução obrigatória<textarea required rows={3} placeholder="Descreva a causa e a ação aplicada…" /></label><button type="button" onClick={() => { setResolved((current) => [...current, row.id]); setResolving(null); }}>Registrar resolução</button></div> : <div className="ops-incident-actions"><button type="button">Assumir</button><button type="button" className="secondary">Mitigar</button>{row.status !== "RESOLVIDO" && <button type="button" onClick={() => setResolving(row.id)}>Resolver</button>}<button type="button" className="secondary">Ignorar</button></div>}</div></details>)}{!filtered.length && <div className="owner-empty"><span>◇</span><strong>Nenhum incidente neste filtro</strong><p>Quando houver ocorrências compatíveis, elas aparecerão aqui.</p></div>}</div></section></div>;
+function EmptyState({ title, text }: { title: string; text: string }) {
+  return <div className="ops-empty-state"><span aria-hidden="true">◇</span><strong>{title}</strong><p>{text}</p></div>;
+}
+
+function Status({ result }: { result: unknown }) {
+  const normalized = String(result || "NÃO INFORMADO").toUpperCase();
+  const tone = ["SUCESSO", "OK", "ATIVO"].includes(normalized) ? "success" : ["ERRO", "NEGADO", "INATIVO"].includes(normalized) ? "danger" : "neutral";
+  return <span className={`ops-status ${tone}`}>{humanize(normalized)}</span>;
+}
+
+function AuditPanel({ rows, title = "Registros encontrados", emptyTitle = "Nenhum registro disponível", emptyText = "A fonte atual não retornou eventos para esta área." }: { rows: Record<string, unknown>[]; title?: string; emptyTitle?: string; emptyText?: string }) {
+  return <section className="ops-panel"><header className="ops-panel-title"><div><h3>{title}</h3><p>{rows.length} {rows.length === 1 ? "registro na fonte atual" : "registros na fonte atual"}</p></div></header>{rows.length ? <div className="ops-event-list">{rows.map((row, index) => <article key={read(row, "id", String(index))}><span className={`ops-event-icon ${isFailure(row) ? "danger" : "success"}`}>{isFailure(row) ? "!" : "✓"}</span><div><strong>{humanize(row.evento)}</strong><p>{read(row, "comunidade_nome", "Plataforma")} · {read(row, "usuario_nome", "Sistema")}</p></div><Status result={row.resultado} /><time>{formatDate(row.criado_em)}</time></article>)}</div> : <EmptyState title={emptyTitle} text={emptyText} />}</section>;
+}
+
+function Metric({ label, number, detail }: { label: string; number: number; detail: string }) {
+  return <article><small>{label}</small><strong>{number.toLocaleString("pt-BR")}</strong><p>{detail}</p></article>;
+}
+
+export default function OwnerOperationsWorkspace({ screen, data }: { screen: OwnerOperationsScreen; data: OwnerOperationsData }) {
+  if (screen === "passwords") return <FilteredAuditWorkspace screen={screen} data={data} />;
+  if (screen === "deleted") return <DeletedWorkspace data={data} />;
+  if (screen === "finance") return <UnavailableWorkspace screen={screen} source="Fonte não conectada" title="Dados financeiros indisponíveis" text="A API do proprietário ainda não fornece cobranças, pagamentos, valores ou renovações. Nenhuma estimativa é exibida para evitar dados falsos." needs={["Integração com o sistema de cobrança", "Status confirmado pelo provedor de pagamento", "Histórico de competências e renovações"]} />;
+  if (screen === "realtime") return <RealtimeWorkspace data={data} />;
+  if (screen === "performance") return <PerformanceWorkspace data={data} />;
+  if (screen === "publication") return <FilteredAuditWorkspace screen={screen} data={data} />;
+  return <IncidentWorkspace data={data} />;
+}
+
+function FilteredAuditWorkspace({ screen, data }: { screen: "passwords" | "publication"; data: OwnerOperationsData }) {
+  const rows = useMemo(() => data.audit.filter((row) => matchesEvent(row, SEARCH_TERMS[screen])), [data.audit, screen]);
+  const isPassword = screen === "passwords";
+  return <div className="ops-stack"><WorkspaceHeader screen={screen} source="Auditoria real" /><SourceNote>Esta visão filtra a trilha de auditoria disponível. Ela não gera links, aprova acessos nem simula etapas que não estejam registradas.</SourceNote><AuditPanel rows={rows} title={isPassword ? "Eventos de credenciais" : "Eventos de publicação"} emptyTitle={isPassword ? "Nenhum evento de senha encontrado" : "Nenhum evento de publicação encontrado"} emptyText={isPassword ? "Não há redefinições ou eventos de credenciais na janela de auditoria disponível." : "A fonte atual não registra pipeline, versões ou implantações. Conecte o histórico de releases para habilitar esta área."} /></div>;
+}
+
+function DeletedWorkspace({ data }: { data: OwnerOperationsData }) {
+  const inactiveUsers = useMemo(() => data.users.filter((row) => Number(row.ativo) !== 1), [data.users]);
+  const events = useMemo(() => data.audit.filter((row) => matchesEvent(row, SEARCH_TERMS.deleted)), [data.audit]);
+  return <div className="ops-stack"><WorkspaceHeader screen="deleted" source="Cadastros e auditoria" /><SourceNote>A listagem usa apenas o estado real dos cadastros. Ações de restauração ou exclusão definitiva não aparecem porque não existe um fluxo confiável exposto nesta tela.</SourceNote><div className="ops-metrics"><Metric label="Contas inativas" number={inactiveUsers.length} detail="presentes na fonte atual" /><Metric label="Eventos relacionados" number={events.length} detail="na janela de auditoria" /></div><section className="ops-panel"><header className="ops-panel-title"><div><h3>Cadastros inativos</h3><p>Identificação mínima para conferência administrativa.</p></div></header>{inactiveUsers.length ? <div className="ops-table-wrap"><table className="ops-table"><thead><tr><th>Referência</th><th>Perfil</th><th>Comunidades</th><th>Criado em</th><th>Estado</th></tr></thead><tbody>{inactiveUsers.map((row, index) => <tr key={read(row, "id", String(index))}><td data-label="Referência"><strong>Conta #{read(row, "id")}</strong></td><td data-label="Perfil">{humanize(row.perfil)}</td><td data-label="Comunidades">{read(row, "comunidades_nomes", "Sem vínculo informado")}</td><td data-label="Criado em">{formatDate(row.criado_em)}</td><td data-label="Estado"><Status result="INATIVO" /></td></tr>)}</tbody></table></div> : <EmptyState title="Nenhuma conta inativa" text="A fonte atual não retornou cadastros inativos." />}</section><AuditPanel rows={events} title="Eventos de exclusão e desativação" /></div>;
+}
+
+function UnavailableWorkspace({ screen, source, title, text, needs }: { screen: OwnerOperationsScreen; source: string; title: string; text: string; needs: string[] }) {
+  return <div className="ops-stack"><WorkspaceHeader screen={screen} source={source} /><section className="ops-panel ops-unavailable"><span aria-hidden="true">⌁</span><div><p className="pilot-kicker">SEM DADOS SUFICIENTES</p><h3>{title}</h3><p>{text}</p><ul>{needs.map((need) => <li key={need}>{need}</li>)}</ul></div></section></div>;
+}
+
+function RealtimeWorkspace({ data }: { data: OwnerOperationsData }) {
+  const currentCommunities = Number(data.metrics.comunidades_ativas || data.communities.filter((row) => String(row.status).toUpperCase() === "ATIVA").length);
+  const currentUsers = Number(data.metrics.usuarios_ativos || data.users.filter((row) => Number(row.ativo) === 1).length);
+  return <div className="ops-stack"><WorkspaceHeader screen="realtime" source="Último carregamento" /><SourceNote>Os números abaixo são um retrato da API do proprietário. Eles não representam presença online nem atualização contínua.</SourceNote><div className="ops-metrics"><Metric label="Comunidades ativas" number={currentCommunities} detail="na resposta atual" /><Metric label="Usuários ativos" number={currentUsers} detail="na resposta atual" /><Metric label="Registros de auditoria" number={data.audit.length} detail="na janela disponível" /></div><section className="ops-panel ops-unavailable"><span aria-hidden="true">⌁</span><div><p className="pilot-kicker">TELEMETRIA AUSENTE</p><h3>Sem presença em tempo real</h3><p>A fonte atual não informa sessões, pessoas online, duração ou picos simultâneos.</p><ul><li>Canal de presença com expiração</li><li>Agregação temporal de sessões</li><li>Política de privacidade para telemetria</li></ul></div></section></div>;
+}
+
+function PerformanceWorkspace({ data }: { data: OwnerOperationsData }) {
+  const failures = useMemo(() => data.audit.filter(isFailure), [data.audit]);
+  const denied = failures.filter((row) => read(row, "resultado", "").toUpperCase() === "NEGADO").length;
+  const errors = failures.filter((row) => read(row, "resultado", "").toUpperCase() === "ERRO").length;
+  return <div className="ops-stack"><WorkspaceHeader screen="performance" source="Auditoria disponível" /><SourceNote>Sem séries temporais de APM, esta tela mede somente resultados registrados na auditoria — não latência, uptime, CPU ou taxa global de erro.</SourceNote><div className="ops-metrics"><Metric label="Registros analisados" number={data.audit.length} detail="janela de auditoria" /><Metric label="Resultados com falha" number={failures.length} detail="diferentes de sucesso" /><Metric label="Negados" number={denied} detail="na fonte atual" /><Metric label="Erros" number={errors} detail="na fonte atual" /></div><AuditPanel rows={failures} title="Ocorrências que exigem leitura" emptyTitle="Nenhuma falha na janela disponível" emptyText="Todos os registros disponíveis estão marcados como sucesso ou OK." /><section className="ops-panel ops-needs"><header className="ops-panel-title"><div><h3>Lacunas de observabilidade</h3><p>Fontes necessárias para uma análise de desempenho completa.</p></div></header><div>{["Latência e uptime", "Erros HTTP", "CPU e memória", "Consultas lentas", "Histórico por versão"].map((item) => <span key={item}>{item}<small>Fonte não conectada</small></span>)}</div></section></div>;
+}
+
+function IncidentWorkspace({ data }: { data: OwnerOperationsData }) {
+  const [query, setQuery] = useState("");
+  const failures = useMemo(() => data.audit.filter(isFailure), [data.audit]);
+  const filtered = useMemo(() => failures.filter((row) => [row.evento, row.resultado, row.comunidade_nome, row.usuario_nome].join(" ").toLocaleLowerCase("pt-BR").includes(query.toLocaleLowerCase("pt-BR"))), [failures, query]);
+  return <div className="ops-stack"><WorkspaceHeader screen="incidents" source="Derivado da auditoria" /><SourceNote>Uma ocorrência aqui significa apenas que a auditoria registrou resultado diferente de sucesso. Severidade, impacto e resolução não são inferidos sem uma fonte própria.</SourceNote><div className="ops-metrics"><Metric label="Ocorrências disponíveis" number={failures.length} detail="resultados com falha" /><Metric label="Registros auditados" number={data.audit.length} detail="na janela atual" /></div><section className="ops-panel"><header className="ops-panel-title ops-panel-filter"><div><h3>Ocorrências</h3><p>Use a busca para localizar evento, pessoa ou comunidade.</p></div><label>Buscar<input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Evento, resultado ou contexto" /></label></header><div className="ops-embedded-panel"><AuditPanel rows={filtered} title="Resultados do filtro" emptyTitle="Nenhuma ocorrência encontrada" emptyText={failures.length ? "Ajuste o termo de busca." : "Não há resultados com falha na janela de auditoria disponível."} /></div></section></div>;
 }
