@@ -28,6 +28,7 @@ export type OwnerTab =
   | "plans"
   | "controls"
   | "laboratory"
+  | "integrations"
   | OwnerOperationsScreen;
 export type OwnerGridPreset = "2x2" | "2x4" | "4x2" | "4x4";
 export type OwnerMetricKey =
@@ -58,6 +59,7 @@ export const TABS: { id: OwnerTab; label: string }[] = [
   { id: "realtime", label: "Tempo real" },
   { id: "performance", label: "Saúde & incidentes" },
   { id: "publication", label: "Releases & dados" },
+  { id: "integrations", label: "Integrações" },
   { id: "incidents", label: "Incidentes" },
   { id: "controls", label: "Controles & módulos" },
 ];
@@ -67,7 +69,7 @@ export const OWNER_NAV_SECTIONS: { id: string; label: string; items: OwnerTab[] 
   { id: "operation", label: "Operação", items: ["communities", "users", "finance", "statistics"] },
   { id: "reliability", label: "Confiabilidade", items: ["performance", "realtime", "audit"] },
   { id: "platform", label: "Plataforma", items: ["controls", "appearance", "plans", "editorial", "optimization"] },
-  { id: "system", label: "Sistema", items: ["publication", "laboratory"] },
+  { id: "system", label: "Sistema", items: ["integrations", "publication", "laboratory"] },
 ];
 
 function OwnerSectionIcon({ section }: { section: string }) {

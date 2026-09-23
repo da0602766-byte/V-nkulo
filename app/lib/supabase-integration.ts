@@ -82,7 +82,7 @@ export async function parseIntegration(payload: Record<string, unknown>, current
   const serviceRoleKey = await secret("serviceRoleKey");
   const jwtSecret = await secret("jwtSecret");
   if (!serviceRoleKey && (ativa || !current || payload.removeServiceRoleKey !== true)) throw new IntegrationInputError("Configure a chave secreta do servidor para salvar a integração.");
-  return {ambiente,url:origin,projectRef,anonKey,schema,bucket,ativa,serviceRoleKey,jwtSecret,lastCheck:current?.lastCheck || null};
+  return {ambiente,url:origin,projectRef,anonKey,schema,bucket,ativa,serviceRoleKey,jwtSecret,lastCheck:null};
 }
 export async function writeIntegration(config: Integration, userId: number) {
   await getD1().prepare("INSERT INTO configuracoes (chave, valor, atualizado_por, atualizado_em) VALUES (?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor, atualizado_por = excluded.atualizado_por, atualizado_em = CURRENT_TIMESTAMP").bind(KEY,JSON.stringify(config),String(userId)).run();
@@ -94,7 +94,7 @@ async function checkedFetch(url: string, init: RequestInit) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
     try {
-      const response = await fetch(url,{...init,cache:"no-store",signal:controller.signal});
+      const response = await fetch(url,{...init,redirect:"error",cache:"no-store",signal:controller.signal});
       clearTimeout(timer);
       if (response.status < 500 || attempt === 1) return response;
     } catch (error) {

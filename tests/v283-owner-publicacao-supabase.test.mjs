@@ -57,7 +57,8 @@ test("integração Supabase protege acesso, cifra segredos e preserva segredo va
   const activated=await worker.fetch(new Request(endpoint,{method:"PATCH",headers:{cookie:ownerCookie,"content-type":"application/json"},body:JSON.stringify({...configuration,serviceRoleKey:"",bucket:"arquivos",ativa:true})}),runtime,context);
   assert.equal(activated.status,200);
   const nativeFetch=globalThis.fetch;
-  globalThis.fetch=async request=>{
+  globalThis.fetch=async (request, options)=>{
+    assert.equal(options.redirect,"error","segredos não seguem redirecionamentos do provedor");
     const url=String(request);
     if (url.endsWith("/storage/v1/bucket")) return Response.json([{id:"arquivos",name:"arquivos"}]);
     return Response.json({ok:true});
@@ -69,6 +70,9 @@ test("integração Supabase protege acesso, cifra segredos e preserva segredo va
     assert.equal(check.ok,true);
     assert.equal(check.bucketFound,true);
   } finally { globalThis.fetch=nativeFetch; }
+  const resaved=await worker.fetch(new Request(endpoint,{method:"PATCH",headers:{cookie:ownerCookie,"content-type":"application/json"},body:JSON.stringify({...configuration,serviceRoleKey:"",bucket:"arquivos",ativa:true})}),runtime,context);
+  assert.equal(resaved.status,200);
+  assert.equal((await resaved.json()).integration.lastCheck,null,"salvar exige nova validação, sem reaproveitar o teste de outra configuração");
   const audit=database.prepare("SELECT metadados FROM auditoria_piloto WHERE evento='INTEGRACAO_SUPABASE_TESTADA' ORDER BY id DESC LIMIT 1").get();
   assert.ok(audit);
   assert.equal(audit.metadados.includes(configuration.serviceRoleKey),false);

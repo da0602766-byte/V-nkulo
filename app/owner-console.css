@@ -1,4 +1,26 @@
 /* Owner console: isolated shell, shared real workspaces. No styles escape this area. */
+.owner-console .oi-intro { display: grid; gap: 14px; padding: 20px; color: var(--owner-muted); }
+.owner-console .oi-intro ol { display: flex; flex-wrap: wrap; gap: 16px 36px; margin: 0; padding-left: 20px; color: var(--owner-ink); }
+.owner-console .owner-integrations .ops-panel-title { flex-wrap: wrap; }
+.owner-console .owner-integrations .oc-button { min-height: 44px; }
+.owner-console .oi-catalog { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; }
+.owner-console .oi-card { display: flex; flex-direction: column; gap: 16px; padding: 20px; min-width: 0; }
+.owner-console .oi-card header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.owner-console .oi-card h3 { font-size: 18px; }
+.owner-console .oi-card p { color: var(--owner-muted); line-height: 1.6; }
+.owner-console .oi-card .oi-message { color: var(--owner-ink); }
+.owner-console .oi-card dl { display: grid; gap: 10px; margin: 0; }
+.owner-console .oi-card dt { color: var(--owner-muted); font-size: 12px; }
+.owner-console .oi-card dd { margin: 3px 0 0; font-size: 13px; overflow-wrap: anywhere; }
+.owner-console .oi-status { padding: 6px 10px; border-radius: 20px; background: var(--owner-surface-2); color: var(--owner-muted); font-size: 12px; font-weight: 700; }
+.owner-console .oi-status.connected { background: var(--owner-accent-soft); color: var(--owner-positive); }
+.owner-console .oi-status.attention { color: var(--owner-danger); }
+.owner-console .oi-card .oc-button { margin-top: auto; align-self: flex-start; }
+.owner-console .oi-settings { display: grid; gap: 18px; min-width: 0; }
+.owner-console .oi-settings > h2 { font-size: 20px; }
+.owner-console .oi-settings :is(input,select,button) { min-height: 44px; }
+.owner-console .oi-settings input[type="checkbox"] { min-height: 24px; }
+@media (max-width: 700px) { .owner-console .oi-catalog { grid-template-columns: minmax(0,1fr); } }
 .owner-console .owner-push { min-width: 0; }
 .owner-console .owner-push-header { flex-wrap: wrap; }
 .owner-console .owner-push-header .oc-button { min-height: 44px; }

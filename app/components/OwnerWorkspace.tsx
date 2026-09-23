@@ -17,6 +17,7 @@ const OwnerAppearanceWorkspace = dynamic(() => import("./OwnerAppearanceWorkspac
 const PlatformPlansWorkspace = dynamic(() => import("./PlatformPlansWorkspace"), { loading: () => <p className="oc-loading" role="status">Carregando área…</p> });
 import type { OwnerOperationsScreen } from "./OwnerOperationsWorkspace";
 const OwnerOperationsWorkspace = dynamic(() => import("./OwnerOperationsWorkspace"), { loading: () => <p role="status">Carregando área…</p> });
+const OwnerIntegrationsWorkspace = dynamic(() => import("./OwnerIntegrationsWorkspace"), { loading: () => <p role="status">Carregando integrações…</p> });
 import {
   COMMUNITY_MODULES,
   normalizeCommunityModules,
@@ -375,6 +376,7 @@ export default function OwnerWorkspace({
 
           {tab === "overview" && data && <OwnerExecutiveOverview data={data} gridPreset={gridPreset} metricOrder={metricOrder} draggingMetric={draggingMetric} onSelectTab={selectTab} onOpenCommunity={openCommunity} onSaveLayout={saveOwnerLayout} onDragStart={setDraggingMetric} onDragEnd={() => setDraggingMetric(null)} onDropMetric={reorderMetric} onMoveMetric={moveMetric} />}
           {tab === "laboratory" && <OwnerLaboratoryWorkspace />}
+          {data && tab === "integrations" && <OwnerIntegrationsWorkspace />}
           {data && (["passwords", "deleted", "finance", "realtime", "performance", "publication", "incidents"] as OwnerOperationsScreen[]).includes(tab as OwnerOperationsScreen) && <OwnerOperationsWorkspace screen={tab as OwnerOperationsScreen} data={data} />}
 
           {tab === "requests" && data && (
@@ -715,6 +717,7 @@ function tabDescription(tab: OwnerTab) {
     realtime: "Consulte o último retrato administrativo disponível.",
     performance: "Investigue falhas, incidentes e lacunas de observabilidade.",
     publication: "Consulte eventos de publicação registrados na auditoria.",
+    integrations: "Configure conexões e acompanhe os diagnósticos dos serviços integrados.",
     incidents: "Investigue os resultados com falha na auditoria disponível.",
     controls: "Configure identidade, módulos e regras globais da plataforma.",
   }[tab];
