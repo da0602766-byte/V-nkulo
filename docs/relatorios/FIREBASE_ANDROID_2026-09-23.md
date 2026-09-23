@@ -27,6 +27,7 @@ A fila durável existente passa a encaminhar Web Push e FCM separadamente. Itens
 - Testes web cobrem criptografia real, assinatura RSA do JWT, recusa de projeto/arquivo/origem/usuário, preservação de credencial anterior após erro, fila FCM, troca de token, logout, permissão e descarte de resposta atrasada. Google/FCM são simulados nesses testes; não houve envio real com uma credencial do usuário.
 - Verificador de segredos preservado. O reconhecimento do envelope PEM foi ajustado para extrair seu corpo e conferir o rótulo de fechamento, eliminando o falso positivo causado pelo marcador literal de formato.
 - Lint da aplicação: zero erros e 43 avisos preexistentes. O script geral também percorre o checkout Android em `.task-tools`, contabilizando 84 avisos combinados.
+- `scripts/pre-publicacao.sh` aprovado no commit publicado: TypeScript limpo, build/artefato aprovados e **470 testes web aprovados, zero falhas**.
 - Tela local conferida no navegador em 390/1440 px claro e 320 px escuro, sem transbordamento horizontal. O teste de seleção do arquivo pela automação não foi concluído: a autorização da ferramenta foi dispensada. A API de upload foi validada por testes automatizados.
 
 ## Ativação pelo celular e homologação restante
@@ -42,4 +43,8 @@ Referências: [HTTP v1 e autorização](https://firebase.google.com/docs/cloud-m
 
 ## Publicação
 
-Validação final e publicação registradas após a confirmação do deploy. A chave administrativa e a entrega física continuam pendentes de ativação pelo proprietário.
+Publicada a **versão 301**, commit `c3e63ce0126accd0b8c3b797630deb5107947eac`, em [Vínkulo](https://adote-gestao.da0602766.chatgpt.site), em 23/09/2026 às 17h03 (Brasília). Deploy `appgdep_6ab4307d0a888191a61dbb51593bf121` concluído com sucesso. Público anterior preservado.
+
+Conferência em produção: home e APK HTTP 200; APK com tamanho e SHA-256 idênticos ao artefato validado; API Firebase e registro nativo retornam HTTP 401 sem sessão. Console autenticado abre a configuração e mostra **Aguardando credencial / 0 aparelhos**, estado real esperado antes da ativação. Supabase continua conectado, com agendamento confirmado.
+
+A chave administrativa e a entrega física continuam pendentes de ativação pelo proprietário. PR Android [#15](https://github.com/da0602766-byte/V-nkulo/pull/15) atualizado e mantido em rascunho; sem merge.
