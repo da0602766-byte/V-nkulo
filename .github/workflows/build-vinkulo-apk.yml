@@ -43,8 +43,9 @@ jobs:
         run: |
           signer="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)"
           "$signer" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
-          old_digest="$("$signer" verify --print-certs "$GITHUB_WORKSPACE/public/downloads/VINKULO_ANDROID_1.5.1.apk" | grep 'Signer #1 certificate SHA-256 digest:')"
-          new_digest="$("$signer" verify --print-certs app/build/outputs/apk/release/app-release.apk | grep 'Signer #1 certificate SHA-256 digest:')"
+          old_digest="$("$signer" verify --print-certs "$GITHUB_WORKSPACE/public/downloads/VINKULO_ANDROID_1.5.1.apk" | awk '/certificate SHA-256 digest:/ {print $NF}' | sort -u)"
+          new_digest="$("$signer" verify --print-certs app/build/outputs/apk/release/app-release.apk | awk '/certificate SHA-256 digest:/ {print $NF}' | sort -u)"
+          test -n "$old_digest"
           test "$old_digest" = "$new_digest"
           sha256sum app/build/outputs/apk/release/app-release.apk
       - uses: actions/upload-artifact@v4
@@ -52,3 +53,11 @@ jobs:
           name: Vinkulo-Android-1.6.0-producao
           path: Vinkulo-Android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Vinkulo-Android-1.6.0-validacao
+          path: |
+            Vinkulo-Android/app/build/reports/
+            Vinkulo-Android/app/build/test-results/
+            Vinkulo-Android/app/build/outputs/mapping/release/mapping.txt
