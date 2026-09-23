@@ -25,7 +25,7 @@ async function fixture(t) {
   const calls = [], audit = [], notifications = [];
   const integration = await load("app/lib/firebase-integration.ts", { "../../db": { getD1: () => d1 }, "../../db/runtime-env": { getRuntimeEnv: () => ({ AUTH_SECRET: authSecret }) } }, {
     fetch: async (url, options) => {
-      calls.push({ url, options }); assert.equal(options.redirect, "error");
+      calls.push({ url, options }); assert.equal(options.redirect, "manual");
       if (url === "https://oauth2.googleapis.com/token") {
         const jwt = options.body.get("assertion"); const [header, claims, signature] = jwt.split(".");
         assert.ok(await crypto.subtle.verify("RSASSA-PKCS1-v1_5", pair.publicKey, Buffer.from(signature,"base64url"), new TextEncoder().encode(`${header}.${claims}`)));

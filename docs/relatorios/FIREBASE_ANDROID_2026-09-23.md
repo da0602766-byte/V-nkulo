@@ -48,3 +48,15 @@ Publicada a **versão 301**, commit `c3e63ce0126accd0b8c3b797630deb5107947eac`, 
 Conferência em produção: home e APK HTTP 200; APK com tamanho e SHA-256 idênticos ao artefato validado; API Firebase e registro nativo retornam HTTP 401 sem sessão. Console autenticado abre a configuração e mostra **Aguardando credencial / 0 aparelhos**, estado real esperado antes da ativação. Supabase continua conectado, com agendamento confirmado.
 
 A chave administrativa e a entrega física continuam pendentes de ativação pelo proprietário. PR Android [#15](https://github.com/da0602766-byte/V-nkulo/pull/15) atualizado e mantido em rascunho; sem merge.
+
+## Correção do cadastro — 23/09/2026
+
+O proprietário relatou erro ao salvar o JSON. Logs do PATCH `/api/proprietario/integracoes/firebase` confirmaram respostas 503 no navegador e no APK, incluindo 17h25min34 (Brasília), requisição `c6eb57d92b17814c2d13e07279661251`. Nenhum corpo de requisição ou credencial foi coletado.
+
+Causa reproduzida no Workerd: `Request` rejeita `redirect: "error"` com TypeError. Os testes anteriores simulavam `fetch` no Node e não construíam a Request real do Workers, deixando essa incompatibilidade passar. O erro acontecia na chamada OAuth antes de o Google validar a chave.
+
+As duas chamadas Firebase agora usam `redirect: "manual"`, compatível com Workers. Respostas de redirecionamento continuam recusadas; JWT e token não são encaminhados para o endereço de Location. O limite de tempo do FCM passa a começar após a obtenção do token OAuth, dando a cada etapa seu próprio prazo.
+
+Novo teste executado no Miniflare/Workerd com a data e flags do build valida criptografia, construção nativa de Request, chamadas OAuth/FCM simuladas e rejeição de redirecionamentos nas duas etapas. A chave usada é efêmera e fictícia, sem acesso ao projeto. Sete testes direcionados passaram; validação completa/publicação registradas após o deploy.
+
+O usuário deve atualizar a página e selecionar novamente o mesmo arquivo JSON já baixado. A ativação com a chave real e a entrega no celular ainda exigem essa ação do proprietário.

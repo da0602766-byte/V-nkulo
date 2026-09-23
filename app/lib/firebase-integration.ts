@@ -69,7 +69,9 @@ async function mintAccessToken(config: FirebaseConfig) {
   const now = Math.floor(Date.now() / 1000);
   const unsigned = `${base64url(encoder.encode(JSON.stringify({ alg: "RS256", typ: "JWT" })))}.${base64url(encoder.encode(JSON.stringify({ iss: credential.client_email, scope: "https://www.googleapis.com/auth/firebase.messaging", aud: TOKEN_URL, iat: now, exp: now + 3600 })))}`;
   const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", await privateKey(credential.private_key), encoder.encode(unsigned));
-  const response = await fetch(TOKEN_URL, { method: "POST", redirect: "error", signal: AbortSignal.timeout(5000),
+  // Workers supports manual/follow only. Reject non-2xx below without following
+  // redirects, so assertions and bearer tokens never reach another endpoint.
+  const response = await fetch(TOKEN_URL, { method: "POST", redirect: "manual", signal: AbortSignal.timeout(5000),
     body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: `${unsigned}.${base64url(new Uint8Array(signature))}` }) });
   if (!response.ok) { await response.body?.cancel(); throw new FirebaseInputError("O Google recusou a credencial. Confira se a chave continua ativa e o relógio do servidor está correto."); }
   const result = await response.json() as { access_token?: string; expires_in?: number };
@@ -84,8 +86,9 @@ async function accessToken(config: FirebaseConfig) {
   try { return await flight.promise; } finally { if (accessFlight === flight) accessFlight = null; }
 }
 async function fcmRequest(config: FirebaseConfig, body: unknown) {
-  return fetch(SEND_URL, { method: "POST", redirect: "error", signal: AbortSignal.timeout(5000),
-    headers: { Authorization: `Bearer ${await accessToken(config)}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const token = await accessToken(config);
+  return fetch(SEND_URL, { method: "POST", redirect: "manual", signal: AbortSignal.timeout(5000),
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
 }
 export async function verifyFirebaseConfig(config: FirebaseConfig) {
   // validate_only checks permission and API availability without delivering a message.
