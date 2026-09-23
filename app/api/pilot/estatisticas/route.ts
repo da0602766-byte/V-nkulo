@@ -37,7 +37,8 @@ export async function GET() {
         .prepare(
           `SELECT substr(criado_em, 1, 7) AS mes, COUNT(*) AS total
           FROM usuarios
-          WHERE date(criado_em) >= date('now', '-6 months')
+          WHERE date(criado_em) >= date('now', 'start of month', '-5 months')
+            AND date(criado_em) < date('now', 'start of month', '+1 month')
           GROUP BY substr(criado_em, 1, 7)
           ORDER BY mes`,
         )
@@ -46,7 +47,8 @@ export async function GET() {
         .prepare(
           `SELECT substr(criado_em, 1, 7) AS mes, COUNT(*) AS total
           FROM comunidades
-          WHERE date(criado_em) >= date('now', '-6 months')
+          WHERE date(criado_em) >= date('now', 'start of month', '-5 months')
+            AND date(criado_em) < date('now', 'start of month', '+1 month')
           GROUP BY substr(criado_em, 1, 7)
           ORDER BY mes`,
         )

@@ -1,22 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import type { PilotFeatureState } from "../lib/pilot-data";
+import { useTransientMessage } from "../lib/use-transient-message";
 import GlobalVisualEditor from "./GlobalVisualEditorLazy";
-import PilotNotificationCenter from "./PilotNotificationCenter";
-import VerifiedOwnerName from "./VerifiedOwnerName";
-import PlatformControlsWorkspace from "./PlatformControlsWorkspace";
-import EditorialAutomationWorkspace from "./EditorialAutomationWorkspace";
-import StatisticsWorkspace from "./StatisticsWorkspace";
-import PlatformOptimizerWorkspace from "./PlatformOptimizerWorkspace";
-import OwnerLaboratoryWorkspace from "./OwnerLaboratoryWorkspace";
-import OwnerAppearanceWorkspace from "./OwnerAppearanceWorkspace";
-import PlatformPlansWorkspace from "./PlatformPlansWorkspace";
-import OwnerOperationsWorkspace, { type OwnerOperationsScreen } from "./OwnerOperationsWorkspace";
-import Link from "./StableLink";
-import ThemeControl from "./ThemeControl";
+import dynamic from "next/dynamic";
+import OwnerConsoleShell, { OwnerDecisionQueue, formatConsoleDate } from "./OwnerConsoleShell";
+const PlatformControlsWorkspace = dynamic(() => import("./PlatformControlsWorkspace"), { loading: () => <p className="oc-loading" role="status">Carregando área…</p> });
+const EditorialAutomationWorkspace = dynamic(() => import("./EditorialAutomationWorkspace"), { loading: () => <p className="oc-loading" role="status">Carregando área…</p> });
+const StatisticsWorkspace = dynamic(() => import("./StatisticsWorkspace"), { loading: () => <p className="oc-loading" role="status">Carregando área…</p> });
+const PlatformOptimizerWorkspace = dynamic(() => import("./PlatformOptimizerWorkspace"), { loading: () => <p className="oc-loading" role="status">Carregando área…</p> });
+const OwnerLaboratoryWorkspace = dynamic(() => import("./OwnerLaboratoryWorkspace"), { loading: () => <p className="oc-loading" role="status">Carregando área…</p> });
+const OwnerAppearanceWorkspace = dynamic(() => import("./OwnerAppearanceWorkspace"), { loading: () => <p className="oc-loading" role="status">Carregando área…</p> });
+const PlatformPlansWorkspace = dynamic(() => import("./PlatformPlansWorkspace"), { loading: () => <p className="oc-loading" role="status">Carregando área…</p> });
+import type { OwnerOperationsScreen } from "./OwnerOperationsWorkspace";
+const OwnerOperationsWorkspace = dynamic(() => import("./OwnerOperationsWorkspace"), { loading: () => <p role="status">Carregando área…</p> });
 import {
   COMMUNITY_MODULES,
   normalizeCommunityModules,
@@ -24,72 +24,7 @@ import {
   type CommunityModuleKey,
 } from "../lib/community-modules";
 
-type OwnerData = {
-  owner: { id: number; nome: string; email: string };
-  metrics: Record<string, number>;
-  requests: Record<string, unknown>[];
-  communities: Record<string, unknown>[];
-  users: Record<string, unknown>[];
-  audit: Record<string, unknown>[];
-  feedback: Record<string, unknown>[];
-  auditRetention?: { days: number; visibleLimit: number };
-  ownerLayout?: { gridPreset?: OwnerGridPreset; metricOrder?: OwnerMetricKey[] };
-};
-
-type OwnerTab =
-  | "overview"
-  | "requests"
-  | "communities"
-  | "users"
-  | "audit"
-  | "feedback"
-  | "editorial"
-  | "statistics"
-  | "optimization"
-  | "appearance"
-  | "plans"
-  | "controls"
-  | "laboratory"
-  | OwnerOperationsScreen;
-type OwnerGridPreset = "2x2" | "2x4" | "4x2" | "4x4";
-type OwnerMetricKey =
-  | "comunidades_ativas"
-  | "usuarios_ativos"
-  | "ministerios_ativos"
-  | "solicitacoes_pendentes"
-  | "eventos_futuros"
-  | "conversas_semana";
-
-const TABS: { id: OwnerTab; label: string; icon: string }[] = [
-  { id: "overview", label: "Visão geral", icon: "⌂" },
-  { id: "requests", label: "Solicitações", icon: "◫" },
-  { id: "communities", label: "Comunidades", icon: "◇" },
-  { id: "users", label: "Pessoas", icon: "◎" },
-  { id: "audit", label: "Segurança e auditoria", icon: "✓" },
-  { id: "feedback", label: "Feedback e denúncias", icon: "!" },
-  { id: "editorial", label: "IA Editorial", icon: "✦" },
-  { id: "statistics", label: "Estatísticas", icon: "▥" },
-  { id: "optimization", label: "Otimização", icon: "↻" },
-  { id: "appearance", label: "Aparência", icon: "◐" },
-  { id: "plans", label: "Planos", icon: "¤" },
-  { id: "laboratory", label: "Laboratório", icon: "◈" },
-  { id: "passwords", label: "Redefinições de senha", icon: "⌁" },
-  { id: "deleted", label: "Contas excluídas", icon: "⊘" },
-  { id: "finance", label: "Financeiro", icon: "¤" },
-  { id: "realtime", label: "Tempo real", icon: "◉" },
-  { id: "performance", label: "Desempenho", icon: "↗" },
-  { id: "publication", label: "Publicação do sistema", icon: "⇧" },
-  { id: "incidents", label: "Incidentes", icon: "!" },
-  { id: "controls", label: "Configurações", icon: "⚙" },
-];
-
-const OWNER_NAV_SECTIONS: { id: string; label: string; description: string; icon: string; items: OwnerTab[] }[] = [
-  { id: "command", label: "Comando", description: "Resumo e decisões", icon: "⌂", items: ["overview"] },
-  { id: "network", label: "Rede", description: "Comunidades e pessoas", icon: "◇", items: ["requests", "communities", "users"] },
-  { id: "product", label: "Produto", description: "Oferta e experiência", icon: "◈", items: ["plans", "appearance", "editorial", "controls", "laboratory"] },
-  { id: "operation", label: "Operação", description: "Sinais e atendimento", icon: "↗", items: ["feedback", "statistics", "optimization", "realtime", "performance", "incidents"] },
-  { id: "governance", label: "Governança", description: "Risco e histórico", icon: "✓", items: ["audit", "passwords", "deleted", "finance", "publication"] },
-];
+import { TABS, OwnerTabIcon, type OwnerData, type OwnerTab, type OwnerGridPreset, type OwnerMetricKey } from "../lib/owner-console";
 
 const OWNER_METRICS: {
   key: OwnerMetricKey;
@@ -124,13 +59,15 @@ export default function OwnerWorkspace({
   const [tab, setTab] = useState<OwnerTab>("overview");
   const [data, setData] = useState<OwnerData | null>(null);
   useEffect(() => {
-    if (searchParams.get("tab") !== "plans") return;
-    const frame = window.requestAnimationFrame(() => setTab("plans"));
+    const requested = searchParams.get("tab");
+    if (!TABS.some(item => item.id === requested)) return;
+    const frame = window.requestAnimationFrame(() => setTab(requested as OwnerTab));
     return () => window.cancelAnimationFrame(frame);
   }, [searchParams]);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState<number | null>(null);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useTransientMessage();
+  const [loadError, setLoadError] = useState("");
   const [search, setSearch] = useState("");
   const [directoryOpen, setDirectoryOpen] = useState(true);
   const [directoryPage, setDirectoryPage] = useState(0);
@@ -141,15 +78,27 @@ export default function OwnerWorkspace({
     OWNER_METRICS.map((metric) => metric.key),
   );
   const [draggingMetric, setDraggingMetric] = useState<OwnerMetricKey | null>(null);
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [globalSearch, setGlobalSearch] = useState("");
+  const requestController = useRef<AbortController | null>(null);
+  const dataSection = ["communities", "users", "requests", "feedback", "audit"].includes(tab) ? tab : tab === "deleted" ? "users" : "overview";
 
   const load = useCallback(async (quiet = false) => {
+    requestController.current?.abort();
+    const controller = new AbortController();
+    requestController.current = controller;
     if (!quiet) setLoading(true);
+    if (!quiet) setData(null);
+    setLoadError("");
     try {
-      const response = await fetch("/api/proprietario", { cache: "no-store" });
-      const result = (await response.json()) as OwnerData & { error?: string };
-      if (!response.ok) throw new Error(result.error || "Não foi possível carregar a área do proprietário.");
+      const readSection = async (section: string) => {
+        const response = await fetch(`/api/proprietario?section=${section}`, { cache: "no-store", signal: controller.signal });
+        if (!response.headers.get("content-type")?.includes("application/json")) throw new Error("O servidor não retornou os dados administrativos. Tente atualizar a página.");
+        const result = await response.json() as OwnerData & { error?: string };
+        if (!response.ok) throw new Error(result.error || "Não foi possível carregar a área do proprietário.");
+        return result;
+      };
+      const [summary, detail] = await Promise.all([readSection("overview"), dataSection === "overview" ? Promise.resolve(null) : readSection(dataSection)]);
+      if (controller.signal.aborted) return;
+      const result = { ...summary, ...detail, users: detail?.users || [] };
       setData(result);
       if (["2x2", "2x4", "4x2", "4x4"].includes(String(result.ownerLayout?.gridPreset))) {
         setGridPreset(result.ownerLayout?.gridPreset as OwnerGridPreset);
@@ -159,24 +108,20 @@ export default function OwnerWorkspace({
       }
       if (!quiet) setMessage("");
     } catch (error) {
-      setMessage((error as Error).message);
+      if (!controller.signal.aborted) setLoadError((error as Error).message);
     } finally {
-      if (!quiet) setLoading(false);
+      if (!quiet && !controller.signal.aborted) setLoading(false);
     }
-  }, []);
+  }, [dataSection, setMessage]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
-    return () => window.clearTimeout(timer);
+    return () => { window.clearTimeout(timer); requestController.current?.abort(); };
   }, [load]);
 
   const pending = useMemo(
     () => (data?.requests || []).filter((item) => ["PENDENTE", "EM_ANALISE"].includes(String(item.status))),
     [data?.requests],
-  );
-  const pendingFeedback = useMemo(
-    () => (data?.feedback || []).filter((item) => String(item.status) === "PENDENTE"),
-    [data?.feedback],
   );
   const filteredCommunities = useMemo(() => filterRows(data?.communities || [], search, ["nome", "cidade_publica", "proprietario_nome", "status"]), [data?.communities, search]);
   const filteredUsers = useMemo(() => filterRows(data?.users || [], search, ["nome", "email", "telefone", "perfil", "titulo_eclesiastico", "comunidades_nomes"]), [data?.users, search]);
@@ -190,20 +135,6 @@ export default function OwnerWorkspace({
       ? rows
       : rows.filter((item) => String(item.resultado) === auditResult);
   }, [auditResult, auditSearch, data?.audit]);
-  const globalResults = useMemo(() => {
-    const term = globalSearch.trim().toLocaleLowerCase("pt-BR");
-    if (!term || !data) return [];
-    const navigation = TABS.filter((item) => `${item.label} ${tabDescription(item.id)}`.toLocaleLowerCase("pt-BR").includes(term))
-      .slice(0, 4)
-      .map((item) => ({ kind: "navigation" as const, id: item.id, title: item.label, detail: tabDescription(item.id) }));
-    const communities = filterRows(data.communities, term, ["nome", "cidade_publica", "proprietario_nome"])
-      .slice(0, 4)
-      .map((item) => ({ kind: "community" as const, id: Number(item.id), title: String(item.nome), detail: String(item.cidade_publica || item.proprietario_nome || "Comunidade") }));
-    const users = filterRows(data.users, term, ["nome", "email", "telefone", "comunidades_nomes"])
-      .slice(0, 4)
-      .map((item) => ({ kind: "user" as const, id: Number(item.id), title: String(item.nome), detail: String(item.comunidades_nomes || item.email || "Pessoa") }));
-    return [...navigation, ...communities, ...users].slice(0, 8);
-  }, [data, globalSearch]);
 
   async function decideRequest(formElement: HTMLFormElement, requestId: number, action: "ANALISAR" | "APROVAR" | "RECUSAR") {
     setWorking(requestId);
@@ -420,80 +351,29 @@ export default function OwnerWorkspace({
   function selectTab(next: OwnerTab) {
     setTab(next);
     setDirectoryPage(0);
-    setMobileNavOpen(false);
-    setGlobalSearch("");
+    setSearch("");
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", next);
+    window.history.replaceState(window.history.state, "", url);
     window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "instant" }));
   }
 
-  function toggleMobileNavigation() {
-    setMobileNavOpen((value) => {
-      const next = !value;
-      if (next) window.requestAnimationFrame(() => document.querySelector<HTMLElement>(".owner-sidebar")?.scrollTo({ top: 0 }));
-      return next;
-    });
-  }
-
-  const activeSection = OWNER_NAV_SECTIONS.find((section) => section.items.includes(tab)) || OWNER_NAV_SECTIONS[0];
-
   return (
-    <main className="owner-area owner-area-v3 owner-area-v4" data-ui-version="v4-preview" data-visual-editor-root data-editor-key="area-proprietario">
-      <div className="owner-layout owner-shell-v4">
-        {mobileNavOpen ? <button type="button" className="owner-sidebar-backdrop" aria-label="Fechar menu" onClick={() => setMobileNavOpen(false)} /> : null}
-        <aside className={`owner-sidebar ${mobileNavOpen ? "is-open" : ""}`} style={{ flexDirection: "column" }}>
-          <Link href="/" className="owner-brand owner-brand-desktop"><span><OwnerImage src={brandLogo} fallback={brandName.slice(0, 1)} /></span><div><strong>{brandName}</strong><small>Administração global</small></div></Link>
-          <nav className="owner-section-switcher" aria-label="Áreas administrativas">
-            {OWNER_NAV_SECTIONS.map((section) => <button type="button" key={section.id} className={activeSection.id === section.id ? "active" : ""} onClick={() => selectTab(section.items[0])}><span>{section.icon}</span><strong>{section.label}</strong><small>{section.description}</small></button>)}
-          </nav>
-          <div className="owner-context-nav">
-            <header><span>{activeSection.label}</span><small>{activeSection.items.length} {activeSection.items.length === 1 ? "área" : "áreas"}</small></header>
-            <nav aria-label={`Menu de ${activeSection.label}`}>
-              {activeSection.items.map((id) => { const item = TABS.find((candidate) => candidate.id === id)!; return <button type="button" key={item.id} className={tab === item.id ? "active" : ""} onClick={() => selectTab(item.id)}><span>{item.icon}</span>{item.label}{item.id === "requests" && pending.length > 0 ? <b>{pending.length}</b> : item.id === "feedback" && pendingFeedback.length > 0 ? <b>{pendingFeedback.length}</b> : null}</button>; })}
-            </nav>
-          </div>
-          <div className="owner-sidebar-links">
-            <Link href="/painel" showLoading loadingLabel="Abrindo sua comunidade…">Painel da comunidade <span>↗</span></Link>
-            <Link href="/comunidades" showLoading loadingLabel="Abrindo o diretório público…">Diretório público <span>↗</span></Link>
-          </div>
-          <Link href="/painel?view=conta" className="owner-sidebar-profile"><OwnerAvatar image={ownerPhoto} name={ownerName} /><span><VerifiedOwnerName name={ownerName} verified /><small>Proprietário global</small></span></Link>
-        </aside>
-        <div className="owner-main-v4">
-          <header className="owner-topbar" data-editor-key="cabecalho-proprietario">
-            <button className="owner-mobile-menu" type="button" aria-label="Abrir menu" aria-expanded={mobileNavOpen} onClick={toggleMobileNavigation}>☰</button>
-            <Link href="/" className="owner-brand owner-brand-mobile"><span><OwnerImage src={brandLogo} fallback={brandName.slice(0, 1)} /></span></Link>
-            <div className="owner-breadcrumb"><small>ADMINISTRAÇÃO GLOBAL</small><strong>{activeSection.label} <span>/</span> {tabLabel(tab)}</strong></div>
-            <div className="owner-global-search">
-              <span aria-hidden="true">⌕</span>
-              <input value={globalSearch} onChange={(event) => setGlobalSearch(event.target.value)} placeholder="Buscar comunidade, pessoa, configuração ou ação" aria-label="Busca global administrativa" />
-              {globalSearch && <button type="button" aria-label="Limpar busca" onClick={() => setGlobalSearch("")}>×</button>}
-            </div>
-            <div className="owner-top-actions">
-              <ThemeControl compact />
-              <PilotNotificationCenter />
-              <span id="global-editor-toolbar-slot" className="global-editor-toolbar-slot" aria-label="Aparência" />
-              <Link href="/painel?view=conta" className="owner-profile-link" showLoading loadingLabel="Abrindo seu perfil…"><span><OwnerImage src={ownerPhoto} fallback={initials(ownerName)} /></span></Link>
-            </div>
-          </header>
-          <section className="owner-workspace">
-          {globalSearch && data ? <section className="owner-global-results" aria-label="Resultados da busca global">
-            <header><span>Resultados para</span><strong>“{globalSearch}”</strong></header>
-            {globalResults.map((result) => <button type="button" key={`${result.kind}-${result.id}`} onClick={() => {
-              if (result.kind === "navigation") selectTab(result.id);
-              if (result.kind === "community") void openCommunity(result.id);
-              if (result.kind === "user") { setTab("users"); setSearch(result.title); setGlobalSearch(""); }
-            }}><span>{result.kind === "navigation" ? "Ir" : result.kind === "community" ? "Comunidade" : "Pessoa"}</span><strong>{result.title}</strong><small>{result.detail}</small><i>→</i></button>)}
-            {!globalResults.length && <Empty title="Nenhum resultado" text="Tente outro nome, configuração ou área administrativa." />}
-          </section> : null}
-          <header className="owner-page-heading owner-page-heading-v4">
-            <div><p className="pilot-kicker">{activeSection.label.toUpperCase()}</p><h1>{tabLabel(tab)}</h1><p>{tabDescription(tab)}</p></div>
-            <div className="owner-page-quick-actions">
-              {tab !== "overview" ? <span className="owner-page-scope"><i>✓</i><b>Escopo global</b><small>Registrado na auditoria</small></span> : null}
-              <button type="button" onClick={() => selectTab("requests")}><span>◫</span> Pendências {pending.length > 0 && <b>{pending.length}</b>}</button>
-            </div>
-          </header>
+    <main className="owner-area owner-area-v3 owner-console" data-ui-version="owner-console" data-visual-editor-root data-editor-key="area-proprietario">
+      <OwnerConsoleShell tab={tab} onSelect={selectTab} onSearchDirectory={(next, query) => { selectTab(next); setSearch(query); }} data={data} ownerName={ownerName} ownerPhoto={ownerPhoto} brandName={brandName} brandLogo={brandLogo}>
+        <header className="oc-page-head">
+          <div><p className="oc-eyebrow">Console do proprietário · Escopo global</p><h1>{tabLabel(tab)}</h1><p>{tabDescription(tab)}</p></div>
+          <div className="oc-head-actions">{!["plans", "appearance", "editorial", "statistics", "optimization", "controls", "laboratory"].includes(tab) && <button type="button" className="oc-button" disabled={loading || working !== null} onClick={() => void load()}>Atualizar dados</button>}{tab === "overview" && <button type="button" className="oc-button primary" onClick={() => selectTab("decisions")}>Revisar pendências</button>}</div>
+        </header>
+        {(["audit", "passwords", "deleted"] as OwnerTab[]).includes(tab) && <nav className="oc-subnav" aria-label="Segurança e auditoria">{(["audit", "passwords", "deleted"] as OwnerTab[]).map(id => <button type="button" key={id} aria-current={tab === id ? "page" : undefined} onClick={() => selectTab(id)}><OwnerTabIcon tab={id} />{tabLabel(id)}</button>)}</nav>}
+        {(["performance", "incidents", "realtime"] as OwnerTab[]).includes(tab) && <nav className="oc-subnav" aria-label="Confiabilidade">{(["performance", "incidents", "realtime"] as OwnerTab[]).map(id => <button type="button" key={id} aria-current={tab === id ? "page" : undefined} onClick={() => selectTab(id)}><OwnerTabIcon tab={id} />{tabLabel(id)}</button>)}</nav>}
+        {(["decisions", "requests", "feedback"] as OwnerTab[]).includes(tab) && <nav className="oc-subnav" aria-label="Pendências e históricos">{(["decisions", "requests", "feedback"] as OwnerTab[]).map(id => <button type="button" key={id} aria-current={tab === id ? "page" : undefined} onClick={() => selectTab(id)}>{tabLabel(id)}</button>)}</nav>}
+        {tab === "decisions" && data && <OwnerDecisionQueue data={data} onSelect={selectTab} />}
           {message && <p className="operations-feedback" role="status">{message}</p>}
+          {loadError && <div className="owner-load-error"><p className="operations-feedback error" role="alert">{loadError}</p><button type="button" onClick={() => void load()}>Tentar novamente</button></div>}
           {loading && !data ? <div className="owner-loading">Carregando controles globais…</div> : null}
 
-          {tab === "overview" && data && <OwnerOverviewV3 data={data} pending={pending} pendingFeedback={pendingFeedback} ownerName={ownerName} brandName={brandName} gridPreset={gridPreset} metricOrder={metricOrder} draggingMetric={draggingMetric} onSelectTab={selectTab} onOpenCommunity={openCommunity} onSaveLayout={saveOwnerLayout} onDragStart={setDraggingMetric} onDragEnd={() => setDraggingMetric(null)} onDropMetric={reorderMetric} onMoveMetric={moveMetric} />}
+          {tab === "overview" && data && <OwnerExecutiveOverview data={data} gridPreset={gridPreset} metricOrder={metricOrder} draggingMetric={draggingMetric} onSelectTab={selectTab} onOpenCommunity={openCommunity} onSaveLayout={saveOwnerLayout} onDragStart={setDraggingMetric} onDragEnd={() => setDraggingMetric(null)} onDropMetric={reorderMetric} onMoveMetric={moveMetric} />}
           {tab === "laboratory" && <OwnerLaboratoryWorkspace />}
           {data && (["passwords", "deleted", "finance", "realtime", "performance", "publication", "incidents"] as OwnerOperationsScreen[]).includes(tab as OwnerOperationsScreen) && <OwnerOperationsWorkspace screen={tab as OwnerOperationsScreen} data={data} />}
 
@@ -516,7 +396,7 @@ export default function OwnerWorkspace({
                   {directoryOpen ? "Recolher lista" : "Exibir lista"}
                 </button>
               </header>
-              <label><span>⌕</span><input type="search" value={search} onChange={(event) => { setSearch(event.target.value); setDirectoryPage(0); }} placeholder={tab === "communities" ? "Pesquisar comunidade, cidade ou responsável" : "Pesquisar nome, telefone, e-mail ou comunidade"} /></label>
+              <label><span>⌕</span><input type="search" aria-label={tab === "communities" ? "Pesquisar comunidades" : "Pesquisar pessoas"} value={search} onChange={(event) => { setSearch(event.target.value); setDirectoryPage(0); }} placeholder={tab === "communities" ? "Pesquisar comunidade, cidade ou responsável" : "Pesquisar nome, telefone, e-mail ou comunidade"} /></label>
               {directoryOpen && tab === "communities" ? (
                 <div className="owner-community-list">
                   {visibleDirectoryRows.map((item) => {
@@ -527,7 +407,7 @@ export default function OwnerWorkspace({
                     return <details className="owner-community-profile" key={id}>
                       <summary>
                         <OwnerAvatar image={communityLogo(item)} name={String(item.nome)} />
-                        <div><h2>{String(item.nome)}</h2><p>{String(item.cidade_publica || "Localização não informada")}</p></div>
+                        <div><h2>{String(item.nome)}</h2><p>{String(item.cidade_publica || "Localização não informada")}</p><small className="oc-community-counts">{Number(item.membros || 0)} membros · {Number(item.ministerios || 0)} ministérios</small></div>
                         <b className={active ? "active" : "inactive"}>{status.replaceAll("_", " ")}</b>
                         <i aria-hidden="true">⌄</i>
                       </summary>
@@ -565,7 +445,7 @@ export default function OwnerWorkspace({
                         const id = Number(item.id);
                         const active = Number(item.ativo) === 1;
                         const name = String(item.nome);
-                        return <details key={id}><summary><OwnerAvatar image={String(item.foto_perfil || "")} name={name} /><div><h2>{name}</h2><small>{String(item.telefone || item.email || "Contato não informado")}</small></div><b className={active ? "active" : "inactive"}>{active ? "ATIVO" : "INATIVO"}</b><i aria-hidden="true">⌄</i></summary><div className="owner-user-details"><span><small>E-mail</small><strong>{String(item.email || "Não informado")}</strong></span><span><small>Telefone</small><strong>{String(item.telefone || "Não informado")}</strong></span><span><small>Comunidades</small><strong>{String(item.comunidades_nomes || "Sem vínculo")}</strong></span><span><small>Perfil global</small><strong>{String(item.perfil || "MEMBRO")}</strong></span><div className="owner-user-actions"><button type="button" disabled={working === id} onClick={() => void changeUserStatus(id, name, !active)}>{active ? "Desativar conta" : "Reativar conta"}</button><button type="button" className="danger" disabled={working === id} onClick={() => void deleteUserPermanently(id, name)}>Excluir definitivamente</button></div><p>A exclusão definitiva é aceita somente para contas sem vínculos. Contas com histórico devem ser desativadas.</p></div></details>;
+                        return <details key={id}><summary><OwnerAvatar image={String(item.foto_perfil || "")} name={name} /><div><h2>{name}</h2><small>{String(item.telefone || item.email || "Contato não informado")}</small></div><b className={active ? "active" : "inactive"}>{active ? "ATIVO" : "INATIVO"}</b><i aria-hidden="true">⌄</i></summary><div className="owner-user-details"><span><small>E-mail</small><strong>{String(item.email || "Não informado")}</strong></span><span><small>Telefone</small><strong>{String(item.telefone || "Não informado")}</strong></span><span><small>Comunidades</small><strong>{String(item.comunidades_nomes || "Sem vínculo")}</strong></span><span><small>Perfil global</small><strong>{String(item.perfil || "MEMBRO")}</strong></span><div className="owner-user-actions"><button type="button" disabled={working === id || id === data.owner.id || Number(item.system_owner) === 1} onClick={() => void changeUserStatus(id, name, !active)}>{active ? "Desativar conta" : "Reativar conta"}</button><button type="button" className="danger" disabled={working === id || id === data.owner.id || Number(item.system_owner) === 1} onClick={() => void deleteUserPermanently(id, name)}>Excluir definitivamente</button></div><p>{id === data.owner.id || Number(item.system_owner) === 1 ? "Conta do proprietário protegida: desativação e exclusão não são permitidas." : "A exclusão definitiva é aceita somente para contas sem vínculos. Contas com histórico devem ser desativadas."}</p></div></details>;
                       })}
                       {!visibleDirectoryRows.length && <Empty title="Nenhuma pessoa encontrada" text="Ajuste a pesquisa para ver outros resultados." />}
                     </div>
@@ -576,7 +456,7 @@ export default function OwnerWorkspace({
             </section>
           )}
 
-          {tab === "audit" && data && <section className="owner-audit-panel"><header><div><h2>Trilha de auditoria</h2><p>Pesquise e abra um registro para conferir os detalhes preservados.</p></div><div className="owner-audit-filters"><input type="search" value={auditSearch} onChange={(event) => setAuditSearch(event.target.value)} placeholder="Pesquisar ação, pessoa ou comunidade" /><select value={auditResult} onChange={(event) => setAuditResult(event.target.value)} aria-label="Filtrar por resultado"><option value="TODOS">Todos os resultados</option><option value="SUCESSO">Sucesso</option><option value="NEGADO">Negado</option><option value="ERRO">Erro</option></select></div></header><p className="owner-audit-retention" role="note">Retenção automática: registros com mais de {data.auditRetention?.days || 14} dias são excluídos. Esta tela mostra somente as {data.auditRetention?.visibleLimit || 20} ações mais recentes.</p><div className="owner-audit-list">{filteredAudit.map((item) => <details key={Number(item.id)}><summary><span>{String(item.resultado) === "SUCESSO" ? "✓" : "!"}</span><div><strong>{humanize(String(item.evento))}</strong><p>{String(item.comunidade_nome || "Plataforma")} · {String(item.usuario_nome || "Sistema")}</p></div><time>{formatDate(String(item.criado_em))}</time></summary><div className="owner-audit-detail"><span><small>Resultado</small><strong>{String(item.resultado || "NÃO INFORMADO")}</strong></span><span><small>Registro</small><strong>#{Number(item.id)}</strong></span><span><small>Responsável</small><strong>{String(item.usuario_nome || "Sistema")}</strong></span><span><small>Contexto</small><strong>{String(item.comunidade_nome || "Plataforma")}</strong></span><AuditMetadata value={item.metadados} /></div></details>)}{!filteredAudit.length && <Empty title="Nenhum registro encontrado" text="Ajuste a pesquisa ou o filtro de resultado." />}</div></section>}
+          {tab === "audit" && data && <section className="owner-audit-panel"><header><div><h2>Trilha de auditoria</h2><p>Pesquise e abra um registro para conferir os detalhes preservados.</p></div><div className="owner-audit-filters"><input type="search" aria-label="Pesquisar auditoria" value={auditSearch} onChange={(event) => setAuditSearch(event.target.value)} placeholder="Pesquisar ação, pessoa ou comunidade" /><select value={auditResult} onChange={(event) => setAuditResult(event.target.value)} aria-label="Filtrar por resultado"><option value="TODOS">Todos os resultados</option><option value="SUCESSO">Sucesso</option><option value="NEGADO">Negado</option><option value="ERRO">Erro</option></select></div></header><p className="owner-audit-retention" role="note">Retenção automática: registros com mais de {data.auditRetention?.days || 14} dias são excluídos. Esta tela mostra somente as {data.auditRetention?.visibleLimit || 20} ações mais recentes.</p><div className="owner-audit-list">{filteredAudit.map((item) => <details key={Number(item.id)}><summary><span>{String(item.resultado) === "SUCESSO" ? "✓" : "!"}</span><div><strong>{humanize(String(item.evento))}</strong><p>{String(item.comunidade_nome || "Plataforma")} · {String(item.usuario_nome || "Sistema")}</p></div><time>{formatDate(String(item.criado_em))}</time></summary><div className="owner-audit-detail"><span><small>Resultado</small><strong>{String(item.resultado || "NÃO INFORMADO")}</strong></span><span><small>Registro</small><strong>#{Number(item.id)}</strong></span><span><small>Responsável</small><strong>{String(item.usuario_nome || "Sistema")}</strong></span><span><small>Contexto</small><strong>{String(item.comunidade_nome || "Plataforma")}</strong></span><AuditMetadata value={item.metadados} /></div></details>)}{!filteredAudit.length && <Empty title="Nenhum registro encontrado" text="Ajuste a pesquisa ou o filtro de resultado." />}</div></section>}
           {tab === "feedback" && data && <FeedbackRepository items={data.feedback || []} working={working} onAction={feedbackAction} onOpenPost={(communityId, postId) => openCommunity(communityId, postId)} />}
           {tab === "editorial" && <EditorialAutomationWorkspace />}
           {tab === "statistics" && <StatisticsWorkspace />}
@@ -584,110 +464,34 @@ export default function OwnerWorkspace({
           {tab === "appearance" && <OwnerAppearanceWorkspace />}
           {tab === "plans" && <PlatformPlansWorkspace />}
           {tab === "controls" && <PlatformControlsWorkspace features={features} currentCommunityId={currentCommunityId} />}
-          </section>
-        </div>
-      </div>
-      <nav className="owner-mobile-nav" aria-label="Navegação rápida do proprietário">
-        {["overview", "requests", "communities", "audit"].map((id) => { const item = TABS.find((candidate) => candidate.id === id)!; const mobileLabel = { overview: "Início", requests: "Pedidos", communities: "Rede", audit: "Auditoria" }[id]; return <button type="button" key={id} className={tab === id ? "active" : ""} onClick={() => selectTab(id as OwnerTab)}><span>{item.icon}</span>{mobileLabel}{id === "requests" && pending.length > 0 ? <b>{pending.length}</b> : null}</button>; })}
-        <button type="button" className={mobileNavOpen ? "active" : ""} onClick={toggleMobileNavigation}><span>☷</span>Mais</button>
-      </nav>
-      <GlobalVisualEditor canEdit communityName="Área do Proprietário" screenId={`owner:${tab}`} rootSelector=".owner-area" />
+      </OwnerConsoleShell>
+      <GlobalVisualEditor canEdit communityName="Área do Proprietário" screenId={`owner:${tab}`} rootSelector=".owner-console" />
     </main>
   );
 }
 
-function OwnerOverviewV3({
-  data,
-  pending,
-  pendingFeedback,
-  ownerName,
-  brandName,
-  gridPreset,
-  metricOrder,
-  draggingMetric,
-  onSelectTab,
-  onOpenCommunity,
-  onSaveLayout,
-  onDragStart,
-  onDragEnd,
-  onDropMetric,
-  onMoveMetric,
-}: {
-  data: OwnerData;
-  pending: Record<string, unknown>[];
-  pendingFeedback: Record<string, unknown>[];
-  ownerName: string;
-  brandName: string;
-  gridPreset: OwnerGridPreset;
-  metricOrder: OwnerMetricKey[];
-  draggingMetric: OwnerMetricKey | null;
-  onSelectTab: (tab: OwnerTab) => void;
-  onOpenCommunity: (id: number) => Promise<void>;
+function OwnerExecutiveOverview({ data, gridPreset, metricOrder, draggingMetric, onSelectTab, onOpenCommunity, onSaveLayout, onDragStart, onDragEnd, onDropMetric, onMoveMetric }: {
+  data: OwnerData; gridPreset: OwnerGridPreset; metricOrder: OwnerMetricKey[]; draggingMetric: OwnerMetricKey | null;
+  onSelectTab: (tab: OwnerTab) => void; onOpenCommunity: (id: number) => Promise<void>;
   onSaveLayout: (preset: OwnerGridPreset, order: OwnerMetricKey[], message: string) => Promise<void>;
-  onDragStart: (key: OwnerMetricKey) => void;
-  onDragEnd: () => void;
-  onDropMetric: (key: OwnerMetricKey) => void;
+  onDragStart: (key: OwnerMetricKey) => void; onDragEnd: () => void; onDropMetric: (key: OwnerMetricKey) => void;
   onMoveMetric: (key: OwnerMetricKey, direction: -1 | 1) => void;
 }) {
-  const nonActiveCommunities = data.communities.filter((item) => String(item.status || "").toUpperCase() !== "ATIVA");
-  const auditIssues = data.audit.filter((item) => !["SUCESSO", "OK"].includes(String(item.resultado || "").toUpperCase()));
-  const attention = [
-    pending.length ? { tone: "urgent", label: `${pending.length} ${pending.length === 1 ? "solicitação aguarda" : "solicitações aguardam"} decisão`, detail: "Novas comunidades dependem da análise do proprietário.", action: "Revisar", tab: "requests" as OwnerTab } : null,
-    pendingFeedback.length ? { tone: "warning", label: `${pendingFeedback.length} ${pendingFeedback.length === 1 ? "mensagem está" : "mensagens estão"} pendente`, detail: "Feedbacks e denúncias ainda não foram tratados.", action: "Abrir caixa", tab: "feedback" as OwnerTab } : null,
-    nonActiveCommunities.length ? { tone: "neutral", label: `${nonActiveCommunities.length} ${nonActiveCommunities.length === 1 ? "comunidade não está ativa" : "comunidades não estão ativas"}`, detail: "Consulte o status e o responsável antes de qualquer ação.", action: "Ver comunidades", tab: "communities" as OwnerTab } : null,
-    auditIssues.length ? { tone: "warning", label: `${auditIssues.length} ${auditIssues.length === 1 ? "registro recente exige" : "registros recentes exigem"} leitura`, detail: "A trilha disponível contém resultado diferente de sucesso.", action: "Ver auditoria", tab: "audit" as OwnerTab } : null,
-  ].filter(Boolean) as { tone: string; label: string; detail: string; action: string; tab: OwnerTab }[];
+  const [organizing, setOrganizing] = useState(false);
+  const failures = data.audit.filter(row => ["ERRO", "NEGADO", "FALHA"].includes(String(row.resultado).toUpperCase()));
   const compact = ["4x2", "4x4"].includes(gridPreset);
-
-  return <div className="owner-overview-v3">
-    <section className="owner-v3-intro">
-      <div>
-        <span className="owner-v3-eyebrow">Operação de hoje</span>
-        <h2>Olá, {ownerName.split(" ")[0]}. Aqui está o que pede atenção.</h2>
-        <p>Uma leitura objetiva da plataforma, baseada somente nas fontes administrativas disponíveis agora.</p>
-      </div>
-      <button type="button" onClick={() => onSelectTab("appearance")}><span>◐</span><b>Marca e conteúdo</b><small>{brandName}</small><i>→</i></button>
+  return <div className="oc-overview">
+    <section aria-label="Indicadores da plataforma" className="oc-status-rail" data-reorder={organizing}>
+      {metricOrder.map((key, index) => { const metric = OWNER_METRICS.find(item => item.key === key)!; return <Metric key={key} label={metric.label} value={data.metrics[key]} detail={compact ? "" : metric.detail} emphasis={metric.emphasis} draggable dragging={draggingMetric === key} onDragStart={() => onDragStart(key)} onDragEnd={onDragEnd} onDragOver={event => event.preventDefault()} onDrop={() => onDropMetric(key)} onMoveUp={index > 0 ? () => onMoveMetric(key, -1) : undefined} onMoveDown={index < metricOrder.length - 1 ? () => onMoveMetric(key, 1) : undefined} />; })}
     </section>
-
-    <section className="owner-v3-attention" aria-labelledby="owner-attention-title">
-      <header><div><span>Prioridades</span><h3 id="owner-attention-title">O que precisa da sua atenção</h3></div><small>Dados atuais da plataforma</small></header>
-      {attention.length ? <div>{attention.map((item) => <button type="button" key={`${item.tab}-${item.label}`} onClick={() => onSelectTab(item.tab)} data-tone={item.tone}>
-        <i aria-hidden="true" /><span><strong>{item.label}</strong><small>{item.detail}</small></span><b>{item.action} →</b>
-      </button>)}</div> : <div className="owner-v3-clear"><span>✓</span><div><strong>Nenhuma pendência identificada</strong><small>As fontes administrativas conectadas não apresentam itens pendentes neste momento.</small></div></div>}
-    </section>
-
-    <section className="owner-v3-metrics" aria-labelledby="owner-metrics-title">
-      <header><div><span>Indicadores</span><h3 id="owner-metrics-title">Pulso da plataforma</h3></div><div className="owner-density-control" aria-label="Densidade da visão geral"><button type="button" className={compact ? "active" : ""} onClick={() => void onSaveLayout("4x2", metricOrder, "Visão enxuta salva para sua área de proprietário.")} aria-pressed={compact}>Enxuto</button><button type="button" className={!compact ? "active" : ""} onClick={() => void onSaveLayout("2x2", metricOrder, "Visão detalhada salva para sua área de proprietário.")} aria-pressed={!compact}>Detalhado</button></div></header>
-      <div className="owner-metric-grid" data-grid-preset={compact ? "4x2" : "2x2"}>
-        {metricOrder.map((key, index) => {
-          const metric = OWNER_METRICS.find((item) => item.key === key)!;
-          return <Metric key={key} label={metric.label} value={data.metrics[key]} detail={metric.detail} emphasis={metric.emphasis} draggable dragging={draggingMetric === key} onDragStart={() => onDragStart(key)} onDragEnd={onDragEnd} onDragOver={(event) => event.preventDefault()} onDrop={() => onDropMetric(key)} onMoveUp={index > 0 ? () => onMoveMetric(key, -1) : undefined} onMoveDown={index < metricOrder.length - 1 ? () => onMoveMetric(key, 1) : undefined} />;
-        })}
-      </div>
-      <p className="owner-v3-source">Fonte: base operacional da plataforma · valores carregados nesta sessão.</p>
-    </section>
-
-    <div className="owner-v3-main-grid">
-      <section className="owner-v3-communities" aria-labelledby="owner-communities-title">
-        <header><div><span>Comunidades</span><h3 id="owner-communities-title">Visão administrativa</h3></div><button type="button" onClick={() => onSelectTab("communities")}>Ver todas →</button></header>
-        <div className="owner-v3-community-table" role="table" aria-label="Comunidades recentes">
-          <div role="row" className="owner-v3-table-head"><span role="columnheader">Comunidade</span><span role="columnheader">Responsável</span><span role="columnheader">Membros</span><span role="columnheader">Status</span><span role="columnheader">Ação</span></div>
-          {data.communities.slice(0, 6).map((item) => { const status = String(item.status || "Não informado"); return <div role="row" key={Number(item.id)}>
-            <span role="cell"><OwnerAvatar image={communityLogo(item)} name={String(item.nome)} /><span><strong>{String(item.nome)}</strong><small>{String(item.cidade_publica || "Localização não informada")}</small></span></span>
-            <span role="cell" data-label="Responsável">{String(item.proprietario_nome || "Não definido")}</span>
-            <span role="cell" data-label="Membros">{Number.isFinite(Number(item.membros)) ? Number(item.membros).toLocaleString("pt-BR") : "Sem dados"}</span>
-            <span role="cell" data-label="Status"><b data-status={status.toLowerCase()}>{humanize(status)}</b></span>
-            <span role="cell"><button type="button" onClick={() => void onOpenCommunity(Number(item.id))} disabled={status.toUpperCase() !== "ATIVA"}>Abrir</button></span>
-          </div>; })}
-          {!data.communities.length && <Empty title="Sem comunidades disponíveis" text="A fonte administrativa não retornou registros." />}
-        </div>
-      </section>
-
-      <aside className="owner-v3-activity">
-        <header><div><span>Histórico</span><h3>Atividade recente</h3></div><button type="button" onClick={() => onSelectTab("audit")}>Abrir trilha →</button></header>
-        <div>{data.audit.slice(0, 6).map((item) => <article key={Number(item.id)}><span data-result={String(item.resultado || "").toLowerCase()}>{String(item.resultado) === "SUCESSO" ? "✓" : "!"}</span><div><strong>{humanize(String(item.evento))}</strong><small>{String(item.usuario_nome || "Sistema")}</small><time>{formatDate(String(item.criado_em))}</time></div></article>)}</div>
-        {!data.audit.length && <Empty title="Sem atividade disponível" text="A trilha de auditoria não retornou registros." />}
-      </aside>
+    <div className="oc-source-line"><span>Fonte: base operacional{data.generatedAt && <> · <time dateTime={data.generatedAt}>Atualizado em {formatConsoleDate(data.generatedAt)}</time></>}</span><div role="group" aria-label="Densidade dos indicadores"><button type="button" aria-pressed={organizing} onClick={() => setOrganizing(value => !value)}>Organizar</button><button type="button" aria-pressed={compact} onClick={() => void onSaveLayout("4x2", metricOrder, "Visão enxuta salva.")}>Enxuto</button><button type="button" aria-pressed={!compact} onClick={() => void onSaveLayout("2x2", metricOrder, "Visão detalhada salva.")}>Detalhado</button></div></div>
+    <div className="oc-executive-grid">
+      <OwnerDecisionQueue data={data} onSelect={onSelectTab} compact />
+      <section className="oc-panel oc-health"><header className="oc-panel-head"><div><h2>Saúde da plataforma</h2><p>Evidências disponíveis na auditoria</p></div><OwnerTabIcon tab="performance" /></header><div className="oc-health-summary"><span className="oc-health-symbol"><OwnerTabIcon tab="audit" /></span><div><strong>{failures.length ? "Registros para investigar" : "Sem falhas na amostra"}</strong><p>{data.audit.length} eventos recentes consultados. Isso não comprova disponibilidade ou ausência de incidentes.</p></div></div><dl><div><dt>Erros e acessos negados</dt><dd>{failures.length}</dd></div><div><dt>Latência e disponibilidade</dt><dd>Não integradas</dd></div><div><dt>Retenção da auditoria</dt><dd>{data.auditRetention?.days ? `${data.auditRetention.days} dias` : "Não informada"}</dd></div></dl><footer className="oc-panel-foot"><button type="button" className="oc-text-button" onClick={() => onSelectTab("performance")}>Investigar saúde & incidentes →</button></footer></section>
+    </div>
+    <div className="oc-lower-grid">
+      <section className="oc-panel"><header className="oc-panel-head"><div><h2>Comunidades</h2><p>Operação, responsáveis e situação atual</p></div><button type="button" className="oc-text-button" onClick={() => onSelectTab("communities")}>Ver todas →</button></header><div className="oc-table-scroll" role="region" aria-label="Comunidades da plataforma" tabIndex={0}><table className="oc-table"><caption className="oc-sr-only">Comunidades da plataforma na consulta atual</caption><thead><tr><th scope="col">Comunidade</th><th scope="col">Membros</th><th scope="col">Status</th><th scope="col"><span className="oc-sr-only">Ação</span></th></tr></thead><tbody>{data.communities.slice(0, 5).map(item => <tr key={Number(item.id)}><td><div className="oc-name-cell"><OwnerAvatar image={communityLogo(item)} name={String(item.nome)} /><div><strong>{String(item.nome)}</strong><small>{String(item.proprietario_nome || "Responsável não definido")}</small></div></div></td><td>{Number(item.membros).toLocaleString("pt-BR")}</td><td><span className="oc-status" data-tone={item.status === "ATIVA" ? "success" : "neutral"}>{humanize(String(item.status))}</span></td><td><button type="button" className="oc-text-button" disabled={item.status !== "ATIVA"} onClick={() => void onOpenCommunity(Number(item.id))} aria-label={`Abrir ${item.nome}`}>Abrir ↗</button></td></tr>)}</tbody></table></div>{!data.communities.length && <div className="oc-empty"><h3>Nenhuma comunidade disponível</h3><p>As comunidades aprovadas aparecerão aqui.</p></div>}</section>
+      <section className="oc-panel"><header className="oc-panel-head"><div><h2>Atividade recente</h2><p>Trilha de ações administrativas</p></div><button type="button" className="oc-text-button" onClick={() => onSelectTab("audit")}>Ver auditoria →</button></header><ol className="oc-activity">{data.audit.slice(0, 5).map(item => <li key={Number(item.id)}><span className="oc-activity-icon"><OwnerTabIcon tab="audit" /></span><div><strong>{humanize(String(item.evento))}</strong><small>{String(item.usuario_nome || "Sistema")} · {humanize(String(item.resultado))}</small></div><time dateTime={String(item.criado_em)}>{formatConsoleDate(String(item.criado_em))}</time></li>)}</ol>{!data.audit.length && <div className="oc-empty"><h3>Nenhum evento recente</h3><p>Não há registros na janela disponível.</p></div>}</section>
     </div>
   </div>;
 }
@@ -718,8 +522,9 @@ function RequestCard({ item, working, onDecide }: { item: Record<string, unknown
         }}
       >
         <div className="owner-request-fields">
-          <label>Nome da comunidade<input name="nome" defaultValue={String(item.nome)} required minLength={3} maxLength={120} disabled={!actionable} /></label>
-          <label>Cidade e estado<input name="cidade" defaultValue={String(item.cidade)} required minLength={2} maxLength={120} disabled={!actionable} /></label>
+          <label>Nome da comunidade<input type="text" name="nome" defaultValue={String(item.nome)} required minLength={3} maxLength={120} disabled={!actionable} /></label>
+          <label>Cidade e estado<input type="text" name="cidade" defaultValue={String(item.cidade)} required minLength={2} maxLength={120} disabled={!actionable} /></label>
+          <label className="wide">E-mail institucional<input type="email" value={String(item.email_institucional || "")} readOnly placeholder="Não informado pelo solicitante" /></label>
           <label className="wide">Descrição<textarea name="descricao" defaultValue={String(item.descricao)} required minLength={20} maxLength={600} rows={4} disabled={!actionable} /></label>
           {answers.length > 0 && (
             <section className="owner-request-answers wide" aria-label="Informações enviadas na ficha">
@@ -891,6 +696,7 @@ function communityLogo(item: Record<string, unknown>) {
 function tabLabel(tab: OwnerTab) { return TABS.find((item) => item.id === tab)?.label || "Visão geral"; }
 function tabDescription(tab: OwnerTab) {
   return {
+    decisions: "Solicitações e mensagens abertas em uma única fila, com origem e data reais.",
     overview: "Indicadores, decisões e governança em uma visão clara.",
     requests: "Revise os dados e as abas antes de criar cada comunidade.",
     communities: "Acompanhe status, responsáveis, membros e acesso integral.",

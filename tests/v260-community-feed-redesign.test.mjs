@@ -52,3 +52,25 @@ test("o estilo do feed é delimitado e adapta a composição para celular", () =
   assert.match(styles, /\.community-reaction-picker/);
   assert.match(styles, /@media \(max-width: 680px\)/);
 });
+
+test("o compositor do mural redesenhado não herda a regra legada de tamanho zero", () => {
+  const styles = read("app/globals.css");
+  assert.match(styles, /\.community-home:not\(\.community-feed-redesign\) \.community-composer\s*\{\s*width: 0;\s*height: 0;/);
+  assert.match(styles, /\.community-feed-redesign \.community-composer\s*\{\s*width: 100%;\s*height: auto;/);
+});
+
+test("falha na carga inicial não é exibida como feed vazio", () => {
+  const source = read("app/components/CommunityHome.tsx");
+  assert.match(source, /const \[homeLoadError, setHomeLoadError\] = useState\(""\)/);
+  assert.match(source, /setHomeLoadError\(\(loadError as Error\)\.message\)/);
+  assert.match(source, /homeLoadError && !posts\.length \? \(/);
+  assert.match(source, /!loading && !homeLoadError && <small> no feed<\/small>/);
+  assert.match(source, /onClick=\{\(\) => void loadHome\(\)\}>Tentar novamente/);
+});
+
+test("layout do mural respeita o espaço útil entre desktop, tablet e celular", () => {
+  const styles = read("app/globals.css");
+  assert.match(styles, /@media \(min-width: 821px\) and \(max-width: 1100px\) \{\s*\.pilot-dashboard\[data-ui-version="v2"\] \.community-feed-redesign \.community-home-grid \{\s*grid-template-columns: minmax\(0, 1fr\) !important;/);
+  assert.match(styles, /\.community-feed-redesign \.community-home-command \{\s*display: flex !important;/);
+  assert.match(styles, /@media \(max-width: 820px\) \{\s*\.pilot-dashboard\[data-ui-version="v2"\] \.community-feed-redesign \.community-home-command \{ align-items: flex-start !important; \}\s*\.pilot-dashboard\[data-ui-version="v2"\] \.community-feed-redesign \.community-home-intro \{ width: 100%; flex: none; \}/);
+});

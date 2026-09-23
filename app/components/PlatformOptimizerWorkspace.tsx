@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTransientMessage } from "../lib/use-transient-message";
 
 type OptimizationCounts = {
   expiredSessions: number;
@@ -51,12 +52,14 @@ export default function PlatformOptimizerWorkspace() {
   const [status, setStatus] = useState<OptimizerStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState<"save" | "run" | null>(null);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useTransientMessage();
+  const [loadError, setLoadError] = useState("");
   const [enabled, setEnabled] = useState(true);
   const [intervalHours, setIntervalHours] = useState<24 | 168 | 720>(168);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError("");
     try {
       const response = await fetch("/api/proprietario/otimizacao", { cache: "no-store" });
       const result = await response.json() as OptimizerStatus;
@@ -65,7 +68,7 @@ export default function PlatformOptimizerWorkspace() {
       setEnabled(result.config.enabled);
       setIntervalHours(result.config.intervalHours);
     } catch (error) {
-      setMessage((error as Error).message);
+      setLoadError((error as Error).message);
     } finally {
       setLoading(false);
     }
@@ -107,8 +110,13 @@ export default function PlatformOptimizerWorkspace() {
     return <div className="platform-optimizer-loading" role="status">Verificando a manutenção da plataforma…</div>;
   }
 
+  if (loadError && !status) {
+    return <section className="platform-optimizer"><p className="operations-feedback error" role="alert">{loadError}</p><button type="button" onClick={() => void load()}>Tentar novamente</button></section>;
+  }
+
   return (
     <section className="platform-optimizer" aria-labelledby="optimizer-title">
+      {loadError && <p className="operations-feedback error" role="alert">{loadError}</p>}
       <header className="platform-optimizer-heading">
         <div>
           <p className="pilot-kicker">MANUTENÇÃO SEGURA</p>

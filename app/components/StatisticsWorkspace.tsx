@@ -43,20 +43,18 @@ export default function StatisticsWorkspace() {
   }, [load]);
 
   const growth = useMemo(
-    () => buildGrowth(data?.growth.users || [], data?.growth.communities || []),
+    () => buildGrowth(data?.growth.users || [], data?.growth.communities || [], data?.generatedAt),
     [data],
   );
-  const maxGrowth = Math.max(
-    1,
-    ...growth.flatMap((item) => [item.users, item.communities]),
-  );
+  const maxGrowth = Math.max(1, ...growth.flatMap((item) => [item.users, item.communities]));
+  const hasGrowth = growth.some((item) => item.users > 0 || item.communities > 0);
 
   return (
     <section className="statistics-workspace">
       <header className="workspace-heading">
         <div>
           <p className="pilot-kicker">ESTATÍSTICAS DA PLATAFORMA</p>
-          <h1>Crescimento e participação</h1>
+          <h2>Crescimento e participação</h2>
           <p>
             Indicadores agregados para o superadministrador. Nenhum dado
             pessoal é exibido neste painel.
@@ -73,8 +71,8 @@ export default function StatisticsWorkspace() {
       )}
       {!data ? (
         <div className="statistics-loading">
-          <span className="pilot-loader" />
-          <p>Calculando indicadores da comunidade ativa…</p>
+          {!error && <span className="pilot-loader" />}
+          <p>{error ? "Indicadores indisponíveis. Use Atualizar para tentar novamente." : "Calculando indicadores da plataforma…"}</p>
         </div>
       ) : (
         <>
@@ -120,25 +118,21 @@ export default function StatisticsWorkspace() {
                 <span><i />Comunidades</span>
               </div>
             </header>
-            <div className="statistics-bars" aria-label="Gráfico de crescimento">
+            <div className="statistics-chart" role="group" aria-label="Novos cadastros por mês, conforme a base da plataforma">
+              <div className="statistics-chart-scale" aria-hidden="true"><span>0</span><span>Máximo no período: {maxGrowth}</span></div>
               {growth.map((item) => (
-                <div key={item.month}>
-                  <div>
-                    <i
-                      style={{ height: `${Math.max(5, (item.users / maxGrowth) * 100)}%` }}
-                      title={`${item.users} novos usuários`}
-                    />
-                    <i
-                      style={{
-                        height: `${Math.max(5, (item.communities / maxGrowth) * 100)}%`,
-                      }}
-                      title={`${item.communities} novas comunidades`}
-                    />
+                <div className="statistics-chart-row" key={item.month} aria-label={`${formatMonthKey(item.month)}: ${item.users} ${item.users === 1 ? "novo usuário" : "novos usuários"} e ${item.communities} ${item.communities === 1 ? "nova comunidade" : "novas comunidades"}`}>
+                  <span className="statistics-chart-month">{formatMonthKey(item.month)}</span>
+                  <div className="statistics-chart-pair" aria-hidden="true">
+                    <div className="statistics-chart-track"><span className="statistics-chart-bar users" style={{ width: `${(item.users / maxGrowth) * 100}%` }} /></div>
+                    <div className="statistics-chart-track"><span className="statistics-chart-bar communities" style={{ width: `${(item.communities / maxGrowth) * 100}%` }} /></div>
                   </div>
-                  <span>{formatMonthKey(item.month)}</span>
+                  <div className="statistics-chart-values" aria-hidden="true"><strong>{item.users}</strong><strong>{item.communities}</strong></div>
                 </div>
               ))}
             </div>
+            {!hasGrowth && <p className="statistics-chart-empty">Nenhum novo cadastro registrado nesse período.</p>}
+            <p className="statistics-chart-source">Fonte: datas de criação dos cadastros de usuários e comunidades da plataforma. Zero indica nenhum registro no mês.</p>
           </section>
           <p className="statistics-updated">
             Atualizado em {new Intl.DateTimeFormat("pt-BR", {
@@ -156,8 +150,9 @@ export default function StatisticsWorkspace() {
 function buildGrowth(
   users: { mes: string; total: number }[],
   communities: { mes: string; total: number }[],
+  generatedAt?: string,
 ) {
-  const now = new Date();
+  const now = generatedAt ? new Date(generatedAt) : new Date();
   const months = Array.from({ length: 6 }, (_, offset) => {
     const date = new Date(
       Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 5 + offset, 1),

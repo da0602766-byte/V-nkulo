@@ -127,6 +127,7 @@ export default function CommunityHome({
   const [editingImageUrl, setEditingImageUrl] = useState("");
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
+  const [homeLoadError, setHomeLoadError] = useState("");
   const [feedCursor, setFeedCursor] = useState<string | null>(null);
   const [feedHasMore, setFeedHasMore] = useState(false);
   const [feedLoadingMore, setFeedLoadingMore] = useState(false);
@@ -185,6 +186,7 @@ export default function CommunityHome({
   const loadHome = useCallback(async () => {
     setLoading(true);
     setError("");
+    setHomeLoadError("");
     try {
       const [feedResponse, eventResponse, scheduleResponse] =
         await Promise.all([
@@ -214,7 +216,7 @@ export default function CommunityHome({
       if (eventResponse?.ok) setEvents((eventResult.eventos || []) as EventItem[]);
       if (scheduleResponse?.ok) setSchedules((scheduleResult.escalas || []) as ScheduleItem[]);
     } catch (loadError) {
-      setError((loadError as Error).message);
+      setHomeLoadError((loadError as Error).message);
     } finally {
       setLoading(false);
     }
@@ -742,8 +744,8 @@ export default function CommunityHome({
                 </button>
               )}
               <span className={loading ? "community-home-loading" : "community-feed-count"}>
-                {loading ? "Atualizando…" : `${posts.length}`}
-                {!loading && <small> no feed</small>}
+                {loading ? "Atualizando…" : homeLoadError ? "Indisponível" : `${posts.length}`}
+                {!loading && !homeLoadError && <small> no feed</small>}
               </span>
             </div>
           </header>
@@ -757,9 +759,22 @@ export default function CommunityHome({
               <button key={filter} type="button" aria-pressed={feedFilter === filter} onClick={() => setFeedFilter(filter)}>{label}</button>
             ))}
           </nav>
+          {homeLoadError && posts.length > 0 && (
+            <div className="community-feed-load-error" role="alert">
+              <strong>Não foi possível atualizar as publicações</strong>
+              <p>{homeLoadError}</p>
+              <button type="button" onClick={() => void loadHome()}>Tentar novamente</button>
+            </div>
+          )}
           {loading && !posts.length ? (
             <div className="community-feed-loading" role="status" aria-label="Carregando publicações">
               <span /><span /><span /><small>Carregando publicações…</small>
+            </div>
+          ) : homeLoadError && !posts.length ? (
+            <div className="community-feed-load-error" role="alert">
+              <strong>Não foi possível carregar as publicações</strong>
+              <p>{homeLoadError}</p>
+              <button type="button" onClick={() => void loadHome()}>Tentar novamente</button>
             </div>
           ) : visiblePosts.length ? (
             <div className="community-feed-list">

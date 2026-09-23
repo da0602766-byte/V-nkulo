@@ -85,3 +85,37 @@ test('owner CSS is loaded last and mobile menu sits above its backdrop', () => {
   assert.match(css, /font-size: 12px/);
   assert.doesNotMatch(read('app/components/OwnerWorkspace.tsx'), /data-smart-scroll-header/);
 });
+test('owner confirmations clear after six seconds while source failures remain distinct', () => {
+  const source = ts.transpileModule(read('app/lib/use-transient-message.ts'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+  let current = '';
+  let effect;
+  let onTimeout;
+  let delay;
+  const exports = {};
+  const react = {
+    useState: () => [current, (value) => { current = value; }],
+    useEffect: (callback) => { effect = callback; },
+  };
+  vm.runInNewContext(source, {
+    exports,
+    require: () => react,
+    window: { setTimeout: (callback, ms) => { onTimeout = callback; delay = ms; return 1; }, clearTimeout() {} },
+  });
+  const [, setMessage] = exports.useTransientMessage();
+  setMessage('Salvo');
+  assert.equal(exports.useTransientMessage()[0], 'Salvo');
+  effect();
+  assert.equal(delay, 6000);
+  onTimeout();
+  assert.equal(exports.useTransientMessage()[0], '');
+  assert.match(read('app/components/PlatformPlansWorkspace.tsx'), /loadError \? "Planos indisponíveis"/);
+  assert.match(read('app/components/OwnerWorkspace.tsx'), /loadError && <div className="owner-load-error"/);
+});
+test('growth uses exact calendar months and draws true zero-width bars', () => {
+  const route = read('app/api/pilot/estatisticas/route.ts');
+  const view = read('app/components/StatisticsWorkspace.tsx');
+  assert.equal((route.match(/date\('now', 'start of month', '-5 months'\)/g) || []).length, 2);
+  assert.match(view, /width: `\$\{\(item\.users \/ maxGrowth\) \* 100\}%`/);
+  assert.doesNotMatch(view, /Math\.max\(5,/);
+  assert.match(view, /data\?\.generatedAt/);
+});

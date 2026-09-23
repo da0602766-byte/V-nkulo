@@ -32,7 +32,7 @@ test("proprietário verificado aparece nas superfícies pessoais e de conteúdo"
     source("app/components/PeopleWorkspace.tsx"),
     source("app/components/CommunityPresencePanel.tsx"),
     source("app/components/CommunityPostInteractions.tsx"),
-    source("app/components/OwnerWorkspace.tsx"),
+    source("app/components/OwnerConsoleShell.tsx"),
   ]);
   assert.match(badge, /Proprietário verificado/);
   for (const file of [dashboard, home, people, presence, comments, owner]) {

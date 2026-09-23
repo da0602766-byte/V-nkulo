@@ -53,10 +53,15 @@ async function requireOwner() {
   return { user } as const;
 }
 
-export async function GET() {
+export async function GET(request?: Request) {
   const access = await requireOwner();
   if ("error" in access) return access.error;
   const db = getD1();
+  const section = request ? new URL(request.url).searchParams.get("section") || "all" : "all";
+  if (!["all", "overview", "communities", "users", "requests", "feedback", "audit"].includes(section)) return Response.json({ error: "Área inválida." }, { status: 400 });
+  const summary = section === "overview";
+  const includes = (name: string) => section === "all" || section === name || (summary && name !== "users");
+  const emptyRows = { results: [] as Record<string, unknown>[] };
   await purgeExpiredAudit(db);
   const [metrics, requests, communities, users, audit, feedback, ownerLayout] = await Promise.all([
     db
@@ -68,14 +73,14 @@ export async function GET() {
           (SELECT COUNT(*) FROM solicitacoes_criacao_comunidade
             WHERE status IN ('PENDENTE', 'EM_ANALISE')) AS solicitacoes_pendentes,
           (SELECT COUNT(*) FROM feedback_plataforma
-            WHERE status = 'PENDENTE') AS feedback_pendentes,
+            WHERE status IN ('PENDENTE', 'EM_ANALISE')) AS feedback_pendentes,
           (SELECT COUNT(*) FROM eventos_comunidade
             WHERE status = 'PUBLICADO' AND datetime(inicia_em) >= datetime('now')) AS eventos_futuros,
           (SELECT COUNT(*) FROM conversas_privadas
             WHERE ciclo_semana = strftime('%Y-%W','now')) AS conversas_semana`,
       )
       .first<Record<string, unknown>>(),
-    db
+    includes("requests") ? db
       .prepare(
         `SELECT s.id, s.solicitante_id, s.nome, s.descricao, s.cidade,
           s.email_institucional, s.ficha_criacao, s.status,
@@ -83,12 +88,12 @@ export async function GET() {
           s.atualizado_em, u.nome AS solicitante_nome, u.email AS solicitante_email
          FROM solicitacoes_criacao_comunidade s
          JOIN usuarios u ON u.id = s.solicitante_id
-         ORDER BY CASE s.status WHEN 'PENDENTE' THEN 0 WHEN 'EM_ANALISE' THEN 1 ELSE 2 END,
-           s.criado_em DESC, s.id DESC
+         ${summary ? "WHERE s.status IN ('PENDENTE', 'EM_ANALISE')" : ""}
+         ORDER BY ${summary ? "s.criado_em ASC, s.id ASC" : "CASE s.status WHEN 'PENDENTE' THEN 0 WHEN 'EM_ANALISE' THEN 1 ELSE 2 END, s.criado_em DESC, s.id DESC"}
          LIMIT 200`,
       )
-      .all<Record<string, unknown>>(),
-    db
+      .all<Record<string, unknown>>() : Promise.resolve(emptyRows),
+    includes("communities") ? db
       .prepare(
         `SELECT c.id, c.nome, c.slug, c.descricao_publica, c.cidade_publica,
           c.status, c.criado_em,
@@ -101,10 +106,10 @@ export async function GET() {
             WHERE m.comunidade_id = c.id AND m.status = 'ATIVO') AS ministerios
          FROM comunidades c
          LEFT JOIN usuarios u ON u.id = c.proprietario_usuario_id
-         ORDER BY c.nome LIMIT 300`,
+         ORDER BY c.nome LIMIT ${summary ? 5 : 300}`,
       )
-      .all<Record<string, unknown>>(),
-    db
+      .all<Record<string, unknown>>() : Promise.resolve(emptyRows),
+    includes("users") ? db
       .prepare(
         `SELECT u.id, u.nome, u.email, u.telefone, u.foto_perfil, u.perfil,
           u.titulo_eclesiastico, u.ativo, u.criado_em,
@@ -116,8 +121,8 @@ export async function GET() {
             WHERE uc.usuario_id = u.id AND uc.status = 'ATIVO'), '') AS comunidades_nomes
          FROM usuarios u ORDER BY u.nome LIMIT 300`,
       )
-      .all<Record<string, unknown>>(),
-    db
+      .all<Record<string, unknown>>() : Promise.resolve(emptyRows),
+    includes("audit") ? db
       .prepare(
         `SELECT a.id, a.comunidade_id, a.usuario_id, a.evento, a.resultado,
           a.metadados, a.criado_em, u.nome AS usuario_nome, c.nome AS comunidade_nome
@@ -126,8 +131,8 @@ export async function GET() {
          LEFT JOIN comunidades c ON c.id = a.comunidade_id
          ORDER BY a.id DESC LIMIT ${OWNER_AUDIT_VISIBLE_LIMIT}`,
       )
-      .all<Record<string, unknown>>(),
-    db
+      .all<Record<string, unknown>>() : Promise.resolve(emptyRows),
+    includes("feedback") ? db
       .prepare(
         `SELECT f.id, f.usuario_id, f.comunidade_id, f.tipo, f.categoria,
           f.mensagem, f.pagina, f.entidade_tipo, f.entidade_id,
@@ -140,13 +145,11 @@ export async function GET() {
          JOIN usuarios u ON u.id = f.usuario_id
          LEFT JOIN comunidades c ON c.id = f.comunidade_id
          LEFT JOIN usuarios r ON r.id = f.respondido_por
-         ORDER BY CASE f.status
-           WHEN 'PENDENTE' THEN 0 WHEN 'EM_ANALISE' THEN 1
-           WHEN 'RESPONDIDO' THEN 2 ELSE 3 END,
-           f.criado_em DESC, f.id DESC
+         ${summary ? "WHERE f.status IN (\'PENDENTE\', \'EM_ANALISE\')" : ""}
+         ORDER BY ${summary ? "f.criado_em ASC, f.id ASC" : "CASE f.status WHEN 'PENDENTE' THEN 0 WHEN 'EM_ANALISE' THEN 1 WHEN 'RESPONDIDO' THEN 2 ELSE 3 END, f.criado_em DESC, f.id DESC"}
          LIMIT 500`,
       )
-      .all<Record<string, unknown>>(),
+      .all<Record<string, unknown>>() : Promise.resolve(emptyRows),
     db
       .prepare("SELECT valor FROM configuracoes WHERE chave = 'owner_dashboard_layout' LIMIT 1")
       .first<{ valor: string }>(),
@@ -154,12 +157,13 @@ export async function GET() {
   return Response.json(
     {
       owner: { id: access.user.id, nome: access.user.nome, email: access.user.email },
+      generatedAt: new Date().toISOString(),
       metrics: metrics || {},
-      requests: requests.results,
-      communities: communities.results,
-      users: users.results,
-      audit: audit.results,
-      feedback: feedback.results,
+      ...(includes("requests") ? { requests: requests.results } : {}),
+      ...(includes("communities") ? { communities: communities.results } : {}),
+      ...(includes("users") ? { users: users.results.map(row => ({ ...row, system_owner: isSystemOwnerAccount({ email: String(row.email), criado_em: String(row.criado_em) }) })) } : {}),
+      ...(includes("audit") ? { audit: audit.results } : {}),
+      ...(includes("feedback") ? { feedback: feedback.results } : {}),
       auditRetention: {
         days: AUDIT_RETENTION_DAYS,
         visibleLimit: OWNER_AUDIT_VISIBLE_LIMIT,

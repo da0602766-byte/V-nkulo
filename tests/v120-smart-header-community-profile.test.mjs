@@ -5,7 +5,7 @@ import test from "node:test";
 const root = new URL("../", import.meta.url);
 const source = (path) => readFile(new URL(path, root), "utf8");
 
-test("cabeçalhos públicos, comunitários e do proprietário respondem à direção da rolagem", async () => {
+test("cabeçalhos públicos e comunitários recolhem; console do proprietário mantém barra fixa", async () => {
   const [behavior, layout, publicHeader, pilot, owner, styles] = await Promise.all([
     source("app/components/SmartScrollHeader.tsx"),
     source("app/layout.tsx"),
@@ -17,7 +17,9 @@ test("cabeçalhos públicos, comunitários e do proprietário respondem à dire�
   assert.match(layout, /<SmartScrollHeader \/>/);
   assert.match(publicHeader, /data-smart-scroll-header/);
   assert.match(pilot, /data-smart-scroll-header/);
-  assert.match(owner, /data-smart-scroll-header/);
+  assert.doesNotMatch(owner, /data-smart-scroll-header/);
+  const consoleStyles = await source("app/owner-console.css");
+  assert.match(consoleStyles, /\.oc-topbar \{ position: fixed/);
   assert.match(behavior, /delta > 8 && currentY > 110/);
   assert.match(behavior, /delta < -8/);
   assert.match(styles, /\[data-smart-scroll-header\]\[data-scroll-hidden="true"\]/);

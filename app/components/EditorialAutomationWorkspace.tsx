@@ -308,8 +308,8 @@ export default function EditorialAutomationWorkspace() {
     <section className="editorial-shell">
       <header className="editorial-hero">
         <div>
-          <p className="pilot-kicker">AUTOMAÇÃO EDITORIAL V4.5</p>
-          <h1>Governança e automação editorial</h1>
+          <p className="pilot-kicker">AUTOMAÇÃO EDITORIAL</p>
+          <h2>Governança e automação editorial</h2>
           <p>
             Escolha o modo, prepare conteúdos seguros e acompanhe cada envio
             programado.

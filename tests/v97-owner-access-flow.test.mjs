@@ -66,10 +66,10 @@ test("central do proprietário e categorias possuem layout responsivo padronizad
   const panelPage = source("app/painel/page.tsx");
   const css = source("app/globals.css");
 
-  assert.match(owner, /owner-command-hero/);
-  assert.match(owner, /OwnerInsights/);
-  assert.match(owner, /DISTRIBUIÇÃO ATUAL/);
-  assert.match(owner, /Governança por função/);
+  assert.match(owner, /OwnerExecutiveOverview/);
+  assert.match(owner, /OwnerDecisionQueue/);
+  assert.match(owner, /Indicadores da plataforma/);
+  assert.match(owner, /<table className="oc-table">/);
   assert.match(owner, /tab === "editorial"/);
   assert.match(owner, /tab === "statistics"/);
   assert.match(owner, /EditorialAutomationWorkspace/);

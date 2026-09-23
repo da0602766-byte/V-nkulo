@@ -192,6 +192,33 @@ test("proprietário tem acesso integral em todas as comunidades", async () => {
     "owner@example.test",
     "Owner123",
   );
+  // Exercise the lazy console endpoint against the isolated integration database.
+  for (const section of ["overview", "communities", "users", "requests", "feedback", "audit"]) {
+    const response = await worker.fetch(new Request(`http://localhost/api/proprietario?section=${section}`, { headers: { cookie: ownerCookie } }), ownerEnv, context);
+    assert.equal(response.status, 200, `owner section ${section}`);
+    assert.equal(response.headers.get("cache-control"), "no-store");
+    const payload = await response.json();
+    assert.equal(payload.metrics.usuarios_ativos, Number(database.prepare("SELECT COUNT(*) AS count FROM usuarios WHERE ativo = 1").get().count));
+    assert.equal(payload.owner.id, ownerId);
+    if (section === "overview") {
+      assert.equal("users" in payload, false, "overview must not fetch the global people directory");
+      assert.ok(payload.communities.length <= 5);
+      assert.ok(payload.requests.every(row => ["PENDENTE", "EM_ANALISE"].includes(row.status)));
+      assert.ok(payload.feedback.every(row => ["PENDENTE", "EM_ANALISE"].includes(row.status)));
+    } else {
+      assert.ok(Array.isArray(payload[section]));
+      for (const other of ["communities", "users", "requests", "feedback", "audit"].filter(key => key !== section)) assert.equal(other in payload, false);
+    }
+    if (section === "users") {
+      assert.equal(payload.users.find(row => row.id === ownerId).system_owner, true);
+      assert.equal(payload.users.find(row => row.id === commonId).system_owner, false);
+      assert.ok(payload.users.every(row => !("senha_hash" in row) && !("password" in row)));
+    }
+  }
+  const invalidSection = await worker.fetch(new Request("http://localhost/api/proprietario?section=unknown", { headers: { cookie: ownerCookie } }), ownerEnv, context);
+  assert.equal(invalidSection.status, 400);
+  const anonymousOwner = await worker.fetch(new Request("http://localhost/api/proprietario?section=users"), ownerEnv, context);
+  assert.equal(anonymousOwner.status, 401);
   const ownerResponse = await worker.fetch(
     new Request("http://localhost/api/pilot/comunidade-ativa", {
       headers: { cookie: ownerCookie },
@@ -303,6 +330,10 @@ test("proprietário tem acesso integral em todas as comunidades", async () => {
   );
   assert.equal(commonResponse.status, 200);
   assert.equal((await commonResponse.json()).context, null);
+  for (const section of ["overview", "users", "audit"]) {
+    const forbidden = await worker.fetch(new Request(`http://localhost/api/proprietario?section=${section}`, { headers: { cookie: commonCookie } }), ownerEnv, context);
+    assert.equal(forbidden.status, 403);
+  }
   database.close();
 });
 

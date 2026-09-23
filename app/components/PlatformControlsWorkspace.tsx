@@ -32,7 +32,7 @@ export default function PlatformControlsWorkspace({
       <header className="workspace-heading platform-controls-heading">
         <div>
           <p className="pilot-kicker">CENTRAL DO PROPRIETÁRIO</p>
-          <h1>Controles da plataforma</h1>
+          <h2>Controles da plataforma</h2>
           <p>
             Identidade, conteúdo, módulos e segurança organizados por assunto.
             Alterações persistentes continuam auditadas no servidor.
@@ -94,13 +94,12 @@ export default function PlatformControlsWorkspace({
                 <p className="pilot-kicker">ESTADO DA PLATAFORMA</p>
                 <h2>Proteções principais</h2>
               </div>
-              <span>V4.5</span>
             </header>
             <ul>
               <li><span>✓</span> Isolamento por comunidade validado no backend</li>
               <li><span>✓</span> Proprietário com acesso global a todas as comunidades</li>
               <li><span>✓</span> Segredos, hashes, tokens e sessões fora do navegador</li>
-              <li><span>✓</span> Pagamentos e publicação automática real desativados</li>
+              <li><span>✓</span> Pagamentos: {features.paymentsEnabled ? "habilitados" : "desativados"} · Publicação automática: {features.aiAutoPublishEnabled ? "habilitada" : "desativada"}</li>
             </ul>
           </section>
         </div>

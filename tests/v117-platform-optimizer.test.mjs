@@ -68,7 +68,7 @@ test("otimizador possui painel compacto, execução periódica e limites explíc
     readFile(new URL("../app/api/proprietario/otimizacao/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/platform-optimizer.ts", import.meta.url), "utf8"),
     readFile(new URL("../worker/index.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/components/OwnerWorkspace.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/lib/owner-console.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
   ]);
   assert.match(owner, /id: "optimization", label: "Otimização"/);

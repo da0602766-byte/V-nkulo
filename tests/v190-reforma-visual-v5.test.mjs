@@ -242,8 +242,9 @@ test("o rótulo Hoje/Ontem não é calculado durante a renderização", async ()
 
 test("a área do proprietário mostra o escopo global sem exigir clique", async () => {
   const owner = await read("app/components/OwnerWorkspace.tsx");
-  assert.match(owner, /owner-scope-banner-v5/);
-  assert.match(owner, /Tudo aqui alcança a plataforma inteira/);
+  assert.match(owner, /Console do proprietário · Escopo global/);
+  const shell = await read("app/components/OwnerConsoleShell.tsx");
+  assert.match(shell, /<strong>Escopo global<\/strong>/);
   // A versão antiga ficava dentro de um <details> fechado.
   assert.doesNotMatch(owner, /owner-scope-note/);
   const styles = await read("app/globals.css");

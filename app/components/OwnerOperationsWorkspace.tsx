@@ -27,7 +27,7 @@ const SCREEN_COPY: Record<OwnerOperationsScreen, { eyebrow: string; title: strin
 const SEARCH_TERMS: Record<"passwords" | "deleted" | "publication", string[]> = {
   passwords: ["SENHA", "PASSWORD", "REDEFIN", "CREDENCIAL"],
   deleted: ["EXCLU", "DESATIV", "REMOVID", "PURG"],
-  publication: ["PUBLIC", "DEPLOY", "RELEASE", "BUILD", "VERSAO", "VERSÃO"],
+  publication: ["DEPLOY", "RELEASE", "BUILD", "PUBLICACAO_SISTEMA", "SUPABASE", "MIGRACAO_DADOS"],
 };
 
 function read(row: Record<string, unknown>, key: string, fallback = "—") {
@@ -48,7 +48,7 @@ function humanize(input: unknown) {
 }
 
 function isFailure(row: Record<string, unknown>) {
-  return !["SUCESSO", "OK"].includes(read(row, "resultado", "").toUpperCase());
+  return ["ERRO", "NEGADO", "FALHA"].includes(read(row, "resultado", "").toUpperCase());
 }
 
 function matchesEvent(row: Record<string, unknown>, terms: string[]) {
@@ -89,7 +89,7 @@ export default function OwnerOperationsWorkspace({ screen, data }: { screen: Own
   if (screen === "finance") return <UnavailableWorkspace screen={screen} source="Fonte não conectada" title="Dados financeiros indisponíveis" text="A API do proprietário ainda não fornece cobranças, pagamentos, valores ou renovações. Nenhuma estimativa é exibida para evitar dados falsos." needs={["Integração com o sistema de cobrança", "Status confirmado pelo provedor de pagamento", "Histórico de competências e renovações"]} />;
   if (screen === "realtime") return <RealtimeWorkspace data={data} />;
   if (screen === "performance") return <PerformanceWorkspace data={data} />;
-  if (screen === "publication") return <FilteredAuditWorkspace screen={screen} data={data} />;
+  if (screen === "publication") return <div className="ops-stack"><UnavailableWorkspace screen={screen} source="Integração não disponível" title="Releases e migração de dados não conectados" text="Este ambiente não expõe um pipeline de deploy nem uma integração de migração D1 → Supabase. Nenhuma publicação ou migração será executada por esta tela." needs={["Histórico de versões e implantações", "Conexão verificada com o destino dos dados", "Validação de integridade e autorização antes de publicar"]} /><FilteredAuditWorkspace screen={screen} data={data} /></div>;
   return <IncidentWorkspace data={data} />;
 }
 
@@ -119,12 +119,12 @@ function PerformanceWorkspace({ data }: { data: OwnerOperationsData }) {
   const failures = useMemo(() => data.audit.filter(isFailure), [data.audit]);
   const denied = failures.filter((row) => read(row, "resultado", "").toUpperCase() === "NEGADO").length;
   const errors = failures.filter((row) => read(row, "resultado", "").toUpperCase() === "ERRO").length;
-  return <div className="ops-stack"><WorkspaceHeader screen="performance" source="Auditoria disponível" /><SourceNote>Sem séries temporais de APM, esta tela mede somente resultados registrados na auditoria — não latência, uptime, CPU ou taxa global de erro.</SourceNote><div className="ops-metrics"><Metric label="Registros analisados" number={data.audit.length} detail="janela de auditoria" /><Metric label="Resultados com falha" number={failures.length} detail="diferentes de sucesso" /><Metric label="Negados" number={denied} detail="na fonte atual" /><Metric label="Erros" number={errors} detail="na fonte atual" /></div><AuditPanel rows={failures} title="Ocorrências que exigem leitura" emptyTitle="Nenhuma falha na janela disponível" emptyText="Todos os registros disponíveis estão marcados como sucesso ou OK." /><section className="ops-panel ops-needs"><header className="ops-panel-title"><div><h3>Lacunas de observabilidade</h3><p>Fontes necessárias para uma análise de desempenho completa.</p></div></header><div>{["Latência e uptime", "Erros HTTP", "CPU e memória", "Consultas lentas", "Histórico por versão"].map((item) => <span key={item}>{item}<small>Fonte não conectada</small></span>)}</div></section></div>;
+  return <div className="ops-stack"><WorkspaceHeader screen="performance" source="Auditoria disponível" /><SourceNote>Sem séries temporais de APM, esta tela mede somente resultados registrados na auditoria — não latência, uptime, CPU ou taxa global de erro.</SourceNote><div className="ops-metrics"><Metric label="Registros analisados" number={data.audit.length} detail="janela de auditoria" /><Metric label="Resultados com falha" number={failures.length} detail="erro, falha ou negação" /><Metric label="Negados" number={denied} detail="na fonte atual" /><Metric label="Erros" number={errors} detail="na fonte atual" /></div><AuditPanel rows={failures} title="Ocorrências que exigem leitura" emptyTitle="Nenhuma falha na janela disponível" emptyText="Não há resultados marcados como erro, falha ou acesso negado na amostra consultada." /><section className="ops-panel ops-needs"><header className="ops-panel-title"><div><h3>Lacunas de observabilidade</h3><p>Fontes necessárias para uma análise de desempenho completa.</p></div></header><div>{["Latência e uptime", "Erros HTTP", "CPU e memória", "Consultas lentas", "Histórico por versão"].map((item) => <span key={item}>{item}<small>Fonte não conectada</small></span>)}</div></section></div>;
 }
 
 function IncidentWorkspace({ data }: { data: OwnerOperationsData }) {
   const [query, setQuery] = useState("");
   const failures = useMemo(() => data.audit.filter(isFailure), [data.audit]);
   const filtered = useMemo(() => failures.filter((row) => [row.evento, row.resultado, row.comunidade_nome, row.usuario_nome].join(" ").toLocaleLowerCase("pt-BR").includes(query.toLocaleLowerCase("pt-BR"))), [failures, query]);
-  return <div className="ops-stack"><WorkspaceHeader screen="incidents" source="Derivado da auditoria" /><SourceNote>Uma ocorrência aqui significa apenas que a auditoria registrou resultado diferente de sucesso. Severidade, impacto e resolução não são inferidos sem uma fonte própria.</SourceNote><div className="ops-metrics"><Metric label="Ocorrências disponíveis" number={failures.length} detail="resultados com falha" /><Metric label="Registros auditados" number={data.audit.length} detail="na janela atual" /></div><section className="ops-panel"><header className="ops-panel-title ops-panel-filter"><div><h3>Ocorrências</h3><p>Use a busca para localizar evento, pessoa ou comunidade.</p></div><label>Buscar<input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Evento, resultado ou contexto" /></label></header><div className="ops-embedded-panel"><AuditPanel rows={filtered} title="Resultados do filtro" emptyTitle="Nenhuma ocorrência encontrada" emptyText={failures.length ? "Ajuste o termo de busca." : "Não há resultados com falha na janela de auditoria disponível."} /></div></section></div>;
+  return <div className="ops-stack"><WorkspaceHeader screen="incidents" source="Derivado da auditoria" /><SourceNote>Uma ocorrência aqui significa apenas que a auditoria registrou erro, falha ou acesso negado. Severidade, impacto e resolução não são inferidos sem uma fonte própria.</SourceNote><div className="ops-metrics"><Metric label="Ocorrências disponíveis" number={failures.length} detail="resultados com falha" /><Metric label="Registros auditados" number={data.audit.length} detail="na janela atual" /></div><section className="ops-panel"><header className="ops-panel-title ops-panel-filter"><div><h3>Ocorrências</h3><p>Use a busca para localizar evento, pessoa ou comunidade.</p></div><label>Buscar<input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Evento, resultado ou contexto" /></label></header><div className="ops-embedded-panel"><AuditPanel rows={filtered} title="Resultados do filtro" emptyTitle="Nenhuma ocorrência encontrada" emptyText={failures.length ? "Ajuste o termo de busca." : "Não há resultados com falha na janela de auditoria disponível."} /></div></section></div>;
 }

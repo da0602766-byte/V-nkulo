@@ -8,6 +8,7 @@ import {
   type CommunityTheme,
 } from "../lib/community-theme";
 import NativeImageUpload from "./NativeImageUpload";
+import { useTransientMessage } from "../lib/use-transient-message";
 
 type CommunitySummary = {
   id: number;
@@ -28,7 +29,8 @@ export default function OwnerAppearanceWorkspace() {
   const [communities, setCommunities] = useState<CommunitySummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useTransientMessage();
+  const [loadError, setLoadError] = useState("");
   const [messageTone, setMessageTone] = useState<"success" | "error">("success");
   const [scope, setScope] = useState<Scope>("UNICA");
   const [communityId, setCommunityId] = useState<number | "">("");
@@ -40,6 +42,7 @@ export default function OwnerAppearanceWorkspace() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError("");
     try {
       const response = await fetch("/api/proprietario/aparencia", { cache: "no-store" });
       const result = (await response.json()) as AparenciaResponse;
@@ -54,8 +57,7 @@ export default function OwnerAppearanceWorkspace() {
         setWallpaperUrl(list[0].tema.wallpaperUrl);
       }
     } catch (error) {
-      setMessageTone("error");
-      setMessage((error as Error).message);
+      setLoadError((error as Error).message);
     } finally {
       setLoading(false);
     }
@@ -152,8 +154,13 @@ export default function OwnerAppearanceWorkspace() {
     );
   }
 
+  if (loadError && !communities.length) {
+    return <section className="community-theme-editor owner-appearance-workspace"><p className="operations-feedback error" role="alert">{loadError}</p><button type="button" onClick={() => void load()}>Tentar novamente</button></section>;
+  }
+
   return (
     <section className="community-theme-editor owner-appearance-workspace">
+      {loadError && <p className="operations-feedback error" role="alert">{loadError}</p>}
       <header>
         <div>
           <p className="pilot-kicker">CENTRAL DE APARÊNCIA</p>
