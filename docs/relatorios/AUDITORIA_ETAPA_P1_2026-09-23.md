@@ -59,4 +59,18 @@ As medições de largura não substituem testes em aparelhos físicos, Safari ou
 
 ## Publicação
 
-Candidato validado. A versão, o commit publicado e a conferência de produção serão registrados após a implantação.
+Versão **298**, publicada em `https://adote-gestao.da0602766.chatgpt.site` em 23/09/2026, às 13:24 (Brasília).
+
+- Commit de código: `27bbb1a43b9874ba92455bf5aa3d939c82b9616c`.
+- Versão salva: `appgprj_6a5af9301a888191b2abefddaa299618~appgver_26b45fd06a288191aa6eacd91f759b7e`.
+- Implantação: `appgdep_6ab3fd13a71081919e9ada5193f55e26`, estado `succeeded`.
+- SHA-256 do pacote local aceito: `548a7976277b29ccad5f52e9c27d8d6f507355b9d6e87738b0a2b7f4337cae67`.
+
+Conferência após a publicação:
+
+- `/`, `/login` e `/comunidades` retornaram HTTP 200, com o novo bootstrap e destino de foco no HTML. O login contém o label explícito da senha.
+- `/api/proprietario?section=overview` retornou HTTP 401 sem sessão.
+- Com a sessão existente do proprietário, o console carregou os seis cartões, sem erro de dados. Em 320 px, os cinco controles visíveis do cabeçalho mediram 44 px e não houve transbordamento.
+- Na landing em 320 px, o botão Proprietário terminou em 291 px, dentro dos 305 px úteis; Escape fechou o menu e devolveu foco ao botão.
+- O diretório real com três comunidades permitiu navegação manual. Setas mediram 44 px e indicadores 24 px, sem transbordamento. A pausa automática foi coberta pelos testes; no navegador usado nesta conferência o controle de rotação ficou oculto após a leitura da preferência de movimento reduzido.
+- A troca para escuro aplicou o texto auxiliar `rgb(183, 198, 217)`. Escape no menu da conta fechou o `details` e devolveu foco ao `summary`. Tema claro original restaurado ao final.
