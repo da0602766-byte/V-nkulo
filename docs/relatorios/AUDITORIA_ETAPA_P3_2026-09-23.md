@@ -26,7 +26,7 @@ O catálogo consulta o D1 sem chamar provedores externos. Os estados usam teste 
 
 ## Validação e limites
 
-- Plataforma: TypeScript e build aprovados, 462 testes aprovados. Validação completa sem erros de lint; o primeiro lint contou também a cópia de código do worktree Android (84 avisos). Conferência da árvore principal separadamente, ignorando `.task-tools`, preserva a distinção dos avisos históricos.
+- Plataforma: TypeScript e build aprovados, 462 testes aprovados. Validação completa sem erros de lint; o primeiro lint contou também a cópia de código do worktree Android (84 avisos). Conferência da árvore principal separadamente, ignorando `.task-tools`: 0 erros e 43 avisos preexistentes.
 - Android: 4 testes unitários passaram; lint com 0 erros e 12 avisos (incluindo target SDK 35, atualizações disponíveis e avisos de detecção das verificações de recursos). As duas APIs WebKit têm verificações explícitas em tempo de execução.
 - Central conferida em 320, 390 e 1440 pixels, temas claro e escuro, sem transbordamento horizontal nas medidas realizadas. Novos botões com altura de 44 pixels; foco encaminhado ao abrir a configuração.
 - Sem teste em aparelho físico ou emulador nesta entrega. Atualização instalada, retorno do Google, câmera, microfone, downloads e retomada devem ser homologados em aparelhos representativos; não se declara redução medida de bateria ou latência.
@@ -41,4 +41,6 @@ O catálogo consulta o D1 sem chamar provedores externos. Os estados usam teste 
 
 ## Publicação
 
-Verificações locais concluídas; identificação da versão e conferências de produção serão registradas após o deploy.
+Publicado como versão **300** em https://adote-gestao.da0602766.chatgpt.site, commit de código `8e0249cbcaa6555a94831b071b46314bd40a42ea`, deployment `appgdep_6ab418dc6ad48191b7a9e9d6f3bc505a`, concluído em 23/09/2026 às 15h22 (Brasília). Download HTTP 200, 69.037 bytes e SHA-256 idêntico ao artefato assinado; início, login e comunidades HTTP 200; catálogo sem sessão HTTP 401. Audiência pública preservada. PR Android 15 permanece em rascunho; não foi mesclada.
+
+Conferência autenticada em produção às 15h24: central carregada, Supabase conectado, sincronização às 15h20m01s e agendamento às 15h20m00s, sem modificar configuração.
