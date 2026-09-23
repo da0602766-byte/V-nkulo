@@ -192,30 +192,27 @@ export async function getSessionState(): Promise<SessionState> {
     if (!signed) return { user: null, reason: "sessao_invalida" };
     if (signed.e <= Date.now())
       return { user: null, reason: "sessao_expirada" };
-    const persistedSession = await db
-      .prepare(
-        `SELECT 1 AS active
-        FROM sessoes
-        WHERE usuario_id = ? AND token_hash = ?
-          AND datetime(expira_em) > CURRENT_TIMESTAMP
-        LIMIT 1`,
-      )
-      .bind(signed.u, await sha256(signed.n))
-      .first<{ active: number }>();
-    if (!persistedSession)
-      return { user: null, reason: "sessao_invalida" };
+    // A sessão persistida e o usuário dependem do mesmo ID. Uma única leitura
+    // conserva a revogação/expiração no banco e elimina uma ida sequencial ao D1.
+    // LEFT JOIN distingue uma sessão válida com usuário removido da ausência
+    // da própria sessão (motivos preservados para o fluxo de login).
     const row = await db
       .prepare(
         `SELECT u.id, u.nome, u.email, u.perfil, u.permissoes, u.foto_perfil, u.telefone,
       u.data_nascimento, u.nome_pais, u.endereco, u.celula, u.ministerio, u.observacoes,
       u.diaconia_equipe_id, d.nome AS diaconia_equipe_nome, u.tema_preferido,
       u.titulo_eclesiastico, u.ativo, u.criado_em, u.senha_hash
-      FROM usuarios u LEFT JOIN diaconia_equipes d ON d.id = u.diaconia_equipe_id
-      WHERE u.id = ? LIMIT 1`,
+      FROM sessoes s
+      LEFT JOIN usuarios u ON u.id = s.usuario_id
+      LEFT JOIN diaconia_equipes d ON d.id = u.diaconia_equipe_id
+      WHERE s.usuario_id = ? AND s.token_hash = ?
+        AND datetime(s.expira_em) > CURRENT_TIMESTAMP
+      LIMIT 1`,
       )
-      .bind(signed.u)
+      .bind(signed.u, await sha256(signed.n))
       .first<AppUser & { senha_hash: string | null }>();
-    if (!row) return { user: null, reason: "usuario_ausente" };
+    if (!row) return { user: null, reason: "sessao_invalida" };
+    if (row.id == null) return { user: null, reason: "usuario_ausente" };
     if (
       !row.senha_hash ||
       (await sha256(row.senha_hash)).slice(0, 24) !== signed.p

@@ -127,7 +127,6 @@ export default function CommunityHome({
   const [editingImageUrl, setEditingImageUrl] = useState("");
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
-  const [homeLoadError, setHomeLoadError] = useState("");
   const [feedCursor, setFeedCursor] = useState<string | null>(null);
   const [feedHasMore, setFeedHasMore] = useState(false);
   const [feedLoadingMore, setFeedLoadingMore] = useState(false);
@@ -186,40 +185,54 @@ export default function CommunityHome({
   const loadHome = useCallback(async () => {
     setLoading(true);
     setError("");
-    setHomeLoadError("");
-    try {
-      const [feedResponse, eventResponse, scheduleResponse] =
-        await Promise.all([
-          fetch("/api/pilot/publicacoes?limit=10", { cache: "no-store" }),
-          readOnlyFeed ? null : fetch("/api/pilot/eventos", { cache: "no-store" }),
-          !readOnlyFeed && canViewSchedules
+    // O feed já possui uma primeira versão entregue pelo servidor. Atualizamos
+    // publicações, eventos e escalas em paralelo, mas somente a resposta de
+    // publicações controla o estado visual do mural. Assim uma agenda ou escala
+    // lenta não mantém publicações já visíveis marcadas como “Atualizando…”.
+    const feedTask = (async () => {
+      try {
+        const response = await fetch("/api/pilot/publicacoes?limit=10", { cache: "no-store" });
+        const result = await readJson<Record<string, unknown>>(response);
+        if (!response.ok) {
+          throw new Error(
+            String(result.error || "Não foi possível carregar o feed."),
+          );
+        }
+        setPosts((result.publicacoes || []) as FeedItem[]);
+        setFeedCursor(String(result.nextCursor || "") || null);
+        setFeedHasMore(Boolean(result.hasMore));
+      } catch (loadError) {
+        setError((loadError as Error).message);
+      } finally {
+        setLoading(false);
+      }
+    })();
+    const eventsTask = readOnlyFeed
+      ? Promise.resolve()
+      : (async () => {
+          try {
+            const response = await fetch("/api/pilot/eventos", { cache: "no-store" });
+            const result = await readJson<Record<string, unknown>>(response);
+            if (response.ok) setEvents((result.eventos || []) as EventItem[]);
+          } catch {
+            // Eventos são auxiliares e não impedem a leitura do mural.
+          }
+        })();
+    const schedulesTask = !readOnlyFeed && canViewSchedules
+      ? (async () => {
+          try {
             // A trilha mostra no máximo quatro escalas com participação
             // pendente; o filtro e o limite vão ao servidor em vez de
             // baixar o lote inteiro para descartar quase tudo aqui.
-            ? fetch("/api/pilot/escalas?filtro=minhas-pendentes&limite=4", { cache: "no-store" })
-            : null,
-        ]);
-      const [feedResult, eventResult, scheduleResult] =
-        await Promise.all([
-          readJson<Record<string, unknown>>(feedResponse),
-          eventResponse ? readJson<Record<string, unknown>>(eventResponse) : Promise.resolve({} as Record<string, unknown>),
-          scheduleResponse ? readJson<Record<string, unknown>>(scheduleResponse) : Promise.resolve({} as Record<string, unknown>),
-        ]);
-      if (!feedResponse.ok) {
-        throw new Error(
-          String(feedResult.error || "Não foi possível carregar o feed."),
-        );
-      }
-      setPosts((feedResult.publicacoes || []) as FeedItem[]);
-      setFeedCursor(String(feedResult.nextCursor || "") || null);
-      setFeedHasMore(Boolean(feedResult.hasMore));
-      if (eventResponse?.ok) setEvents((eventResult.eventos || []) as EventItem[]);
-      if (scheduleResponse?.ok) setSchedules((scheduleResult.escalas || []) as ScheduleItem[]);
-    } catch (loadError) {
-      setHomeLoadError((loadError as Error).message);
-    } finally {
-      setLoading(false);
-    }
+            const response = await fetch("/api/pilot/escalas?filtro=minhas-pendentes&limite=4", { cache: "no-store" });
+            const result = await readJson<Record<string, unknown>>(response);
+            if (response.ok) setSchedules((result.escalas || []) as ScheduleItem[]);
+          } catch {
+            // Escalas são auxiliares e não impedem a leitura do mural.
+          }
+        })()
+      : Promise.resolve();
+    await Promise.all([feedTask, eventsTask, schedulesTask]);
   }, [canViewSchedules, readOnlyFeed]);
 
   const refreshFeed = useCallback(async () => {
@@ -744,8 +757,8 @@ export default function CommunityHome({
                 </button>
               )}
               <span className={loading ? "community-home-loading" : "community-feed-count"}>
-                {loading ? "Atualizando…" : homeLoadError ? "Indisponível" : `${posts.length}`}
-                {!loading && !homeLoadError && <small> no feed</small>}
+                {loading ? "Atualizando…" : `${posts.length}`}
+                {!loading && <small> no feed</small>}
               </span>
             </div>
           </header>
@@ -759,22 +772,9 @@ export default function CommunityHome({
               <button key={filter} type="button" aria-pressed={feedFilter === filter} onClick={() => setFeedFilter(filter)}>{label}</button>
             ))}
           </nav>
-          {homeLoadError && posts.length > 0 && (
-            <div className="community-feed-load-error" role="alert">
-              <strong>Não foi possível atualizar as publicações</strong>
-              <p>{homeLoadError}</p>
-              <button type="button" onClick={() => void loadHome()}>Tentar novamente</button>
-            </div>
-          )}
           {loading && !posts.length ? (
             <div className="community-feed-loading" role="status" aria-label="Carregando publicações">
               <span /><span /><span /><small>Carregando publicações…</small>
-            </div>
-          ) : homeLoadError && !posts.length ? (
-            <div className="community-feed-load-error" role="alert">
-              <strong>Não foi possível carregar as publicações</strong>
-              <p>{homeLoadError}</p>
-              <button type="button" onClick={() => void loadHome()}>Tentar novamente</button>
             </div>
           ) : visiblePosts.length ? (
             <div className="community-feed-list">

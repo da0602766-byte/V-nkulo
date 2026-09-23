@@ -61,11 +61,12 @@ test("o compositor do mural redesenhado não herda a regra legada de tamanho zer
 
 test("falha na carga inicial não é exibida como feed vazio", () => {
   const source = read("app/components/CommunityHome.tsx");
-  assert.match(source, /const \[homeLoadError, setHomeLoadError\] = useState\(""\)/);
-  assert.match(source, /setHomeLoadError\(\(loadError as Error\)\.message\)/);
-  assert.match(source, /homeLoadError && !posts\.length \? \(/);
-  assert.match(source, /!loading && !homeLoadError && <small> no feed<\/small>/);
-  assert.match(source, /onClick=\{\(\) => void loadHome\(\)\}>Tentar novamente/);
+  assert.match(source, /const \[error, setError\] = useState\(""\)/);
+  assert.match(source, /setError\(\(loadError as Error\)\.message\)/);
+  assert.match(source, /\(feedback \|\| error\) &&/);
+  assert.match(source, /className=\{`operations-feedback \$\{error \? "error" : ""\}`\}/);
+  assert.match(source, /feedLoadError &&/);
+  assert.match(source, /onClick=\{\(\) => void loadMorePosts\(\)\}>/);
 });
 
 test("layout do mural respeita o espaço útil entre desktop, tablet e celular", () => {
@@ -73,4 +74,12 @@ test("layout do mural respeita o espaço útil entre desktop, tablet e celular",
   assert.match(styles, /@media \(min-width: 821px\) and \(max-width: 1100px\) \{\s*\.pilot-dashboard\[data-ui-version="v2"\] \.community-feed-redesign \.community-home-grid \{\s*grid-template-columns: minmax\(0, 1fr\) !important;/);
   assert.match(styles, /\.community-feed-redesign \.community-home-command \{\s*display: flex !important;/);
   assert.match(styles, /@media \(max-width: 820px\) \{\s*\.pilot-dashboard\[data-ui-version="v2"\] \.community-feed-redesign \.community-home-command \{ align-items: flex-start !important; \}\s*\.pilot-dashboard\[data-ui-version="v2"\] \.community-feed-redesign \.community-home-intro \{ width: 100%; flex: none; \}/);
+});
+
+test("o compositor do mural mantém largura e altura próprias em telas maiores", () => {
+  const styles = read("app/globals.css");
+  assert.match(
+    styles,
+    /\.pilot-dashboard\[data-ui-version="v2"\] \.community-feed-redesign > \.community-composer\s*\{[^}]*width:\s*100%\s*!important;[^}]*height:\s*auto\s*!important;/s,
+  );
 });
