@@ -57,6 +57,8 @@ Causa reproduzida no Workerd: `Request` rejeita `redirect: "error"` com TypeErro
 
 As duas chamadas Firebase agora usam `redirect: "manual"`, compatível com Workers. Respostas de redirecionamento continuam recusadas; JWT e token não são encaminhados para o endereço de Location. O limite de tempo do FCM passa a começar após a obtenção do token OAuth, dando a cada etapa seu próprio prazo.
 
-Novo teste executado no Miniflare/Workerd com a data e flags do build valida criptografia, construção nativa de Request, chamadas OAuth/FCM simuladas e rejeição de redirecionamentos nas duas etapas. A chave usada é efêmera e fictícia, sem acesso ao projeto. Sete testes direcionados passaram; validação completa/publicação registradas após o deploy.
+Novo teste executado no Miniflare/Workerd com a data e flags do build valida criptografia, construção nativa de Request, chamadas OAuth/FCM simuladas e rejeição de redirecionamentos nas duas etapas. A chave usada é efêmera e fictícia, sem acesso ao projeto. Sete testes direcionados e **471 testes da suíte completa** passaram. TypeScript/build/artefato aprovados; lint sem erros, 86 avisos combinados (inclui checkout e dois avisos de probes descartáveis em `.task-tools`); arquivos de código/teste alterados sem avisos.
+
+Correção publicada na **versão 302**, commit `3c0341decdf1bd32928cf262a34b5406a1481005`, deploy `appgdep_6ab438035a008191a446b4a4c7d91c8d` concluído em 23/09/2026 às 17h35 (Brasília). Home HTTP 200, API Firebase sem sessão HTTP 401. Nenhuma alteração no APK ou nos segredos do ambiente.
 
 O usuário deve atualizar a página e selecionar novamente o mesmo arquivo JSON já baixado. A ativação com a chave real e a entrega no celular ainda exigem essa ação do proprietário.
