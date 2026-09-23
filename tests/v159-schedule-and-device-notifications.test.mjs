@@ -28,6 +28,6 @@ test("every unread purple notice is forwarded once to the Android tray", async (
   assert.match(nativeSync, /vinkulo:native-notification-refresh/);
   assert.match(center, /await load\(\);/);
   assert.match(center, /adote:refresh-notifications/);
-  assert.match(serviceWorker, /vinkulo-shell-v4/);
+  assert.match(serviceWorker, /const CACHE = "vinkulo-shell-v\d+"/);
   assert.match(serviceWorker, /renotify: true/);
 });

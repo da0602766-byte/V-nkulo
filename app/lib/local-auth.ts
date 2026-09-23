@@ -60,12 +60,14 @@ export async function verifyPassword(
 
 export async function setUserPassword(userId: number, password: string) {
   const { salt, hash } = await hashPassword(password);
-  await getD1()
-    .prepare(
+  const db = getD1();
+  await db.batch([
+    db.prepare(
       "UPDATE usuarios SET senha_hash = ?, senha_salt = ?, tentativas_login = 0, bloqueado_ate = NULL, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?",
     )
-    .bind(hash, salt, userId)
-    .run();
+      .bind(hash, salt, userId),
+    db.prepare("DELETE FROM sessoes WHERE usuario_id = ?").bind(userId),
+  ]);
 }
 
 export async function createSession(userId: number) {
@@ -73,6 +75,7 @@ export async function createSession(userId: number) {
   const tokenHash = await sha256(token);
   const expires = new Date(Date.now() + SESSION_DAYS * 86400000);
   const db = getD1();
+  const previousSessionHash = await getCurrentSessionTokenHash();
   const password = await db
     .prepare("SELECT senha_hash FROM usuarios WHERE id = ? LIMIT 1")
     .bind(userId)
@@ -86,12 +89,15 @@ export async function createSession(userId: number) {
       "DELETE FROM sessoes WHERE datetime(expira_em) <= CURRENT_TIMESTAMP",
     )
     .run();
-  await db
-    .prepare(
+  await db.batch([
+    db.prepare(
       "INSERT INTO sessoes (usuario_id, token_hash, expira_em) VALUES (?, ?, ?)",
     )
-    .bind(userId, tokenHash, expires.toISOString())
-    .run();
+      .bind(userId, tokenHash, expires.toISOString()),
+    // Trocar de conta no mesmo navegador revoga apenas a sessão substituída.
+    // As assinaturas push dessa sessão são removidas pela chave estrangeira.
+    db.prepare("DELETE FROM sessoes WHERE token_hash = ?").bind(previousSessionHash || ""),
+  ]);
   const payload: SignedSessionPayload = {
     u: userId,
     e: expires.getTime(),
@@ -166,6 +172,19 @@ export async function destroySession() {
     path: "/",
     maxAge: 0,
   });
+}
+
+// Identificador interno, nunca enviado ao navegador. Os chamadores continuam
+// validando getSessionUser; o registro push também verifica a sessão no SQL.
+export async function getCurrentSessionTokenHash(): Promise<string | null> {
+  const jar = await cookies();
+  const cookieValue = jar.get(SESSION_COOKIE)?.value || jar.get(PREVIEW_SESSION_COOKIE)?.value;
+  if (cookieValue) {
+    const signed = await decodeSignedSession(cookieValue);
+    return signed && signed.e > Date.now() ? sha256(signed.n) : null;
+  }
+  const legacyToken = jar.get(LEGACY_SESSION_COOKIE)?.value;
+  return legacyToken ? sha256(legacyToken) : null;
 }
 
 export type SessionState = {

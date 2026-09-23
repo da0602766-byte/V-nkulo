@@ -1,5 +1,5 @@
-const CACHE = "vinkulo-shell-v5";
-const RUNTIME_CACHE = "vinkulo-static-v5";
+const CACHE = "vinkulo-shell-v6";
+const RUNTIME_CACHE = "vinkulo-static-v6";
 const IS_LOCAL_PREVIEW = ["localhost", "127.0.0.1", "[::1]"].includes(self.location.hostname);
 const APP_SHELL = ["/", "/offline.html", "/manifest.webmanifest", "/vinkulo-app-icon-192.png", "/vinkulo-app-icon-512.png"];
 
@@ -80,23 +80,43 @@ self.addEventListener("push", (event) => {
   try {
     payload = event.data?.json() || {};
   } catch {
-    payload = { body: event.data?.text() || "Você recebeu um novo aviso." };
+    return;
   }
-  event.waitUntil(self.registration.showNotification(payload.title || "Vínkulo", {
-    body: payload.body || "Você recebeu uma nova atualização.",
-    icon: "/vinkulo-app-icon-192.png",
-    badge: "/vinkulo-app-icon-192.png",
-    tag: payload.tag || "vinkulo-update",
-    renotify: true,
-    data: { url: payload.url || "/painel" },
+  event.waitUntil(resolvePushNotification(payload).then(async (notification) => {
+    if (!notification) return;
+    await self.registration.showNotification(notification.title, {
+      body: notification.body,
+      icon: "/vinkulo-app-icon-192.png",
+      badge: "/vinkulo-app-icon-192.png",
+      tag: notification.tag,
+      renotify: true,
+      data: { notificationId: payload.notificationId, bindingId: payload.bindingId },
+    });
   }));
 });
 
+async function resolvePushNotification(payload) {
+  if (!Number.isSafeInteger(payload?.notificationId) || payload.notificationId <= 0 ||
+      typeof payload.bindingId !== "string" || !/^[a-f0-9-]{36}$/i.test(payload.bindingId)) return null;
+  try {
+    const params = new URLSearchParams({ id: String(payload.notificationId), binding: payload.bindingId });
+    const response = await fetch(`/api/push-subscriptions/notification?${params}`, {
+      credentials: "same-origin", cache: "no-store", signal: AbortSignal.timeout(8_000),
+    });
+    return response.ok ? await response.json() : null;
+  } catch {
+    // Sem sessão/rede não expõe avisos antigos; a central continua sendo a fonte.
+    return null;
+  }
+}
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const destination = new URL(event.notification.data?.url || "/painel", self.location.origin).href;
-  event.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
-    const existing = clients.find((client) => client.url.startsWith(self.location.origin));
+  event.waitUntil(resolvePushNotification(event.notification.data).then(async (notification) => {
+    const target = new URL(notification?.url || "/painel", self.location.origin);
+    const destination = target.origin === self.location.origin ? target.href : new URL("/painel", self.location.origin).href;
+    const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    const existing = clients.find((client) => new URL(client.url).origin === self.location.origin);
     if (existing) {
       return existing.focus().then((client) => client.navigate(destination));
     }

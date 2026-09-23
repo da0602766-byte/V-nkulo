@@ -12,6 +12,7 @@ type PushSubscriptionRow = {
   endpoint: string;
   p256dh: string;
   auth: string;
+  vinculo_id: string;
 };
 
 type PushNotification = {
@@ -81,37 +82,56 @@ async function deliverWebPushNotifications(
 ) {
   const subscriptions = await db
     .prepare(
-      `SELECT id, endpoint, p256dh, auth
-       FROM notificacoes_push_dispositivos
-       WHERE usuario_id = ?
-       ORDER BY atualizado_em DESC`,
+      `SELECT p.id, p.endpoint, p.p256dh, p.auth, p.vinculo_id
+       FROM notificacoes_push_dispositivos p
+       JOIN sessoes s ON s.token_hash = p.sessao_token_hash AND s.usuario_id = p.usuario_id
+       JOIN usuarios u ON u.id = p.usuario_id AND u.ativo = 1
+       WHERE p.usuario_id = ? AND p.vinculo_id IS NOT NULL
+         AND datetime(s.expira_em) > CURRENT_TIMESTAMP
+         AND (p.expiracao_em IS NULL OR datetime(p.expiracao_em) > CURRENT_TIMESTAMP)
+       ORDER BY p.atualizado_em DESC`,
     )
     .bind(notification.userId)
     .all<PushSubscriptionRow>();
-  const payload = JSON.stringify({
-    title: notification.title.trim().slice(0, 120) || "Vínkulo",
-    body: notification.message.trim().slice(0, 500) || "Você recebeu uma nova atualização.",
-    tag: `vinkulo-notification-${notification.notificationId}`,
-    url: safeDestination(notification.destination),
-  });
   await Promise.all(
     subscriptions.results.map(async (subscription) => {
+      const payload = JSON.stringify({
+        title: "Vínkulo",
+        body: "Você recebeu uma atualização. Abra o Vínkulo para consultar.",
+        tag: `vinkulo-notification-${notification.notificationId}`,
+        url: "/painel",
+        notificationId: notification.notificationId,
+        bindingId: subscription.vinculo_id,
+      });
       try {
         const result = await sendWebPush(subscription, payload, configuration);
         // 404/410 mean the provider has discarded this browser endpoint.
         // Removing only that exact row keeps other devices of the user intact.
         if (result.status === 404 || result.status === 410) {
           await db
-            .prepare("DELETE FROM notificacoes_push_dispositivos WHERE id = ? AND usuario_id = ?")
-            .bind(subscription.id, notification.userId)
+            .prepare("DELETE FROM notificacoes_push_dispositivos WHERE id = ? AND usuario_id = ? AND vinculo_id = ?")
+            .bind(subscription.id, notification.userId, subscription.vinculo_id)
             .run();
+          return;
         }
+        await recordDeliveryAttempt(db, subscription, result.status);
       } catch {
-        // The persisted in-app notification remains the source of truth. A
-        // temporary push-provider failure never blocks the user's action.
+        // Registra apenas estado operacional, nunca endpoint, token ou mensagem.
+        await recordDeliveryAttempt(db, subscription, 0).catch(() => undefined);
       }
     }),
   );
+}
+
+async function recordDeliveryAttempt(db: D1Database, subscription: PushSubscriptionRow, status: number) {
+  const accepted = status >= 200 && status < 300 ? 1 : 0;
+  await db.prepare(
+    `UPDATE notificacoes_push_dispositivos
+     SET ultima_tentativa_em = CURRENT_TIMESTAMP, ultimo_status = ?,
+       ultimo_aceite_em = CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE ultimo_aceite_em END,
+       falhas_consecutivas = CASE WHEN ? = 1 THEN 0 ELSE falhas_consecutivas + 1 END
+     WHERE id = ? AND vinculo_id = ?`,
+  ).bind(status, accepted, accepted, subscription.id, subscription.vinculo_id).run();
 }
 
 async function sendWebPush(
@@ -127,6 +147,7 @@ async function sendWebPush(
   return fetch(subscription.endpoint, {
     method: "POST",
     redirect: "error",
+    signal: AbortSignal.timeout(8_000),
     headers: {
       Authorization: authorization,
       "Content-Encoding": "aes128gcm",
@@ -167,7 +188,7 @@ function isVapidSubject(value: string) {
   }
 }
 
-function safeDestination(value: string) {
+export function safeDestination(value: string) {
   return value.startsWith("/painel?") || value.startsWith("/comunidades") || value.startsWith("/proprietario")
     ? value.slice(0, 300)
     : "/painel";

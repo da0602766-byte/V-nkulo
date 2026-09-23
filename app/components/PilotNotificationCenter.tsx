@@ -10,6 +10,7 @@ import {
   getWebPushSubscriptionState,
   isWebPushSupported,
   subscribeWebPushNotifications,
+  type PushDeliveryStatus,
 } from "../lib/web-push-client";
 
 type Notification = {
@@ -49,6 +50,7 @@ export default function PilotNotificationCenter({
   const [config, setConfig] = useState<NotificationConfig>(DEFAULT_CONFIG);
   const [devicePermission, setDevicePermission] = useState<"unsupported" | NotificationPermission>("unsupported");
   const [webPushSubscribed, setWebPushSubscribed] = useState(false);
+  const [pushDelivery, setPushDelivery] = useState<PushDeliveryStatus | null>(null);
   const [showDevicePermissionHelp, setShowDevicePermissionHelp] = useState(false);
 
   useEffect(() => {
@@ -133,12 +135,15 @@ export default function PilotNotificationCenter({
       setDevicePermission(Notification.permission);
       if (Notification.permission === "granted") {
         void getWebPushSubscriptionState().then((state) => {
-          if (state.supported) setWebPushSubscribed(state.subscribed);
+          if (state.supported) {
+            setWebPushSubscribed(state.subscribed);
+            setPushDelivery(state.delivery || null);
+          }
         }).catch(() => undefined);
       }
     }, 0);
     return () => window.clearTimeout(initial);
-  }, []);
+  }, [open]);
 
   useEffect(() => {
     const initial = window.setTimeout(() => void load(), 0);
@@ -227,6 +232,7 @@ export default function PilotNotificationCenter({
       permissionRef.current = "granted";
       setDevicePermission("granted");
       setWebPushSubscribed(true);
+      setPushDelivery(null);
       await registration.showNotification("Notificações ativadas", {
         body: "Agora o Vínkulo poderá avisar você mesmo quando estiver fechado.",
         icon: "/vinkulo-app-icon-192.png",
@@ -303,6 +309,14 @@ export default function PilotNotificationCenter({
               <div><strong>Avisos neste celular</strong><small>{webPushSubscribed ? "Ativados — você recebe avisos mesmo com o Vínkulo fechado" : devicePermission === "denied" ? "Bloqueados nas configurações do navegador ou aplicativo" : devicePermission === "unsupported" ? "Instale pelo navegador para receber avisos mesmo com o aplicativo fechado" : devicePermission === "granted" ? "Permissão liberada; conclua a ativação para receber avisos em segundo plano" : "Receba escalas, eventos, pedidos e demais avisos"}</small></div>
               {!webPushSubscribed && devicePermission !== "unsupported" && <button type="button" onClick={handleDeviceNotificationPermission}>{devicePermission === "denied" ? "Como liberar" : "Ativar"}</button>}
             </section>
+            {webPushSubscribed && <section className="notification-device-help" aria-live="polite">
+              <strong>{pushDelivery?.consecutiveFailures ? "O último envio encontrou uma dificuldade" : "Privacidade neste aparelho"}</strong>
+              <p>{pushDelivery?.consecutiveFailures
+                ? "Os avisos continuam disponíveis nesta central. Confira sua conexão e a permissão de notificações."
+                : pushDelivery?.lastAcceptedAt
+                  ? "O último envio foi aceito pelo serviço de notificações. Isso não confirma a exibição no aparelho."
+                  : "Os avisos externos não exibem o conteúdo das mensagens."} Ao sair da conta, as notificações desta sessão são desativadas.</p>
+            </section>}
             {showDevicePermissionHelp && devicePermission === "denied" && (
               <section className="notification-device-help" aria-live="polite">
                 <strong>Liberar notificações do aplicativo</strong>

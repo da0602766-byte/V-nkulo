@@ -10,8 +10,5 @@
 # Se um nome novo aparecer, é regressão e precisa ser investigada antes de
 # publicar. Se um daqui voltar a passar, remova a linha.
 
-# As asserções abaixo ainda esperam os identificadores v4 do cache, mas o
-# service worker versionado do repositório já usa v5. São testes de legado fora
-# do console do Proprietário e não foram alterados nesta entrega.
-cache local preserva apenas o shell e arquivos estáticos
-every unread purple notice is forwarded once to the Android tray
+# As duas asserções de versão de cache foram atualizadas na etapa P0 de push;
+# preservam a exigência de cache versionado sem fixar uma versão aposentada.

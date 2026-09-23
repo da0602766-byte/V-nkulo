@@ -6,8 +6,14 @@ migração nova, leia isto.
 
 ## Próximo número livre
 
-**`0077`**. Use o próximo inteiro disponível a partir daí — não reaproveite
+**`0078`**. Use o próximo inteiro disponível a partir daí — não reaproveite
 um número já usado, mesmo que o arquivo tenha sido escrito à mão.
+
+`0077_push_session_privacy.sql` vincula cada assinatura à sessão autenticada,
+com exclusão em cascata ao revogar a sessão. Acrescenta um identificador de
+vínculo para rejeitar push atrasado após troca de conta e metadados de tentativa
+e aceite pelo provedor, sem conteúdo da notificação. Assinaturas antigas só
+voltam a enviar após reconciliação autenticada da mesma conta/aparelho.
 
 `0075_notificacoes_push_dispositivos.sql` guarda uma assinatura Web Push por
 aparelho autenticado. O endpoint é único, então o mesmo navegador não continua

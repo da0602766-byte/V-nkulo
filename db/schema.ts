@@ -1993,6 +1993,12 @@ export const notificacoesPushDispositivos = sqliteTable(
     endpoint: text("endpoint").notNull(),
     p256dh: text("p256dh").notNull(),
     auth: text("auth").notNull(),
+    sessaoTokenHash: text("sessao_token_hash").references(() => sessoes.tokenHash, { onDelete: "cascade" }),
+    vinculoId: text("vinculo_id"),
+    ultimaTentativaEm: text("ultima_tentativa_em"),
+    ultimoAceiteEm: text("ultimo_aceite_em"),
+    ultimoStatus: integer("ultimo_status"),
+    falhasConsecutivas: integer("falhas_consecutivas").notNull().default(0),
     expiracaoEm: text("expiracao_em"),
     criadoEm: text("criado_em")
       .notNull()
@@ -2003,6 +2009,8 @@ export const notificacoesPushDispositivos = sqliteTable(
   },
   (table) => [
     uniqueIndex("notificacoes_push_dispositivos_endpoint_unique").on(table.endpoint),
+    uniqueIndex("notificacoes_push_dispositivos_vinculo_unique").on(table.vinculoId),
+    index("notificacoes_push_dispositivos_sessao_idx").on(table.sessaoTokenHash),
     index("notificacoes_push_dispositivos_usuario_atualizado_idx").on(
       table.usuarioId,
       table.atualizadoEm,

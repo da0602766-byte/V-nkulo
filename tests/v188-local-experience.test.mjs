@@ -14,7 +14,7 @@ test("experiência local detecta conexão lenta e melhora mensagens de validaç�
 
 test("cache local preserva apenas o shell e arquivos estáticos", async () => {
   const worker = await read("public/sw.js");
-  assert.match(worker, /vinkulo-static-v4/);
+  assert.match(worker, /const RUNTIME_CACHE = "vinkulo-static-v\d+"/);
   assert.match(worker, /\["script", "style", "font", "image"\]/);
   assert.match(worker, /url\.pathname\.startsWith\("\/api\/"\)/);
   assert.doesNotMatch(worker, /cache\.put\(request[^\n]+navigate/);

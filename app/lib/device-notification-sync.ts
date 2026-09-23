@@ -2,6 +2,7 @@ import {
   isNativeNotificationBridgeAvailable,
   showDeviceNotification,
 } from "./androidNativeBridge";
+import { isWebPushSupported } from "./web-push-client";
 
 const DEVICE_NOTIFICATION_STORAGE_KEY = "vinkulo-device-notifications-v1";
 
@@ -16,7 +17,11 @@ export type DeviceNotificationRecord = {
 let shownNotificationIds: Set<number> | null = null;
 
 export async function showUnreadDeviceNotifications(items: DeviceNotificationRecord[]) {
+  if (document.visibilityState !== "visible") return;
   const nativeBridge = isNativeNotificationBridgeAvailable();
+  // Navegadores com push já recebem pelo service worker autenticado. O polling
+  // atualiza apenas a central, evitando o segundo aviso para o mesmo evento.
+  if (!nativeBridge && isWebPushSupported()) return;
   if (!nativeBridge && (!("Notification" in window) || Notification.permission !== "granted" || !("serviceWorker" in navigator))) {
     return;
   }
@@ -34,14 +39,14 @@ export async function showUnreadDeviceNotifications(items: DeviceNotificationRec
       : "/painel";
     const tag = `vinkulo-notification-${item.id}`;
     const shownNatively = nativeBridge && showDeviceNotification({
-      title: item.title || "Vínkulo",
-      body: item.message,
+      title: "Vínkulo",
+      body: "Você recebeu uma atualização. Abra o Vínkulo para consultar.",
       tag,
       url: destination,
     });
     if (!shownNatively && registration) {
-      await registration.showNotification(item.title || "Vínkulo", {
-        body: item.message,
+      await registration.showNotification("Vínkulo", {
+        body: "Você recebeu uma atualização. Abra o Vínkulo para consultar.",
         icon: "/vinkulo-app-icon-192.png",
         badge: "/vinkulo-app-icon-192.png",
         tag,

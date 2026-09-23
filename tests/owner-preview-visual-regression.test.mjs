@@ -5,6 +5,8 @@ import test from 'node:test';
 import ts from 'typescript';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+const serviceWorker = read('public/sw.js');
+const currentCaches = [...serviceWorker.matchAll(/^const (?:CACHE|RUNTIME_CACHE) = "([^"]+)";/gm)].map((match) => match[1]);
 test('laboratory distinguishes loading, failure and a confirmed empty list', () => {
   const source = read('app/components/OwnerLaboratoryWorkspace.tsx');
   assert.match(source, /setLoadState\("loading"\)/);
@@ -21,10 +23,10 @@ function worker(hostname, networkFails = false) {
   const context = {
     URL, Response,
     self: { location: { hostname, origin: `http://${hostname}` }, addEventListener: (name, fn) => { handlers[name] = fn; }, skipWaiting() {}, clients: { claim() {} } },
-    caches: { open: async () => ({ match: async () => cached, put() {} }), keys: async () => ['vinkulo-static-v4', 'unrelated-cache', 'vinkulo-shell-v5'], delete: async (key) => deleted.push(key) },
+    caches: { open: async () => ({ match: async () => cached, put() {} }), keys: async () => ['vinkulo-static-v0', 'vinkulo-shell-v0', 'unrelated-cache', ...currentCaches], delete: async (key) => deleted.push(key) },
     fetch: async () => { if (networkFails) throw Error('offline'); return network; },
   };
-  vm.runInNewContext(read('public/sw.js'), context);
+  vm.runInNewContext(serviceWorker, context);
   return { handlers, cached, network, deleted };
 }
 test('preview never intercepts changing scripts and styles', () => {
@@ -50,11 +52,12 @@ test('deployed code keeps an offline fallback', async () => {
   assert.equal(await response, cached);
 });
 test('activation deletes only obsolete application caches', async () => {
+  assert.equal(currentCaches.length, 2);
   const { handlers, deleted } = worker('example.test');
   let finished;
   handlers.activate({ waitUntil(promise) { finished = promise; } });
   await finished;
-  assert.deepEqual(deleted, ['vinkulo-static-v4']);
+  assert.deepEqual(deleted, ['vinkulo-static-v0', 'vinkulo-shell-v0']);
 });
 test('plan normalization preserves the first benefit across repeated reads', () => {
   const source = ts.transpileModule(read('app/lib/platform-plans.ts'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
