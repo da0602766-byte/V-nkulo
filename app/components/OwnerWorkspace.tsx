@@ -83,12 +83,12 @@ const TABS: { id: OwnerTab; label: string; icon: string }[] = [
   { id: "controls", label: "Configurações", icon: "⚙" },
 ];
 
-const OWNER_NAV_GROUPS: { label: string; items: OwnerTab[] }[] = [
-  { label: "Comando", items: ["overview", "requests"] },
-  { label: "Administração", items: ["communities", "users", "plans"] },
-  { label: "Experiência", items: ["appearance", "editorial", "controls", "laboratory"] },
-  { label: "Operação", items: ["feedback", "statistics", "optimization", "realtime", "performance", "incidents"] },
-  { label: "Governança", items: ["audit", "passwords", "deleted", "finance", "publication"] },
+const OWNER_NAV_SECTIONS: { id: string; label: string; description: string; icon: string; items: OwnerTab[] }[] = [
+  { id: "command", label: "Comando", description: "Resumo e decisões", icon: "⌂", items: ["overview"] },
+  { id: "network", label: "Rede", description: "Comunidades e pessoas", icon: "◇", items: ["requests", "communities", "users"] },
+  { id: "product", label: "Produto", description: "Oferta e experiência", icon: "◈", items: ["plans", "appearance", "editorial", "controls", "laboratory"] },
+  { id: "operation", label: "Operação", description: "Sinais e atendimento", icon: "↗", items: ["feedback", "statistics", "optimization", "realtime", "performance", "incidents"] },
+  { id: "governance", label: "Governança", description: "Risco e histórico", icon: "✓", items: ["audit", "passwords", "deleted", "finance", "publication"] },
 ];
 
 const OWNER_METRICS: {
@@ -432,48 +432,47 @@ export default function OwnerWorkspace({
     });
   }
 
-  return (
-    <main className="owner-area owner-area-v3" data-ui-version="v3-preview" data-visual-editor-root data-editor-key="area-proprietario">
-      <header className="owner-topbar" data-editor-key="cabecalho-proprietario" data-smart-scroll-header>
-        <button className="owner-mobile-menu" type="button" aria-label="Abrir menu" aria-expanded={mobileNavOpen} onClick={toggleMobileNavigation}>☰</button>
-        <Link href="/" className="owner-brand"><span><OwnerImage src={brandLogo} fallback={brandName.slice(0, 1)} /></span><div><strong>{brandName}</strong><small>Central da plataforma</small></div></Link>
-        <div className="owner-global-search">
-          <span aria-hidden="true">⌕</span>
-          <input value={globalSearch} onChange={(event) => setGlobalSearch(event.target.value)} placeholder="Buscar áreas, comunidades ou pessoas" aria-label="Busca global administrativa" />
-          {globalSearch && <button type="button" aria-label="Limpar busca" onClick={() => setGlobalSearch("")}>×</button>}
-        </div>
-        <div className="owner-top-actions">
-          <ThemeControl compact />
-          <PilotNotificationCenter />
-          <span id="global-editor-toolbar-slot" className="global-editor-toolbar-slot" aria-label="Aparência" />
-          <Link href="/painel?view=conta" className="owner-profile-link" showLoading loadingLabel="Abrindo seu perfil…">
-            <span><OwnerImage src={ownerPhoto} fallback={initials(ownerName)} /></span>
-            <div><VerifiedOwnerName name={ownerName} verified /><small>Proprietário global</small></div>
-          </Link>
-        </div>
-      </header>
+  const activeSection = OWNER_NAV_SECTIONS.find((section) => section.items.includes(tab)) || OWNER_NAV_SECTIONS[0];
 
-      <div className="owner-layout">
+  return (
+    <main className="owner-area owner-area-v3 owner-area-v4" data-ui-version="v4-preview" data-visual-editor-root data-editor-key="area-proprietario">
+      <div className="owner-layout owner-shell-v4">
         {mobileNavOpen ? <button type="button" className="owner-sidebar-backdrop" aria-label="Fechar menu" onClick={() => setMobileNavOpen(false)} /> : null}
         <aside className={`owner-sidebar ${mobileNavOpen ? "is-open" : ""}`} style={{ flexDirection: "column" }}>
-          <div className="owner-sidebar-heading"><span>Administração global</span><small>Dados e configurações da plataforma</small></div>
-          <nav aria-label="Menu do proprietário">
-            {OWNER_NAV_GROUPS.map((group) => <section key={group.label}>
-              <small>{group.label}</small>
-              {group.items.map((id) => {
-                const item = TABS.find((candidate) => candidate.id === id)!;
-                return <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => selectTab(item.id)}><span>{item.icon}</span>{item.label}{item.id === "requests" && pending.length > 0 ? <b>{pending.length}</b> : item.id === "feedback" && pendingFeedback.length > 0 ? <b>{pendingFeedback.length}</b> : null}</button>;
-              })}
-            </section>)}
+          <Link href="/" className="owner-brand owner-brand-desktop"><span><OwnerImage src={brandLogo} fallback={brandName.slice(0, 1)} /></span><div><strong>{brandName}</strong><small>Administração global</small></div></Link>
+          <nav className="owner-section-switcher" aria-label="Áreas administrativas">
+            {OWNER_NAV_SECTIONS.map((section) => <button type="button" key={section.id} className={activeSection.id === section.id ? "active" : ""} onClick={() => selectTab(section.items[0])}><span>{section.icon}</span><strong>{section.label}</strong><small>{section.description}</small></button>)}
           </nav>
+          <div className="owner-context-nav">
+            <header><span>{activeSection.label}</span><small>{activeSection.items.length} {activeSection.items.length === 1 ? "área" : "áreas"}</small></header>
+            <nav aria-label={`Menu de ${activeSection.label}`}>
+              {activeSection.items.map((id) => { const item = TABS.find((candidate) => candidate.id === id)!; return <button type="button" key={item.id} className={tab === item.id ? "active" : ""} onClick={() => selectTab(item.id)}><span>{item.icon}</span>{item.label}{item.id === "requests" && pending.length > 0 ? <b>{pending.length}</b> : item.id === "feedback" && pendingFeedback.length > 0 ? <b>{pendingFeedback.length}</b> : null}</button>; })}
+            </nav>
+          </div>
           <div className="owner-sidebar-links">
             <Link href="/painel" showLoading loadingLabel="Abrindo sua comunidade…">Painel da comunidade <span>↗</span></Link>
             <Link href="/comunidades" showLoading loadingLabel="Abrindo o diretório público…">Diretório público <span>↗</span></Link>
           </div>
           <Link href="/painel?view=conta" className="owner-sidebar-profile"><OwnerAvatar image={ownerPhoto} name={ownerName} /><span><VerifiedOwnerName name={ownerName} verified /><small>Proprietário global</small></span></Link>
         </aside>
-
-        <section className="owner-workspace">
+        <div className="owner-main-v4">
+          <header className="owner-topbar" data-editor-key="cabecalho-proprietario" data-smart-scroll-header>
+            <button className="owner-mobile-menu" type="button" aria-label="Abrir menu" aria-expanded={mobileNavOpen} onClick={toggleMobileNavigation}>☰</button>
+            <Link href="/" className="owner-brand owner-brand-mobile"><span><OwnerImage src={brandLogo} fallback={brandName.slice(0, 1)} /></span></Link>
+            <div className="owner-breadcrumb"><small>ADMINISTRAÇÃO GLOBAL</small><strong>{activeSection.label} <span>/</span> {tabLabel(tab)}</strong></div>
+            <div className="owner-global-search">
+              <span aria-hidden="true">⌕</span>
+              <input value={globalSearch} onChange={(event) => setGlobalSearch(event.target.value)} placeholder="Buscar comunidade, pessoa, configuração ou ação" aria-label="Busca global administrativa" />
+              {globalSearch && <button type="button" aria-label="Limpar busca" onClick={() => setGlobalSearch("")}>×</button>}
+            </div>
+            <div className="owner-top-actions">
+              <ThemeControl compact />
+              <PilotNotificationCenter />
+              <span id="global-editor-toolbar-slot" className="global-editor-toolbar-slot" aria-label="Aparência" />
+              <Link href="/painel?view=conta" className="owner-profile-link" showLoading loadingLabel="Abrindo seu perfil…"><span><OwnerImage src={ownerPhoto} fallback={initials(ownerName)} /></span></Link>
+            </div>
+          </header>
+          <section className="owner-workspace">
           {globalSearch && data ? <section className="owner-global-results" aria-label="Resultados da busca global">
             <header><span>Resultados para</span><strong>“{globalSearch}”</strong></header>
             {globalResults.map((result) => <button type="button" key={`${result.kind}-${result.id}`} onClick={() => {
@@ -483,28 +482,13 @@ export default function OwnerWorkspace({
             }}><span>{result.kind === "navigation" ? "Ir" : result.kind === "community" ? "Comunidade" : "Pessoa"}</span><strong>{result.title}</strong><small>{result.detail}</small><i>→</i></button>)}
             {!globalResults.length && <Empty title="Nenhum resultado" text="Tente outro nome, configuração ou área administrativa." />}
           </section> : null}
-          <header className="owner-page-heading owner-page-heading-v97">
-            <div><p className="pilot-kicker">CENTRAL DO PROPRIETÁRIO</p><h1>{tabLabel(tab)}</h1><p>{tabDescription(tab)}</p></div>
+          <header className="owner-page-heading owner-page-heading-v4">
+            <div><p className="pilot-kicker">{activeSection.label.toUpperCase()}</p><h1>{tabLabel(tab)}</h1><p>{tabDescription(tab)}</p></div>
             <div className="owner-page-quick-actions">
-              <button type="button" onClick={() => selectTab("requests")}><span>◫</span> Solicitações {pending.length > 0 && <b>{pending.length}</b>}</button>
-              <button type="button" onClick={() => selectTab("feedback")}><span>!</span> Feedback {pendingFeedback.length > 0 && <b>{pendingFeedback.length}</b>}</button>
+              {tab !== "overview" ? <span className="owner-page-scope"><i>✓</i><b>Escopo global</b><small>Registrado na auditoria</small></span> : null}
+              <button type="button" onClick={() => selectTab("requests")}><span>◫</span> Pendências {pending.length > 0 && <b>{pending.length}</b>}</button>
             </div>
           </header>
-          {/* A nota de escopo vivia dentro de um <details> fechado: era preciso
-              clicar para descobrir que se está agindo sobre a plataforma
-              inteira. Aqui ela é permanente, porque saber em que camada a ação
-              cai não é detalhe opcional. */}
-          {tab !== "overview" ? <p className="owner-scope-banner-v5" role="note">
-            <span aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2.8 19.4 6v5.9c0 4.5-3 8.2-7.4 9.3-4.4-1.1-7.4-4.8-7.4-9.3V6L12 2.8Z" />
-                <path d="m8.9 11.9 2.2 2.2 4.2-4.3" />
-              </svg>
-            </span>
-            <b>Escopo global</b>
-            Tudo aqui alcança a plataforma inteira, fora do contexto de qualquer
-            comunidade, e fica registrado na auditoria com o seu nome.
-          </p> : null}
           {message && <p className="operations-feedback" role="status">{message}</p>}
           {loading && !data ? <div className="owner-loading">Carregando controles globais…</div> : null}
 
@@ -599,7 +583,8 @@ export default function OwnerWorkspace({
           {tab === "appearance" && <OwnerAppearanceWorkspace />}
           {tab === "plans" && <PlatformPlansWorkspace />}
           {tab === "controls" && <PlatformControlsWorkspace features={features} currentCommunityId={currentCommunityId} />}
-        </section>
+          </section>
+        </div>
       </div>
       <nav className="owner-mobile-nav" aria-label="Navegação rápida do proprietário">
         {["overview", "requests", "communities", "audit"].map((id) => { const item = TABS.find((candidate) => candidate.id === id)!; const mobileLabel = { overview: "Início", requests: "Pedidos", communities: "Comunidades", audit: "Auditoria" }[id]; return <button type="button" key={id} className={tab === id ? "active" : ""} onClick={() => selectTab(id as OwnerTab)}><span>{item.icon}</span>{mobileLabel}{id === "requests" && pending.length > 0 ? <b>{pending.length}</b> : null}</button>; })}
