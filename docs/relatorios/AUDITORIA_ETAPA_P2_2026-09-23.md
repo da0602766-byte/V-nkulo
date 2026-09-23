@@ -54,4 +54,11 @@ Há três oportunidades de execução: após criar um aviso pelo helper, com tr�
 
 ## Publicação
 
-Candidato validado; os identificadores da versão e as verificações de produção serão registrados após a implantação.
+- Versão **299**, publicada em **23/09/2026 às 14h09min41s (Brasília)**, na [plataforma Vínkulo](https://adote-gestao.da0602766.chatgpt.site).
+- Commit de código: `7c7a0ecd5529bcb8a26e083a7a24eda2e5b59077`, enviado à branch `main` do repositório Sites e confirmado por fetch antes de salvar a versão.
+- Versão salva: `appgprj_6a5af9301a888191b2abefddaa299618~appgver_b7fbbe44fec88191a8f516a5875034e4`.
+- Implantação: `appgdep_6ab407b1f04081919caedd776398bbb8`, estado `succeeded`.
+- SHA-256 do pacote gzip local: `ec7742fe906be5976df25eede82b1244f49caaee641fd127564b150d27c3dd58`. Pacote construído do commit acima, com Worker, assets e migração 0078.
+- Produção: início, login e comunidades retornaram HTTP 200; o novo diagnóstico retornou HTTP 401 e `no-store` sem sessão.
+- No console autenticado, o painel exibiu **Envio configurado** e **Agendamento ativo**. Consulta às 14h11min28s: última execução agendada às **14h10min00s** e último processamento concluído às **14h10min59s**, todos em Brasília. A fila começou vazia, como esperado sem backfill ou avisos artificiais.
+- Painel publicado conferido em 390 px: documento de 375 px, sem transbordamento horizontal. Nenhum erro foi exibido no diagnóstico durante as consultas observadas. O teste não comprova entrega física em um aparelho; nenhuma mensagem foi gerada para essa finalidade.
