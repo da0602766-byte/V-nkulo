@@ -230,7 +230,7 @@ public class MainActivity extends Activity {
                         }
                     } catch (JSONException ignored) { /* Ignore malformed messages without logging their content. */ }
                 });
-        String script = "if(window===window.top){window.VinkuloAndroid=Object.freeze({version:'1.6.0',"
+        String script = "if(window===window.top){window.VinkuloAndroid=Object.freeze({version:'1.7.0',"
                 + "shareToWhatsApp:function(text){VinkuloNative.postMessage(JSON.stringify({action:'share',text:text}));},"
                 + "openGoogleAuth:function(url){VinkuloNative.postMessage(JSON.stringify({action:'google',url:url}));},"
                 + "showNotification:function(title,body,tag,url){VinkuloNative.postMessage(JSON.stringify({action:'notification',tag:tag,url:url}));}"

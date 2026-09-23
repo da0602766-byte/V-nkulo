@@ -2,9 +2,9 @@
 
 Aplicativo Android conectado à plataforma oficial do Vínkulo.
 
-Versão atual: **1.6.0** (`versionCode 8`).
+Versão atual: **1.7.0** (`versionCode 9`).
 
-## Melhorias da versão 1.6.0
+## Melhorias da versão 1.7.0
 
 - Ponte `WebMessageListener` restrita à origem oficial e ao frame principal. O adaptador JavaScript mantém os métodos usados pela plataforma, sem `addJavascriptInterface`.
 - Remove o timer nativo duplicado de 20 segundos; a plataforma mantém uma consulta em primeiro plano e recebe um evento ao retomar o aplicativo. Timers e WebView são pausados quando o app sai de uso.
@@ -15,7 +15,7 @@ Versão atual: **1.6.0** (`versionCode 8`).
 
 Os recursos da ponte exigem Android System WebView com `WEB_MESSAGE_LISTENER` e `DOCUMENT_START_SCRIPT`. Se não estiverem disponíveis, o app orienta atualizar o WebView e mantém a navegação web, sem reinstalar uma ponte insegura.
 
-Esta versão ainda não contém FCM: notificações nativas continuam dependendo do app em uso. A integração em segundo plano exige a configuração do projeto Firebase e do remetente no backend; não há polling permanente ou serviço em primeiro plano para contornar essa dependência.
+O FCM foi integrado ao APK. O arquivo `google-services.json` fica fora do repositório e é fornecido ao workflow pelo segredo `VINKULO_GOOGLE_SERVICES_JSON`. O serviço nativo recebe notificações enquanto o processo não foi forçadamente encerrado pelo usuário. O registro do token e o envio pelo backend dependem da próxima etapa de integração do dispositivo; não há polling permanente ou serviço em primeiro plano.
 
 ## Login e Google Drive
 
@@ -38,6 +38,8 @@ O GitHub Actions recebe a chave exclusivamente pelos segredos
 `ANDROID_SIGNING_KEYSTORE_BASE64` e `ANDROID_SIGNING_PASSWORD`, executa
 `assembleRelease` e entrega `app-release.apk`. A chave, a senha e seus backups
 nunca devem ser adicionados ao repositório.
+
+Para o FCM, cadastre também o segredo `VINKULO_GOOGLE_SERVICES_JSON` com o conteúdo integral do arquivo baixado no Firebase Console. Ele deve corresponder ao pacote `com.vinkulo.app` do projeto `vinkulo-256e8`.
 
 A versão 1.3.0 pública usava um certificado de depuração. Por isso, a primeira
 instalação da versão 1.5.0 de produção exige remover a versão anterior uma única

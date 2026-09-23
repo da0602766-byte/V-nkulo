@@ -34,6 +34,12 @@ jobs:
           test -n "$KEYSTORE_BASE64"
           test -n "$STORE_PASSWORD"
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/vinkulo-release.p12"
+      - name: Preparar configuração Firebase
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.VINKULO_GOOGLE_SERVICES_JSON }}
+        run: |
+          test -n "$GOOGLE_SERVICES_JSON"
+          printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
       - name: Compilar APK de produção
         env:
           VINKULO_SIGNING_STORE_FILE: ${{ runner.temp }}/vinkulo-release.p12
@@ -50,13 +56,13 @@ jobs:
           sha256sum app/build/outputs/apk/release/app-release.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: Vinkulo-Android-1.6.0-producao
+          name: Vinkulo-Android-1.7.0-producao
           path: Vinkulo-Android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: Vinkulo-Android-1.6.0-validacao
+          name: Vinkulo-Android-1.7.0-validacao
           path: |
             Vinkulo-Android/app/build/reports/
             Vinkulo-Android/app/build/test-results/
