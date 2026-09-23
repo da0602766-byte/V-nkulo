@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import type { ConnectorStatus, IntegrationCatalog } from "../lib/integration-catalog";
 const SupabaseIntegrationForm = dynamic(() => import("./SupabaseIntegrationForm"), { loading: () => <p role="status">Carregando configuração…</p> });
 const SupabaseAutoSync = dynamic(() => import("./SupabaseAutoSync"), { loading: () => <p role="status">Carregando sincronização…</p> });
+const FirebaseIntegrationForm = dynamic(() => import("./FirebaseIntegrationForm"), { loading: () => <p role="status">Carregando Firebase…</p> });
 const labels: Record<ConnectorStatus, string> = { connected: "Conectado", not_connected: "Não conectado", paused: "Desativado", attention: "Requer atenção", unavailable: "Não disponível" };
 function date(value: string | null) { return value ? new Date(value).toLocaleString("pt-BR") : "Ainda não registrado"; }
 
@@ -37,7 +38,8 @@ export default function OwnerIntegrationsWorkspace() {
     const timer = setTimeout(() => void load(), 0);
     const update = () => void load();
     window.addEventListener("vinkulo:supabase-status", update);
-    return () => { clearTimeout(timer); request.current?.abort(); request.current = null; window.removeEventListener("vinkulo:supabase-status", update); };
+    window.addEventListener("vinkulo:firebase-status", update);
+    return () => { clearTimeout(timer); request.current?.abort(); request.current = null; window.removeEventListener("vinkulo:supabase-status", update); window.removeEventListener("vinkulo:firebase-status", update); };
   }, [load]);
   useEffect(() => { if (selected) detail.current?.focus(); }, [selected]);
 
@@ -52,9 +54,10 @@ export default function OwnerIntegrationsWorkspace() {
     <div className="oi-catalog">{catalog?.connectors.map(connector => <article className="ops-panel oi-card" key={connector.id}>
       <header><h3>{connector.name}</h3><span className={`oi-status ${connector.status}`}>{labels[connector.status]}</span></header>
       <p>{connector.description}</p><p className="oi-message">{connector.message}</p>
-      {connector.available && <><dl><div><dt>Último teste</dt><dd>{date(connector.checkedAt)}</dd></div><div><dt>Última sincronização</dt><dd>{date(connector.lastSyncAt)}</dd></div><div><dt>Último agendamento</dt><dd>{date(connector.lastHeartbeatAt)}</dd></div></dl>
-        <p className="oi-capabilities">{connector.capabilities.join(" · ")}</p><button type="button" className="oc-button" aria-expanded={selected === connector.id} aria-controls="connector-settings" onClick={() => setSelected(selected === connector.id ? null : connector.id)}>{selected === connector.id ? "Fechar configuração" : "Configurar Supabase"}</button></>}
+      {connector.available && <><dl><div><dt>Último teste</dt><dd>{date(connector.checkedAt)}</dd></div>{connector.id === "supabase" && <><div><dt>Última sincronização</dt><dd>{date(connector.lastSyncAt)}</dd></div><div><dt>Último agendamento</dt><dd>{date(connector.lastHeartbeatAt)}</dd></div></>}</dl>
+        <p className="oi-capabilities">{connector.capabilities.join(" · ")}</p><button type="button" className="oc-button" aria-expanded={selected === connector.id} aria-controls="connector-settings" onClick={() => setSelected(selected === connector.id ? null : connector.id)}>{selected === connector.id ? "Fechar configuração" : connector.id === "firebase" ? "Configurar Firebase" : "Configurar Supabase"}</button></>}
     </article>)}</div>
+    {selected === "firebase" && <section id="connector-settings" className="owner-publication oi-settings" aria-labelledby="connector-settings-title"><h2 id="connector-settings-title" ref={detail} tabIndex={-1}>Configurar Firebase</h2><FirebaseIntegrationForm /></section>}
     {selected === "supabase" && <section id="connector-settings" className="owner-publication oi-settings" aria-labelledby="connector-settings-title">
       <h2 id="connector-settings-title" ref={detail} tabIndex={-1}>Configurar Supabase</h2>
       <p>Salvar, testar e remover usam a conexão existente. Remover a configuração não apaga os dados armazenados no Supabase.</p>

@@ -1,6 +1,7 @@
 import { getRuntimeEnv } from "../../db/runtime-env";
 import { getVapidConfiguration, isTrustedPushEndpoint, isWebPushConfigured, sendWebPush, type PushSubscriptionRow, type VapidConfiguration } from "./web-push";
 import type { PushQueueState, PushQueueStatus } from "./push-delivery-types";
+import { readFirebaseConfig, nativeToken, sendFcm, type FirebaseConfig } from "./firebase-integration";
 
 const BATCH_SIZE = 8;
 const CONCURRENCY = 4;
@@ -12,7 +13,6 @@ type Control = { lease_ate: number; ultimo_inicio_em: string | null; ultimo_fim_
 
 /** A fila já existe no D1; waitUntil só reduz o tempo até a primeira tentativa. */
 export function scheduleWebPushDelivery(db: D1Database, reason: DrainReason = "immediate") {
-  if (!isWebPushConfigured()) return;
   const delivery = drainPushQueue(db, reason).catch(() => undefined);
   const executionContext = getRuntimeEnv().executionContext;
   if (executionContext) executionContext.waitUntil(delivery);
@@ -33,7 +33,8 @@ export async function drainPushQueue(db: D1Database, reason: DrainReason = "traf
     await db.prepare("UPDATE notificacoes_push_controle SET ultimo_agendamento_em = CURRENT_TIMESTAMP WHERE id = 1").run();
   }
   const configuration = getVapidConfiguration();
-  if (!configuration) return { configured: false, claimed: 0, busy: false };
+  const firebase = await readFirebaseConfig(db).catch(() => null);
+  if (!configuration && !firebase) return { configured: false, claimed: 0, busy: false };
   const now = Date.now(), token = crypto.randomUUID();
   const lock = await db.prepare(
     `UPDATE notificacoes_push_controle SET lease_token = ?, lease_ate = ?, ultimo_inicio_em = CURRENT_TIMESTAMP
@@ -52,15 +53,17 @@ export async function drainPushQueue(db: D1Database, reason: DrainReason = "traf
       `UPDATE notificacoes_push_fila SET estado = 'PROCESSANDO', lease_token = ?, lease_ate = ?,
          tentativas = tentativas + 1, atualizado_em = CURRENT_TIMESTAMP
        WHERE id IN (SELECT id FROM notificacoes_push_fila
-         WHERE (estado = 'PENDENTE' AND proxima_tentativa_em <= ?)
-            OR (estado = 'PROCESSANDO' AND lease_ate <= ?)
+         WHERE ((estado = 'PENDENTE' AND proxima_tentativa_em <= ?)
+            OR (estado = 'PROCESSANDO' AND lease_ate <= ?))
+           AND dispositivo_id IN (SELECT id FROM notificacoes_push_dispositivos
+             WHERE (? = 1 AND endpoint NOT LIKE 'fcm:%') OR (? = 1 AND endpoint LIKE 'fcm:%'))
          ORDER BY proxima_tentativa_em, id LIMIT ?)
        RETURNING id, notificacao_id, dispositivo_id, usuario_id, vinculo_id, tentativas, expira_em`,
-    ).bind(token, now + LEASE_MS, now, now, BATCH_SIZE).all<Job>();
+    ).bind(token, now + LEASE_MS, now, now, configuration ? 1 : 0, firebase ? 1 : 0, BATCH_SIZE).all<Job>();
     // Duas ondas de até quatro requisições com timeout de cinco segundos cada.
     for (let index = 0; index < claimed.results.length; index += CONCURRENCY) {
       const outcomes = await Promise.allSettled(claimed.results.slice(index, index + CONCURRENCY)
-        .map(job => deliverJob(db, job, token, configuration)));
+        .map(job => deliverJob(db, job, token, configuration, firebase)));
       if (outcomes.some(outcome => outcome.status === "rejected")) failed = true;
     }
     if (failed) throw new Error("Falha ao registrar uma tentativa da fila push.");
@@ -85,7 +88,7 @@ async function finish(db: D1Database, job: Job, token: string, state: PushQueueS
   ).bind(state, status, reason, nextAt, job.id, token).run();
 }
 
-async function deliverJob(db: D1Database, job: Job, token: string, configuration: VapidConfiguration) {
+async function deliverJob(db: D1Database, job: Job, token: string, configuration: VapidConfiguration | null, firebase: FirebaseConfig | null) {
   if (job.expira_em <= Date.now()) return finish(db, job, token, "EXPIRADA", null, "PRAZO_EXPIRADO");
   if (job.tentativas > MAX_ATTEMPTS) return finish(db, job, token, "FALHA", null, "LIMITE_TENTATIVAS");
   // Revalida a autorização e a leitura a cada envio, incluindo execuções recuperadas.
@@ -103,15 +106,18 @@ async function deliverJob(db: D1Database, job: Job, token: string, configuration
        AND NOT EXISTS (SELECT 1 FROM notificacoes_lidas l WHERE l.notificacao_id = n.id AND l.usuario_id = q.usuario_id)`,
   ).bind(job.id, token, Date.now()).first<PushSubscriptionRow & { tipo: string }>();
   if (!subscription) return finish(db, job, token, "CANCELADA", null, "ACESSO_OU_AVISO_INDISPONIVEL");
-  if (!isTrustedPushEndpoint(subscription.endpoint)) return finish(db, job, token, "FALHA", null, "DESTINO_INVALIDO");
+  const native = nativeToken(subscription.endpoint);
+  if (!native && !isTrustedPushEndpoint(subscription.endpoint)) return finish(db, job, token, "FALHA", null, "DESTINO_INVALIDO");
 
   const payload = JSON.stringify({ title: "Vínkulo", body: "Você recebeu uma atualização. Abra o Vínkulo para consultar.",
     tag: `vinkulo-notification-${job.notificacao_id}`, url: "/painel", notificationId: job.notificacao_id, bindingId: job.vinculo_id });
   let status = 0, retryAfter: string | null = null;
   try {
-    const result = await sendWebPush(subscription, payload, configuration, {
+    const options = {
       ttl: Math.ceil((job.expira_em - Date.now()) / 1000), topic: `n-${job.notificacao_id}`, urgent: subscription.tipo === "IMPORTANTE",
-    });
+    };
+    const result = native && firebase ? await sendFcm(firebase, subscription.endpoint, { tag: `vinkulo-notification-${job.notificacao_id}`, url: "/painel", notificationId: job.notificacao_id, bindingId: job.vinculo_id }, options.ttl)
+      : configuration ? await sendWebPush(subscription, payload, configuration, options) : new Response(null, { status: 503 });
     status = result.status;
     retryAfter = result.headers.get("Retry-After");
     await result.body?.cancel();
@@ -156,7 +162,7 @@ export async function getPushQueueStatus(db: D1Database): Promise<PushQueueStatu
   for (const row of aggregate.results) counts[row.estado] = Number(row.total);
   const scheduledAt = control.ultimo_agendamento_em ? Date.parse(`${control.ultimo_agendamento_em.replace(" ", "T")}Z`) : 0;
   return {
-    configured: isWebPushConfigured(), checkedAt: new Date().toISOString(), counts,
+    configured: isWebPushConfigured() || !!await readFirebaseConfig(db), checkedAt: new Date().toISOString(), counts,
     nextAttemptAt: pending?.next_at != null ? new Date(pending.next_at).toISOString() : null,
     oldestPendingAt: pending?.oldest ?? null, processing: control.lease_ate > Date.now(),
     lastStartedAt: control.ultimo_inicio_em, lastFinishedAt: control.ultimo_fim_em,

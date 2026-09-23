@@ -331,3 +331,13 @@ body:has(.owner-console dialog[open]) .global-feedback-launcher { visibility: hi
   .owner-console .oc-dialog :is(input,select,textarea) { font-size:16px; }
   .owner-console .oc-nav button { font-size:14px; }
 }
+.oi-firebase { padding: 20px; overflow-wrap: anywhere; }
+.oi-firebase form { display: grid; gap: 16px; margin: 20px 0; }
+.oi-firebase input[type="file"] { max-width: 100%; min-width: 0; min-height: 44px; padding: 8px; border: 1px solid var(--owner-line); border-radius: 10px; color: inherit; background: var(--owner-surface); }
+.oi-firebase .oi-consent { display: flex; align-items: flex-start; gap: 12px; line-height: 1.6; }
+.oi-firebase .oi-consent input { flex: 0 0 24px; width: 24px; height: 24px; margin-top: 4px; }
+.oi-firebase a { text-decoration: underline; text-underline-offset: 3px; font-weight: 600; }
+.oi-firebase ol { padding-left: 24px; line-height: 1.8; list-style: decimal; }
+.oi-firebase dl { display: grid; gap: 10px; }
+.oi-firebase dd { margin: 0; }
+.oi-firebase .oi-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; }

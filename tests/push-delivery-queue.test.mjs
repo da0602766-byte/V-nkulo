@@ -24,7 +24,7 @@ async function fixture(t) {
   database.prepare("INSERT INTO sessoes(usuario_id,token_hash,expira_em) VALUES (?,?,datetime('now','+1 day'))").run(userId, session);
   database.prepare("INSERT INTO notificacoes_push_dispositivos(usuario_id,endpoint,p256dh,auth,sessao_token_hash,vinculo_id) VALUES (?,'https://fcm.googleapis.com/fcm/send/test','key','auth',?,?)").run(userId, session, binding);
   const calls = [], jobs = [];
-  let configured = true;
+  let configured = true, firebase = false;
   let sender = async () => new Response(null, { status: 201 });
   const transport = {
     getVapidConfiguration: () => configured ? {} : null,
@@ -33,14 +33,31 @@ async function fixture(t) {
     sendWebPush: async (sub, payload, config, options) => { calls.push({ sub, payload: JSON.parse(payload), options }); return sender(sub, payload); },
   };
   const queue = await moduleAt("app/lib/push-delivery-queue.ts", {
+    "./firebase-integration": { readFirebaseConfig: async () => firebase ? {} : null, nativeToken: endpoint => endpoint.startsWith("fcm:") ? endpoint.slice(4) : null,
+      sendFcm: async (config, endpoint, payload, ttl) => { calls.push({ sub: { endpoint }, payload, options: { ttl }, native: true }); return sender({ endpoint }, payload); } },
     "./web-push": transport, "../../db/runtime-env": { getRuntimeEnv: () => ({ executionContext: { waitUntil: p => jobs.push(p) } }) },
   });
   const notify = (area = "EVENTOS", type = "INFO") => Number(database.prepare("INSERT INTO notificacoes_sistema(tipo,titulo,mensagem,area,usuario_id,criado_por) VALUES (?,'Título secreto','Mensagem secreta',?,?,'teste')").run(type, area, userId).lastInsertRowid);
   const rows = () => database.prepare("SELECT * FROM notificacoes_push_fila ORDER BY id").all();
   const due = () => database.prepare("UPDATE notificacoes_push_fila SET proxima_tentativa_em = 0 WHERE estado = 'PENDENTE'").run();
   return { database, d1, userId, binding, session, calls, queue, notify, rows, due, jobs,
-    sender: fn => { sender = fn; }, configured: value => { configured = value; } };
+    sender: fn => { sender = fn; }, configured: value => { configured = value; }, firebase: value => { firebase = value; } };
 }
+
+test("fila FCM: aguarda configuração, funciona sem VAPID e revoga tokens expirados", async t => {
+  const f = await fixture(t);
+  f.database.exec("UPDATE notificacoes_push_dispositivos SET endpoint='fcm:token-native-for-test'");
+  f.notify(); await f.queue.drainPushQueue(f.d1);
+  assert.equal(f.rows()[0].tentativas, 0, "configuração ausente não consome tentativas");
+  f.firebase(true); f.configured(false);
+  await f.queue.drainPushQueue(f.d1);
+  assert.equal(f.rows()[0].estado, "ACEITO"); assert.equal(f.calls[0].native, true);
+  assert.equal(f.calls[0].payload.bindingId, f.binding);
+  assert.doesNotMatch(JSON.stringify(f.calls), /Título secreto|Mensagem secreta|session-queue/);
+  f.notify(); f.sender(async () => new Response(null, { status: 410 }));
+  await f.queue.drainPushQueue(f.d1);
+  assert.equal(f.database.prepare("SELECT COUNT(*) AS n FROM notificacoes_push_dispositivos").get().n, 0);
+});
 
 test("fila push: gatilho atômico, unicidade e exclusão de chat, sessão expirada e legado", async t => {
   const f = await fixture(t);

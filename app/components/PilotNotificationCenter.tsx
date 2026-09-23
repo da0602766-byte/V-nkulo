@@ -220,6 +220,11 @@ export default function PilotNotificationCenter({
   }
 
   const enableDeviceNotifications = useCallback(async () => {
+    if (window.VinkuloAndroid?.requestPushToken) {
+      window.VinkuloAndroid.requestPushToken();
+      setMessage("O registro Android será atualizado. Permita notificações nas configurações do aplicativo; o envio também depende da configuração Firebase do proprietário.");
+      return;
+    }
     if (!isWebPushSupported()) {
       setDevicePermission("unsupported");
       setMessage(isNativeNotificationBridgeAvailable()

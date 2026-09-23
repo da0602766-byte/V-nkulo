@@ -17,6 +17,7 @@ export type DeviceNotificationRecord = {
 let shownNotificationIds: Set<number> | null = null;
 
 export async function showUnreadDeviceNotifications(items: DeviceNotificationRecord[]) {
+  if (window.VinkuloFcmActive) return;
   if (document.visibilityState !== "visible") return;
   const nativeBridge = isNativeNotificationBridgeAvailable();
   // Navegadores com push já recebem pelo service worker autenticado. O polling

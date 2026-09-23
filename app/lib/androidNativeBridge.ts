@@ -1,6 +1,10 @@
 declare global {
   interface Window {
+    VinkuloFcmActive?: boolean;
     VinkuloAndroid?: {
+      requestPushToken?: () => void;
+      setPushBinding?: (token: string, bindingId: string) => void;
+      clearPushBinding?: () => void;
       shareToWhatsApp?: (message: string) => void;
       downloadFile?: (url: string, filename: string) => void;
       addCalendarEvent?: (eventJson: string) => void;

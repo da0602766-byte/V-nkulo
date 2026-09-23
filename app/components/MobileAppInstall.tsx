@@ -118,8 +118,8 @@ export default function MobileAppInstall() {
             : <>No Android, abra o menu do navegador e escolha <strong>Instalar aplicativo</strong> ou <strong>Adicionar à tela inicial</strong>.</>}
           {androidDevice && (
             <p>
-              <a href="/downloads/VINKULO_ANDROID_1.6.0.apk" download>Baixar APK Android 1.6.0</a>
-              {" — Nesta versão do APK, os avisos são recebidos enquanto o aplicativo está aberto. Para avisos com ele fechado, use a instalação pelo navegador e ative as notificações."}
+              <a href="/downloads/VINKULO_ANDROID_1.7.1.apk" download>Baixar APK Android 1.7.1</a>
+              {" — Permita notificações ao abrir. Os avisos com o aplicativo fechado dependem da ativação do Firebase pelo proprietário."}
             </p>
           )}
         </div>

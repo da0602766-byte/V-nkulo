@@ -161,6 +161,7 @@ test("push: entrega registra aceite e falha, sem enviar conteúdo privado ou ses
       return new Response(null, { status });
     } });
     const delivery = await loadModule("app/lib/push-delivery-queue.ts", {
+      "./firebase-integration": { readFirebaseConfig: async () => null, nativeToken: () => null },
       "../../db/runtime-env": { getRuntimeEnv: () => f.env }, "./web-push": transport,
     });
     async function send() {
@@ -237,6 +238,7 @@ test("sincronização nativa suspende consultas ocultas e cancela a resposta em 
   const doc = { visibilityState: "hidden", addEventListener: (name, fn) => { handlers[name] = fn; }, removeEventListener() {} };
   const component = await loadModule("app/components/NativeNotificationSync.tsx", {
     react: { useEffect: fn => { effectCleanup = fn(); } },
+    "next/navigation": { usePathname: () => "/painel" },
     "../lib/androidNativeBridge": { isNativeNotificationBridgeAvailable: () => true },
     "../lib/device-notification-sync": { showUnreadDeviceNotifications: items => shown.push(items) },
   }, {
@@ -258,4 +260,35 @@ test("sincronização nativa suspende consultas ocultas e cancela a resposta em 
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(shown.length, 0);
   effectCleanup();
+});
+
+test("FCM no cliente vincula somente a resposta atual e limpa a sessão sem rede no login", async () => {
+  const effects = [], handlers = {}, bound = [];
+  let requested = 0, cleared = 0, finish, signal, timer, path = "/painel";
+  const bridge = { requestPushToken: () => requested++, setPushBinding: (...args) => bound.push(args), clearPushBinding: () => cleared++ };
+  const win = { VinkuloAndroid: bridge, addEventListener: (name, fn) => { handlers[name] = fn; }, removeEventListener: name => { delete handlers[name]; } };
+  const doc = { visibilityState: "visible", addEventListener() {}, removeEventListener() {} };
+  const component = await loadModule("app/components/NativeNotificationSync.tsx", {
+    react: { useEffect: fn => effects.push(fn) },
+    "next/navigation": { usePathname: () => path },
+    "../lib/androidNativeBridge": { isNativeNotificationBridgeAvailable: () => false },
+    "../lib/device-notification-sync": { showUnreadDeviceNotifications() {} },
+  }, {
+    AbortController, document: doc, window: win, setTimeout: fn => { timer = fn; return 1; }, clearTimeout() {},
+    fetch: (_url, options) => { signal = options.signal; return new Promise(resolve => { finish = resolve; }); },
+  });
+  component.default();
+  const cleanup = effects[0](); timer(); assert.equal(requested, 1);
+  handlers["vinkulo:fcm-token"]({ detail: { token: "device-token", projectId: "vinkulo-256e8", permission: true } });
+  finish(Response.json({ registered: true, configured: true, bindingId: "current-binding" }));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(bound, [["device-token", "current-binding"]]); assert.equal(win.VinkuloFcmActive, true);
+  handlers["vinkulo:firebase-status"](); assert.equal(requested, 2);
+  handlers["vinkulo:fcm-token"]({ detail: { token: "device-token" } });
+  cleanup(); assert.equal(signal.aborted, true);
+  finish(Response.json({ registered: true, configured: true, bindingId: "stale-binding" }));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(bound.length, 1, "não reaplica vínculo após desmontar a sessão");
+  path = "/login"; effects.length = 0; component.default(); effects[0]();
+  assert.equal(cleared, 1); assert.equal(win.VinkuloFcmActive, false); assert.equal(requested, 2);
 });

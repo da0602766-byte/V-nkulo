@@ -2,6 +2,7 @@ import { getD1 } from "../../db";
 import { readIntegration } from "./supabase-integration";
 import { getAutoSyncStatus } from "./supabase-auto-sync";
 import { getScheduleStatus } from "./supabase-schedule";
+import { readFirebaseConfig } from "./firebase-integration";
 
 export type ConnectorStatus = "connected" | "not_connected" | "paused" | "attention" | "unavailable";
 export type ConnectorSummary = {
@@ -52,6 +53,14 @@ function planned(id: string, name: string, description: string, requirement: str
 // Registro fechado: novos conectores implementam este contrato no servidor.
 // Não executa URLs, scripts ou módulos fornecidos pelo navegador.
 const adapters: ConnectorAdapter[] = [
+  { id: "firebase", name: "Firebase · Android", description: "Envio de notificações para o APK, com credencial cadastrada pelo celular.", available: true,
+    capabilities: ["Cadastrar arquivo JSON", "Verificar acesso", "Testar no aparelho", "Desconectar"],
+    async read() {
+      const config = await readFirebaseConfig();
+      return { status: !config ? "not_connected" : recent(config.checkedAt, 24 * 60 * 60_000) ? "connected" : "attention",
+        message: !config ? "Cadastre a chave de Contas de serviço pelo botão Configurar Firebase." : recent(config.checkedAt, 24 * 60 * 60_000) ? "Acesso ao FCM verificado. Confirme a entrega usando o teste no aparelho." : "Credencial cadastrada. Verifique o acesso para atualizar o diagnóstico.",
+        checkedAt: config?.checkedAt || null, lastSyncAt: null, lastHeartbeatAt: null };
+    } },
   supabase,
   planned("whatsapp", "WhatsApp Business", "Mensagens e eventos da conta comercial.", "Conector ainda não implementado. Exige configuração da conta comercial e autorização na API oficial; compartilhar pelo WhatsApp não é uma conexão de API."),
   planned("booking", "Booking.com", "Disponibilidade e reservas de hospedagem.", "Conector ainda não implementado. O acesso e as permissões da API precisam ser confirmados com o provedor antes da implementação."),

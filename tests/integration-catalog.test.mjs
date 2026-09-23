@@ -21,6 +21,7 @@ async function fixture() {
     "./supabase-integration": { readIntegration: async () => { if (fail) throw new Error("segredo"); return config ? { config, updatedAt } : null; } },
     "./supabase-auto-sync": { getAutoSyncStatus: async () => sync },
     "./supabase-schedule": { getScheduleStatus: async () => schedule },
+    "./firebase-integration": { readFirebaseConfig: async () => null },
   });
   const route = await load("app/api/proprietario/integracoes/route.ts", {
     "../../../lib/local-auth": { getSessionUser: async () => user }, "../../../lib/integration-catalog": catalog,
@@ -76,6 +77,6 @@ test("catálogo: não expõe segredos, não simula conectores e isola falha de u
     assert.equal(entry.available, false); assert.equal(entry.status, "unavailable"); assert.equal(entry.capabilities.length, 0);
   }
   f.fail(); catalog = await f.catalog.getIntegrationCatalog();
-  assert.equal(catalog.connectors[0].status, "attention");
-  assert.equal(catalog.connectors.length, 4); assert.doesNotMatch(JSON.stringify(catalog), /segredo/);
+  assert.equal(catalog.connectors.find(c => c.id === "supabase").status, "attention");
+  assert.equal(catalog.connectors.length, 5); assert.doesNotMatch(JSON.stringify(catalog), /segredo/);
 });
