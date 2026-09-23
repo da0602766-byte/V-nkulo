@@ -4,6 +4,8 @@ import { FormEvent, useEffect, useState } from "react";
 import GoogleStatusToast, { type GoogleToastState } from "./GoogleStatusToast";
 import type { PilotSignupField } from "../lib/pilot-login-config";
 import Link from "./StableLink";
+import { useThemePreference } from "../lib/use-theme-preference";
+import type { ThemePreference } from "../lib/theme-preference";
 
 type LoginConfig = {
   kicker?: string;
@@ -130,19 +132,8 @@ export default function LoginPortal({
   const [googlePairing, setGooglePairing] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [activeMessageIndex, setActiveMessageIndex] = useState(0);
-  const [loginTheme, setLoginTheme] = useState<LoginTheme>(
-    (config.themeMode || "AUTO").toLowerCase() as LoginTheme,
-  );
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      const saved = window.localStorage.getItem("vinkulo-login-theme");
-      if (saved === "auto" || saved === "claro" || saved === "escuro") {
-        setLoginTheme(saved);
-      }
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, []);
+  const { theme, updateTheme } = useThemePreference("", config.themeMode || "AUTO");
+  const loginTheme = theme.toLowerCase() as LoginTheme;
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -277,8 +268,7 @@ export default function LoginPortal({
   }
 
   function changeTheme(next: LoginTheme) {
-    setLoginTheme(next);
-    window.localStorage.setItem("vinkulo-login-theme", next);
+    updateTheme(next.toUpperCase() as ThemePreference);
   }
 
   async function startGoogleLogin() {
@@ -451,7 +441,7 @@ export default function LoginPortal({
                   : <input name={`cadastro_${field.id}`} type={field.type} required={field.required} maxLength={field.type === "date" || field.type === "number" ? undefined : 500} placeholder={field.placeholder} autoComplete={signupAutocomplete(field.id, field.type)} />}
               </label>
             ))}
-            {mode !== "esqueci" && <label>Senha<div className="password-field"><input name="senha" type={showPassword ? "text" : "password"} required autoComplete={mode === "cadastro" ? "new-password" : "current-password"} minLength={8} placeholder="Digite sua senha" /><button type="button" onClick={() => setShowPassword((value) => !value)}>{showPassword ? "Ocultar" : "Mostrar"}</button></div></label>}
+            {mode !== "esqueci" && <div className="login-password-group"><label htmlFor="login-password">Senha</label><div className="password-field"><input id="login-password" name="senha" type={showPassword ? "text" : "password"} required autoComplete={mode === "cadastro" ? "new-password" : "current-password"} minLength={8} placeholder="Digite sua senha" /><button type="button" aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"} aria-pressed={showPassword} aria-controls="login-password" onClick={() => setShowPassword((value) => !value)}>{showPassword ? "Ocultar" : "Mostrar"}</button></div></div>}
             {mode === "cadastro" && <>
               <label>Confirmar senha<input name="confirmarSenha" type={showPassword ? "text" : "password"} required autoComplete="new-password" minLength={8} /></label>
               <label className="login-terms-check"><input name="aceiteTermos" type="checkbox" required /><span>Li e aceito os <Link href="/termos">Termos de Uso</Link> e a <Link href="/privacidade">Política de Privacidade</Link>.</span></label>

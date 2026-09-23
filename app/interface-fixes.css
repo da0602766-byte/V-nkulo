@@ -93,3 +93,88 @@ html:is([data-theme="light"],[data-pilot-theme="claro"]) .social-public-header.r
   .theme-control.is-transitioning .theme-control-glyph,
   .social-public-header.reception-header .public-account-popover { animation:none; }
 }
+
+/* Auditoria P1 — tokens por função e reflow das superfícies de acesso. */
+.login-shell.login-shell-v2.login-shell-last-layout[data-ui-version="v2"] {
+  --auth-canvas:#f7f9fc; --auth-surface:#fff; --auth-input:#fff;
+  --auth-ink:#172b3d; --auth-muted:#4b5d70; --auth-line:#64748b;
+  --auth-link:#1d4ed8; --auth-action:#1d4ed8; --auth-on-action:#fff;
+  --login-v2-text:var(--auth-ink); --login-v2-muted:var(--auth-muted);
+  --login-v2-card:var(--auth-surface); --login-v2-line:var(--auth-line);
+  background:var(--auth-canvas)!important; color:var(--auth-ink)!important;
+  color-scheme:light; min-width:0; min-height:100dvh; overflow-x:clip;
+}
+html[data-theme="dark"] .login-shell.login-shell-v2.login-shell-last-layout[data-ui-version="v2"] {
+  --auth-canvas:#08111f; --auth-surface:#111e2f; --auth-input:#18283d;
+  --auth-ink:#eff6ff; --auth-muted:#b7c6d9; --auth-line:#7890af; --auth-link:#93c5fd;
+  color-scheme:dark;
+}
+.login-shell.login-shell-v2.login-shell-last-layout[data-ui-version="v2"] :is(.login-v2-controls-row,.login-v2-theme,.login-v2-benefits>span,.login-card.login-v2-card) {
+  background:var(--auth-surface)!important; border-color:var(--auth-line)!important; color:var(--auth-ink)!important;
+}
+.login-shell.login-shell-v2.login-shell-last-layout[data-ui-version="v2"] :is(h1,h2,strong,label,summary) { color:var(--auth-ink)!important; }
+.login-shell.login-shell-v2.login-shell-last-layout[data-ui-version="v2"] :is(.login-v2-heading p,.login-v2-intro>header>span,.login-v2-page-brand small,.login-v2-benefits small,.login-google-access small,.login-v2-footer,.login-pilot-notice p) { color:var(--auth-muted)!important; }
+.login-shell.login-shell-v2.login-shell-last-layout[data-ui-version="v2"] :is(.login-links a,.login-links button,.login-v2-options button,.login-v2-footer a,.login-google-access small a,.login-last-header-actions>a,.login-v2-intro em) { color:var(--auth-link)!important; }
+.login-shell.login-shell-v2.login-shell-last-layout[data-ui-version="v2"] .login-card.login-v2-card .login-form :is(input:not([type="checkbox"]),textarea,select) {
+  min-width:0; max-width:100%; min-height:48px; border-color:var(--auth-line)!important;
+  background:var(--auth-input)!important; color:var(--auth-ink)!important; font-size:16px;
+}
+.login-shell.login-shell-v2.login-shell-last-layout[data-ui-version="v2"] .login-card.login-v2-card .login-form :is(input,textarea)::placeholder { color:var(--auth-muted)!important; opacity:1; }
+.login-shell.login-shell-v2.login-shell-last-layout[data-ui-version="v2"] .login-card.login-v2-card .login-submit { background:var(--auth-action)!important; color:var(--auth-on-action)!important; min-height:48px; }
+.login-shell.login-shell-v2.login-shell-last-layout[data-ui-version="v2"] :is(button,a,summary,input,textarea,select):focus-visible { outline:3px solid var(--auth-link)!important; outline-offset:3px; }
+.login-shell.login-shell-v2.login-shell-last-layout[data-ui-version="v2"] .login-v2-theme button { min-width:44px; min-height:44px; color:var(--auth-ink)!important; }
+.login-shell.login-shell-v2.login-shell-last-layout[data-ui-version="v2"] .login-v2-theme button.active { background:var(--auth-action)!important; color:var(--auth-on-action)!important; }
+.login-shell-last-layout .login-password-group { display:grid; gap:8px; min-width:0; }
+.login-shell-last-layout .password-field { min-width:0; }
+.login-shell-last-layout .password-field button { min-width:72px; min-height:44px; color:var(--auth-link)!important; }
+.login-shell-last-layout :is(.login-v2-card,.login-v2-heading,.login-v2-stage,.login-v2-controls-row,.login-form>label) { min-width:0; max-width:100%; overflow-wrap:anywhere; }
+.login-shell-last-layout .login-last-header-actions { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:12px; }
+.login-shell-last-layout .login-last-tabs { display:flex; gap:8px; margin-bottom:20px; }
+.login-shell-last-layout .login-last-tabs button { flex:1; min-width:0; min-height:44px; padding:10px; border:1px solid var(--auth-line); border-radius:10px; color:var(--auth-ink); background:var(--auth-surface); }
+.login-shell-last-layout .login-last-tabs button.active { background:var(--auth-action); color:var(--auth-on-action); border-color:var(--auth-action); }
+.login-shell-last-layout :is(.login-links button,.login-links a,.login-v2-options button,.login-v2-remember,.login-terms-check,.login-pilot-notice summary) { min-height:44px; }
+.login-shell-last-layout :is(.login-links a,.login-last-header-actions>a) { display:inline-flex; align-items:center; }
+.login-shell-last-layout :is(.login-last-header-actions>a,.login-links a,.login-v2-options button) { text-decoration:underline; text-underline-offset:3px; }
+@media(max-width:900px) {
+  .login-shell.login-shell-v2.login-shell-last-layout .login-v2-stage { grid-template-columns:minmax(0,1fr); }
+  .login-shell-last-layout .login-card.login-v2-card { width:100%; max-width:540px; justify-self:center; }
+}
+@media(max-width:540px) {
+  .login-shell.login-shell-v2.login-shell-last-layout { padding:16px 12px calc(28px + env(safe-area-inset-bottom)); }
+  .login-shell-last-layout .login-v2-controls-row { flex-wrap:wrap; gap:16px; height:auto; padding:14px; }
+  .login-shell-last-layout .login-last-header-actions { width:100%; justify-content:space-between; }
+  .login-shell-last-layout .login-card.login-v2-card { padding:22px 16px; }
+  .login-shell-last-layout .login-v2-options { flex-wrap:wrap; gap:8px; }
+  .login-shell-last-layout .login-signup-form { grid-template-columns:minmax(0,1fr); }
+}
+
+:is(.social-directory,.social-public-community) {
+  --public-readable:#526174; --public-link:#8f4c28; --public-action:#8f4c28; --public-focus:#1d4ed8;
+  --muted:var(--public-readable); --v2-muted:var(--public-readable);
+}
+html[data-theme="dark"] :is(.social-directory,.social-public-community) {
+  --public-readable:#b7c6d9; --public-link:#efae87; --public-focus:#93c5fd;
+}
+:is(.social-directory,.social-public-community) :is(a,button,summary,input,select,textarea):focus-visible { outline:3px solid var(--public-focus)!important; outline-offset:3px; }
+.social-directory :is(.directory-intro>p:last-of-type,.directory-search-result,.directory-note,.directory-profile-description,.directory-profile-facts dt,.directory-profile-location) { color:var(--public-readable)!important; }
+.social-directory .directory-search-v81>button,.social-directory .directory-profile-action { background:var(--public-action); color:#fff; }
+:is(.social-directory,.social-public-community) :is(h1,h2,h3,p,dd) { overflow-wrap:anywhere; }
+.social-directory .directory-search :is(input,select) { min-width:0; font-size:16px; }
+.social-directory .directory-carousel-controls { flex-wrap:wrap; gap:8px; }
+.social-directory .directory-carousel-controls>button { min-width:44px; min-height:44px; }
+.social-directory .directory-carousel-progress { flex-wrap:wrap; gap:4px; }
+.social-directory .directory-carousel-progress>button { display:grid; place-items:center; width:24px; height:24px; flex:0 0 24px; padding:0; background:transparent; border:0; border-radius:50%; }
+.social-directory .directory-carousel-progress>button::after { content:""; width:8px; height:8px; border-radius:50%; background:var(--public-readable); }
+.social-directory .directory-carousel-progress>button.active::after { width:14px; height:14px; background:var(--public-link); }
+.social-directory .directory-profile-facts dt { font-size:12px; }
+.social-directory .directory-profile-facts dd { font-size:14px; }
+:is(.social-directory,.social-public-community)[data-ui-version="v2"] .pilot-kicker { font-size:12px; color:var(--public-link)!important; }
+.social-public-community[data-ui-version="v2"] :is(.community-profile-description,.community-profile-information>p,.community-profile-quick-info dd) { font-size:14px; line-height:1.6; }
+.social-public-community[data-ui-version="v2"] :is(.community-profile-quick-info dt,.community-profile-information>header small) { font-size:12px; }
+.social-public-community[data-ui-version="v2"] .community-profile-information>header small { color:var(--public-link); }
+.social-directory .directory-profile-description { font-size:14px; }
+@media(max-width:720px) {
+  :is(.social-directory,.social-public-community) .reception-header-actions { gap:4px; }
+  :is(.social-directory,.social-public-community) .reception-header-actions :is(.reception-icon-button,.theme-control-cycle button,.reception-account-summary) { min-width:44px; min-height:44px; }
+  .social-directory .directory-search-v81 summary { min-height:44px; display:flex; align-items:center; justify-content:space-between; }
+}

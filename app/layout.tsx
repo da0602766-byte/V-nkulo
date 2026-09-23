@@ -19,6 +19,7 @@ import MobileAppInstall from "./components/MobileAppInstall";
 import GlobalFeedbackLauncher from "./components/GlobalFeedbackLauncher";
 import SystemExperienceController from "./components/SystemExperienceController";
 import NativeNotificationSync from "./components/NativeNotificationSync";
+import { THEME_BOOTSTRAP_SCRIPT } from "./lib/theme-preference";
 
 const instrumentSans = Instrument_Sans({
   variable: "--font-body",
@@ -85,7 +86,7 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "try{const r=document.documentElement,t=localStorage.getItem('vinkulo-theme'),d=t==='ESCURO'||(t!=='CLARO'&&matchMedia('(prefers-color-scheme: dark)').matches);r.dataset.theme=d?'dark':'light';if(t==='CLARO'||t==='ESCURO')r.dataset.pilotTheme=t.toLowerCase();else delete r.dataset.pilotTheme;r.style.colorScheme=d?'dark':'light';const z=Number(localStorage.getItem('vinkulo:font-scale'));if(Number.isFinite(z)&&z>=.85&&z<=1.25){r.style.zoom=String(z);r.style.setProperty('--vinkulo-ui-scale',String(z));r.style.setProperty('--vinkulo-ui-scale-inverse',String(1/z));r.dataset.vinkuloScale=z>1?'ampliado':z<1?'reduzido':'normal'}const g=Number(localStorage.getItem('vinkulo:glass-opacity'));if(Number.isFinite(g)&&g>=55&&g<=88)r.style.setProperty('--vinkulo-glass-alpha',String(g/100));if(localStorage.getItem('vinkulo:data-saver')==='true')r.dataset.dataSaver='true'}catch{}",
+              THEME_BOOTSTRAP_SCRIPT + "try{const r=document.documentElement;const z=Number(localStorage.getItem('vinkulo:font-scale'));if(Number.isFinite(z)&&z>=.85&&z<=1.25){r.style.zoom=String(z);r.style.setProperty('--vinkulo-ui-scale',String(z));r.style.setProperty('--vinkulo-ui-scale-inverse',String(1/z));r.dataset.vinkuloScale=z>1?'ampliado':z<1?'reduzido':'normal'}const g=Number(localStorage.getItem('vinkulo:glass-opacity'));if(Number.isFinite(g)&&g>=55&&g<=88)r.style.setProperty('--vinkulo-glass-alpha',String(g/100));if(localStorage.getItem('vinkulo:data-saver')==='true')r.dataset.dataSaver='true'}catch{}",
           }}
         />
       </head>
@@ -94,7 +95,7 @@ export default function RootLayout({
       >
         <a className="skip-to-content" href="#main-content">Pular para o conteúdo principal</a>
         <SmartScrollHeader />
-        <div id="main-content">{children}</div>
+        <div id="main-content" tabIndex={-1}>{children}</div>
         <SystemExperienceController />
         <NativeNotificationSync />
         <GlobalFeedbackLauncher />

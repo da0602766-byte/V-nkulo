@@ -21,13 +21,13 @@ test("account menu keeps compact theme and magnifier controls side by side", asy
 test("theme and zoom preferences are isolated by user and restored globally", async () => {
   const [dashboard, theme, layout] = await Promise.all([
     read("app/components/PilotDashboard.tsx"),
-    read("app/components/ThemeControl.tsx"),
+    read("app/lib/theme-preference.ts"),
     read("app/layout.tsx"),
   ]);
 
   assert.match(dashboard, /`vinkulo:font-scale:\$\{userEmail\.trim\(\)\.toLowerCase\(\)\}`/);
   assert.match(dashboard, /localStorage\.setItem\("vinkulo:font-scale", String\(fontScale\)\)/);
   assert.match(theme, /`vinkulo:theme:\$\{normalized\}`/);
-  assert.match(theme, /localStorage\.setItem\(individualKey, next\)/);
+  assert.match(theme, /localStorage\.setItem\(individualKey, theme\)/);
   assert.match(layout, /localStorage\.getItem\('vinkulo:font-scale'\)/);
 });

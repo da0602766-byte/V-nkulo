@@ -17,9 +17,11 @@ export default function CloseDetailsOnOutside() {
     };
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
+      const focusedDetail = document.activeElement?.closest<HTMLDetailsElement>("details[open]");
       document.querySelectorAll<HTMLDetailsElement>("details[open]").forEach((detail) => {
         detail.open = false;
       });
+      focusedDetail?.querySelector<HTMLElement>(":scope > summary")?.focus();
     };
     document.addEventListener("pointerdown", closeOutside);
     document.addEventListener("keydown", closeOnEscape);

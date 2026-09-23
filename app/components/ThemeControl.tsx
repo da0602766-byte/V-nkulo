@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-
-type Theme = "CLARO" | "ESCURO" | "AUTO";
+import { useRef, useState } from "react";
+import { useThemePreference } from "../lib/use-theme-preference";
+import { applyTheme, type ThemePreference as Theme } from "../lib/theme-preference";
 
 export default function ThemeControl({
   compact = false,
@@ -13,44 +13,15 @@ export default function ThemeControl({
   cycle?: boolean;
   storageId?: string;
 }) {
-  const [theme, setTheme] = useState<Theme>("AUTO");
-  const [resolvedDark, setResolvedDark] = useState(false);
+  const { theme, resolvedDark, updateTheme } = useThemePreference(storageId);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const transitionInProgress = useRef(false);
-  const individualKey = themeStorageKey(storageId);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      const saved = normalizeTheme(
-        (individualKey && window.localStorage.getItem(individualKey)) ||
-        window.localStorage.getItem("vinkulo-theme"),
-      );
-      setTheme(saved);
-      applyTheme(saved);
-      setResolvedDark(currentThemeIsDark(saved));
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [individualKey]);
-
-  useEffect(() => {
-    if (theme !== "AUTO") return;
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
-    const syncAutomaticTheme = () => {
-      applyTheme("AUTO");
-      setResolvedDark(media.matches);
-    };
-    media.addEventListener("change", syncAutomaticTheme);
-    return () => media.removeEventListener("change", syncAutomaticTheme);
-  }, [theme]);
 
   function update(next: Theme) {
     if (transitionInProgress.current) return;
     transitionInProgress.current = true;
     setIsTransitioning(true);
-    setTheme(next);
-    setResolvedDark(currentThemeIsDark(next));
-    window.localStorage.setItem("vinkulo-theme", next);
-    if (individualKey) window.localStorage.setItem(individualKey, next);
+    updateTheme(next);
     animateThemeChange(next).finally(() => {
       transitionInProgress.current = false;
       setIsTransitioning(false);
@@ -118,40 +89,8 @@ function ThemeGlyph({ theme }: { theme: Theme }) {
   return <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" /><path className="theme-auto-half" d="M12 4a8 8 0 0 1 0 16Z" /></svg>;
 }
 
-function normalizeTheme(value: string | null): Theme {
-  return value === "CLARO" || value === "ESCURO" ? value : "AUTO";
-}
-
-function themeStorageKey(storageId: string) {
-  const normalized = storageId.trim().toLowerCase();
-  return normalized ? `vinkulo:theme:${normalized}` : "";
-}
-
-function currentThemeIsDark(theme: Theme) {
-  if (theme === "ESCURO") return true;
-  if (theme === "CLARO") return false;
-  if (typeof window === "undefined") return false;
-  return document.documentElement.dataset.theme === "dark" ||
-    window.matchMedia("(prefers-color-scheme: dark)").matches;
-}
-
 async function animateThemeChange(theme: Theme) {
   applyTheme(theme);
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   await new Promise<void>((resolve) => window.setTimeout(resolve, 180));
-}
-
-function applyTheme(theme: Theme) {
-  const root = document.documentElement;
-  if (theme === "AUTO") {
-    root.removeAttribute("data-pilot-theme");
-    const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    root.dataset.theme = isDark ? "dark" : "light";
-    root.style.colorScheme = isDark ? "dark" : "light";
-    return;
-  }
-  const isDark = theme === "ESCURO";
-  root.dataset.pilotTheme = theme.toLowerCase();
-  root.dataset.theme = isDark ? "dark" : "light";
-  root.style.colorScheme = isDark ? "dark" : "light";
 }

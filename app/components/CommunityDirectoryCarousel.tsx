@@ -14,6 +14,9 @@ export default function CommunityDirectoryCarousel({
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [pageVisible, setPageVisible] = useState(true);
   const [reducedMotion, setReducedMotion] = useState(false);
 
   useEffect(() => {
@@ -25,14 +28,24 @@ export default function CommunityDirectoryCarousel({
   }, []);
 
   useEffect(() => {
-    if (communities.length < 2 || paused || reducedMotion) return;
+    const update = () => setPageVisible(document.visibilityState === "visible");
+    update();
+    document.addEventListener("visibilitychange", update);
+    return () => document.removeEventListener("visibilitychange", update);
+  }, []);
+
+  const rotating = communities.length > 1 && !paused && !hovered && !focused && !reducedMotion && pageVisible;
+
+  useEffect(() => {
+    if (!rotating) return;
     const timer = window.setInterval(() => {
       setActiveIndex((current) => (current + 1) % communities.length);
     }, ROTATION_INTERVAL);
     return () => window.clearInterval(timer);
-  }, [communities.length, paused, reducedMotion]);
+  }, [communities.length, rotating]);
 
   const select = (index: number) => {
+    setPaused(true);
     setActiveIndex((index + communities.length) % communities.length);
   };
   const community = communities[activeIndex] || communities[0];
@@ -42,15 +55,15 @@ export default function CommunityDirectoryCarousel({
     <section
       className="directory-community-showcase"
       aria-label="Perfis das comunidades"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-      onFocusCapture={() => setPaused(true)}
+      aria-roledescription="carrossel"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocusCapture={() => setFocused(true)}
       onBlurCapture={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setPaused(false);
+        if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);
       }}
-      onTouchStart={() => setPaused(true)}
     >
-      <div className="directory-carousel-viewport" aria-live={paused ? "polite" : "off"}>
+      <div className="directory-carousel-viewport" aria-live={rotating ? "off" : "polite"} aria-atomic="true" onTouchStart={() => setPaused(true)}>
         <article className="directory-community-profile" key={community.id}>
           <div className="directory-profile-visual">
             {community.bannerUrl ? (
@@ -98,7 +111,7 @@ export default function CommunityDirectoryCarousel({
           <span>{activeIndex + 1} / {communities.length}</span>
           <button type="button" onClick={() => select(activeIndex + 1)} aria-label="Próxima comunidade">→</button>
           {!reducedMotion && (
-            <button type="button" className="directory-carousel-pause" onClick={() => setPaused((current) => !current)}>
+            <button type="button" className="directory-carousel-pause" aria-label={paused ? "Continuar rotação automática" : "Pausar rotação automática"} aria-pressed={paused} onClick={() => setPaused((current) => !current)}>
               {paused ? "Continuar" : "Pausar"}
             </button>
           )}
