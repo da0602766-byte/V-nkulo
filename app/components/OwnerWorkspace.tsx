@@ -61,7 +61,7 @@ type OwnerMetricKey =
   | "conversas_semana";
 
 const TABS: { id: OwnerTab; label: string; icon: string }[] = [
-  { id: "overview", label: "Painel geral", icon: "▦" },
+  { id: "overview", label: "Visão geral", icon: "⌂" },
   { id: "requests", label: "Solicitações", icon: "◫" },
   { id: "communities", label: "Comunidades", icon: "◇" },
   { id: "users", label: "Pessoas", icon: "◎" },
@@ -81,6 +81,14 @@ const TABS: { id: OwnerTab; label: string; icon: string }[] = [
   { id: "publication", label: "Publicação do sistema", icon: "⇧" },
   { id: "incidents", label: "Incidentes", icon: "!" },
   { id: "controls", label: "Configurações", icon: "⚙" },
+];
+
+const OWNER_NAV_GROUPS: { label: string; items: OwnerTab[] }[] = [
+  { label: "Comando", items: ["overview", "requests"] },
+  { label: "Administração", items: ["communities", "users", "plans"] },
+  { label: "Experiência", items: ["appearance", "editorial", "controls", "laboratory"] },
+  { label: "Operação", items: ["feedback", "statistics", "optimization", "realtime", "performance", "incidents"] },
+  { label: "Governança", items: ["audit", "passwords", "deleted", "finance", "publication"] },
 ];
 
 const OWNER_METRICS: {
@@ -133,6 +141,8 @@ export default function OwnerWorkspace({
     OWNER_METRICS.map((metric) => metric.key),
   );
   const [draggingMetric, setDraggingMetric] = useState<OwnerMetricKey | null>(null);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [globalSearch, setGlobalSearch] = useState("");
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -180,6 +190,20 @@ export default function OwnerWorkspace({
       ? rows
       : rows.filter((item) => String(item.resultado) === auditResult);
   }, [auditResult, auditSearch, data?.audit]);
+  const globalResults = useMemo(() => {
+    const term = globalSearch.trim().toLocaleLowerCase("pt-BR");
+    if (!term || !data) return [];
+    const navigation = TABS.filter((item) => `${item.label} ${tabDescription(item.id)}`.toLocaleLowerCase("pt-BR").includes(term))
+      .slice(0, 4)
+      .map((item) => ({ kind: "navigation" as const, id: item.id, title: item.label, detail: tabDescription(item.id) }));
+    const communities = filterRows(data.communities, term, ["nome", "cidade_publica", "proprietario_nome"])
+      .slice(0, 4)
+      .map((item) => ({ kind: "community" as const, id: Number(item.id), title: String(item.nome), detail: String(item.cidade_publica || item.proprietario_nome || "Comunidade") }));
+    const users = filterRows(data.users, term, ["nome", "email", "telefone", "comunidades_nomes"])
+      .slice(0, 4)
+      .map((item) => ({ kind: "user" as const, id: Number(item.id), title: String(item.nome), detail: String(item.comunidades_nomes || item.email || "Pessoa") }));
+    return [...navigation, ...communities, ...users].slice(0, 8);
+  }, [data, globalSearch]);
 
   async function decideRequest(formElement: HTMLFormElement, requestId: number, action: "ANALISAR" | "APROVAR" | "RECUSAR") {
     setWorking(requestId);
@@ -393,10 +417,31 @@ export default function OwnerWorkspace({
     );
   }
 
+  function selectTab(next: OwnerTab) {
+    setTab(next);
+    setDirectoryPage(0);
+    setMobileNavOpen(false);
+    setGlobalSearch("");
+  }
+
+  function toggleMobileNavigation() {
+    setMobileNavOpen((value) => {
+      const next = !value;
+      if (next) window.requestAnimationFrame(() => document.querySelector<HTMLElement>(".owner-sidebar")?.scrollTo({ top: 0 }));
+      return next;
+    });
+  }
+
   return (
-    <main className="owner-area" data-ui-version="v2" data-visual-editor-root data-editor-key="area-proprietario">
+    <main className="owner-area owner-area-v3" data-ui-version="v3-preview" data-visual-editor-root data-editor-key="area-proprietario">
       <header className="owner-topbar" data-editor-key="cabecalho-proprietario" data-smart-scroll-header>
-        <Link href="/" className="owner-brand"><span><OwnerImage src={brandLogo} fallback={brandName.slice(0, 1)} /></span><div><strong>{brandName}</strong><small>Propriedade do sistema</small></div></Link>
+        <button className="owner-mobile-menu" type="button" aria-label="Abrir menu" aria-expanded={mobileNavOpen} onClick={toggleMobileNavigation}>☰</button>
+        <Link href="/" className="owner-brand"><span><OwnerImage src={brandLogo} fallback={brandName.slice(0, 1)} /></span><div><strong>{brandName}</strong><small>Central da plataforma</small></div></Link>
+        <div className="owner-global-search">
+          <span aria-hidden="true">⌕</span>
+          <input value={globalSearch} onChange={(event) => setGlobalSearch(event.target.value)} placeholder="Buscar áreas, comunidades ou pessoas" aria-label="Busca global administrativa" />
+          {globalSearch && <button type="button" aria-label="Limpar busca" onClick={() => setGlobalSearch("")}>×</button>}
+        </div>
         <div className="owner-top-actions">
           <ThemeControl compact />
           <PilotNotificationCenter />
@@ -409,29 +454,47 @@ export default function OwnerWorkspace({
       </header>
 
       <div className="owner-layout">
-        <aside className="owner-sidebar">
-          <div className="owner-identity-card"><span>DA</span><div><small>ACESSO INTEGRAL</small><VerifiedOwnerName name={ownerName} verified /><p>Todas as comunidades, usuários, módulos e configurações.</p></div></div>
+        {mobileNavOpen ? <button type="button" className="owner-sidebar-backdrop" aria-label="Fechar menu" onClick={() => setMobileNavOpen(false)} /> : null}
+        <aside className={`owner-sidebar ${mobileNavOpen ? "is-open" : ""}`} style={{ flexDirection: "column" }}>
+          <div className="owner-sidebar-heading"><span>Administração global</span><small>Dados e configurações da plataforma</small></div>
           <nav aria-label="Menu do proprietário">
-            {TABS.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => { setTab(item.id); setDirectoryPage(0); }}><span>{item.icon}</span>{item.label}{item.id === "requests" && pending.length > 0 ? <b>{pending.length}</b> : item.id === "feedback" && pendingFeedback.length > 0 ? <b>{pendingFeedback.length}</b> : null}</button>)}
+            {OWNER_NAV_GROUPS.map((group) => <section key={group.label}>
+              <small>{group.label}</small>
+              {group.items.map((id) => {
+                const item = TABS.find((candidate) => candidate.id === id)!;
+                return <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => selectTab(item.id)}><span>{item.icon}</span>{item.label}{item.id === "requests" && pending.length > 0 ? <b>{pending.length}</b> : item.id === "feedback" && pendingFeedback.length > 0 ? <b>{pendingFeedback.length}</b> : null}</button>;
+              })}
+            </section>)}
           </nav>
-          <Link href="/painel" showLoading loadingLabel="Abrindo sua comunidade…">Abrir painel de comunidade →</Link>
-          <Link href="/comunidades" showLoading loadingLabel="Abrindo o diretório público…">Ver diretório público →</Link>
+          <div className="owner-sidebar-links">
+            <Link href="/painel" showLoading loadingLabel="Abrindo sua comunidade…">Painel da comunidade <span>↗</span></Link>
+            <Link href="/comunidades" showLoading loadingLabel="Abrindo o diretório público…">Diretório público <span>↗</span></Link>
+          </div>
+          <Link href="/painel?view=conta" className="owner-sidebar-profile"><OwnerAvatar image={ownerPhoto} name={ownerName} /><span><VerifiedOwnerName name={ownerName} verified /><small>Proprietário global</small></span></Link>
         </aside>
 
         <section className="owner-workspace">
+          {globalSearch && data ? <section className="owner-global-results" aria-label="Resultados da busca global">
+            <header><span>Resultados para</span><strong>“{globalSearch}”</strong></header>
+            {globalResults.map((result) => <button type="button" key={`${result.kind}-${result.id}`} onClick={() => {
+              if (result.kind === "navigation") selectTab(result.id);
+              if (result.kind === "community") void openCommunity(result.id);
+              if (result.kind === "user") { setTab("users"); setSearch(result.title); setGlobalSearch(""); }
+            }}><span>{result.kind === "navigation" ? "Ir" : result.kind === "community" ? "Comunidade" : "Pessoa"}</span><strong>{result.title}</strong><small>{result.detail}</small><i>→</i></button>)}
+            {!globalResults.length && <Empty title="Nenhum resultado" text="Tente outro nome, configuração ou área administrativa." />}
+          </section> : null}
           <header className="owner-page-heading owner-page-heading-v97">
             <div><p className="pilot-kicker">CENTRAL DO PROPRIETÁRIO</p><h1>{tabLabel(tab)}</h1><p>{tabDescription(tab)}</p></div>
             <div className="owner-page-quick-actions">
-              <button type="button" onClick={() => setTab("requests")}><span>◫</span> Revisar solicitações {pending.length > 0 && <b>{pending.length}</b>}</button>
-              <button type="button" onClick={() => setTab("feedback")}><span>!</span> Feedback {pendingFeedback.length > 0 && <b>{pendingFeedback.length}</b>}</button>
-              <button type="button" onClick={() => setTab("communities")}><span>◇</span> Abrir comunidades</button>
+              <button type="button" onClick={() => selectTab("requests")}><span>◫</span> Solicitações {pending.length > 0 && <b>{pending.length}</b>}</button>
+              <button type="button" onClick={() => selectTab("feedback")}><span>!</span> Feedback {pendingFeedback.length > 0 && <b>{pendingFeedback.length}</b>}</button>
             </div>
           </header>
           {/* A nota de escopo vivia dentro de um <details> fechado: era preciso
               clicar para descobrir que se está agindo sobre a plataforma
               inteira. Aqui ela é permanente, porque saber em que camada a ação
               cai não é detalhe opcional. */}
-          <p className="owner-scope-banner-v5" role="note">
+          {tab !== "overview" ? <p className="owner-scope-banner-v5" role="note">
             <span aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 2.8 19.4 6v5.9c0 4.5-3 8.2-7.4 9.3-4.4-1.1-7.4-4.8-7.4-9.3V6L12 2.8Z" />
@@ -441,53 +504,11 @@ export default function OwnerWorkspace({
             <b>Escopo global</b>
             Tudo aqui alcança a plataforma inteira, fora do contexto de qualquer
             comunidade, e fica registrado na auditoria com o seu nome.
-          </p>
+          </p> : null}
           {message && <p className="operations-feedback" role="status">{message}</p>}
           {loading && !data ? <div className="owner-loading">Carregando controles globais…</div> : null}
 
-          {tab === "overview" && data && (
-            <>
-              <section className="owner-command-hero">
-                <div>
-                  <p className="pilot-kicker">CONTROLE DA PLATAFORMA</p>
-                  <h2>Olá, {ownerName.split(" ")[0]}. A operação está centralizada.</h2>
-                  <p>Acompanhe comunidades, pessoas, permissões e decisões sem perder o contexto de segurança.</p>
-                </div>
-                <div className="owner-command-summary">
-                  <span><small>Decisões pendentes</small><strong>{pending.length}</strong></span>
-                  <span><small>Comunidades ativas</small><strong>{Number(data.metrics.comunidades_ativas || 0)}</strong></span>
-                  <span><small>Pessoas ativas</small><strong>{Number(data.metrics.usuarios_ativos || 0)}</strong></span>
-                </div>
-              </section>
-              <div className="owner-grid-toolbar" aria-label="Organização dos cartões">
-                <div><strong>Organização dos cartões</strong><small>Escolha a densidade do seu painel.</small></div>
-                <div>{(["2x2", "2x4", "4x2", "4x4"] as OwnerGridPreset[]).map((preset) => <button type="button" key={preset} className={gridPreset === preset ? "active" : ""} onClick={() => void saveOwnerLayout(preset, metricOrder, `Organização ${preset} salva para sua área de proprietário.`)} aria-pressed={gridPreset === preset}>{preset}</button>)}</div>
-              </div>
-              <div className="owner-metric-grid" data-grid-preset={gridPreset}>
-                {metricOrder.map((key, index) => {
-                  const metric = OWNER_METRICS.find((item) => item.key === key)!;
-                  return <Metric
-                    key={key}
-                    label={metric.label}
-                    value={data.metrics[key]}
-                    detail={metric.detail}
-                    emphasis={metric.emphasis}
-                    draggable
-                    dragging={draggingMetric === key}
-                    onDragStart={() => setDraggingMetric(key)}
-                    onDragEnd={() => setDraggingMetric(null)}
-                    onDragOver={(event) => event.preventDefault()}
-                    onDrop={() => reorderMetric(key)}
-                    onMoveUp={index > 0 ? () => moveMetric(key, -1) : undefined}
-                    onMoveDown={index < metricOrder.length - 1 ? () => moveMetric(key, 1) : undefined}
-                  />;
-                })}
-              </div>
-              <OwnerInsights metrics={data.metrics} />
-              <section className="owner-focus-panel"><div><p className="pilot-kicker">PRÓXIMA AÇÃO</p><h2>Solicitações aguardando análise</h2><p>Nenhuma comunidade é criada sem sua aprovação explícita.</p></div><button onClick={() => setTab("requests")}>Revisar {pending.length} solicitações</button></section>
-              <section className="owner-recent-grid"><div><header><h2>Comunidades recentes</h2><button type="button" onClick={() => setTab("communities")}>Ver todas</button></header>{data.communities.slice(0, 5).map((item) => <button key={Number(item.id)} onClick={() => void openCommunity(Number(item.id))}><OwnerAvatar image={communityLogo(item)} name={String(item.nome)} /><div><strong>{String(item.nome)}</strong><small>{String(item.cidade_publica || "Localização não informada")}</small></div><em>Abrir →</em></button>)}</div><div><header><h2>Atividade auditada</h2><button type="button" onClick={() => setTab("audit")}>Ver auditoria</button></header>{data.audit.slice(0, 6).map((item) => <article key={Number(item.id)}><span>✓</span><div><strong>{humanize(String(item.evento))}</strong><small>{String(item.usuario_nome || "Sistema")} · {formatDate(String(item.criado_em))}</small></div></article>)}</div></section>
-            </>
-          )}
+          {tab === "overview" && data && <OwnerOverviewV3 data={data} pending={pending} pendingFeedback={pendingFeedback} ownerName={ownerName} brandName={brandName} gridPreset={gridPreset} metricOrder={metricOrder} draggingMetric={draggingMetric} onSelectTab={selectTab} onOpenCommunity={openCommunity} onSaveLayout={saveOwnerLayout} onDragStart={setDraggingMetric} onDragEnd={() => setDraggingMetric(null)} onDropMetric={reorderMetric} onMoveMetric={moveMetric} />}
           {tab === "laboratory" && <OwnerLaboratoryWorkspace />}
           {(["passwords", "deleted", "finance", "realtime", "performance", "publication", "incidents"] as OwnerOperationsScreen[]).includes(tab as OwnerOperationsScreen) && <OwnerOperationsWorkspace screen={tab as OwnerOperationsScreen} />}
 
@@ -580,9 +601,109 @@ export default function OwnerWorkspace({
           {tab === "controls" && <PlatformControlsWorkspace features={features} currentCommunityId={currentCommunityId} />}
         </section>
       </div>
+      <nav className="owner-mobile-nav" aria-label="Navegação rápida do proprietário">
+        {["overview", "requests", "communities", "audit"].map((id) => { const item = TABS.find((candidate) => candidate.id === id)!; return <button type="button" key={id} className={tab === id ? "active" : ""} onClick={() => selectTab(id as OwnerTab)}><span>{item.icon}</span>{item.label.replace("Segurança e ", "")}{id === "requests" && pending.length > 0 ? <b>{pending.length}</b> : null}</button>; })}
+        <button type="button" className={mobileNavOpen ? "active" : ""} onClick={toggleMobileNavigation}><span>☷</span>Mais</button>
+      </nav>
       <GlobalVisualEditor canEdit communityName="Área do Proprietário" screenId={`owner:${tab}`} rootSelector=".owner-area" />
     </main>
   );
+}
+
+function OwnerOverviewV3({
+  data,
+  pending,
+  pendingFeedback,
+  ownerName,
+  brandName,
+  gridPreset,
+  metricOrder,
+  draggingMetric,
+  onSelectTab,
+  onOpenCommunity,
+  onSaveLayout,
+  onDragStart,
+  onDragEnd,
+  onDropMetric,
+  onMoveMetric,
+}: {
+  data: OwnerData;
+  pending: Record<string, unknown>[];
+  pendingFeedback: Record<string, unknown>[];
+  ownerName: string;
+  brandName: string;
+  gridPreset: OwnerGridPreset;
+  metricOrder: OwnerMetricKey[];
+  draggingMetric: OwnerMetricKey | null;
+  onSelectTab: (tab: OwnerTab) => void;
+  onOpenCommunity: (id: number) => Promise<void>;
+  onSaveLayout: (preset: OwnerGridPreset, order: OwnerMetricKey[], message: string) => Promise<void>;
+  onDragStart: (key: OwnerMetricKey) => void;
+  onDragEnd: () => void;
+  onDropMetric: (key: OwnerMetricKey) => void;
+  onMoveMetric: (key: OwnerMetricKey, direction: -1 | 1) => void;
+}) {
+  const nonActiveCommunities = data.communities.filter((item) => String(item.status || "").toUpperCase() !== "ATIVA");
+  const auditIssues = data.audit.filter((item) => !["SUCESSO", "OK"].includes(String(item.resultado || "").toUpperCase()));
+  const attention = [
+    pending.length ? { tone: "urgent", label: `${pending.length} ${pending.length === 1 ? "solicitação aguarda" : "solicitações aguardam"} decisão`, detail: "Novas comunidades dependem da análise do proprietário.", action: "Revisar", tab: "requests" as OwnerTab } : null,
+    pendingFeedback.length ? { tone: "warning", label: `${pendingFeedback.length} ${pendingFeedback.length === 1 ? "mensagem está" : "mensagens estão"} pendente`, detail: "Feedbacks e denúncias ainda não foram tratados.", action: "Abrir caixa", tab: "feedback" as OwnerTab } : null,
+    nonActiveCommunities.length ? { tone: "neutral", label: `${nonActiveCommunities.length} ${nonActiveCommunities.length === 1 ? "comunidade não está ativa" : "comunidades não estão ativas"}`, detail: "Consulte o status e o responsável antes de qualquer ação.", action: "Ver comunidades", tab: "communities" as OwnerTab } : null,
+    auditIssues.length ? { tone: "warning", label: `${auditIssues.length} ${auditIssues.length === 1 ? "registro recente exige" : "registros recentes exigem"} leitura`, detail: "A trilha disponível contém resultado diferente de sucesso.", action: "Ver auditoria", tab: "audit" as OwnerTab } : null,
+  ].filter(Boolean) as { tone: string; label: string; detail: string; action: string; tab: OwnerTab }[];
+  const compact = ["4x2", "4x4"].includes(gridPreset);
+
+  return <div className="owner-overview-v3">
+    <section className="owner-v3-intro">
+      <div>
+        <span className="owner-v3-eyebrow">Operação de hoje</span>
+        <h2>Olá, {ownerName.split(" ")[0]}. Aqui está o que pede atenção.</h2>
+        <p>Uma leitura objetiva da plataforma, baseada somente nas fontes administrativas disponíveis agora.</p>
+      </div>
+      <button type="button" onClick={() => onSelectTab("appearance")}><span>◐</span><b>Marca e conteúdo</b><small>{brandName}</small><i>→</i></button>
+    </section>
+
+    <section className="owner-v3-attention" aria-labelledby="owner-attention-title">
+      <header><div><span>Prioridades</span><h3 id="owner-attention-title">O que precisa da sua atenção</h3></div><small>Dados atuais da plataforma</small></header>
+      {attention.length ? <div>{attention.map((item) => <button type="button" key={`${item.tab}-${item.label}`} onClick={() => onSelectTab(item.tab)} data-tone={item.tone}>
+        <i aria-hidden="true" /><span><strong>{item.label}</strong><small>{item.detail}</small></span><b>{item.action} →</b>
+      </button>)}</div> : <div className="owner-v3-clear"><span>✓</span><div><strong>Nenhuma pendência identificada</strong><small>As fontes administrativas conectadas não apresentam itens pendentes neste momento.</small></div></div>}
+    </section>
+
+    <section className="owner-v3-metrics" aria-labelledby="owner-metrics-title">
+      <header><div><span>Indicadores</span><h3 id="owner-metrics-title">Pulso da plataforma</h3></div><div className="owner-density-control" aria-label="Densidade da visão geral"><button type="button" className={compact ? "active" : ""} onClick={() => void onSaveLayout("4x2", metricOrder, "Visão enxuta salva para sua área de proprietário.")} aria-pressed={compact}>Enxuto</button><button type="button" className={!compact ? "active" : ""} onClick={() => void onSaveLayout("2x2", metricOrder, "Visão detalhada salva para sua área de proprietário.")} aria-pressed={!compact}>Detalhado</button></div></header>
+      <div className="owner-metric-grid" data-grid-preset={compact ? "4x2" : "2x2"}>
+        {metricOrder.map((key, index) => {
+          const metric = OWNER_METRICS.find((item) => item.key === key)!;
+          return <Metric key={key} label={metric.label} value={data.metrics[key]} detail={metric.detail} emphasis={metric.emphasis} draggable dragging={draggingMetric === key} onDragStart={() => onDragStart(key)} onDragEnd={onDragEnd} onDragOver={(event) => event.preventDefault()} onDrop={() => onDropMetric(key)} onMoveUp={index > 0 ? () => onMoveMetric(key, -1) : undefined} onMoveDown={index < metricOrder.length - 1 ? () => onMoveMetric(key, 1) : undefined} />;
+        })}
+      </div>
+      <p className="owner-v3-source">Fonte: base operacional da plataforma · valores carregados nesta sessão.</p>
+    </section>
+
+    <div className="owner-v3-main-grid">
+      <section className="owner-v3-communities" aria-labelledby="owner-communities-title">
+        <header><div><span>Comunidades</span><h3 id="owner-communities-title">Visão administrativa</h3></div><button type="button" onClick={() => onSelectTab("communities")}>Ver todas →</button></header>
+        <div className="owner-v3-community-table" role="table" aria-label="Comunidades recentes">
+          <div role="row" className="owner-v3-table-head"><span role="columnheader">Comunidade</span><span role="columnheader">Responsável</span><span role="columnheader">Membros</span><span role="columnheader">Status</span><span role="columnheader">Ação</span></div>
+          {data.communities.slice(0, 6).map((item) => { const status = String(item.status || "Não informado"); return <div role="row" key={Number(item.id)}>
+            <span role="cell"><OwnerAvatar image={communityLogo(item)} name={String(item.nome)} /><span><strong>{String(item.nome)}</strong><small>{String(item.cidade_publica || "Localização não informada")}</small></span></span>
+            <span role="cell" data-label="Responsável">{String(item.proprietario_nome || "Não definido")}</span>
+            <span role="cell" data-label="Membros">{Number.isFinite(Number(item.membros)) ? Number(item.membros).toLocaleString("pt-BR") : "Sem dados"}</span>
+            <span role="cell" data-label="Status"><b data-status={status.toLowerCase()}>{humanize(status)}</b></span>
+            <span role="cell"><button type="button" onClick={() => void onOpenCommunity(Number(item.id))} disabled={status.toUpperCase() !== "ATIVA"}>Abrir</button></span>
+          </div>; })}
+          {!data.communities.length && <Empty title="Sem comunidades disponíveis" text="A fonte administrativa não retornou registros." />}
+        </div>
+      </section>
+
+      <aside className="owner-v3-activity">
+        <header><div><span>Histórico</span><h3>Atividade recente</h3></div><button type="button" onClick={() => onSelectTab("audit")}>Abrir trilha →</button></header>
+        <div>{data.audit.slice(0, 6).map((item) => <article key={Number(item.id)}><span data-result={String(item.resultado || "").toLowerCase()}>{String(item.resultado) === "SUCESSO" ? "✓" : "!"}</span><div><strong>{humanize(String(item.evento))}</strong><small>{String(item.usuario_nome || "Sistema")}</small><time>{formatDate(String(item.criado_em))}</time></div></article>)}</div>
+        {!data.audit.length && <Empty title="Sem atividade disponível" text="A trilha de auditoria não retornou registros." />}
+      </aside>
+    </div>
+  </div>;
 }
 
 function RequestCard({ item, working, onDecide }: { item: Record<string, unknown>; working: boolean; onDecide: (form: HTMLFormElement, id: number, action: "ANALISAR" | "APROVAR" | "RECUSAR") => Promise<void> }) {
@@ -732,43 +853,6 @@ function FeedbackRepository({
   </section>;
 }
 
-function OwnerInsights({ metrics }: { metrics: Record<string, number> }) {
-  const rows = OWNER_METRICS.map((metric) => ({
-    ...metric,
-    value: Number(metrics[metric.key] || 0),
-  }));
-  const maximum = Math.max(1, ...rows.map((row) => row.value));
-  return (
-    <section className="owner-insights-grid" aria-label="Indicadores e permissões da plataforma">
-      <article className="owner-volume-chart">
-        <header><div><p className="pilot-kicker">DISTRIBUIÇÃO ATUAL</p><h2>Visão operacional</h2></div><span>Dados em tempo real</span></header>
-        <div>
-          {rows.map((row) => (
-            <div key={row.key}>
-              <span><strong>{row.label}</strong><b>{row.value}</b></span>
-              <i aria-hidden="true"><b style={{ width: `${Math.max(row.value ? 7 : 0, (row.value / maximum) * 100)}%` }} /></i>
-            </div>
-          ))}
-        </div>
-      </article>
-      <article className="owner-governance-card">
-        <header><div><p className="pilot-kicker">PERMISSÕES</p><h2>Governança por função</h2></div><span>Servidor protegido</span></header>
-        <div>
-          {[
-            ["Proprietário", "Plataforma, auditoria e aprovação", "Integral"],
-            ["Admin da comunidade", "Somente a comunidade vinculada", "Administrativo"],
-            ["Líder", "Ministérios sob responsabilidade", "Operacional"],
-            ["Membro", "Perfil, feed e próprias escalas", "Pessoal"],
-          ].map(([role, scope, level]) => (
-            <span key={role}><i aria-hidden="true">✓</i><div><strong>{role}</strong><small>{scope}</small></div><b>{level}</b></span>
-          ))}
-        </div>
-        <footer>Menus orientam a navegação; APIs continuam validando função, comunidade e recurso.</footer>
-      </article>
-    </section>
-  );
-}
-
 function Metric({
   label,
   value,
@@ -803,7 +887,7 @@ function Metric({
     onDragEnd={onDragEnd}
     onDragOver={onDragOver}
     onDrop={onDrop}
-  ><span className="owner-metric-grip" aria-hidden="true">⋮⋮</span><div className="owner-metric-touch-actions" aria-label={`Reordenar ${label}`}><button type="button" onClick={onMoveUp} disabled={!onMoveUp} aria-label={`Mover ${label} para cima`}>↑</button><button type="button" onClick={onMoveDown} disabled={!onMoveDown} aria-label={`Mover ${label} para baixo`}>↓</button></div><small>{label}</small><strong>{Number(value || 0)}</strong><p>{detail}</p></article>;
+  ><span className="owner-metric-grip" aria-hidden="true">⋮⋮</span><div className="owner-metric-touch-actions" aria-label={`Reordenar ${label}`}><button type="button" onClick={onMoveUp} disabled={!onMoveUp} aria-label={`Mover ${label} para cima`}>↑</button><button type="button" onClick={onMoveDown} disabled={!onMoveDown} aria-label={`Mover ${label} para baixo`}>↓</button></div><small>{label}</small><strong>{Number.isFinite(Number(value)) ? Number(value).toLocaleString("pt-BR") : "Sem dados"}</strong><p>{detail}</p></article>;
 }
 function Empty({ title, text }: { title: string; text: string }) { return <div className="owner-empty"><span>◇</span><strong>{title}</strong><p>{text}</p></div>; }
 function OwnerImage({ src, fallback }: { src?: string | null; fallback: string }) {
