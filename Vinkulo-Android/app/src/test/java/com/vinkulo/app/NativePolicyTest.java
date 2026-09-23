@@ -4,6 +4,14 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 public class NativePolicyTest {
+    @Test public void pushFromAnOldAccountOrWithoutBindingIsRejected() {
+        String binding = "550e8400-e29b-41d4-a716-446655440000";
+        assertTrue(NativePolicy.bindingMatches(binding, binding));
+        assertFalse(NativePolicy.bindingMatches("", ""));
+        assertFalse(NativePolicy.bindingMatches(binding, null));
+        assertFalse(NativePolicy.bindingMatches(binding, "550e8400-e29b-41d4-a716-446655440001"));
+        assertFalse(NativePolicy.validBinding("invalid"));
+    }
     @Test public void onlyOfficialHttpsOriginCanReachNativeFeatures() {
         assertTrue(NativePolicy.trusted(NativePolicy.ORIGIN + "/painel?view=conta"));
         assertTrue(NativePolicy.trusted(NativePolicy.ORIGIN + ":443/painel"));

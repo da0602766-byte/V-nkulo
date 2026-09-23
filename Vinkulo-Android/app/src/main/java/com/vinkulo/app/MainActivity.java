@@ -15,6 +15,9 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.graphics.Insets;
+import android.graphics.Bitmap;
+import com.google.firebase.messaging.FirebaseMessaging;
+import com.google.firebase.FirebaseApp;
 import android.view.View;
 import android.view.WindowInsets;
 import android.webkit.CookieManager;
@@ -79,6 +82,12 @@ public class MainActivity extends Activity {
         webView.setDownloadListener((url, userAgent, disposition, mimeType, length) ->
                 downloadDocument(url, userAgent, disposition, mimeType));
         webView.setWebViewClient(new WebViewClient() {
+            @Override public void onPageStarted(WebView view, String url, Bitmap icon) {
+                if (NativePolicy.trusted(url)) {
+                    String path = Uri.parse(url).getPath();
+                    if ("/api/auth/logout".equals(path) || "/login".equals(path)) FirebaseDeviceState.clearBinding(MainActivity.this);
+                }
+            }
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 if (!request.isForMainFrame()) return false;
@@ -222,6 +231,24 @@ public class MainActivity extends Activity {
                                 if (!text.trim().isEmpty() && text.length() <= 8000) openWhatsAppShare(text);
                                 break;
                             case "google": openGoogleAuthorization(data.optString("url")); break;
+                            case "push-token":
+                                FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
+                                    if (!task.isSuccessful() || isFinishing() || isDestroyed()) return;
+                                    String token = task.getResult();
+                                    FirebaseDeviceState.updateToken(MainActivity.this, token);
+                                    boolean permission = Build.VERSION.SDK_INT < 33 || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
+                                    NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+                                    permission = permission && manager != null && manager.areNotificationsEnabled();
+                                    if (!permission) FirebaseDeviceState.clearBinding(MainActivity.this);
+                                    try {
+                                        JSONObject result = new JSONObject().put("token", token).put("permission", permission)
+                                                .put("projectId", FirebaseApp.getInstance().getOptions().getProjectId());
+                                        reply.postMessage(result.toString());
+                                    } catch (JSONException | IllegalStateException ignored) { }
+                                });
+                                break;
+                            case "push-bind": FirebaseDeviceState.bind(MainActivity.this, data.optString("token"), data.optString("bindingId")); break;
+                            case "push-clear": FirebaseDeviceState.clearBinding(MainActivity.this); break;
                             case "notification":
                                 postNativeNotification("Vínkulo", "Você recebeu uma atualização. Abra o Vínkulo para consultar.",
                                         data.optString("tag"), data.optString("url"));
@@ -230,7 +257,10 @@ public class MainActivity extends Activity {
                         }
                     } catch (JSONException ignored) { /* Ignore malformed messages without logging their content. */ }
                 });
-        String script = "if(window===window.top){window.VinkuloAndroid=Object.freeze({version:'1.7.0',"
+        String script = "if(window===window.top){VinkuloNative.onmessage=function(e){try{window.dispatchEvent(new CustomEvent('vinkulo:fcm-token',{detail:JSON.parse(e.data)}));}catch(ignore){}};window.VinkuloAndroid=Object.freeze({version:'1.7.1',"
+                + "requestPushToken:function(){VinkuloNative.postMessage(JSON.stringify({action:'push-token'}));},"
+                + "setPushBinding:function(token,bindingId){VinkuloNative.postMessage(JSON.stringify({action:'push-bind',token:token,bindingId:bindingId}));},"
+                + "clearPushBinding:function(){VinkuloNative.postMessage(JSON.stringify({action:'push-clear'}));},"
                 + "shareToWhatsApp:function(text){VinkuloNative.postMessage(JSON.stringify({action:'share',text:text}));},"
                 + "openGoogleAuth:function(url){VinkuloNative.postMessage(JSON.stringify({action:'google',url:url}));},"
                 + "showNotification:function(title,body,tag,url){VinkuloNative.postMessage(JSON.stringify({action:'notification',tag:tag,url:url}));}"
@@ -338,7 +368,10 @@ public class MainActivity extends Activity {
         String scheme = uri.getScheme();
         if ("https".equalsIgnoreCase(scheme)) {
             String host = uri.getHost();
-            if (NativePolicy.trusted(uri.toString())) return false;
+            if (NativePolicy.trusted(uri.toString())) {
+                if ("/api/auth/logout".equals(uri.getPath()) || "/login".equals(uri.getPath())) FirebaseDeviceState.clearBinding(this);
+                return false;
+            }
             if (GOOGLE_AUTH_HOST.equalsIgnoreCase(host)) {
                 openGoogleAuthorization(uri.toString());
                 return true;

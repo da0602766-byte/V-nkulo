@@ -6,6 +6,8 @@ import java.net.URI;
 final class NativePolicy {
     static final String ORIGIN = "https://adote-gestao.da0602766.chatgpt.site";
     private NativePolicy() {}
+    static boolean validBinding(String value) { return value != null && value.matches("[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}"); }
+    static boolean bindingMatches(String current, String received) { return validBinding(current) && current.equals(received); }
 
     static boolean trusted(String value) {
         try {

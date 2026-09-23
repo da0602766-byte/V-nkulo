@@ -56,13 +56,13 @@ jobs:
           sha256sum app/build/outputs/apk/release/app-release.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: Vinkulo-Android-1.7.0-producao
+          name: Vinkulo-Android-1.7.1-producao
           path: Vinkulo-Android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: Vinkulo-Android-1.7.0-validacao
+          name: Vinkulo-Android-1.7.1-validacao
           path: |
             Vinkulo-Android/app/build/reports/
             Vinkulo-Android/app/build/test-results/

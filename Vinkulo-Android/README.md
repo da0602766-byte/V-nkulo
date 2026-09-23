@@ -2,7 +2,7 @@
 
 Aplicativo Android conectado à plataforma oficial do Vínkulo.
 
-Versão atual: **1.7.0** (`versionCode 9`).
+Versão atual: **1.7.1** (`versionCode 10`).
 
 ## Melhorias da versão 1.7.0
 
@@ -15,7 +15,9 @@ Versão atual: **1.7.0** (`versionCode 9`).
 
 Os recursos da ponte exigem Android System WebView com `WEB_MESSAGE_LISTENER` e `DOCUMENT_START_SCRIPT`. Se não estiverem disponíveis, o app orienta atualizar o WebView e mantém a navegação web, sem reinstalar uma ponte insegura.
 
-O FCM foi integrado ao APK. O arquivo `google-services.json` fica fora do repositório e é fornecido ao workflow pelo segredo `VINKULO_GOOGLE_SERVICES_JSON`. O serviço nativo recebe notificações enquanto o processo não foi forçadamente encerrado pelo usuário. O registro do token e o envio pelo backend dependem da próxima etapa de integração do dispositivo; não há polling permanente ou serviço em primeiro plano.
+O FCM usa mensagens de dados vinculadas à sessão. O arquivo `google-services.json` fica fora do repositório e é fornecido pelo segredo `VINKULO_GOOGLE_SERVICES_JSON`. O token é registrado pela página oficial autenticada; troca de token/conta e logout invalidam o vínculo local. O servidor revalida sessão, usuário e aviso antes do envio. O serviço exibe somente texto genérico e ignora mensagens de vínculos antigos. O envio depende da credencial cadastrada em Proprietário → Integrações → Firebase. É necessário instalar, abrir, entrar na conta e permitir notificações; encerramento forçado e restrições do Android podem impedir a entrega. Homologação em aparelho real ainda necessária.
+
+O backend deve usar apenas mensagens FCM `data` com `bindingId`, `notificationId` e rota interna. Mensagens `notification` enviadas pelo Console Firebase podem ser exibidas automaticamente pelo SDK sem passar pela validação de vínculo; não use campanhas do console para conteúdo de usuários. Use o teste autenticado da plataforma.
 
 ## Login e Google Drive
 
