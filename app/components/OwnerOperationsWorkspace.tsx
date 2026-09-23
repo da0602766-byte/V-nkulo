@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import OwnerPushDelivery from "./OwnerPushDelivery";
 
 export type OwnerOperationsScreen = "passwords" | "deleted" | "finance" | "realtime" | "performance" | "publication" | "incidents";
 
@@ -18,7 +19,7 @@ const SCREEN_COPY: Record<OwnerOperationsScreen, { eyebrow: string; title: strin
   passwords: { eyebrow: "ACESSO SEGURO", title: "Redefinições de senha", description: "Consulte os eventos de segurança registrados pela plataforma, sem expor credenciais." },
   deleted: { eyebrow: "CICLO DE VIDA", title: "Contas excluídas", description: "Veja contas inativas e eventos de desativação que existem na fonte atual." },
   finance: { eyebrow: "CONTROLE FINANCEIRO", title: "Financeiro", description: "Acompanhe a disponibilidade da fonte financeira da plataforma." },
-  realtime: { eyebrow: "OBSERVABILIDADE", title: "Tempo real", description: "Diferencie dados atuais de telemetria verdadeiramente contínua." },
+  realtime: { eyebrow: "OBSERVABILIDADE", title: "Tempo real", description: "Acompanhe a entrega de notificações e os dados disponíveis da plataforma." },
   performance: { eyebrow: "SAÚDE DA PLATAFORMA", title: "Desempenho", description: "Investigue resultados diferentes de sucesso na auditoria disponível." },
   publication: { eyebrow: "ENTREGA CONTROLADA", title: "Publicação do sistema", description: "Consulte somente os eventos de publicação registrados na auditoria." },
   incidents: { eyebrow: "RESPOSTA OPERACIONAL", title: "Incidentes", description: "Priorize ocorrências reais derivadas de registros com falha ou negação." },
@@ -112,7 +113,7 @@ function UnavailableWorkspace({ screen, source, title, text, needs }: { screen: 
 function RealtimeWorkspace({ data }: { data: OwnerOperationsData }) {
   const currentCommunities = Number(data.metrics.comunidades_ativas || data.communities.filter((row) => String(row.status).toUpperCase() === "ATIVA").length);
   const currentUsers = Number(data.metrics.usuarios_ativos || data.users.filter((row) => Number(row.ativo) === 1).length);
-  return <div className="ops-stack"><WorkspaceHeader screen="realtime" source="Último carregamento" /><SourceNote>Os números abaixo são um retrato da API do proprietário. Eles não representam presença online nem atualização contínua.</SourceNote><div className="ops-metrics"><Metric label="Comunidades ativas" number={currentCommunities} detail="na resposta atual" /><Metric label="Usuários ativos" number={currentUsers} detail="na resposta atual" /><Metric label="Registros de auditoria" number={data.audit.length} detail="na janela disponível" /></div><section className="ops-panel ops-unavailable"><span aria-hidden="true">⌁</span><div><p className="pilot-kicker">TELEMETRIA AUSENTE</p><h3>Sem presença em tempo real</h3><p>A fonte atual não informa sessões, pessoas online, duração ou picos simultâneos.</p><ul><li>Canal de presença com expiração</li><li>Agregação temporal de sessões</li><li>Política de privacidade para telemetria</li></ul></div></section></div>;
+  return <div className="ops-stack"><WorkspaceHeader screen="realtime" source="Diagnóstico operacional" /><OwnerPushDelivery /><SourceNote>Os números abaixo são um retrato da API do proprietário. Eles não representam presença online nem atualização contínua.</SourceNote><div className="ops-metrics"><Metric label="Comunidades ativas" number={currentCommunities} detail="na resposta atual" /><Metric label="Usuários ativos" number={currentUsers} detail="na resposta atual" /><Metric label="Registros de auditoria" number={data.audit.length} detail="na janela disponível" /></div><section className="ops-panel ops-unavailable"><span aria-hidden="true">⌁</span><div><p className="pilot-kicker">TELEMETRIA AUSENTE</p><h3>Sem presença em tempo real</h3><p>A fonte atual não informa sessões, pessoas online, duração ou picos simultâneos.</p><ul><li>Canal de presença com expiração</li><li>Agregação temporal de sessões</li><li>Política de privacidade para telemetria</li></ul></div></section></div>;
 }
 
 function PerformanceWorkspace({ data }: { data: OwnerOperationsData }) {

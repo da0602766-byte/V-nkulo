@@ -1,4 +1,4 @@
-import { scheduleWebPushDelivery } from "./web-push";
+import { scheduleWebPushDelivery } from "./push-delivery-queue";
 
 type NotificationInput = {
   tipo?: "INFO" | "NOVO" | "IMPORTANTE";
@@ -44,13 +44,8 @@ export async function createSystemNotification(
 
   const notificationId = Number(created.meta.last_row_id || 0);
   if (input.usuarioId && notificationId > 0) {
-    scheduleWebPushDelivery(db, {
-      userId: input.usuarioId,
-      notificationId,
-      title: input.titulo,
-      message: input.mensagem,
-      destination: normalizeInternalDestination(input.destinoRota),
-    });
+    // O trigger já persistiu a fila junto com a notificação. Apenas desperta o consumidor.
+    scheduleWebPushDelivery(db);
   }
 }
 

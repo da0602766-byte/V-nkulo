@@ -39,6 +39,7 @@ test("agendamento exige proprietário, não revela token e webhook rejeita chama
   assert.equal((await install(ownerCookie)).status, 409);
   assert.equal((await call(webhookEndpoint, { method: "POST" })).status, 401);
   assert.equal((await call(webhookEndpoint, { method: "POST", headers: { authorization: "Bearer " + "a".repeat(64) } })).status, 401);
+  assert.equal(database.prepare("SELECT ultimo_agendamento_em FROM notificacoes_push_controle WHERE id = 1").get().ultimo_agendamento_em, null);
 
   const configuration = { confirm: true, ambiente: "PRODUCAO", url: "https://erdyearvkahtwdmpcvgc.supabase.co",
     projectRef: "erdyearvkahtwdmpcvgc", anonKey: "sb_publishable_abcdefghijklmnopqrstuvwxyz",
@@ -67,6 +68,7 @@ test("agendamento exige proprietário, não revela token e webhook rejeita chama
     assert.equal((await call(webhookEndpoint, { method: "POST", headers: { authorization: "Bearer " + "a".repeat(64) } })).status, 401);
     const webhook = await call(webhookEndpoint, { method: "POST", headers: { authorization: `Bearer ${submittedToken}` } });
     assert.equal(webhook.status, 503); // catálogo remoto indisponível no teste
+    assert.ok(database.prepare("SELECT ultimo_agendamento_em FROM notificacoes_push_controle WHERE id = 1").get().ultimo_agendamento_em, "fila recebe o agendamento mesmo quando a sincronização falha");
     assert.ok((await (await call(scheduleEndpoint, { headers: { cookie: ownerCookie } })).json()).status.lastHeartbeatAt);
   } finally { globalThis.fetch = nativeFetch; await Promise.all(tasks.splice(0)); database.close(); }
 });

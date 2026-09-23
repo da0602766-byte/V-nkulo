@@ -89,7 +89,7 @@ self.addEventListener("push", (event) => {
       icon: "/vinkulo-app-icon-192.png",
       badge: "/vinkulo-app-icon-192.png",
       tag: notification.tag,
-      renotify: true,
+      renotify: false,
       data: { notificationId: payload.notificationId, bindingId: payload.bindingId },
     });
   }));

@@ -6,8 +6,13 @@ migração nova, leia isto.
 
 ## Próximo número livre
 
-**`0078`**. Use o próximo inteiro disponível a partir daí — não reaproveite
+**`0079`**. Use o próximo inteiro disponível a partir daí — não reaproveite
 um número já usado, mesmo que o arquivo tenha sido escrito à mão.
+
+`0078_push_delivery_queue.sql` cria a fila, o controle do consumidor e um trigger
+que inclui as entregas na mesma transação de cada nova notificação individual.
+Não copia título, mensagem, endpoint ou chaves; não reenvia notificações antigas.
+O trigger é parte obrigatória da migração e não é representado pelo Drizzle.
 
 `0077_push_session_privacy.sql` vincula cada assinatura à sessão autenticada,
 com exclusão em cascata ao revogar a sessão. Acrescenta um identificador de

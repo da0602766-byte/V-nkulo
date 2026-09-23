@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  check,
   index,
   integer,
   sqliteTable,
@@ -2017,6 +2018,43 @@ export const notificacoesPushDispositivos = sqliteTable(
     ),
   ],
 );
+
+// O trigger de enfileiramento atômico vive em drizzle/0078_push_delivery_queue.sql.
+export const notificacoesPushFila = sqliteTable("notificacoes_push_fila", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  notificacaoId: integer("notificacao_id").notNull().references(() => notificacoesSistema.id, { onDelete: "cascade" }),
+  dispositivoId: integer("dispositivo_id").notNull().references(() => notificacoesPushDispositivos.id, { onDelete: "cascade" }),
+  usuarioId: integer("usuario_id").notNull().references(() => usuarios.id, { onDelete: "cascade" }),
+  vinculoId: text("vinculo_id").notNull(),
+  estado: text("estado", { enum: ["PENDENTE", "PROCESSANDO", "ACEITO", "FALHA", "EXPIRADA", "CANCELADA"] }).notNull().default("PENDENTE"),
+  tentativas: integer("tentativas").notNull().default(0),
+  proximaTentativaEm: integer("proxima_tentativa_em").notNull().default(sql`(unixepoch() * 1000)`),
+  expiraEm: integer("expira_em").notNull().default(sql`((unixepoch() + 86400) * 1000)`),
+  leaseToken: text("lease_token"),
+  leaseAte: integer("lease_ate").notNull().default(0),
+  ultimoStatus: integer("ultimo_status"),
+  motivo: text("motivo"),
+  criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+  atualizadoEm: text("atualizado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, table => [
+  uniqueIndex("notificacoes_push_fila_evento_vinculo_unique").on(table.notificacaoId, table.vinculoId),
+  index("notificacoes_push_fila_pendente_idx").on(table.estado, table.proximaTentativaEm, table.id),
+  index("notificacoes_push_fila_lease_idx").on(table.estado, table.leaseAte, table.id),
+  index("notificacoes_push_fila_historico_idx").on(table.atualizadoEm),
+  index("notificacoes_push_fila_dispositivo_idx").on(table.dispositivoId),
+  index("notificacoes_push_fila_usuario_idx").on(table.usuarioId),
+  check("notificacoes_push_fila_estado_check", sql`${table.estado} IN ('PENDENTE','PROCESSANDO','ACEITO','FALHA','EXPIRADA','CANCELADA')`),
+]);
+
+export const notificacoesPushControle = sqliteTable("notificacoes_push_controle", {
+  id: integer("id").primaryKey(),
+  leaseToken: text("lease_token"),
+  leaseAte: integer("lease_ate").notNull().default(0),
+  ultimoInicioEm: text("ultimo_inicio_em"),
+  ultimoFimEm: text("ultimo_fim_em"),
+  ultimoAgendamentoEm: text("ultimo_agendamento_em"),
+  ultimoErro: text("ultimo_erro"),
+}, table => [check("notificacoes_push_controle_singleton", sql`${table.id} = 1`)]);
 
 // Uma escala pode reunir várias equipes do mesmo ministério. A função/local
 // pertence à participação daquela equipe na escala (por exemplo, "Centro"),

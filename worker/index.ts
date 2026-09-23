@@ -6,6 +6,7 @@ import type { R2BucketBinding } from "../db/runtime-env";
 import { runPlatformOptimizationIfDue } from "../app/lib/platform-optimizer";
 import { purgeExpiredPrivateMessagesIfDue } from "../app/lib/chat-retention";
 import { runAutoSyncIfDue } from "../app/lib/supabase-auto-sync";
+import { scheduleWebPushDelivery } from "../app/lib/push-delivery-queue";
 
 interface Env {
   ASSETS: Fetcher;
@@ -37,6 +38,7 @@ const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const OPTIMIZER_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 let nextOptimizerCheckAt = 0;
 let nextAutoSyncCheckAt = 0;
+let nextPushQueueCheckAt = 0;
 const AUTO_SYNC_CHECK_MS = 60_000;
 const AUTO_SYNC_MUTATION_PATHS = [
   "/api/auth/cadastro", "/api/conta/perfil", "/api/pilot/pessoas",
@@ -99,6 +101,12 @@ const worker = {
         handler.fetch(request, env, ctx),
       );
       const now = Date.now();
+      if (response.status < 400 && now >= nextPushQueueCheckAt &&
+          url.pathname !== "/api/system/supabase-sync" &&
+          (url.pathname.startsWith("/api/") || url.pathname === "/painel" || url.pathname === "/proprietario")) {
+        nextPushQueueCheckAt = now + 30_000;
+        runWithRuntimeEnv({ ...env, executionContext: ctx }, () => scheduleWebPushDelivery(env.DB, "traffic"));
+      }
       const forced = response.status < 400 && relevantCatalogMutation(url.pathname, request.method);
       if (forced || (now >= nextAutoSyncCheckAt && (url.pathname === "/painel" || url.pathname === "/proprietario" || url.pathname.startsWith("/api/")))) {
         nextAutoSyncCheckAt = now + AUTO_SYNC_CHECK_MS;

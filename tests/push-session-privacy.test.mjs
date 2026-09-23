@@ -150,7 +150,7 @@ test("push: entrega registra aceite e falha, sem enviar conteúdo privado ou ses
     let replaceBinding = false;
     const nextBinding = crypto.randomUUID();
     f.env.executionContext = { waitUntil: promise => jobs.push(promise) };
-    const delivery = await loadModule("app/lib/web-push.ts", {
+    const transport = await loadModule("app/lib/web-push.ts", {
       "../../db/runtime-env": { getRuntimeEnv: () => f.env },
       "./web-push-crypto": {
         encryptWebPushPayload: async payload => { payloads.push(JSON.parse(payload)); return new Uint8Array([1]); },
@@ -160,8 +160,12 @@ test("push: entrega registra aceite e falha, sem enviar conteúdo privado ou ses
       if (replaceBinding) f.database.prepare("UPDATE notificacoes_push_dispositivos SET vinculo_id = ? WHERE endpoint = ?").run(nextBinding, sub.endpoint);
       return new Response(null, { status });
     } });
+    const delivery = await loadModule("app/lib/push-delivery-queue.ts", {
+      "../../db/runtime-env": { getRuntimeEnv: () => f.env }, "./web-push": transport,
+    });
     async function send() {
-      delivery.scheduleWebPushDelivery(f.d1, { userId: f.userId, notificationId: 42, title: "Reservado", message: "Pedido confidencial", destination: "/painel?view=pedidos" });
+      f.database.prepare("INSERT INTO notificacoes_sistema(tipo,titulo,mensagem,area,usuario_id,criado_por,destino_rota) VALUES ('INFO','Reservado','Pedido confidencial','EVENTOS',?,'teste','/painel?view=pedidos')").run(f.userId);
+      delivery.scheduleWebPushDelivery(f.d1);
       await Promise.all(jobs.splice(0));
     }
     await send();
@@ -206,6 +210,7 @@ test("service worker só exibe push autorizado e descarta payload legado ou sem 
   await push(payload);
   assert.equal(shown.length, 1);
   assert.equal(shown[0].title, "Vínkulo");
+  assert.equal(shown[0].renotify, false, "retentativa com a mesma tag não deve alertar novamente");
   assert.doesNotMatch(JSON.stringify(shown), /Segredo|Não confiar/);
   status = 401;
   await push(payload);

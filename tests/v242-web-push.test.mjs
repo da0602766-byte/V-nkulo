@@ -21,19 +21,20 @@ test("push web registra um aparelho autenticado e persiste somente as chaves nec
 });
 
 test("servidor entrega push criptografado com VAPID e remove endpoints invalidados", async () => {
-  const [delivery, crypto, notifications, worker] = await Promise.all([
+  const [delivery, crypto, notifications, worker, queue] = await Promise.all([
     read("app/lib/web-push.ts"),
     read("app/lib/web-push-crypto.ts"),
     read("app/lib/system-notifications.ts"),
     read("worker/index.ts"),
+    read("app/lib/push-delivery-queue.ts"),
   ]);
   assert.match(delivery, /Content-Encoding": "aes128gcm"/);
   assert.match(delivery, /Authorization: authorization/);
   assert.match(crypto, /name: "ECDH", namedCurve: "P-256"/);
   assert.match(crypto, /name: "AES-GCM"/);
   assert.match(crypto, /vapid t=\$\{unsigned\}/);
-  assert.match(delivery, /result\.status === 404 \|\| result\.status === 410/);
-  assert.match(delivery, /executionContext\.waitUntil\(delivery\)/);
+  assert.match(queue, /status === 404 \|\| status === 410/);
+  assert.match(queue, /executionContext\.waitUntil\(delivery\)/);
   assert.match(notifications, /scheduleWebPushDelivery/);
   assert.match(worker, /executionContext: ctx/);
 });
