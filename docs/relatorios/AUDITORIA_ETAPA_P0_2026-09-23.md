@@ -40,4 +40,11 @@ O APK não foi recompilado. As mudanças no sincronizador se aplicam à camada w
 
 ## Publicação
 
-Candidato validado para publicação em `https://adote-gestao.da0602766.chatgpt.site`.
+Versão **297**, publicada em `https://adote-gestao.da0602766.chatgpt.site` em 23/09/2026, às 12:30 (Brasília).
+
+- Commit de código: `142467f8b32dc39e1eabe9f6e72c6508d4c3b6c5`.
+- Versão salva: `appgprj_6a5af9301a888191b2abefddaa299618~appgver_0471d10859688191965d92abc4a2ca67`.
+- Implantação: `appgdep_6ab3f07cb91c8191bfbefb81da99fa85`, estado `succeeded`.
+- SHA-256 do pacote local aceito: `295a5a4722b39ff11d2bb688710c876c3254cf3b53fc101d7ed1de4dec4250c2`.
+
+Conferência HTTP após a publicação: `/`, `/login` e `/comunidades` retornaram 200; ambas as rotas de push retornaram 401 sem sessão; `/sw.js` contém os caches v6 e a consulta autenticada antes de exibir/abrir avisos. Os eventos de log dessas duas recusas de autenticação tiveram execução normal (`outcome: ok`). O teste autenticado de múltiplos aparelhos foi feito no Worker local com banco migrado, sem disparos para usuários reais em produção.
