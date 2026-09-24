@@ -59,7 +59,7 @@ test("integração Supabase protege acesso, cifra segredos e preserva segredo va
   assert.equal(activated.status,200);
   const nativeFetch=globalThis.fetch;
   globalThis.fetch=async (request, options)=>{
-    assert.equal(options.redirect,"error","segredos não seguem redirecionamentos do provedor");
+    assert.equal(options.redirect,"manual","segredos não seguem redirecionamentos do provedor");
     const url=String(request);
     if (url.endsWith("/storage/v1/bucket")) return Response.json([{id:"arquivos",name:"arquivos"}]);
     return Response.json({ok:true});

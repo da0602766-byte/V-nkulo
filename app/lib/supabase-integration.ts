@@ -94,7 +94,9 @@ async function checkedFetch(url: string, init: RequestInit) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
     try {
-      const response = await fetch(url,{...init,redirect:"error",cache:"no-store",signal:controller.signal});
+      // Workers accepts manual/follow. Keep credentials on the configured host;
+      // callers reject non-success responses, including every redirect.
+      const response = await fetch(url,{...init,redirect:"manual",cache:"no-store",signal:controller.signal});
       clearTimeout(timer);
       if (response.status < 500 || attempt === 1) return response;
     } catch (error) {
