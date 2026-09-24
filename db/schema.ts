@@ -3108,7 +3108,7 @@ export const identidadesCpf = sqliteTable('identidades_cpf', {
   usuarioId: integer('usuario_id').primaryKey().references(()=>usuarios.id,{onDelete:'cascade'}),
   cpfHash:text('cpf_hash').notNull().unique(), finais:text('finais').notNull(), criadoEm:text('criado_em').notNull().default(sql`CURRENT_TIMESTAMP`),
 });
-export const authRateLimits=sqliteTable('auth_rate_limits',{
+export const authRateLimits=sqliteTable('controlled_auth_rate_limits',{
   chave:text('chave').primaryKey(),tentativas:integer('tentativas').notNull().default(1),expiraEm:integer('expira_em').notNull(),
 });
 export const planosPlataforma=sqliteTable('planos_plataforma',{

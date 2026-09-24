@@ -23,11 +23,11 @@ export async function rateLimit(request: Request, purpose: string, identifier: s
   const network = request.headers.get('cf-connecting-ip') || 'local';
   const keys = await Promise.all([privateHash('rate', `${purpose}:ip:${network}`), privateHash('rate', `${purpose}:id:${identifier}`)]);
   const results = await db.batch(keys.map(chave => db.prepare(
-    `INSERT INTO auth_rate_limits(chave,tentativas,expira_em) VALUES (?,1,?)
+    `INSERT INTO controlled_auth_rate_limits(chave,tentativas,expira_em) VALUES (?,1,?)
      ON CONFLICT(chave) DO UPDATE SET tentativas = CASE WHEN expira_em <= ? THEN 1 ELSE tentativas + 1 END,
      expira_em = CASE WHEN expira_em <= ? THEN excluded.expira_em ELSE expira_em END RETURNING tentativas`,
   ).bind(chave, now + 900, now, now)));
-  await db.prepare('DELETE FROM auth_rate_limits WHERE expira_em < ?').bind(now - 86400).run();
+  await db.prepare('DELETE FROM controlled_auth_rate_limits WHERE expira_em < ?').bind(now - 86400).run();
   return Number((results[0].results?.[0] as {tentativas:number}|undefined)?.tentativas ?? Infinity) <= max * 10
     && Number((results[1].results?.[0] as {tentativas:number}|undefined)?.tentativas ?? Infinity) <= max;
 }

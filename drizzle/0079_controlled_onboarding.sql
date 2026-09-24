@@ -14,7 +14,7 @@ CREATE TABLE identidades_cpf (
   criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 --> statement-breakpoint
-CREATE TABLE auth_rate_limits (
+CREATE TABLE controlled_auth_rate_limits (
   chave TEXT PRIMARY KEY,
   tentativas INTEGER NOT NULL DEFAULT 1,
   expira_em INTEGER NOT NULL
