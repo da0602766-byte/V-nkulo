@@ -230,6 +230,7 @@ test("diagnóstico push: polling suspende oculto/offline, aborta consulta e igno
   const doc = { visibilityState: "hidden", addEventListener: (name, fn) => { handlers[name] = fn; }, removeEventListener() {} };
   const nav = { onLine: true };
   const component = await moduleAt("app/components/OwnerPushDelivery.tsx", {
+    "./OperationalDeliveryChart": { default: () => null },
     react: { useState: value => [value, value => states.push(value)], useEffect: fn => { effect = fn; } },
     "react/jsx-runtime": { jsx: () => null, jsxs: () => null },
   }, { AbortController, document: doc, navigator: nav,

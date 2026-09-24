@@ -22,6 +22,35 @@
 .owner-console .oi-settings input[type="checkbox"] { min-height: 24px; }
 @media (max-width: 700px) { .owner-console .oi-catalog { grid-template-columns: minmax(0,1fr); } }
 .owner-console .owner-push { min-width: 0; }
+.owner-console .opd-filters { display: flex; flex-wrap: wrap; gap: 16px; }
+.owner-console .opd-filters label { display: grid; gap: 8px; flex: 1 1 200px; color: var(--owner-muted); font-size: 13px; }
+.owner-console .opd-filters select { width: 100%; min-height: 44px; border: 1px solid var(--owner-line); border-radius: 10px; padding: 10px; color: var(--owner-ink); background: var(--owner-surface); font-size: 16px; }
+.owner-console .opd-highlights small { display: block; margin-top: 8px; color: var(--owner-muted); font-size: 12px; line-height: 1.5; }
+.owner-console .opd-chart, .owner-console .opd-queue, .owner-console .opd-integrations { min-width: 0; padding: 18px; border: 1px solid var(--owner-line); border-radius: 12px; }
+.owner-console .opd-chart h4, .owner-console .opd-queue h4, .owner-console .opd-integrations h4 { font-size: 16px; margin: 0 0 8px; }
+.owner-console .opd-chart > p, .owner-console .opd-queue > p, .owner-console .opd-integrations > p { color: var(--owner-muted); font-size: 13px; line-height: 1.6; margin: 0 0 16px; }
+.owner-console .opd-chart svg { display: block; width: 100%; height: 180px; }
+.owner-console .opd-chart-axis { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--owner-muted); margin: 8px 0 16px; }
+.owner-console .opd-chart svg text { fill: var(--owner-muted); font-size: 12px; }
+.owner-console .opd-gridline { stroke: var(--owner-line); }
+.owner-console .opd-accepted { fill: var(--owner-positive); background: var(--owner-positive); }
+.owner-console .opd-failed { fill: var(--owner-danger); background: var(--owner-danger); }
+.owner-console .opd-other { fill: var(--owner-muted); background: var(--owner-muted); }
+.owner-console .opd-chart-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; margin-bottom: 8px; }
+.owner-console .opd-chart-legend span { display: inline-flex; gap: 6px; align-items: center; }
+.owner-console .opd-chart-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; }
+.owner-console .opd-chart summary { cursor: pointer; min-height: 44px; align-content: center; color: var(--owner-ink); font-size: 14px; }
+.owner-console .opd-table-scroll { overflow-x: auto; max-width: 100%; }
+.owner-console .opd-chart table { border-collapse: collapse; width: 100%; min-width: 0; font-size: 12px; }
+.owner-console .opd-chart th, .owner-console .opd-chart td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--owner-line); white-space: nowrap; }
+.owner-console .opd-chart caption { text-align: left; padding: 8px 0; color: var(--owner-muted); }
+.owner-console .opd-channels, .owner-console .opd-connectors { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,240px),1fr)); gap: 12px; }
+.owner-console .opd-channels > div, .owner-console .opd-connectors article { padding: 16px; background: var(--owner-surface-2); border: 1px solid var(--owner-line); border-radius: 10px; min-width: 0; }
+.owner-console .opd-channels p, .owner-console .opd-connectors p { color: var(--owner-muted); font-size: 13px; line-height: 1.6; margin: 8px 0; }
+.owner-console .opd-connectors h5 { font-size: 15px; margin: 0 0 10px; }
+.owner-console .opd-connectors small { display: block; color: var(--owner-muted); margin-top: 8px; overflow-wrap: anywhere; }
+.owner-console .opd-integrations > a { display: inline-flex; align-items: center; margin-top: 16px; min-height: 44px; }
+.owner-console .opd-filters select:focus-visible, .owner-console .opd-chart summary:focus-visible, .owner-console .opd-table-scroll:focus-visible { outline: 2px solid var(--owner-accent); outline-offset: 3px; }
 .owner-console .owner-push-header { flex-wrap: wrap; }
 .owner-console .owner-push-header .oc-button { min-height: 44px; }
 .owner-console .owner-push-body { display: grid; gap: 18px; padding: 20px; color: var(--owner-ink); }
@@ -47,6 +76,8 @@
   .owner-console .owner-push-body { padding: 16px; }
   .owner-console .owner-push-header .oc-button { width: 100%; }
   .owner-console .owner-push-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+  .owner-console .owner-push-metrics.opd-highlights { grid-template-columns: minmax(0,1fr); }
+  .owner-console .owner-push-metrics dd { overflow-wrap: anywhere; }
   .owner-console .owner-push-metrics > div { padding: 12px; }
   .owner-console .owner-push-times { grid-template-columns: minmax(0,1fr); }
   .owner-console .owner-push-recent li { grid-template-columns: minmax(0,1fr); gap: 6px; }
