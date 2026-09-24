@@ -22,4 +22,11 @@ Testes cobrem envio no runtime Workers, criptografia real, redirecionamentos, or
 
 A confirmação física da faixa de notificação depende de novo teste no celular do proprietário. Os testes automatizados não provam exibição no sistema operacional. A orientação é atualizar/reabrir o PWA, verificar a ativação em “Avisos neste celular” e enviar uma mensagem nova mantendo o destinatário conectado e fora da conversa. Conversas abertas podem ser marcadas como lidas antes do envio, cancelando corretamente o aviso.
 
-Publicação e validação completa serão registradas após o deploy.
+## Publicação e validação
+
+- Sites **304**, commit `38fc03a08b2fe23b32209c17580477a11ecf7346`; deploy `appgdep_6ab49b2d28d88191b309d58f2102f122` concluído em 24/09/2026 às 00h38 (Brasília).
+- URL: https://adote-gestao.da0602766.chatgpt.site
+- **489 testes aprovados**; build Worker/artefato Sites aprovado; TypeScript limpo; lint sem erros, com 86 avisos preexistentes combinados.
+- A primeira execução da validação detectou a tipagem opcional de `results` do D1. Corrigida no commit final antes do build, que passou com esse código. TypeScript e suíte foram revalidados, inclusive pelo modo rápido do script de publicação; nenhum código mudou após o build aprovado.
+- Pós-publicação: home HTTP 200, chat sem sessão HTTP 401 e resolução push sem sessão HTTP 401. O artefato compilado inclui o novo fluxo do chat.
+- Não foram enviadas mensagens a usuários reais nem alteradas permissões dos celulares. Recebimento físico permanece para homologação pelo proprietário com uma nova mensagem, fora da conversa no aparelho destinatário.
