@@ -3138,3 +3138,21 @@ export const assinaturasComunidade=sqliteTable('assinaturas_comunidade',{
  fundamento:text('fundamento').notNull(),referencia:text('referencia').notNull().default(''),aprovadoPor:integer('aprovado_por').notNull().references(()=>usuarios.id),
  iniciaEm:text('inicia_em').notNull().default(sql`CURRENT_TIMESTAMP`),terminaEm:text('termina_em'),atualizadoEm:text('atualizado_em').notNull().default(sql`CURRENT_TIMESTAMP`),
 });
+
+// Reset metadata contains no copied user records. Encrypted payloads live in chunks.
+export const platformResetControl = sqliteTable('platform_reset_control', {
+  id: integer('id').primaryKey(), challengeHash: text('challenge_hash'), ownerId: integer('owner_id'),
+  expiresAt: integer('expires_at').notNull().default(0), summary: text('summary'), generation: integer('generation').notNull().default(0),
+});
+export const platformResetGuard = sqliteTable('platform_reset_guard', { ok: integer('ok').notNull() });
+export const platformResetHistory = sqliteTable('platform_reset_history', {
+  id: text('id').primaryKey(), mode: text('mode').notNull(), createdAt: text('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+  ownerId: integer('owner_id').notNull(), summary: text('summary').notNull(), archiveIv: text('archive_iv'), archiveBytes: integer('archive_bytes').notNull().default(0),
+});
+export const platformResetChunks = sqliteTable('platform_reset_chunks', {
+  resetId: text('reset_id').notNull().references(() => platformResetHistory.id, { onDelete: 'cascade' }),
+  part: integer('part').notNull(), ciphertext: text('ciphertext').notNull(),
+}, table => [uniqueIndex('platform_reset_chunks_unique').on(table.resetId, table.part)]);
+export const platformResetFiles = sqliteTable('platform_reset_files', {
+  objectKey: text('object_key').primaryKey(), resetId: text('reset_id').notNull().references(() => platformResetHistory.id), disposition: text('disposition').notNull(),
+});

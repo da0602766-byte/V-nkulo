@@ -6,8 +6,12 @@ migração nova, leia isto.
 
 ## Próximo número livre
 
-**`0080`**. Use o próximo inteiro disponível a partir daí — não reaproveite
+**`0081`**. Use o próximo inteiro disponível a partir daí — não reaproveite
 um número já usado, mesmo que o arquivo tenha sido escrito à mão.
+
+`0080_platform_reset.sql` cria somente estruturas de controle e arquivo protegido.
+Não apaga nem arquiva nenhum dado durante a migração. A reinicialização exige
+ação explícita e reautenticação do Proprietário; veja `docs/REINICIAR_PLATAFORMA.md`.
 
 `0079_controlled_onboarding.sql` adiciona identidade CPF por HMAC, solicitações
 LOG1, catálogo de planos, links de contratação e assinaturas. Não altera contas

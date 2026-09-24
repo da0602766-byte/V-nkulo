@@ -16,6 +16,7 @@ const OwnerLaboratoryWorkspace = dynamic(() => import("./OwnerLaboratoryWorkspac
 const OwnerAppearanceWorkspace = dynamic(() => import("./OwnerAppearanceWorkspace"), { loading: () => <p className="oc-loading" role="status">Carregando área…</p> });
 const PlatformPlansWorkspace = dynamic(() => import("./CommercialPlansWorkspace"), { loading: () => <p className="oc-loading" role="status">Carregando área…</p> });
 const OwnerOnboardingWorkspace = dynamic(() => import('./OwnerOnboardingWorkspace'));
+const OwnerResetWorkspace = dynamic(() => import('./OwnerResetWorkspace'));
 import type { OwnerOperationsScreen } from "./OwnerOperationsWorkspace";
 const OwnerOperationsWorkspace = dynamic(() => import("./OwnerOperationsWorkspace"), { loading: () => <p role="status">Carregando área…</p> });
 const OwnerIntegrationsWorkspace = dynamic(() => import("./OwnerIntegrationsWorkspace"), { loading: () => <p role="status">Carregando integrações…</p> });
@@ -467,6 +468,7 @@ export default function OwnerWorkspace({
           {tab === "appearance" && <OwnerAppearanceWorkspace />}
           {tab === "plans" && <PlatformPlansWorkspace />}
           {tab === 'onboarding' && <OwnerOnboardingWorkspace />}
+          {tab === 'reset' && <OwnerResetWorkspace onReset={() => void load(true)} />}
           {tab === "controls" && <PlatformControlsWorkspace features={features} currentCommunityId={currentCommunityId} />}
       </OwnerConsoleShell>
       <GlobalVisualEditor canEdit communityName="Área do Proprietário" screenId={`owner:${tab}`} rootSelector=".owner-console" />
@@ -704,6 +706,7 @@ function tabDescription(tab: OwnerTab) {
     overview: "Indicadores, decisões e governança em uma visão clara.",
     requests: "Revise os dados e as abas antes de criar cada comunidade.",
     onboarding: 'Analise solicitações LOG1, propostas e ativações de comunidades.',
+    reset: 'Reinicie os dados operacionais, preservando seu acesso de Proprietário.',
     communities: "Acompanhe status, responsáveis, membros e acesso integral.",
     users: "Consulte pessoas, vínculos e perfis globais.",
     audit: "Investigue ações, resultados e contexto de segurança.",

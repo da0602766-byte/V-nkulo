@@ -64,6 +64,7 @@ function relevantCatalogMutation(pathname: string, method: string) {
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+    const resetRequest = url.pathname === '/api/proprietario/reset';
     const blockedRequest = validateApiRequest(request, url);
     if (blockedRequest) {
       return withSecurityHeaders(blockedRequest, url.pathname);
@@ -83,7 +84,7 @@ const worker = {
       }
 
       if (
-        url.pathname !== "/api/proprietario/otimizacao" &&
+        !resetRequest && url.pathname !== "/api/proprietario/otimizacao" &&
         Date.now() >= nextOptimizerCheckAt
       ) {
         nextOptimizerCheckAt = Date.now() + OPTIMIZER_CHECK_INTERVAL_MS;
@@ -95,13 +96,14 @@ const worker = {
       // app/lib/chat-retention.ts), então roda fora do otimizador
       // configurável acima e em toda requisição (a própria função se
       // limita a checar o banco uma vez a cada poucos minutos).
-      ctx.waitUntil(
+      if (!resetRequest) ctx.waitUntil(
         purgeExpiredPrivateMessagesIfDue(env.DB).catch(() => undefined),
       );
 
       const response = await runWithRuntimeEnv({ ...env, executionContext: ctx }, () =>
         handler.fetch(request, env, ctx),
       );
+      if (resetRequest) return withSecurityHeaders(response, url.pathname);
       const now = Date.now();
       if (now >= nextAccessCleanupAt && env.DB) {
         nextAccessCleanupAt = now + 10 * 60_000;

@@ -11,6 +11,10 @@ export async function GET(
   }
   const bucket = getRuntimeEnv().BUCKET;
   if (!bucket) return new Response("Armazenamento indisponível.", { status: 503 });
+  const db = getRuntimeEnv().DB;
+  if (db && await db.prepare('SELECT 1 FROM platform_reset_files WHERE object_key=? LIMIT 1').bind(key).first()) {
+    return new Response('Imagem não encontrada.', { status: 404, headers: { 'Cache-Control': 'no-store' } });
+  }
   const object = await bucket.get(key);
   if (!object) return new Response("Imagem não encontrada.", { status: 404 });
   const download = new URL(request.url).searchParams.get("download") === "1";

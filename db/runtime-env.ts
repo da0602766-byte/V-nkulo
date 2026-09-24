@@ -1,6 +1,9 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 
 export type R2BucketBinding = {
+  list?(options?: { cursor?: string; limit?: number }): Promise<{
+    objects: { key: string }[]; truncated: boolean; cursor?: string;
+  }>;
   put(
     key: string,
     value: ReadableStream | ArrayBuffer | Blob,

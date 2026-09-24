@@ -18,6 +18,7 @@ export type OwnerTab =
   | "decisions"
   | "requests"
   | "onboarding"
+  | "reset"
   | "communities"
   | "users"
   | "audit"
@@ -45,6 +46,7 @@ export const TABS: { id: OwnerTab; label: string }[] = [
   { id: "decisions", label: "Pendências" },
   { id: "requests", label: "Solicitações" },
   { id: "onboarding", label: "LOG1 e contratação" },
+  { id: "reset", label: "Reiniciar plataforma" },
   { id: "communities", label: "Comunidades" },
   { id: "users", label: "Pessoas" },
   { id: "audit", label: "Segurança e auditoria" },
@@ -71,7 +73,7 @@ export const OWNER_NAV_SECTIONS: { id: string; label: string; items: OwnerTab[] 
   { id: "operation", label: "Operação", items: ["onboarding", "communities", "users", "finance", "statistics"] },
   { id: "reliability", label: "Confiabilidade", items: ["performance", "realtime", "audit"] },
   { id: "platform", label: "Plataforma", items: ["controls", "appearance", "plans", "editorial", "optimization"] },
-  { id: "system", label: "Sistema", items: ["integrations", "publication", "laboratory"] },
+  { id: "system", label: "Sistema", items: ["integrations", "publication", "laboratory", "reset"] },
 ];
 
 function OwnerSectionIcon({ section }: { section: string }) {
