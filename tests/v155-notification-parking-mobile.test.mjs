@@ -38,7 +38,7 @@ test("public mobile header is compact and install prompt is browser-driven", asy
     read("app/components/MobileAppInstall.tsx"),
     read("app/globals.css"),
   ]);
-  assert.match(header, /<ThemeControl compact cycle \/>/);
+  assert.match(header, /<ThemeControl compact cycle storageId=\{user\?\.email\} \/>/);
   assert.match(theme, /theme-control-cycle/);
   assert.match(install, /if \(isAppleMobile\(\)\) setVisible\(true\)/);
   assert.match(install, /beforeinstallprompt[\s\S]*setVisible\(true\)/);

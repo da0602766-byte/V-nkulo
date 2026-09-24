@@ -1,5 +1,5 @@
 import { getD1 } from "../../db";
-import { parseCommunityTheme } from "./community-theme";
+import { parseCommunityTheme, type CommunityPaletteId } from "./community-theme";
 
 export type PublicCommunity = {
   id: number;
@@ -13,6 +13,7 @@ export type PublicCommunity = {
   eventosPublicos: number;
   logoUrl: string;
   bannerUrl: string;
+  paletteId: CommunityPaletteId;
 };
 
 export type PublicCommunityEvent = {
@@ -379,6 +380,7 @@ function mapCommunity(row: CommunityRow): PublicCommunity {
     eventosPublicos: Number(row.eventos_publicos || 0),
     logoUrl: theme.logoUrl,
     bannerUrl: theme.bannerUrl,
+    paletteId: theme.paletteId,
   };
 }
 

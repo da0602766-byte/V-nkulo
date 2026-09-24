@@ -2,15 +2,17 @@
 
 import Link from "./StableLink";
 import dynamic from "next/dynamic";
-import { type CSSProperties, FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PilotFeatureState } from "../lib/pilot-data";
 import type { TenantContext, TenantMembership } from "../lib/tenant";
 import {
   getCommunityPalette,
+  communityThemeStyle,
   type CommunityTheme,
 } from "../lib/community-theme";
 import type { CommunityManagementView } from "./CommunityAdminWorkspace";
 import CommunityHome from "./CommunityHome";
+import useFeedDialog from "./feed/useFeedDialog";
 import GlobalVisualEditor from "./GlobalVisualEditorLazy";
 import PilotNotificationCenter, {
   type NotificationUnreadSummary,
@@ -262,6 +264,8 @@ export default function PilotDashboard({
   const [inviteLink, setInviteLink] = useState("");
   const [inviteLoading, setInviteLoading] = useState(false);
   const [communityInfoOpen, setCommunityInfoOpen] = useState(false);
+  const closeCommunityInfo = useCallback(() => setCommunityInfoOpen(false), []);
+  useFeedDialog(communityInfoOpen ? "community-info" : "", closeCommunityInfo, ".community-info-dialog");
   const [communityProfile, setCommunityProfile] =
     useState<CommunityProfile | null>(null);
   const [communityInfoLoading, setCommunityInfoLoading] = useState(false);
@@ -953,26 +957,7 @@ export default function PilotDashboard({
       data-visual-editor-root
       data-editor-key="painel"
       style={{
-        "--community-light-bg": communityPalette.light.background,
-        "--community-light-surface": communityPalette.light.surface,
-        "--community-light-surface-2": communityPalette.light.surface2,
-        "--community-light-text": communityPalette.light.text,
-        "--community-light-muted": communityPalette.light.muted,
-        "--community-light-line": communityPalette.light.line,
-        "--community-light-primary": communityPalette.light.primary,
-        "--community-light-secondary": communityPalette.light.secondary,
-        "--community-light-accent": communityPalette.light.accent,
-        "--community-light-shadow": communityPalette.light.shadow,
-        "--community-dark-bg": communityPalette.dark.background,
-        "--community-dark-surface": communityPalette.dark.surface,
-        "--community-dark-surface-2": communityPalette.dark.surface2,
-        "--community-dark-text": communityPalette.dark.text,
-        "--community-dark-muted": communityPalette.dark.muted,
-        "--community-dark-line": communityPalette.dark.line,
-        "--community-dark-primary": communityPalette.dark.primary,
-        "--community-dark-secondary": communityPalette.dark.secondary,
-        "--community-dark-accent": communityPalette.dark.accent,
-        "--community-dark-shadow": communityPalette.dark.shadow,
+        ...communityThemeStyle(communityTheme.paletteId),
         ...(communityTheme.wallpaperUrl
           ? {
               "--community-wallpaper-image": `url("${communityTheme.wallpaperUrl}")`,

@@ -6,6 +6,8 @@ import PublicIcon from "../../components/PublicIcon";
 import PublicEventRegistration from "../../components/PublicEventRegistration";
 import PublicCellRequest from "../../components/PublicCellRequest";
 import { getSessionUser } from "../../lib/local-auth";
+import { communityThemeStyle } from "../../lib/community-theme";
+import Link from "../../components/StableLink";
 import {
   getCommunityJoinState,
   getPublicCommunityBySlug,
@@ -50,8 +52,9 @@ export default async function PublicCommunityPage({
     getCommunityJoinState(user?.id || null, community.id),
   ]);
   return (
-    <main className="vinkulo-site public-community social-public-community" data-ui-version="v2">
+    <main className="vinkulo-site public-community social-public-community" data-ui-version="v2" data-community-palette={community.paletteId.toLowerCase()} style={communityThemeStyle(community.paletteId)}>
       <PublicHeader />
+      <nav className="community-profile-back" aria-label="Voltar da página da comunidade"><Link href={joinState.isMember ? "/painel" : "/comunidades"}>← {joinState.isMember ? "Voltar à minha comunidade" : "Ver comunidades"}</Link></nav>
       <section className="community-profile-shell">
         <div
           className={`community-profile-cover ${community.bannerUrl ? "has-image" : ""}`}

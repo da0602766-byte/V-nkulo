@@ -64,7 +64,7 @@ export default async function PublicHeader({
               <button type="submit">Buscar</button>
             </form>
           </details>
-          <ThemeControl compact cycle />
+          <ThemeControl compact cycle storageId={user?.email} />
           {canEdit && (
             <span
               id="global-editor-toolbar-slot"

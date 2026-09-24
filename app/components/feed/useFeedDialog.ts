@@ -1,11 +1,11 @@
 import { useEffect } from "react";
 
 /** Focus and scroll belong to the active portal, including when switching edit/actions. */
-export default function useFeedDialog(key: string, close: () => void) {
+export default function useFeedDialog(key: string, close: () => void, selector = "[data-feed-dialog]") {
   useEffect(() => {
     if (!key) return;
     const previous = document.activeElement as HTMLElement | null;
-    const dialog = document.querySelector<HTMLElement>("[data-feed-dialog]");
+    const dialog = document.querySelector<HTMLElement>(selector);
     if (!dialog) return;
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -28,5 +28,5 @@ export default function useFeedDialog(key: string, close: () => void) {
       document.removeEventListener("keydown", handleKey);
       if (previous?.isConnected) previous.focus({ preventScroll: true });
     };
-  }, [key, close]);
+  }, [key, close, selector]);
 }

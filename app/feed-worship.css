@@ -1,22 +1,18 @@
 /* Feed Worship: a separate visual composition, sharing the existing actions and data.
    Shell overrides apply only while the feed is selected; other workspaces keep their theme. */
 .pilot-dashboard[data-ui-version="v2"][data-feed-design="worship"] {
-  --w-bg: #f7f5fb;
-  --w-surface: #fff;
-  --w-ink: #231735;
-  --w-muted: #746780;
-  --w-line: #ebe6f2;
-  --w-violet: #6530c8;
-  --w-soft: #efe9fc;
+  --w-bg: var(--community-bg);
+  --w-surface: var(--community-surface);
+  --w-ink: var(--community-text);
+  --w-muted: var(--community-muted);
+  --w-line: var(--community-line);
+  --w-violet: var(--community-link);
+  --w-soft: var(--community-soft);
   --feed-violet: var(--w-violet);
   --feed-line: var(--w-line);
   --feed-soft: var(--w-soft);
   background: var(--w-bg) !important;
   color: var(--w-ink);
-}
-html[data-theme="dark"] .pilot-dashboard[data-feed-design="worship"] {
-  --w-bg: #18131f; --w-surface: #231c2d; --w-ink: #f5eefc;
-  --w-muted: #b9adc9; --w-line: #3b304a; --w-violet: #ba93ff; --w-soft: #39284f;
 }
 .pilot-dashboard[data-ui-version="v2"][data-feed-design="worship"] .pilot-dashboard-layout { background: var(--w-bg) !important; }
 .pilot-dashboard[data-ui-version="v2"][data-feed-design="worship"] .pilot-workspace {
@@ -44,15 +40,15 @@ html[data-theme="dark"] .pilot-dashboard[data-feed-design="worship"] {
   min-height: 44px; border-radius: 9px !important; font-weight: 550;
 }
 .pilot-dashboard[data-ui-version="v2"][data-feed-design="worship"] .pilot-sidebar nav :is(button, a):hover { background: var(--w-soft) !important; color: var(--w-violet) !important; }
-.pilot-dashboard[data-ui-version="v2"][data-feed-design="worship"] .pilot-sidebar nav button.active { background: var(--w-violet) !important; color: var(--w-surface) !important; }
+.pilot-dashboard[data-ui-version="v2"][data-feed-design="worship"] .pilot-sidebar nav button.active { background: var(--community-primary) !important; color: var(--community-on-primary) !important; }
 .pilot-dashboard[data-feed-design="worship"] .pilot-sidebar-icon { background: transparent !important; }
 .pilot-dashboard[data-feed-design="worship"] .pilot-sidebar-group > h2 { color: var(--w-muted) !important; }
 .pilot-dashboard[data-feed-design="worship"] .pilot-sidebar-note { border: 0; padding: 8px; margin-top: 0; }
-.worship-sidebar-art { position: relative; overflow: hidden; isolation: isolate; padding: 26px 20px; min-height: 255px; border-radius: 14px 14px 38px 14px; background: linear-gradient(145deg, #3d1c8c, #8152b2); color: white; }
+.worship-sidebar-art { position: relative; overflow: hidden; isolation: isolate; padding: 26px 20px; min-height: 255px; border-radius: 14px 14px 38px 14px; background: var(--community-primary); color: var(--community-on-primary); }
 .worship-sidebar-art p { margin: 20px 0; font: 30px/1.08 Georgia, serif; letter-spacing: -.8px; }
-.worship-sidebar-art em { color: #e8d8ff; }
+.worship-sidebar-art em { color: inherit; }
 .worship-sidebar-art small { font-size: 10px; line-height: 1.6; letter-spacing: .5px; }
-.worship-sidebar-art > span { position: absolute; z-index: -1; right: 26px; top: 68px; width: 7px; height: 75px; background: #d8b7ff; opacity: .4; transform: rotate(-8deg); }
+.worship-sidebar-art > span { position: absolute; z-index: -1; right: 26px; top: 68px; width: 7px; height: 75px; background: currentColor; opacity: .4; transform: rotate(-8deg); }
 .worship-sidebar-art > span::after { content: ""; position: absolute; top: 18px; left: -16px; width: 39px; height: 7px; background: inherit; }
 [data-sidebar-collapsed="true"] .worship-sidebar-art { display: none; }
 
@@ -82,7 +78,7 @@ html[data-theme="dark"] .pilot-dashboard[data-feed-design="worship"] {
 .worship-highlights > header > span { color: var(--w-violet); }
 .worship-stories { display: flex; gap: 14px; overflow-x: auto; padding: 4px 2px 6px; scrollbar-width: thin; overscroll-behavior-inline: contain; }
 .worship-story { flex: 0 0 70px; display: flex; flex-direction: column; gap: 7px; align-items: center; border: 0; padding: 0; background: none; color: var(--w-ink); }
-.worship-story-ring { display: grid; place-items: center; width: 66px; height: 66px; padding: 2px; border-radius: 50%; background: conic-gradient(#6530c8, #b887e8, #dfb8a3, #6530c8); transition: transform .18s; }
+.worship-story-ring { display: grid; place-items: center; width: 66px; height: 66px; padding: 2px; border-radius: 50%; background: conic-gradient(var(--community-primary), var(--community-accent), var(--community-soft), var(--community-primary)); transition: transform .18s; }
 .worship-story-ring > img, .worship-story-initial { display: grid; place-items: center; width: 62px; height: 62px; border: 3px solid var(--w-surface); border-radius: 50%; object-fit: cover; background: var(--w-soft); color: var(--w-violet); font: 24px Georgia, serif; }
 .worship-story > span:last-child { max-width: 72px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
 .worship-story-create .worship-story-ring { background: var(--w-soft); color: var(--w-violet); }
@@ -227,7 +223,7 @@ html[data-theme="dark"] [data-feed-dialog] :is(input, textarea, select) { backgr
   .pilot-dashboard[data-ui-version="v2"][data-feed-design="worship"] nav.pilot-mobile-nav { position: fixed !important; z-index: 60 !important; }
   .pilot-dashboard[data-ui-version="v2"][data-feed-design="worship"] .pilot-mobile-nav-icon { background: transparent !important; box-shadow: none !important; color: inherit !important; }
   .pilot-dashboard[data-ui-version="v2"][data-feed-design="worship"] .pilot-mobile-nav > button.active { color: var(--w-violet) !important; background: var(--w-soft) !important; }
-  .pilot-dashboard[data-ui-version="v2"][data-feed-design="worship"] .pilot-mobile-create-icon { background: #6530c8 !important; color: white !important; border-radius: 50%; box-shadow: none !important; }
+  .pilot-dashboard[data-ui-version="v2"][data-feed-design="worship"] .pilot-mobile-create-icon { background: var(--community-primary) !important; color: var(--community-on-primary) !important; border-radius: 50%; box-shadow: none !important; }
   .worship-welcome h1 { font-size: 30px; }
 }
 @media (max-width: 680px) {

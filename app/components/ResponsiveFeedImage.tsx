@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import FeedImageLightbox from "./feed/FeedImageLightbox";
 
 export default function ResponsiveFeedImage({
   src,
@@ -22,6 +23,7 @@ export default function ResponsiveFeedImage({
   const [dataSaver, setDataSaver] = useState(false);
   const [requestedLoad, setRequestedLoad] = useState(false);
   const [preferenceReady, setPreferenceReady] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   useEffect(() => {
     const sync = () => {
@@ -70,6 +72,7 @@ export default function ResponsiveFeedImage({
       ) : (
         <>
           <span className="feed-image-placeholder" aria-hidden="true" />
+          <button type="button" className="feed-image-preview" onClick={() => setLightboxOpen(true)} aria-label={`Ampliar imagem: ${alt || "publicação"}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={optimizedSource}
@@ -87,10 +90,11 @@ export default function ResponsiveFeedImage({
             onLoad={() => setLoaded(true)}
             onError={() => setFailed(true)}
           />
+          </button>
         </>
       )}
       <div className="feed-image-attachment-actions">
-        {presentation === "photo" && showImage && !failed ? <a href={src} target="_blank" rel="noreferrer">Abrir imagem</a> : (
+        {presentation === "photo" && showImage && !failed ? <button type="button" onClick={() => setLightboxOpen(true)}>Ampliar imagem</button> : (
         <button
           type="button"
           onClick={() => {
@@ -105,6 +109,7 @@ export default function ResponsiveFeedImage({
           Baixar imagem
         </a>
       </div>
+      {lightboxOpen && <FeedImageLightbox src={src} alt={alt} onClose={() => setLightboxOpen(false)} />}
     </figure>
   );
 }

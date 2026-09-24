@@ -1,4 +1,6 @@
 
+import type { CSSProperties } from "react";
+
 export type CommunityPaletteId =
   | "NEUTRO"
   | "CLASSICO"
@@ -348,6 +350,32 @@ export function getCommunityPalette(id: CommunityPaletteId) {
     COMMUNITY_PALETTES.find((palette) => palette.id === DEFAULT_COMMUNITY_THEME.paletteId) ||
     COMMUNITY_PALETTES[0]
   );
+}
+
+function luminance(hex: string) {
+  const rgb = hex.replace("#", "").match(/.{2}/g)!.map((part) => {
+    const value = parseInt(part, 16) / 255;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+}
+
+/** Shared by internal and public surfaces; no database or browser dependency. */
+export function communityThemeStyle(id: CommunityPaletteId): CSSProperties {
+  const palette = getCommunityPalette(id);
+  const variables: Record<string, string> = {};
+  for (const mode of ["light", "dark"] as const) {
+    const tokens = palette[mode];
+    for (const [name, value] of Object.entries(tokens)) {
+      const key = name === "background" ? "bg" : name === "surface2" ? "surface-2" : name;
+      variables[`--community-${mode}-${key}`] = value;
+    }
+    const primary = luminance(tokens.primary);
+    const surface = luminance(tokens.surface);
+    variables[`--community-${mode}-on-primary`] = primary > 0.179 ? "#000000" : "#ffffff";
+    variables[`--community-${mode}-link`] = (Math.max(primary, surface) + 0.05) / (Math.min(primary, surface) + 0.05) >= 4.5 ? tokens.primary : tokens.text;
+  }
+  return variables as CSSProperties;
 }
 
 function assetUrl(value: unknown) {

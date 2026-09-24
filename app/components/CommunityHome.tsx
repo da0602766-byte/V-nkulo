@@ -1131,13 +1131,15 @@ export default function CommunityHome({
                               type="button"
                               disabled={scheduleWorkingId === schedule.id}
                               onClick={() => void respondToSchedule(schedule.id, "CONFIRMADA")}
-                            >Confirmar minha presença</button>
+                              aria-label="Confirmar minha presença"
+                            >Confirmar presença</button>
                             <button
                               type="button"
                               className="secondary"
                               disabled={scheduleWorkingId === schedule.id}
                               onClick={() => void respondToSchedule(schedule.id, "INDISPONIVEL")}
-                            >Não poderei participar</button>
+                              aria-label="Não poderei participar"
+                            >Não poderei ir</button>
                             <button
                               type="button"
                               className="secondary"

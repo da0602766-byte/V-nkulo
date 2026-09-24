@@ -1,0 +1,160 @@
+/* A single community palette for internal and public surfaces, in both modes. */
+[data-community-palette] {
+  --community-bg: var(--community-light-bg);
+  --community-surface: var(--community-light-surface);
+  --community-soft: var(--community-light-surface-2);
+  --community-text: var(--community-light-text);
+  --community-muted: var(--community-light-muted);
+  --community-line: var(--community-light-line);
+  --community-primary: var(--community-light-primary);
+  --community-accent: var(--community-light-accent);
+  --community-link: var(--community-light-link);
+  --community-on-primary: var(--community-light-on-primary);
+}
+html[data-theme="dark"] [data-community-palette] {
+  --community-bg: var(--community-dark-bg);
+  --community-surface: var(--community-dark-surface);
+  --community-soft: var(--community-dark-surface-2);
+  --community-text: var(--community-dark-text);
+  --community-muted: var(--community-dark-muted);
+  --community-line: var(--community-dark-line);
+  --community-primary: var(--community-dark-primary);
+  --community-accent: var(--community-dark-accent);
+  --community-link: var(--community-dark-link);
+  --community-on-primary: var(--community-dark-on-primary);
+}
+html[data-theme] .pilot-dashboard[data-ui-version="v2"][data-community-palette],
+html[data-theme] .social-public-community[data-ui-version="v2"][data-community-palette] {
+  --bg: var(--community-bg); --surface: var(--community-surface); --ink: var(--community-text);
+  --muted: var(--community-muted); --line: var(--community-line); --violet: var(--community-primary);
+  --pilot-bg: var(--community-bg); --pilot-surface: var(--community-surface); --pilot-surface-opaque: var(--community-surface);
+  --pilot-surface-2: var(--community-soft); --pilot-text: var(--community-text); --pilot-muted: var(--community-muted);
+  --pilot-line: var(--community-line); --pilot-primary: var(--community-primary); --pilot-purple: var(--community-primary);
+  --v2-bg: var(--community-bg); --v2-surface: var(--community-surface); --v2-surface-subtle: var(--community-soft);
+  --v2-ink: var(--community-text); --v2-text: var(--community-text); --v2-muted: var(--community-muted);
+  --v2-line: var(--community-line); --v2-blue: var(--community-primary); --v2-accent: var(--community-accent);
+  background: var(--community-bg) !important; color: var(--community-text);
+}
+html[data-theme] .pilot-dashboard[data-ui-version="v2"][data-community-palette] :is(.pilot-topbar,.pilot-sidebar,.pilot-mobile-nav),
+html[data-theme] .social-public-community[data-ui-version="v2"][data-community-palette] :is(.vinkulo-header,.public-mobile-nav) {
+  background: var(--community-surface) !important; color: var(--community-text) !important; border-color: var(--community-line) !important;
+}
+html[data-theme] .pilot-dashboard[data-ui-version="v2"][data-community-palette] .pilot-mobile-nav > button,
+html[data-theme] .social-public-community[data-ui-version="v2"][data-community-palette] .public-mobile-nav > a { color: var(--community-muted) !important; }
+html[data-theme] .pilot-dashboard[data-ui-version="v2"][data-community-palette] .pilot-mobile-nav > button.active,
+html[data-theme] .social-public-community[data-ui-version="v2"][data-community-palette] .public-mobile-nav > a.active { background: var(--community-soft) !important; color: var(--community-link) !important; }
+html[data-theme] .pilot-dashboard[data-ui-version="v2"][data-community-palette] .pilot-mobile-create-icon,
+html[data-theme] .social-public-community[data-ui-version="v2"][data-community-palette] .create-community-shortcut > span {
+  background: var(--community-primary) !important; color: var(--community-on-primary) !important;
+}
+html[data-theme] .pilot-dashboard[data-ui-version="v2"][data-community-palette] .pilot-sidebar nav button.active,
+html[data-theme] .pilot-dashboard[data-ui-version="v2"][data-community-palette] .worship-publish { background: var(--community-primary) !important; color: var(--community-on-primary) !important; }
+
+/* Preview height is bounded independently of the uploaded photo's orientation. */
+html[data-theme] .pilot-dashboard[data-ui-version="v2"] .feed-responsive-image .feed-image-preview {
+  position: relative; display: block; width: 100%; max-width: 100%; min-width: 0; min-height: 0;
+  height: auto; max-height: min(420px, 52dvh); padding: 0 !important; margin: 0;
+  border: 0 !important; border-radius: 10px; overflow: hidden; background: var(--pilot-surface-2) !important;
+  cursor: zoom-in; aspect-ratio: var(--photo-ratio, 16 / 9);
+}
+html[data-theme] .pilot-dashboard[data-ui-version="v2"] .feed-responsive-image .feed-image-preview > img {
+  position: static !important; display: block !important; width: 100% !important; max-width: 100% !important;
+  height: 100% !important; max-height: min(420px, 52dvh) !important; object-fit: contain !important;
+  border-radius: 0 !important; margin: 0 !important;
+}
+html[data-theme] .pilot-dashboard[data-ui-version="v2"] .worship-photo-pending { max-height: min(420px, 52dvh); }
+html[data-theme] .pilot-dashboard[data-ui-version="v2"] .worship-photo .feed-image-attachment-actions :is(button,a) { min-height: 44px; background: transparent !important; color: var(--community-link) !important; }
+.feed-image-lightbox[open] {
+  position: fixed; inset: 0; z-index: 10000; display: flex; flex-direction: column; align-items: center; gap: 12px;
+  box-sizing: border-box; width: 100%; max-width: 100%; height: 100dvh; max-height: 100dvh; margin: 0;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  border: 0; border-radius: 0; background: #080b10f5; color: #fff; overflow: hidden; overscroll-behavior: contain;
+}
+.feed-image-lightbox::backdrop { background: #080b10e8; }
+.feed-image-lightbox[open] > header { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 0; background: none; border: 0; color: #fff; font-size: 14px; }
+.feed-image-lightbox[open] > header button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 44px; min-height: 44px; border: 1px solid #ffffff80; border-radius: 10px; padding: 8px 12px; background: #252830; color: #fff; font: inherit; cursor: pointer; }
+.feed-image-lightbox[open] > img { position: static !important; display: block; flex: 1 1 0; min-height: 0; width: 100% !important; max-width: 1400px !important; height: 0 !important; max-height: none !important; object-fit: contain !important; margin: 0 !important; border-radius: 0 !important; }
+.feed-image-lightbox button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+
+/* Reactions remain in the card's document flow, clear of navigation and help. */
+html[data-theme] .pilot-dashboard[data-ui-version="v2"] .worship-post > footer { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 0 8px; }
+.worship-feed .community-reactions { display: contents; }
+.worship-feed .community-reactions-trigger { grid-column: 1; grid-row: 1; justify-self: start; display: flex; align-items: center; gap: 6px; border: 0; background: transparent; border-radius: 8px; padding: 6px 8px; }
+.worship-feed .community-reactions-trigger[aria-expanded="true"] { background: var(--community-soft); }
+.worship-feed .community-post-share { grid-column: 2; grid-row: 1; }
+.worship-feed .community-reaction-summary { grid-column: 1 / -1; grid-row: 2; padding: 0 8px 5px; }
+.worship-feed .community-reaction-summary:empty { display: none; }
+html[data-theme] .pilot-dashboard[data-ui-version="v2"] .worship-feed .community-reaction-picker {
+  grid-column: 1 / -1; grid-row: 3; position: static; inset: auto; width: 100%; max-width: 100%; box-sizing: border-box;
+  grid-template-columns: repeat(4,minmax(0,1fr)); gap: 4px; padding: 6px; margin: 2px 0 8px;
+  border: 1px solid var(--community-line); border-radius: 12px; background: var(--community-soft); box-shadow: none;
+  animation: community-reactions-enter .16s ease-out;
+}
+.worship-feed .community-reaction-picker[hidden] { display: none !important; }
+.worship-feed .community-reaction-picker button { min-width: 0; min-height: 58px; padding: 5px 2px; color: var(--community-text); transition: background .15s; }
+.worship-feed .community-reaction-picker small { white-space: normal; line-height: 1.25; font-size: 10px; }
+.worship-feed .community-reaction-picker button[aria-pressed="true"] { background: var(--community-surface); color: var(--community-link); box-shadow: inset 0 0 0 1px var(--community-primary); }
+.worship-feed .community-reaction-error { grid-column: 1 / -1; grid-row: 4; padding: 8px; }
+@keyframes community-reactions-enter { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+/* Remove the legacy 240px cap and internal scroller, keeping each action visible. */
+html[data-theme] .pilot-dashboard[data-ui-version="v2"] .worship-rail .community-my-schedules { display: grid !important; height: auto !important; min-height: 0 !important; max-height: none !important; overflow: visible !important; gap: 10px; padding: 14px; }
+html[data-theme] .pilot-dashboard[data-ui-version="v2"] .worship-rail .community-my-schedules > header { position: static; min-height: 0; padding: 0 !important; margin: 0 !important; align-items: start; }
+html[data-theme] .pilot-dashboard[data-ui-version="v2"] .worship-rail .community-schedule-list { display: grid; grid-template-columns: minmax(0,1fr); height: auto; max-height: none !important; overflow: visible !important; gap: 8px; }
+html[data-theme] .pilot-dashboard[data-ui-version="v2"] .worship-rail .community-schedule-list > article { display: grid; grid-template-columns: 42px minmax(0,1fr); align-items: start; gap: 10px; min-height: 0; max-height: none; padding: 0 !important; margin: 0; background: transparent !important; border: 0; overflow: visible; }
+html[data-theme] .pilot-dashboard[data-ui-version="v2"] .worship-rail .community-schedule-list time { width: 42px; height: 48px; border-radius: 9px; }
+html[data-theme] .pilot-dashboard[data-ui-version="v2"] .worship-rail .community-schedule-list > article > div:nth-child(2) strong { white-space: normal; overflow-wrap: anywhere; }
+html[data-theme] .pilot-dashboard[data-ui-version="v2"] .worship-rail .community-schedule-actions { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 6px; width: 100%; }
+html[data-theme] .pilot-dashboard[data-ui-version="v2"] .worship-rail .community-schedule-actions button { min-width: 0; min-height: 44px; height: auto; padding: 6px 8px; font-size: 12px; line-height: 1.3; font-weight: 600; border-radius: 8px; }
+html[data-theme] .pilot-dashboard[data-ui-version="v2"] .worship-rail .community-schedule-actions button:first-child { background: var(--community-primary); color: var(--community-on-primary); }
+html[data-theme] .pilot-dashboard[data-ui-version="v2"] .worship-rail .community-schedule-actions button:last-child { grid-column: 1 / -1; }
+html[data-theme] .pilot-dashboard[data-ui-version="v2"] .worship-rail .community-schedule-state { grid-column: 1 / -1; }
+html[data-theme] .pilot-dashboard[data-ui-version="v2"] .worship-rail .community-substitute-picker { position: static !important; inset: auto !important; width: 100%; min-width: 0; max-height: none !important; overflow: visible !important; padding: 12px 0 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; }
+html[data-theme] .pilot-dashboard[data-ui-version="v2"] .worship-rail .community-substitute-picker > div:not(.community-substitute-actions) { grid-template-columns: minmax(0,1fr); }
+
+/* Public identity: photo, title and navigation occupy explicit, non-overlapping rows. */
+html[data-theme] .social-public-community[data-ui-version="v2"] .community-profile-back { width: min(1120px,calc(100% - 40px)); margin: 12px auto 0; }
+.community-profile-back a { display: inline-flex; align-items: center; min-height: 44px; color: var(--community-link); font-size: 13px; text-decoration: none; }
+html[data-theme] .social-public-community[data-ui-version="v2"] .community-profile-shell { margin-top: 8px; background: var(--community-surface); }
+html[data-theme] .social-public-community[data-ui-version="v2"] .community-profile-cover { position: relative; height: auto; min-height: 130px; max-height: none; aspect-ratio: 3 / 1; overflow: hidden; background: var(--community-soft); }
+html[data-theme] .social-public-community[data-ui-version="v2"] .community-profile-cover.has-image img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; max-height: none; object-fit: contain; margin: 0; }
+html[data-theme] .social-public-community[data-ui-version="v2"] .reception-login { background: var(--community-primary) !important; color: var(--community-on-primary) !important; border-color: var(--community-primary) !important; }
+html[data-theme] .social-public-community[data-ui-version="v2"] .community-profile-identity-v120 { align-items: start; padding: 22px; gap: 12px 18px; background: var(--community-surface); }
+html[data-theme] .social-public-community[data-ui-version="v2"] .community-public-avatar { display: grid; place-items: center; width: 70px; height: 70px; margin: 0; flex-shrink: 0; border: 1px solid var(--community-line); background: var(--community-soft); color: var(--community-link); border-radius: 16px; overflow: hidden; }
+html[data-theme] .social-public-community[data-ui-version="v2"] .community-public-avatar img { width: 100%; height: 100%; object-fit: contain; }
+html[data-theme] .social-public-community[data-ui-version="v2"] .community-profile-copy { min-width: 0; }
+html[data-theme] .social-public-community[data-ui-version="v2"] .community-profile-copy h1 { font-size: clamp(23px,3vw,36px); line-height: 1.15; overflow-wrap: anywhere; margin: 4px 0 0; }
+html[data-theme] .social-public-community[data-ui-version="v2"] .pilot-kicker { color: var(--community-link) !important; }
+html[data-theme] .social-public-community[data-ui-version="v2"] .community-profile-description { color: var(--community-muted) !important; font-size: 14px; line-height: 1.6; }
+html[data-theme] .social-public-community[data-ui-version="v2"] .community-profile-quick-info { border-color: var(--community-line); }
+html[data-theme] .social-public-community[data-ui-version="v2"] .community-profile-quick-info dt { color: var(--community-muted); }
+html[data-theme] .social-public-community[data-ui-version="v2"] .community-profile-quick-info dd { color: var(--community-text); overflow-wrap: anywhere; }
+html[data-theme] .social-public-community[data-ui-version="v2"] .public-header-actions :is(summary,.theme-control button,.global-editor-pencil) { color: var(--community-text) !important; background: var(--community-surface) !important; border-color: var(--community-line) !important; }
+html[data-theme] .pilot-dashboard[data-ui-version="v2"] .community-info-dialog { max-height: calc(100dvh - 32px); overflow-y: auto; background: var(--community-surface); color: var(--community-text); }
+html[data-theme] .pilot-dashboard[data-ui-version="v2"] .community-info-dialog > header { position: relative; min-height: 140px; background-color: var(--community-soft); background-size: contain; background-repeat: no-repeat; background-position: center; }
+html[data-theme] .pilot-dashboard[data-ui-version="v2"] .community-info-dialog > header > button { position: absolute; inset: 10px 10px auto auto; display: grid; place-items: center; width: 44px; height: 44px; min-height: 44px; margin: 0; padding: 0; background: var(--community-surface); color: var(--community-text); border: 1px solid var(--community-line); border-radius: 50%; box-shadow: 0 2px 8px #0003; }
+html[data-theme] .pilot-dashboard[data-ui-version="v2"] .community-info-identity { display: grid; grid-template-columns: 56px minmax(0,1fr); align-items: center; gap: 12px; margin: 0; padding: 16px; }
+html[data-theme] .pilot-dashboard[data-ui-version="v2"] .community-info-identity > span { width: 56px; height: 56px; margin: 0; background: var(--community-soft); }
+html[data-theme] .pilot-dashboard[data-ui-version="v2"] .community-info-identity > span img { width: 100%; height: 100%; object-fit: contain; }
+html[data-theme] .pilot-dashboard[data-ui-version="v2"] .community-info-identity h2 { font-size: clamp(20px,4vw,26px); line-height: 1.2; overflow-wrap: anywhere; }
+@media (max-width: 680px) {
+  html[data-theme] .pilot-dashboard[data-ui-version="v2"] .feed-responsive-image .feed-image-preview,
+  html[data-theme] .pilot-dashboard[data-ui-version="v2"] .feed-responsive-image .feed-image-preview > img,
+  html[data-theme] .pilot-dashboard[data-ui-version="v2"] .worship-photo-pending { max-height: min(300px, 42dvh) !important; }
+  html[data-theme] .social-public-community[data-ui-version="v2"] .vinkulo-header { width: 100%; min-height: 64px; padding: 8px 12px; margin: 0; gap: 8px; }
+  html[data-theme] .social-public-community[data-ui-version="v2"] .vinkulo-header .vinkulo-brand { flex: 1 1 auto; min-width: 36px; }
+  html[data-theme] .social-public-community[data-ui-version="v2"] .public-header-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 6px; }
+  html[data-theme] .social-public-community[data-ui-version="v2"] .public-header-actions > :is(details,.theme-control,.global-editor-toolbar-slot) { flex: 0 0 auto; margin: 0; }
+  html[data-theme] .social-public-community[data-ui-version="v2"] .public-header-actions > .theme-control { box-sizing: border-box; width: 44px !important; min-width: 44px !important; max-width: 44px !important; height: 44px; padding: 0 !important; border: 0; }
+  html[data-theme] .social-public-community[data-ui-version="v2"] .public-header-actions :is(summary,.theme-control button,.global-editor-pencil) { box-sizing: border-box; width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 0; border-radius: 12px; margin: 0; }
+  html[data-theme] .social-public-community[data-ui-version="v2"] .public-account-avatar { width: 32px; height: 32px; border-radius: 50%; overflow: hidden; }
+  html[data-theme] .social-public-community[data-ui-version="v2"] .public-account-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  html[data-theme] .social-public-community[data-ui-version="v2"] .community-profile-back { width: calc(100% - 24px); margin-top: 6px; }
+  html[data-theme] .social-public-community[data-ui-version="v2"] .community-profile-cover { min-height: 0; aspect-ratio: 16 / 9; }
+  html[data-theme] .social-public-community[data-ui-version="v2"] .community-profile-identity-v120 { grid-template-columns: 56px minmax(0,1fr); padding: 16px; gap: 12px; }
+  html[data-theme] .social-public-community[data-ui-version="v2"] .community-public-avatar { width: 56px; height: 56px; border-radius: 12px; }
+  html[data-theme] .social-public-community[data-ui-version="v2"] .community-profile-copy .pilot-kicker { font-size: 10px; letter-spacing: .08em; line-height: 1.4; }
+  html[data-theme] .social-public-community[data-ui-version="v2"] .community-profile-quick-info > div { grid-template-columns: minmax(90px,.8fr) minmax(0,1.2fr); gap: 12px; }
+  html[data-theme] .social-public-community[data-ui-version="v2"] .community-profile-quick-info :is(dt,dd) { font-size: 12px; line-height: 1.4; }
+}
+@media (prefers-reduced-motion: reduce) { .worship-feed .community-reaction-picker { animation: none; } }

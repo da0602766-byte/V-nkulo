@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 const REACTIONS = [
   { type: "AMEM", icon: "🙏", label: "Amém" },
@@ -48,6 +48,7 @@ export default function CommunityPostReactions({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [working, setWorking] = useState<ReactionType | null>(null);
   const [error, setError] = useState("");
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const total = useMemo(
     () => Object.values(counts).reduce((sum, count) => sum + count, 0),
@@ -79,6 +80,8 @@ export default function CommunityPostReactions({
       if (!response.ok) throw new Error(payload.error || "Não foi possível registrar a reação.");
       if (payload.contagens) setCounts(payload.contagens);
       if (payload.minhas) setMine(new Set(payload.minhas));
+      setPickerOpen(false);
+      triggerRef.current?.focus({ preventScroll: true });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Não foi possível registrar a reação. Tente novamente.");
       setMine((current) => {
@@ -97,14 +100,26 @@ export default function CommunityPostReactions({
   }
 
   return (
-    <div className="community-reactions" data-open={pickerOpen ? "true" : undefined}>
+    <div className="community-reactions" data-open={pickerOpen ? "true" : undefined} onKeyDown={(event) => {
+      if (event.key === "Escape" && pickerOpen) { event.stopPropagation(); setPickerOpen(false); triggerRef.current?.focus({ preventScroll: true }); }
+    }}>
       <div className="community-reaction-summary" aria-label={total ? `${total} reações` : "Ainda não há reações"}>
         {REACTIONS.filter((reaction) => counts[reaction.type]).slice(0, 3).map((reaction) => (
           <span key={reaction.type} aria-hidden="true">{reaction.icon}</span>
         ))}
         {total > 0 && <small>{total} {total === 1 ? "reação" : "reações"}</small>}
       </div>
-      <div className="community-reaction-picker" role="group" aria-label="Reagir à publicação">
+      <button
+        type="button"
+        ref={triggerRef}
+        className="community-reactions-trigger"
+        aria-expanded={pickerOpen}
+        aria-controls={`reaction-picker-${postId}`}
+        onClick={() => setPickerOpen((open) => !open)}
+      >
+        <span aria-hidden="true">♡</span>{mine.size ? "Reagiu" : "Reagir"}
+      </button>
+      <div id={`reaction-picker-${postId}`} className="community-reaction-picker" role="group" aria-label="Reagir à publicação" hidden={!pickerOpen}>
         {REACTIONS.map((reaction) => (
           <button
             key={reaction.type}
@@ -120,14 +135,6 @@ export default function CommunityPostReactions({
           </button>
         ))}
       </div>
-      <button
-        type="button"
-        className="community-reactions-trigger"
-        aria-expanded={pickerOpen}
-        onClick={() => setPickerOpen((open) => !open)}
-      >
-        <span aria-hidden="true">♡</span>{mine.size ? "Reagiu" : "Reagir"}
-      </button>
       {error && <small className="community-reaction-error" role="alert">{error}</small>}
     </div>
   );
