@@ -49,19 +49,15 @@ test("a tela de conta comprova a permissão concedida ao Drive", async () => {
   assert.match(workspace, /function describeScopes/);
 });
 
-test("o cadastro público abre sessão em vez de devolver ao formulário de login", async () => {
+test("o cadastro público é fechado e o login encaminha interessados ao LOG1", async () => {
   const [route, portal] = await Promise.all([
     read("app/api/auth/cadastro/route.ts"),
-    read("app/components/LoginPortal.tsx"),
+    read("app/components/AccessPortal.tsx"),
   ]);
-  assert.match(route, /attachSessionCookie\(/);
-  assert.match(route, /createSession\(userId\)/);
-  assert.match(route, /redirect: "\/sem-comunidade"/);
-  // O vínculo comunitário continua dependendo de aprovação.
-  assert.match(route, /membershipCreated: false/);
-  assert.match(route, /'LEITURA'/);
-  assert.doesNotMatch(portal, /setMode\("login"\);\s*\n\s*setMessage\(result\.message/);
-  assert.match(portal, /result\.redirect \|\| "\/sem-comunidade"/);
+  assert.match(route, /status:\s*403/);
+  assert.doesNotMatch(route, /createSession|attachSessionCookie|INSERT INTO/);
+  assert.match(portal, /href="\/log1"/);
+  assert.doesNotMatch(portal, /Criar conta|\/api\/auth\/cadastro/);
 });
 
 test("toda ação com o Google termina em um aviso animado", async () => {

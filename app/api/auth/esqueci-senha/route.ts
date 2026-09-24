@@ -1,11 +1,15 @@
+import { normalizeCpf } from '../../../lib/cpf';
+import { privateHash, rateLimit } from '../../../lib/access-security';
 import { getD1 } from "../../../../db";
 import { createResetToken, normalizeEmail } from "../../../lib/local-auth";
 import { notifyUser } from "../../../lib/pilot-notifications";
 
 export async function POST(request: Request) {
-  const { email } = await request.json() as { email?: string };
+  const { email, cpf } = await request.json().catch(()=>({})) as { email?: string; cpf?: string };
+  const document = normalizeCpf(cpf);
+  if (!await rateLimit(request,'recovery',document||normalizeEmail(email),5)) return Response.json({error:'Aguarde 15 minutos para tentar novamente.'},{status:429});
   const db = getD1();
-  const user = await db.prepare("SELECT id, nome, email FROM usuarios WHERE email = ? AND ativo = 1 LIMIT 1").bind(normalizeEmail(email)).first<{ id: number; nome: string; email: string }>();
+  const user = await db.prepare("SELECT u.id,u.nome,u.email FROM usuarios u LEFT JOIN identidades_cpf i ON i.usuario_id=u.id WHERE u.ativo=1 AND ((? != '' AND i.cpf_hash=?) OR (? = '' AND u.email=?)) LIMIT 1").bind(document, document ? await privateHash('cpf',document) : '',String(cpf||''),normalizeEmail(email)).first<{ id: number; nome: string; email: string }>();
   if (user) {
     // Sem isso, qualquer pessoa poderia repetir esta chamada sem parar para um
     // e-mail cadastrado e inundar a liderança responsável com notificações a
@@ -19,7 +23,7 @@ export async function POST(request: Request) {
        LIMIT 1`,
     ).bind(user.id).first<{ id: number }>();
     if (recent) {
-      return Response.json({ ok: true, message: "Se o e-mail estiver cadastrado, a liderança responsável receberá um link seguro para encaminhar. Por privacidade, não confirmamos contas nesta tela." });
+      return Response.json({ ok: true, message: "Se os dados corresponderem a uma conta, a liderança responsável receberá um link seguro para encaminhar. Por privacidade, não confirmamos contas nesta tela." });
     }
     const token = await createResetToken(user.id);
     const resetPath = `/redefinir-senha?token=${encodeURIComponent(token)}`;
@@ -37,11 +41,11 @@ export async function POST(request: Request) {
     await Promise.all(managers.results.map((manager) => notifyUser(db, {
       userId: Number(manager.id),
       title: "Redefinição de acesso solicitada",
-      message: `${user.nome} confirmou o e-mail cadastrado e solicitou um link de redefinição. Abra para encaminhar o acesso seguro.`,
+      message: `${user.nome} solicitou um link de redefinição. Abra para encaminhar o acesso seguro.`,
       entityId: user.id,
       destination: resetPath,
       createdBy: "sistema",
     })));
   }
-  return Response.json({ ok: true, message: "Se o e-mail estiver cadastrado, a liderança responsável receberá um link seguro para encaminhar. Por privacidade, não confirmamos contas nesta tela." });
+  return Response.json({ ok: true, message: "Se os dados corresponderem a uma conta, a liderança responsável receberá um link seguro para encaminhar. Por privacidade, não confirmamos contas nesta tela." });
 }

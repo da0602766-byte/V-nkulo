@@ -1,3 +1,4 @@
+import { cpfLoginRequest } from './helpers/cpf-login.mjs';
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
@@ -32,11 +33,11 @@ function createEnv(d1) {
 
 async function login(worker, env, context, email, senha) {
   const response = await worker.fetch(
-    new Request("http://localhost/api/auth/login", {
+    await cpfLoginRequest(env, new Request("http://localhost/api/auth/login", {
       method: "POST",
       headers: { accept: "text/html", "content-type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ email, senha }),
-    }),
+    })),
     env,
     context,
   );

@@ -1,11 +1,9 @@
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
-import LoginPortal from "../components/LoginPortal";
+import AccessPortal from "../components/AccessPortal";
 import { getSessionUser } from "../lib/local-auth";
 import { getPilotLoginConfig } from "../lib/pilot-login-config";
 import { listTenantMemberships } from "../lib/tenant";
 import { safeRelativeReturnPath } from "../lib/safe-return-path";
-import { googleIntegrationAvailable } from "../lib/google-integration";
 
 export const dynamic = "force-dynamic";
 
@@ -29,22 +27,13 @@ export default async function LoginPage({
   }>;
 }) {
   const params = await searchParams;
+  if (params.modo === 'cadastro') redirect('/log1');
   const returnTo = safeRelativeReturnPath(params.returnTo, "");
   const user = await getSessionUser();
   if (user) {
     if (returnTo) redirect(returnTo);
     const memberships = await listTenantMemberships(user);
     redirect(memberships.length ? "/painel" : "/comunidades?conta=ativa");
-  }
-  const requestHeaders = await headers();
-  const hostname = String(requestHeaders.get("host") || "")
-    .split(":")[0]
-    .toLowerCase();
-  const isLocalPreview =
-    hostname === "127.0.0.1" || hostname === "localhost" || hostname === "[::1]";
-  if (isLocalPreview && params.auto !== "0") {
-    const query = returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : "";
-    redirect(`/api/auth/preview${query}`);
   }
   const config = await getPilotLoginConfig();
   const sessionMessages: Record<string, string> = {
@@ -56,17 +45,13 @@ export default async function LoginPage({
       "Este cadastro não está mais disponível. Fale com o administrador.",
   };
   return (
-    <LoginPortal
+    <AccessPortal
       initialMessage={
         params.erro || sessionMessages[params.motivo || ""] || ""
       }
       siteName={config.siteName}
-      scheduledMessages={[]}
-      maintenance={{ ativa: false, mensagem: "", terminaEm: null }}
-      config={config}
+      logoUrl={config.logoUrl}
       returnTo={returnTo}
-      initialMode={params.modo === "cadastro" && config.cadastroHabilitado !== false ? "cadastro" : "login"}
-      googleAvailable={googleIntegrationAvailable()}
     />
   );
 }

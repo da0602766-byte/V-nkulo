@@ -1,3 +1,4 @@
+import { cpfLoginRequest } from './helpers/cpf-login.mjs';
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
@@ -687,7 +688,7 @@ test("acesso temporário valida pessoa, comunidade, recurso, horário, cancelame
   }
 
   const browserLogin = await worker.fetch(
-    new Request("http://localhost/api/auth/login", {
+    await cpfLoginRequest(env, new Request("http://localhost/api/auth/login", {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
@@ -695,7 +696,7 @@ test("acesso temporário valida pessoa, comunidade, recurso, horário, cancelame
         senha: "Temporario123",
         returnTo: `/acesso/${scaleCancelledAccess.token}`,
       }),
-    }),
+    })),
     env,
     context,
   );
@@ -720,11 +721,11 @@ async function createAccess(worker, env, cookie, scheduleId, body) {
 
 async function login(worker, env, email, senha) {
   const response = await worker.fetch(
-    new Request("http://localhost/api/auth/login", {
+    await cpfLoginRequest(env, new Request("http://localhost/api/auth/login", {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ email, senha }),
-    }),
+    })),
     env,
     context,
   );

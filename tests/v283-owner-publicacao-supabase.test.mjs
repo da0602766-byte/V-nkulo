@@ -1,3 +1,4 @@
+import { cpfLoginRequest } from './helpers/cpf-login.mjs';
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
@@ -11,7 +12,7 @@ async function loadWorker() {
 }
 function env(d1){return {DB:d1,AUTH_SECRET:"segredo-ficticio-do-teste-da-integracao",SYSTEM_OWNER_EMAIL:"owner.supabase@example.test",SYSTEM_OWNER_LOCKED_BEFORE:"2099-01-01T00:00:00.000Z",ASSETS:{fetch:async()=>new Response("Not found",{status:404})}};}
 async function login(worker,runtime,email,password) {
-  const response=await worker.fetch(new Request("http://localhost/api/auth/login",{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded",accept:"text/html"},body:new URLSearchParams({email,senha:password})}),runtime,context);
+  const response=await worker.fetch(await cpfLoginRequest(runtime, new Request("http://localhost/api/auth/login",{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded",accept:"text/html"},body:new URLSearchParams({email,senha:password})})),runtime,context);
   assert.equal(response.status,303);
   const values=typeof response.headers.getSetCookie==="function" ? response.headers.getSetCookie() : [response.headers.get("set-cookie")||""];
   return values.map(value=>value.match(/__Host-adote_session=[^;]+/)?.[0]).find(Boolean);

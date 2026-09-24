@@ -9,8 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function OwnerPage() {
   const session = await getSessionState();
-  if (!session.user) redirect(`/login?motivo=${session.reason}`);
-  if (!session.user.ativo || !session.user.system_owner) redirect("/acesso-negado");
+  if (!session.user?.ativo || !session.user.system_owner) redirect('/proprietario/acesso');
 
   const tenant = await getActiveTenantContext(session.user);
   const currentCommunityId = tenant.context?.comunidadeId || 0;

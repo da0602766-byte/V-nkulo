@@ -14,7 +14,8 @@ const StatisticsWorkspace = dynamic(() => import("./StatisticsWorkspace"), { loa
 const PlatformOptimizerWorkspace = dynamic(() => import("./PlatformOptimizerWorkspace"), { loading: () => <p className="oc-loading" role="status">Carregando área…</p> });
 const OwnerLaboratoryWorkspace = dynamic(() => import("./OwnerLaboratoryWorkspace"), { loading: () => <p className="oc-loading" role="status">Carregando área…</p> });
 const OwnerAppearanceWorkspace = dynamic(() => import("./OwnerAppearanceWorkspace"), { loading: () => <p className="oc-loading" role="status">Carregando área…</p> });
-const PlatformPlansWorkspace = dynamic(() => import("./PlatformPlansWorkspace"), { loading: () => <p className="oc-loading" role="status">Carregando área…</p> });
+const PlatformPlansWorkspace = dynamic(() => import("./CommercialPlansWorkspace"), { loading: () => <p className="oc-loading" role="status">Carregando área…</p> });
+const OwnerOnboardingWorkspace = dynamic(() => import('./OwnerOnboardingWorkspace'));
 import type { OwnerOperationsScreen } from "./OwnerOperationsWorkspace";
 const OwnerOperationsWorkspace = dynamic(() => import("./OwnerOperationsWorkspace"), { loading: () => <p role="status">Carregando área…</p> });
 const OwnerIntegrationsWorkspace = dynamic(() => import("./OwnerIntegrationsWorkspace"), { loading: () => <p role="status">Carregando integrações…</p> });
@@ -465,6 +466,7 @@ export default function OwnerWorkspace({
           {tab === "optimization" && <PlatformOptimizerWorkspace />}
           {tab === "appearance" && <OwnerAppearanceWorkspace />}
           {tab === "plans" && <PlatformPlansWorkspace />}
+          {tab === 'onboarding' && <OwnerOnboardingWorkspace />}
           {tab === "controls" && <PlatformControlsWorkspace features={features} currentCommunityId={currentCommunityId} />}
       </OwnerConsoleShell>
       <GlobalVisualEditor canEdit communityName="Área do Proprietário" screenId={`owner:${tab}`} rootSelector=".owner-console" />
@@ -701,6 +703,7 @@ function tabDescription(tab: OwnerTab) {
     decisions: "Solicitações e mensagens abertas em uma única fila, com origem e data reais.",
     overview: "Indicadores, decisões e governança em uma visão clara.",
     requests: "Revise os dados e as abas antes de criar cada comunidade.",
+    onboarding: 'Analise solicitações LOG1, propostas e ativações de comunidades.',
     communities: "Acompanhe status, responsáveis, membros e acesso integral.",
     users: "Consulte pessoas, vínculos e perfis globais.",
     audit: "Investigue ações, resultados e contexto de segurança.",
@@ -709,7 +712,7 @@ function tabDescription(tab: OwnerTab) {
     statistics: "Consulte indicadores globais sem expor ferramentas da plataforma nos menus comunitários.",
     optimization: "Diagnostique e execute retenções seguras sem remover dados ativos.",
     appearance: "Aplique paleta, logotipo, banner e papel de parede a uma comunidade ou a todas de uma vez.",
-    plans: "Defina os planos e chamadas comerciais da prévia exclusiva do proprietário.",
+    plans: 'Configure valores, recursos, limites e assinaturas das comunidades.',
     laboratory: "Crie e valide protótipos isolados, sem modificar páginas ou dados reais.",
     passwords: "Consulte os eventos de credenciais disponíveis na auditoria.",
     deleted: "Confira cadastros inativos e eventos de desativação disponíveis.",

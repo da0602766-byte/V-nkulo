@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import {cpfLoginRequest} from './helpers/cpf-login.mjs';
 import { readFile } from "node:fs/promises";
 import { runInNewContext } from "node:vm";
 import test from "node:test";
@@ -22,10 +23,11 @@ async function fixture() {
   };
   const worker = (await import(`../dist/server/index.js?push-session=${crypto.randomUUID()}`)).default;
   async function request(path, cookie = "", method = "GET", body, extra = {}) {
-    return worker.fetch(new Request(`${base}${path}`, {
+    const req=new Request(`${base}${path}`, {
       method, headers: { cookie, "content-type": "application/json", ...extra },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    }), env, context);
+    });
+    return worker.fetch(path==='/api/auth/login'?await cpfLoginRequest(env,req):req, env, context);
   }
   async function login(email = "a@push.test", previous = "") {
     const response = await request("/api/auth/login", previous, "POST", { email, senha: "Push12345" });
@@ -119,7 +121,7 @@ test("push: redefinir senha revoga as sessões e assinaturas anteriores", async 
     const a = await f.login(), b = await f.login();
     await f.save(a, f.subscription("reset-a"));
     await f.save(b, f.subscription("reset-b"));
-    const token = crypto.randomUUID();
+    const token = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('hex');
     const hash = Buffer.from(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token))).toString("hex");
     f.database.prepare("INSERT INTO redefinicoes_senha (usuario_id,token_hash,expira_em,usado) VALUES (?,?,datetime('now','+1 hour'),0)").run(f.userId, hash);
     const response = await f.request("/api/auth/redefinir-senha", "", "POST", { token, senha: "NovaSenha12345" });

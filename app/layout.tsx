@@ -16,6 +16,8 @@ import "./owner-workspace.css";
 import "./owner-console.css"; // Isolated owner console design.
 import "./feed-worship.css";
 import "./community-surfaces.css";
+import "./access.css";
+import "./commerce.css";
 import SmartScrollHeader from "./components/SmartScrollHeader";
 import MobileAppInstall from "./components/MobileAppInstall";
 import GlobalFeedbackLauncher from "./components/GlobalFeedbackLauncher";

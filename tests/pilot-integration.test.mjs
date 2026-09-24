@@ -1,3 +1,4 @@
+import { cpfLoginRequest } from './helpers/cpf-login.mjs';
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
@@ -841,14 +842,14 @@ test("feed interno pagina por cursor e o feed público agregado permanece desati
 
 async function login(worker, env, email, senha) {
   const response = await worker.fetch(
-    new Request("http://localhost/api/auth/login", {
+    await cpfLoginRequest(env, new Request("http://localhost/api/auth/login", {
       method: "POST",
       headers: {
         accept: "text/html",
         "content-type": "application/x-www-form-urlencoded",
       },
       body: new URLSearchParams({ email, senha }),
-    }),
+    })),
     env,
     context,
   );
@@ -1438,74 +1439,14 @@ test("continuidade V4.5 protege solicitações, tenants e decisões críticas", 
   database.close();
 });
 
-test("cadastro público cria conta sem vínculo e login encaminha para comunidades", async () => {
-  const { database, d1 } = await createPilotD1();
-  const worker = await loadWorker();
-  const env = createEnv(d1);
-  const signupResponse = await worker.fetch(
-    new Request("http://localhost/api/auth/cadastro", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        nome: "Visitante Público Fictício",
-        email: "visitante.publico@example.test",
-        cadastro_telefone: "(00) 90000-0000",
-        cadastro_cep: "00000-000",
-        cadastro_numero: "42",
-        senha: "Visitante123",
-        confirmarSenha: "Visitante123",
-        aceiteTermos: true,
-      }),
-    }),
-    env,
-    context,
-  );
-  assert.equal(signupResponse.status, 201);
-  const signupBody = await signupResponse.json();
-  assert.equal(signupBody.membershipCreated, false);
-  const user = database
-    .prepare(
-      `SELECT u.id, u.perfil, u.telefone, u.cadastro_dados,
-        (SELECT count(*) FROM usuario_comunidades uc WHERE uc.usuario_id = u.id) AS memberships
-      FROM usuarios u WHERE u.email = ?`,
-    )
-    .get("visitante.publico@example.test");
-  assert.equal(user.perfil, "LEITURA");
-  assert.equal(user.memberships, 0);
-  assert.equal(user.telefone, "(00) 90000-0000");
-  assert.deepEqual(JSON.parse(user.cadastro_dados), {
-    telefone: {
-      label: "Telefone ou WhatsApp",
-      value: "(00) 90000-0000",
-    },
-    cep: { label: "CEP", value: "00000-000" },
-    numero: { label: "Número", value: "42" },
-  });
-
-  const loginResponse = await worker.fetch(
-    new Request("http://localhost/api/auth/login", {
-      method: "POST",
-      headers: {
-        accept: "text/html",
-        "content-type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({
-        email: "visitante.publico@example.test",
-        senha: "Visitante123",
-      }),
-    }),
-    env,
-    context,
-  );
-  assert.equal(loginResponse.status, 303);
-  assert.equal(
-    new URL(loginResponse.headers.get("location")).pathname,
-    "/comunidades",
-  );
-  assert.equal(
-    new URL(loginResponse.headers.get("location")).searchParams.get("conta"),
-    "ativa",
-  );
+test("cadastro público fechado não cria conta, vínculo ou sessão", async () => {
+  const {database,d1}=await createPilotD1();
+  const worker=await loadWorker();const env=createEnv(d1);
+  const before=database.prepare('SELECT COUNT(*) AS n FROM usuarios').get().n;
+  const response=await worker.fetch(new Request('http://localhost/api/auth/cadastro',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({nome:'Pessoa',email:'visitante.publico@example.test',senha:'Visitante123',cpf:'52998224725',role:'owner'})}),env,context);
+  assert.equal(response.status,403);assert.equal(response.headers.get('set-cookie'),null);
+  assert.equal((await response.json()).redirect,'/log1');
+  assert.equal(database.prepare('SELECT COUNT(*) AS n FROM usuarios').get().n,before);
   database.close();
 });
 
@@ -1805,20 +1746,17 @@ test("convite de membro é persistente, individual e de uso único", async () =>
         nome: "Pessoa Convidada",
         email: "pessoa.convidada@example.test",
         senha: "Convite123",
+        cpf: "52998224725", aceite: true,
       }),
     }),
     env,
     context,
   );
-  assert.equal(acceptanceResponse.status, 200);
-  const acceptedCookies =
-    typeof acceptanceResponse.headers.getSetCookie === "function"
-      ? acceptanceResponse.headers.getSetCookie()
-      : [acceptanceResponse.headers.get("set-cookie") || ""];
-  const memberCookie = acceptedCookies
-    .map((value) => value.match(/__Host-adote_session=[^;]+/)?.[0])
-    .find(Boolean);
-  assert.ok(memberCookie, "sessão do membro convidado ausente");
+  assert.equal(acceptanceResponse.status, 201);
+  assert.equal(acceptanceResponse.headers.get('set-cookie'),null);
+  const memberLogin=await worker.fetch(new Request('http://localhost/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({cpf:'52998224725',senha:'Convite123'})}),env,context);
+  const memberCookie=memberLogin.headers.get('set-cookie')?.match(/__Host-adote_session=[^;]+/)?.[0];
+  assert.ok(memberCookie,'login por CPF do membro convidado');
   const membership = database
     .prepare(
       `SELECT uc.comunidade_id, uc.papel, uc.status
@@ -1851,6 +1789,7 @@ test("convite de membro é persistente, individual e de uso único", async () =>
         nome: "Pessoa Convidada",
         email: "pessoa.convidada@example.test",
         senha: "Convite123",
+        cpf: "52998224725", aceite: true,
       }),
     }),
     env,

@@ -1,3 +1,4 @@
+import { cpfLoginRequest } from './helpers/cpf-login.mjs';
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
@@ -160,11 +161,11 @@ function yearsAgo(years) {
 
 async function login(worker, env, email, senha) {
   const response = await worker.fetch(
-    new Request("http://localhost/api/auth/login", {
+    await cpfLoginRequest(env, new Request("http://localhost/api/auth/login", {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ email, senha }),
-    }),
+    })),
     env,
     context,
   );

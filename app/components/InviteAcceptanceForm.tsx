@@ -23,7 +23,7 @@ export default function InviteAcceptanceForm({
       const response = await fetch("/api/pilot/convites/aceitar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...body, token }),
+        body: JSON.stringify({ ...body, token, aceite: body.aceite === 'on' }),
       });
       const result = (await response.json()) as {
         error?: string;
@@ -39,9 +39,9 @@ export default function InviteAcceptanceForm({
   }
 
   return (
-    <form className="pilot-form" onSubmit={submit}>
+    <form className="access-form" method="post" action="/api/pilot/convites/aceitar" onSubmit={submit}>
       <div className="pilot-invite-summary">
-        <span>Convite para membro</span>
+        <span>Seu vínculo na comunidade</span>
         <strong>{communityName}</strong>
         <small>E-mail esperado: {maskedEmail}</small>
       </div>
@@ -54,6 +54,10 @@ export default function InviteAcceptanceForm({
         <input name="email" required type="email" autoComplete="email" />
       </label>
       <label>
+        CPF
+        <input name="cpf" required inputMode="numeric" minLength={11} maxLength={14} autoComplete="username" />
+      </label>
+      <label>
         Senha
         <input
           name="senha"
@@ -62,10 +66,11 @@ export default function InviteAcceptanceForm({
           minLength={8}
           autoComplete="new-password"
         />
-        <small>Mínimo de 8 caracteres, com letras e número.</small>
+        <small>Mínimo de 8 caracteres, com letras e número. Já tem conta? Use sua senha atual.</small>
       </label>
+      <label className="access-check"><input type="checkbox" name="aceite" required/><span>Aceito os Termos de Uso e a Política de Privacidade.</span></label>
       {message && <p className="pilot-form-message" role="alert">{message}</p>}
-      <button disabled={loading}>
+      <button className="access-primary" disabled={loading}>
         {loading ? "Validando convite…" : "Aceitar convite"}
       </button>
     </form>

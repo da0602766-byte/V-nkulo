@@ -1,3 +1,4 @@
+import { cpfLoginRequest } from './helpers/cpf-login.mjs';
 import assert from "node:assert/strict";
 import test from "node:test";
 import { getVisitorAttention, visitorDaysWithoutContact, visitorToday } from "../app/lib/visitor-attention.ts";
@@ -31,7 +32,7 @@ test("lista e contagem de pendências descartam agendamento antigo após novo ac
     const worker = (await import("../dist/server/index.js")).default;
     const env = { DB: d1, AUTH_SECRET: "attention-test-only-secret", ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } };
     const ctx = { waitUntil() {}, passThroughOnException() {} };
-    const login = await worker.fetch(new Request("http://localhost/api/auth/login", { method: "POST", body: new URLSearchParams({ email: "attention@example.test", senha: "Attention123" }) }), env, ctx);
+    const login = await worker.fetch(await cpfLoginRequest(env, new Request("http://localhost/api/auth/login", { method: "POST", body: new URLSearchParams({ email: "attention@example.test", senha: "Attention123" }) })), env, ctx);
     assert.equal(login.status, 303);
     const cookie = login.headers.getSetCookie().map((item) => item.match(/__Host-adote_session=[^;]+/)?.[0]).find(Boolean);
     assert.ok(cookie);

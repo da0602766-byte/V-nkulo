@@ -1,3 +1,4 @@
+import { cpfLoginRequest } from './helpers/cpf-login.mjs';
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
@@ -24,11 +25,11 @@ test("sessão assinada preserva revogação com uma só consulta D1", async () =
     AUTH_SECRET: "segredo-ficticio-exclusivo-desempenho-v293",
     ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) },
   };
-  const login = await worker.fetch(new Request("http://localhost/api/auth/login", {
+  const login = await worker.fetch(await cpfLoginRequest(env, new Request("http://localhost/api/auth/login", {
     method: "POST",
     headers: { accept: "text/html", "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ email: "medicao.sessao@example.test", senha: "Medicao123" }),
-  }), env, context);
+  })), env, context);
   assert.equal(login.status, 303);
   const setCookies = typeof login.headers.getSetCookie === "function"
     ? login.headers.getSetCookie()

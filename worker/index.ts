@@ -7,6 +7,7 @@ import { runPlatformOptimizationIfDue } from "../app/lib/platform-optimizer";
 import { purgeExpiredPrivateMessagesIfDue } from "../app/lib/chat-retention";
 import { runAutoSyncIfDue } from "../app/lib/supabase-auto-sync";
 import { scheduleWebPushDelivery } from "../app/lib/push-delivery-queue";
+import { purgeAccessRequests } from "../app/lib/access-retention";
 
 interface Env {
   ASSETS: Fetcher;
@@ -39,6 +40,7 @@ const OPTIMIZER_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 let nextOptimizerCheckAt = 0;
 let nextAutoSyncCheckAt = 0;
 let nextPushQueueCheckAt = 0;
+let nextAccessCleanupAt = 0;
 const AUTO_SYNC_CHECK_MS = 60_000;
 const AUTO_SYNC_MUTATION_PATHS = [
   "/api/auth/cadastro", "/api/conta/perfil", "/api/pilot/pessoas",
@@ -101,6 +103,10 @@ const worker = {
         handler.fetch(request, env, ctx),
       );
       const now = Date.now();
+      if (now >= nextAccessCleanupAt && env.DB) {
+        nextAccessCleanupAt = now + 10 * 60_000;
+        ctx.waitUntil(purgeAccessRequests(env.DB).catch(() => undefined));
+      }
       if (response.status < 400 && now >= nextPushQueueCheckAt &&
           url.pathname !== "/api/system/supabase-sync" &&
           (url.pathname.startsWith("/api/") || url.pathname === "/painel" || url.pathname === "/proprietario")) {
@@ -114,7 +120,10 @@ const worker = {
           runAutoSyncIfDue(env.DB, { force: forced }).catch(() => undefined)));
       }
       return withSecurityHeaders(response, url.pathname);
-    } catch {
+    } catch (error) {
+      if (url.pathname.startsWith("/api/") && /PLAN_([A-Z_]*LIMIT|INACTIVE)/.test(String(error))) {
+        return withSecurityHeaders(Response.json({error:"O plano da comunidade está inativo ou atingiu o limite deste recurso. Consulte o responsável."},{status:409}),url.pathname);
+      }
       const fallback = url.pathname.startsWith("/api/")
         ? Response.json(
             { error: "Não foi possível concluir a solicitação." },
@@ -154,14 +163,14 @@ function withSecurityHeaders(response: Response, pathname: string) {
   if (
     pathname.startsWith("/convite/") ||
     pathname.startsWith("/escala/") ||
-    pathname.startsWith("/redefinir-senha")
+    pathname.startsWith("/redefinir-senha") || pathname.startsWith("/contratacao/") || pathname.startsWith("/cadastro-membro/")
   ) {
     headers.set("Referrer-Policy", "no-referrer");
   }
   if (
     pathname.startsWith("/api/") ||
     pathname === "/painel" ||
-    pathname === "/login" ||
+    pathname === "/login" || pathname === "/log1" || pathname === "/vincular-cpf" || pathname.startsWith("/redefinir-senha") || pathname.startsWith("/proprietario") || pathname.startsWith("/contratacao/") || pathname.startsWith("/cadastro-membro/") ||
     pathname.startsWith("/convite/") ||
     pathname.startsWith("/escala/")
   ) {

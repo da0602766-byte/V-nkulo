@@ -76,6 +76,7 @@ export default function MemberRegistrationLinkManager() {
           opensAt: localToIso(data.get("opensAt")),
           closesAt: localToIso(data.get("closesAt")),
           autoDelete: data.get("autoDelete") === "on",
+          maxUses: Number(data.get('maxUses') || 100),
         }),
       });
       const result = await response.json();
@@ -159,6 +160,7 @@ export default function MemberRegistrationLinkManager() {
       <header><div><p className="pilot-kicker">CADASTRO DE MEMBROS</p><h2 id="member-link-manager-title">Convites para novos membros</h2><p>Crie um convite seguro. A pessoa preencherá os dados, criará sua conta e entrará na comunidade escolhida.</p></div><span>{loading ? "Carregando…" : `${links.length} links`}</span></header>
       <form className="member-link-create" onSubmit={createLink}>
         <label>Título do formulário<input name="title" required minLength={3} maxLength={100} defaultValue="Cadastro de novos membros" /></label>
+        <label>Máximo de cadastros<input name="maxUses" type="number" min={1} max={10000} defaultValue={100} required /></label>
         <label>Abre em<input name="opensAt" type="datetime-local" required defaultValue={defaults.opensAt} /></label>
         <label>Fecha em<input name="closesAt" type="datetime-local" required defaultValue={defaults.closesAt} /></label>
         <label className="member-link-auto-delete"><input name="autoDelete" type="checkbox" /><span><strong>Limpeza automática</strong><small>Excluir o link quando for cancelado ou expirar</small></span></label>

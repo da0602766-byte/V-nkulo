@@ -1,3 +1,4 @@
+import { cpfLoginRequest } from './helpers/cpf-login.mjs';
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
@@ -14,10 +15,10 @@ const configuration = {
 const iso = value => new Date(`${value.replace(" ", "T")}Z`).toISOString();
 
 async function login(worker, runtime, email, password) {
-  const response = await worker.fetch(new Request("http://localhost/api/auth/login", {
+  const response = await worker.fetch(await cpfLoginRequest(runtime, new Request("http://localhost/api/auth/login", {
     method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", accept: "text/html" },
     body: new URLSearchParams({ email, senha: password }),
-  }), runtime, context);
+  })), runtime, context);
   assert.equal(response.status, 303);
   const values = typeof response.headers.getSetCookie === "function" ? response.headers.getSetCookie() : [response.headers.get("set-cookie") || ""];
   return values.map(value => value.match(/__Host-adote_session=[^;]+/)?.[0]).find(Boolean);
@@ -89,5 +90,6 @@ test("consultas independentes do contexto de acesso rodam juntas sem mudar a ord
   const block = source.slice(source.indexOf("export async function getActiveTenantContext"), source.indexOf("async function getCommunityModules"));
   assert.match(block, /Promise\.all\(\[\s*getDiaconiaPermissions[\s\S]*getNetworkPermissions[\s\S]*getActiveParkingAssignment[\s\S]*getParkingLeaderPermissions/);
   assert.match(block, /for \(const permission of diaconiaPermissions\)[\s\S]*for \(const permission of networkPermissions\)[\s\S]*if \(parkingAssignment\)[\s\S]*for \(const permission of parkingLeaderPermissions\)/);
-  assert.match(block, /const temporaryGrant[\s\S]*const modules = await getCommunityModules/);
+  assert.match(block, /const temporaryGrant[\s\S]*const configuredModules = await getCommunityModules/);
+  assert.match(block, /filterPlanPermissions/);
 });

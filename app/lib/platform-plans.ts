@@ -1,4 +1,7 @@
 import { getD1 } from "../../db";
+import { listCommercialPlans } from "./commerce";
+import { formatPlanPrice, PLAN_LIMITS, PLAN_RESOURCES } from "./commerce-types";
+import { COMMUNITY_MODULES } from "./community-modules";
 
 export type LandingPlan = {
   name: string;
@@ -11,11 +14,7 @@ export type LandingPlan = {
   contact?: boolean;
 };
 
-export const DEFAULT_LANDING_PLANS: LandingPlan[] = [
-  { name: "Comunidade", price: "Gratuito", description: "Para igrejas em início de organização digital.", items: ["Até 100 membros cadastrados", "Módulos: Fio, Agenda, Pedidos", "1 administrador", "Suporte por e-mail"], cta: "Começar grátis", featured: false, contact: false },
-  { name: "Crescimento", price: "R$ 89", period: "/mês", description: "Para igrejas em expansão que precisam de mais controle.", items: ["Membros ilimitados", "Todos os módulos", "Até 5 administradores", "Células e relatórios", "Suporte prioritário"], cta: "Experimentar 30 dias grátis", featured: true, contact: false },
-  { name: "Rede", price: "Fale conosco", description: "Para redes de igrejas com múltiplas unidades.", items: ["Múltiplas comunidades", "Painel de rede unificado", "Customização de cor e marca", "Suporte dedicado", "Treinamento de equipe"], cta: "Falar com o time", featured: false, contact: true },
-];
+export const DEFAULT_LANDING_PLANS: LandingPlan[] = [];
 
 const CONFIG_KEY = "platform_landing_plans";
 
@@ -59,13 +58,14 @@ export async function getConfiguredLandingPlans() {
   return plans;
 }
 
-export async function getLandingPlans() {
+export async function getLandingPlans(): Promise<LandingPlan[]> {
   try {
-    const row = await getD1().prepare("SELECT valor FROM configuracoes WHERE chave = ? LIMIT 1").bind(CONFIG_KEY).first<{ valor: string }>();
-    return parseLandingPlans(row?.valor ? JSON.parse(row.valor) : null);
-  } catch {
-    return DEFAULT_LANDING_PLANS;
-  }
+    return (await listCommercialPlans()).filter(p=>p.ativo&&p.contratavel).map(p=>({
+      name:p.nome,price:formatPlanPrice(p),description:p.descricao,featured:p.destaque,contact:p.personalizado,cta:'Solicitar comunidade',
+      items:[...p.modulos.map(key=>COMMUNITY_MODULES.find(m=>m.key===key)!.label),...p.recursos.map(key=>PLAN_RESOURCES.find(r=>r.key===key)!.label),
+        ...PLAN_LIMITS.map(({key,label})=>label+': '+(p.limites[key]===null?'sem limite definido':p.limites[key]))],
+    }));
+  } catch { return []; }
 }
 
 export { CONFIG_KEY };

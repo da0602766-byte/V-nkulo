@@ -1,7 +1,5 @@
 import { getD1 } from "../../../../../db";
-import { attachSessionCookie, createSession, getSessionUser, hashPassword, normalizeEmail } from "../../../../lib/local-auth";
-import { getPilotLoginConfig } from "../../../../lib/pilot-login-config";
-import { PILOT_CONFIG } from "../../../../lib/pilot-config";
+import { attachSessionCookie, createSession, getSessionUser, normalizeEmail } from "../../../../lib/local-auth";
 import {
   exchangeGoogleCode,
   readGoogleState,
@@ -56,45 +54,7 @@ export async function GET(request: Request) {
           "SELECT id, ativo FROM usuarios WHERE email = ? LIMIT 1",
         ).bind(normalizeEmail(identity.email)).first<{ id: number; ativo: number }>();
       }
-      if (!row) {
-        const loginConfig = await getPilotLoginConfig();
-        if (!PILOT_CONFIG.openRegistrationEnabled || loginConfig.cadastroHabilitado === false) {
-          throw new Error("A criação de novas contas está temporariamente desativada.");
-        }
-        const generatedPassword = await hashPassword(randomGoogleOnlyPassword());
-        const name = String(identity.name || identity.email.split("@")[0] || "Nova conta")
-          .trim().slice(0, 120);
-        try {
-          const result = await getD1().prepare(
-            `INSERT INTO usuarios
-              (nome, email, perfil, permissoes, cadastro_dados, foto_perfil, senha_hash, senha_salt,
-               titulo_eclesiastico, ativo)
-             VALUES (?, ?, 'LEITURA', '', ?, ?, ?, ?, 'VISITANTE', 1)`,
-          ).bind(
-            name.length >= 3 ? name : `Usuário ${name}`,
-            normalizeEmail(identity.email),
-            JSON.stringify({ origem: { label: "Origem", value: "Conta Google verificada" } }),
-            identity.picture || null,
-            generatedPassword.hash,
-            generatedPassword.salt,
-          ).run();
-          const createdUserId = Number(result.meta.last_row_id);
-          await getD1().prepare(
-            `INSERT INTO auditoria_piloto
-              (comunidade_id, usuario_id, evento, resultado, metadados)
-             VALUES (NULL, ?, 'CONTA_GOOGLE_CRIADA', 'SUCESSO', ?)`,
-          ).bind(
-            createdUserId,
-            JSON.stringify({ membershipCreated: false, roleGranted: false, emailVerified: true }),
-          ).run();
-          row = { id: createdUserId, ativo: 1 };
-        } catch {
-          row = await getD1().prepare(
-            "SELECT id, ativo FROM usuarios WHERE lower(email) = ? LIMIT 1",
-          ).bind(normalizeEmail(identity.email)).first<{ id: number; ativo: number }>();
-          if (!row) throw new Error("Não foi possível criar sua conta com o Google. Tente novamente.");
-        }
-      }
+      if (!row) throw new Error("Novas contas exigem um convite temporário da comunidade. Para criar uma comunidade, use o LOG1.");
       if (!row.ativo) throw new Error("Este cadastro está inativo. Solicite revisão ao suporte.");
       userId = row.id;
     } else if (nativeHandoff) {
@@ -147,11 +107,6 @@ export async function GET(request: Request) {
       (error as Error).message,
     );
   }
-}
-
-function randomGoogleOnlyPassword() {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 function nativeReturn(origin: string, message = "") {

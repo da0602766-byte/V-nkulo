@@ -1,3 +1,4 @@
+import { cpfLoginRequest } from './helpers/cpf-login.mjs';
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
@@ -15,10 +16,10 @@ function createEnv(d1) {
   return { DB: d1, AUTH_SECRET: "segredo-ficticio-pedidos-v213", ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } };
 }
 async function login(worker, env, email) {
-  const response = await worker.fetch(new Request("http://localhost/api/auth/login", {
+  const response = await worker.fetch(await cpfLoginRequest(env, new Request("http://localhost/api/auth/login", {
     method: "POST", headers: { accept: "text/html", "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ email, senha: "Pedidos123" }),
-  }), env, context);
+  })), env, context);
   assert.equal(response.status, 303);
   const values = typeof response.headers.getSetCookie === "function" ? response.headers.getSetCookie() : [response.headers.get("set-cookie") || ""];
   const cookie = values.map((value) => value.match(/__Host-adote_session=[^;]+/)?.[0]).find(Boolean);

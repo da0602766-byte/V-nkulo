@@ -1,3 +1,4 @@
+import { cpfLoginRequest } from './helpers/cpf-login.mjs';
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
@@ -10,10 +11,10 @@ const configuration = { confirm: true, ambiente: "PRODUCAO", url: "https://examp
 const iso = value => new Date(`${value.replace(" ", "T")}Z`).toISOString();
 
 async function login(worker, runtime, context, email, password) {
-  const response = await worker.fetch(new Request("http://localhost/api/auth/login", {
+  const response = await worker.fetch(await cpfLoginRequest(runtime, new Request("http://localhost/api/auth/login", {
     method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", accept: "text/html" },
     body: new URLSearchParams({ email, senha: password }),
-  }), runtime, context);
+  })), runtime, context);
   assert.equal(response.status, 303);
   const values = typeof response.headers.getSetCookie === "function" ? response.headers.getSetCookie() : [response.headers.get("set-cookie") || ""];
   return values.map(value => value.match(/__Host-adote_session=[^;]+/)?.[0]).find(Boolean);

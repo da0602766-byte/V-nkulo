@@ -192,7 +192,7 @@ async function loadOperationalGeneralList(db: ReturnType<typeof getD1>, access: 
 }
 
 export async function GET(request: Request) {
-  const access = await requireTenantPermission("dashboard.view");
+  const access = await requireTenantPermission("dashboard.view", "requests");
   if ("error" in access) return access.error;
   if (access.context.communityAccess === "FEED_ONLY") {
     return Response.json({ error: "Ação não permitida." }, { status: 403 });
@@ -391,7 +391,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const access = await requireTenantPermission("dashboard.view");
+  const access = await requireTenantPermission("dashboard.view", "requests");
   if ("error" in access) return access.error;
   if (access.context.communityAccess === "FEED_ONLY") {
     return Response.json({ error: "Ação não permitida." }, { status: 403 });
@@ -552,7 +552,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const access = await requireTenantPermission("dashboard.view");
+  const access = await requireTenantPermission("dashboard.view", "requests");
   if ("error" in access) return access.error;
   const body = await safeJson(request);
   if (!body) return Response.json({ error: "Dados inválidos." }, { status: 400 });

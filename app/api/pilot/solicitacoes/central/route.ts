@@ -215,7 +215,7 @@ async function loadRepositoryItemsMetrics(db: ReturnType<typeof getD1>, input: {
 }
 
 export async function GET(request: Request) {
-  const access = await requireTenantPermission("dashboard.view");
+  const access = await requireTenantPermission("dashboard.view", "requests");
   if ("error" in access) return access.error;
   if (access.context.communityAccess === "FEED_ONLY") return Response.json({ error: "Ação não permitida." }, { status: 403 });
 
@@ -314,7 +314,7 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const access = await requireTenantPermission("dashboard.view");
+  const access = await requireTenantPermission("dashboard.view", "requests");
   if ("error" in access) return access.error;
   if (access.context.communityAccess === "FEED_ONLY") return Response.json({ error: "Ação não permitida." }, { status: 403 });
   const body = await safeJson(request);

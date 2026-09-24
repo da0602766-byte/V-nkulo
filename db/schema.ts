@@ -970,6 +970,7 @@ export const solicitacoesEntradaComunidade = sqliteTable(
 );
 
 export const convitesComunidade = sqliteTable("convites_comunidade", {
+  usoChave: text('uso_chave'),
   id: integer("id").primaryKey({ autoIncrement: true }),
   comunidadeId: integer("comunidade_id")
     .notNull()
@@ -1835,6 +1836,8 @@ export const usuarioIntroducoes = sqliteTable(
 export const linksCadastroMembros = sqliteTable(
   "links_cadastro_membros",
   {
+    maxUsos: integer('max_usos').notNull().default(100),
+    usos: integer('usos').notNull().default(0),
     id: integer("id").primaryKey({ autoIncrement: true }),
     comunidadeOrigemId: integer("comunidade_origem_id")
       .notNull()
@@ -3098,3 +3101,40 @@ export const feedbackPlataforma = sqliteTable(
     index("feedback_plataforma_tipo_idx").on(table.tipo, table.categoria, table.criadoEm),
   ],
 );
+
+
+// Controlled onboarding (0079); quota triggers are maintained in the SQL migration.
+export const identidadesCpf = sqliteTable('identidades_cpf', {
+  usuarioId: integer('usuario_id').primaryKey().references(()=>usuarios.id,{onDelete:'cascade'}),
+  cpfHash:text('cpf_hash').notNull().unique(), finais:text('finais').notNull(), criadoEm:text('criado_em').notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+export const authRateLimits=sqliteTable('auth_rate_limits',{
+  chave:text('chave').primaryKey(),tentativas:integer('tentativas').notNull().default(1),expiraEm:integer('expira_em').notNull(),
+});
+export const planosPlataforma=sqliteTable('planos_plataforma',{
+ id:text('id').primaryKey(),nome:text('nome').notNull(),descricao:text('descricao').notNull().default(''),valorCentavos:integer('valor_centavos'),
+ periodicidade:text('periodicidade').notNull().default('MENSAL'),duracaoDias:integer('duracao_dias'),ativo:integer('ativo').notNull().default(0),
+ contratavel:integer('contratavel').notNull().default(0),destaque:integer('destaque').notNull().default(0),personalizado:integer('personalizado').notNull().default(0),
+ modulos:text('modulos').notNull().default('[]'),recursos:text('recursos').notNull().default('[]'),limites:text('limites').notNull().default('{}'),condicoes:text('condicoes').notNull().default(''),
+ versao:integer('versao').notNull().default(1),atualizadoEm:text('atualizado_em').notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+export const solicitacoesLog1=sqliteTable('solicitacoes_log1',{
+ id:integer('id').primaryKey({autoIncrement:true}),protocolo:text('protocolo').notNull().unique(),nome:text('nome').notNull(),telefone:text('telefone').notNull(),
+ nascimento:text('nascimento').notNull(),cpfHash:text('cpf_hash').notNull(),cpfFinais:text('cpf_finais').notNull(),status:text('status').notNull().default('NOVA'),
+ planosPermitidos:text('planos_permitidos').notNull().default('[]'),proposta:text('proposta'),planoId:text('plano_id').references(()=>planosPlataforma.id),contrato:text('contrato'),
+ email:text('email'),senhaHash:text('senha_hash'),senhaSalt:text('senha_salt'),usuarioId:integer('usuario_id').references(()=>usuarios.id,{onDelete:'set null'}),
+ comunidadeNome:text('comunidade_nome'),comunidadeCidade:text('comunidade_cidade'),comunidadeId:integer('comunidade_id').references(()=>comunidades.id,{onDelete:'set null'}),
+ responsavelId:integer('responsavel_id').references(()=>usuarios.id,{onDelete:'set null'}),observacao:text('observacao').notNull().default(''),ativacaoChave:text('ativacao_chave'),
+ criadoEm:text('criado_em').notNull().default(sql`CURRENT_TIMESTAMP`),atualizadoEm:text('atualizado_em').notNull().default(sql`CURRENT_TIMESTAMP`),retencaoAte:text('retencao_ate').notNull().default(sql`(datetime('now','+180 days'))`),
+}, t=>[index('log1_status_idx').on(t.status,t.criadoEm),uniqueIndex('log1_cpf_aberto_idx').on(t.cpfHash).where(sql`status IN ('NOVA','EM_ANALISE','LINK_GERADO','CONTRATADA')`)]);
+export const linksContratacao=sqliteTable('links_contratacao',{
+ id:integer('id').primaryKey({autoIncrement:true}),solicitacaoId:integer('solicitacao_id').notNull().references(()=>solicitacoesLog1.id,{onDelete:'cascade'}),
+ tokenHash:text('token_hash').notNull().unique(),finalidade:text('finalidade').notNull().default('CONTRATACAO'),expiraEm:text('expira_em').notNull(),revogadoEm:text('revogado_em'),usadoEm:text('usado_em'),usoChave:text('uso_chave'),
+ criadoPor:integer('criado_por').notNull().references(()=>usuarios.id),criadoEm:text('criado_em').notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+export const assinaturasComunidade=sqliteTable('assinaturas_comunidade',{
+ comunidadeId:integer('comunidade_id').primaryKey().references(()=>comunidades.id,{onDelete:'cascade'}),planoId:text('plano_id').notNull().references(()=>planosPlataforma.id),
+ solicitacaoId:integer('solicitacao_id').unique().references(()=>solicitacoesLog1.id,{onDelete:'set null'}),status:text('status').notNull(),contrato:text('contrato').notNull(),
+ fundamento:text('fundamento').notNull(),referencia:text('referencia').notNull().default(''),aprovadoPor:integer('aprovado_por').notNull().references(()=>usuarios.id),
+ iniciaEm:text('inicia_em').notNull().default(sql`CURRENT_TIMESTAMP`),terminaEm:text('termina_em'),atualizadoEm:text('atualizado_em').notNull().default(sql`CURRENT_TIMESTAMP`),
+});

@@ -1,0 +1,7 @@
+"use client";
+import {useEffect,useState} from 'react';
+export default function InviteRevocationList({refreshKey}:{refreshKey:string}){
+ const [rows,setRows]=useState<{id:number;email:string;status:string;papel:string;expira_em:string}[]>([]);const [message,setMessage]=useState('');const [busy,setBusy]=useState(false);
+ useEffect(()=>{const controller=new AbortController();fetch('/api/pilot/convites',{signal:controller.signal,cache:'no-store'}).then(async r=>{const data=await r.json();if(!r.ok)throw new Error(data.error);setRows(data.invites||[]);}).catch(e=>{if(!controller.signal.aborted)setMessage(e.message);});return()=>controller.abort();},[refreshKey]);
+ return <section className="commerce-workspace"><h3>Convites individuais</h3>{message&&<p role="status">{message}</p>}{rows.length?rows.map(r=><div className="commerce-request" key={r.id}><div className="commerce-actions"><span>{r.email} · {r.papel} · {r.status} · {new Date(r.expira_em).toLocaleString('pt-BR')}</span>{r.status==='PENDENTE'&&<button disabled={busy} onClick={async()=>{setBusy(true);try{const response=await fetch('/api/pilot/convites',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:r.id})});const b=await response.json();if(!response.ok)throw new Error(b.error);setRows(current=>current.map(i=>i.id===r.id?{...i,status:'REVOGADO'}:i));setMessage('Convite revogado.');}catch(e){setMessage((e as Error).message);}finally{setBusy(false);}}}>Revogar</button>}</div></div>):<p>Nenhum convite individual enviado.</p>}</section>;
+}

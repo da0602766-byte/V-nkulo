@@ -8,6 +8,7 @@ import {
   permissionsForTenantRole,
 } from "./tenant-policy.mjs";
 import { getSessionUser } from "./local-auth";
+import { getSubscription, filterPlanPermissions } from './commerce';
 import {
   getTemporaryAccessByToken,
   TEMPORARY_ACCESS_COOKIE,
@@ -289,8 +290,11 @@ export async function getActiveTenantContext(
     permissions.push("community.lifecycle.review");
   }
 
-  const modules = await getCommunityModules(membership.comunidadeId);
+  const subscription = await getSubscription(membership.comunidadeId);
+  const configuredModules = await getCommunityModules(membership.comunidadeId);
+  const modules = subscription ? configuredModules.filter(key => subscription.active && subscription.plan.modulos.includes(key)) : configuredModules;
   permissions = filterPermissionsForCommunityModules(permissions, modules);
+  permissions = filterPlanPermissions(permissions, subscription?.plan || null, subscription?.active ?? true);
 
   return {
     memberships,
@@ -396,6 +400,7 @@ async function getParkingLeaderPermissions(
 
 export async function requireTenantPermission(
   permission: string,
+  resource?: 'requests' | 'feed' | 'reports',
 ): Promise<TenantPermissionResult> {
   const user = await getSessionUser();
   if (!user) {
@@ -427,6 +432,10 @@ export async function requireTenantPermission(
         { status: 403 },
       ),
     } as const;
+  }
+  if (resource) {
+    const subscription=await getSubscription(tenant.context.comunidadeId);
+    if(subscription && (!subscription.active || !subscription.plan.recursos.includes(resource))) return {error:Response.json({error:'Este recurso não está disponível no plano da comunidade.'},{status:403})};
   }
   return {
     user,

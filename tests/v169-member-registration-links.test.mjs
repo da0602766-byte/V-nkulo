@@ -24,8 +24,8 @@ test("temporary member registration is owner-scoped in schema, queries and UI", 
   assert.match(helper, /m\.comunidade_id = f\.comunidade_id/);
   assert.match(adminRoute, /tenant\.context\.isCommunityOwner/);
   assert.match(adminRoute, /proprietario_usuario_id = links_cadastro_membros\.criado_por/);
-  assert.match(publicRoute, /c\.proprietario_usuario_id = \?/);
-  assert.match(publicRoute, /m\.comunidade_id = c\.id/);
+  assert.match(publicRoute, /c\.proprietario_usuario_id\s*=\s*l\.criado_por/);
+  assert.match(publicRoute, /m\.comunidade_id\s*=\s*c\.id/);
   assert.match(dashboard, /canManageRegistrationLinks=\{active\.isCommunityOwner\}/);
   assert.match(adminUi, /Criar link temporário/);
   assert.match(publicUi, /Revisar cadastro/);
@@ -74,6 +74,8 @@ test("public form never exposes or accepts another owner's community data", asyn
   const validBody = new FormData();
   validBody.set("fullName", "Pessoa Cadastrada");
   validBody.set("email", "pessoa.cadastrada@example.test");
+  validBody.set("cpf", "52998224725");
+  validBody.set("senha", "Cadastro123!");
   validBody.set("cep", "58000000");
   validBody.set("birthDate", "1990-05-20");
   validBody.set("communityId", "1");
@@ -90,6 +92,8 @@ test("public form never exposes or accepts another owner's community data", asyn
   const invalidBody = new FormData();
   invalidBody.set("fullName", "Pessoa Indevida");
   invalidBody.set("email", "indevida@example.test");
+  invalidBody.set("cpf", "11144477735");
+  invalidBody.set("senha", "Cadastro123!");
   invalidBody.set("cep", "58000000");
   invalidBody.set("birthDate", "1990-05-20");
   invalidBody.set("communityId", "2");

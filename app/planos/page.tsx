@@ -1,17 +1,11 @@
-import PublicHeader from "../components/PublicHeader";
+import PublicHeader from '../components/PublicHeader';
+import Link from '../components/StableLink';
+import {getLandingPlans} from '../lib/platform-plans';
 
-export default function PlansPage() {
-  return (
-    <main className="vinkulo-site public-directory">
-      <PublicHeader />
-      <section className="directory-intro">
-        <p className="pilot-kicker">PREPARAÇÃO COMERCIAL</p><h1>Planos ainda não estão à venda</h1>
-        <p>A contratação permanece indisponível. Não existe checkout, cobrança, assinatura ou gateway de pagamento nesta etapa.</p>
-      </section>
-      <section className="plans-grid">
-        <article><span>ACESSO CONTROLADO</span><h2>Avaliação da plataforma</h2><strong>Sem cobrança</strong><ul><li>Comunidades e ministérios</li><li>Permissões por perfil</li><li>Automação em revisão humana</li></ul><button disabled>Contratação indisponível</button></article>
-        <article className="plan-muted"><span>FUTURO</span><h2>Redes e afiliadas</h2><strong>Em preparação</strong><ul><li>Limite de afiliadas previsto</li><li>Período de teste previsto</li><li>Gateway ainda não escolhido</li></ul><button disabled>Módulo desativado</button></article>
-      </section>
-    </main>
-  );
+export default async function PlansPage() {
+  const plans=await getLandingPlans();
+  return <main className="vinkulo-site public-directory"><PublicHeader/>
+    <section className="directory-intro"><p className="pilot-kicker">PLANOS VÍNKULO</p><h1>Um plano para sua comunidade.</h1><p>Envie uma solicitação pelo LOG1. Após a análise, você receberá um link individual para escolher seu plano e confirmar as condições.</p></section>
+    {plans.length?<section className="plans-grid">{plans.map(plan=><article key={plan.name}><h2>{plan.name}</h2><strong>{plan.price}</strong><p>{plan.description}</p><ul>{plan.items.map((item,i)=><li key={i}>{item}</li>)}</ul><Link href="/log1">Solicitar comunidade →</Link></article>)}</section>:<section className="directory-intro"><h2>Vamos conhecer sua comunidade.</h2><p>Os planos estão em configuração. Você já pode enviar sua solicitação para conversar com o responsável pela plataforma.</p><Link href="/log1">Enviar solicitação pelo LOG1 →</Link></section>}
+  </main>;
 }

@@ -4,7 +4,7 @@ import test from "node:test";
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("Conta Google usa OAuth real e cria cadastro neutro sem acesso comunitário", async () => {
+test("Conta Google preserva OAuth para contas existentes sem abrir cadastro público", async () => {
   const [start, callback, integration] = await Promise.all([
     read("app/api/auth/google/start/route.ts"),
     read("app/api/auth/google/callback/route.ts"),
@@ -14,10 +14,8 @@ test("Conta Google usa OAuth real e cria cadastro neutro sem acesso comunitário
   assert.match(callback, /google_sub = \?/);
   assert.match(callback, /WHERE email = \? LIMIT 1/);
   assert.match(callback, /normalizeEmail\(identity\.email\)/);
-  assert.match(callback, /INSERT INTO usuarios/);
-  assert.match(callback, /'LEITURA'/);
-  assert.match(callback, /membershipCreated: false/);
-  assert.match(callback, /roleGranted: false/);
+  assert.doesNotMatch(callback, /INSERT INTO usuarios|INSERT INTO usuario_comunidades/);
+  assert.match(callback, /LOG1/);
   assert.match(callback, /function mutableRedirect/);
   assert.doesNotMatch(callback, /Response\.redirect/);
   assert.match(integration, /accounts\.google\.com\/o\/oauth2\/v2\/auth/);

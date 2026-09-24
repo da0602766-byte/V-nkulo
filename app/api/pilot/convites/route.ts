@@ -35,23 +35,25 @@ export async function GET() {
 export async function POST(request: Request) {
   const access = await requireTenantPermission("invites.manage");
   if ("error" in access) return access.error;
-  const payload = (await request.json()) as { email?: string; papel?: string };
+  const payload = (await request.json()) as { email?: string; papel?: string; horas?: number };
   const email = normalizeEmail(payload.email);
   const papel = String(payload.papel || "MEMBRO").toUpperCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return Response.json({ error: "Informe um e-mail válido." }, { status: 400 });
   }
-  if (papel !== "MEMBRO") {
+  if (!['MEMBRO','LIDER','ADMIN_COMUNIDADE'].includes(papel) || (papel !== 'MEMBRO' && !access.context.isCommunityOwner && !access.context.isOwner)) {
     return Response.json(
       {
         error:
-          "O piloto permite convites apenas para membros. Perfis privilegiados exigem MFA e revisão.",
+          "Somente o proprietário pode convidar líderes ou administradores da comunidade.",
       },
       { status: 403 },
     );
   }
 
   const db = getD1();
+  const hours = payload.horas === undefined ? INVITE_DURATION_HOURS : Number(payload.horas);
+  if (!Number.isInteger(hours) || hours < 1 || hours > 168) return Response.json({error:'Defina uma validade de 1 a 168 horas.'},{status:400});
   const active = await db
     .prepare(
       `SELECT COUNT(*) AS total
@@ -78,17 +80,18 @@ export async function POST(request: Request) {
     .run();
   const token = randomHex(32);
   const expiresAt = new Date(
-    Date.now() + INVITE_DURATION_HOURS * 60 * 60 * 1000,
+    Date.now() + hours * 60 * 60 * 1000,
   ).toISOString();
   const result = await db
     .prepare(
       `INSERT INTO convites_comunidade
       (comunidade_id, email, papel, token_hash, status, expira_em, criado_por)
-      VALUES (?, ?, 'MEMBRO', ?, 'PENDENTE', ?, ?)`,
+      VALUES (?, ?, ?, ?, 'PENDENTE', ?, ?)`,
     )
     .bind(
       access.context.comunidadeId,
       email,
+      papel,
       await sha256(token),
       expiresAt,
       access.user.id,
@@ -106,7 +109,7 @@ export async function POST(request: Request) {
       JSON.stringify({
         conviteId: Number(result.meta.last_row_id),
         emailHash: await sha256(email),
-        papel: "MEMBRO",
+        papel,
       }),
     )
     .run();
@@ -120,6 +123,17 @@ export async function POST(request: Request) {
     },
     { status: 201 },
   );
+}
+
+export async function PATCH(request: Request) {
+  const access=await requireTenantPermission('invites.manage'); if('error' in access) return access.error;
+  const body=await request.json().catch(()=>null); const id=Number(body?.id);
+  if(!Number.isSafeInteger(id)||id<1) return Response.json({error:'Convite inválido.'},{status:400});
+  const db=getD1(); const result=await db.batch([
+    db.prepare(`UPDATE convites_comunidade SET status='REVOGADO' WHERE id=? AND comunidade_id=? AND status='PENDENTE'`).bind(id,access.context.comunidadeId),
+    db.prepare(`INSERT INTO auditoria_piloto(comunidade_id,usuario_id,evento,resultado,metadados) SELECT ?,?,'CONVITE_REVOGADO','SUCESSO',? WHERE changes()=1`).bind(access.context.comunidadeId,access.user.id,JSON.stringify({conviteId:id})),
+  ]);
+  return result[0].meta.changes ? Response.json({ok:true}) : Response.json({error:'Convite pendente não encontrado.'},{status:404});
 }
 
 function randomHex(length: number) {

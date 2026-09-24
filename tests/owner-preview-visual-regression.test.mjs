@@ -63,10 +63,12 @@ test('plan normalization preserves the first benefit across repeated reads', () 
   const source = ts.transpileModule(read('app/lib/platform-plans.ts'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
   const exports = {};
   vm.runInNewContext(source, { exports, require: () => ({ getD1() { throw Error('No database access in this unit test'); } }) });
-  const once = exports.parseLandingPlans(exports.DEFAULT_LANDING_PLANS);
+  const fixture = [{name:'Plano de teste',price:'Valor configurado',cta:'Solicitar comunidade',items:['Recurso configurado']}];
+  assert.equal(exports.DEFAULT_LANDING_PLANS.length,0);
+  const once = exports.parseLandingPlans(fixture);
   const twice = exports.parseLandingPlans(once);
-  assert.equal(twice[0].items[0], exports.DEFAULT_LANDING_PLANS[0].items[0]);
-  assert.equal(twice[0].items.length, exports.DEFAULT_LANDING_PLANS[0].items.length);
+  assert.equal(twice[0].items[0], fixture[0].items[0]);
+  assert.equal(twice[0].items.length, fixture[0].items.length);
 });
 test('administrative plans never substitute defaults for missing or invalid configuration', async () => {
   const source = ts.transpileModule(read('app/lib/platform-plans.ts'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;

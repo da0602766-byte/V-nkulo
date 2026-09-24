@@ -39,9 +39,9 @@ export { DEFAULT_LANDING_PLANS };
 const FAQS = [
   ["Preciso instalar algum aplicativo?", "Não. O Vínkulo funciona diretamente no navegador do celular ou computador, sem instalação. A experiência é otimizada para toque e para telas pequenas."],
   ["Os dados da minha igreja ficam separados de outras?", "Sim. Cada comunidade é um ambiente isolado. Nenhuma outra igreja acessa seus dados operacionais — membros, células, relatórios ou comunicações."],
-  ["Posso usar a cor da minha igreja no sistema?", "Sim. Nos planos Crescimento e Rede, você pode personalizar a cor de acento do sistema com a identidade visual da sua comunidade."],
-  ["Como é o suporte?", "Por e-mail para o plano gratuito. Suporte prioritário para o plano Crescimento e suporte dedicado com gerente de conta para o plano Rede."],
-  ["Posso cancelar quando quiser?", "Sim. Não há fidelidade. Você cancela pelo painel e continua com acesso até o fim do período pago."],
+  ["Posso usar a cor da minha igreja no sistema?", "A personalização depende dos recursos liberados para a sua comunidade. Consulte as condições da proposta."],
+  ["Como é o suporte?", "O responsável pela plataforma informa o canal de atendimento ao analisar sua solicitação."],
+  ["Posso cancelar quando quiser?", "As condições de duração e encerramento constam na proposta apresentada antes da contratação."],
 ] as const;
 
 export default function LandingPageExperience({ signedIn, panelHref, canEdit, plans }: LandingPageExperienceProps) {
@@ -67,7 +67,7 @@ export default function LandingPageExperience({ signedIn, panelHref, canEdit, pl
       document.removeEventListener("keydown", escape);
     };
   }, [ownerAccessOpen]);
-  const signupHref = signedIn ? panelHref : "/login?modo=cadastro";
+  const signupHref = signedIn ? panelHref : "/log1";
   const loginHref = signedIn ? panelHref : "/login";
 
   return (
@@ -93,7 +93,7 @@ export default function LandingPageExperience({ signedIn, panelHref, canEdit, pl
           <h1>Tudo que sua <em>comunidade</em> precisa, conectado.</h1>
           <p>Células, ministérios, escalas, visitantes, pedidos de oração e muito mais — em uma plataforma feita para igrejas brasileiras.</p>
           <div className="lp-hero-actions">
-            <Link className="lp-button" href={signupHref} showLoading>{signedIn ? "Abrir meu painel" : "Começar grátis"}</Link>
+            <Link className="lp-button" href={signupHref} showLoading>{signedIn ? "Abrir meu painel" : "Solicitar comunidade"}</Link>
             <a className="lp-button lp-button-secondary" href="#fio-do-dia">Ver demonstração</a>
           </div>
           <div className="lp-social-proof">
@@ -129,7 +129,7 @@ export default function LandingPageExperience({ signedIn, panelHref, canEdit, pl
       </section>
 
       {canEdit && <section className="lp-section lp-shell" id="planos" data-editor-key="landing-governanca">
-        <Reveal className="lp-section-heading lp-centered"><SectionLabel>Planos</SectionLabel><h2>Simples e <em>transparente</em></h2><p>Comece grátis. Escale quando sua comunidade crescer.</p></Reveal>
+        <Reveal className="lp-section-heading lp-centered"><SectionLabel>Planos</SectionLabel><h2>Simples e <em>transparente</em></h2><p>Planos configurados para as necessidades da sua comunidade.</p></Reveal>
         <div className="lp-plan-grid">{plans.map((plan, index) => <Reveal key={plan.name} delay={index * 150}><article className={plan.featured ? "featured" : ""}>{plan.featured && <span className="lp-popular">Mais popular</span>}<h3>{plan.name}</h3><div className="lp-price"><strong>{plan.price}</strong>{plan.period && <span>{plan.period}</span>}</div><p>{plan.description}</p><ul>{plan.items.map((item) => <li key={item}><CheckIcon />{item}</li>)}</ul><Link className={`lp-button ${plan.featured ? "" : "lp-button-secondary"}`} href="/proprietario?tab=plans" showLoading>{plan.cta}</Link></article></Reveal>)}</div>
         <p className="lp-owner-plan-note">Esta prévia é exclusiva do proprietário. <Link href="/proprietario?tab=plans">Configurar planos e chamadas →</Link></p>
       </section>}
@@ -139,7 +139,7 @@ export default function LandingPageExperience({ signedIn, panelHref, canEdit, pl
         <div>{FAQS.map(([question, answer], index) => <Reveal key={question} delay={index * 100}><article><button type="button" aria-expanded={activeFaq === index} aria-controls={`faq-${index}`} onClick={() => setActiveFaq(activeFaq === index ? null : index)}><span>{question}</span><i aria-hidden="true">+</i></button><div id={`faq-${index}`} hidden={activeFaq !== index}><p>{answer}</p></div></article></Reveal>)}</div>
       </section>
 
-      <section className="lp-final"><Reveal className="lp-shell"><VinkuloMark light size={62} /><h2>Sua comunidade merece o melhor</h2><p>Comece gratuitamente hoje. Sem cartão de crédito.</p><Link className="lp-button lp-button-white" href={signupHref} showLoading>{signedIn ? "Abrir meu painel →" : "Criar conta grátis →"}</Link></Reveal></section>
+      <section className="lp-final"><Reveal className="lp-shell"><VinkuloMark light size={62} /><h2>Sua comunidade merece o melhor</h2><p>Encontre o plano adequado e solicite sua comunidade.</p><Link className="lp-button lp-button-white" href={signupHref} showLoading>{signedIn ? "Abrir meu painel →" : "Solicitar minha comunidade →"}</Link></Reveal></section>
 
       <footer className="lp-footer"><div className="lp-shell"><div className="lp-footer-main"><div><Link className="lp-brand" href="/"><VinkuloMark /><span>vínkulo</span></Link><p>Plataforma de gestão para igrejas e comunidades em português do Brasil.</p></div><nav aria-label="Links institucionais"><Link href="/termos">Termos de uso</Link><Link href="/privacidade">Privacidade</Link><Link href="/contato">Suporte</Link><Link href="/comunidades">Comunidades</Link></nav></div><div className="lp-footer-bottom"><span>© 2026 Vínkulo</span><span>Feito com cuidado para igrejas brasileiras</span></div></div></footer>
     </main>

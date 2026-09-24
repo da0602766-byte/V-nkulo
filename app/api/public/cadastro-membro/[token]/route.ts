@@ -1,6 +1,8 @@
+import { normalizeCpf,validBirthDate } from '../../../../lib/cpf';
+import { privateHash, rateLimit, secureToken } from '../../../../lib/access-security';
 import { getD1 } from "../../../../../db";
 import { getMemberRegistrationForm } from "../../../../lib/member-registration";
-import { createFirstAccessToken, generateTemporaryPassword, hashPassword } from "../../../../lib/local-auth";
+import { hashPassword, validatePassword } from "../../../../lib/local-auth";
 
 type Context = { params: Promise<{ token: string }> };
 const DAY_VALUES = new Set(["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"]);
@@ -17,6 +19,7 @@ export async function GET(_request: Request, context: Context) {
 
 export async function POST(request: Request, context: Context) {
   const token = (await context.params).token;
+  if (!await rateLimit(request,'member-link',token,30)) return Response.json({error:'Muitas tentativas. Aguarde 15 minutos.'},{status:429});
   const db = getD1();
   const registration = await getMemberRegistrationForm(db, token);
   if (!registration) {
@@ -44,7 +47,9 @@ export async function POST(request: Request, context: Context) {
   }
   const fullName = clean(form.get("fullName"), 120);
   const email = clean(form.get("email"), 180).toLocaleLowerCase("pt-BR");
-  const cpf = digits(form.get("cpf")).slice(0, 11);
+  const cpf = normalizeCpf(form.get("cpf"));
+  const senha = String(form.get("senha") || "");
+  if (!cpf || validatePassword(senha) || senha.length > 256) return Response.json({error:"Informe CPF válido e uma senha com pelo menos 8 caracteres, letras e números."},{status:400});
   const cep = digits(form.get("cep")).slice(0, 8);
   const birthDate = clean(form.get("birthDate"), 10);
   const communityId = positiveInteger(form.get("communityId"));
@@ -72,9 +77,6 @@ export async function POST(request: Request, context: Context) {
       { error: "Revise nome, e-mail, CEP, nascimento, comunidade, unção e ministério." },
       { status: 400 },
     );
-  }
-  if (cpf && !validCpf(cpf)) {
-    return Response.json({ error: "O CPF informado é inválido." }, { status: 400 });
   }
   if (functionId && !ministryFunction) {
     return Response.json({ error: "A função escolhida não pertence a este ministério." }, { status: 400 });
@@ -109,85 +111,31 @@ export async function POST(request: Request, context: Context) {
 
   const photoUrl = "";
 
-  const temporaryPassword = generateTemporaryPassword();
-  const passwordData = await hashPassword(temporaryPassword);
-  const account = await db.prepare(
-    `INSERT INTO usuarios
-     (nome, email, perfil, permissoes, senha_hash, senha_salt, titulo_eclesiastico, ativo, cadastro_dados)
-     VALUES (?, ?, 'LEITURA', '', ?, ?, 'MEMBRO', 1, ?)`,
-  ).bind(fullName, email, passwordData.hash, passwordData.salt, JSON.stringify({ origem: "LINK_CADASTRO_MEMBROS" })).run();
-  const userId = Number(account.meta.last_row_id);
-  await db.prepare(
-    `INSERT INTO usuario_comunidades (usuario_id, comunidade_id, papel, status)
-     VALUES (?, ?, 'MEMBRO', 'ATIVO')
-     ON CONFLICT(usuario_id, comunidade_id) DO UPDATE SET status = 'ATIVO', papel = 'MEMBRO'`,
-  ).bind(userId, community.id).run();
-
-  let firstAccess: Awaited<ReturnType<typeof createFirstAccessToken>>;
+  const passwordData = await hashPassword(senha);
+  const marker = JSON.stringify({ origem: 'LINK_CADASTRO_MEMBROS', operacao: secureToken() });
+  const cpfHash = await privateHash('cpf', cpf);
   try {
-    firstAccess = await createFirstAccessToken(userId);
+    const result = await db.batch([
+      db.prepare(`INSERT INTO usuarios(nome,email,perfil,permissoes,senha_hash,senha_salt,titulo_eclesiastico,ativo,cadastro_dados)
+        SELECT ?,?,'LEITURA','',?,?,'MEMBRO',1,? FROM links_cadastro_membros l
+        JOIN comunidades c ON c.id=l.comunidade_origem_id AND c.proprietario_usuario_id=l.criado_por AND c.status='ATIVA'
+        JOIN ministerios_comunidade m ON m.id=? AND m.comunidade_id=c.id AND m.status='ATIVO'
+        WHERE l.id=? AND c.id=? AND l.status='ATIVO' AND datetime(l.abre_em)<=CURRENT_TIMESTAMP AND datetime(l.fecha_em)>CURRENT_TIMESTAMP AND l.usos<l.max_usos`)
+        .bind(fullName,email,passwordData.hash,passwordData.salt,marker,ministry.id,registration.id,community.id),
+      db.prepare(`INSERT INTO identidades_cpf(usuario_id,cpf_hash,finais) SELECT id,?,? FROM usuarios WHERE email=? AND cadastro_dados=?`).bind(cpfHash,cpf.slice(-2),email,marker),
+      db.prepare(`INSERT INTO usuario_comunidades(usuario_id,comunidade_id,papel,status) SELECT id,?,'MEMBRO','ATIVO' FROM usuarios WHERE email=? AND cadastro_dados=?`).bind(community.id,email,marker),
+      db.prepare(`INSERT INTO cadastros_membros_temporarios(link_id,comunidade_id,ministerio_id,nome_completo,email,cpf,cep,data_nascimento,uncao,foto_url,ministerio_dados,status)
+        SELECT ?,?,?,?,?,?,?,?,?,?,?,'PENDENTE' WHERE EXISTS(SELECT 1 FROM usuarios WHERE email=? AND cadastro_dados=?)`)
+        .bind(registration.id,community.id,ministry.id,fullName,email,'***.***.***-'+cpf.slice(-2),cep,birthDate,anointing,photoUrl,
+          JSON.stringify({functionId:ministryFunction?.id||null,functionName:ministryFunction?.name||'',availableDays:[...new Set(days)],preferredPeriod:period||'FLEXIVEL',customAnswers}),email,marker),
+      db.prepare(`UPDATE links_cadastro_membros SET usos=usos+1 WHERE id=? AND EXISTS(SELECT 1 FROM usuarios WHERE email=? AND cadastro_dados=?)`).bind(registration.id,email,marker),
+      db.prepare(`INSERT INTO auditoria_piloto(comunidade_id,usuario_id,evento,resultado,metadados) SELECT ?,id,'CADASTRO_POR_LINK','SUCESSO',? FROM usuarios WHERE email=? AND cadastro_dados=?`).bind(community.id,JSON.stringify({linkId:registration.id}),email,marker),
+    ]);
+    if (!result[0].meta.changes) return Response.json({error:'O link não está mais disponível.'},{status:409});
+    return Response.json({submitted:true,accountCreated:true,membershipCreated:true,redirect:'/login'},{status:201,headers:{'Cache-Control':'no-store'}});
   } catch {
-    await db.prepare("DELETE FROM usuarios WHERE id = ?").bind(userId).run();
-    return Response.json(
-      { error: "Não foi possível preparar o primeiro acesso. Tente novamente." },
-      { status: 503 },
-    );
+    return Response.json({error:'Não foi possível concluir. Confira seus dados ou solicite à comunidade a revisão dos limites.'},{status:409});
   }
-
-  const result = await db
-    .prepare(
-      `INSERT INTO cadastros_membros_temporarios
-       (link_id, comunidade_id, ministerio_id, nome_completo, email, cpf, cep,
-        data_nascimento, uncao, foto_url, ministerio_dados, status)
-       SELECT ?, c.id, m.id, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDENTE'
-       FROM comunidades c
-       JOIN ministerios_comunidade m
-         ON m.id = ? AND m.comunidade_id = c.id AND m.status = 'ATIVO'
-       WHERE c.id = ? AND c.proprietario_usuario_id = ? AND c.status = 'ATIVA'`,
-    )
-    .bind(
-      registration.id,
-      fullName,
-      email,
-      cpf,
-      cep,
-      birthDate,
-      anointing,
-      photoUrl,
-      JSON.stringify({
-        functionId: ministryFunction?.id || null,
-        functionName: ministryFunction?.name || "",
-        availableDays: [...new Set(days)],
-        preferredPeriod: period || "FLEXIVEL",
-        customAnswers,
-      }),
-      ministry.id,
-      community.id,
-      registration.creatorId,
-    )
-    .run();
-  if (!Number(result.meta.changes)) {
-    await db.prepare("DELETE FROM usuarios WHERE id = ?").bind(userId).run();
-    return Response.json(
-      { error: "A comunidade ou o ministério não está mais disponível neste formulário." },
-      { status: 409 },
-    );
-  }
-  return Response.json(
-    {
-      submitted: true,
-      accountCreated: true,
-      membershipCreated: true,
-      registrationId: Number(result.meta.last_row_id),
-      firstAccess: {
-        path: `/primeiro-acesso?token=${encodeURIComponent(firstAccess.token)}&login=${encodeURIComponent(email)}`,
-        login: email,
-        temporaryPassword,
-        expiresAt: firstAccess.expiresAt,
-      },
-    },
-    { status: 201, headers: { "Cache-Control": "no-store" } },
-  );
 }
 
 function clean(value: unknown, maximum: number) {
@@ -199,19 +147,4 @@ function digits(value: unknown) {
 function positiveInteger(value: unknown) {
   const parsed = Number(value || 0);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
-}
-function validBirthDate(value: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const date = new Date(`${value}T12:00:00Z`);
-  return Number.isFinite(date.getTime()) && date.getTime() <= Date.now();
-}
-function validCpf(cpf: string) {
-  if (!/^\d{11}$/.test(cpf) || /^(\d)\1{10}$/.test(cpf)) return false;
-  const numbers = cpf.split("").map(Number);
-  for (let position = 9; position <= 10; position += 1) {
-    const sum = numbers.slice(0, position).reduce((total, digit, index) => total + digit * (position + 1 - index), 0);
-    const check = (sum * 10) % 11 % 10;
-    if (check !== numbers[position]) return false;
-  }
-  return true;
 }

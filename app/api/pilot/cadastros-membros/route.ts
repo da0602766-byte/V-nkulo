@@ -12,12 +12,12 @@ export async function GET() {
   await purgeInactiveLinks(db, access.user.id);
   const links = await db
     .prepare(
-      `SELECT l.id, l.token, l.titulo, l.abre_em, l.fecha_em, l.status, l.criado_em, l.auto_excluir,
+      `SELECT l.id, l.token, l.titulo, l.abre_em, l.fecha_em, l.status, l.criado_em, l.auto_excluir, l.max_usos, l.usos,
         origem.nome AS comunidade_origem_nome,
         CASE
           WHEN l.status != 'ATIVO' THEN 'CANCELADO'
           WHEN datetime('now') < datetime(l.abre_em) THEN 'AGUARDANDO'
-          WHEN datetime('now') >= datetime(l.fecha_em) THEN 'ENCERRADO'
+          WHEN datetime('now') >= datetime(l.fecha_em) OR l.usos >= l.max_usos THEN 'ENCERRADO'
           ELSE 'ABERTO'
         END AS estado,
         COUNT(cadastro.id) AS total_cadastros
@@ -69,6 +69,7 @@ export async function GET() {
         state: String(row.estado),
         originCommunityName: String(row.comunidade_origem_nome || ""),
         totalSubmissions: Number(row.total_cadastros || 0),
+        maxUses: Number(row.max_usos),
         autoDelete: Number(row.auto_excluir ?? 0) === 1,
       })),
       submissions: submissions.results.map((row) => ({
@@ -76,7 +77,7 @@ export async function GET() {
         linkId: Number(row.link_id),
         fullName: String(row.nome_completo || ""),
         email: String(row.email || ""),
-        cpf: String(row.cpf || ""),
+        cpf: row.cpf ? `***.***.***-${String(row.cpf).slice(-2)}` : '',
         cep: String(row.cep || ""),
         birthDate: String(row.data_nascimento || ""),
         anointing: String(row.uncao || ""),
@@ -100,9 +101,11 @@ export async function POST(request: Request) {
   const opensAt = parseDate(body.opensAt);
   const closesAt = parseDate(body.closesAt);
   const autoDelete = body.autoDelete === true;
-  if (title.length < 3 || !opensAt || !closesAt || closesAt <= opensAt) {
+  const maxUses=Number(body.maxUses ?? 100);
+  if(!Number.isInteger(maxUses)||maxUses<1||maxUses>10000|| (opensAt && closesAt && closesAt.getTime()-opensAt.getTime()>30*86400000)) return Response.json({error:'Use de 1 a 10000 cadastros e prazo de até 30 dias.'},{status:400});
+  if (title.length < 3 || !opensAt || !closesAt || closesAt <= opensAt || closesAt.getTime()-opensAt.getTime()>30*86400000 || closesAt.getTime()>Date.now()+30*86400000) {
     return Response.json(
-      { error: "Informe título, abertura e fechamento válidos." },
+      { error: "Informe título, abertura e fechamento válidos, com prazo máximo de 30 dias." },
       { status: 400 },
     );
   }
@@ -117,8 +120,8 @@ export async function POST(request: Request) {
   const result = await db
     .prepare(
       `INSERT INTO links_cadastro_membros
-       (comunidade_origem_id, criado_por, token, titulo, abre_em, fecha_em, status, auto_excluir)
-       SELECT c.id, ?, ?, ?, ?, ?, 'ATIVO', ?
+       (comunidade_origem_id, criado_por, token, titulo, abre_em, fecha_em, status, auto_excluir, max_usos)
+       SELECT c.id, ?, ?, ?, ?, ?, 'ATIVO', ?, ?
        FROM comunidades c
        WHERE c.id = ? AND c.proprietario_usuario_id = ? AND c.status = 'ATIVA'`,
     )
@@ -129,6 +132,7 @@ export async function POST(request: Request) {
       opensAt.toISOString(),
       closesAt.toISOString(),
       autoDelete ? 1 : 0,
+      maxUses,
       access.context.comunidadeId,
       access.user.id,
     )
@@ -190,9 +194,9 @@ export async function PATCH(request: Request) {
   const opensAt = parseDate(body.opensAt);
   const closesAt = parseDate(body.closesAt);
   const autoDelete = body.autoDelete === true;
-  if (title.length < 3 || !opensAt || !closesAt || closesAt <= opensAt) {
+  if (title.length < 3 || !opensAt || !closesAt || closesAt <= opensAt || closesAt.getTime()-opensAt.getTime()>30*86400000 || closesAt.getTime()>Date.now()+30*86400000) {
     return Response.json(
-      { error: "Informe título, abertura e fechamento válidos." },
+      { error: "Informe título, abertura e fechamento válidos, com prazo máximo de 30 dias." },
       { status: 400 },
     );
   }

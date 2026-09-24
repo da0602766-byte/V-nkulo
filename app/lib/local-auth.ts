@@ -8,7 +8,7 @@ const PREVIEW_SESSION_COOKIE = "adote_preview_session";
 const LEGACY_SESSION_COOKIE = "adote_session";
 const SESSION_DAYS = 14;
 const PASSWORD_ITERATIONS = 100_000;
-type SignedSessionPayload = { u: number; e: number; n: string; p: string };
+type SignedSessionPayload = { u: number; e: number; n: string; p: string; scope?: 'owner' | 'member'; amr?: 'pwd' };
 
 export function normalizeEmail(value: unknown) {
   return String(value || "")
@@ -70,16 +70,17 @@ export async function setUserPassword(userId: number, password: string) {
   ]);
 }
 
-export async function createSession(userId: number) {
+export async function createSession(userId: number, scope: 'member' | 'owner' = 'member') {
   const token = randomHex(32);
   const tokenHash = await sha256(token);
-  const expires = new Date(Date.now() + SESSION_DAYS * 86400000);
+  const expires = new Date(Date.now() + (scope === 'owner' ? 3600000 : SESSION_DAYS * 86400000));
   const db = getD1();
   const previousSessionHash = await getCurrentSessionTokenHash();
   const password = await db
-    .prepare("SELECT senha_hash FROM usuarios WHERE id = ? LIMIT 1")
+    .prepare("SELECT senha_hash, email, criado_em, ativo FROM usuarios WHERE id = ? LIMIT 1")
     .bind(userId)
-    .first<{ senha_hash: string | null }>();
+    .first<{ senha_hash: string | null; email: string; criado_em: string; ativo: number }>();
+  if (!password?.ativo || (scope === 'owner' && !isSystemOwnerAccount(password))) throw new Error('Sessão não autorizada.');
   if (!password?.senha_hash)
     throw new Error(
       "Não foi possível criar uma sessão segura para este cadastro.",
@@ -103,6 +104,8 @@ export async function createSession(userId: number) {
     e: expires.getTime(),
     n: token,
     p: (await sha256(password.senha_hash)).slice(0, 24),
+    scope,
+    amr: 'pwd',
   };
   const encoded = base64UrlEncode(JSON.stringify(payload));
   return { token: `${encoded}.${await signSession(encoded)}`, expires };
@@ -120,7 +123,7 @@ export function attachSessionCookie(
 ) {
   response.headers.append(
     "Set-Cookie",
-    `${SESSION_COOKIE}=${session.token}; Path=/; Max-Age=${SESSION_DAYS * 86400}; Expires=${session.expires.toUTCString()}; HttpOnly; Secure; SameSite=Lax`,
+    `${SESSION_COOKIE}=${session.token}; Path=/; Max-Age=${Math.max(0, Math.floor((session.expires.getTime() - Date.now()) / 1000))}; Expires=${session.expires.toUTCString()}; HttpOnly; Secure; SameSite=Lax`,
   );
   response.headers.append(
     "Set-Cookie",
@@ -240,7 +243,8 @@ export async function getSessionState(): Promise<SessionState> {
     const user = Object.fromEntries(
       Object.entries(row).filter(([key]) => key !== "senha_hash"),
     ) as AppUser;
-    return { user: applySystemOwnerRole(user), reason: "ok" };
+    if (!user.ativo) return { user: null, reason: 'usuario_ausente' };
+    return { user: signed.scope === 'owner' ? applySystemOwnerRole(user) : memberSessionUser(user), reason: "ok" };
   }
 
   const session = await db
@@ -266,8 +270,8 @@ export async function getSessionState(): Promise<SessionState> {
     )
     .bind(session.usuario_id)
     .first<AppUser>();
-  return user
-    ? { user: applySystemOwnerRole(user), reason: "ok" }
+  return user?.ativo
+    ? { user: memberSessionUser(user), reason: "ok" }
     : { user: null, reason: "usuario_ausente" };
 }
 
@@ -285,6 +289,11 @@ export function isSystemOwnerAccount(
     Number.isFinite(createdAt) &&
     createdAt <= lockedBefore
   );
+}
+
+function memberSessionUser(user: AppUser): AppUser {
+  // The global owner's normal login only receives their community membership permissions.
+  return isSystemOwnerAccount(user) ? {...user,perfil:'ACOMPANHANTE',system_owner:false} : user;
 }
 
 function applySystemOwnerRole(user: AppUser): AppUser {
@@ -408,24 +417,18 @@ export async function consumeFirstAccessToken(input: {
 }
 
 export async function consumeResetToken(token: string, password: string) {
-  const db = getD1();
-  const row = await db
-    .prepare(
-      "SELECT usuario_id FROM redefinicoes_senha WHERE token_hash = ? AND usado = 0 AND datetime(expira_em) > CURRENT_TIMESTAMP LIMIT 1",
-    )
-    .bind(await sha256(token))
-    .first<{ usuario_id: number }>();
-  if (!row) return false;
-  await setUserPassword(row.usuario_id, password);
-  await db
-    .prepare("UPDATE redefinicoes_senha SET usado = 1 WHERE usuario_id = ? AND usado = 0")
-    .bind(row.usuario_id)
-    .run();
-  await db
-    .prepare("DELETE FROM sessoes WHERE usuario_id = ?")
-    .bind(row.usuario_id)
-    .run();
-  return true;
+  if (!/^[a-f0-9]{64}$/.test(token) || validatePassword(password) || password.length>256) return false;
+  const db=getD1();const digest=await sha256(token);
+  const row=await db.prepare("SELECT usuario_id FROM redefinicoes_senha WHERE token_hash=? AND usado=0 AND datetime(expira_em)>CURRENT_TIMESTAMP").bind(digest).first<{usuario_id:number}>();
+  if(!row)return false;
+  const {hash,salt}=await hashPassword(password);
+  const result=await db.batch([
+    db.prepare("UPDATE usuarios SET senha_hash=?,senha_salt=?,tentativas_login=0,bloqueado_ate=NULL,atualizado_em=CURRENT_TIMESTAMP WHERE id=? AND ativo=1 AND EXISTS(SELECT 1 FROM redefinicoes_senha WHERE token_hash=? AND usado=0 AND datetime(expira_em)>CURRENT_TIMESTAMP)").bind(hash,salt,row.usuario_id,digest),
+    db.prepare("UPDATE redefinicoes_senha SET usado=1 WHERE usuario_id=? AND usado=0 AND changes()=1").bind(row.usuario_id),
+    db.prepare("DELETE FROM sessoes WHERE usuario_id=? AND EXISTS(SELECT 1 FROM usuarios WHERE id=? AND senha_hash=?)").bind(row.usuario_id,row.usuario_id,hash),
+    db.prepare("INSERT INTO auditoria_piloto(usuario_id,evento,resultado,metadados) SELECT id,'SENHA_REDEFINIDA','SUCESSO','{}' FROM usuarios WHERE id=? AND senha_hash=?").bind(row.usuario_id,hash),
+  ]);
+  return Number(result[0].meta.changes)>0;
 }
 
 export async function sha256(value: string) {

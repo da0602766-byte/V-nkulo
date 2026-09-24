@@ -38,11 +38,11 @@ export async function getMemberRegistrationForm(
   if (!/^[0-9a-f-]{36}$/i.test(token)) return null;
   const link = await db
     .prepare(
-      `SELECT l.id, l.titulo, l.abre_em, l.fecha_em, l.status, l.criado_por,
+      `SELECT l.id, l.comunidade_origem_id, l.titulo, l.abre_em, l.fecha_em, l.status, l.criado_por,
         CASE
           WHEN l.status != 'ATIVO' THEN 'CANCELADO'
           WHEN datetime('now') < datetime(l.abre_em) THEN 'AGUARDANDO'
-          WHEN datetime('now') >= datetime(l.fecha_em) THEN 'ENCERRADO'
+          WHEN datetime('now') >= datetime(l.fecha_em) OR l.usos >= l.max_usos THEN 'ENCERRADO'
           ELSE 'ABERTO'
         END AS estado,
         CAST(strftime('%s', 'now') AS INTEGER) * 1000 AS agora_ms
@@ -63,10 +63,10 @@ export async function getMemberRegistrationForm(
     .prepare(
       `SELECT id, nome
        FROM comunidades
-       WHERE proprietario_usuario_id = ? AND status = 'ATIVA'
+       WHERE proprietario_usuario_id = ? AND id = ? AND status = 'ATIVA'
        ORDER BY nome ASC, id ASC`,
     )
-    .bind(creatorId)
+    .bind(creatorId, Number(link.comunidade_origem_id))
     .all<Row>();
   const communityIds = communitiesResult.results.map((row) => Number(row.id));
   if (!communityIds.length) return null;

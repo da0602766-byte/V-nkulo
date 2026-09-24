@@ -6,8 +6,13 @@ migração nova, leia isto.
 
 ## Próximo número livre
 
-**`0079`**. Use o próximo inteiro disponível a partir daí — não reaproveite
+**`0080`**. Use o próximo inteiro disponível a partir daí — não reaproveite
 um número já usado, mesmo que o arquivo tenha sido escrito à mão.
+
+`0079_controlled_onboarding.sql` adiciona identidade CPF por HMAC, solicitações
+LOG1, catálogo de planos, links de contratação e assinaturas. Não altera contas
+ou vínculos existentes. Seus triggers de cota são parte obrigatória da migração.
+Veja `docs/ACESSO_LOG1_PLANOS.md` para implantação, retenção e rollback.
 
 `0078_push_delivery_queue.sql` cria a fila, o controle do consumidor e um trigger
 que inclui as entregas na mesma transação de cada nova notificação individual.

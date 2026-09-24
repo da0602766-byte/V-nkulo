@@ -154,9 +154,9 @@ test("gate do piloto protege recursos críticos e reautentica controles de rede"
   assert.match(networks, /networkModuleEnabled/);
   assert.match(networks, /status:\s*404/);
   assert.match(editorial, /autoPublish:\s*false/);
-  assert.match(config, /openRegistrationEnabled:\s*true/);
-  assert.match(signup, /INSERT INTO usuarios/);
-  assert.match(signup, /membershipCreated:\s*false/);
+  assert.match(config, /openRegistrationEnabled:\s*false/);
+  assert.match(signup, /status:\s*403/);
+  assert.doesNotMatch(signup, /INSERT INTO usuarios|createSession/);
   assert.doesNotMatch(signup, /INSERT INTO usuario_comunidades/);
   assert.match(migration, /'network_module_enabled','GLOBAL',0,0/);
   assert.match(migration, /'COM_REVISAO','ATIVA',0/);
@@ -266,7 +266,9 @@ test("páginas, temas e responsividade do VÍNKULO permanecem explícitos", asyn
   assert.match(landingStyles, /@media \(max-width:620px\)/);
   assert.match(privacy, /Política de Privacidade/);
   assert.match(terms, /Termos de Uso/);
-  assert.match(plans, /Não existe checkout/i);
+  assert.match(plans, /getLandingPlans/);
+  assert.match(plans, /LOG1/);
+  assert.doesNotMatch(plans, /pagamento aprovado|checkout simulado/i);
   assert.match(login, /getPilotLoginConfig/);
   assert.match(login, /siteName=\{config\.siteName\}/);
   assert.match(styles, /html\[data-pilot-theme="escuro"\]/);

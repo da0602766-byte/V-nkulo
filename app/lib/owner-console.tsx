@@ -17,6 +17,7 @@ export type OwnerTab =
   | "overview"
   | "decisions"
   | "requests"
+  | "onboarding"
   | "communities"
   | "users"
   | "audit"
@@ -43,6 +44,7 @@ export const TABS: { id: OwnerTab; label: string }[] = [
   { id: "overview", label: "Visão executiva" },
   { id: "decisions", label: "Pendências" },
   { id: "requests", label: "Solicitações" },
+  { id: "onboarding", label: "LOG1 e contratação" },
   { id: "communities", label: "Comunidades" },
   { id: "users", label: "Pessoas" },
   { id: "audit", label: "Segurança e auditoria" },
@@ -66,7 +68,7 @@ export const TABS: { id: OwnerTab; label: string }[] = [
 
 export const OWNER_NAV_SECTIONS: { id: string; label: string; items: OwnerTab[] }[] = [
   { id: "command", label: "Comando", items: ["overview", "decisions"] },
-  { id: "operation", label: "Operação", items: ["communities", "users", "finance", "statistics"] },
+  { id: "operation", label: "Operação", items: ["onboarding", "communities", "users", "finance", "statistics"] },
   { id: "reliability", label: "Confiabilidade", items: ["performance", "realtime", "audit"] },
   { id: "platform", label: "Plataforma", items: ["controls", "appearance", "plans", "editorial", "optimization"] },
   { id: "system", label: "Sistema", items: ["integrations", "publication", "laboratory"] },

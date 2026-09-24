@@ -1,4 +1,5 @@
 "use client";
+import InviteRevocationList from './InviteRevocationList';
 
 import Link from "./StableLink";
 import dynamic from "next/dynamic";
@@ -933,7 +934,7 @@ export default function PilotDashboard({
       const response = await fetch("/api/pilot/convites", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...body, papel: "MEMBRO" }),
+        body: JSON.stringify(body),
       });
       const result = (await response.json()) as { error?: string; inviteUrl?: string };
       if (!response.ok) throw new Error(result.error || "Não foi possível criar.");
@@ -1404,12 +1405,13 @@ export default function PilotDashboard({
                     <>
                       <form className="pilot-form invite-generator" onSubmit={createInvite}>
                         <label>E-mail da pessoa<input name="email" type="email" required autoComplete="off" /></label>
-                        <label>Perfil<select name="papel" value="MEMBRO" disabled><option value="MEMBRO">Membro</option></select></label>
+                        <label>Perfil<select name="papel" defaultValue="MEMBRO"><option value="MEMBRO">Membro</option>{(active.isCommunityOwner || active.isOwner) && <><option value="LIDER">Líder</option><option value="ADMIN_COMUNIDADE">Administrador da comunidade</option></>}</select></label>
+                        <label>Validade (horas)<input name="horas" type="number" min={1} max={168} defaultValue={48} required /></label>
                         <button disabled={inviteLoading}>{inviteLoading ? "Criando…" : "Criar convite"}</button>
                       </form>
                       {inviteMessage && <p className="pilot-form-message" role="status">{inviteMessage}</p>}
                       {inviteLink && <div className="invite-result"><label>Link individual<input readOnly value={inviteLink} onFocus={(event) => event.currentTarget.select()} /></label><button onClick={() => navigator.clipboard.writeText(inviteLink)}>Copiar link</button></div>}
-                      <div className="sensitive-action-note"><strong>Perfis privilegiados bloqueados</strong><p>Convites para líderes, pastores ou administradores exigirão MFA, reautenticação e revisão.</p></div>
+                      <InviteRevocationList refreshKey={inviteLink} />
                     </>
                   ) : null
                 }

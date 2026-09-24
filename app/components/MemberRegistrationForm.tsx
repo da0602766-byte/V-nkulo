@@ -12,6 +12,7 @@ type Values = {
   fullName: string;
   email: string;
   cpf: string;
+  senha: string;
   cep: string;
   birthDate: string;
   communityId: string;
@@ -24,13 +25,6 @@ type Values = {
   acceptedTerms: boolean;
 };
 
-type FirstAccess = {
-  path: string;
-  login: string;
-  temporaryPassword: string;
-  expiresAt: string;
-};
-
 export default function MemberRegistrationForm({
   token,
   registration,
@@ -40,7 +34,7 @@ export default function MemberRegistrationForm({
 }) {
   const initialCommunity = registration.communities[0];
   const [values, setValues] = useState<Values>({
-    fullName: "", email: "", cpf: "", cep: "", birthDate: "",
+    fullName: "", email: "", cpf: "", senha: "", cep: "", birthDate: "",
     communityId: initialCommunity ? String(initialCommunity.id) : "",
     anointing: initialCommunity?.anointings[0]?.id || "",
     ministryId: initialCommunity?.ministries[0] ? String(initialCommunity.ministries[0].id) : "",
@@ -50,8 +44,6 @@ export default function MemberRegistrationForm({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(false);
-  const [firstAccess, setFirstAccess] = useState<FirstAccess | null>(null);
-  const [accessCopied, setAccessCopied] = useState(false);
   const [remaining, setRemaining] = useState(() => Math.max(0, Date.parse(registration.state === "AGUARDANDO" ? registration.opensAt : registration.closesAt) - registration.serverNow));
 
   const community = useMemo(
@@ -99,10 +91,8 @@ export default function MemberRegistrationForm({
       values.availableDays.forEach((day) => body.append("availableDays", day));
       Object.entries(values.extras).forEach(([id, value]) => body.set(`extra:${id}`, value));
       const response = await fetch(`/api/public/cadastro-membro/${token}`, { method: "POST", body });
-      const result = await response.json() as { error?: string; firstAccess?: FirstAccess };
+      const result = await response.json() as { error?: string };
       if (!response.ok) throw new Error(result.error || "Não foi possível enviar o cadastro.");
-      if (!result.firstAccess) throw new Error("A conta foi criada, mas os dados do primeiro acesso não foram recebidos.");
-      setFirstAccess(result.firstAccess);
       setSubmitted(true);
     } catch (submissionError) {
       setError((submissionError as Error).message);
@@ -111,37 +101,29 @@ export default function MemberRegistrationForm({
     }
   }
 
-  async function copyFirstAccess() {
-    if (!firstAccess) return;
-    const url = new URL(firstAccess.path, window.location.origin).toString();
-    await navigator.clipboard.writeText(
-      `VÍNKULO — primeiro acesso\nLink: ${url}\nLogin: ${firstAccess.login}\nSenha temporária: ${firstAccess.temporaryPassword}`,
-    );
-    setAccessCopied(true);
-  }
-
   if (registration.state !== "ABERTO") {
     return <main className="member-registration-public"><section className="member-registration-state"><span aria-hidden="true">V+</span><p>CADASTRO DE MEMBROS</p><h1>{registration.title}</h1><strong>{registration.state === "AGUARDANDO" ? "O formulário ainda não abriu" : registration.state === "ENCERRADO" ? "O período de cadastro terminou" : "Este formulário foi cancelado"}</strong>{registration.state === "AGUARDANDO" && <><time>{formatDate(registration.opensAt)}</time><em>{formatRemaining(remaining)}</em></>}<small>As opções são carregadas somente das comunidades pertencentes ao criador deste link.</small></section></main>;
   }
-  if (submitted && firstAccess) {
-    return <main className="member-registration-public"><section className="member-registration-success member-first-access-success"><span aria-hidden="true">✓</span><p>CONTA CRIADA</p><h1>Bem-vindo, {values.fullName.split(" ")[0]}.</h1><strong>Seu primeiro acesso à comunidade {community?.name} está pronto.</strong><small>Guarde estes dados agora. A senha temporária é exibida somente nesta tela e deverá ser substituída ao entrar.</small><dl className="member-first-access-credentials"><div><dt>Login</dt><dd>{firstAccess.login}</dd></div><div><dt>Senha temporária</dt><dd><code>{firstAccess.temporaryPassword}</code></dd></div><div><dt>Validade do link</dt><dd>{formatDate(firstAccess.expiresAt)}</dd></div></dl><div className="member-first-access-actions"><button type="button" onClick={() => void copyFirstAccess()}>{accessCopied ? "Dados copiados" : "Copiar dados de acesso"}</button><a className="member-registration-login" href={firstAccess.path} target="_blank" rel="noreferrer">Criar minha senha e entrar →</a></div></section></main>;
+  if (submitted) {
+    return <main className="member-registration-public"><section className="member-registration-success"><span aria-hidden="true">✓</span><h1>Seu cadastro foi concluído.</h1><p>Entre com seu CPF e a senha que você criou para acessar a comunidade.</p><a className="member-registration-login" href="/login">Entrar no Vínkulo →</a></section></main>;
   }
 
   return (
     <main className="member-registration-public">
       <header className="member-registration-public-head"><span aria-hidden="true">V+</span><div><p>VÍNKULO · CADASTRO TEMPORÁRIO</p><h1>{registration.title}</h1><small>Aberto até {formatDate(registration.closesAt)} · {formatRemaining(remaining)}</small></div></header>
       {!reviewing ? (
-        <form className="member-registration-public-form" onSubmit={(event) => { event.preventDefault(); setError(""); setReviewing(true); }}>
+        <form method="post" className="member-registration-public-form" onSubmit={(event) => { event.preventDefault(); setError(""); setReviewing(true); }}>
           <section><header><b>01</b><div><h2>Seus dados e sua conta</h2><p>Preencha o cadastro e crie o acesso que você usará na comunidade.</p></div></header><div className="member-registration-fields">
             <div className="member-registration-photo member-registration-photo-private"><span aria-hidden="true">☁</span><strong>Foto após o primeiro acesso <small>A imagem será salva no seu Google Drive ou somente no aparelho; nunca no Vínkulo.</small></strong></div>
             <label>Nome completo*<input required minLength={5} maxLength={120} value={values.fullName} onChange={(event) => update("fullName", event.target.value)} autoComplete="name" /></label>
             <label>E-mail*<input required type="email" maxLength={180} value={values.email} onChange={(event) => update("email", event.target.value)} autoComplete="email" /></label>
-            <label>CPF <small>Opcional</small><input inputMode="numeric" maxLength={14} value={values.cpf} onChange={(event) => update("cpf", event.target.value)} /></label>
+            <label>CPF*<input required inputMode="numeric" maxLength={14} value={values.cpf} onChange={(event) => update("cpf", event.target.value)} /></label>
+            <label>Crie sua senha*<input required type="password" minLength={8} maxLength={256} autoComplete="new-password" value={values.senha} onChange={event=>update('senha',event.target.value)}/><small>Use letras e números.</small></label>
             <label>CEP*<input required inputMode="numeric" pattern="[0-9. -]{8,10}" maxLength={10} value={values.cep} onChange={(event) => update("cep", event.target.value)} autoComplete="postal-code" /></label>
             <label>Data de nascimento*<input required type="date" max={new Date().toISOString().slice(0, 10)} value={values.birthDate} onChange={(event) => update("birthDate", event.target.value)} /></label>
             <label className="member-registration-consent member-registration-wide"><input required type="checkbox" checked={values.acceptedTerms} onChange={(event) => update("acceptedTerms", event.target.checked)} /><span>Concordo com os Termos de Uso e a Política de Privacidade.</span></label>
           </div></section>
-          <section><header><b>02</b><div><h2>Comunidade e unção</h2><p>Somente opções do proprietário deste link.</p></div></header><div className="member-registration-fields">
+          <section><header><b>02</b><div><h2>Comunidade e unção</h2><p>Cadastro vinculado à comunidade que emitiu o link.</p></div></header><div className="member-registration-fields">
             <label>Comunidade*<select required value={values.communityId} onChange={(event) => chooseCommunity(event.target.value)}>{registration.communities.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
             <label>Unção*<select required value={values.anointing} onChange={(event) => update("anointing", event.target.value)}>{community?.anointings.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
           </div></section>
@@ -157,9 +139,9 @@ export default function MemberRegistrationForm({
           <button className="member-registration-primary" disabled={!ministry || !values.acceptedTerms}>Revisar cadastro e conta <span aria-hidden="true">→</span></button>
         </form>
       ) : (
-        <section className="member-registration-review"><header><p>REVISÃO FINAL</p><h2>Confira antes de criar sua conta</h2><span>Ao confirmar, sua conta será criada e você receberá um link com login e senha temporária para o primeiro acesso.</span></header><dl><div><dt>Nome</dt><dd>{values.fullName}</dd></div><div><dt>E-mail</dt><dd>{values.email}</dd></div><div><dt>CPF</dt><dd>{values.cpf || "Não informado"}</dd></div><div><dt>CEP</dt><dd>{values.cep}</dd></div><div><dt>Nascimento</dt><dd>{formatSimpleDate(values.birthDate)}</dd></div><div><dt>Comunidade</dt><dd>{community?.name}</dd></div><div><dt>Unção</dt><dd>{community?.anointings.find((item) => item.id === values.anointing)?.name}</dd></div><div><dt>Ministério</dt><dd>{ministry?.name}</dd></div><div><dt>Dias disponíveis</dt><dd>{values.availableDays.length ? values.availableDays.map((day) => DAYS.find(([id]) => id === day)?.[1]).join(", ") : "A combinar"}</dd></div></dl>{error && <p className="member-registration-feedback" role="alert">{error}</p>}<footer><button type="button" onClick={() => setReviewing(false)}>← Editar informações</button><button type="button" disabled={sending} onClick={() => void submit()}>{sending ? "Criando primeiro acesso…" : "Criar conta e gerar primeiro acesso"}</button></footer></section>
+        <section className="member-registration-review"><header><p>REVISÃO FINAL</p><h2>Confira antes de criar sua conta</h2><span>Ao confirmar, sua conta será criada nesta comunidade. Use CPF e senha para entrar.</span></header><dl><div><dt>Nome</dt><dd>{values.fullName}</dd></div><div><dt>E-mail</dt><dd>{values.email}</dd></div><div><dt>CPF</dt><dd>{`***.***.***-${values.cpf.replace(/\D/g, "").slice(-2)}`}</dd></div><div><dt>CEP</dt><dd>{values.cep}</dd></div><div><dt>Nascimento</dt><dd>{formatSimpleDate(values.birthDate)}</dd></div><div><dt>Comunidade</dt><dd>{community?.name}</dd></div><div><dt>Unção</dt><dd>{community?.anointings.find((item) => item.id === values.anointing)?.name}</dd></div><div><dt>Ministério</dt><dd>{ministry?.name}</dd></div><div><dt>Dias disponíveis</dt><dd>{values.availableDays.length ? values.availableDays.map((day) => DAYS.find(([id]) => id === day)?.[1]).join(", ") : "A combinar"}</dd></div></dl>{error && <p className="member-registration-feedback" role="alert">{error}</p>}<footer><button type="button" onClick={() => setReviewing(false)}>← Editar informações</button><button type="button" disabled={sending} onClick={() => void submit()}>{sending ? "Criando cadastro…" : "Concluir meu cadastro"}</button></footer></section>
       )}
-      <footer className="member-registration-privacy">As informações ficam restritas ao proprietário das comunidades exibidas neste formulário.</footer>
+      <footer className="member-registration-privacy">As informações ficam restritas à gestão autorizada da comunidade.</footer>
     </main>
   );
 }
