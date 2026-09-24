@@ -195,7 +195,7 @@ export async function POST(request: Request) {
       .bind(targetUserId, access.user.id, access.context.comunidadeId, conversation.id, access.user.id),
     db.prepare("UPDATE conversas_privadas SET atualizado_em = CURRENT_TIMESTAMP WHERE id = ?").bind(conversation.id),
   ]);
-  const inserted = saved[0].results[0] as { id: number; criado_em: string } | undefined;
+  const inserted = saved[0]?.results?.[0] as { id: number; criado_em: string } | undefined;
   if (!inserted) return Response.json({ error: "Não foi possível enviar a mensagem." }, { status: 500 });
   scheduleWebPushDelivery(db);
 
