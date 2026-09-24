@@ -62,7 +62,9 @@ export async function sendWebPush(
   const authorization = await createVapidAuthorization(subscription.endpoint, configuration);
   return fetch(subscription.endpoint, {
     method: "POST",
-    redirect: "error",
+    // Workers rejects redirect:error before sending. Return redirects to the
+    // queue, which rejects non-2xx responses; never forward VAPID to another host.
+    redirect: "manual",
     signal: AbortSignal.timeout(5_000),
     headers: {
       Authorization: authorization,

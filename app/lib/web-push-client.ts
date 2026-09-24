@@ -57,19 +57,22 @@ export async function subscribeWebPushNotifications() {
   if (!isWebPushSupported()) {
     throw new Error("Este navegador não oferece notificações push.");
   }
-  const configResponse = await fetch("/api/push-subscriptions", { cache: "no-store" });
-  const config = (await configResponse.json().catch(() => ({}))) as PushSubscriptionResponse;
-  if (!configResponse.ok || !config.publicKey) {
-    throw new Error(config.error || "As notificações push ainda não foram configuradas.");
-  }
+  // Ask within the user's click, before network I/O can consume transient
+  // activation (required by browsers such as Safari).
   const permission = Notification.permission === "default"
     ? await Notification.requestPermission()
     : Notification.permission;
   if (permission !== "granted") {
     throw new Error("A permissão de notificações não foi liberada neste aparelho.");
   }
+  const configResponse = await fetch("/api/push-subscriptions", { cache: "no-store" });
+  const config = (await configResponse.json().catch(() => ({}))) as PushSubscriptionResponse;
+  if (!configResponse.ok || !config.publicKey) {
+    throw new Error(config.error || "As notificações push ainda não foram configuradas.");
+  }
 
   const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+  await waitForActiveServiceWorker(registration);
   let subscription = await registration.pushManager.getSubscription();
   const applicationServerKey = base64UrlToUint8Array(config.publicKey);
   if (subscription && !sameApplicationServerKey(subscription, applicationServerKey)) {
@@ -92,6 +95,26 @@ export async function subscribeWebPushNotifications() {
     throw new Error(saved.error || "Não foi possível ativar as notificações push.");
   }
   return { registration, subscription };
+}
+
+function waitForActiveServiceWorker(registration: ServiceWorkerRegistration) {
+  if (registration.active?.state === "activated") return Promise.resolve();
+  const worker = registration.installing || registration.waiting || registration.active;
+  if (!worker) return Promise.reject(new Error("Não foi possível preparar os avisos. Atualize a página e tente ativar novamente."));
+  return new Promise<void>((resolve, reject) => {
+    const finish = (error?: Error) => {
+      clearTimeout(timer);
+      worker.removeEventListener("statechange", check);
+      if (error) reject(error); else resolve();
+    };
+    const check = () => {
+      if (worker.state === "activated") finish();
+      else if (worker.state === "redundant") finish(new Error("A instalação dos avisos foi interrompida. Atualize a página e tente novamente."));
+    };
+    const timer = setTimeout(() => finish(new Error("A preparação dos avisos demorou mais que o esperado. Verifique a conexão e tente novamente.")), 15_000);
+    worker.addEventListener("statechange", check);
+    check();
+  });
 }
 
 export async function unsubscribeWebPushNotifications() {

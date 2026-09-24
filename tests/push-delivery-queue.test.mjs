@@ -134,6 +134,18 @@ test("fila push: erro 503 recupera, recusa permanente encerra e espera acima do 
   assert.equal(f.rows()[2].estado, "EXPIRADA");
 });
 
+test("fila push: redirecionamento do provedor não conta como aceite nem é repetido", async t => {
+  const f = await fixture(t);
+  f.notify();
+  f.sender(async () => new Response(null, { status: 307, headers: { Location: "https://untrusted.example.test" } }));
+  await f.queue.drainPushQueue(f.d1);
+  assert.equal(f.rows()[0].estado, "FALHA");
+  assert.equal(f.rows()[0].ultimo_status, 307);
+  assert.equal(f.rows()[0].motivo, "RECUSADO_PELO_PROVEDOR");
+  await f.queue.drainPushQueue(f.d1);
+  assert.equal(f.calls.length, 1);
+});
+
 test("fila push: revalida leitura, conta ativa, sessão, vínculo e prazo antes de enviar", async t => {
   const f = await fixture(t);
   const read = f.notify();
