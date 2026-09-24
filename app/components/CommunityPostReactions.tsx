@@ -47,6 +47,7 @@ export default function CommunityPostReactions({
   const [mine, setMine] = useState(() => new Set(parseTypes(initialMine)));
   const [pickerOpen, setPickerOpen] = useState(false);
   const [working, setWorking] = useState<ReactionType | null>(null);
+  const [error, setError] = useState("");
 
   const total = useMemo(
     () => Object.values(counts).reduce((sum, count) => sum + count, 0),
@@ -55,6 +56,7 @@ export default function CommunityPostReactions({
 
   async function toggle(type: ReactionType) {
     if (working) return;
+    setError("");
     const hadReaction = mine.has(type);
     setWorking(type);
     setMine((current) => {
@@ -77,7 +79,8 @@ export default function CommunityPostReactions({
       if (!response.ok) throw new Error(payload.error || "Não foi possível registrar a reação.");
       if (payload.contagens) setCounts(payload.contagens);
       if (payload.minhas) setMine(new Set(payload.minhas));
-    } catch {
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Não foi possível registrar a reação. Tente novamente.");
       setMine((current) => {
         const next = new Set(current);
         if (hadReaction) next.add(type);
@@ -125,6 +128,7 @@ export default function CommunityPostReactions({
       >
         <span aria-hidden="true">♡</span>{mine.size ? "Reagiu" : "Reagir"}
       </button>
+      {error && <small className="community-reaction-error" role="alert">{error}</small>}
     </div>
   );
 }

@@ -55,7 +55,7 @@ export default async function PilotPanelPage({
   const db = getD1();
   const [feed, features, parkingEnabled, communityTheme, promocao, introducao] =
     await Promise.all([
-      getPilotFeed(tenant.context.comunidadeId),
+      getPilotFeed(tenant.context.comunidadeId, session.user.id, tenant.context.permissions.includes("feed.moderate")),
       getPilotFeatureState(tenant.context.comunidadeId),
       getParkingModuleState(tenant.context.comunidadeId),
       getCommunityTheme(tenant.context.comunidadeId),

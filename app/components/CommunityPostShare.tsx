@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { shareToWhatsAppApp } from "../lib/androidNativeBridge";
+import useFeedDialog from "./feed/useFeedDialog";
 
 export default function CommunityPostShare({
   postId,
@@ -10,15 +11,19 @@ export default function CommunityPostShare({
   content,
   imageUrl,
   links,
+  showLabel = false,
 }: {
   postId: number;
   title: string;
   content: string;
   imageUrl?: string;
   links: string[];
+  showLabel?: boolean;
 }) {
   const [feedback, setFeedback] = useState("");
   const [openPanel, setOpenPanel] = useState(false);
+  const closePanel = useCallback(() => setOpenPanel(false), []);
+  useFeedDialog(openPanel ? `share-${postId}` : "", closePanel);
   const shareData = useMemo(() => {
     if (typeof window === "undefined") return { pageUrl: "", image: "", message: "" };
     const pageUrl = `${window.location.origin}/compartilhar/publicacao/${postId}`;
@@ -78,23 +83,15 @@ export default function CommunityPostShare({
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
-  useEffect(() => {
-    if (!openPanel) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpenPanel(false);
-    };
-    document.addEventListener("keydown", closeOnEscape);
-    return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [openPanel]);
-
   return (
     <div className="community-post-share">
       <button type="button" className="community-post-share-trigger" aria-label="Compartilhar publicação" title="Compartilhar publicação" onClick={() => setOpenPanel(true)}>
         <PaperPlaneIcon />
+        {showLabel && <span>Compartilhar</span>}
       </button>
       {openPanel && typeof document !== "undefined" && createPortal(
         <div className="community-share-backdrop" role="presentation" onClick={() => setOpenPanel(false)}>
-          <section className="community-share-dialog" role="dialog" aria-modal="true" aria-label="Compartilhar publicação" onClick={(event) => event.stopPropagation()}>
+          <section data-feed-dialog className="community-share-dialog" role="dialog" aria-modal="true" aria-label="Compartilhar publicação" onClick={(event) => event.stopPropagation()}>
             <header>
               <span><PaperPlaneIcon /></span>
               <div><strong>Compartilhar publicação</strong><p>Escolha onde enviar ou copie a mensagem pronta.</p></div>

@@ -4,13 +4,12 @@ import test from "node:test";
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("mural keeps a compact create-publication action beside its heading", async () => {
+test("mural keeps a compact create-publication action above its posts", async () => {
   const home = await read("app/components/CommunityHome.tsx");
-  const styles = await read("app/globals.css");
-  assert.match(home, /community-feed-heading-actions/);
-  assert.match(home, /className="community-feed-create"[\s\S]{0,300}Criar publicação/);
-  assert.match(styles, /\.community-feed-create\s*\{[^}]*min-height:\s*38px/s);
-  assert.match(styles, /\.community-feed-create\s*\{[^}]*white-space:\s*nowrap/s);
+  const composer = await read("app/components/feed/FeedComposerBar.tsx");
+  assert.match(home, /<FeedComposerBar/);
+  assert.match(composer, /className="worship-publish" onClick=\{\(\) => onOpen\("text"\)\}>Publicar/);
+  assert.ok(home.indexOf("<FeedComposerBar") < home.indexOf("visiblePosts.map"));
 });
 
 test("requests start with a guided shortcut that opens the existing form", async () => {

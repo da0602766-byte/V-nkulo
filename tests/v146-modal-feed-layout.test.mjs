@@ -7,7 +7,7 @@ const read = (path) => readFileSync(new URL(path, root), "utf8");
 
 test("a criação de publicação abre em cartão modal", () => {
   const source = read("app/components/CommunityHome.tsx");
-  assert.match(source, /community-composer-trigger/);
+  assert.match(source, /<FeedComposerBar[\s\S]{0,250}onOpen=\{openComposer\}/);
   assert.match(source, /community-composer-overlay/);
   assert.match(source, /setComposerOpen\(true\)/);
   assert.match(source, /setComposerOpen\(false\)/);

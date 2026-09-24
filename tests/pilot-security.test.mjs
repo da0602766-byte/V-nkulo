@@ -620,7 +620,7 @@ test("painel de presença está montado numa tela alcançável e usa o chat vivo
   );
   // A trilha lateral só existe fora do acesso somente-feed, que é a mesma
   // regra que `/api/pilot/presenca` aplica no servidor (403 para FEED_ONLY).
-  assert.match(home, /\{!readOnlyFeed && <aside className="community-home-rail">/);
+  assert.match(home, /\{!readOnlyFeed && <aside[^>]*className="worship-rail"/);
 
   assert.match(panel, /new CustomEvent\("vinkulo:open-chat"/);
   assert.doesNotMatch(

@@ -3,7 +3,6 @@
 import Link from "./StableLink";
 import CommunityPresencePanel from "./CommunityPresencePanel";
 import {
-  type CSSProperties,
   FormEvent,
   useCallback,
   useEffect,
@@ -18,6 +17,10 @@ import CommunityPostInteractions from "./CommunityPostInteractions";
 import CommunityPostShare from "./CommunityPostShare";
 import CommunityPostReactions from "./CommunityPostReactions";
 import VerifiedOwnerName from "./VerifiedOwnerName";
+import FeedHighlights from "./feed/FeedHighlights";
+import FeedComposerBar, { type ComposerIntent } from "./feed/FeedComposerBar";
+import FeedIcon from "./feed/FeedIcon";
+import useFeedDialog from "./feed/useFeedDialog";
 
 type FeedItem = {
   id: number;
@@ -105,6 +108,9 @@ export default function CommunityHome({
   initialFeed,
   currentUserId,
   userName,
+  userPhotoUrl,
+  eventsEnabled = true,
+  onNavigate,
   readOnlyFeed = false,
 }: {
   communityName: string;
@@ -113,6 +119,9 @@ export default function CommunityHome({
   initialFeed: FeedItem[];
   currentUserId: number;
   userName: string;
+  userPhotoUrl?: string;
+  eventsEnabled?: boolean;
+  onNavigate?: (view: "eventos" | "solicitacoes", create?: boolean) => void;
   readOnlyFeed?: boolean;
 }) {
   const [posts, setPosts] = useState<FeedItem[]>(initialFeed);
@@ -123,6 +132,10 @@ export default function CommunityHome({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [postActionsId, setPostActionsId] = useState<number | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [composerIntent, setComposerIntent] = useState<ComposerIntent>("text");
+  const [feedSearch, setFeedSearch] = useState("");
+  const [contextOpen, setContextOpen] = useState(false);
+  const [eventsError, setEventsError] = useState("");
   const [composerImageUrl, setComposerImageUrl] = useState("");
   const [editingImageUrl, setEditingImageUrl] = useState("");
   const [feedback, setFeedback] = useState("");
@@ -146,27 +159,30 @@ export default function CommunityHome({
   const [selectedMinistries, setSelectedMinistries] = useState<number[]>([]);
   const feedAbortRef = useRef<AbortController | null>(null);
   const feedRequestRef = useRef(0);
-  const canPublish = permissions.includes("feed.publish");
+  const canPublish = !readOnlyFeed && permissions.includes("feed.publish");
   const canViewSchedules = permissions.includes("schedules.view");
   const scrollKey = `vinkulo-community-feed-scroll:${communitySlug}`;
 
-  useEffect(() => {
-    if (editingId === null) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [editingId]);
+  const busyRef = useRef(working);
+  useEffect(() => { busyRef.current = working; }, [working]);
+  const closeDialog = useCallback(() => {
+    if (busyRef.current) return;
+    setComposerOpen(false);
+    setEditingId(null);
+    setPostActionsId(null);
+  }, []);
+  useFeedDialog(composerOpen ? "composer" : editingId !== null ? `edit-${editingId}` : postActionsId !== null ? `actions-${postActionsId}` : "", closeDialog);
 
+  function openComposer(intent: ComposerIntent = "text") {
+    setComposerIntent(intent);
+    setComposerOpen(true);
+  }
   useEffect(() => {
-    if (!composerOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [composerOpen]);
+    if (!canPublish) return;
+    const open = () => { setComposerIntent("text"); setComposerOpen(true); };
+    window.addEventListener("vinkulo:new-publication", open);
+    return () => window.removeEventListener("vinkulo:new-publication", open);
+  }, [canPublish]);
 
   useEffect(() => {
     if (!composerOpen || ministries.length) return;
@@ -207,15 +223,17 @@ export default function CommunityHome({
         setLoading(false);
       }
     })();
-    const eventsTask = readOnlyFeed
+    const eventsTask = readOnlyFeed || !eventsEnabled
       ? Promise.resolve()
       : (async () => {
           try {
             const response = await fetch("/api/pilot/eventos", { cache: "no-store" });
             const result = await readJson<Record<string, unknown>>(response);
-            if (response.ok) setEvents((result.eventos || []) as EventItem[]);
+            if (!response.ok) throw new Error("Não foi possível carregar os eventos.");
+            setEvents((result.eventos || []) as EventItem[]);
+            setEventsError("");
           } catch {
-            // Eventos são auxiliares e não impedem a leitura do mural.
+            setEventsError("Não foi possível carregar os eventos.");
           }
         })();
     const schedulesTask = !readOnlyFeed && canViewSchedules
@@ -233,7 +251,7 @@ export default function CommunityHome({
         })()
       : Promise.resolve();
     await Promise.all([feedTask, eventsTask, schedulesTask]);
-  }, [canViewSchedules, readOnlyFeed]);
+  }, [canViewSchedules, readOnlyFeed, eventsEnabled]);
 
   const refreshFeed = useCallback(async () => {
     const response = await fetch("/api/pilot/publicacoes?limit=10", { cache: "no-store" });
@@ -324,13 +342,13 @@ export default function CommunityHome({
   const upcomingEvents = useMemo(
     () =>
       events
-        .filter((item) => item.status === "PUBLICADO")
+        .filter((item) => item.status === "PUBLICADO" && Date.parse(item.termina_em || item.inicia_em) >= renderedAt)
         .sort(
           (left, right) =>
             Date.parse(left.inicia_em) - Date.parse(right.inicia_em),
         )
         .slice(0, 3),
-    [events],
+    [events, renderedAt],
   );
   const myEvents = useMemo(
     () => events.filter((item) => item.criado_por === currentUserId && item.status !== "CANCELADO"),
@@ -360,11 +378,23 @@ export default function CommunityHome({
   ).length;
 
   const visiblePosts = useMemo(() => posts.filter((post) => {
+    const query = feedSearch.trim().toLocaleLowerCase("pt-BR");
+    if (query && !`${post.titulo} ${post.conteudo || post.resumo} ${post.autor_nome || communityName}`.toLocaleLowerCase("pt-BR").includes(query)) return false;
     if (feedFilter === "TODOS") return true;
     if (feedFilter === "EVENTOS") return post.categoria === "EVENTO";
     if (feedFilter === "MINISTERIOS") return post.audiencia_tipo === "MINISTERIOS" || ["JUVENTUDE", "ACAO_SOCIAL"].includes(post.categoria);
     return post.categoria !== "EVENTO" && post.audiencia_tipo !== "MINISTERIOS";
-  }), [feedFilter, posts]);
+  }), [feedFilter, feedSearch, posts, communityName]);
+  const highlights = useMemo(() => posts.filter((post) => post.status === "PUBLICADA").slice(0, 8), [posts]);
+  function openHighlight(id: number) {
+    setFeedSearch("");
+    setFeedFilter("TODOS");
+    window.requestAnimationFrame(() => {
+      const target = document.getElementById(`publicacao-${id}`);
+      target?.focus({ preventScroll: true });
+      target?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" });
+    });
+  }
 
   async function respondToSchedule(
     scheduleId: number,
@@ -574,23 +604,19 @@ export default function CommunityHome({
   }
 
   return (
-    <section className="community-home community-feed-redesign" aria-busy={loading}>
-      <header className="community-home-welcome community-home-command">
-        <div className="community-home-intro">
-          <p className="community-feed-eyebrow">COMUNIDADE</p>
-          <h1>O que acontece por aqui.</h1>
-          <p>
-            {/* A quebra de linha depois da expressão não vira espaço no JSX:
-                a saudação lia "…em Comunidade Nova Aliançae resolva…". */}
-            Olá, {userName.split(/\s+/)[0]}. Acompanhe as pessoas, os avisos e os próximos momentos de {communityName}{" "}
-            em um só lugar.
-          </p>
+    <section className="worship-feed community-feed-redesign" aria-busy={loading}>
+      <header className="worship-welcome">
+        <div><p className="worship-eyebrow">VIDA EM COMUNIDADE</p>
+          <h1>Fé que conecta pessoas.<br />Comunidade que <em>transforma.</em></h1>
+          <p className="worship-community-name">{communityName}</p>
         </div>
-        <div className="community-home-actions">
-          {canPublish && <button type="button" className="community-composer-trigger" onClick={() => setComposerOpen(true)}>Criar publicação</button>}
-          <Link href={`/comunidades/${communitySlug}`}>Página pública</Link>
-        </div>
+        <Link className="worship-signature" href={`/comunidades/${communitySlug}`} aria-label={`Página pública de ${communityName}`}>Juntos, por<br />algo maior.<FeedIcon name="heart" /></Link>
       </header>
+      {!readOnlyFeed && <nav className="worship-context-nav" aria-label="Acontece na comunidade">
+        {eventsEnabled && <button type="button" onClick={() => onNavigate?.("eventos")}><FeedIcon name="calendar" />Agenda</button>}
+        <button type="button" onClick={() => onNavigate?.("solicitacoes")}><FeedIcon name="heart" />Pedidos</button>
+        <button type="button" aria-expanded={contextOpen} aria-controls="feed-community-context" onClick={() => setContextOpen((value) => !value)}><FeedIcon name="people" />Comunidade</button>
+      </nav>}
 
       {readOnlyFeed && (
         <div className="owner-readonly-banner">
@@ -606,13 +632,18 @@ export default function CommunityHome({
         </div>
       )}
 
+      {(feedback || error) && (
+        <p className={`operations-feedback ${error ? "error" : ""}`} role="status">
+          {error || feedback}
+        </p>
+      )}
+
+      <div className={`worship-layout ${readOnlyFeed ? "feed-only" : ""}`}>
+        <div className="worship-main">
+          <FeedHighlights items={highlights} onSelect={openHighlight} onCreate={canPublish ? () => openComposer() : undefined} />
       {canPublish && (
-        <section className="community-composer">
-          <button type="button" className="community-composer-compact" onClick={() => setComposerOpen(true)}>
-            <span aria-hidden="true">{getInitials(userName)}</span>
-            <strong>Compartilhe algo com a comunidade…</strong>
-            <small>Foto · Evento · Mensagem</small>
-          </button>
+        <section className="worship-composer">
+          <FeedComposerBar name={userName} photo={userPhotoUrl} hasEvents={myEvents.length > 0} onOpen={openComposer} onRequest={!readOnlyFeed && onNavigate ? () => onNavigate("solicitacoes", true) : undefined} />
           {composerOpen && typeof document !== "undefined" && createPortal(
             <div
               className="community-composer-overlay"
@@ -621,14 +652,14 @@ export default function CommunityHome({
                 if (event.target === event.currentTarget && !working) setComposerOpen(false);
               }}
             >
-          <form className="pilot-form community-composer-dialog community-composer-organized" role="dialog" aria-modal="true" aria-label="Criar publicação" onSubmit={createPost}>
+          <form data-feed-dialog className="pilot-form community-composer-dialog community-composer-organized" role="dialog" aria-modal="true" aria-label="Criar publicação" onSubmit={createPost}>
             <header>
               <div><small>NOVA PUBLICAÇÃO</small><strong>Criar publicação</strong></div>
               <button type="button" className="community-composer-close" aria-label="Fechar criação de publicação" onClick={() => setComposerOpen(false)}>×</button>
             </header>
             <label>
               Título
-              <input ref={composerTitleRef} name="titulo" required maxLength={140} />
+              <input data-initial-focus={composerIntent === "text" ? "" : undefined} ref={composerTitleRef} name="titulo" required maxLength={140} />
             </label>
             <label className="composer-wide">
               Conteúdo
@@ -638,6 +669,7 @@ export default function CommunityHome({
               <label className="composer-wide community-event-publish-field">
                 Puxar um evento criado por você
                 <select
+                  data-initial-focus={composerIntent === "event" ? "" : undefined}
                   name="eventId"
                   value={selectedEventId}
                   onChange={(event) => {
@@ -657,7 +689,7 @@ export default function CommunityHome({
                 <small>Ao selecionar, os dados do evento e o link próprio de inscrição são incluídos automaticamente.</small>
               </label>
             )}
-            <div className="composer-wide">
+            <div className="composer-wide" tabIndex={composerIntent === "image" ? 0 : undefined} data-initial-focus={composerIntent === "image" ? "" : undefined}>
               <NativeImageUpload
                 label="Imagem da publicação (opcional)"
                 value={composerImageUrl}
@@ -722,6 +754,7 @@ export default function CommunityHome({
               />
               <span>Permitir comentários de usuários com conta ativa</span>
             </label>
+            {error && <p className="operations-feedback error composer-wide" role="alert">{error}</p>}
             <button disabled={working}>
               {working ? "Salvando…" : "Salvar publicação"}
             </button>
@@ -732,37 +765,13 @@ export default function CommunityHome({
         </section>
       )}
 
-      {(feedback || error) && (
-        <p className={`operations-feedback ${error ? "error" : ""}`} role="status">
-          {error || feedback}
-        </p>
-      )}
 
-      <div className={`community-home-grid ${readOnlyFeed ? "feed-only" : ""}`}>
-        <div className="community-feed-panel">
-          <header id="mural">
-            <div>
-              <p className="pilot-kicker">MURAL DA COMUNIDADE</p>
-              <h2>Atualizações</h2>
-            </div>
-            <div className="community-feed-heading-actions">
-              {canPublish && (
-                <button
-                  type="button"
-                  className="community-feed-create"
-                  onClick={() => setComposerOpen(true)}
-                >
-                  <span aria-hidden="true">＋</span>
-                  Criar publicação
-                </button>
-              )}
-              <span className={loading ? "community-home-loading" : "community-feed-count"}>
-                {loading ? "Atualizando…" : `${posts.length}`}
-                {!loading && <small> no feed</small>}
-              </span>
-            </div>
+          <header id="mural" className="worship-feed-heading">
+            <h2>Feed da comunidade</h2>
+            {loading && <span role="status">Atualizando…</span>}
           </header>
-          <nav className="community-feed-tabs" aria-label="Filtrar atualizações">
+          <label className="worship-search"><FeedIcon name="search" /><span className="sr-only">Buscar nas publicações carregadas</span><input type="search" value={feedSearch} onChange={(event) => setFeedSearch(event.target.value)} placeholder="Buscar nas publicações carregadas…" /></label>
+          <nav className="worship-tabs" aria-label="Filtrar atualizações">
             {([
               ["TODOS", "Para você"],
               ["COMUNICADOS", "Comunicados"],
@@ -776,17 +785,19 @@ export default function CommunityHome({
             <div className="community-feed-loading" role="status" aria-label="Carregando publicações">
               <span /><span /><span /><small>Carregando publicações…</small>
             </div>
+          ) : error && !posts.length ? (
+            <div className="worship-empty" role="alert"><FeedIcon name="heart" /><h3>Não foi possível carregar o feed.</h3><p>{error}</p><button type="button" onClick={() => void loadHome()}>Tentar novamente</button></div>
           ) : visiblePosts.length ? (
-            <div className="community-feed-list">
+            <div className="worship-posts">
               {visiblePosts.map((post) => (
                 <article
                   key={post.id}
                   id={`publicacao-${post.id}`}
-                  className={`community-feed-entry ${post.imagem_url ? "has-smart-image-tone" : ""}`}
-                  style={post.imagem_url ? { "--smart-card-image": `url("${post.imagem_thumbnail_url || post.imagem_url}")` } as CSSProperties : undefined}
+                  className="worship-post"
+                  tabIndex={-1}
                 >
                   <header>
-                    <span className="community-feed-avatar">
+                    <span className="worship-avatar">
                       {post.autor_foto ? <img loading="lazy" src={post.autor_foto} alt="" /> : getInitials(post.autor_nome || communityName)}
                     </span>
                     <div>
@@ -818,7 +829,7 @@ export default function CommunityHome({
                           }}
                         >
                           <section
-                            className="community-post-actions-dialog"
+                            data-feed-dialog className="community-post-actions-dialog"
                             role="dialog"
                             aria-modal="true"
                             aria-label={`Ações de ${post.titulo}`}
@@ -883,7 +894,7 @@ export default function CommunityHome({
                       }}
                     >
                       <form
-                        className="pilot-form community-post-edit-form"
+                        data-feed-dialog className="pilot-form community-post-edit-form"
                         role="dialog"
                         aria-modal="true"
                         aria-labelledby={`editar-publicacao-${post.id}`}
@@ -979,6 +990,7 @@ export default function CommunityHome({
                         />
                         <span>Permitir comentários</span>
                       </label>
+                      {error && <p className="operations-feedback error composer-wide" role="alert">{error}</p>}
                       <div className="community-post-edit-actions">
                         <button disabled={working}>Salvar alterações</button>
                         <button
@@ -1004,6 +1016,8 @@ export default function CommunityHome({
                   )}
                   {post.imagem_url ? (
                     <ResponsiveFeedImage
+                      key={post.imagem_url}
+                      presentation="photo"
                       src={post.imagem_url}
                       thumbnail={post.imagem_thumbnail_url}
                       alt={post.imagem_alt || post.titulo}
@@ -1012,7 +1026,7 @@ export default function CommunityHome({
                     />
                   ) : null}
                   <footer>
-                    <span>
+                    <span className="worship-post-status" hidden={post.status === "PUBLICADA"}>
                       {post.status === "RASCUNHO" ? "Rascunho" : post.status === "EM_ANALISE" ? "Aguardando aprovação" : "Publicada"}
                     </span>
                     {post.status === "PUBLICADA" && <CommunityPostReactions postId={post.id} initialCounts={post.reacoes_json} initialMine={post.minhas_reacoes_json} />}
@@ -1021,6 +1035,7 @@ export default function CommunityHome({
                         postId={post.id}
                         title={post.titulo}
                         content={post.conteudo || post.resumo}
+                        showLabel
                         imageUrl={post.imagem_url}
                         links={parsePostLinks(post.links_json)}
                       />
@@ -1041,9 +1056,12 @@ export default function CommunityHome({
               )}
             </div>
           ) : (
-            <div className="pilot-empty-state">
-              <strong>{posts.length ? "Nenhuma publicação neste filtro" : "Nenhuma publicação nesta comunidade"}</strong>
-              <p>{posts.length ? "Tente escolher outra categoria para ver mais atualizações." : "O estado vazio não busca dados de outra comunidade."}</p>
+            <div className="worship-empty">
+              <FeedIcon name="heart" />
+              <h3>{posts.length ? "Nenhuma publicação neste filtro." : "Nenhuma publicação ainda."}</h3>
+              <p>{posts.length ? "Tente outra busca ou categoria, ou carregue mais publicações." : "As histórias e novidades da sua comunidade aparecerão aqui."}</p>
+              {posts.length > 0 && <button type="button" onClick={() => { setFeedSearch(""); setFeedFilter("TODOS"); }}>Limpar filtros</button>}
+              {!posts.length && canPublish && <button type="button" onClick={() => openComposer()}>Criar publicação</button>}
             </div>
           )}
           <div className="feed-pagination-controls">
@@ -1078,7 +1096,7 @@ export default function CommunityHome({
           </div>
         </div>
 
-        {!readOnlyFeed && <aside className="community-home-rail">
+        {!readOnlyFeed && <aside id="feed-community-context" className="worship-rail" data-mobile-open={contextOpen} aria-label="Acontece na comunidade">
           {!readOnlyFeed && canViewSchedules && (
             <section className="community-my-schedules" aria-labelledby="my-schedules-title">
               <header>
@@ -1176,19 +1194,16 @@ export default function CommunityHome({
               )}
             </section>
           )}
-          <section className="home-needs-you">
+          {canViewSchedules && pendingSchedules > 1 && <section className="home-needs-you">
             <header><div><p className="pilot-kicker">PRECISA DE VOCÊ</p><strong>Pendências</strong></div><span>{pendingSchedules}</span></header>
             {pendingSchedules ? (
               <Link className="home-rail-card-link" href="/painel?view=ministerios"><strong>{pendingSchedules === 1 ? "Uma escala aguarda resposta" : `${pendingSchedules} escalas aguardam resposta`}</strong><p>Confirme sua presença ou avise a liderança com antecedência.</p><span>Ver todas as escalas →</span></Link>
             ) : (
               <Link className="home-rail-empty home-rail-card-link" href="/painel?view=ministerios"><strong>Nada pendente agora</strong><p>Quando uma ação depender de você, ela aparecerá aqui.</p><span>Ver ministérios →</span></Link>
             )}
-          </section>
-          <section>
-            <header>
-              <p className="pilot-kicker">PRÓXIMOS EVENTOS</p>
-              <strong>Agenda</strong>
-            </header>
+          </section>}
+          {eventsEnabled && <section className="worship-events">
+            <header><h2>Próximos eventos</h2><button type="button" onClick={() => onNavigate?.("eventos")}>Ver todos <FeedIcon name="arrow" /></button></header>
             {upcomingEvents.length ? (
               upcomingEvents.map((item) => (
                 <Link className="home-event-item home-rail-card-link" href={`/painel?view=eventos&evento=${item.id}`} key={item.id} aria-label={`Abrir evento ${item.titulo}`}>
@@ -1198,16 +1213,17 @@ export default function CommunityHome({
                   </time>
                   <div>
                     <strong>{item.titulo}</strong>
-                    <small>{item.local || "Local a confirmar"}</small>
+                    <small>{formatDateTime(item.inicia_em)}</small><small>{item.local || "Local a confirmar"}</small>
                   </div>
                   <span className="home-event-open" aria-hidden="true">›</span>
                 </Link>
               ))
             ) : (
-              <p className="home-rail-empty">Nenhum evento publicado.</p>
+              <p className="home-rail-empty">{eventsError || "Nenhum evento próximo."}{eventsError && <button type="button" onClick={() => void loadHome()}>Tentar novamente</button>}</p>
             )}
-          </section>
+          </section>}
 
+          <section className="worship-prayer"><FeedIcon name="heart" /><h2>Cuidar também é estar presente.</h2><p>Compartilhe seu pedido com quem pode caminhar com você.</p><button type="button" onClick={() => onNavigate?.("solicitacoes", true)}><FeedIcon name="plus" />Fazer um pedido</button></section>
           <CommunityPresencePanel />
         </aside>}
       </div>

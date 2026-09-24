@@ -243,6 +243,8 @@ export async function getCommunityJoinState(
 
 export async function getPilotFeed(
   comunidadeId: number,
+  userId: number,
+  canModerate = false,
 ): Promise<PilotFeedItem[]> {
   const result = await getD1()
     .prepare(
@@ -250,10 +252,16 @@ export async function getPilotFeed(
         origem, criado_por, comentarios_habilitados, links_json,
         criado_em, atualizado_em
       FROM publicacoes_piloto
-      WHERE comunidade_id = ? AND status = 'PUBLICADA'
+        WHERE comunidade_id = ? AND status = 'PUBLICADA' AND canal_feed = 1
+          AND (audiencia_tipo <> 'MINISTERIOS' OR ? = 1 OR EXISTS (
+            SELECT 1 FROM json_each(publicacoes_piloto.ministerios_json) audiencia
+            JOIN ministerio_voluntarios mv ON mv.ministerio_id = CAST(audiencia.value AS INTEGER)
+            JOIN ministerios_comunidade m ON m.id = mv.ministerio_id AND m.comunidade_id = publicacoes_piloto.comunidade_id
+            WHERE mv.usuario_id = ? AND mv.ativo = 1
+          ))
       ORDER BY criado_em DESC, id DESC LIMIT 10`,
     )
-    .bind(comunidadeId)
+      .bind(comunidadeId, canModerate ? 1 : 0, userId)
     .all<PilotFeedItem>();
   return result.results;
 }

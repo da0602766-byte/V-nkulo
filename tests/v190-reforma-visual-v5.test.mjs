@@ -68,7 +68,7 @@ test("Mural e Escalas levam a destinos próprios em vez de repetir a view", asyn
   assert.match(dashboard, /openView\(item\.id, item\.focus\)/);
 
   const home = await read("app/components/CommunityHome.tsx");
-  assert.match(home, /<header id="mural">/);
+  assert.match(home, /<header id="mural"[^>]*>/);
 
   // O ouvinte que só revela a aba depende de poder ver escalas, nunca de ter
   // ministério administrável — isso é requisito de criar.
@@ -452,5 +452,5 @@ test("a saudação do painel não cola o nome da comunidade na frase seguinte", 
   const home = await read("app/components/CommunityHome.tsx");
   // A quebra de linha depois da expressão não vira espaço no JSX: lia
   // "…em Comunidade Nova Aliançae resolva…".
-  assert.match(home, /\{communityName\}\{" "\}/);
+  assert.match(home, /<p className="worship-community-name">\{communityName\}<\/p>/);
 });

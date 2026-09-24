@@ -62,6 +62,7 @@ export async function GET(request: Request) {
       AND (p.audiencia_tipo <> 'MINISTERIOS' OR ? = 1 OR EXISTS (
         SELECT 1 FROM json_each(p.ministerios_json) audiencia
         JOIN ministerio_voluntarios mv ON mv.ministerio_id = CAST(audiencia.value AS INTEGER)
+        JOIN ministerios_comunidade m ON m.id = mv.ministerio_id AND m.comunidade_id = p.comunidade_id
         WHERE mv.usuario_id = ? AND mv.ativo = 1
       ))
       AND (p.status = 'PUBLICADA' OR p.criado_por = ? OR ? = 1)

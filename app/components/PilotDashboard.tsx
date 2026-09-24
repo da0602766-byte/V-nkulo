@@ -512,6 +512,9 @@ export default function PilotDashboard({
       active.communityAccess === "FEED_ONLY"
         ? []
         : [
+            active.permissions.includes("feed.publish")
+              ? { label: "Nova publicação", description: "Compartilhar com a comunidade", icon: "mural" as MenuIconId, view: "inicio" as View, event: "vinkulo:new-publication" }
+              : null,
             active.permissions.includes("visitors.create")
               ? {
                   label: "Novo visitante",
@@ -944,6 +947,7 @@ export default function PilotDashboard({
     <main
       className="pilot-dashboard"
       data-ui-version="v2"
+      data-feed-design={visibleView === "inicio" ? "worship" : undefined}
       data-sidebar-collapsed={sidebarCollapsed ? "true" : "false"}
       data-community-palette={communityTheme.paletteId.toLowerCase()}
       data-visual-editor-root
@@ -1004,7 +1008,7 @@ export default function PilotDashboard({
             aria-label="Buscar uma área do Vínkulo"
           >
             <span aria-hidden="true">⌕</span>
-            <span>Buscar</span>
+            <span>{visibleView === "inicio" ? "Buscar uma área da comunidade…" : "Buscar"}</span>
             <kbd>⌘K</kbd>
           </button>
           <PilotNotificationCenter onUnreadChange={setUnreadNotifications} />
@@ -1272,7 +1276,7 @@ export default function PilotDashboard({
                   <button
                     key={item.key}
                     data-editor-key={`menu-principal-${item.key}`}
-                    className={visibleView === item.id ? "active" : ""}
+                    className={visibleView === item.id && (visibleView !== "inicio" || item.key === "mural") ? "active" : ""}
                     onClick={() => openView(item.id, item.focus)}
                     aria-label={item.label}
                     title={item.label}
@@ -1297,6 +1301,7 @@ export default function PilotDashboard({
             <EditorialSidebarSchedule onOpen={() => window.location.assign("/proprietario?tab=editorial")} />
           )}
           <div className="pilot-sidebar-note"><strong>{allowedMenu.length} áreas disponíveis</strong><p>As demais dependem das permissões do seu perfil.</p></div>
+          {visibleView === "inicio" && <div className="worship-sidebar-art"><small>MAIS QUE UM APP.</small><p>Pessoas reais.<br />Propósito<br /><em>eterno.</em></p><span aria-hidden="true" /><small>Onde a fé encontra<br />uma família.</small></div>}
         </aside>
         <section
           className={`pilot-workspace${viewLoading ? " is-view-loading" : ""}${
@@ -1334,12 +1339,16 @@ export default function PilotDashboard({
           )}
           {visibleView === "inicio" && !accessDeniedView && (
             <CommunityHome
+              key={active.comunidadeId}
               communityName={active.comunidadeNome}
               communitySlug={active.comunidadeSlug}
               permissions={active.permissions}
               initialFeed={feed}
               currentUserId={active.userId}
               userName={userName}
+              userPhotoUrl={userPhotoUrl}
+              eventsEnabled={allowedMenu.some((item) => item.id === "eventos")}
+              onNavigate={(next, create) => openView(next, create ? { event: next === "eventos" ? "vinkulo:new-event" : "vinkulo:new-request" } : undefined)}
               readOnlyFeed={active.communityAccess === "FEED_ONLY"}
             />
           )}
@@ -1674,7 +1683,9 @@ export default function PilotDashboard({
                             ? ["Agenda", "Comunidade"]
                             : action.label === "Nova escala"
                               ? ["Ministérios", "Escala"]
-                              : ["Pedidos", "Privacidade"];
+                              : action.label === "Nova publicação"
+                                ? ["Feed", "Comunidade"]
+                                : ["Pedidos", "Privacidade"];
                       return (
                         <button
                           type="button"

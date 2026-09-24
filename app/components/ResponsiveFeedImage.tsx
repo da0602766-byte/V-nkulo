@@ -8,17 +8,20 @@ export default function ResponsiveFeedImage({
   alt,
   width,
   height,
+  presentation = "attachment",
 }: {
   src: string;
   thumbnail?: string;
   alt: string;
   width?: number;
   height?: number;
+  presentation?: "attachment" | "photo";
 }) {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
   const [dataSaver, setDataSaver] = useState(false);
   const [requestedLoad, setRequestedLoad] = useState(false);
+  const [preferenceReady, setPreferenceReady] = useState(false);
 
   useEffect(() => {
     const sync = () => {
@@ -26,6 +29,7 @@ export default function ResponsiveFeedImage({
       setDataSaver(
         root.dataset.dataSaver === "true" || root.dataset.network === "slow",
       );
+      setPreferenceReady(true);
     };
     sync();
     window.addEventListener("vinkulo:network-mode", sync);
@@ -34,16 +38,20 @@ export default function ResponsiveFeedImage({
 
   if (!src) return null;
   const optimizedSource = dataSaver && thumbnail ? thumbnail : src;
+  const showImage = requestedLoad || (presentation === "photo" && preferenceReady && !dataSaver);
   const downloadUrl = src.startsWith("/api/")
     ? `${src}${src.includes("?") ? "&" : "?"}download=1`
     : src;
 
   return (
     <figure
-      className={`feed-responsive-image feed-image-attachment ${loaded ? "is-loaded" : ""}`}
-      aria-busy={requestedLoad && !loaded && !failed}
+      className={`feed-responsive-image feed-image-attachment ${presentation === "photo" ? "worship-photo" : ""} ${loaded ? "is-loaded" : ""}`}
+      style={presentation === "photo" ? { aspectRatio: "auto", "--photo-ratio": `${width || 1280} / ${height || 720}` } as React.CSSProperties : undefined}
+      aria-busy={showImage && !loaded && !failed}
     >
-      {!requestedLoad ? (
+      {presentation === "photo" && !preferenceReady ? (
+        <div className="worship-photo-pending" role="status" aria-label="Preparando imagem" />
+      ) : !showImage ? (
         <div className="feed-image-attachment-summary">
           <span aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none">
@@ -70,7 +78,7 @@ export default function ResponsiveFeedImage({
                 ? `${thumbnail} 480w, ${src} 1280w`
                 : undefined
             }
-            sizes="(max-width: 720px) 100vw, 720px"
+            sizes="(max-width: 680px) 100vw, (max-width: 1100px) 75vw, 720px"
             alt={alt || "Imagem da publicação"}
             width={width || 1280}
             height={height || 720}
@@ -82,6 +90,7 @@ export default function ResponsiveFeedImage({
         </>
       )}
       <div className="feed-image-attachment-actions">
+        {presentation === "photo" && showImage && !failed ? <a href={src} target="_blank" rel="noreferrer">Abrir imagem</a> : (
         <button
           type="button"
           onClick={() => {
@@ -91,6 +100,7 @@ export default function ResponsiveFeedImage({
         >
           {requestedLoad ? "Fechar imagem" : "Visualizar imagem"}
         </button>
+        )}
         <a href={downloadUrl} download>
           Baixar imagem
         </a>
