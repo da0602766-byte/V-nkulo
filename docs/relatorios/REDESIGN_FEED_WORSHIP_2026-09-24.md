@@ -1,6 +1,6 @@
 # Redesign do Feed — 24/09/2026
 
-Implementado na branch `codex/feed-worship-redesign`, a partir da imagem fornecida e do protótipo `vinkulo-feed-worship` do ZIP. Sem merge, push, deploy ou migração.
+Implementado na branch `codex/feed-worship-redesign`, a partir da imagem fornecida e do protótipo `vinkulo-feed-worship` do ZIP. Publicação autorizada pelo proprietário e concluída no Sites como versão **305**, em 24/09/2026 às 08h49 (Brasília). Sem merge no GitHub ou migração.
 
 ## Implementação
 
@@ -70,4 +70,11 @@ O comando wrapper `npm run build` encontrou limitação de caminhos/permissões 
 - O banco local persistente está incompleto para a sessão operacional; por isso a conferência funcional ocorreu com a infraestrutura isolada de testes. Não se afirma homologação em produção.
 - Fidelidade de fotografias e densidade de conteúdo no ambiente real dependem das publicações existentes. Estados vazios não recebem imagens, categorias ou contagens ilustrativas.
 
-Entrega local pronta para revisão. Publicação e merge continuam pendentes de autorização explícita.
+## Publicação
+
+- Código publicado: `bca1d5a519ef5d64576c9b2517b9e0cb5e275230`, enviado por fast-forward ao repositório de origem do Sites.
+- Versão: **305**, `appgprj_6a5af9301a888191b2abefddaa299618~appgver_4a49d7fb7ae881919602ed131bb9cce7`.
+- Deploy: `appgdep_6ab50e44b7948191850a0bcd9f0931b6`, estado `succeeded`.
+- URL: https://adote-gestao.da0602766.chatgpt.site
+- Pós-publicação: home e login HTTP 200; API de publicações sem sessão HTTP 401; bundle do Feed HTTP 200 e SHA-256 idêntico ao artefato validado.
+- Público e configurações do site preservados. Nenhuma migração ou alteração de dados de produção. Homologação autenticada em dispositivo real continua com os limites descritos acima.
