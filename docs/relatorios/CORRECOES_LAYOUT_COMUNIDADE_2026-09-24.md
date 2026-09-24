@@ -28,4 +28,10 @@ Branch: `codex/community-responsive-fixes`. Correções baseadas nas três captu
 
 As capturas enviadas e os registros de teste foram usados exclusivamente no servidor local e banco em memória; não integram o pacote de produção. Nenhum dado real, permissão ou tabela foi alterado. A publicação não exige migração. O APK/WebView e o botão Voltar físico do Android ainda dependem de homologação em aparelho; o fechamento por botão visível e Escape foi verificado no navegador.
 
-Publicação: aguardando registro do resultado do deploy.
+## Publicação
+
+- Sites **306**, commit `ef75346cadbcd9aaa476482435ca8dfa53760d82`, publicado em 24/09/2026 às 11h12 (Brasília).
+- Deploy `appgdep_6ab52fbb79e081919bd037d39dbe014c`, estado `succeeded`.
+- URL: https://adote-gestao.da0602766.chatgpt.site
+- Home, login e perfil comunitário público HTTP 200; API de publicações sem sessão HTTP 401. JS do painel e CSS publicado com SHA-256 idêntico ao artefato validado. Perfil público confirmado com paleta e navegação de retorno.
+- O primeiro push recebeu erro 500 temporário do servidor; o remoto foi conferido antes da repetição, que concluiu por fast-forward. Sem merge no GitHub, alteração de público, migração ou escrita de dados reais.
