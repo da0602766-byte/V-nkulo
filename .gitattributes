@@ -1,0 +1,3 @@
+# D1's remote SQL splitter requires LF for trigger bodies.
+drizzle/0079_controlled_onboarding.sql text eol=lf
+drizzle/0080_platform_reset.sql text eol=lf

@@ -111,52 +111,52 @@ CREATE TABLE assinaturas_comunidade (
 CREATE TRIGGER plano_membros_insert BEFORE INSERT ON usuario_comunidades
 WHEN NEW.status = 'ATIVO' AND EXISTS(SELECT 1 FROM assinaturas_comunidade WHERE comunidade_id = NEW.comunidade_id)
 BEGIN
- SELECT CASE WHEN EXISTS(SELECT 1 FROM assinaturas_comunidade s WHERE s.comunidade_id = NEW.comunidade_id
+ SELECT (CASE WHEN EXISTS(SELECT 1 FROM assinaturas_comunidade s WHERE s.comunidade_id = NEW.comunidade_id
    AND (s.status != 'ATIVA' OR (s.termina_em IS NOT NULL AND datetime(s.termina_em) <= CURRENT_TIMESTAMP)))
- THEN RAISE(ABORT,'PLAN_INACTIVE') END;
- SELECT CASE WHEN (SELECT COUNT(*) FROM usuario_comunidades WHERE comunidade_id = NEW.comunidade_id AND status = 'ATIVO') >=
+ THEN RAISE(ABORT,'PLAN_INACTIVE') END);
+ SELECT (CASE WHEN (SELECT COUNT(*) FROM usuario_comunidades WHERE comunidade_id = NEW.comunidade_id AND status = 'ATIVO') >=
    (SELECT json_extract(contrato,'$.limites.usuarios') FROM assinaturas_comunidade WHERE comunidade_id = NEW.comunidade_id)
- THEN RAISE(ABORT,'PLAN_USER_LIMIT') END;
- SELECT CASE WHEN NEW.papel IN ('ADMIN_COMUNIDADE','SUPERADMIN','PASTOR') AND
+ THEN RAISE(ABORT,'PLAN_USER_LIMIT') END);
+ SELECT (CASE WHEN NEW.papel IN ('ADMIN_COMUNIDADE','SUPERADMIN','PASTOR') AND
    (SELECT COUNT(*) FROM usuario_comunidades WHERE comunidade_id = NEW.comunidade_id AND status = 'ATIVO' AND papel IN ('ADMIN_COMUNIDADE','SUPERADMIN','PASTOR')) >=
    (SELECT json_extract(contrato,'$.limites.administradores') FROM assinaturas_comunidade WHERE comunidade_id = NEW.comunidade_id)
- THEN RAISE(ABORT,'PLAN_ADMIN_LIMIT') END;
+ THEN RAISE(ABORT,'PLAN_ADMIN_LIMIT') END);
 END;
 --> statement-breakpoint
 CREATE TRIGGER plano_membros_update BEFORE UPDATE OF status,papel,comunidade_id ON usuario_comunidades
 WHEN NEW.status = 'ATIVO' AND EXISTS(SELECT 1 FROM assinaturas_comunidade WHERE comunidade_id = NEW.comunidade_id)
 BEGIN
- SELECT CASE WHEN (OLD.status != 'ATIVO' OR OLD.comunidade_id != NEW.comunidade_id) AND
+ SELECT (CASE WHEN (OLD.status != 'ATIVO' OR OLD.comunidade_id != NEW.comunidade_id) AND
    (SELECT COUNT(*) FROM usuario_comunidades WHERE comunidade_id = NEW.comunidade_id AND status = 'ATIVO' AND id != OLD.id) >=
    (SELECT json_extract(contrato,'$.limites.usuarios') FROM assinaturas_comunidade WHERE comunidade_id = NEW.comunidade_id)
- THEN RAISE(ABORT,'PLAN_USER_LIMIT') END;
- SELECT CASE WHEN NEW.papel IN ('ADMIN_COMUNIDADE','SUPERADMIN','PASTOR') AND
+ THEN RAISE(ABORT,'PLAN_USER_LIMIT') END);
+ SELECT (CASE WHEN NEW.papel IN ('ADMIN_COMUNIDADE','SUPERADMIN','PASTOR') AND
    (OLD.status != 'ATIVO' OR OLD.papel NOT IN ('ADMIN_COMUNIDADE','SUPERADMIN','PASTOR') OR OLD.comunidade_id != NEW.comunidade_id) AND
    (SELECT COUNT(*) FROM usuario_comunidades WHERE comunidade_id = NEW.comunidade_id AND status = 'ATIVO' AND id != OLD.id AND papel IN ('ADMIN_COMUNIDADE','SUPERADMIN','PASTOR')) >=
    (SELECT json_extract(contrato,'$.limites.administradores') FROM assinaturas_comunidade WHERE comunidade_id = NEW.comunidade_id)
- THEN RAISE(ABORT,'PLAN_ADMIN_LIMIT') END;
+ THEN RAISE(ABORT,'PLAN_ADMIN_LIMIT') END);
 END;
 
 --> statement-breakpoint
 CREATE TRIGGER plano_cadastros_insert BEFORE INSERT ON visitantes WHEN NEW.ativo=1
-BEGIN SELECT CASE WHEN (SELECT COUNT(*) FROM visitantes WHERE comunidade_id=NEW.comunidade_id AND ativo=1) >= (SELECT json_extract(contrato,'$.limites.cadastros') FROM assinaturas_comunidade WHERE comunidade_id=NEW.comunidade_id) THEN RAISE(ABORT,'PLAN_QUOTA_LIMIT') END; END;
+BEGIN SELECT (CASE WHEN (SELECT COUNT(*) FROM visitantes WHERE comunidade_id=NEW.comunidade_id AND ativo=1) >= (SELECT json_extract(contrato,'$.limites.cadastros') FROM assinaturas_comunidade WHERE comunidade_id=NEW.comunidade_id) THEN RAISE(ABORT,'PLAN_QUOTA_LIMIT') END); END;
 --> statement-breakpoint
 CREATE TRIGGER plano_cadastros_update BEFORE UPDATE OF ativo,comunidade_id ON visitantes
 WHEN NEW.ativo=1 AND (OLD.ativo!=1 OR OLD.comunidade_id!=NEW.comunidade_id)
-BEGIN SELECT CASE WHEN (SELECT COUNT(*) FROM visitantes WHERE comunidade_id=NEW.comunidade_id AND ativo=1) >= (SELECT json_extract(contrato,'$.limites.cadastros') FROM assinaturas_comunidade WHERE comunidade_id=NEW.comunidade_id) THEN RAISE(ABORT,'PLAN_QUOTA_LIMIT') END; END;
+BEGIN SELECT (CASE WHEN (SELECT COUNT(*) FROM visitantes WHERE comunidade_id=NEW.comunidade_id AND ativo=1) >= (SELECT json_extract(contrato,'$.limites.cadastros') FROM assinaturas_comunidade WHERE comunidade_id=NEW.comunidade_id) THEN RAISE(ABORT,'PLAN_QUOTA_LIMIT') END); END;
 
 --> statement-breakpoint
 CREATE TRIGGER plano_celulas_insert BEFORE INSERT ON celulas WHEN NEW.ativo=1
-BEGIN SELECT CASE WHEN (SELECT COUNT(*) FROM celulas WHERE comunidade_id=NEW.comunidade_id AND ativo=1) >= (SELECT json_extract(contrato,'$.limites.celulas') FROM assinaturas_comunidade WHERE comunidade_id=NEW.comunidade_id) THEN RAISE(ABORT,'PLAN_QUOTA_LIMIT') END; END;
+BEGIN SELECT (CASE WHEN (SELECT COUNT(*) FROM celulas WHERE comunidade_id=NEW.comunidade_id AND ativo=1) >= (SELECT json_extract(contrato,'$.limites.celulas') FROM assinaturas_comunidade WHERE comunidade_id=NEW.comunidade_id) THEN RAISE(ABORT,'PLAN_QUOTA_LIMIT') END); END;
 --> statement-breakpoint
 CREATE TRIGGER plano_celulas_update BEFORE UPDATE OF ativo,comunidade_id ON celulas
 WHEN NEW.ativo=1 AND (OLD.ativo!=1 OR OLD.comunidade_id!=NEW.comunidade_id)
-BEGIN SELECT CASE WHEN (SELECT COUNT(*) FROM celulas WHERE comunidade_id=NEW.comunidade_id AND ativo=1) >= (SELECT json_extract(contrato,'$.limites.celulas') FROM assinaturas_comunidade WHERE comunidade_id=NEW.comunidade_id) THEN RAISE(ABORT,'PLAN_QUOTA_LIMIT') END; END;
+BEGIN SELECT (CASE WHEN (SELECT COUNT(*) FROM celulas WHERE comunidade_id=NEW.comunidade_id AND ativo=1) >= (SELECT json_extract(contrato,'$.limites.celulas') FROM assinaturas_comunidade WHERE comunidade_id=NEW.comunidade_id) THEN RAISE(ABORT,'PLAN_QUOTA_LIMIT') END); END;
 
 --> statement-breakpoint
 CREATE TRIGGER plano_ministerios_insert BEFORE INSERT ON ministerios_comunidade WHEN NEW.status='ATIVO'
-BEGIN SELECT CASE WHEN (SELECT COUNT(*) FROM ministerios_comunidade WHERE comunidade_id=NEW.comunidade_id AND status='ATIVO') >= (SELECT json_extract(contrato,'$.limites.ministerios') FROM assinaturas_comunidade WHERE comunidade_id=NEW.comunidade_id) THEN RAISE(ABORT,'PLAN_QUOTA_LIMIT') END; END;
+BEGIN SELECT (CASE WHEN (SELECT COUNT(*) FROM ministerios_comunidade WHERE comunidade_id=NEW.comunidade_id AND status='ATIVO') >= (SELECT json_extract(contrato,'$.limites.ministerios') FROM assinaturas_comunidade WHERE comunidade_id=NEW.comunidade_id) THEN RAISE(ABORT,'PLAN_QUOTA_LIMIT') END); END;
 --> statement-breakpoint
 CREATE TRIGGER plano_ministerios_update BEFORE UPDATE OF status,comunidade_id ON ministerios_comunidade
 WHEN NEW.status='ATIVO' AND (OLD.status!='ATIVO' OR OLD.comunidade_id!=NEW.comunidade_id)
-BEGIN SELECT CASE WHEN (SELECT COUNT(*) FROM ministerios_comunidade WHERE comunidade_id=NEW.comunidade_id AND status='ATIVO') >= (SELECT json_extract(contrato,'$.limites.ministerios') FROM assinaturas_comunidade WHERE comunidade_id=NEW.comunidade_id) THEN RAISE(ABORT,'PLAN_QUOTA_LIMIT') END; END;
+BEGIN SELECT (CASE WHEN (SELECT COUNT(*) FROM ministerios_comunidade WHERE comunidade_id=NEW.comunidade_id AND status='ATIVO') >= (SELECT json_extract(contrato,'$.limites.ministerios') FROM assinaturas_comunidade WHERE comunidade_id=NEW.comunidade_id) THEN RAISE(ABORT,'PLAN_QUOTA_LIMIT') END); END;
