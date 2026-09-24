@@ -29,4 +29,14 @@ Testes SQLite reais cobrem agregações, canais, janela temporal, fila antiga, a
 
 Conferência visual local autenticada em 320, 390 e 1440 px: filtros funcionais, temas claro/escuro, gráfico legível, tabela acessível e ausência de transbordamento horizontal. Nenhum erro de console observado. A base local não tem registros de entrega; casos com dados são validados nos testes SQLite.
 
-Publicação e resultado da validação final serão registrados após a conclusão do deploy.
+Validação final: **477 testes aprovados**, TypeScript limpo, build/artefato Sites aprovados e lint com zero erros. Os 86 avisos são preexistentes e incluem o checkout Android e probes ignorados pela publicação.
+
+## Publicação
+
+- Sites **303**, commit `0bdfe6a5dd87381727495e45d2e5cade0b50c0d0`.
+- Deploy `appgdep_6ab4917c44008191aad65ed284d845b1`, concluído em 23/09/2026 às 23h57 (Brasília).
+- URL: https://adote-gestao.da0602766.chatgpt.site/proprietario?tab=realtime
+- Home HTTP 200; nova API sem sessão HTTP 401.
+- Conferência autenticada em produção: 4 registros na janela inicial (2 aceitos Android, 1 falha Web, 1 cancelamento Web), média de aceite de 2 segundos; agendamento ativo; Firebase e Supabase verificados. São observações do momento, não garantias permanentes de disponibilidade.
+- Filtros 7 dias/Android retornaram 2 registros aceitos, coerentes com gráfico e tabela. Conferência móvel com dados reais em 390 px sem transbordamento horizontal da página; tabela tem rolagem interna quando necessário. Nenhum erro de console observado.
+- Repositório de origem Sites atualizado. Nenhuma alteração no repositório Android ou no APK.
