@@ -2,6 +2,7 @@ import { getRuntimeEnv } from "../../db/runtime-env";
 import { getVapidConfiguration, isTrustedPushEndpoint, isWebPushConfigured, sendWebPush, type PushSubscriptionRow, type VapidConfiguration } from "./web-push";
 import type { PushQueueState, PushQueueStatus } from "./push-delivery-types";
 import { readFirebaseConfig, nativeToken, sendFcm, type FirebaseConfig } from "./firebase-integration";
+import { getAuthorizedChatPush } from "./chat-push";
 
 const BATCH_SIZE = 8;
 const CONCURRENCY = 4;
@@ -93,7 +94,7 @@ async function deliverJob(db: D1Database, job: Job, token: string, configuration
   if (job.tentativas > MAX_ATTEMPTS) return finish(db, job, token, "FALHA", null, "LIMITE_TENTATIVAS");
   // Revalida a autorização e a leitura a cada envio, incluindo execuções recuperadas.
   const subscription = await db.prepare(
-    `SELECT p.id, p.endpoint, p.p256dh, p.auth, p.vinculo_id, n.tipo
+    `SELECT p.id, p.endpoint, p.p256dh, p.auth, p.vinculo_id, n.tipo, n.area
      FROM notificacoes_push_fila q
      JOIN notificacoes_push_dispositivos p ON p.id = q.dispositivo_id
        AND p.usuario_id = q.usuario_id AND p.vinculo_id = q.vinculo_id
@@ -101,11 +102,14 @@ async function deliverJob(db: D1Database, job: Job, token: string, configuration
      JOIN usuarios u ON u.id = p.usuario_id AND u.ativo = 1
      JOIN notificacoes_sistema n ON n.id = q.notificacao_id AND n.usuario_id = q.usuario_id
      WHERE q.id = ? AND q.lease_token = ? AND q.estado = 'PROCESSANDO' AND q.lease_ate > ?
-       AND n.area <> 'CHAT' AND datetime(s.expira_em) > CURRENT_TIMESTAMP
+       AND datetime(s.expira_em) > CURRENT_TIMESTAMP
        AND (p.expiracao_em IS NULL OR datetime(p.expiracao_em) > CURRENT_TIMESTAMP)
        AND NOT EXISTS (SELECT 1 FROM notificacoes_lidas l WHERE l.notificacao_id = n.id AND l.usuario_id = q.usuario_id)`,
-  ).bind(job.id, token, Date.now()).first<PushSubscriptionRow & { tipo: string }>();
+  ).bind(job.id, token, Date.now()).first<PushSubscriptionRow & { tipo: string; area: string }>();
   if (!subscription) return finish(db, job, token, "CANCELADA", null, "ACESSO_OU_AVISO_INDISPONIVEL");
+  if (subscription.area === "CHAT" && !await getAuthorizedChatPush(db, job.notificacao_id, job.usuario_id)) {
+    return finish(db, job, token, "CANCELADA", null, "ACESSO_OU_AVISO_INDISPONIVEL");
+  }
   const native = nativeToken(subscription.endpoint);
   if (!native && !isTrustedPushEndpoint(subscription.endpoint)) return finish(db, job, token, "FALHA", null, "DESTINO_INVALIDO");
 
@@ -114,7 +118,7 @@ async function deliverJob(db: D1Database, job: Job, token: string, configuration
   let status = 0, retryAfter: string | null = null;
   try {
     const options = {
-      ttl: Math.ceil((job.expira_em - Date.now()) / 1000), topic: `n-${job.notificacao_id}`, urgent: subscription.tipo === "IMPORTANTE",
+      ttl: Math.ceil((job.expira_em - Date.now()) / 1000), topic: `n-${job.notificacao_id}`, urgent: subscription.tipo === "IMPORTANTE" || subscription.area === "CHAT",
     };
     const result = native && firebase ? await sendFcm(firebase, subscription.endpoint, { tag: `vinkulo-notification-${job.notificacao_id}`, url: "/painel", notificationId: job.notificacao_id, bindingId: job.vinculo_id }, options.ttl)
       : configuration ? await sendWebPush(subscription, payload, configuration, options) : new Response(null, { status: 503 });

@@ -33,6 +33,7 @@ async function fixture(t) {
     sendWebPush: async (sub, payload, config, options) => { calls.push({ sub, payload: JSON.parse(payload), options }); return sender(sub, payload); },
   };
   const queue = await moduleAt("app/lib/push-delivery-queue.ts", {
+    "./chat-push": { getAuthorizedChatPush: async () => null },
     "./firebase-integration": { readFirebaseConfig: async () => firebase ? {} : null, nativeToken: endpoint => endpoint.startsWith("fcm:") ? endpoint.slice(4) : null,
       sendFcm: async (config, endpoint, payload, ttl) => { calls.push({ sub: { endpoint }, payload, options: { ttl }, native: true }); return sender({ endpoint }, payload); } },
     "./web-push": transport, "../../db/runtime-env": { getRuntimeEnv: () => ({ executionContext: { waitUntil: p => jobs.push(p) } }) },

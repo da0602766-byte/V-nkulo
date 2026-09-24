@@ -82,7 +82,10 @@ class SqliteD1Database {
     this.database.exec("BEGIN IMMEDIATE");
     try {
       const results = [];
-      for (const statement of statements) results.push(await statement.run());
+      for (const statement of statements) {
+        // D1 batch returns result rows for SELECT and INSERT ... RETURNING too.
+        results.push(await (/^\s*(SELECT|WITH|PRAGMA)\b|\bRETURNING\b/i.test(statement.query) ? statement.all() : statement.run()));
+      }
       this.database.exec("COMMIT");
       return results;
     } catch (error) {

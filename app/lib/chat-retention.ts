@@ -23,11 +23,14 @@ export async function purgeExpiredPrivateMessagesIfDue(
 ) {
   if (now < nextRetentionCheckAt) return;
   nextRetentionCheckAt = now + RETENTION_CHECK_INTERVAL_MS;
-  await db
-    .prepare(
+  await db.batch([
+    db.prepare(`DELETE FROM notificacoes_sistema WHERE area='CHAT' AND NOT EXISTS (
+      SELECT 1 FROM mensagens_privadas m JOIN conversas_privadas c ON c.id=m.conversa_id
+      WHERE m.id=notificacoes_sistema.entidade_id AND c.ciclo_semana=strftime('%Y-%W','now'))`),
+    db.prepare(
       "DELETE FROM conversas_privadas WHERE ciclo_semana <> strftime('%Y-%W','now')",
-    )
-    .run();
+    ),
+  ]);
 }
 
 /** Próxima segunda-feira 00h00 UTC — momento em que o ciclo semanal vira e

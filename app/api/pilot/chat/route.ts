@@ -1,6 +1,7 @@
 import { getD1 } from "../../../../db";
 import { CHAT_RETENTION_NOTICE, nextWeeklyPurgeAt } from "../../../lib/chat-retention";
 import { requireTenantPermission } from "../../../lib/tenant";
+import { scheduleWebPushDelivery } from "../../../lib/push-delivery-queue";
 
 type Access = Awaited<ReturnType<typeof requireTenantPermission>>;
 type ValidAccess = Exclude<Access, { error: Response }>;
@@ -165,14 +166,38 @@ export async function POST(request: Request) {
   if (!message) return Response.json({ ok: true, conversationId: conversation.id });
 
   const sender = await senderMetadata(access.user.id, access.context.comunidadeId);
-  const inserted = await db.prepare(
+  // D1 batch is an atomic transaction: the latest message below is the one
+  // inserted by this batch, never a concurrent sender's write. Only generic
+  // metadata is copied into notifications; private text stays in the chat.
+  const saved = await db.batch([
+    db.prepare(
     `INSERT INTO mensagens_privadas (conversa_id, remetente_id, mensagem)
      VALUES (?, ?, ?)
      RETURNING id, criado_em`,
-  ).bind(conversation.id, access.user.id, message).first<{ id: number; criado_em: string }>();
+    ).bind(conversation.id, access.user.id, message),
+    db.prepare(`INSERT INTO notificacoes_sistema
+      (tipo,titulo,mensagem,area,entidade_id,usuario_id,comunidade_id,remetente_usuario_id,destino_rota,criado_por)
+      SELECT 'INFO','Vínkulo','Você recebeu uma nova mensagem. Abra o Vínkulo para consultar.',
+        'CHAT',id,?,?,?,'/painel?view=mensagens','chat'
+      FROM mensagens_privadas WHERE conversa_id=? AND remetente_id=? ORDER BY id DESC LIMIT 1`)
+      .bind(targetUserId, access.context.comunidadeId, access.user.id, conversation.id, access.user.id),
+    // The general trigger deliberately ignores CHAT. Enqueue only this freshly
+    // persisted message, for the recipient's currently authorized devices.
+    db.prepare(`INSERT INTO notificacoes_push_fila(notificacao_id,dispositivo_id,usuario_id,vinculo_id)
+      SELECT n.id,p.id,p.usuario_id,p.vinculo_id FROM notificacoes_sistema n
+      JOIN notificacoes_push_dispositivos p ON p.usuario_id=n.usuario_id
+      JOIN sessoes s ON s.token_hash=p.sessao_token_hash AND s.usuario_id=p.usuario_id
+      JOIN usuarios u ON u.id=p.usuario_id AND u.ativo=1
+      WHERE n.area='CHAT' AND n.usuario_id=? AND n.remetente_usuario_id=? AND n.comunidade_id=?
+        AND n.entidade_id=(SELECT id FROM mensagens_privadas WHERE conversa_id=? AND remetente_id=? ORDER BY id DESC LIMIT 1)
+        AND p.vinculo_id IS NOT NULL AND datetime(s.expira_em)>CURRENT_TIMESTAMP
+        AND (p.expiracao_em IS NULL OR datetime(p.expiracao_em)>CURRENT_TIMESTAMP)`)
+      .bind(targetUserId, access.user.id, access.context.comunidadeId, conversation.id, access.user.id),
+    db.prepare("UPDATE conversas_privadas SET atualizado_em = CURRENT_TIMESTAMP WHERE id = ?").bind(conversation.id),
+  ]);
+  const inserted = saved[0].results[0] as { id: number; criado_em: string } | undefined;
   if (!inserted) return Response.json({ error: "Não foi possível enviar a mensagem." }, { status: 500 });
-  await db.prepare("UPDATE conversas_privadas SET atualizado_em = CURRENT_TIMESTAMP WHERE id = ?")
-    .bind(conversation.id).run();
+  scheduleWebPushDelivery(db);
 
   const item: Message = {
     id: inserted.id,
