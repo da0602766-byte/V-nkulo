@@ -30,7 +30,6 @@ const AccountProfileWorkspace = dynamic(() => import("./AccountProfileWorkspace"
 const CommunityAdminWorkspace = dynamic(() => import("./CommunityAdminWorkspace"), { loading: moduleLoading });
 const CommunityLifecycleWorkspace = dynamic(() => import("./CommunityLifecycleWorkspace"), { loading: moduleLoading });
 const DayThreadWorkspace = dynamic(() => import("./DayThreadWorkspace"), { loading: moduleLoading });
-const DiaconiaWorkspace = dynamic(() => import("./DiaconiaWorkspace"), { loading: moduleLoading });
 const EditorialSidebarSchedule = dynamic(() => import("./EditorialSidebarSchedule"), { loading: () => null });
 const EventsWorkspace = dynamic(() => import("./EventsWorkspace"), { loading: moduleLoading });
 const LeadershipWorkspace = dynamic(() => import("./LeadershipWorkspace"), { loading: moduleLoading });
@@ -69,7 +68,6 @@ type View =
   | "visitantes"
   | "celulas"
   | "estacionamento"
-  | "diaconia"
   | "redes"
   | "membro"
   | "lider"
@@ -90,7 +88,6 @@ const MENU: { id: View; label: string; permission: string }[] = [
   { id: "visitantes", label: "Visitantes", permission: "visitors.view" },
   { id: "celulas", label: "Células", permission: "cells.view" },
   { id: "estacionamento", label: "Gestão", permission: "parking.view" },
-  { id: "diaconia", label: "Diaconia", permission: "diaconia.view" },
   { id: "redes", label: "Redes e unidades", permission: "networks.view" },
   { id: "membro", label: "Painel do membro", permission: "dashboard.view" },
   { id: "lider", label: "Painel de liderança", permission: "leadership.panel.view" },
@@ -119,7 +116,6 @@ const VIEW_MODULE: Partial<Record<View, TenantContext["modules"][number]>> = {
   visitantes: "visitors",
   celulas: "cells",
   estacionamento: "parking",
-  diaconia: "diaconia",
   redes: "networks",
   pessoas: "people",
 };
@@ -475,7 +471,6 @@ export default function PilotDashboard({
           makeItem("estacionamento", "Gestão do estacionamento"),
           makeItem("celulas"),
           makeItem("redes"),
-          makeItem("diaconia"),
         ].filter(Boolean),
       },
       {
@@ -1374,9 +1369,6 @@ export default function PilotDashboard({
           {visibleView === "estacionamento" && (
             <ParkingWorkspace communityName={active.comunidadeNome} memberMode={!active.permissions.includes("parking.view")} />
           )}
-          {visibleView === "diaconia" && (
-            <DiaconiaWorkspace communityName={active.comunidadeNome} />
-          )}
           {visibleView === "redes" && features.networkModuleEnabled && (
             <NetworkWorkspace />
           )}
@@ -1851,7 +1843,6 @@ function MenuIcon({ id }: { id: MenuIconId }) {
     eventos: "M5 4h14a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm0 6h14M8 2v4m8-4v4",
     ministerios: "M12 3v18m-7-9h14M7 7h10v10H7z",
     escalas: "M7 4h10v3H7V4Zm-2 2h14v15H5V6Zm3 6 2 2 4-4m-6 7h7",
-    diaconia: "M6 20v-8a6 6 0 0 1 12 0v8M9 8a3 3 0 1 1 6 0",
     solicitacoes: "M12 21s-8-4.4-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 6.6-8 11-8 11Z",
     visitantes: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m7-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8m9-2v6m3-3h-6",
     celulas: "M12 3 4 7v10l8 4 8-4V7l-8-4Zm0 0v18M4 7l8 4 8-4",

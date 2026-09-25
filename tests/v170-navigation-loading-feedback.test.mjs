@@ -11,7 +11,7 @@ test("atalhos de proprietário e comunidade exibem carregamento antes da navega�
   const mobile = read("app/components/PublicMobileNav.tsx");
 
   assert.match(link, /showLoading = false/);
-  assert.match(link, /global-navigation-loading/);
+  assert.match(link, /<VinkuloLoading label=\{loadingLabel\}/);
   assert.match(link, /document\.documentElement\.dataset\.navigationLoading = "true"/);
   assert.match(header, /showLoading[\s\S]*Abrindo a Área do proprietário/);
   assert.match(header, /href="\/painel" showLoading loadingLabel="Abrindo sua comunidade/);

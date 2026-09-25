@@ -645,14 +645,14 @@ export function RelacionamentoTools({ visitantes = [], compacto = false, onAbrir
                 {!prioridades.length && <div className="relationship-empty-v3"><strong>Nenhuma prioridade encontrada</strong><p>{busca ? "Tente outro nome ou limpe a pesquisa." : "Os próximos cuidados aparecerão aqui conforme o histórico de contato."}</p></div>}
               </div>
             </section>
-            <aside className="relationship-suggestions-v3" aria-labelledby="relationship-suggestions-title-v3">
+            <details className="relationship-suggestions-v3"><summary aria-label="Sugestões de organização e cuidado" title="Sugestões de cuidado">!</summary><div className="relationship-suggestions-content">
               <header><p className="pilot-kicker">SUGESTÕES</p><h3 id="relationship-suggestions-title-v3">Organização e cuidado</h3></header>
               <ol>
                 <li data-tone={urgentes ? "urgent" : "calm"}><span>1</span><div><strong>{urgentes ? `Acolha ${urgentes} ${urgentes === 1 ? "pessoa urgente" : "pessoas urgentes"}` : "Prioridades em dia"}</strong><p>{urgentes ? "Contato pessoal hoje, com responsável e próximo passo definidos." : "Continue registrando cada retorno para manter a cadência saudável."}</p></div></li>
                 <li data-tone={semContato ? "attention" : "calm"}><span>2</span><div><strong>{semContato ? `${semContato} sem primeiro contato` : "Primeiro contato concluído"}</strong><p>{semContato ? "Distribua entre os responsáveis e evite abordagens duplicadas." : "As pessoas ativas já têm histórico de relacionamento."}</p></div></li>
                 <li><span>3</span><div><strong>Registre o próximo cuidado</strong><p>Depois da conversa, escolha uma data e deixe uma anotação com checklist.</p></div></li>
               </ol>
-            </aside>
+            </div></details>
           </div>
 
           <section className="relationship-people-v3" aria-labelledby="relationship-people-title-v3" data-mobile-panel="pessoas">

@@ -27,7 +27,6 @@ const VALID_VIEWS = new Set([
   "ministerios",
   "visitantes",
   "celulas",
-  "diaconia",
   "estacionamento",
   "redes",
   "membro",

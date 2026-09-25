@@ -48,7 +48,7 @@ type Visitor = {
 // As abas de seção seguem o padrão de Ministérios: a navegação divide a área em
 // partes e cada uma carrega só o que precisa. As "visões" continuam existindo,
 // mas como filtro da lista dentro da aba Pessoas — são coisas diferentes.
-type VisitorTab = "painel" | "pessoas" | "acompanhamento" | "aniversarios";
+type VisitorTab = "painel" | "pessoas" | "acompanhamento" | "aniversarios" | "anotacoes";
 
 type VisitorVision =
   | "todos"
@@ -180,6 +180,7 @@ export function VisitorsWorkspace({
   const [canManageCategories, setCanManageCategories] = useState(false);
   const [categoriesLoaded, setCategoriesLoaded] = useState(false);
   const [tab, setTab] = useState<VisitorTab>("painel");
+  const [birthdayMessage, setBirthdayMessage] = useState<string>(BIRTHDAY_MESSAGES[0].text);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState("");
   const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
@@ -1229,7 +1230,9 @@ export function VisitorsWorkspace({
             {label}{total !== null && <b>{total}</b>}
           </button>
         ))}
+        <button type="button" className={`visitor-notebook-tab ${tab === "anotacoes" ? "active" : ""}`} aria-label="Minhas anotações de cuidado" title="Minhas anotações" aria-current={tab === "anotacoes" ? "page" : undefined} onClick={() => openTab("anotacoes")}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="5" y="3" width="15" height="18" rx="2"/><path d="M8 3v18M3 7h4M3 12h4M3 17h4M11 8h6M11 12h6"/></svg></button>
       </nav>
+      {tab === "anotacoes" && <div className="visitor-notes-panel"><CareNotesBoard /></div>}
 
       {!overlayOpen && <VisitorNotice message={message} error={error} warning={warning} onDismiss={dismissNotice} />}
 
@@ -1336,7 +1339,7 @@ export function VisitorsWorkspace({
                   </ul>
                 )}
             </article>
-            <CareNotesBoard side />
+
           </div>
         </div>
       )}
@@ -1482,14 +1485,21 @@ export function VisitorsWorkspace({
               <div><p className="pilot-kicker">ANIVERSÁRIOS DO MÊS</p><h2 id="visitor-birthday-title-v7">Celebre com carinho</h2></div>
               <span>{birthdays.length}</span>
             </header>
-            <p className="visitor-birthday-note-v7">A mensagem de parabéns já abre preenchida no WhatsApp. Quem não tem telefone cadastrado aparece marcado, para que alguém complete a ficha.</p>
+            <p className="visitor-birthday-note-v7">Escolha uma mensagem, ajuste como preferir e abra o WhatsApp da pessoa para revisar e enviar.</p>
+            <div className="birthday-message-editor">
+              <label>Mensagem pronta<select value={BIRTHDAY_MESSAGES.find(item => item.text === birthdayMessage)?.id || "custom"} onChange={event => { const item = BIRTHDAY_MESSAGES.find(item => item.id === event.target.value); if (item) setBirthdayMessage(item.text); }}>
+                {BIRTHDAY_MESSAGES.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}<option value="custom" disabled>Personalizada</option>
+              </select></label>
+              <label>Personalize a mensagem<textarea rows={3} maxLength={1200} value={birthdayMessage} onChange={event => setBirthdayMessage(event.target.value)} /></label>
+              <small>O campo {"{nome}"} será substituído pelo primeiro nome do aniversariante.</small>
+            </div>
                         <ul className="visitor-birthday-feed-v6">
                           {birthdays.map((visitor) => (
                             <li key={visitor.id}>
                               <time dateTime={visitor.data_nascimento || ""}>{birthdayDay(visitor.data_nascimento)}</time>
                               <span><strong>{visitor.nome_completo}</strong><small>{formatBirthday(visitor.data_nascimento)}</small></span>
-                              {visitor.telefone && birthdayWhatsappHref(visitor)
-                                ? <a href={birthdayWhatsappHref(visitor) || undefined} target="_blank" rel="noreferrer" aria-label={`Enviar parabéns para ${visitor.nome_completo} pelo WhatsApp`}>WhatsApp</a>
+                              {visitor.telefone && birthdayWhatsappHref(visitor, birthdayMessage)
+                                ? <a href={birthdayWhatsappHref(visitor, birthdayMessage) || undefined} target="_blank" rel="noreferrer" aria-label={`Enviar parabéns para ${visitor.nome_completo} pelo WhatsApp`}>WhatsApp</a>
                                 : <i>Sem contato</i>}
                             </li>
                           ))}
@@ -2212,11 +2222,17 @@ function whatsappHref(phone: string | null) {
     : null;
 }
 
-function birthdayWhatsappHref(visitor: BirthdayVisitor) {
+const BIRTHDAY_MESSAGES = [
+  { id: "carinho", label: "Com carinho", text: "Parabéns, {nome}! 🎉 Que seu novo ciclo seja cheio de alegria, saúde e bênçãos. Com carinho, sua comunidade." },
+  { id: "fe", label: "Fé e gratidão", text: "Feliz aniversário, {nome}! Hoje agradecemos a Deus pela sua vida. Que Ele guie seus passos e renove sua esperança a cada dia. Você é muito especial para nossa comunidade!" },
+  { id: "breve", label: "Uma mensagem breve", text: "Feliz aniversário, {nome}! Que seu dia seja leve, feliz e cheio de amor. Um abraço de toda a comunidade! 💜" },
+];
+
+function birthdayWhatsappHref(visitor: BirthdayVisitor, template: string) {
   const base = whatsappHref(visitor.telefone);
   if (!base) return null;
   const firstName = visitor.nome_completo.trim().split(/\s+/)[0] || visitor.nome_completo;
-  const message = `Parabéns, ${firstName}! 🎉 Que seu novo ciclo seja cheio de alegria, saúde e bênçãos. Com carinho, sua comunidade.`;
+  const message = (template.trim() || BIRTHDAY_MESSAGES[0].text).replaceAll("{nome}", firstName);
   return `${base}?text=${encodeURIComponent(message)}`;
 }
 

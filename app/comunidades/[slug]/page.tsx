@@ -6,6 +6,7 @@ import PublicIcon from "../../components/PublicIcon";
 import PublicEventRegistration from "../../components/PublicEventRegistration";
 import PublicCellRequest from "../../components/PublicCellRequest";
 import { getSessionUser } from "../../lib/local-auth";
+import { getPublishedCommunityStory } from "../../lib/community-story";
 import { communityThemeStyle } from "../../lib/community-theme";
 import Link from "../../components/StableLink";
 import {
@@ -46,10 +47,11 @@ export default async function PublicCommunityPage({
   const community = await getPublicCommunityBySlug(slug);
   if (!community) notFound();
   const user = await getSessionUser();
-  const [events, cells, joinState] = await Promise.all([
+  const [events, cells, joinState, story] = await Promise.all([
     getPublicCommunityEvents(community.id),
     getPublicCommunityCells(community.id),
     getCommunityJoinState(user?.id || null, community.id),
+    getPublishedCommunityStory(community.id),
   ]);
   return (
     <main className="vinkulo-site public-community social-public-community" data-ui-version="v2" data-community-palette={community.paletteId.toLowerCase()} style={communityThemeStyle(community.paletteId)}>
@@ -86,12 +88,15 @@ export default async function PublicCommunityPage({
         <div className="community-public-about">
           <header className="community-section-heading">
             <div>
-              <p className="pilot-kicker">SOBRE A COMUNIDADE</p>
-              <h2>Um espaço para conhecer antes de solicitar entrada</h2>
+              <p className="pilot-kicker">{story ? "NOSSA HISTÓRIA" : "SOBRE A COMUNIDADE"}</p>
+              <h2>{story?.title || "Conheça nossa comunidade"}</h2>
             </div>
-            <span>Conteúdo interno protegido</span>
+            {story?.foundedYear && <span>Desde {story.foundedYear}</span>}
           </header>
-          <article className="community-institutional-card community-profile-information">
+          {story ? <article className="community-story-public">
+            <div className="community-story-body">{story.body.split(/\n\s*\n/).filter(Boolean).map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>
+            {story.mission && <section className="community-story-mission"><p className="pilot-kicker">NOSSO PROPÓSITO</p><p>{story.mission}</p></section>}
+          </article> : <article className="community-institutional-card community-profile-information">
             <header><span aria-hidden="true"><PublicIcon name="community" size={20} /></span><div><small>APRESENTAÇÃO</small><h3>{community.nome}</h3></div></header>
             <p>{community.descricao || "Esta comunidade ainda está completando sua apresentação institucional."}</p>
             <dl>
@@ -99,7 +104,7 @@ export default async function PublicCommunityPage({
               <div><dt>Entrada</dt><dd>Solicitação analisada pela comunidade</dd></div>
               <div><dt>Privacidade</dt><dd>Dados pessoais e atividades internas permanecem protegidos</dd></div>
             </dl>
-          </article>
+          </article>}
         </div>
         <aside className="community-public-side">
           <JoinCommunityCard

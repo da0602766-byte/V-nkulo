@@ -1,0 +1,33 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createPilotD1,createPilotUser} from './helpers/sqlite-d1.mjs';
+import {cpfLoginRequest} from './helpers/cpf-login.mjs';
+const worker=(await import('../dist/server/index.js')).default;
+const context={waitUntil(p){p.catch(()=>{});},passThroughOnException(){}};
+test('community story enforces tenant, role, paid status, draft/public state and expiry',async()=>{
+  const {database:db,d1}=await createPilotD1();
+  const env={DB:d1,AUTH_SECRET:'story-test-only',ASSETS:{fetch:async()=>new Response('',{status:404})}};
+  let ip=0;
+  const call=(path,cookie='',method='GET',body)=>worker.fetch(new Request('https://test.invalid'+path,{method,headers:{cookie,origin:'https://test.invalid','content-type':'application/json','cf-connecting-ip':`192.0.2.${++ip}`},body:body===undefined?undefined:JSON.stringify(body)}),env,context);
+  async function user(email,communityId,papel){const id=await createPilotUser(db,{nome:'Teste História',email,senha:'Teste123!',memberships:[{comunidadeId:communityId,papel}]});const request=await cpfLoginRequest(env,new Request('https://test.invalid/api/auth/login',{method:'POST',headers:{'content-type':'application/json',origin:'https://test.invalid'},body:JSON.stringify({email,senha:'Teste123!'})}));const response=await worker.fetch(request,env,context);assert.equal(response.status,200);return {id,cookie:response.headers.get('set-cookie').match(/__Host-adote_session=[^;]+/)[0]};}
+  const admin=await user('story-admin@test.invalid',1,'ADMIN_COMUNIDADE');
+  const member=await user('story-member@test.invalid',1,'MEMBRO');
+  const other=await user('story-other@test.invalid',2,'ADMIN_COMUNIDADE');
+  const story={title:'Nossa origem',body:'Uma história de encontros e cuidado que começou em nossa comunidade.',mission:'Cuidar das pessoas.',foundedYear:'2001',published:true};
+  assert.equal((await call('/api/pilot/community-story')).status,401);
+  assert.equal((await call('/api/pilot/community-story',member.cookie,'PATCH',story)).status,403);
+  assert.equal((await call('/api/pilot/community-story',admin.cookie,'PATCH',story)).status,403);
+  const plan={id:'gratuito',nome:'Contrato de teste',descricao:'',valor_centavos:5000,periodicidade:'MENSAL',duracao_dias:null,ativo:true,contratavel:true,destaque:false,personalizado:false,modulos:['events','ministries','visitors','cells','parking','people'],recursos:['feed','requests','reports'],limites:{usuarios:null,administradores:null,cadastros:null,celulas:null,ministerios:null},condicoes:'',versao:1};
+  db.prepare("INSERT INTO assinaturas_comunidade(comunidade_id,plano_id,status,contrato,fundamento,aprovado_por) VALUES(1,'gratuito','ATIVA',?,'CONFIRMACAO_EXTERNA',?)").run(JSON.stringify(plan),admin.id);
+  assert.equal((await call('/api/pilot/community-story',admin.cookie,'PATCH',{...story,published:false,comunidadeId:2})).status,200);
+  assert.equal(db.prepare("SELECT valor FROM configuracoes WHERE chave='community_story:2'").get(),undefined);
+  const slug=db.prepare('SELECT slug FROM comunidades WHERE id=1').get().slug;
+  assert.doesNotMatch(await (await call('/comunidades/'+slug)).text(),/Uma história de encontros/);
+  assert.equal((await call('/api/pilot/community-story',admin.cookie,'PATCH',story)).status,200);
+  assert.match(await (await call('/comunidades/'+slug)).text(),/Uma história de encontros/);
+  const otherResult=await (await call('/api/pilot/community-story',other.cookie)).json();assert.equal(otherResult.story.body,'');
+  db.prepare("UPDATE assinaturas_comunidade SET termina_em='2000-01-01' WHERE comunidade_id=1").run();
+  assert.doesNotMatch(await (await call('/comunidades/'+slug)).text(),/Uma história de encontros/);
+  assert.equal(db.prepare("SELECT valor FROM configuracoes WHERE chave='community_story:1'").get().valor.includes(story.body),true);
+  db.close();
+});

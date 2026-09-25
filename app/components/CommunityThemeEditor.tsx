@@ -8,6 +8,7 @@ import {
   type CommunityTheme,
 } from "../lib/community-theme";
 import NativeImageUpload from "./NativeImageUpload";
+import CommunityStoryEditor from "./CommunityStoryEditor";
 
 type ThemeResponse = {
   theme?: CommunityTheme;
@@ -168,12 +169,13 @@ export default function CommunityThemeEditor() {
           <header><span aria-hidden="true">◐</span><div><strong>Paleta</strong><small>Cores testadas nos modos claro, escuro e automático.</small></div></header>
           <div className="community-palette-grid">
             {COMMUNITY_PALETTES.map((item) => (
-              <button type="button" className={paletteId === item.id ? "active" : ""} key={item.id} onClick={() => setPaletteId(item.id)}>
+              <button type="button" aria-pressed={paletteId === item.id} title={item.description} className={paletteId === item.id ? "active" : ""} key={item.id} onClick={() => setPaletteId(item.id)}>
                 <span style={{ background: `linear-gradient(135deg,${item.light.background} 0 49%,${item.dark.background} 51%)` }}><i style={{ background: item.light.primary }} /><i style={{ background: item.dark.accent }} /></span>
                 <strong>{item.name}</strong><small>{item.description}</small>
               </button>
             ))}
           </div>
+          <p className="community-palette-description">{palette.name}: {palette.description}</p>
         </div>
         <div className="community-theme-block community-theme-media">
           <header><span aria-hidden="true">▧</span><div><strong>Imagens</strong><small>Avatar, banner e papel de parede otimizados para computador e celular.</small></div></header>
@@ -195,6 +197,7 @@ export default function CommunityThemeEditor() {
           <button type="submit" disabled={saving}>{saving ? "Salvando…" : "Salvar configurações"}</button>
         </footer>
       </form>
+      <CommunityStoryEditor />
     </section>
   );
 }

@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import VinkuloLoading from "./VinkuloLoading";
 
 export default function StableLink({
   href,
@@ -60,11 +61,7 @@ export default function StableLink({
         {children}
       </a>
       {pending && typeof document !== "undefined" && createPortal((
-        <div className="global-navigation-loading" role="status" aria-live="polite" aria-busy="true">
-          <span className="pilot-loader" aria-hidden="true" />
-          <strong>{loadingLabel}</strong>
-          <small>Preparando sua sessão, comunidade e permissões.</small>
-        </div>
+        <VinkuloLoading label={loadingLabel} />
       ), document.body)}
     </>
   );

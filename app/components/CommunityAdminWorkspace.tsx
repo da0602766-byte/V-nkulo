@@ -310,10 +310,7 @@ export default function CommunityAdminWorkspace({
                 <div>
                   <strong>{item.nome}</strong>
                   <small>{item.email}</small>
-                  <p>{item.mensagem || "Nenhuma mensagem informada."}</p>
-                  <time dateTime={item.solicitado_em}>
-                    {formatDate(item.solicitado_em)}
-                  </time>
+                  <details><summary>Detalhes da solicitação</summary>{item.mensagem && <p>{item.mensagem}</p>}<time dateTime={item.solicitado_em}>{formatDate(item.solicitado_em)}</time></details>
                 </div>
                 <div>
                   <span className={`request-status status-${item.status.toLowerCase()}`}>

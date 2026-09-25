@@ -1304,7 +1304,7 @@ export default function SecretaryMinisterialWorkspace({
           data-editor-key="ministerios-catalogo-cabecalho"
         >
           <div>
-            <p className="pilot-kicker">MINISTÉRIOS · V4.7.3</p>
+            <p className="pilot-kicker">SERVIR EM COMUNIDADE</p>
             <h1 data-editor-key="ministerios-catalogo-titulo">Ministérios</h1>
             <p>
               Acesse somente os ministérios relacionados à sua participação
@@ -1338,13 +1338,8 @@ export default function SecretaryMinisterialWorkspace({
                   className={`secretary-ministry-tile ${ministry.banner_url ? "has-banner" : ""}`}
                   onClick={() => openMinistry(ministry)}
                 >
-                  {ministry.banner_url && (
-                    <span className="secretary-ministry-tile-media" aria-hidden="true">
-                      <img src={ministry.banner_url} alt="" loading="lazy" />
-                    </span>
-                  )}
-                  <span className="secretary-ministry-symbol" aria-hidden="true">
-                    {ministrySymbol(ministry.categoria)}
+                  <span className={`secretary-ministry-tile-media ${ministry.banner_url ? "" : "is-placeholder"}`} aria-hidden="true">
+                    {ministry.banner_url ? <img src={ministry.banner_url} alt="" loading="lazy" /> : <span>{ministrySymbol(ministry.categoria)}</span>}
                   </span>
                   <span className="secretary-ministry-copy">
                     <small>{CATEGORY_LABELS[ministry.categoria] || ministry.categoria}</small>
