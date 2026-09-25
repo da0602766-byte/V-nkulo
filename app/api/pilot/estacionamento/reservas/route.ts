@@ -9,10 +9,11 @@ function normalizeReservationCode(value: unknown) {
   return match?.[0] || "";
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const access = await requireTenantPermission("parking.reserve");
   if ("error" in access) return access.error;
-  const canManage = ["parking.entry", "parking.exit", "parking.edit", "parking.configure"]
+  const personalView = new URL(request.url).searchParams.get("scope") === "mine";
+  const canManage = !personalView && ["parking.entry", "parking.exit", "parking.edit", "parking.configure"]
     .some((permission) => access.context.permissions.includes(permission));
   const db = getD1();
   const rows = await db.prepare(`SELECT r.id, r.usuario_id, r.vaga_id, r.evento_id, r.evento_titulo, r.nome_completo, r.email, r.telefone,

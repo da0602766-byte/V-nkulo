@@ -25,6 +25,18 @@ export default function ParkingWorkspace({
   communityName: string;
   memberMode?: boolean;
 }) {
+  const [viewAsMember, setViewAsMember] = useState(false);
+  const effectiveMemberMode = memberMode || viewAsMember;
+  return <div className="parking-experience">
+    {!memberMode && <nav className="parking-experience-switch" aria-label="Visão do estacionamento">
+      <button type="button" aria-pressed={!viewAsMember} onClick={() => setViewAsMember(false)}>Gestão</button>
+      <button type="button" aria-pressed={viewAsMember} onClick={() => setViewAsMember(true)}>Visão do membro · Reservar vaga</button>
+    </nav>}
+    <ParkingExperience key={effectiveMemberMode ? "member" : "management"} communityName={communityName} memberMode={effectiveMemberMode} />
+  </div>;
+}
+
+function ParkingExperience({ communityName, memberMode }: { communityName: string; memberMode: boolean }) {
   const parking = useParkingData(memberMode);
   const [isMobile, setIsMobile] = useState(false);
 

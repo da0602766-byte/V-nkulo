@@ -37,10 +37,7 @@ function markPending(cellId: number) {
   window.localStorage.setItem(PENDING_KEY, JSON.stringify([...next]));
 }
 
-// Participação em Células — Frame 3 (computador) e Frame 4 (celular) do
-// design aprovado, incluindo a caixinha de destaque (Mateus 18:20 por
-// padrão) que a liderança pode reescrever, e a prévia de celular que fica
-// visível também para quem está no computador.
+// Participação em células com apresentações próprias para computador e celular.
 export default function CellMemberPortal({
   communityName,
   cells,
@@ -52,9 +49,7 @@ export default function CellMemberPortal({
 }) {
   const [pendingIds, setPendingIds] = useState<Set<number>>(() => new Set());
   const [mobileSelected, setMobileSelected] = useState<Cell | null>(null);
-  // Abaixo de 680px a própria página vira a experiência de celular (Frame 4)
-  // — os mesmos componentes de baixo, sem a moldura de telefone, que só faz
-  // sentido como prévia para quem está olhando de um computador.
+  // Abaixo de 680px, mostrar a interface própria do celular.
   const [isRealMobile, setIsRealMobile] = useState(false);
 
   useEffect(() => {
@@ -110,20 +105,6 @@ export default function CellMemberPortal({
         onRequestEntry={requestEntry}
         onBackToGestao={onBackToGestao}
       />
-      <div className="cpart-mobile-preview-section">
-        <div className="cpart-mobile-preview-intro">
-          <p className="cpart-kicker">VISUALIZAÇÃO MOBILE</p>
-          <h2>Experiência no celular</h2>
-          <p>Toque nos cartões para navegar. Líderes têm acesso a relatórios e aprovações diretamente pelo celular.</p>
-        </div>
-        <PhoneFrame>
-          {mobileSelected ? (
-            <MobileDetail cell={mobileSelected} cells={cells} status={statusOf(mobileSelected)} onBack={() => setMobileSelected(null)} onRequestEntry={requestEntry} />
-          ) : (
-            <MobileList list={list} statusOf={statusOf} onSelect={setMobileSelected} />
-          )}
-        </PhoneFrame>
-      </div>
     </section>
   );
 }
@@ -436,17 +417,6 @@ function CellProfilePanel({
 }
 
 // ── Frame 4 — prévia e experiência de celular ──────────────────────────────
-function PhoneFrame({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="cpart-phone">
-      <div className="cpart-phone-screen">
-        <div className="cpart-phone-status"><span>9:41</span></div>
-        <div className="cpart-phone-body">{children}</div>
-      </div>
-    </div>
-  );
-}
-
 function MobileList({
   list,
   statusOf,

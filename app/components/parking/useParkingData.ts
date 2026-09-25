@@ -36,7 +36,7 @@ export function useParkingData(memberMode: boolean) {
       }
       setData(result);
       const [reservationResponse, reportResponse, eventResponse] = await Promise.all([
-        fetch("/api/pilot/estacionamento/reservas", { cache: "no-store" }),
+        fetch(memberMode ? "/api/pilot/estacionamento/reservas?scope=mine" : "/api/pilot/estacionamento/reservas", { cache: "no-store" }),
         memberMode ? Promise.resolve(null) : fetch("/api/pilot/estacionamento/relatorios", { cache: "no-store" }),
         fetch("/api/pilot/eventos", { cache: "no-store" }),
       ]);
@@ -71,7 +71,7 @@ export function useParkingData(memberMode: boolean) {
   const refreshReservations = useCallback(async () => {
     try {
       const [response, availabilityResponse, reportResponse] = await Promise.all([
-        fetch("/api/pilot/estacionamento/reservas", { cache: "no-store" }),
+        fetch(memberMode ? "/api/pilot/estacionamento/reservas?scope=mine" : "/api/pilot/estacionamento/reservas", { cache: "no-store" }),
         memberMode ? fetch("/api/pilot/estacionamento/disponibilidade", { cache: "no-store" }) : Promise.resolve(null),
         memberMode ? Promise.resolve(null) : fetch("/api/pilot/estacionamento/relatorios", { cache: "no-store" }),
       ]);

@@ -1342,18 +1342,12 @@ export default function SecretaryMinisterialWorkspace({
                     {ministry.banner_url ? <img src={ministry.banner_url} alt="" loading="lazy" /> : <span>{ministrySymbol(ministry.categoria)}</span>}
                   </span>
                   <span className="secretary-ministry-copy">
-                    <small>{CATEGORY_LABELS[ministry.categoria] || ministry.categoria}</small>
+                    {ministry.categoria !== "OUTRO" && (CATEGORY_LABELS[ministry.categoria] || ministry.categoria).toLocaleLowerCase("pt-BR") !== ministry.nome.toLocaleLowerCase("pt-BR") && <small>{CATEGORY_LABELS[ministry.categoria] || ministry.categoria}</small>}
                     <strong>{ministry.nome}</strong>
-                    <span>{ministry.descricao || "Ministério da comunidade"}</span>
+                    {ministry.descricao && <span>{ministry.descricao}</span>}
                   </span>
                   <span className="secretary-ministry-meta">
-                    <small>Liderança</small>
-                    <strong>{ministry.responsavel_nome || "Não definida"}</strong>
-                    {ministry.categorias_visitantes?.length > 0 && (
-                      <small className="secretary-visitor-care">
-                        Acompanha {ministry.categorias_visitantes.map((item) => item.nome).join(", ")}
-                      </small>
-                    )}
+                    {ministry.responsavel_nome && <strong title={`Liderança: ${ministry.responsavel_nome}`}>{ministry.responsavel_nome}</strong>}
                     <span>{ministry.can_manage ? "Gerenciar →" : "Minhas escalas →"}</span>
                   </span>
                 </button>

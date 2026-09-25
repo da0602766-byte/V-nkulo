@@ -165,7 +165,7 @@ export default function CommunityThemeEditor() {
             </div>
           </div>
         )}
-        <div className="community-theme-block">
+        <div className="community-theme-block community-theme-palette">
           <header><span aria-hidden="true">◐</span><div><strong>Paleta</strong><small>Cores testadas nos modos claro, escuro e automático.</small></div></header>
           <div className="community-palette-grid">
             {COMMUNITY_PALETTES.map((item) => (
