@@ -120,3 +120,28 @@ html[data-theme] .gestao-scan-hub button :is(strong,span,small){color:inherit!im
 .parking-experience-switch button[aria-pressed="true"]{background:var(--community-primary);color:var(--community-on-primary);border-color:var(--community-primary)}
 @media(max-width:1100px){.worship-layout,.worship-welcome{padding-left:0}}
 @media(max-width:760px){.community-theme-editor .community-theme-media{grid-template-columns:minmax(0,1fr)}.parking-experience-switch button{font-size:13px}.pilot-dashboard[data-ui-version="v2"] .secretary-catalog.ministry-project .secretary-ministry-tile{height:auto!important;min-height:160px!important;padding:16px!important}}
+
+/* Ministry art sits on the right, leaving a clear reading area on the left. */
+.pilot-dashboard[data-ui-version="v2"] .secretary-catalog.ministry-project .secretary-ministry-tile.has-banner .secretary-ministry-tile-media{left:45%!important;right:0!important;top:0!important;bottom:0!important;width:55%!important;height:100%!important;mask-image:linear-gradient(to right,transparent 0%,#000 72%)!important;background:transparent!important}
+.pilot-dashboard[data-ui-version="v2"] .secretary-catalog.ministry-project .secretary-ministry-tile.has-banner .secretary-ministry-tile-media img{opacity:1!important;object-fit:cover!important;object-position:center!important}
+.pilot-dashboard[data-ui-version="v2"] .secretary-catalog.ministry-project .secretary-ministry-tile.has-banner .secretary-ministry-copy{max-width:62%}
+.pilot-dashboard[data-ui-version="v2"] .secretary-catalog.ministry-project .secretary-ministry-tile.has-banner .secretary-ministry-meta{border-top:0!important}
+.pilot-dashboard[data-ui-version="v2"] .secretary-catalog.ministry-project .secretary-ministry-tile.has-banner .secretary-ministry-meta>strong{max-width:54%}
+.pilot-dashboard[data-ui-version="v2"] .secretary-catalog.ministry-project .secretary-ministry-tile.has-banner .secretary-ministry-meta>span{background:var(--community-surface);border:1px solid var(--community-line);border-radius:8px;padding:5px 8px}
+
+/* One clear reading order for the next shift, with actions in their own row. */
+.secretary-next-schedule{display:grid;grid-template-columns:52px minmax(0,1fr);gap:12px;padding:14px;border:1px solid var(--pilot-line);border-radius:14px;background:var(--pilot-surface-2);min-width:0}
+.secretary-next-schedule time{width:52px;height:60px;border-radius:11px}
+.secretary-next-schedule-detail{display:flex!important;flex-direction:column;gap:5px;min-width:0}
+.secretary-next-schedule-detail>strong{font-size:14px;line-height:1.3;overflow-wrap:anywhere}
+.secretary-next-schedule-detail>span{font-size:12px!important;line-height:1.35;color:var(--pilot-muted)}
+.secretary-next-schedule-detail>small{font-size:11px!important;color:var(--pilot-muted)}
+.secretary-next-schedule>.secretary-card-actions{grid-column:1/-1!important;display:flex;flex-wrap:wrap;gap:7px;margin:4px 0 0!important;padding-top:12px;border-top:1px solid var(--pilot-line)}
+.secretary-next-schedule>.secretary-card-actions>button{flex:1 1 74px;min-width:0;padding:8px 6px;text-align:center}
+@media(max-width:760px){.pilot-dashboard[data-ui-version="v2"] .secretary-catalog.ministry-project .secretary-ministry-tile.has-banner .secretary-ministry-copy{max-width:65%}}
+
+@media(min-width:1400px){
+  .pilot-dashboard[data-ui-version="v2"] .worship-feed.community-feed-redesign{max-width:none!important;width:100%;margin:0!important}
+  .worship-layout{padding-left:max(0px,calc((100% - 858px)/2))}
+  .worship-welcome{padding-left:max(0px,calc((100% - 858px)/2))}
+}

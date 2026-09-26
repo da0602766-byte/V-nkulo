@@ -2742,7 +2742,13 @@ function ScheduleCompact({
   return (
     <div className="secretary-next-schedule">
       <time><strong>{formatDay(schedule.inicia_em)}</strong><span>{formatMonth(schedule.inicia_em)}</span></time>
-      <div><strong>{schedule.titulo}</strong><span>{formatDate(schedule.inicia_em)} · {schedule.local || "Local não informado"}</span><small>{schedule.designacoes.length} integrantes · {schedule.repertorio.length} itens no repertório</small>{schedule.status === "AGENDADA" && schedule.publicar_em && <SchedulePublicationCountdown opensAt={schedule.publicar_em} />}</div>
+      <div className="secretary-next-schedule-detail">
+        <strong>{schedule.titulo}</strong>
+        <span>{formatDate(schedule.inicia_em)}</span>
+        <span>{schedule.local || "Local a confirmar"}</span>
+        <small>{schedule.designacoes.length} integrantes{schedule.repertorio.length > 0 ? ` · ${schedule.repertorio.length} itens no repertório` : ""}</small>
+        {schedule.status === "AGENDADA" && schedule.publicar_em && <SchedulePublicationCountdown opensAt={schedule.publicar_em} />}
+      </div>
       <div className="secretary-card-actions"><button type="button" onClick={() => void onPdf(schedule)} disabled={busy === `pdf-${schedule.id}`}>{busy === `pdf-${schedule.id}` ? "Preparando…" : "PDF"}</button><button type="button" onClick={() => onCalendar(schedule)}>Calendário</button>{schedule.can_manage && schedule.status === "PUBLICADA" && <button type="button" onClick={() => onShare(schedule)} disabled={busy === `share-${schedule.id}`}>Compartilhar</button>}</div>
     </div>
   );
