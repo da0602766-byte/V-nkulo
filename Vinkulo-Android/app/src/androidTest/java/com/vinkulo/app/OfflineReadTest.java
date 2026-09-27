@@ -105,13 +105,13 @@ public class OfflineReadTest {
             try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
                 assertTrue(device.wait(Until.hasObject(By.text("Aparelho preparado")),15000));
                 scrollTo(device,"Aviso offline de teste");
-                device.takeScreenshot(new File(context.getExternalFilesDir(null),"reader-mural.png"));
+                capture(device,"mural");
                 scrollTo(device,"Agenda");device.findObject(By.text("Agenda")).click();
                 scrollTo(device,"Encontro offline de teste");
-                device.takeScreenshot(new File(context.getExternalFilesDir(null),"reader-agenda.png"));
+                capture(device,"agenda");
                 scrollTo(device,"Minhas escalas");device.findObject(By.text("Minhas escalas")).click();
                 scrollTo(device,"Escala offline de teste");
-                device.takeScreenshot(new File(context.getExternalFilesDir(null),"reader-escalas.png"));
+                capture(device,"escalas");
                 scenario.recreate();
                 scrollTo(device,"Aviso offline de teste");
                 setCookie("different-session");scenario.recreate();
@@ -128,6 +128,13 @@ public class OfflineReadTest {
         InstrumentationRegistry.getInstrumentation().runOnMainSync(()->CookieManager.getInstance().setCookie(
                 NativePolicy.ORIGIN,"__Host-adote_session="+value+"; Secure; Path=/; SameSite=Lax",ok->done.countDown()));
         assertTrue(done.await(5,TimeUnit.SECONDS));
+    }
+    private void capture(UiDevice device,String section) throws Exception {
+        device.waitForIdle(); SystemClock.sleep(1500);
+        // The test runner uninstalls the disposable app after tests. Preserve
+        // only synthetic QA screenshots outside its deleted app directory.
+        device.executeShellCommand("screencap -p /sdcard/vinkulo-reader-"+section+".png");
+        device.executeShellCommand("uiautomator dump /sdcard/vinkulo-reader-"+section+".xml");
     }
     private void scrollTo(UiDevice device,String label) throws Exception {
         if(device.wait(Until.hasObject(By.text(label)),3000)) return;
