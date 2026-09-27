@@ -45,7 +45,7 @@ final class OfflineController {
     void lock() {
         blocked = true; generation.incrementAndGet(); result = "locked";
         // Persist the barrier before queued database work, including process death.
-        if (!barriers.edit().putBoolean("locked", true).remove("read-consent").commit()) result = "storage-error";
+        if (!barriers.edit().putBoolean("locked", true).remove("read-consent").remove("requests-consent").commit()) result = "storage-error";
         if (closed) return;
         executor.execute(() -> { try { store().lock(); } catch (Exception ignored) { result = "storage-error"; } notifyChanged(); });
     }
@@ -58,6 +58,10 @@ final class OfflineController {
             String requestedBinding = binding();
             try {
                 JSONObject saved = blocked ? null : store().read(requestedBinding, System.currentTimeMillis(), SystemClock.elapsedRealtime(), boot());
+                if(saved!=null && saved.optJSONObject("snapshot")!=null && saved.getJSONObject("snapshot").has("pedidos")
+                    && !requestedBinding.equals(barriers.getString("requests-consent",""))) {
+                    saved.getJSONObject("snapshot").put("pedidos",new JSONObject().put("allowed",false).put("hasMore",false).put("items",new org.json.JSONArray()));
+                }
                 state.put("prepared", saved != null).put("result", result).put("refreshing", refreshing);
                 if (saved != null) state.put("communityName", saved.getString("communityName"))
                         .put("preparedAt", saved.getLong("serverIssuedAt"))
@@ -77,10 +81,14 @@ final class OfflineController {
     // Native HTTPS only: neither a JS payload nor a cached WebView response can
     // authorize a local context. No redirects, bearer tokens or raw error logs.
     void refresh(boolean explicit) {
+        refresh(explicit,false);
+    }
+    void refresh(boolean explicit, boolean optInRequests) {
         if (closed || refreshing || (!explicit && lastAttempt != 0 && SystemClock.elapsedRealtime() - lastAttempt < 60_000)) return;
         final String requestCookies = cookies();
         if (requestCookies.isEmpty()) { lock(); return; }
         final String requestedBinding = OfflinePolicy.digest(requestCookies);
+        final boolean includeRequests = (explicit && optInRequests) || requestedBinding.equals(barriers.getString("requests-consent",""));
         // Operational text is opt-in, tied to this exact session/community.
         if (!explicit && !requestedBinding.equals(barriers.getString("read-consent", ""))) return;
         final long ticket = generation.incrementAndGet();
@@ -95,11 +103,12 @@ final class OfflineController {
                 connection.setUseCaches(false); connection.setRequestProperty("Cookie", requestCookies);
                 connection.setRequestProperty("Origin", NativePolicy.ORIGIN);
                 connection.setRequestProperty("X-Vinkulo-Challenge", challenge);
-                connection.setRequestProperty("X-Vinkulo-Client", "android-read-2");
+                connection.setRequestProperty("X-Vinkulo-Client", "android-read-3");
+                if(includeRequests) connection.setRequestProperty("X-Vinkulo-Requests","own");
                 int status = connection.getResponseCode();
                 if (status == 401 || status == 403) {
                     if (generation.get() == ticket) {
-                        blocked = true; barriers.edit().putBoolean("locked", true).remove("read-consent").commit(); store().lock(); result = "locked";
+                        blocked = true; barriers.edit().putBoolean("locked", true).remove("read-consent").remove("requests-consent").commit(); store().lock(); result = "locked";
                     }
                     return;
                 }
@@ -113,13 +122,17 @@ final class OfflineController {
                     }
                 }
                 JSONObject grant = new JSONObject(bytes.toString(StandardCharsets.UTF_8.name()));
-                if (grant.getInt("protocol") != 2 || !challenge.equals(grant.getString("challenge"))) throw new java.io.IOException("Invalid challenge");
+                if (grant.getInt("protocol") != 3 || !challenge.equals(grant.getString("challenge"))) throw new java.io.IOException("Invalid challenge");
+                final boolean requestsAllowed=grant.getJSONObject("snapshot").getJSONObject("pedidos").getBoolean("allowed");
+                if(requestsAllowed&&!includeRequests)throw new java.io.IOException("Unexpected scope");
                 if (generation.get() != ticket || !requestedBinding.equals(binding())) return;
                 store().install(grant, requestedBinding, System.currentTimeMillis(), SystemClock.elapsedRealtime(), boot(), SystemClock.elapsedRealtime() - started);
                 activity.runOnUiThread(() -> {
                     if (!closed && generation.get() == ticket && requestedBinding.equals(binding())) {
-                        blocked = !barriers.edit().putBoolean("locked", false).putString("read-consent", requestedBinding).commit();
-                        result = blocked ? "storage-error" : "ready"; notifyChanged();
+                        SharedPreferences.Editor edit=barriers.edit().putBoolean("locked", false).putString("read-consent", requestedBinding);
+                        if(includeRequests&&requestsAllowed)edit.putString("requests-consent",requestedBinding);else edit.remove("requests-consent");
+                        blocked = !edit.commit();
+                        result = blocked ? "storage-error" : includeRequests&&!requestsAllowed ? "requests-denied" : "ready"; notifyChanged();
                     }
                 });
             } catch (Exception ignored) {

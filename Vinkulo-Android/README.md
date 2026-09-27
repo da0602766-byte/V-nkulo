@@ -2,7 +2,27 @@
 
 Aplicativo Android conectado à plataforma oficial do Vínkulo.
 
-Versão estável de distribuição geral: **1.7.1** (`versionCode 10`). Candidato para homologação: **1.10.0** (`versionCode 13`).
+Versão estável de distribuição geral: **1.7.1** (`versionCode 10`). Candidato para homologação: **1.11.0** (`versionCode 14`).
+
+## Meus pedidos — bloco 5A / candidato 1.11.0
+
+Consulta opcional de até 50 pedidos criados pela própria pessoa, com título,
+texto (até 2.000 caracteres), tipo, situação e datas. Nunca inclui caixa de
+atendimento, pedidos recebidos, destinatários, contatos ou notas da equipe.
+Ativação separada: **Incluir meus pedidos nas consultas offline**. O
+consentimento antigo das consultas não habilita pedidos automaticamente.
+
+Protocolo `android-read-3` e cabeçalho nativo de opt-in; o servidor revalida
+acesso/plano de Pedidos. Protocolos anteriores continuam compatíveis. Cópia
+AES-GCM substituída integralmente, até 8 horas; bloqueio/reinício/troca de
+sessão exigem nova preparação. Pedidos concluídos há mais de 30 dias ficam
+fora da cópia, sem apagar registros no servidor. Situação é histórica,
+nunca promessa de atendimento atual. Remover consultas não apaga a fila de
+visitantes. Criação/envio/respostas de pedidos continuam online.
+
+Este é somente o primeiro bloco da etapa 5, não a conclusão de todos os
+módulos. Demais capacidades precisam de contrato e testes próprios. Não
+promover à distribuição geral sem homologação física.
 
 ## Rascunhos e fila de visitantes — candidato 1.10.0
 

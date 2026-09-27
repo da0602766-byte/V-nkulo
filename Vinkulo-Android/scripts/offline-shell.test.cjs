@@ -100,3 +100,31 @@ test('revoked sections, empty content and capped results are explained', () => {
   app.send({prepared:true,preparedAt:2,validForMs:1000,snapshot:data});
   assert.match(app.elements.get('list-status').textContent,/mais itens disponíveis online/);
 });
+
+test('personal requests require a separate opt-in and are never invented for older snapshots', () => {
+  const app=shell();
+  app.send({prepared:true,preparedAt:1,validForMs:1000,snapshot:snapshot()});
+  assert.equal(app.elements.get('tab-pedidos').hidden,true);
+  app.elements.get('prepare').handlers.click();assert.equal(app.requests.at(-1).action,'refresh');
+  app.send({prepared:true,preparedAt:1,validForMs:1000,snapshot:snapshot()});
+  app.elements.get('prepare-requests').handlers.click();assert.equal(app.requests.at(-1).action,'refresh-requests');
+});
+test('own request text is literal, searchable and visibly historical; revoked consent clears the selected section', () => {
+  const app=shell(),data=snapshot();
+  data.pedidos={allowed:true,hasMore:true,items:[{id:4,titulo:'<b>Meu pedido</b>',texto:'Texto particular',tipo:'ORACAO',status:'EM_ANALISE',data:'2026-09-27',atualizado:'2026-09-27'}]};
+  app.send({prepared:true,preparedAt:1,validForMs:1000,snapshot:data});
+  app.elements.get('tab-pedidos').handlers.click();
+  assert.equal(app.elements.get('tab-pedidos').hidden,false);
+  assert.equal(app.elements.get('requests-notice').hidden,false);
+  const article=app.elements.get('items').children.at(-1);
+  assert.equal(article.children[0].textContent,'<b>Meu pedido</b>');
+  assert.ok(article.children.some(x=>x.textContent==='Oração · Em análise'));
+  app.elements.get('search').value='particular';app.elements.get('search').handlers.input();
+  assert.match(app.elements.get('list-status').textContent,/1 item/);
+  data.pedidos={allowed:false,hasMore:false,items:[]};
+  app.send({prepared:true,preparedAt:1,validForMs:1000,snapshot:data,result:'requests-denied'});
+  assert.equal(app.elements.get('tab-pedidos').hidden,true);
+  assert.equal(app.elements.get('requests-notice').hidden,true);
+  assert.equal(app.elements.get('tab-mural').attributes['aria-pressed'],'true');
+  assert.match(app.elements.get('context-detail').textContent,/acesso ou plano/);
+});

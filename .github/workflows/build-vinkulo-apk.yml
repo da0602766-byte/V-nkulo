@@ -62,13 +62,13 @@ jobs:
           sha256sum app/build/outputs/apk/release/app-release.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: Vinkulo-Android-1.10.0-homologacao-api${{ matrix.api }}
+          name: Vinkulo-Android-1.11.0-homologacao-api${{ matrix.api }}
           path: Vinkulo-Android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: Vinkulo-Android-1.10.0-validacao-api${{ matrix.api }}
+          name: Vinkulo-Android-1.11.0-validacao-api${{ matrix.api }}
           path: |
             Vinkulo-Android/app/build/reports/
             Vinkulo-Android/app/build/test-results/
@@ -98,6 +98,9 @@ jobs:
             curl --fail --location https://adote-gestao.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.9.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.9.0.apk
             echo '207318d3a9343dd55e85d8c76539b7dd80ff642a11b34d36dc69c1878cbc83ec  /tmp/vinkulo-1.9.0.apk' | sha256sum --check
             adb install -r /tmp/vinkulo-1.9.0.apk
+            curl --fail --location https://adote-gestao.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.10.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.10.0.apk
+            echo '344f81565d286c491e7a5b9f30e48ffe52ba66cd8e8e3497769949cc6797be0a  /tmp/vinkulo-1.10.0.apk' | sha256sum --check
+            adb install -r /tmp/vinkulo-1.10.0.apk
             adb install -r app/build/outputs/apk/release/app-release.apk
             adb shell dumpsys package com.vinkulo.app | grep firstInstallTime > /tmp/vinkulo-after-update.txt
             diff /tmp/vinkulo-first-install.txt /tmp/vinkulo-after-update.txt
@@ -111,7 +114,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: Vinkulo-Android-1.10.0-emulador-api${{ matrix.api }}
+          name: Vinkulo-Android-1.11.0-emulador-api${{ matrix.api }}
           path: |
             Vinkulo-Android/app/build/reports/androidTests/
             Vinkulo-Android/app/build/outputs/androidTest-results/

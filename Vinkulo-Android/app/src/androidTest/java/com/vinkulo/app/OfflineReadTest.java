@@ -72,6 +72,34 @@ public class OfflineReadTest {
         } finally {context.deleteDatabase(name);}
     }
 
+    private JSONObject requestsGrant() throws Exception {
+        JSONObject value=grant().put("protocol",3);
+        value.getJSONObject("snapshot").put("pedidos",section(new JSONArray().put(new JSONObject()
+            .put("id",71).put("titulo","Meu pedido offline de teste").put("texto","Texto pessoal cifrado")
+            .put("tipo","ORACAO").put("status","ABERTA").put("data","2026-09-27T12:00:00Z").put("atualizado","2026-09-27T12:00:00Z"))));
+        return value;
+    }
+    @Test public void ownRequestsAreEncryptedBoundedAndRemovedByReplacementWithoutAffectingQueuedVisitors() throws Exception {
+        String name="test-requests-"+UUID.randomUUID()+".db";
+        try(OfflineStore store=new OfflineStore(OfflineDatabase.open(context,name),cipher())) {
+            VisitorDrafts drafts=new VisitorDrafts(store.database,cipher());
+            drafts.put("visitors:test","pending",new JSONObject().put("state","PENDING"));
+            store.install(requestsGrant(),"a",1000,100,1,10);
+            assertFalse(new String(store.database.storage().context().sealed,java.nio.charset.StandardCharsets.UTF_8).contains("Texto pessoal"));
+            assertEquals(1,store.read("a",2000,1100,1).getJSONObject("snapshot").getJSONObject("pedidos").getJSONArray("items").length());
+            JSONObject invalid=requestsGrant();invalid.getJSONObject("snapshot").getJSONObject("pedidos").put("allowed",false);
+            try{store.install(invalid,"a",2000,1100,1,10);fail("Denied section retained data");}catch(IllegalArgumentException expected) { }
+            invalid=requestsGrant();invalid.getJSONObject("snapshot").getJSONObject("pedidos").getJSONArray("items").getJSONObject(0).put("destinatario","Forbidden");
+            try{store.install(invalid,"a",2000,1100,1,10);fail("Unexpected private field");}catch(IllegalArgumentException expected) { }
+            JSONObject revoked=requestsGrant();revoked.getJSONObject("snapshot").put("pedidos",section(new JSONArray()).put("allowed",false));
+            store.install(revoked,"a",3000,2100,1,10);
+            assertEquals(0,store.read("a",3001,2101,1).getJSONObject("snapshot").getJSONObject("pedidos").getJSONArray("items").length());
+            store.install(grant(),"a",4000,3100,1,10); // Existing v2 is still accepted.
+            assertFalse(store.read("a",4001,3101,1).getJSONObject("snapshot").has("pedidos"));
+            store.lock();assertEquals("PENDING",drafts.get("visitors:test","pending").getString("state"));
+        }finally{context.deleteDatabase(name);}
+    }
+
     @Test public void malformedOverQuotaOrOverlongGrantNeverReplacesValidContent() throws Exception {
         String name="test-invalid-read-"+UUID.randomUUID()+".db";
         try (OfflineStore store=new OfflineStore(OfflineDatabase.open(context,name),cipher())) {
@@ -94,10 +122,10 @@ public class OfflineReadTest {
         if(android.os.Build.VERSION.SDK_INT>=33) device.executeShellCommand("pm grant com.vinkulo.app android.permission.POST_NOTIFICATIONS");
         setCookie("fixture-read-session");
         String binding=OfflinePolicy.digest(OfflinePolicy.sessionCookies(CookieManager.getInstance().getCookie(NativePolicy.ORIGIN)));
-        context.getSharedPreferences("offline-lock",Context.MODE_PRIVATE).edit().putBoolean("locked",false).remove("read-consent").commit();
+        context.getSharedPreferences("offline-lock",Context.MODE_PRIVATE).edit().putBoolean("locked",false).remove("read-consent").putString("requests-consent",binding).commit();
         try {
             try(OfflineStore store=new OfflineStore(OfflineDatabase.open(context,"vinkulo-offline.db"),new OfflineCipher("vinkulo-offline-v1"))) {
-                store.install(grant(),binding,System.currentTimeMillis(),SystemClock.elapsedRealtime(),Settings.Global.getInt(context.getContentResolver(),Settings.Global.BOOT_COUNT,-1),10);
+                store.install(requestsGrant(),binding,System.currentTimeMillis(),SystemClock.elapsedRealtime(),Settings.Global.getInt(context.getContentResolver(),Settings.Global.BOOT_COUNT,-1),10);
             }
             try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
                 requireReader(scenario,true);
@@ -106,6 +134,8 @@ public class OfflineReadTest {
                 OfflineUiEvidence.capture(device,"agenda");
                 tapTab(scenario,device,"escalas","Escala offline de teste");
                 OfflineUiEvidence.capture(device,"escalas");
+                tapTab(scenario,device,"pedidos","Meu pedido offline de teste");
+                OfflineUiEvidence.capture(device,"requests");
                 scenario.recreate();
                 requireReader(scenario,true);
                 OfflineUiEvidence.capture(device,"reader-restored");

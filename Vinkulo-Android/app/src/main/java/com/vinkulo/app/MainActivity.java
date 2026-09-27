@@ -308,7 +308,7 @@ public class MainActivity extends Activity {
                         }
                     } catch (JSONException ignored) { /* Ignore malformed messages without logging their content. */ }
                 });
-        String script = "if(window===window.top){VinkuloNative.onmessage=function(e){try{window.dispatchEvent(new CustomEvent('vinkulo:fcm-token',{detail:JSON.parse(e.data)}));}catch(ignore){}};window.VinkuloAndroid=Object.freeze({version:'1.10.0',"
+        String script = "if(window===window.top){VinkuloNative.onmessage=function(e){try{window.dispatchEvent(new CustomEvent('vinkulo:fcm-token',{detail:JSON.parse(e.data)}));}catch(ignore){}};window.VinkuloAndroid=Object.freeze({version:'1.11.0',"
                 + "requestPushToken:function(){VinkuloNative.postMessage(JSON.stringify({action:'push-token'}));},"
                 + "setPushBinding:function(token,bindingId){VinkuloNative.postMessage(JSON.stringify({action:'push-bind',token:token,bindingId:bindingId}));},"
                 + "clearPushBinding:function(){VinkuloNative.postMessage(JSON.stringify({action:'push-clear'}));},"
@@ -373,6 +373,7 @@ public class MainActivity extends Activity {
                         if (requestId <= 0) return;
                         if ("lock".equals(action)) offline.lock();
                         else if ("refresh".equals(action)) offline.refresh(true);
+                        else if ("refresh-requests".equals(action)) offline.refresh(true,true);
                         else if (!"status".equals(action)) return;
                         offline.status(state -> {
                             if (webView != null && OfflinePolicy.localPage(webView.getUrl())) {

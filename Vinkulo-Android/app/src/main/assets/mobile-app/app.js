@@ -20,6 +20,7 @@
   }
   function renderItems() {
     const container = byId('items'); container.textContent = '';
+    byId('requests-notice').hidden = !snapshot || selected !== 'pedidos';
     if (!snapshot) return;
     const names = selected === 'agenda' ? ['eventos', 'compromissos'] : [selected];
     let rows = [], more = false, denied = false;
@@ -30,7 +31,7 @@
     });
     if (selected === 'agenda') rows.sort((a, b) => new Date(a.item.data) - new Date(b.item.data));
     const query = byId('search').value.trim().toLocaleLowerCase('pt-BR');
-    rows = rows.filter(row => [row.item.titulo, row.item.texto, row.item.local, row.item.ministerio, row.item.autor]
+    rows = rows.filter(row => [row.item.titulo, row.item.texto, row.item.local, row.item.ministerio, row.item.autor, row.item.tipo, row.item.status]
       .join(' ').toLocaleLowerCase('pt-BR').indexOf(query) !== -1);
     byId('list-status').textContent = rows.length + ' item(ns) salvo(s)' + (query ? ' nesta busca.' : '.')
       + (more ? ' Há mais itens disponíveis online.' : '') + (denied ? ' Parte desta consulta não foi autorizada.' : '');
@@ -38,7 +39,7 @@
     rows.forEach(row => {
       const item = row.item, article = document.createElement('article'); article.className = 'entry';
       text(article, 'h3', item.titulo || 'Sem título');
-      const label = row.name === 'compromissos' ? 'Meu compromisso' : row.name === 'eventos' ? 'Evento' : row.name === 'escalas' ? 'Minha escala' : 'Publicação';
+      const label = row.name === 'pedidos' ? 'Meu pedido' : row.name === 'compromissos' ? 'Meu compromisso' : row.name === 'eventos' ? 'Evento' : row.name === 'escalas' ? 'Minha escala' : 'Publicação';
       text(article, 'p', label + ' · ' + date(item.data) + (item.fim ? ' até ' + date(item.fim) : ''), 'muted');
       if (item.autor) text(article, 'p', item.autor, 'muted');
       if (item.ministerio) text(article, 'p', item.ministerio, 'muted');
@@ -46,6 +47,12 @@
       if (item.diaInteiro) text(article, 'p', 'Dia inteiro', 'muted');
       if (item.concluido) text(article, 'p', 'Concluído na última atualização', 'muted');
       if (item.resposta) text(article, 'p', 'Sua resposta na última atualização: ' + item.resposta, 'muted');
+      if (row.name === 'pedidos') {
+        const types = {ORACAO:'Oração',VISITA:'Visita',ACONSELHAMENTO:'Aconselhamento',APOIO:'Apoio',MINISTERIO:'Ministério',OUTRO:'Outro',INFORMACAO:'Informação'};
+        const statuses = {ABERTA:'Aberto',EM_ANALISE:'Em análise',CONCLUIDA:'Concluído'};
+        text(article, 'p', (types[item.tipo] || item.tipo) + ' · ' + (statuses[item.status] || item.status), 'muted');
+        text(article, 'p', 'Atualização do pedido: ' + date(item.atualizado), 'muted');
+      }
       if (item.texto) text(article, 'p', item.texto, 'body');
       container.appendChild(article);
     });
@@ -54,11 +61,15 @@
     snapshot = null; snapshotTime = 0; byId('reader').hidden = true;
     byId('items').textContent = ''; byId('search').value = ''; byId('window').textContent = '';
     byId('list-status').textContent = '';
+    byId('tab-pedidos').hidden = true; byId('requests-notice').hidden = true;
+    selected = 'mural';
+    ['mural','agenda','escalas','pedidos'].forEach(tab => byId('tab-' + tab).setAttribute('aria-pressed', String(tab === selected)));
   }
   function render(state) {
     window.clearTimeout(expiryTimer);
     waiting = !!state.refreshing;
     byId('prepare').disabled = waiting;
+    byId('prepare-requests').disabled = waiting;
     byId('context-title').textContent = state.prepared ? 'Aparelho preparado' : 'Preparação necessária';
     const message = state.prepared
       ? state.snapshot ? 'Consultas protegidas disponíveis por tempo limitado. Esta é uma cópia da última atualização, não uma confirmação em tempo real.' : 'Identificação preparada na versão anterior. Ative as consultas offline para salvar conteúdo autorizado.'
@@ -75,15 +86,23 @@
     // An expired copy must remain removable without requiring a new login.
     byId('lock').hidden = !bridge;
     byId('prepare').textContent = state.prepared && state.snapshot ? 'Atualizar consultas offline' : 'Ativar consultas offline';
+    const requestsAllowed = !!(state.prepared && state.snapshot && state.snapshot.pedidos && state.snapshot.pedidos.allowed);
+    byId('prepare-requests').textContent = requestsAllowed ? 'Atualizar meus pedidos offline' : 'Incluir meus pedidos nas consultas offline';
+    byId('tab-pedidos').hidden = !requestsAllowed;
+    if (selected === 'pedidos' && !requestsAllowed) {
+      selected = 'mural';
+      ['mural','agenda','escalas','pedidos'].forEach(tab => byId('tab-' + tab).setAttribute('aria-pressed', String(tab === selected)));
+    }
     if (state.prepared && state.snapshot) {
       byId('reader').hidden = false;
-      if (!snapshot || snapshotTime !== state.preparedAt) {
+      if (!snapshot || snapshotTime !== state.preparedAt || !!(snapshot.pedidos && snapshot.pedidos.allowed) !== requestsAllowed) {
         snapshot = state.snapshot; snapshotTime = state.preparedAt;
         byId('window').textContent = 'Agenda e escalas: ' + date(snapshot.from) + ' a ' + date(snapshot.until) + '.';
         renderItems();
       }
     } else clearSnapshot();
     if (state.prepared && state.result === 'unavailable') byId('context-detail').textContent = 'Não foi possível atualizar. A cópia anterior permanece disponível apenas até o vencimento.';
+    if (state.prepared && state.result === 'requests-denied') byId('context-detail').textContent = 'Meus pedidos não estão disponíveis para este acesso ou plano. As demais consultas autorizadas foram atualizadas.';
     if (state.prepared) expiryTimer = window.setTimeout(() => { render({result:'locked'}); send('status'); }, Math.max(0, Number(state.validForMs) || 0));
   }
   function connection() {
@@ -95,14 +114,16 @@
   else {
     byId('context-title').textContent = 'Atualize o Android System WebView';
     byId('context-detail').textContent = 'A preparação protegida precisa de uma versão compatível do WebView. Você pode continuar no sistema online.';
-    byId('prepare').disabled = true; byId('lock').hidden = true;
+    byId('prepare').disabled = true; byId('prepare-requests').disabled = true; byId('lock').hidden = true;
   }
   byId('open').addEventListener('click', () => { window.location.assign('/painel'); });
   byId('prepare').addEventListener('click', () => { if (waiting) return; waiting = true; byId('prepare').disabled = true; send('refresh'); });
+  byId('prepare-requests').addEventListener('click', () => { if (waiting) return; waiting = true; byId('prepare-requests').disabled = true; send('refresh-requests'); });
   byId('lock').addEventListener('click', () => { render({result:'locked'}); send('lock'); });
-  ['mural', 'agenda', 'escalas'].forEach(name => byId('tab-' + name).addEventListener('click', () => {
+  ['mural', 'agenda', 'escalas', 'pedidos'].forEach(name => byId('tab-' + name).addEventListener('click', () => {
+    if (name === 'pedidos' && (!snapshot || !snapshot.pedidos || !snapshot.pedidos.allowed)) return;
     selected = name;
-    ['mural', 'agenda', 'escalas'].forEach(tab => byId('tab-' + tab).setAttribute('aria-pressed', String(tab === selected)));
+    ['mural', 'agenda', 'escalas', 'pedidos'].forEach(tab => byId('tab-' + tab).setAttribute('aria-pressed', String(tab === selected)));
     renderItems();
   }));
   byId('search').addEventListener('input', renderItems);
