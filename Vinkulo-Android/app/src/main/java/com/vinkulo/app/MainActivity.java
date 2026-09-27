@@ -25,6 +25,8 @@ import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
+import android.webkit.WebResourceError;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -35,6 +37,7 @@ import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.webkit.WebViewCompat;
 import androidx.webkit.WebViewFeature;
 import androidx.webkit.WebMessageCompat;
+import androidx.webkit.ServiceWorkerControllerCompat;
 import org.json.JSONObject;
 import org.json.JSONException;
 import java.util.Collections;
@@ -56,6 +59,8 @@ public class MainActivity extends Activity {
     private static final String EXTRA_NOTIFICATION_URL = "vinkulo_notification_url";
 
     private WebView webView;
+    private OfflineController offline;
+    private OfflineAssets offlineAssets;
     private ValueCallback<Uri[]> fileCallback;
     private final ArrayDeque<PermissionRequest> pendingMediaRequests = new ArrayDeque<>();
     private boolean awaitingMediaPermissionResult;
@@ -66,6 +71,15 @@ public class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
         applySafeSystemInsets();
         webView = findViewById(R.id.webview);
+        offlineAssets = new OfflineAssets(getApplicationContext());
+        offline = new OfflineController(this, () -> {
+            if (webView != null && OfflinePolicy.localPage(webView.getUrl())) {
+                webView.evaluateJavascript("window.dispatchEvent(new Event('vinkulo:offline-status'))", null);
+            }
+        });
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.SERVICE_WORKER_BASIC_USAGE)) {
+            ServiceWorkerControllerCompat.getInstance().setServiceWorkerClient(offlineAssets.workerClient());
+        }
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -79,13 +93,29 @@ public class MainActivity extends Activity {
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, false);
         installNativeBridge();
+        installOfflineBridge();
         webView.setDownloadListener((url, userAgent, disposition, mimeType, length) ->
                 downloadDocument(url, userAgent, disposition, mimeType));
         webView.setWebViewClient(new WebViewClient() {
             @Override public void onPageStarted(WebView view, String url, Bitmap icon) {
                 if (NativePolicy.trusted(url)) {
                     String path = Uri.parse(url).getPath();
-                    if ("/api/auth/logout".equals(path) || "/login".equals(path)) FirebaseDeviceState.clearBinding(MainActivity.this);
+                    if ("/api/auth/logout".equals(path) || "/login".equals(path)) {
+                        FirebaseDeviceState.clearBinding(MainActivity.this);
+                        offline.lock();
+                    }
+                }
+            }
+            @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                if (NativePolicy.trusted(request.getUrl().toString()) && "/api/auth/logout".equals(request.getUrl().getPath())) offline.lock();
+                return offlineAssets.intercept(request.getUrl());
+            }
+            @Override public void onPageFinished(WebView view, String url) {
+                if (NativePolicy.trusted(url) && "/painel".equals(Uri.parse(url).getPath())) offline.refresh(false);
+            }
+            @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                if (request.isForMainFrame() && NativePolicy.trusted(request.getUrl().toString()) && !OfflinePolicy.localPage(request.getUrl().toString())) {
+                    view.loadUrl(OfflinePolicy.HOME);
                 }
             }
             @Override
@@ -129,9 +159,9 @@ public class MainActivity extends Activity {
         requestStartupPermissions();
         if (state == null) {
             String coldStartPath = notificationPathFromIntent(getIntent());
-            webView.loadUrl(coldStartPath != null ? APP_URL + coldStartPath : APP_URL);
+            webView.loadUrl(coldStartPath != null ? APP_URL + coldStartPath : OfflinePolicy.HOME);
         } else {
-            if (webView.restoreState(state) == null) webView.loadUrl(APP_URL);
+            if (webView.restoreState(state) == null) webView.loadUrl(OfflinePolicy.HOME);
             handleNotificationTap(getIntent());
         }
         handleGoogleReturn(getIntent());
@@ -156,6 +186,7 @@ public class MainActivity extends Activity {
     }
 
     @Override protected void onDestroy() {
+        if (offline != null) offline.close();
         if (fileCallback != null) { fileCallback.onReceiveValue(null); fileCallback = null; }
         while (!pendingMediaRequests.isEmpty()) pendingMediaRequests.poll().deny();
         if (webView != null) {
@@ -257,7 +288,7 @@ public class MainActivity extends Activity {
                         }
                     } catch (JSONException ignored) { /* Ignore malformed messages without logging their content. */ }
                 });
-        String script = "if(window===window.top){VinkuloNative.onmessage=function(e){try{window.dispatchEvent(new CustomEvent('vinkulo:fcm-token',{detail:JSON.parse(e.data)}));}catch(ignore){}};window.VinkuloAndroid=Object.freeze({version:'1.7.1',"
+        String script = "if(window===window.top){VinkuloNative.onmessage=function(e){try{window.dispatchEvent(new CustomEvent('vinkulo:fcm-token',{detail:JSON.parse(e.data)}));}catch(ignore){}};window.VinkuloAndroid=Object.freeze({version:'1.8.0',"
                 + "requestPushToken:function(){VinkuloNative.postMessage(JSON.stringify({action:'push-token'}));},"
                 + "setPushBinding:function(token,bindingId){VinkuloNative.postMessage(JSON.stringify({action:'push-bind',token:token,bindingId:bindingId}));},"
                 + "clearPushBinding:function(){VinkuloNative.postMessage(JSON.stringify({action:'push-clear'}));},"
@@ -266,6 +297,26 @@ public class MainActivity extends Activity {
                 + "showNotification:function(title,body,tag,url){VinkuloNative.postMessage(JSON.stringify({action:'notification',tag:tag,url:url}));}"
                 + "});}";
         WebViewCompat.addDocumentStartJavaScript(webView, script, Collections.singleton(APP_URL));
+    }
+
+    private void installOfflineBridge() {
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) return;
+        WebViewCompat.addWebMessageListener(webView, "VinkuloOffline", Collections.singleton(APP_URL),
+                (view, message, origin, mainFrame, reply) -> {
+                    if (!mainFrame || !NativePolicy.trusted(origin.toString()) || !OfflinePolicy.localPage(view.getUrl())
+                            || message.getType() != WebMessageCompat.TYPE_STRING || message.getData() == null || message.getData().length() > 512) return;
+                    try {
+                        String action = new JSONObject(message.getData()).getString("action");
+                        if ("lock".equals(action)) offline.lock();
+                        else if ("refresh".equals(action)) offline.refresh(true);
+                        else if (!"status".equals(action)) return;
+                        offline.status(state -> {
+                            if (webView != null && OfflinePolicy.localPage(webView.getUrl())) {
+                                try { reply.postMessage(state.toString()); } catch (IllegalStateException ignored) { }
+                            }
+                        });
+                    } catch (JSONException ignored) { }
+                });
     }
 
     private void openGoogleAuthorization(String authorizationUrl) {

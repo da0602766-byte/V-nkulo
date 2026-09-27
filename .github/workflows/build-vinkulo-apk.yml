@@ -56,14 +56,53 @@ jobs:
           sha256sum app/build/outputs/apk/release/app-release.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: Vinkulo-Android-1.7.1-producao
+          name: Vinkulo-Android-1.8.0-homologacao
           path: Vinkulo-Android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: Vinkulo-Android-1.7.1-validacao
+          name: Vinkulo-Android-1.8.0-validacao
           path: |
             Vinkulo-Android/app/build/reports/
             Vinkulo-Android/app/build/test-results/
             Vinkulo-Android/app/build/outputs/mapping/release/mapping.txt
+            Vinkulo-Android/app/schemas/
+      - name: Habilitar KVM do runner
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Validar atualização assinada e base offline no emulador
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          arch: x86_64
+          target: default
+          disable-animations: true
+          working-directory: Vinkulo-Android
+          script: |
+            curl --fail --location https://adote-gestao.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.7.1.apk --output /tmp/vinkulo-1.7.1.apk
+            echo '901e1d4e73bdc990d7d5d500ef10a422636777155cb821b6980e0cd083da7e8e  /tmp/vinkulo-1.7.1.apk' | sha256sum --check
+            adb install /tmp/vinkulo-1.7.1.apk
+            adb shell dumpsys package com.vinkulo.app | grep firstInstallTime > /tmp/vinkulo-first-install.txt
+            adb install -r app/build/outputs/apk/release/app-release.apk
+            adb shell dumpsys package com.vinkulo.app | grep firstInstallTime > /tmp/vinkulo-after-update.txt
+            diff /tmp/vinkulo-first-install.txt /tmp/vinkulo-after-update.txt
+            adb shell svc wifi disable
+            adb shell svc data disable
+            adb shell am start -W -n com.vinkulo.app/.MainActivity
+            sleep 3
+            adb shell uiautomator dump /sdcard/vinkulo-foundation.xml
+            adb pull /sdcard/vinkulo-foundation.xml app/build/reports/vinkulo-release-offline.xml
+            grep 'Seu Vínkulo começa aqui' app/build/reports/vinkulo-release-offline.xml
+            adb uninstall com.vinkulo.app
+            gradle connectedDebugAndroidTest
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Vinkulo-Android-1.8.0-emulador
+          path: |
+            Vinkulo-Android/app/build/reports/androidTests/
+            Vinkulo-Android/app/build/outputs/androidTest-results/
+            Vinkulo-Android/app/build/reports/vinkulo-release-offline.xml

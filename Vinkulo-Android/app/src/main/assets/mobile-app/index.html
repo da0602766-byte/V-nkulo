@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="light dark"><title>Vínkulo no aparelho</title>
+  <link rel="stylesheet" href="/mobile-app/app.css"><script src="/mobile-app/app.js" defer></script>
+</head>
+<body>
+<main>
+  <div class="brand" aria-label="Vínkulo">V<span>Í</span>NKULO</div>
+  <p class="eyebrow">SUA COMUNIDADE, MAIS PERTO</p>
+  <h1>Seu Vínkulo começa aqui.</h1>
+  <p class="intro">Esta tela está no seu aparelho e abre mesmo sem internet.</p>
+  <section class="card" aria-labelledby="context-title">
+    <span class="dot" aria-hidden="true"></span><h2 id="context-title">Verificando este aparelho</h2>
+    <p id="context-detail" role="status" aria-live="polite">Aguarde um instante.</p>
+    <p id="community" hidden></p><p id="prepared-at" class="muted" hidden></p>
+  </section>
+  <button id="open" class="primary" type="button">Abrir sistema online</button>
+  <button id="prepare" class="secondary" type="button">Preparar este aparelho</button>
+  <p id="connection" class="muted" role="status"></p>
+  <section class="next"><h2>O que já está disponível</h2><p>Abertura local e identificação protegida da comunidade após entrar na sua conta. Agenda, escalas, cadastros e mensagens ainda precisam de internet nesta versão.</p></section>
+  <button id="lock" class="quiet" type="button">Bloquear identificação local</button>
+  <p class="footnote">O bloqueio local não encerra a sessão online. Para sair da conta, use Sair dentro do sistema.</p>
+</main>
+</body></html>

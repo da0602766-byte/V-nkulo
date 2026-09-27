@@ -13,8 +13,14 @@ android {
         applicationId = "com.vinkulo.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 10
-        versionName = "1.7.1"
+        versionCode = 11
+        versionName = "1.8.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        javaCompileOptions {
+            annotationProcessorOptions {
+                arguments["room.schemaLocation"] = "$projectDir/schemas"
+            }
+        }
     }
     signingConfigs {
         if (!productionStorePath.isNullOrBlank() && !productionStorePassword.isNullOrBlank()) {
@@ -35,6 +41,11 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
+    buildFeatures { buildConfig = true }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
 }
 
 dependencies {
@@ -42,7 +53,13 @@ dependencies {
     implementation("androidx.webkit:webkit:1.12.1")
     implementation(platform("com.google.firebase:firebase-bom:33.9.0"))
     implementation("com.google.firebase:firebase-messaging")
+    implementation("androidx.room:room-runtime:2.6.1")
+    annotationProcessor("androidx.room:room-compiler:2.6.1")
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:core:1.6.1")
+    androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
 }
 
 gradle.taskGraph.whenReady {
