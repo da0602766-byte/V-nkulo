@@ -112,6 +112,8 @@ Web/PWA: sincronizar ao abrir, retomar e reconectar; não prometer equivalência
 
 ### Recorte autorizado da etapa 4 (27/09/2026)
 
+Implementado no APK de homologação **1.10.0/code 13**, fonte `2adae44f`, CI `36355722077` aprovado em API 29/35; backend compatível publicado no Sites 322/`6934570`, 535 testes web aprovados. Artefato final tem 573.048 bytes, SHA-256 `344f81565d286c491e7a5b9f30e48ffe52ba66cd8e8e3497769949cc6797be0a`. Não promovido à distribuição geral: sessão real, testes físicos e desempenho permanecem pendentes. Etapa 5 depende de nova autorização.
+
 Primeira escrita: cadastro básico de visitante (nome, telefone/e-mail opcionais e data de entrada). Formulário no leitor leve existente; cadastro completo e dados pastorais/administrativos ficam online. Salvar rascunho e colocar na fila são ações explícitas diferentes. Um único registro cifrado do Room/schema 2 contém payload, UUID e estado; 200 registros mais a concessão, sem evicção automática. Campos digitados ainda não salvos não são rascunhos persistidos.
 
 Concessão nativa `visitor.create` separada da leitura, até 8h, token aleatório cifrado no aparelho e HMAC no servidor, vinculado à sessão/comunidade/instalação. Worker envia token **e** cookies próprios; servidor revalida sessão e permissões a cada operação. Token sozinho não autentica o usuário. Nada disso é exposto à ponte JS. Reautenticação da mesma conta/comunidade recupera pendências; bloqueio não apaga trabalho. WorkManager exclusivo com rede, backoff/jitter e reserva recuperável; sem garantia de execução imediata.
