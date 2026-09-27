@@ -4,6 +4,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="color-scheme" content="light dark"><title>Vínkulo no aparelho</title>
   <link rel="stylesheet" href="/mobile-app/app.css"><script src="/mobile-app/app.js" defer></script>
+  <script src="/mobile-app/visitors.js" defer></script>
 </head>
 <body>
 <main>
@@ -35,6 +36,26 @@
     <p class="footnote">Cópia da última atualização: alterações e cancelamentos posteriores podem não aparecer. Para confirmar participação, responder à escala, ver mídias ou consultar todos os detalhes, abra o sistema online.</p>
   </section>
   <section class="next"><h2>O que fica salvo</h2><p>Até 50 publicações recentes, 100 eventos, 100 compromissos seus e 100 designações em escalas publicadas. Agenda e escalas cobrem de ontem aos próximos 30 dias. Respeita suas permissões; textos longos podem estar resumidos.</p></section>
+  <section class="next" aria-label="Cadastro offline de visitantes">
+    <h2>Receber um visitante</h2>
+    <p>Salve um rascunho protegido no aparelho e escolha quando colocá-lo na fila. Envio pendente não é cadastro confirmado.</p>
+    <button id="visitor-prepare" class="secondary" type="button">Ativar cadastros offline</button>
+    <p id="visitor-status" role="status" aria-live="polite" class="muted">Entre com internet e permissão de cadastrar visitantes para preparar.</p>
+    <div id="visitor-workspace" hidden>
+      <p id="visitor-community"></p>
+      <p class="footnote">Autorização de até 8 horas. O Android tentará enviar a fila com internet; o horário não é garantido. Ao vencer ou sair, os rascunhos ficam bloqueados até preparar novamente com a mesma conta/comunidade.</p>
+      <label for="visitor-name">Nome completo</label><input id="visitor-name" maxlength="120" autocomplete="off">
+      <label for="visitor-phone">Telefone (opcional)</label><input id="visitor-phone" type="tel" maxlength="30" autocomplete="off">
+      <label for="visitor-email">E-mail (opcional)</label><input id="visitor-email" type="email" maxlength="180" autocomplete="off">
+      <label for="visitor-date">Data de entrada</label><input id="visitor-date" type="date">
+      <p class="footnote">Toque em Salvar antes de sair desta tela. Campos adicionais ficam no cadastro online.</p>
+      <button id="visitor-save" type="button" class="primary">Salvar rascunho no aparelho</button>
+      <button id="visitor-new" type="button" class="quiet">Limpar formulário / novo rascunho</button>
+      <button id="visitor-sync" type="button" class="secondary">Tentar enviar pendências</button>
+      <div id="visitor-rows"></div>
+      <button id="visitor-lock" type="button" class="quiet">Bloquear cadastros locais sem apagar</button>
+    </div>
+  </section>
   <button id="lock" class="quiet" type="button">Desativar e apagar consultas locais</button>
   <p class="footnote">O bloqueio local não encerra a sessão online. Para sair da conta, use Sair dentro do sistema.</p>
 </main>

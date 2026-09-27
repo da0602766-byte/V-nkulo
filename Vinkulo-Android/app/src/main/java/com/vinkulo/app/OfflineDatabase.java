@@ -34,6 +34,9 @@ abstract class OfflineDatabase extends RoomDatabase {
         @Query("DELETE FROM offline_context") void lock();
         @Insert(onConflict = OnConflictStrategy.REPLACE) void put(RecordRow row);
         @Query("SELECT * FROM local_records WHERE scope = :scope AND recordId = :recordId") RecordRow get(String scope, String recordId);
+        @Query("SELECT * FROM local_records WHERE scope = :scope ORDER BY recordId LIMIT 201") java.util.List<RecordRow> list(String scope);
+        @Query("SELECT COUNT(*) FROM local_records") int recordCount();
+        @Query("DELETE FROM local_records WHERE scope = :scope AND recordId = :recordId") void remove(String scope, String recordId);
     }
     abstract Storage storage();
 
