@@ -1,6 +1,6 @@
 # APK Vínkulo — arquitetura e sequência de evolução
 
-Data: 27/09/2026. Estado: etapas 1–3 implementadas; APK 1.9.0 publicado para homologação no Sites 321. Etapa 4 autorizada e em implementação; etapas 5–7 aguardam autorização. Testes físicos e métricas Android continuam pendentes. Evidências em [etapa 1](../relatorios/APK_ETAPA_1_2026-09-27.md), [etapa 2](../relatorios/APK_ETAPA_2_2026-09-27.md) e [etapa 3](../relatorios/APK_ETAPA_3_2026-09-27.md).
+Data: 27/09/2026. Estado: etapas 1–4 implementadas; APK 1.10.0 publicado para homologação no Sites 323. Etapa 5 autorizada e iniciada pelo bloco 5A (consultas dos próprios pedidos); não declarar a etapa inteira concluída. Etapas 6–7 aguardam autorização. Testes físicos e métricas Android continuam pendentes. Evidências nos relatórios APK das etapas 1–4.
 
 ## Objetivo e limites
 
@@ -110,9 +110,15 @@ Web/PWA: sincronizar ao abrir, retomar e reconectar; não prometer equivalência
 
 ## Matriz inicial de módulos
 
+### Etapa 5 autorizada — primeiro bloco 5A (27/09/2026)
+
+Consulta dos próprios pedidos, com consentimento separado. Protocolo 3 acrescenta uma seção limitada a 50 pedidos do autor atual; protocolo 2 preservado. Snapshot cifrado substituído integralmente, até 8h, com recurso/plano revalidado. Não inclui caixa de terceiros, contatos, destinatários nem conteúdo de atendimento. Não marca visualização, dispara notificações ou apaga dados do servidor. Situação histórica, sem escrita offline nesta capacidade. APK 1.11.0/code 14 candidato; testes e publicação em `docs/relatorios/APK_ETAPA_5A_2026-09-27.md`.
+
+Não confundir o bloco 5A com a conclusão da etapa 5: rascunhos/envio de pedidos e demais módulos da matriz permanecem abertos. Não reutilizar o POST online não idempotente em um worker de repetição automática. Testes de concorrência de escrita, destinatários e efeitos devem ser específicos por módulo.
+
 ### Recorte autorizado da etapa 4 (27/09/2026)
 
-Implementado no APK de homologação **1.10.0/code 13**, fonte `2adae44f`, CI `36355722077` aprovado em API 29/35; backend compatível publicado no Sites 322/`6934570`, 535 testes web aprovados. Artefato final tem 573.048 bytes, SHA-256 `344f81565d286c491e7a5b9f30e48ffe52ba66cd8e8e3497769949cc6797be0a`. Não promovido à distribuição geral: sessão real, testes físicos e desempenho permanecem pendentes. Etapa 5 depende de nova autorização.
+Implementado no APK de homologação **1.10.0/code 13**, fonte `2adae44f`, CI `36355722077` aprovado em API 29/35; backend compatível publicado no Sites 322/`6934570`, 535 testes web aprovados. Artefato final tem 573.048 bytes, SHA-256 `344f81565d286c491e7a5b9f30e48ffe52ba66cd8e8e3497769949cc6797be0a`. Não promovido à distribuição geral: sessão real, testes físicos e desempenho permanecem pendentes. Etapa 5 autorizada posteriormente, conforme o bloco acima.
 
 Primeira escrita: cadastro básico de visitante (nome, telefone/e-mail opcionais e data de entrada). Formulário no leitor leve existente; cadastro completo e dados pastorais/administrativos ficam online. Salvar rascunho e colocar na fila são ações explícitas diferentes. Um único registro cifrado do Room/schema 2 contém payload, UUID e estado; 200 registros mais a concessão, sem evicção automática. Campos digitados ainda não salvos não são rascunhos persistidos.
 

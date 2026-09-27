@@ -16,7 +16,10 @@ export async function GET(request: Request) {
     return reply({ error: "Origem inválida." }, 403);
   }
   const challenge = request.headers.get("x-vinkulo-challenge") || "";
-  if (!/^[a-f0-9]{64}$/.test(challenge) || request.headers.get("x-vinkulo-client") !== "android-read-2") {
+  const client = request.headers.get("x-vinkulo-client");
+  const extended = client === "android-read-3";
+  const requestsOptIn = extended && request.headers.get("x-vinkulo-requests") === "own";
+  if (!/^[a-f0-9]{64}$/.test(challenge) || (!extended && client !== "android-read-2")) {
     return reply({ error: "Versão de consulta incompatível." }, 400);
   }
   const access = await requireTenantPermission("dashboard.view");
@@ -37,6 +40,21 @@ export async function GET(request: Request) {
 
   const { comunidadeId, permissions } = access.context;
   const userId = access.user.id;
+  // Separate explicit consent. Recheck the same resource/plan gate as the
+  // online workspace; being a recipient or manager never widens this copy.
+  let ownRequestsAllowed = false;
+  if (requestsOptIn) {
+    const requestsAccess = await requireTenantPermission("dashboard.view", "requests");
+    if ("error" in requestsAccess) {
+      if (requestsAccess.error.status !== 403) return reply({ error: "Confira seu acesso novamente." }, requestsAccess.error.status);
+    } else {
+      if (requestsAccess.user.id !== userId || requestsAccess.context.comunidadeId !== comunidadeId
+          || !requestsAccess.user.ativo || requestsAccess.context.temporaryAccess || requestsAccess.context.communityAccess === "FEED_ONLY") {
+        return reply({ error: "O contexto de acesso mudou." }, 403);
+      }
+      ownRequestsAllowed = true;
+    }
+  }
   const from = new Date(issuedAt - 86400000).toISOString();
   const until = new Date(issuedAt + 30 * 86400000).toISOString();
   const sections = ["mural", "eventos", "compromissos", "escalas"] as const;
@@ -79,7 +97,18 @@ export async function GET(request: Request) {
         AND datetime(s.termina_em) >= datetime(?) AND datetime(s.inicia_em) <= datetime(?) AND ? = 1
       ORDER BY datetime(s.inicia_em), s.id, d.id LIMIT ?`).bind(comunidadeId, userId, from, until, enabled[3] ? 1 : 0, LIMIT + 1),
   ];
+  if (extended) queries.push(db.prepare(`SELECT s.id, substr(s.titulo,1,120) AS titulo,
+      substr(s.descricao,1,2000) AS texto, s.tipo, s.status,
+      strftime('%Y-%m-%dT%H:%M:%fZ',s.criado_em) AS data,
+      strftime('%Y-%m-%dT%H:%M:%fZ',s.atualizado_em) AS atualizado
+      FROM solicitacoes_comunidade s
+      WHERE s.comunidade_id = ? AND s.solicitante_id = ? AND ? = 1
+        AND NOT (s.status = 'CONCLUIDA' AND s.atualizado_em <= datetime('now','-30 days'))
+      ORDER BY CASE s.status WHEN 'ABERTA' THEN 0 WHEN 'EM_ANALISE' THEN 1 ELSE 2 END, s.id DESC
+      LIMIT 51`).bind(comunidadeId, userId, ownRequestsAllowed ? 1 : 0));
   const results = await db.batch<Record<string, unknown>>(queries);
+  if (extended && (!results[4].success || !results[4].results)) throw new Error("Requests snapshot unavailable");
+  const requestRows = results[4]?.results || [];
   const data = Object.fromEntries(sections.map((name, index) => {
     const limit = index === 0 ? 50 : LIMIT;
     const rows = results[index].results;
@@ -87,11 +116,13 @@ export async function GET(request: Request) {
     return [name, { allowed: enabled[index], hasMore: rows.length > limit, items: rows.slice(0, limit) }];
   }));
   const value = {
-    protocol: 2, challenge, accountId: userId, communityId: comunidadeId,
+    protocol: extended ? 3 : 2, challenge, accountId: userId, communityId: comunidadeId,
     communityName: access.context.comunidadeNome.slice(0, 160), issuedAt,
     expiresAt: Math.min(sessionExpires, issuedAt + 8 * 60 * 60 * 1000),
     capabilities: ["shell.open", "snapshot.read"],
-    snapshot: { from, until, ...data },
+    snapshot: { from, until, ...data, ...(extended ? {
+      pedidos: { allowed: ownRequestsAllowed, hasMore: requestRows.length > 50, items: requestRows.slice(0,50) },
+    } : {}) },
   };
   if (new TextEncoder().encode(JSON.stringify(value)).byteLength > MAX_BYTES) {
     return reply({ error: "Conteúdo acima do limite seguro. Consulte online." }, 413);

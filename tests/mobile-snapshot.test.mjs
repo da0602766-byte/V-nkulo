@@ -16,12 +16,12 @@ async function fixture(t) {
   const other=await createPilotUser(db,{nome:'Other',email:'mobile-other@example.test',senha:'Teste123!'});
   db.prepare("INSERT INTO sessoes(usuario_id,token_hash,expira_em) VALUES (?, 'read-session', datetime('now','+1 day'))").run(id);
   const access={user:{id,ativo:true},context:{comunidadeId:1,comunidadeNome:'Teste',permissions:[...permissions],communityAccess:'MEMBER'}};
-  let current=access, hash='read-session';
+  let current=access, hash='read-session',requestsDenied=false;
   const exports={};
   const deps={
     '../../../../db':{getD1:()=>d1},
     '../../../lib/local-auth':{getCurrentSessionTokenHash:async()=>hash},
-    '../../../lib/tenant':{requireTenantPermission:async p=>{assert.equal(p,'dashboard.view');return current;}},
+    '../../../lib/tenant':{requireTenantPermission:async (p,resource)=>{assert.equal(p,'dashboard.view');assert.ok(resource===undefined||resource==='requests');return resource==='requests'&&requestsDenied?{error:Response.json({},{status:403})}:current;}},
   };
   const source=await readFile(new URL('../app/api/mobile/snapshot/route.ts',import.meta.url),'utf8');
   runInNewContext(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,
@@ -41,8 +41,47 @@ async function fixture(t) {
     db.prepare("INSERT INTO escala_designacoes(comunidade_id,escala_id,voluntario_id,usuario_id,funcao) VALUES(?,?,?,?,'Recepção')").run(community,scale,volunteer,user);return scale;
   };
   const read=async()=>{const response=await exports.GET(request());assert.equal(response.status,200,await response.clone().text());return response.json();};
-  return {db,d1,id,other,access,route:exports,post,event,appointment,schedule,ministry,volunteer,read,setAccess:v=>{current=v;},setHash:v=>{hash=v;}};
+  return {db,d1,id,other,access,route:exports,post,event,appointment,schedule,ministry,volunteer,read,setAccess:v=>{current=v;},setHash:v=>{hash=v;},denyRequests:()=>{requestsDenied=true;}};
 }
+
+const requestsRead = f => f.route.GET(request({'x-vinkulo-client':'android-read-3','x-vinkulo-requests':'own'}));
+function addOwnRequest(f,{user=f.id,community=1,status='ABERTA',title='Pedido pessoal',date='2026-09-27 12:00:00'}={}) {
+  return Number(f.db.prepare("INSERT INTO solicitacoes_comunidade(comunidade_id,solicitante_id,tipo,titulo,descricao,visibilidade,status,atualizado_em) VALUES(?,?,'ORACAO',?,'Texto sensível pessoal','PRIVADA',?,?)").run(community,user,title,status,date).lastInsertRowid);
+}
+test('mobile requests: explicit protocol and consent, own records only even for managers/recipients',async t=>{
+  const f=await fixture(t);const mine=addOwnRequest(f),other=addOwnRequest(f,{user:f.other,title:'Segredo de terceiro'});addOwnRequest(f,{community:2,title:'Outra comunidade'});
+  f.db.prepare('INSERT INTO solicitacao_destinatarios(solicitacao_id,comunidade_id,usuario_id) VALUES(?,1,?)').run(other,f.id);
+  f.access.context.permissions.push('requests.manage','pastoral.panel.view');
+  assert.ok(!('pedidos' in (await f.read()).snapshot));
+  const noConsent=await (await f.route.GET(request({'x-vinkulo-client':'android-read-3'}))).json();
+  assert.deepEqual(noConsent.snapshot.pedidos,{allowed:false,hasMore:false,items:[]});
+  const body=await (await requestsRead(f)).json();assert.equal(body.protocol,3);
+  assert.deepEqual(body.snapshot.pedidos.items.map(x=>x.id),[mine]);
+  assert.deepEqual(Object.keys(body.snapshot.pedidos.items[0]).sort(),['atualizado','data','id','status','texto','tipo','titulo']);
+  assert.doesNotMatch(JSON.stringify(body),/Segredo de terceiro|Outra comunidade|destinatarios|preferencia_contato|responsavel|solicitante_id/);
+  assert.equal(f.db.prepare('SELECT visualizado_em FROM solicitacao_destinatarios WHERE solicitacao_id=?').get(other).visualizado_em,null,'offline reading has no acknowledgement side effect');
+});
+test('mobile requests: permission/plan removal empties the replacement without removing other eligible sections',async t=>{
+  const f=await fixture(t);addOwnRequest(f);f.post('Aviso autorizado');
+  assert.equal((await (await requestsRead(f)).json()).snapshot.pedidos.items.length,1);
+  f.denyRequests();const body=await (await requestsRead(f)).json();
+  assert.deepEqual(body.snapshot.pedidos,{allowed:false,hasMore:false,items:[]});
+  assert.ok(body.snapshot.mural.items.some(x=>x.titulo==='Aviso autorizado'));
+});
+test('mobile requests: independent snapshots observe changes/deletion, retention and 50-row cap',async t=>{
+  const f=await fixture(t),id=addOwnRequest(f);
+  const phoneA=await (await requestsRead(f)).json();
+  f.db.prepare("UPDATE solicitacoes_comunidade SET status='EM_ANALISE' WHERE id=?").run(id);
+  const phoneB=await (await requestsRead(f)).json();
+  assert.equal(phoneA.snapshot.pedidos.items[0].status,'ABERTA');assert.equal(phoneB.snapshot.pedidos.items[0].status,'EM_ANALISE');
+  f.db.prepare('DELETE FROM solicitacoes_comunidade WHERE id=?').run(id);
+  addOwnRequest(f,{status:'CONCLUIDA',date:'2000-01-01 00:00:00',title:'Fora da retenção'});
+  assert.equal((await (await requestsRead(f)).json()).snapshot.pedidos.items.length,0);
+  for(let i=0;i<55;i++)addOwnRequest(f,{title:'Pedido '+i});
+  const section=(await (await requestsRead(f)).json()).snapshot.pedidos;
+  assert.equal(section.items.length,50);assert.equal(section.hasMore,true);
+  assert.equal(f.db.prepare('SELECT count(*) n FROM solicitacoes_comunidade').get().n,56,'read does not delete server records');
+});
 
 test('mobile read: published text only; community, audience and personal boundaries',async t=>{
   const f=await fixture(t);
@@ -110,6 +149,14 @@ test('mobile read: real authentication and revoked membership are enforced in bu
   assert.equal(login.status,200);const cookie=login.headers.get('set-cookie').match(/__Host-adote_session=[^;]+/)[0];
   const call=auth=>worker.fetch(new Request('http://localhost/api/mobile/snapshot',{headers:{...Object.fromEntries(request().headers),origin:'http://localhost',cookie:auth}}),env,ctx);
   assert.equal((await call('')).status,401);assert.equal((await call(cookie)).status,200);
+  const ownCall=auth=>worker.fetch(new Request('http://localhost/api/mobile/snapshot',{headers:{...Object.fromEntries(request({'x-vinkulo-client':'android-read-3','x-vinkulo-requests':'own'}).headers),origin:'http://localhost',cookie:auth}}),env,ctx);
+  const mine=addOwnRequest(f);addOwnRequest(f,{user:f.other});
+  assert.equal((await ownCall('')).status,401);
+  assert.deepEqual((await (await ownCall(cookie)).json()).snapshot.pedidos.items.map(x=>x.id),[mine]);
+  const plan={id:'gratuito',nome:'Contrato teste',descricao:'',valor_centavos:0,periodicidade:'MENSAL',duracao_dias:null,ativo:true,contratavel:true,destaque:false,personalizado:false,modulos:['events','ministries','visitors','cells','parking','people'],recursos:['feed','reports'],limites:{usuarios:null,administradores:null,cadastros:null,celulas:null,ministerios:null},condicoes:'',versao:1};
+  f.db.prepare("INSERT INTO assinaturas_comunidade(comunidade_id,plano_id,status,contrato,fundamento,aprovado_por) VALUES(1,'gratuito','ATIVA',?,'GRATUITO',?)").run(JSON.stringify(plan),f.id);
+  assert.deepEqual((await (await ownCall(cookie)).json()).snapshot.pedidos,{allowed:false,hasMore:false,items:[]});
   f.db.prepare("UPDATE usuario_comunidades SET status='INATIVO' WHERE usuario_id=?").run(f.id);
   assert.equal((await call(cookie)).status,403);
+  assert.equal((await ownCall(cookie)).status,403);
 });
