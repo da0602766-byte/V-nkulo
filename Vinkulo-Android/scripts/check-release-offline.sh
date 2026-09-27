@@ -17,6 +17,6 @@ for attempt in $(seq 1 12); do
 done
 adb shell screencap -p /sdcard/vinkulo-offline.png
 adb pull /sdcard/vinkulo-offline.png app/build/reports/vinkulo-release-offline.png
-adb logcat -d -t 1500 > app/build/reports/vinkulo-release-logcat.txt
-adb shell dumpsys webviewupdate > app/build/reports/vinkulo-release-webview.txt
+adb logcat -d -t 1500 > app/build/reports/vinkulo-release-logcat.txt || echo 'Optional logcat capture unavailable'
+adb shell dumpsys webviewupdate > app/build/reports/vinkulo-release-webview.txt || echo 'Optional WebView diagnostic unavailable'
 test "$ready" = 1
