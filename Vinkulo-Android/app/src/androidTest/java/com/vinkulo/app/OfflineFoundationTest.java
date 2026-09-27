@@ -110,14 +110,46 @@ public class OfflineFoundationTest {
                     || device.hasObject(By.clazz("android.widget.Button").text("Atualizar WebView")));
             for(int repeat=0;repeat<5;repeat++) {
                 scenario.recreate();
-                requireVisible(device,"Seu Vínkulo começa aqui.");
-                requireVisible(device,expected);
+                if(supportsBridge) requireLocalDocument(scenario,expected);
+                else { requireVisible(device,"Seu Vínkulo começa aqui.");requireVisible(device,expected); }
             }
+            if(supportsBridge) OfflineUiEvidence.capture(device,"recreated");
         }
     }
     private void requireVisible(UiDevice device,String text) throws Exception {
         if(device.wait(Until.hasObject(By.text(text)),15000)) return;
         OfflineUiEvidence.capture(device,"foundation-failure");
         fail("Missing local screen: "+text);
+    }
+    private void requireLocalDocument(ActivityScenario<MainActivity> scenario,String expected) throws Exception {
+        // The emulator's accessibility tree can be empty after recreation even
+        // while the screenshot shows the full page. Assert WebView content via
+        // its DOM plus visual-state callback, independently of UiAutomator's
+        // cached tree. The reader test still checks actual accessible clicks.
+        long deadline=android.os.SystemClock.elapsedRealtime()+15000;
+        JSONObject last=null;
+        while(android.os.SystemClock.elapsedRealtime()<deadline) {
+            java.util.concurrent.CountDownLatch queried=new java.util.concurrent.CountDownLatch(1);
+            java.util.concurrent.atomic.AtomicReference<JSONObject> result=new java.util.concurrent.atomic.AtomicReference<>();
+            scenario.onActivity(activity->{
+                android.webkit.WebView view=activity.findViewById(R.id.webview);
+                view.evaluateJavascript("(function(){var h=document.querySelector('h1'),s=document.getElementById('context-title'),p=document.getElementById('prepare'),r=h&&h.getBoundingClientRect();return JSON.stringify({url:location.href,title:h&&h.textContent,status:s&&s.textContent,ready:document.readyState,button:!!p&&!p.disabled,visible:!document.hidden&&!!r&&r.width>0&&r.height>0&&r.top>=0&&r.bottom<=innerHeight});})()",value->{
+                    try {result.set(new JSONObject(new JSONArray("["+value+"]").getString(0)));}catch(Exception ignored) { }
+                    queried.countDown();
+                });
+            });
+            queried.await(2,java.util.concurrent.TimeUnit.SECONDS);last=result.get();
+            if(last!=null && OfflinePolicy.HOME.equals(last.optString("url")) && "complete".equals(last.optString("ready"))
+                    && "Seu Vínkulo começa aqui.".equals(last.optString("title")) && expected.equals(last.optString("status"))
+                    && last.optBoolean("visible") && last.optBoolean("button")) {
+                java.util.concurrent.CountDownLatch drawn=new java.util.concurrent.CountDownLatch(1);
+                scenario.onActivity(activity->((android.webkit.WebView)activity.findViewById(R.id.webview)).postVisualStateCallback(1,
+                        new android.webkit.WebView.VisualStateCallback(){@Override public void onComplete(long requestId){drawn.countDown();}}));
+                assertTrue("Local document not ready to draw",drawn.await(5,java.util.concurrent.TimeUnit.SECONDS));return;
+            }
+            android.os.SystemClock.sleep(200);
+        }
+        OfflineUiEvidence.capture(UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()),"foundation-failure");
+        fail("Invalid recreated local document: "+String.valueOf(last));
     }
 }
