@@ -110,6 +110,19 @@ Web/PWA: sincronizar ao abrir, retomar e reconectar; não prometer equivalência
 
 ## Matriz inicial de módulos
 
+### Recorte autorizado e implementação da etapa 3 (27/09/2026)
+
+- APK candidato 1.9.0/code 12, somente homologação. A versão geral 1.7.1 e o protocolo 1 da etapa 2 permanecem compatíveis. A autorização da etapa 3 não libera escrita/outbox nem a distribuição geral.
+- `GET /api/mobile/snapshot`, protocolo 2: autenticação/tenant reais, desafio por requisição, origem oficial e sessão própria ainda válida. Capacidades `shell.open` e `snapshot.read`. Snapshot HTTPS autenticado e selado pelo Keystore; **não** é credencial de API nem concessão portátil com assinatura assimétrica.
+- Ativação explícita na entrada local. Consentimento vinculado ao hash dos cookies de sessão/comunidade; login, saída e bloqueio removem a ativação. Abrir o painel só atualiza automaticamente após essa escolha e no mesmo vínculo; sem agendamento/background sync. Falhas de rede conservam somente a cópia ainda válida; 401/403 bloqueiam e apagam o contexto.
+- Prazo operacional máximo de **8 horas**, reduzido à validade da sessão e ao tempo consumido pela requisição. Reinício do aparelho, mudança importante do relógio, troca de sessão/comunidade e expiração bloqueiam a leitura. Revogação remota sem conexão não é instantânea: o limite de exposição é o prazo restante.
+- Uma substituição integral em um único registro AES-GCM do Room/schema 2: instalação atômica, sem migração destrutiva e sem misturar lotes antigos. Não usa a tabela reservada a futuros registros/outbox. Uma nova cópia remove itens excluídos/cancelados e esvazia seções sem permissão. Não há merge por ID, cursor incremental ou acúmulo de contas.
+- Quota do piloto: **1 MiB por resposta**; até 50 publicações, 100 eventos, 100 compromissos pessoais e 100 designações próprias. Textos/campos têm limites no servidor e no cliente. Payload acima da quota é recusado por inteiro, sem substituir o conteúdo anterior. Essa política substitui os orçamentos maiores propostos, apenas para este recorte.
+- Mural: somente publicações publicadas no canal feed e autorizadas por comunidade/audiência. Agenda: eventos publicados e compromissos da própria pessoa, de agora menos 24h até os próximos 30 dias; compromissos de terceiros, mesmo públicos, ficam online neste piloto. Escalas: somente publicadas com designação própria ativa e permissão `schedules.view`. Alterações e aceite continuam online.
+- Sem fotos, anexos, lista de inscritos, demais integrantes, tokens de compartilhamento, diretório de pessoas, contatos ou chat. Download de mídia não foi implementado. Busca é exclusivamente local nos textos já salvos; lotes truncados são sinalizados.
+- Decisão de interface: estender o leitor leve empacotado da etapa 2, em vez de duplicar o calendário e os workspaces React operacionais. O painel React/TypeScript continua sendo a interface completa online. O leitor só projeta campos de consulta com `textContent` e ponte restrita; nenhum SQL, cookie ou comando de escrita chega ao JavaScript. A extração/reutilização de componentes React do painel permanece trabalho posterior, não concluído implicitamente nesta etapa.
+- Mensagens da ponte recebem IDs para descartar respostas antigas; a tela limpa conteúdo ao ocultar, bloquear ou expirar. CSP impede rede e mídia no documento local. Testes físicos, TalkBack, processo frio com sessão real e integrações seguem necessários antes da promoção.
+
 L = leitura offline de dados já preparados; R = rascunho local; F = fila futura, com confirmação do servidor; O = operação online. São metas, não recursos já disponíveis.
 
 | Módulo / fontes atuais | Meta | Condição e prioridade |
