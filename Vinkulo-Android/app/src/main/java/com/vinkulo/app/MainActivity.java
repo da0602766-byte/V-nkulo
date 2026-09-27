@@ -61,6 +61,7 @@ public class MainActivity extends Activity {
     private WebView webView;
     private OfflineController offline;
     private OfflineAssets offlineAssets;
+    private View legacyOfflineView;
     private ValueCallback<Uri[]> fileCallback;
     private final ArrayDeque<PermissionRequest> pendingMediaRequests = new ArrayDeque<>();
     private boolean awaitingMediaPermissionResult;
@@ -115,7 +116,7 @@ public class MainActivity extends Activity {
             }
             @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 if (request.isForMainFrame() && NativePolicy.trusted(request.getUrl().toString()) && !OfflinePolicy.localPage(request.getUrl().toString())) {
-                    view.loadUrl(OfflinePolicy.HOME);
+                    showOfflineEntry();
                 }
             }
             @Override
@@ -159,14 +160,15 @@ public class MainActivity extends Activity {
         requestStartupPermissions();
         if (state == null) {
             String coldStartPath = notificationPathFromIntent(getIntent());
-            webView.loadUrl(coldStartPath != null ? APP_URL + coldStartPath : OfflinePolicy.HOME);
+            if (coldStartPath != null) webView.loadUrl(APP_URL + coldStartPath);
+            else showOfflineEntry();
         } else {
             android.webkit.WebBackForwardList restored = webView.restoreState(state);
             // restoreState restores navigation history, not guaranteed display
             // data. Recreate the stateless local document and its native bridge
             // explicitly; identity is always read again from protected storage.
-            if (restored == null || restored.getCurrentItem() == null
-                    || OfflinePolicy.localPage(restored.getCurrentItem().getUrl())) webView.loadUrl(OfflinePolicy.HOME);
+            if (state.getBoolean("vinkulo.legacyOffline", false) || restored == null || restored.getCurrentItem() == null
+                    || OfflinePolicy.localPage(restored.getCurrentItem().getUrl())) showOfflineEntry();
             handleNotificationTap(getIntent());
         }
         handleGoogleReturn(getIntent());
@@ -304,6 +306,47 @@ public class MainActivity extends Activity {
         WebViewCompat.addDocumentStartJavaScript(webView, script, Collections.singleton(APP_URL));
     }
 
+    private void hideLegacyOfflineEntry() {
+        if (legacyOfflineView != null) {
+            ((android.widget.FrameLayout) findViewById(R.id.app_root)).removeView(legacyOfflineView);
+            legacyOfflineView = null;
+        }
+        webView.setVisibility(View.VISIBLE);
+    }
+
+    private void showOfflineEntry() {
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+            hideLegacyOfflineEntry(); webView.loadUrl(OfflinePolicy.HOME); return;
+        }
+        // An obsolete renderer must not be responsible for drawing its own
+        // update warning. This native fallback has no access to private data.
+        if (legacyOfflineView != null) return;
+        webView.stopLoading(); webView.setVisibility(View.GONE);
+        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+        android.widget.LinearLayout content = new android.widget.LinearLayout(this);
+        content.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int spacing = (int) (24 * getResources().getDisplayMetrics().density);
+        content.setPadding(spacing, spacing, spacing, spacing);
+        scroll.setBackgroundColor(android.graphics.Color.rgb(244, 247, 245));
+        for (String label : new String[]{"Seu Vínkulo começa aqui.", "Atualize o Android System WebView",
+                "Esta orientação abre sem internet. Para usar a preparação protegida e os recursos nativos, atualize o WebView pela loja do aparelho."}) {
+            android.widget.TextView text = new android.widget.TextView(this);
+            text.setText(label); text.setTextSize(label.startsWith("Seu ") ? 28 : 18);
+            text.setTextColor(android.graphics.Color.rgb(38, 54, 59)); text.setPadding(0, 0, 0, spacing);
+            content.addView(text);
+        }
+        android.widget.Button update = new android.widget.Button(this);
+        update.setText("Atualizar WebView");
+        update.setOnClickListener(v -> openExternal(Uri.parse("https://play.google.com/store/apps/details?id=com.google.android.webview")));
+        content.addView(update);
+        android.widget.Button online = new android.widget.Button(this);
+        online.setText("Abrir sistema online");
+        online.setOnClickListener(v -> { hideLegacyOfflineEntry(); webView.loadUrl(APP_URL + "/painel"); });
+        content.addView(online); scroll.addView(content); legacyOfflineView = scroll;
+        ((android.widget.FrameLayout) findViewById(R.id.app_root)).addView(scroll,
+                new android.widget.FrameLayout.LayoutParams(-1, -1));
+    }
+
     private void installOfflineBridge() {
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) return;
         WebViewCompat.addWebMessageListener(webView, "VinkuloOffline", Collections.singleton(APP_URL),
@@ -388,6 +431,9 @@ public class MainActivity extends Activity {
     private void handleNotificationTap(Intent intent) {
         String path = notificationPathFromIntent(intent);
         if (path == null || webView == null) return;
+        if (legacyOfflineView != null || OfflinePolicy.localPage(webView.getUrl())) {
+            hideLegacyOfflineEntry(); webView.loadUrl(APP_URL + path); return;
+        }
         webView.post(() -> webView.evaluateJavascript(
                 "window.dispatchEvent(new CustomEvent('vinkulo:notification-open', { detail: "
                         + toJsStringLiteral(path) + " }))",
@@ -625,11 +671,13 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
+        if (legacyOfflineView != null) { super.onBackPressed(); return; }
         if (webView.canGoBack()) webView.goBack(); else super.onBackPressed();
     }
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
+        outState.putBoolean("vinkulo.legacyOffline", legacyOfflineView != null);
         webView.saveState(outState);
         super.onSaveInstanceState(outState);
     }

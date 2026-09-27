@@ -106,6 +106,8 @@ public class OfflineFoundationTest {
             if (android.os.Build.VERSION.SDK_INT >= 35) assertTrue("Modern WebView must exercise the bridge", supportsBridge);
             String expected = supportsBridge ? "Preparação necessária" : "Atualize o Android System WebView";
             assertTrue("Local JavaScript must render a usable state", device.wait(Until.hasObject(By.text(expected)),15000));
+            if (!supportsBridge) assertTrue(device.hasObject(By.clazz("android.widget.Button").text("ATUALIZAR WEBVIEW"))
+                    || device.hasObject(By.clazz("android.widget.Button").text("Atualizar WebView")));
             scenario.recreate();
             assertTrue(device.wait(Until.hasObject(By.text("Seu Vínkulo começa aqui.")),15000));
             assertTrue(device.wait(Until.hasObject(By.text(expected)),15000));
