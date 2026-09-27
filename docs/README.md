@@ -54,6 +54,7 @@ Relatórios fechados de entregas já publicadas — histórico, não fluxo ativo
 - [`APK_ETAPA_1_2026-09-27.md`](relatorios/APK_ETAPA_1_2026-09-27.md) — diagnóstico sem deploy: origem/assinatura do APK, baseline disponível e limites da homologação Android.
 - [`APK_ETAPA_2_2026-09-27.md`](relatorios/APK_ETAPA_2_2026-09-27.md) — entrada local, contexto cifrado e validação do candidato Android 1.8.0 de homologação.
 - [`APK_ETAPA_3_2026-09-27.md`](relatorios/APK_ETAPA_3_2026-09-27.md) — consultas offline autorizadas de mural, agenda e escalas próprias; candidato 1.9.0 de homologação.
+- [`APK_ETAPA_4_2026-09-27.md`](relatorios/APK_ETAPA_4_2026-09-27.md) — rascunhos cifrados e fila de cadastro básico de visitante, recibos idempotentes e limites de homologação.
 
 - [`RELATORIO_IMPLEMENTACAO_MENU_VISITANTES_COMPARTILHAMENTO.md`](relatorios/RELATORIO_IMPLEMENTACAO_MENU_VISITANTES_COMPARTILHAMENTO.md)
 - [`RELATORIO_IMPLEMENTACAO_VINKULO_2026-08-08.md`](relatorios/RELATORIO_IMPLEMENTACAO_VINKULO_2026-08-08.md)

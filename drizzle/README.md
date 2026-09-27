@@ -6,8 +6,14 @@ migração nova, leia isto.
 
 ## Próximo número livre
 
-**`0081`**. Use o próximo inteiro disponível a partir daí — não reaproveite
+**`0082`**. Use o próximo inteiro disponível a partir daí — não reaproveite
 um número já usado, mesmo que o arquivo tenha sido escrito à mão.
+
+`0081_mobile_visitor_outbox.sql` cria concessões restritas de envio e recibos de
+idempotência sem copiar contatos. Bootstrap autenticado aplica o mesmo DDL
+aditivo em bases antigas. Recibos não expiram automaticamente: removê-los pode
+permitir repetição de uma operação antiga. Exclusão da conta/comunidade remove
+os respectivos recibos. Tokens brutos nunca são persistidos no servidor.
 
 `0080_platform_reset.sql` cria somente estruturas de controle e arquivo protegido.
 Não apaga nem arquiva nenhum dado durante a migração. A reinicialização exige

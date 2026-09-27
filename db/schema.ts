@@ -3,6 +3,7 @@ import {
   check,
   index,
   integer,
+  primaryKey,
   sqliteTable,
   text,
   uniqueIndex,
@@ -3156,3 +3157,18 @@ export const platformResetChunks = sqliteTable('platform_reset_chunks', {
 export const platformResetFiles = sqliteTable('platform_reset_files', {
   objectKey: text('object_key').primaryKey(), resetId: text('reset_id').notNull().references(() => platformResetHistory.id), disposition: text('disposition').notNull(),
 });
+
+export const mobileWriteGrants = sqliteTable('mobile_write_grants', {
+  usuarioId: integer('usuario_id').notNull().references(() => usuarios.id, { onDelete: 'cascade' }),
+  comunidadeId: integer('comunidade_id').notNull().references(() => comunidades.id, { onDelete: 'cascade' }),
+  deviceId: text('device_id').notNull(), sessionHash: text('session_hash').notNull(),
+  tokenHash: text('token_hash').notNull(), expiresAt: integer('expires_at').notNull(),
+}, table => [primaryKey({ columns: [table.usuarioId, table.comunidadeId, table.deviceId] })]);
+export const mobileVisitorReceipts = sqliteTable('mobile_visitor_receipts', {
+  usuarioId: integer('usuario_id').notNull().references(() => usuarios.id, { onDelete: 'cascade' }),
+  comunidadeId: integer('comunidade_id').notNull().references(() => comunidades.id, { onDelete: 'cascade' }),
+  operationId: text('operation_id').notNull(), payloadHash: text('payload_hash').notNull(),
+  result: text('result').notNull(), visitorId: integer('visitor_id'), audited: integer('audited').notNull().default(0),
+  createdAt: text('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+}, table => [primaryKey({ columns: [table.usuarioId, table.comunidadeId, table.operationId] }),
+  check('mobile_visitor_receipt_result', sql`${table.result} IN ('PENDING','CONFIRMED','CONFLICT')`)]);

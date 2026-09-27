@@ -1,6 +1,6 @@
 # APK Vínkulo — arquitetura e sequência de evolução
 
-Data: 27/09/2026. Estado: etapa 1 concluída; etapa 2 implementada e validada em CI/emuladores, destinada à homologação física. Etapas 3–7 não autorizadas. Evidências iniciais em [APK_ETAPA_1_2026-09-27.md](../relatorios/APK_ETAPA_1_2026-09-27.md); implementação e limites em [APK_ETAPA_2_2026-09-27.md](../relatorios/APK_ETAPA_2_2026-09-27.md).
+Data: 27/09/2026. Estado: etapas 1–3 implementadas; APK 1.9.0 publicado para homologação no Sites 321. Etapa 4 autorizada e em implementação; etapas 5–7 aguardam autorização. Testes físicos e métricas Android continuam pendentes. Evidências em [etapa 1](../relatorios/APK_ETAPA_1_2026-09-27.md), [etapa 2](../relatorios/APK_ETAPA_2_2026-09-27.md) e [etapa 3](../relatorios/APK_ETAPA_3_2026-09-27.md).
 
 ## Objetivo e limites
 
@@ -109,6 +109,14 @@ O worker não depende de JavaScript/WebView abertos. Antes de habilitá-lo, impl
 Web/PWA: sincronizar ao abrir, retomar e reconectar; não prometer equivalência ao worker Android nem cifragem baseada em Keystore. Habilitar dados sensíveis no navegador apenas após política de proteção específica.
 
 ## Matriz inicial de módulos
+
+### Recorte autorizado da etapa 4 (27/09/2026)
+
+Primeira escrita: cadastro básico de visitante (nome, telefone/e-mail opcionais e data de entrada). Formulário no leitor leve existente; cadastro completo e dados pastorais/administrativos ficam online. Salvar rascunho e colocar na fila são ações explícitas diferentes. Um único registro cifrado do Room/schema 2 contém payload, UUID e estado; 200 registros mais a concessão, sem evicção automática. Campos digitados ainda não salvos não são rascunhos persistidos.
+
+Concessão nativa `visitor.create` separada da leitura, até 8h, token aleatório cifrado no aparelho e HMAC no servidor, vinculado à sessão/comunidade/instalação. Worker envia token **e** cookies próprios; servidor revalida sessão e permissões a cada operação. Token sozinho não autentica o usuário. Nada disso é exposto à ponte JS. Reautenticação da mesma conta/comunidade recupera pendências; bloqueio não apaga trabalho. WorkManager exclusivo com rede, backoff/jitter e reserva recuperável; sem garantia de execução imediata.
+
+Novas APIs `write-bootstrap` e `visitors` em `/api/mobile/`, cliente `android-write-1`. Migração 0081 aditiva, recibo/hash/cadastro/auditoria transacionais no D1; resposta perdida reutiliza o UUID. Conflito ou recusa é visível, sem merge silencioso. Não apagar operação de resultado incerto nem promover a estável sem homologação física. Evidências e pendências em `docs/relatorios/APK_ETAPA_4_2026-09-27.md`.
 
 ### Recorte autorizado e implementação da etapa 3 (27/09/2026)
 
