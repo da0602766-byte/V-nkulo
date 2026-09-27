@@ -99,10 +99,7 @@ jobs:
             adb shell svc data disable
             if [ "${{ matrix.api }}" -ge 33 ]; then adb shell pm grant com.vinkulo.app android.permission.POST_NOTIFICATIONS; fi
             adb shell am start -W -n com.vinkulo.app/.MainActivity
-            sleep 3
-            adb shell uiautomator dump /sdcard/vinkulo-foundation.xml
-            adb pull /sdcard/vinkulo-foundation.xml app/build/reports/vinkulo-release-offline.xml
-            grep 'Seu Vínkulo começa aqui' app/build/reports/vinkulo-release-offline.xml
+            bash scripts/check-release-offline.sh
             adb uninstall com.vinkulo.app
             gradle connectedDebugAndroidTest
       - uses: actions/upload-artifact@v4
@@ -112,4 +109,4 @@ jobs:
           path: |
             Vinkulo-Android/app/build/reports/androidTests/
             Vinkulo-Android/app/build/outputs/androidTest-results/
-            Vinkulo-Android/app/build/reports/vinkulo-release-offline.xml
+            Vinkulo-Android/app/build/reports/vinkulo-release-*

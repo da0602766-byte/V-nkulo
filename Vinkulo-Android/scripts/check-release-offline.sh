@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+mkdir -p app/build/reports
+ready=0
+# Cold WebView initialization on shared CI runners has variable latency.
+# Wait for usable content, not an arbitrary 3-second screenshot. This is a
+# functional timeout, not a performance measurement or relaxed assertion.
+for attempt in $(seq 1 12); do
+  adb shell uiautomator dump /sdcard/vinkulo-foundation.xml >/dev/null 2>&1 || true
+  adb pull /sdcard/vinkulo-foundation.xml app/build/reports/vinkulo-release-offline.xml >/dev/null 2>&1 || true
+  if grep -q 'Seu Vínkulo começa aqui' app/build/reports/vinkulo-release-offline.xml &&
+     grep -Eq 'Preparação necessária|Atualize o Android System WebView' app/build/reports/vinkulo-release-offline.xml; then
+    ready=1
+    break
+  fi
+  sleep 2
+done
+adb shell screencap -p /sdcard/vinkulo-offline.png
+adb pull /sdcard/vinkulo-offline.png app/build/reports/vinkulo-release-offline.png
+adb logcat -d -t 1500 > app/build/reports/vinkulo-release-logcat.txt
+adb shell dumpsys webviewupdate > app/build/reports/vinkulo-release-webview.txt
+test "$ready" = 1
