@@ -12,16 +12,26 @@ final class OfflineStore implements AutoCloseable {
 
     void install(JSONObject grant, String binding, long wall, long elapsed, int boot, long requestDuration) throws Exception {
         long issued = grant.getLong("issuedAt"), expires = grant.getLong("expiresAt");
-        if (grant.getInt("protocol") != 1 || grant.getLong("accountId") <= 0 || grant.getLong("communityId") <= 0
+        int protocol = grant.getInt("protocol");
+        if ((protocol != 1 && protocol != 2) || grant.getLong("accountId") <= 0 || grant.getLong("communityId") <= 0
                 || binding.isEmpty() || boot < 0 || expires <= issued || expires - issued > OfflinePolicy.MAX_AGE
                 || requestDuration < 0 || requestDuration >= expires - issued
                 || grant.getString("communityName").length() > 160
-                || grant.getJSONArray("capabilities").length() != 1
+                || grant.getJSONArray("capabilities").length() != (protocol == 2 ? 2 : 1)
                 || !"shell.open".equals(grant.getJSONArray("capabilities").getString(0))) throw new IllegalArgumentException("Invalid grant");
+        if (protocol == 2) {
+            if (expires - issued > 8 * 60 * 60 * 1000L
+                    || !"snapshot.read".equals(grant.getJSONArray("capabilities").getString(1))
+                    || grant.toString().getBytes(StandardCharsets.UTF_8).length > OfflineSnapshot.MAX_BYTES) throw new IllegalArgumentException("Invalid read grant");
+            OfflineSnapshot.validate(grant.getJSONObject("snapshot"));
+        }
         JSONObject saved = new JSONObject().put("communityName", grant.getString("communityName"))
                 .put("scope", OfflinePolicy.digest(grant.getLong("accountId") + ":" + grant.getLong("communityId")))
                 .put("binding", binding).put("wall", wall).put("elapsed", elapsed).put("boot", boot)
                 .put("duration", expires - issued - requestDuration).put("serverIssuedAt", issued);
+        if (protocol == 2) saved.put("snapshot", grant.getJSONObject("snapshot"));
+        // One encrypted row, one atomic replacement: deletions, lost permissions,
+        // other accounts and communities never accumulate in a merged cache.
         OfflineDatabase.ContextRow row = new OfflineDatabase.ContextRow();
         row.sealed = cipher.seal(saved.toString().getBytes(StandardCharsets.UTF_8), CONTEXT_AAD);
         database.storage().save(row);

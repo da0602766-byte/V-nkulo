@@ -17,10 +17,25 @@
     <p id="community" hidden></p><p id="prepared-at" class="muted" hidden></p>
   </section>
   <button id="open" class="primary" type="button">Abrir sistema online</button>
-  <button id="prepare" class="secondary" type="button">Preparar este aparelho</button>
+  <button id="prepare" class="secondary" type="button">Ativar consultas offline</button>
+  <p class="footnote">Ao ativar, você permite salvar textos autorizados neste aparelho por até 8 horas. A atualização acontece ao abrir o painel online ou tocar neste botão. Sem baixar fotos ou arquivos.</p>
   <p id="connection" class="muted" role="status"></p>
-  <section class="next"><h2>O que já está disponível</h2><p>Abertura local e identificação protegida da comunidade após entrar na sua conta. Agenda, escalas, cadastros e mensagens ainda precisam de internet nesta versão.</p></section>
-  <button id="lock" class="quiet" type="button">Bloquear identificação local</button>
+  <section id="reader" class="reader" hidden aria-label="Consultas salvas">
+    <h2>Consultar no aparelho</h2>
+    <p id="window" class="muted"></p>
+    <div class="tabs" role="group" aria-label="Escolher consulta">
+      <button id="tab-mural" type="button" aria-pressed="true">Mural</button>
+      <button id="tab-agenda" type="button" aria-pressed="false">Agenda</button>
+      <button id="tab-escalas" type="button" aria-pressed="false">Minhas escalas</button>
+    </div>
+    <label for="search">Buscar nos textos salvos</label>
+    <input id="search" type="search" maxlength="100" placeholder="Título, texto ou local" autocomplete="off">
+    <p id="list-status" class="muted" role="status" aria-live="polite"></p>
+    <div id="items"></div>
+    <p class="footnote">Cópia da última atualização: alterações e cancelamentos posteriores podem não aparecer. Para confirmar participação, responder à escala, ver mídias ou consultar todos os detalhes, abra o sistema online.</p>
+  </section>
+  <section class="next"><h2>O que fica salvo</h2><p>Até 50 publicações recentes, 100 eventos, 100 compromissos seus e 100 designações em escalas publicadas. Agenda e escalas cobrem de ontem aos próximos 30 dias. Respeita suas permissões; textos longos podem estar resumidos.</p></section>
+  <button id="lock" class="quiet" type="button">Desativar e apagar consultas locais</button>
   <p class="footnote">O bloqueio local não encerra a sessão online. Para sair da conta, use Sair dentro do sistema.</p>
 </main>
 </body></html>

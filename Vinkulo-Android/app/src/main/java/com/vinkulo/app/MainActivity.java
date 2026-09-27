@@ -295,7 +295,7 @@ public class MainActivity extends Activity {
                         }
                     } catch (JSONException ignored) { /* Ignore malformed messages without logging their content. */ }
                 });
-        String script = "if(window===window.top){VinkuloNative.onmessage=function(e){try{window.dispatchEvent(new CustomEvent('vinkulo:fcm-token',{detail:JSON.parse(e.data)}));}catch(ignore){}};window.VinkuloAndroid=Object.freeze({version:'1.8.0',"
+        String script = "if(window===window.top){VinkuloNative.onmessage=function(e){try{window.dispatchEvent(new CustomEvent('vinkulo:fcm-token',{detail:JSON.parse(e.data)}));}catch(ignore){}};window.VinkuloAndroid=Object.freeze({version:'1.9.0',"
                 + "requestPushToken:function(){VinkuloNative.postMessage(JSON.stringify({action:'push-token'}));},"
                 + "setPushBinding:function(token,bindingId){VinkuloNative.postMessage(JSON.stringify({action:'push-bind',token:token,bindingId:bindingId}));},"
                 + "clearPushBinding:function(){VinkuloNative.postMessage(JSON.stringify({action:'push-clear'}));},"
@@ -354,13 +354,17 @@ public class MainActivity extends Activity {
                     if (!mainFrame || !NativePolicy.trusted(origin.toString()) || !OfflinePolicy.localPage(view.getUrl())
                             || message.getType() != WebMessageCompat.TYPE_STRING || message.getData() == null || message.getData().length() > 512) return;
                     try {
-                        String action = new JSONObject(message.getData()).getString("action");
+                        JSONObject command = new JSONObject(message.getData());
+                        String action = command.getString("action");
+                        int requestId = command.getInt("requestId");
+                        if (requestId <= 0) return;
                         if ("lock".equals(action)) offline.lock();
                         else if ("refresh".equals(action)) offline.refresh(true);
                         else if (!"status".equals(action)) return;
                         offline.status(state -> {
                             if (webView != null && OfflinePolicy.localPage(webView.getUrl())) {
-                                try { reply.postMessage(state.toString()); } catch (IllegalStateException ignored) { }
+                                try { state.put("requestId", requestId); reply.postMessage(state.toString()); }
+                                catch (IllegalStateException | JSONException ignored) { }
                             }
                         });
                     } catch (JSONException ignored) { }

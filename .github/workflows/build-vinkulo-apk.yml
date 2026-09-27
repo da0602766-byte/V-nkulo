@@ -62,13 +62,13 @@ jobs:
           sha256sum app/build/outputs/apk/release/app-release.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: Vinkulo-Android-1.8.0-homologacao-api${{ matrix.api }}
+          name: Vinkulo-Android-1.9.0-homologacao-api${{ matrix.api }}
           path: Vinkulo-Android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: Vinkulo-Android-1.8.0-validacao-api${{ matrix.api }}
+          name: Vinkulo-Android-1.9.0-validacao-api${{ matrix.api }}
           path: |
             Vinkulo-Android/app/build/reports/
             Vinkulo-Android/app/build/test-results/
@@ -92,6 +92,9 @@ jobs:
             echo '901e1d4e73bdc990d7d5d500ef10a422636777155cb821b6980e0cd083da7e8e  /tmp/vinkulo-1.7.1.apk' | sha256sum --check
             adb install /tmp/vinkulo-1.7.1.apk
             adb shell dumpsys package com.vinkulo.app | grep firstInstallTime > /tmp/vinkulo-first-install.txt
+            curl --fail --location https://adote-gestao.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.8.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.8.0.apk
+            echo 'e1d6b91650f420a646972f68163ab8e19f01762dd862b2992a1851ead10a3da7  /tmp/vinkulo-1.8.0.apk' | sha256sum --check
+            adb install -r /tmp/vinkulo-1.8.0.apk
             adb install -r app/build/outputs/apk/release/app-release.apk
             adb shell dumpsys package com.vinkulo.app | grep firstInstallTime > /tmp/vinkulo-after-update.txt
             diff /tmp/vinkulo-first-install.txt /tmp/vinkulo-after-update.txt
@@ -102,11 +105,13 @@ jobs:
             bash scripts/check-release-offline.sh
             adb uninstall com.vinkulo.app
             gradle connectedDebugAndroidTest
+            adb pull /sdcard/Android/data/com.vinkulo.app/files/. app/build/reports/vinkulo-reader/ || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: Vinkulo-Android-1.8.0-emulador-api${{ matrix.api }}
+          name: Vinkulo-Android-1.9.0-emulador-api${{ matrix.api }}
           path: |
             Vinkulo-Android/app/build/reports/androidTests/
             Vinkulo-Android/app/build/outputs/androidTest-results/
             Vinkulo-Android/app/build/reports/vinkulo-release-*
+            Vinkulo-Android/app/build/reports/vinkulo-reader/

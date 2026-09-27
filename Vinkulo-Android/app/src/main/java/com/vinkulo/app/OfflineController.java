@@ -45,7 +45,7 @@ final class OfflineController {
     void lock() {
         blocked = true; generation.incrementAndGet(); result = "locked";
         // Persist the barrier before queued database work, including process death.
-        if (!barriers.edit().putBoolean("locked", true).commit()) result = "storage-error";
+        if (!barriers.edit().putBoolean("locked", true).remove("read-consent").commit()) result = "storage-error";
         if (closed) return;
         executor.execute(() -> { try { store().lock(); } catch (Exception ignored) { result = "storage-error"; } notifyChanged(); });
     }
@@ -61,6 +61,7 @@ final class OfflineController {
                 state.put("prepared", saved != null).put("result", result).put("refreshing", refreshing);
                 if (saved != null) state.put("communityName", saved.getString("communityName"))
                         .put("preparedAt", saved.getLong("serverIssuedAt"))
+                        .put("snapshot", saved.optJSONObject("snapshot"))
                         .put("validForMs", Math.max(0, saved.getLong("duration") - (SystemClock.elapsedRealtime() - saved.getLong("elapsed"))));
             } catch (Exception ignored) {
                 blocked = true;
@@ -80,6 +81,8 @@ final class OfflineController {
         final String requestCookies = cookies();
         if (requestCookies.isEmpty()) { lock(); return; }
         final String requestedBinding = OfflinePolicy.digest(requestCookies);
+        // Operational text is opt-in, tied to this exact session/community.
+        if (!explicit && !requestedBinding.equals(barriers.getString("read-consent", ""))) return;
         final long ticket = generation.incrementAndGet();
         lastAttempt = SystemClock.elapsedRealtime(); refreshing = true; result = "refreshing";
         executor.execute(() -> {
@@ -87,16 +90,16 @@ final class OfflineController {
             try {
                 long started = SystemClock.elapsedRealtime();
                 String challenge = OfflinePolicy.digest(UUID.randomUUID().toString());
-                connection = (HttpsURLConnection) new URL(NativePolicy.ORIGIN + "/api/mobile/bootstrap").openConnection();
+                connection = (HttpsURLConnection) new URL(NativePolicy.ORIGIN + "/api/mobile/snapshot").openConnection();
                 connection.setInstanceFollowRedirects(false); connection.setConnectTimeout(8000); connection.setReadTimeout(8000);
                 connection.setUseCaches(false); connection.setRequestProperty("Cookie", requestCookies);
                 connection.setRequestProperty("Origin", NativePolicy.ORIGIN);
                 connection.setRequestProperty("X-Vinkulo-Challenge", challenge);
-                connection.setRequestProperty("X-Vinkulo-Client", "android-foundation-1");
+                connection.setRequestProperty("X-Vinkulo-Client", "android-read-2");
                 int status = connection.getResponseCode();
                 if (status == 401 || status == 403) {
                     if (generation.get() == ticket) {
-                        blocked = true; barriers.edit().putBoolean("locked", true).commit(); store().lock(); result = "locked";
+                        blocked = true; barriers.edit().putBoolean("locked", true).remove("read-consent").commit(); store().lock(); result = "locked";
                     }
                     return;
                 }
@@ -105,17 +108,17 @@ final class OfflineController {
                 try (InputStream input = connection.getInputStream()) {
                     byte[] chunk = new byte[2048]; int count;
                     while ((count = input.read(chunk)) != -1) {
-                        if (bytes.size() + count > 16_384 || SystemClock.elapsedRealtime() - started > 16_000) throw new java.io.IOException("Limit");
+                        if (bytes.size() + count > OfflineSnapshot.MAX_BYTES || SystemClock.elapsedRealtime() - started > 16_000) throw new java.io.IOException("Limit");
                         bytes.write(chunk, 0, count);
                     }
                 }
                 JSONObject grant = new JSONObject(bytes.toString(StandardCharsets.UTF_8.name()));
-                if (!challenge.equals(grant.getString("challenge"))) throw new java.io.IOException("Invalid challenge");
+                if (grant.getInt("protocol") != 2 || !challenge.equals(grant.getString("challenge"))) throw new java.io.IOException("Invalid challenge");
                 if (generation.get() != ticket || !requestedBinding.equals(binding())) return;
                 store().install(grant, requestedBinding, System.currentTimeMillis(), SystemClock.elapsedRealtime(), boot(), SystemClock.elapsedRealtime() - started);
                 activity.runOnUiThread(() -> {
                     if (!closed && generation.get() == ticket && requestedBinding.equals(binding())) {
-                        blocked = !barriers.edit().putBoolean("locked", false).commit();
+                        blocked = !barriers.edit().putBoolean("locked", false).putString("read-consent", requestedBinding).commit();
                         result = blocked ? "storage-error" : "ready"; notifyChanged();
                     }
                 });

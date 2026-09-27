@@ -3,14 +3,65 @@
   const bridge = window.VinkuloOffline;
   let waiting = false;
   let expiryTimer;
-  const send = action => { if (bridge) bridge.postMessage(JSON.stringify({ action })); };
+  let requestId = 0;
+  let snapshot = null;
+  let snapshotTime = 0;
+  let selected = 'mural';
+  const send = action => { if (bridge) bridge.postMessage(JSON.stringify({ action, requestId: ++requestId })); };
+  const date = value => {
+    if (!value) return '';
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toLocaleString('pt-BR');
+  };
+  function text(parent, tag, value, className) {
+    const element = document.createElement(tag);
+    element.textContent = value; if (className) element.className = className;
+    parent.appendChild(element);
+  }
+  function renderItems() {
+    const container = byId('items'); container.textContent = '';
+    if (!snapshot) return;
+    const names = selected === 'agenda' ? ['eventos', 'compromissos'] : [selected];
+    let rows = [], more = false, denied = false;
+    names.forEach(name => {
+      const section = snapshot[name];
+      denied = denied || !section.allowed; more = more || section.hasMore;
+      if (section.allowed) rows = rows.concat(section.items.map(item => ({item, name})));
+    });
+    if (selected === 'agenda') rows.sort((a, b) => new Date(a.item.data) - new Date(b.item.data));
+    const query = byId('search').value.trim().toLocaleLowerCase('pt-BR');
+    rows = rows.filter(row => [row.item.titulo, row.item.texto, row.item.local, row.item.ministerio, row.item.autor]
+      .join(' ').toLocaleLowerCase('pt-BR').indexOf(query) !== -1);
+    byId('list-status').textContent = rows.length + ' item(ns) salvo(s)' + (query ? ' nesta busca.' : '.')
+      + (more ? ' Há mais itens disponíveis online.' : '') + (denied ? ' Parte desta consulta não foi autorizada.' : '');
+    if (!rows.length) text(container, 'p', query ? 'Nenhum texto salvo corresponde à busca.' : 'Nenhum item salvo nesta consulta. Confira o período e atualize com internet.', 'muted');
+    rows.forEach(row => {
+      const item = row.item, article = document.createElement('article'); article.className = 'entry';
+      text(article, 'h3', item.titulo || 'Sem título');
+      const label = row.name === 'compromissos' ? 'Meu compromisso' : row.name === 'eventos' ? 'Evento' : row.name === 'escalas' ? 'Minha escala' : 'Publicação';
+      text(article, 'p', label + ' · ' + date(item.data) + (item.fim ? ' até ' + date(item.fim) : ''), 'muted');
+      if (item.autor) text(article, 'p', item.autor, 'muted');
+      if (item.ministerio) text(article, 'p', item.ministerio, 'muted');
+      if (item.local) text(article, 'p', 'Local: ' + item.local, 'muted');
+      if (item.diaInteiro) text(article, 'p', 'Dia inteiro', 'muted');
+      if (item.concluido) text(article, 'p', 'Concluído na última atualização', 'muted');
+      if (item.resposta) text(article, 'p', 'Sua resposta na última atualização: ' + item.resposta, 'muted');
+      if (item.texto) text(article, 'p', item.texto, 'body');
+      container.appendChild(article);
+    });
+  }
+  function clearSnapshot() {
+    snapshot = null; snapshotTime = 0; byId('reader').hidden = true;
+    byId('items').textContent = ''; byId('search').value = ''; byId('window').textContent = '';
+    byId('list-status').textContent = '';
+  }
   function render(state) {
     window.clearTimeout(expiryTimer);
     waiting = !!state.refreshing;
     byId('prepare').disabled = waiting;
     byId('context-title').textContent = state.prepared ? 'Aparelho preparado' : 'Preparação necessária';
     const message = state.prepared
-      ? 'A identificação desta comunidade está protegida neste aparelho. Os módulos ainda precisam de conexão.'
+      ? state.snapshot ? 'Consultas protegidas disponíveis por tempo limitado. Esta é uma cópia da última atualização, não uma confirmação em tempo real.' : 'Identificação preparada na versão anterior. Ative as consultas offline para salvar conteúdo autorizado.'
       : state.result === 'storage-error'
         ? 'Não foi possível abrir o armazenamento protegido. Entre no sistema online; seus dados não foram apagados.'
         : state.result === 'unavailable'
@@ -22,12 +73,24 @@
     byId('community').textContent = state.prepared ? state.communityName : '';
     byId('prepared-at').textContent = state.prepared ? `Preparado em ${new Date(state.preparedAt).toLocaleString('pt-BR')}` : '';
     byId('lock').hidden = !state.prepared;
+    byId('prepare').textContent = state.prepared && state.snapshot ? 'Atualizar consultas offline' : 'Ativar consultas offline';
+    if (state.prepared && state.snapshot) {
+      byId('reader').hidden = false;
+      if (!snapshot || snapshotTime !== state.preparedAt) {
+        snapshot = state.snapshot; snapshotTime = state.preparedAt;
+        byId('window').textContent = 'Agenda e escalas: ' + date(snapshot.from) + ' a ' + date(snapshot.until) + '.';
+        renderItems();
+      }
+    } else clearSnapshot();
+    if (state.prepared && state.result === 'unavailable') byId('context-detail').textContent = 'Não foi possível atualizar. A cópia anterior permanece disponível apenas até o vencimento.';
     if (state.prepared) expiryTimer = window.setTimeout(() => { render({result:'locked'}); send('status'); }, Math.max(0, Number(state.validForMs) || 0));
   }
   function connection() {
     byId('connection').textContent = navigator.onLine ? 'Os recursos online dependem de conexão com o servidor.' : 'Sem conexão. Esta tela continua disponível.';
   }
-  if (bridge) bridge.onmessage = event => { if (document.hidden) return; try { render(JSON.parse(event.data)); } catch (error) { render({result:'storage-error'}); } };
+  if (bridge) bridge.onmessage = event => { if (document.hidden) return; try {
+    const state = JSON.parse(event.data); if (state.requestId !== requestId) return; render(state);
+  } catch (error) { render({result:'storage-error'}); } };
   else {
     byId('context-title').textContent = 'Atualize o Android System WebView';
     byId('context-detail').textContent = 'A preparação protegida precisa de uma versão compatível do WebView. Você pode continuar no sistema online.';
@@ -36,10 +99,16 @@
   byId('open').addEventListener('click', () => { window.location.assign('/painel'); });
   byId('prepare').addEventListener('click', () => { if (waiting) return; waiting = true; byId('prepare').disabled = true; send('refresh'); });
   byId('lock').addEventListener('click', () => { render({result:'locked'}); send('lock'); });
+  ['mural', 'agenda', 'escalas'].forEach(name => byId('tab-' + name).addEventListener('click', () => {
+    selected = name;
+    ['mural', 'agenda', 'escalas'].forEach(tab => byId('tab-' + tab).setAttribute('aria-pressed', String(tab === selected)));
+    renderItems();
+  }));
+  byId('search').addEventListener('input', renderItems);
   window.addEventListener('vinkulo:offline-status', () => send('status'));
   document.addEventListener('visibilitychange', () => { if (!bridge) return; render({result:'locked'}); if (!document.hidden) send('status'); });
   window.addEventListener('online', connection); window.addEventListener('offline', connection);
-  // Periodic expiry check is foreground-only; no operational sync in this stage.
+  // Foreground expiry checks are local; never poll the server or write remotely.
   window.setInterval(() => { if (!document.hidden) send('status'); }, 30000);
   connection(); send('status');
 })();
