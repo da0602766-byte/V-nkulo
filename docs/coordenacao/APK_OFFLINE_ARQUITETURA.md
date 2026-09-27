@@ -1,6 +1,6 @@
 # APK Vínkulo — arquitetura e sequência de evolução
 
-Data: 27/09/2026. Estado: etapa 1 concluída; etapa 2 autorizada e em validação para homologação. Etapas 3–7 não autorizadas. Evidências iniciais em [APK_ETAPA_1_2026-09-27.md](../relatorios/APK_ETAPA_1_2026-09-27.md); implementação e limites em [APK_ETAPA_2_2026-09-27.md](../relatorios/APK_ETAPA_2_2026-09-27.md).
+Data: 27/09/2026. Estado: etapa 1 concluída; etapa 2 implementada e validada em CI/emuladores, destinada à homologação física. Etapas 3–7 não autorizadas. Evidências iniciais em [APK_ETAPA_1_2026-09-27.md](../relatorios/APK_ETAPA_1_2026-09-27.md); implementação e limites em [APK_ETAPA_2_2026-09-27.md](../relatorios/APK_ETAPA_2_2026-09-27.md).
 
 ## Objetivo e limites
 
