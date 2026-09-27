@@ -17,6 +17,8 @@ Antes de alterar o código, leia este documento e atualize a seção **Trabalho 
 
 ## Trabalho em andamento
 
+Comprovante da etapa 2 do APK (27/09/2026, 17h16 Brasília): homologação publicada no **Sites 319**, fonte `e6c0b3a39225d45ca224f58305bef8c4e1d6ef17`, deployment `appgdep_6ab9797a89208191a76c0eb90b4e8074`. URL: https://adote-gestao.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.8.0_HOMOLOGACAO.apk. Download público 200 e SHA-256 `e1d6b91650f420a646972f68163ab8e19f01762dd862b2992a1851ead10a3da7` confirmado; estável 1.7.1 inalterado. Homologação física e etapas 3–7 permanecem pendentes. Registro documental posterior ao deploy.
+
 > Preencha uma linha ao começar, atualize ao concluir e remova apenas tarefas canceladas.
 
 | Responsável | Tarefa | Arquivos reservados | Início | Estado | Observações |
