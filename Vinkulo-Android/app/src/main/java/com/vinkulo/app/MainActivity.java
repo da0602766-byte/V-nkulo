@@ -161,7 +161,12 @@ public class MainActivity extends Activity {
             String coldStartPath = notificationPathFromIntent(getIntent());
             webView.loadUrl(coldStartPath != null ? APP_URL + coldStartPath : OfflinePolicy.HOME);
         } else {
-            if (webView.restoreState(state) == null) webView.loadUrl(OfflinePolicy.HOME);
+            android.webkit.WebBackForwardList restored = webView.restoreState(state);
+            // restoreState restores navigation history, not guaranteed display
+            // data. Recreate the stateless local document and its native bridge
+            // explicitly; identity is always read again from protected storage.
+            if (restored == null || restored.getCurrentItem() == null
+                    || OfflinePolicy.localPage(restored.getCurrentItem().getUrl())) webView.loadUrl(OfflinePolicy.HOME);
             handleNotificationTap(getIntent());
         }
         handleGoogleReturn(getIntent());
