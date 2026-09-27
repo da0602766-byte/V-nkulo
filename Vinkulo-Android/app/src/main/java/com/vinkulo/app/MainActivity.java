@@ -162,6 +162,12 @@ public class MainActivity extends Activity {
             String coldStartPath = notificationPathFromIntent(getIntent());
             if (coldStartPath != null) webView.loadUrl(APP_URL + coldStartPath);
             else showOfflineEntry();
+        } else if (state.getBoolean("vinkulo.localOffline", false) || state.getBoolean("vinkulo.legacyOffline", false)) {
+            // The local reader has no navigation/form state to restore. Loading
+            // after restoreState races the renderer's own history restoration.
+            // Recreate it directly and ask native storage for authorized data.
+            showOfflineEntry();
+            handleNotificationTap(getIntent());
         } else {
             android.webkit.WebBackForwardList restored = webView.restoreState(state);
             // restoreState restores navigation history, not guaranteed display
@@ -682,7 +688,9 @@ public class MainActivity extends Activity {
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         outState.putBoolean("vinkulo.legacyOffline", legacyOfflineView != null);
-        webView.saveState(outState);
+        boolean local = legacyOfflineView != null || OfflinePolicy.localPage(webView.getUrl());
+        outState.putBoolean("vinkulo.localOffline", local);
+        if (!local) webView.saveState(outState);
         super.onSaveInstanceState(outState);
     }
 }

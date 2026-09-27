@@ -72,7 +72,8 @@
     byId('prepared-at').hidden = !state.prepared;
     byId('community').textContent = state.prepared ? state.communityName : '';
     byId('prepared-at').textContent = state.prepared ? `Preparado em ${new Date(state.preparedAt).toLocaleString('pt-BR')}` : '';
-    byId('lock').hidden = !state.prepared;
+    // An expired copy must remain removable without requiring a new login.
+    byId('lock').hidden = !bridge;
     byId('prepare').textContent = state.prepared && state.snapshot ? 'Atualizar consultas offline' : 'Ativar consultas offline';
     if (state.prepared && state.snapshot) {
       byId('reader').hidden = false;

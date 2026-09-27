@@ -2,7 +2,21 @@
 
 Aplicativo Android conectado à plataforma oficial do Vínkulo.
 
-Versão atual: **1.7.1** (`versionCode 10`).
+Versão estável de distribuição geral: **1.7.1** (`versionCode 10`). Candidato para homologação: **1.9.0** (`versionCode 12`).
+
+## Consultas offline — candidato 1.9.0
+
+Entrada local com ativação explícita de mural, agenda (eventos e compromissos próprios) e designações próprias em escalas publicadas. Os workspaces completos continuam online. APK 1.8.0 introduziu a fundação; esta versão acrescenta somente leitura, não rascunhos/outbox.
+
+- Backend `/api/mobile/snapshot`, protocolo 2; o bootstrap de protocolo 1 permanece disponível para APKs anteriores.
+- Transporte HTTPS nativo com sessão/origem/desafio, sem instalar concessões recebidas de JavaScript. Snapshot autenticado, não um token de API.
+- Uma cópia substituída atomicamente, cifrada com AES-GCM/Android Keystore no Room/schema 2; limite 1 MiB, validade até 8h ou expiração da sessão. Cookies não são enviados à ponte JavaScript.
+- Troca de sessão/comunidade, reboot, relógio alterado, bloqueio e 401/403 impedem leitura. Sem rede, revogação remota só é limitada pelo vencimento da cópia.
+- Máximos: 50 publicações, 100 eventos, 100 compromissos e 100 designações; agenda/escalas de agora menos 24h aos próximos 30 dias. Sem mídias, diretório de pessoas, lista de inscritos, tokens de compartilhamento ou chat.
+- Atualizar manualmente na entrada local, ou ao abrir o painel após consentimento no mesmo vínculo. Sem sincronização operacional em segundo plano. Desativar remove a cópia consultável, mas não encerra a sessão online.
+- Testes de homologação: testes Java/JS, armazenamento cifrado, migração, limites, expiração, troca de vínculo, leitura local/recriação e cadeia de atualização assinada 1.7.1 → 1.8.0 → 1.9.0 em emuladores API 29/35. WebView antigo sem ponte segura só oferece atualização do WebView e sistema online.
+
+Distribuição geral depende de testes físicos autenticados e integrações, desempenho medido, Gradle Wrapper/checksum, dependências verificadas/travadas e actions fixadas por SHA. Não prometer funcionamento majoritariamente offline nem build bit a bit reproduzível nesta etapa.
 
 ## Melhorias da versão 1.7.0
 

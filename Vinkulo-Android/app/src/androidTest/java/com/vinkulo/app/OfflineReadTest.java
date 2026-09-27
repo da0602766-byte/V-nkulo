@@ -131,8 +131,11 @@ public class OfflineReadTest {
     }
     private void scrollTo(UiDevice device,String label) throws Exception {
         if(device.wait(Until.hasObject(By.text(label)),3000)) return;
-        for(int i=0;i<6;i++) {device.swipe(200,650,200,250,25);if(device.wait(Until.hasObject(By.text(label)),1000))return;}
-        for(int i=0;i<6;i++) {device.swipe(200,250,200,650,25);if(device.wait(Until.hasObject(By.text(label)),1000))return;}
+        int x=device.getDisplayWidth()/2, top=device.getDisplayHeight()/3, bottom=device.getDisplayHeight()*4/5;
+        for(int i=0;i<8;i++) {device.swipe(x,bottom,x,top,25);if(device.wait(Until.hasObject(By.text(label)),1000))return;}
+        for(int i=0;i<8;i++) {device.swipe(x,top,x,bottom,25);if(device.wait(Until.hasObject(By.text(label)),1000))return;}
+        device.takeScreenshot(new File(context.getExternalFilesDir(null),"reader-failure.png"));
+        device.dumpWindowHierarchy(new File(context.getExternalFilesDir(null),"reader-failure.xml"));
         assertTrue("Missing local reader text: "+label,device.hasObject(By.text(label)));
     }
 }

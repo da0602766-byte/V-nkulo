@@ -101,7 +101,7 @@ public class OfflineFoundationTest {
         // obscuring the UI under test on Android 13+.
         if (android.os.Build.VERSION.SDK_INT >= 33) device.executeShellCommand("pm grant com.vinkulo.app android.permission.POST_NOTIFICATIONS");
         try (ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
-            assertTrue(device.wait(Until.hasObject(By.text("Seu Vínkulo começa aqui.")),15000));
+            requireVisible(device,"Seu Vínkulo começa aqui.");
             boolean supportsBridge = WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER);
             if (android.os.Build.VERSION.SDK_INT >= 35) assertTrue("Modern WebView must exercise the bridge", supportsBridge);
             String expected = supportsBridge ? "Preparação necessária" : "Atualize o Android System WebView";
@@ -109,8 +109,14 @@ public class OfflineFoundationTest {
             if (!supportsBridge) assertTrue(device.hasObject(By.clazz("android.widget.Button").text("ATUALIZAR WEBVIEW"))
                     || device.hasObject(By.clazz("android.widget.Button").text("Atualizar WebView")));
             scenario.recreate();
-            assertTrue(device.wait(Until.hasObject(By.text("Seu Vínkulo começa aqui.")),15000));
-            assertTrue(device.wait(Until.hasObject(By.text(expected)),15000));
+            requireVisible(device,"Seu Vínkulo começa aqui.");
+            requireVisible(device,expected);
         }
+    }
+    private void requireVisible(UiDevice device,String text) throws Exception {
+        if(device.wait(Until.hasObject(By.text(text)),15000)) return;
+        device.takeScreenshot(new java.io.File(context.getExternalFilesDir(null),"foundation-failure.png"));
+        device.dumpWindowHierarchy(new java.io.File(context.getExternalFilesDir(null),"foundation-failure.xml"));
+        fail("Missing local screen: "+text);
     }
 }

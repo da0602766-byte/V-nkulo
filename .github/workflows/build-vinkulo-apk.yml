@@ -104,8 +104,7 @@ jobs:
             adb shell am start -W -n com.vinkulo.app/.MainActivity
             bash scripts/check-release-offline.sh
             adb uninstall com.vinkulo.app
-            gradle connectedDebugAndroidTest
-            adb pull /sdcard/Android/data/com.vinkulo.app/files/. app/build/reports/vinkulo-reader/ || true
+            result=0; gradle connectedDebugAndroidTest || result=$?; adb pull /sdcard/Android/data/com.vinkulo.app/files/. app/build/reports/vinkulo-reader/ || true; exit "$result"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
