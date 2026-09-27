@@ -9,13 +9,14 @@ test("capa fica na lista à direita com degradê sem remover dados do cartão", 
     read("app/secretary.css"),
     read("app/components/SecretaryMinisterialWorkspace.tsx"),
   ]);
-  assert.match(workspace, /className="secretary-ministry-tile-media"/);
+  assert.match(workspace, /secretary-ministry-tile-media \$\{ministry\.banner_url/);
+  assert.match(workspace, /ministry\.banner_url \? <img src=\{ministry\.banner_url\}/);
   assert.match(css, /\.secretary-ministry-tile-media \{[\s\S]*inset: 0 0 0 auto/);
   assert.match(css, /mask-image:\s*linear-gradient\(to right,transparent 0%/);
   assert.match(css, /\.secretary-ministry-tile\.has-banner::before/);
   assert.match(workspace, /CATEGORY_LABELS\[ministry\.categoria\]/);
-  assert.match(workspace, /ministry\.descricao \|\| "Ministério da comunidade"/);
-  assert.match(workspace, /ministry\.responsavel_nome \|\| "Não definida"/);
+  assert.match(workspace, /ministry\.descricao && <span>\{ministry\.descricao\}/);
+  assert.match(workspace, /ministry\.responsavel_nome && <strong/);
   assert.match(workspace, /ministry\.can_manage \? "Gerenciar →" : "Minhas escalas →"/);
   assert.match(css, /\.secretary-hero\.has-banner\{grid-template-columns:1fr;padding:0\}/);
   assert.doesNotMatch(css, /\.secretary-hero\.has-banner\{min-height:520px/);

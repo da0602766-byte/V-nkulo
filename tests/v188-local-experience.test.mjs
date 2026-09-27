@@ -20,7 +20,7 @@ test("cache local preserva apenas o shell e arquivos estáticos", async () => {
   assert.doesNotMatch(worker, /cache\.put\(request[^\n]+navigate/);
 });
 
-test("preferências de transparência e economia são restauradas antes da tela", async () => {
+test("economia respeita navegador e controles individuais removidos não retornam", async () => {
   const [layout, dashboard] = await Promise.all([
     read("app/layout.tsx"),
     read("app/components/PilotDashboard.tsx"),
@@ -28,8 +28,8 @@ test("preferências de transparência e economia são restauradas antes da tela"
   assert.match(layout, /vinkulo:glass-opacity/);
   assert.match(layout, /vinkulo:data-saver/);
   assert.match(layout, /skip-to-content/);
-  assert.match(dashboard, /Intensidade do vidro <b>\{glassOpacity\}%<\/b>/);
-  assert.match(dashboard, /Economizar dados/);
+  assert.doesNotMatch(dashboard, /Intensidade do vidro|Economizar dados/);
+  assert.match(dashboard, /root\.dataset\.dataSaver = [^\n]+connection\?\.saveData/);
   assert.match(dashboard, /dynamic\(\(\) => import\("\.\/TenantOperations"\)/);
   assert.match(dashboard, /vinkulo:recent-views/);
 });

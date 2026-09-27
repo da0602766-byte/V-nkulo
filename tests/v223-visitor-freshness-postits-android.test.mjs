@@ -18,7 +18,7 @@ test("cadastro novo usa a data real de entrada e nunca inventa 999 dias sem cont
   assert.match(tools, /rotuloTempoSemContato\(item\)/);
 });
 
-test("post-its ficam na coluna lateral da visão geral", async () => {
+test("post-its ficam na aba de anotações e preservam a grade do painel", async () => {
   const [operations, notes, secretaryCss, visitorsCss] = await Promise.all([
     read("app/components/TenantOperations.tsx"),
     read("app/components/CareNotesBoard.tsx"),
@@ -29,7 +29,9 @@ test("post-its ficam na coluna lateral da visão geral", async () => {
   // A coluna lateral agora é a coluna estreita da grade de cartões que a aba
   // divide com Ministérios, e não mais uma grade só dos visitantes.
   assert.match(operations, /visitor-dashboard-v7/);
-  assert.match(operations, /<CareNotesBoard side \/>/);
+  assert.match(operations, /tab === "anotacoes" && <div className="visitor-notes-panel"><CareNotesBoard \/>/);
+  assert.match(operations, /aria-label="Minhas anotações de cuidado"/);
+  assert.doesNotMatch(operations, /<CareNotesBoard side/);
   assert.match(notes, /side\?: boolean/);
   assert.match(secretaryCss, /\.secretary-dashboard-grid\{display:grid;grid-template-columns:1\.35fr 1fr/);
   assert.match(visitorsCss, /\.visitor-dashboard-v7 > \.care-notes-board\.is-side/);

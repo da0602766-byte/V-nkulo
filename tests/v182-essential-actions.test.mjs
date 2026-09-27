@@ -4,11 +4,13 @@ import test from "node:test";
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("mural keeps a compact create-publication action above its posts", async () => {
+test("mural keeps typed composer shortcuts above its posts", async () => {
   const home = await read("app/components/CommunityHome.tsx");
   const composer = await read("app/components/feed/FeedComposerBar.tsx");
   assert.match(home, /<FeedComposerBar/);
-  assert.match(composer, /className="worship-publish" onClick=\{\(\) => onOpen\("text"\)\}>Publicar/);
+  for (const intent of ["text", "image", "event"]) assert.ok(composer.includes(`onOpen("${intent}")`));
+  assert.match(composer, /className="worship-composer-tools"/);
+  assert.match(home, /aria-label="Criar publicação" onSubmit=\{createPost\}/);
   assert.ok(home.indexOf("<FeedComposerBar") < home.indexOf("visiblePosts.map"));
 });
 

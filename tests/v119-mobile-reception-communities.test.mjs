@@ -10,7 +10,10 @@ test("landing móvel usa a identidade real e mantém a página sem overflow", as
   assert.match(page, /LandingPageExperience/);
   assert.match(landing, /className="lp-brand"/);
   assert.match(landing, /className="lp-hero"/);
-  assert.match(header, /branding\.logoUrl \|\| "\/adote-symbol\.svg"/);
+  assert.match(header, /<VinkuloMark logoUrl=\{branding\.logoUrl\}/);
+  const mark = await source("app/components/VinkuloMark.tsx");
+  assert.match(mark, /if \(logoUrl\) return <img/);
+  assert.match(mark, /return <svg/);
   assert.match(landingStyles, /overflow-x:clip/);
   assert.match(landingStyles, /@media \(max-width:620px\)/);
   assert.match(styles, /overflow-x:clip/);

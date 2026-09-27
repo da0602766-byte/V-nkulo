@@ -25,15 +25,15 @@ test("componentes e helpers aposentados não voltam ao repositório", async () =
   ]);
 });
 
-test("Diaconia permanece alcançável e pastoral usa a view de liderança", async () => {
+test("Diaconia removida não retorna e pastoral usa a view de liderança", async () => {
   const [dashboard, panel] = await Promise.all([
     source("app/components/PilotDashboard.tsx"),
     source("app/painel/page.tsx"),
   ]);
 
-  assert.match(dashboard, /dynamic\(\(\) => import\("\.\/DiaconiaWorkspace"\)/);
-  assert.match(dashboard, /id: "diaconia"[\s\S]*permission: "diaconia\.view"/);
-  assert.match(dashboard, /visibleView === "diaconia"[\s\S]*<DiaconiaWorkspace/);
+  // Decisão explícita do proprietário em 25/09/2026; não restaurar a aba.
+  assert.doesNotMatch(dashboard, /DiaconiaWorkspace|id: "diaconia"|visibleView === "diaconia"/);
+  assert.doesNotMatch(panel, /^\s*"diaconia",$/m);
   assert.match(dashboard, /mode=\{active\.permissions\.includes\("pastoral\.panel\.view"\) \? "pastoral" : "leader"\}/);
   assert.doesNotMatch(dashboard, /\| "pastoral"/);
   assert.doesNotMatch(panel, /^\s*"pastoral",$/m);

@@ -18,6 +18,9 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);
+  // Android serves this reserved prefix from its signed APK. Do not cache it
+  // or replace it with the web offline fallback, even on first offline boot.
+  if (url.origin === self.location.origin && url.pathname.startsWith("/mobile-app/")) return;
   if (request.method === "GET" && url.origin === self.location.origin && url.pathname.startsWith("/local-media/")) {
     event.respondWith(readLocalMedia(url.pathname.slice("/local-media/".length)));
     return;

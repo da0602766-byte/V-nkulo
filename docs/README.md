@@ -14,6 +14,7 @@ publicar algo ou entender o que já foi feito.
   publicou o quê, quando e como.
 - [`ESTADO_DO_PROJETO.md`](coordenacao/ESTADO_DO_PROJETO.md) — estado
   técnico e limitações atuais.
+- [`APK_OFFLINE_ARQUITETURA.md`](coordenacao/APK_OFFLINE_ARQUITETURA.md) — arquitetura proposta, matriz de módulos e critérios das etapas do APK offline.
 - [`REFORMA_VISUAL_V5.md`](coordenacao/REFORMA_VISUAL_V5.md) — especificação
   em andamento da reforma de UI/UX.
 
@@ -49,6 +50,9 @@ Documentação funcional de módulos específicos.
 ## `relatorios/`
 
 Relatórios fechados de entregas já publicadas — histórico, não fluxo ativo.
+
+- [`APK_ETAPA_1_2026-09-27.md`](relatorios/APK_ETAPA_1_2026-09-27.md) — diagnóstico sem deploy: origem/assinatura do APK, baseline disponível e limites da homologação Android.
+- [`APK_ETAPA_2_2026-09-27.md`](relatorios/APK_ETAPA_2_2026-09-27.md) — entrada local, contexto cifrado e validação do candidato Android 1.8.0 de homologação.
 
 - [`RELATORIO_IMPLEMENTACAO_MENU_VISITANTES_COMPARTILHAMENTO.md`](relatorios/RELATORIO_IMPLEMENTACAO_MENU_VISITANTES_COMPARTILHAMENTO.md)
 - [`RELATORIO_IMPLEMENTACAO_VINKULO_2026-08-08.md`](relatorios/RELATORIO_IMPLEMENTACAO_VINKULO_2026-08-08.md)

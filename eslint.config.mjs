@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Downloaded CI reports and isolated native checkout are not web source.
+    ".task-tools/**",
   ]),
 ]);
 
