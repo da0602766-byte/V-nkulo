@@ -6,6 +6,7 @@ import { getPlatformBranding } from "../lib/platform-branding";
 import PublicIcon from "./PublicIcon";
 import CloseDetailsOnOutside from "./CloseDetailsOnOutside";
 import CloseDetailsBackdrop from "./CloseDetailsBackdrop";
+import VinkuloMark from "./VinkuloMark";
 
 export default async function PublicHeader({
   editorScreen = "public:geral",
@@ -29,10 +30,10 @@ export default async function PublicHeader({
           href="/"
           aria-label={`${branding.siteName} — início`}
         >
-          <span className="adote-mark" aria-hidden="true">
-            <img loading="lazy" src={branding.logoUrl || "/adote-symbol.svg"} alt="" />
+          <span className="adote-mark public-brand-mark" aria-hidden="true">
+            <VinkuloMark logoUrl={branding.logoUrl} size={40} />
           </span>
-          <span>
+          <span className="public-brand-copy">
             <strong>{branding.siteName}</strong>
             <small>Gestão de comunidades</small>
           </span>

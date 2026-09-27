@@ -3,6 +3,7 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import Link from "./StableLink";
 import ThemeControl from "./ThemeControl";
+import VinkuloMark from "./VinkuloMark";
 import { DEFAULT_LANDING_PLANS, type LandingPlan } from "../lib/platform-plans";
 
 type LandingPageExperienceProps = {
@@ -10,6 +11,8 @@ type LandingPageExperienceProps = {
   panelHref: string;
   canEdit: boolean;
   plans: LandingPlan[];
+  siteName?: string;
+  logoUrl?: string;
 };
 
 
@@ -44,7 +47,7 @@ const FAQS = [
   ["Posso cancelar quando quiser?", "As condições de duração e encerramento constam na proposta apresentada antes da contratação."],
 ] as const;
 
-export default function LandingPageExperience({ signedIn, panelHref, canEdit, plans }: LandingPageExperienceProps) {
+export default function LandingPageExperience({ signedIn, panelHref, canEdit, plans, siteName = "Vínkulo", logoUrl = "" }: LandingPageExperienceProps) {
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
   const [ownerAccessOpen, setOwnerAccessOpen] = useState(false);
   const ownerAccess = useRef<HTMLDivElement>(null);
@@ -74,7 +77,7 @@ export default function LandingPageExperience({ signedIn, panelHref, canEdit, pl
     <main className="vinkulo-site vinkulo-reception vinkulo-landing" data-visual-editor-root data-editor-key="landing-page" aria-label="VÍNKULO — gestão para igrejas e comunidades">
       <nav className="lp-nav" aria-label="Navegação principal">
         <div className="lp-shell lp-nav-inner">
-          <Link className="lp-brand" href="/" aria-label="Vínkulo — início"><VinkuloMark /><span>vínkulo</span></Link>
+          <Link className="lp-brand" href="/" aria-label={`${siteName} — início`}><VinkuloMark logoUrl={logoUrl} size={40} /><span>{siteName}</span></Link>
           <div className="lp-nav-links">
             <a href="#recursos">Recursos</a><a href="#fio-do-dia">Fio do dia</a>{canEdit && <a href="#planos">Planos</a>}<a href="#duvidas">Dúvidas</a>
           </div>
@@ -141,7 +144,7 @@ export default function LandingPageExperience({ signedIn, panelHref, canEdit, pl
 
       <section className="lp-final"><Reveal className="lp-shell"><VinkuloMark light size={62} /><h2>Sua comunidade merece o melhor</h2><p>Encontre o plano adequado e solicite sua comunidade.</p><Link className="lp-button lp-button-white" href={signupHref} showLoading>{signedIn ? "Abrir meu painel →" : "Solicitar minha comunidade →"}</Link></Reveal></section>
 
-      <footer className="lp-footer"><div className="lp-shell"><div className="lp-footer-main"><div><Link className="lp-brand" href="/"><VinkuloMark /><span>vínkulo</span></Link><p>Plataforma de gestão para igrejas e comunidades em português do Brasil.</p></div><nav aria-label="Links institucionais"><Link href="/termos">Termos de uso</Link><Link href="/privacidade">Privacidade</Link><Link href="/contato">Suporte</Link><Link href="/comunidades">Comunidades</Link></nav></div><div className="lp-footer-bottom"><span>© 2026 Vínkulo</span><span>Feito com cuidado para igrejas brasileiras</span></div></div></footer>
+      <footer className="lp-footer"><div className="lp-shell"><div className="lp-footer-main"><div><Link className="lp-brand" href="/" aria-label={`${siteName} — início`}><VinkuloMark logoUrl={logoUrl} size={40} /><span>{siteName}</span></Link><p>Plataforma de gestão para igrejas e comunidades em português do Brasil.</p></div><nav aria-label="Links institucionais"><Link href="/termos">Termos de uso</Link><Link href="/privacidade">Privacidade</Link><Link href="/contato">Suporte</Link><Link href="/comunidades">Comunidades</Link></nav></div><div className="lp-footer-bottom"><span>© 2026 Vínkulo</span><span>Feito com cuidado para igrejas brasileiras</span></div></div></footer>
     </main>
   );
 }
@@ -164,10 +167,6 @@ function Reveal({ children, className = "", delay = 0, direction = "up" }: { chi
 }
 
 function SectionLabel({ children }: { children: ReactNode }) { return <p className="lp-section-label">{children}</p>; }
-
-function VinkuloMark({ light = false, size = 28 }: { light?: boolean; size?: number }) {
-  return <svg className="lp-mark" width={size} height={size} viewBox="0 0 28 28" fill="none" aria-hidden="true"><rect width="28" height="28" rx="8" fill={light ? "#fff" : "currentColor"} /><g stroke={light ? "#2563eb" : "#fff"} strokeWidth="1.7" strokeLinecap="round"><path d="M14 5v7" /><path d="M14 16v7" strokeDasharray="2 2" /><path d="M7 14h4M17 14h4" /></g><circle cx="14" cy="14" r="2.6" fill="#f97316" /><circle cx="6" cy="14" r="1.4" fill={light ? "#2563eb" : "#fff"} /><circle cx="22" cy="14" r="1.4" fill={light ? "#2563eb" : "#fff"} /></svg>;
-}
 
 function FeatureIcon({ name }: { name: string }) {
   const common = { fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };

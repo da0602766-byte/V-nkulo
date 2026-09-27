@@ -3,6 +3,7 @@ import LandingPageExperience from "./components/LandingPageExperience";
 import StableLink from "./components/StableLink";
 import { getSessionUser } from "./lib/local-auth";
 import { getLandingPlans } from "./lib/platform-plans";
+import { getPlatformBranding } from "./lib/platform-branding";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,7 @@ export default async function Home() {
       ? "/painel"
       : "/login";
   const plans = await getLandingPlans();
+  const branding = await getPlatformBranding();
   return <>
     <StableLink className="sr-only" href={panelHref}>Abrir painel</StableLink>
     <LandingPageExperience
@@ -25,6 +27,8 @@ export default async function Home() {
       panelHref={panelHref}
       canEdit={Boolean(user?.system_owner)}
       plans={plans}
+      siteName={branding.siteName}
+      logoUrl={branding.logoUrl}
     />
     <GlobalVisualEditor
       canEdit={Boolean(user?.system_owner)}

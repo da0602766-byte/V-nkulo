@@ -14,3 +14,7 @@
 - A agenda usa calendário mensal, roteiro semanal e lista cronológica, com busca na programação e todas as ações de participação e gestão mantidas.
 - Economia de dados respeita a preferência do navegador. Ajuste de transparência não aparece no menu individual.
 - Etapas do Fio são lidas do JSON persistido antes de validar a ação. Etapas removidas em outra sessão são retiradas e a lista é atualizada.
+- A barra inferior de navegação das páginas públicas foi retirada; busca, tema e conta permanecem no cabeçalho, com alvos de toque separados e marca padronizada com a recepção.
+- O calendário ocupa toda a largura da aba, sem moldura de cartão. Selecionar um dia oferece evento e compromisso com a data preenchida; a criação continua explícita e respeita as permissões.
+- A lista de compromissos do período fica expansível abaixo do calendário. Confirmação, link e compartilhamento dos eventos mantêm rótulos visíveis.
+- Sem uma conversa selecionada, mensagens exibem apenas a lista de contatos. A área da conversa aparece após a seleção, com retorno à lista.

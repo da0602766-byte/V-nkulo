@@ -1,5 +1,4 @@
 import PublicHeader from "../components/PublicHeader";
-import PublicMobileNav from "../components/PublicMobileNav";
 import CommunityDirectoryCarousel from "../components/CommunityDirectoryCarousel";
 import Link from "../components/StableLink";
 import { getPublicCommunities } from "../lib/pilot-data";
@@ -98,7 +97,6 @@ export default async function CommunitiesPage({
         Solicitações são analisadas por responsáveis da comunidade. Nenhum
         acesso é concedido automaticamente.
       </p>
-      <PublicMobileNav active="communities" />
     </main>
   );
 }

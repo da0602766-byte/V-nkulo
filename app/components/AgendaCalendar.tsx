@@ -83,12 +83,14 @@ export default function AgendaCalendar({
   podeVerEventos,
   podeAprovar,
   aoCriarEvento,
+  atualizacao = 0,
 }: {
   podeVerEventos: boolean;
   podeAprovar: boolean;
   // Quem hospeda o calendário decide o que "criar evento" faz; aqui só existe
   // o lugar certo para essa ação morar — junto da navegação de período.
-  aoCriarEvento?: () => void;
+  aoCriarEvento?: (dia?: string) => void;
+  atualizacao?: number;
 }) {
   const [referencia, setReferencia] = useState(() => inicioDoDia(new Date()));
   const [visao, setVisao] = useState<Visao>("mes");
@@ -98,6 +100,7 @@ export default function AgendaCalendar({
   const [erro, setErro] = useState("");
   const [diaAberto, setDiaAberto] = useState<string | null>(null);
   const [formAberto, setFormAberto] = useState(false);
+  const [formDia, setFormDia] = useState("");
   const [salvando, setSalvando] = useState(false);
 
   const dias = useMemo(() => {
@@ -139,7 +142,7 @@ export default function AgendaCalendar({
     // renderizações em cascata. É o mesmo padrão do resto do painel.
     const timer = window.setTimeout(() => void carregar(), 0);
     return () => window.clearTimeout(timer);
-  }, [carregar]);
+  }, [carregar, atualizacao]);
 
   const visiveis = useMemo(
     () => itens.filter((item) => camadasAtivas.includes(item.camada)),
@@ -164,13 +167,27 @@ export default function AgendaCalendar({
   }
 
   function mover(passo: number) {
+    setDiaAberto(null);
     setReferencia((atual) => {
       const proximo = new Date(atual);
-      if (visao === "mes") proximo.setMonth(atual.getMonth() + passo);
+      if (visao === "mes") {
+        proximo.setDate(1);
+        proximo.setMonth(atual.getMonth() + passo);
+      }
       else if (visao === "semana") proximo.setDate(atual.getDate() + passo * 7);
       else proximo.setDate(atual.getDate() + passo);
       return proximo;
     });
+  }
+
+  function abrirCompromisso(dia = chaveDia(referencia)) {
+    setFormDia(dia);
+    setFormAberto(true);
+    window.setTimeout(() => {
+      const form = document.querySelector<HTMLFormElement>(".agenda-form");
+      form?.scrollIntoView({ behavior: "smooth", block: "center" });
+      form?.querySelector<HTMLInputElement>('[name="titulo"]')?.focus({ preventScroll: true });
+    }, 0);
   }
 
   async function criarCompromisso(evento: React.FormEvent<HTMLFormElement>) {
@@ -252,6 +269,7 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
     };
   }, []);
   const itensDoDiaAberto = diaAberto ? porDia.get(diaAberto) || [] : [];
+  const diaSelecionado = visao === "dia" ? chaveDia(referencia) : diaAberto;
 
   const rotuloPeriodo =
     visao === "dia"
@@ -316,14 +334,14 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
           </button>
         ))}
         {aoCriarEvento && (
-          <button type="button" className="agenda-novo-evento" onClick={aoCriarEvento}>
+          <button type="button" className="agenda-novo-evento" onClick={() => aoCriarEvento(diaSelecionado || undefined)}>
             + Novo evento
           </button>
         )}
         <button
           type="button"
           className="agenda-novo"
-          onClick={() => setFormAberto((aberto) => !aberto)}
+          onClick={() => formAberto ? setFormAberto(false) : abrirCompromisso(diaSelecionado || chaveDia(referencia))}
         >
           {formAberto ? "Cancelar" : "Novo compromisso"}
         </button>
@@ -332,11 +350,19 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
       {erro && <p className="agenda-erro" role="alert">{erro}</p>}
 
       <div className="agenda-studio-layout"><div className="agenda-studio-planner">
-      {/* O formulário fica ao lado do calendário, não empurrando-o para baixo:
-          quem está marcando algo precisa continuar vendo os dias ocupados. */}
+      {diaSelecionado && <section className="agenda-day-actions" aria-label="Planejar dia selecionado">
+        <div><small>DIA SELECIONADO</small><strong>{new Date(`${diaSelecionado}T12:00:00`).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}</strong><span>{(porDia.get(diaSelecionado) || []).length ? `${(porDia.get(diaSelecionado) || []).length} compromisso(s) neste dia` : "Que tal planejar um novo encontro?"}</span></div>
+        <div className="agenda-day-buttons">
+          {aoCriarEvento && <button type="button" onClick={() => aoCriarEvento(diaSelecionado)}>Criar evento</button>}
+          <button type="button" onClick={() => abrirCompromisso(diaSelecionado)}>Novo compromisso</button>
+          {visao === "mes" && <button type="button" className="agenda-day-close" aria-label="Fechar dia selecionado" onClick={() => setDiaAberto(null)}>×</button>}
+        </div>
+      </section>}
+      {/* Criar exige confirmação explícita no formulário, com a data escolhida preservada. */}
       <div className={`agenda-corpo${formAberto ? " com-form" : ""}`}>
       {formAberto && (
-        <form className="agenda-form" onSubmit={criarCompromisso}>
+        <form className="agenda-form" key={formDia} onSubmit={criarCompromisso}>
+          <header className="agenda-form-larga"><strong>Novo compromisso</strong><button type="button" onClick={() => setFormAberto(false)} aria-label="Fechar formulário de compromisso">×</button></header>
           <label>
             Título
             <input name="titulo" required maxLength={140} placeholder="Visita à família Silva" />
@@ -351,11 +377,11 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
           </label>
           <label>
             Início
-            <input name="iniciaEm" type="datetime-local" required />
+            <input name="iniciaEm" type="datetime-local" required defaultValue={formDia ? `${formDia}T09:00` : ""} />
           </label>
           <label>
             Término
-            <input name="terminaEm" type="datetime-local" />
+            <input name="terminaEm" type="datetime-local" defaultValue={formDia ? `${formDia}T10:00` : ""} />
           </label>
           <label>
             Quem vê
@@ -443,9 +469,10 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
               <button
                 type="button"
                 key={chave}
-                className={`agenda-dia${doPeriodo ? "" : " fora"}${chave === hojeChave ? " hoje" : ""}`}
+                className={`agenda-dia${doPeriodo ? "" : " fora"}${chave === hojeChave ? " hoje" : ""}${chave === diaAberto ? " selected" : ""}`}
                 onClick={() => setDiaAberto(chave === diaAberto ? null : chave)}
                 aria-label={`${dia.getDate()} — ${doDia.length} compromisso(s)`}
+                aria-pressed={chave === diaAberto}
               >
                 <span className="agenda-dia-numero">{dia.getDate()}</span>
                 <span className="agenda-dia-itens">
@@ -464,7 +491,7 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
         </div>
       )}
 
-      {visao === "mes" && diaAberto && (
+      {visao === "mes" && diaAberto && itensDoDiaAberto.length > 0 && (
         <div className="agenda-detalhe">
           <header>
             <strong>
@@ -505,9 +532,9 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
         </div>
       )}
       </div>
-      </div><aside className="agenda-studio-upcoming"><header><small>NO PERÍODO SELECIONADO</small><h2>Na sua agenda</h2><span>{visiveis.length} compromisso(s)</span></header>
+      </div><details className="agenda-studio-upcoming"><summary><span>Compromissos deste período</span><small>{visiveis.length} compromisso(s)</small><span aria-hidden="true">⌄</span></summary>
       {carregando ? <p role="status">Carregando compromissos…</p> : !visiveis.length ? <div className="agenda-studio-empty"><span aria-hidden="true">♡</span><strong>Tempo para novos encontros</strong><p>Não há compromissos nas categorias selecionadas. Adicione um ou navegue para outro período.</p></div> : <ol>{[...visiveis].sort((a,b) => Date.parse(a.iniciaEm)-Date.parse(b.iniciaEm)).map(item => <li key={item.id}><button type="button" onClick={() => { setReferencia(inicioDoDia(new Date(item.iniciaEm))); setVisao("dia"); }}><time dateTime={item.iniciaEm}><b>{new Date(item.iniciaEm).getDate()}</b><span>{new Date(item.iniciaEm).toLocaleDateString("pt-BR",{month:"short"})}</span></time><div><small>{CAMADAS.find(layer => layer.id === item.camada)?.rotulo}</small><strong>{item.titulo}</strong><span>{item.diaInteiro ? "Dia inteiro" : hora(item.iniciaEm)}{item.local ? ` · ${item.local}` : ""}</span></div><span aria-hidden="true">→</span></button></li>)}</ol>}
-      <a href="/painel?view=fio">Acompanhar o Fio do dia →</a></aside></div>
+      <a href="/painel?view=fio">Acompanhar o Fio do dia →</a></details></div>
     </section>
   );
 }

@@ -58,6 +58,12 @@ const CATEGORY_LABELS: Record<string, string> = {
   OUTRO: "Outro",
 };
 
+function EventActionIcon({ name }: { name: "check" | "link" | "share" }) {
+  return <svg className="event-action-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    {name === "check" ? <path d="m5 12 4 4L19 6" /> : name === "link" ? <><path d="M14 3h7v7m0-7L10 14" /><path d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5" /></> : <><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="m9 10 6-3m-6 7 6 3" /></>}
+  </svg>;
+}
+
 export default function EventsWorkspace({
   permissions,
   communityName,
@@ -70,12 +76,15 @@ export default function EventsWorkspace({
   const [eventSearch, setEventSearch] = useState("");
   const [eventStatus, setEventStatus] = useState("TODOS");
   const [events, setEvents] = useState<CommunityEvent[]>([]);
+  const [agendaRevision, setAgendaRevision] = useState(0);
   const [now] = useState(() => Date.now());
   const [loading, setLoading] = useState(true);
   const [workingId, setWorkingId] = useState<number | "form" | null>(null);
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<CommunityEvent | null>(null);
+  const [newEventDay, setNewEventDay] = useState("");
+  const [newEventDraft, setNewEventDraft] = useState(0);
   const [shareFeedback, setShareFeedback] = useState("");
   const [pollEnabled, setPollEnabled] = useState(false);
   const [pollOptions, setPollOptions] = useState(["", ""]);
@@ -115,6 +124,7 @@ export default function EventsWorkspace({
         throw new Error(result.error || "Não foi possível carregar os eventos.");
       }
       setEvents(result.eventos || []);
+      setAgendaRevision((value) => value + 1);
     } catch (loadError) {
       if (!quiet) setError((loadError as Error).message);
     } finally {
@@ -160,16 +170,15 @@ export default function EventsWorkspace({
     if (!canManage) return;
     const open = () => {
       setEditing(null);
+      setNewEventDay("");
+      setNewEventDraft((value) => value + 1);
       setPollEnabled(false);
       setPollOptions(["", ""]);
-      if (!detailsRef.current) return;
-      detailsRef.current.open = true;
-      window.requestAnimationFrame(() =>
-        detailsRef.current?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        }),
-      );
+      window.requestAnimationFrame(() => {
+        if (!detailsRef.current) return;
+        detailsRef.current.open = true;
+        detailsRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
     };
     window.addEventListener("vinkulo:new-event", open);
     return () => window.removeEventListener("vinkulo:new-event", open);
@@ -406,15 +415,26 @@ export default function EventsWorkspace({
           comunidade, as escalas desta pessoa e os compromissos que ela mesma
           marcou. A lista de gestão de eventos continua abaixo. */}
       <AgendaCalendar
+        atualizacao={agendaRevision}
         podeVerEventos={permissions.includes("events.view")}
         podeAprovar={canManage}
         aoCriarEvento={
           canManage
-            ? () => {
-                const alvo = detailsRef.current;
-                if (!alvo) return;
-                alvo.open = true;
-                alvo.scrollIntoView({ behavior: "smooth", block: "start" });
+            ? (dia) => {
+                setEditing(null);
+                setNewEventDay(dia || "");
+                setNewEventDraft((value) => value + 1);
+                setPollEnabled(false);
+                setPollOptions(["", ""]);
+                setError("");
+                setFeedback("");
+                window.requestAnimationFrame(() => {
+                  const alvo = detailsRef.current;
+                  if (!alvo) return;
+                  alvo.open = true;
+                  alvo.scrollIntoView({ behavior: "smooth", block: "start" });
+                  alvo.querySelector<HTMLInputElement>('[name="titulo"]')?.focus({ preventScroll: true });
+                });
               }
             : undefined
         }
@@ -426,7 +446,7 @@ export default function EventsWorkspace({
         <details
           className="operations-form-card event-form-card"
           ref={detailsRef}
-          key={editing?.id || "new"}
+          key={editing?.id || `new-${newEventDraft}`}
         >
           <summary className="event-form-summary">
             <span aria-hidden="true">＋</span><div><strong>{editing ? `Editar: ${editing.titulo}` : "Novo evento"}</strong><small>Organize os detalhes, a participação e a divulgação.</small></div><i aria-hidden="true">⌄</i>
@@ -460,7 +480,7 @@ export default function EventsWorkspace({
                 name="iniciaEm"
                 type="datetime-local"
                 required
-                defaultValue={toLocalInput(editing?.inicia_em)}
+                defaultValue={editing ? toLocalInput(editing.inicia_em) : newEventDay ? `${newEventDay}T09:00` : ""}
               />
             </label>
             <label>
@@ -468,7 +488,7 @@ export default function EventsWorkspace({
               <input
                 name="terminaEm"
                 type="datetime-local"
-                defaultValue={toLocalInput(editing?.termina_em)}
+                defaultValue={editing ? toLocalInput(editing.termina_em) : newEventDay ? `${newEventDay}T10:00` : ""}
               />
             </label>
             <label>
@@ -740,6 +760,8 @@ export default function EventsWorkspace({
                   <div className="event-actions">
                     {canRsvp && isPublished && (
                       <button
+                        type="button"
+                        className={`event-attendance-action${isConfirmed ? " is-confirmed" : ""}`}
                         disabled={workingId === item.id || (isFull && !isConfirmed)}
                         onClick={() =>
                           void updateConfirmation(
@@ -748,7 +770,7 @@ export default function EventsWorkspace({
                           )
                         }
                       >
-                        <span aria-hidden="true">✓</span><span className="event-action-label">{workingId === item.id
+                        <EventActionIcon name="check" /><span className="event-action-label">{workingId === item.id
                           ? "Atualizando…"
                           : isConfirmed
                             ? "Cancelar presença"
@@ -763,14 +785,14 @@ export default function EventsWorkspace({
                         href={eventUrl(item)}
                         target="_blank"
                         rel="noreferrer"
-                      aria-label="Abrir link próprio" title="Link próprio"><span aria-hidden="true">↗</span><span className="event-action-label">Link próprio</span></a>
+                      aria-label="Abrir link próprio" title="Link próprio"><EventActionIcon name="link" /><span className="event-action-label">Link próprio</span></a>
                     )}
                     {isPublished && (
                       <button
                         type="button"
                         className="event-link-action event-share-action"
                         onClick={() => void shareEvent(item)}
-                      aria-label="Compartilhar inscrição" title="Compartilhar inscrição"><span aria-hidden="true">➤</span><span className="event-action-label">Compartilhar inscrição</span></button>
+                      aria-label="Compartilhar inscrição" title="Compartilhar inscrição"><EventActionIcon name="share" /><span className="event-action-label">Compartilhar inscrição</span></button>
                     )}
                   </div>
                   {item.enquete && isPublished && (

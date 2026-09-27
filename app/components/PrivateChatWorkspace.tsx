@@ -231,6 +231,11 @@ export default function PrivateChatWorkspace({
     setFreshIds([]);
     setPulseIds([]);
     setActiveId(conversationId);
+    if (conversationId === 0) {
+      const address = new URL(window.location.href);
+      address.searchParams.delete("conversation");
+      window.history.replaceState(window.history.state, "", address);
+    }
   }
 
   useEffect(() => {
@@ -490,7 +495,7 @@ export default function PrivateChatWorkspace({
             ))}
           </div>
         </aside>
-        <section className="private-chat-thread" aria-live="polite">
+        {activeId > 0 && <section className="private-chat-thread" aria-live="polite">
           {!workspace ? (
             <p className="private-chat-empty">Carregando conversas…</p>
           ) : !activeConversation ? (
@@ -568,7 +573,7 @@ export default function PrivateChatWorkspace({
               </form>
             </>
           )}
-        </section>
+        </section>}
       </div>
     </section>
   );

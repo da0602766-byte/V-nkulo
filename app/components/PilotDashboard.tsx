@@ -220,6 +220,17 @@ export default function PilotDashboard({
   const communityPalette = getCommunityPalette(communityTheme.paletteId);
   const [view, setView] = useState<View>(initialView as View);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const dashboardRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const dashboard = dashboardRef.current;
+    const header = dashboard?.querySelector<HTMLElement>(".pilot-topbar");
+    if (!dashboard || !header) return;
+    const measure = () => dashboard.style.setProperty("--pilot-header-height", `${header.offsetHeight}px`);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, []);
   const [mobileMenu, setMobileMenu] = useState<
     "menu" | "perfil" | "actions" | "shortcuts" | null
   >(null);
@@ -920,6 +931,7 @@ export default function PilotDashboard({
 
   return (
     <main
+      ref={dashboardRef}
       className="pilot-dashboard"
       data-ui-version="v2"
       data-feed-design={visibleView === "inicio" ? "worship" : undefined}
