@@ -20,6 +20,10 @@ import static org.junit.Assume.assumeTrue;
 @RunWith(AndroidJUnit4.class)
 public class VisitorOutboxTest {
     private final Context context=ApplicationProvider.getApplicationContext();
+    private final class TestDatabase implements AutoCloseable {
+        final OfflineDatabase db;TestDatabase(String name){db=OfflineDatabase.open(context,name);}
+        @Override public void close(){db.close();}
+    }
     private JSONObject payload() throws Exception {return new JSONObject().put("nomeCompleto","Visitante fictício offline").put("telefone","11999991234").put("email","offline@example.test").put("dataEntrada","2026-09-27");}
     private void cookies(String value) throws Exception {
         CountDownLatch done=new CountDownLatch(1);
@@ -33,7 +37,8 @@ public class VisitorOutboxTest {
     @Test public void draftAndQueueAreEncryptedAtomicAndSurviveReopen() throws Exception {
         String database="test-drafts-"+UUID.randomUUID()+".db",scope="scope-a",id;
         try {
-            try(OfflineDatabase db=OfflineDatabase.open(context,database)) {
+            try(TestDatabase handle=new TestDatabase(database)) {
+                OfflineDatabase db=handle.db;
                 VisitorDrafts drafts=new VisitorDrafts(db,new OfflineCipher("test-visitors"));
                 id=drafts.save(scope,"",payload()).getString("id");drafts.enqueue(scope,id);drafts.enqueue(scope,id);
                 assertEquals(1,drafts.list(scope).length());assertEquals("PENDING",drafts.get(scope,id).getString("state"));
@@ -43,7 +48,8 @@ public class VisitorOutboxTest {
                 assertEquals(0,drafts.list("scope-b").length());
                 JSONObject claimed=drafts.claim(scope,1000);assertEquals(id,claimed.getString("id"));assertNull(drafts.claim(scope,1001));
             }
-            try(OfflineDatabase db=OfflineDatabase.open(context,database)) {
+            try(TestDatabase handle=new TestDatabase(database)) {
+                OfflineDatabase db=handle.db;
                 VisitorDrafts drafts=new VisitorDrafts(db,new OfflineCipher("test-visitors"));
                 assertEquals(id,drafts.claim(scope,122000).getString("id"));
                 assertEquals(2,drafts.get(scope,id).getInt("attempts"));
@@ -80,7 +86,8 @@ public class VisitorOutboxTest {
     }
     @Test public void invalidPayloadAndQuotaNeverPretendToSave() throws Exception {
         String database="test-quota-"+UUID.randomUUID()+".db";
-        try(OfflineDatabase db=OfflineDatabase.open(context,database)){
+        try(TestDatabase handle=new TestDatabase(database)){
+            OfflineDatabase db=handle.db;
             VisitorDrafts drafts=new VisitorDrafts(db,new OfflineCipher("test-visitors"));
             try{VisitorDrafts.validate(payload().put("dataEntrada","2026-02-30"));fail();}catch(Exception expected){}
             for(int i=0;i<201;i++)drafts.save("scope","",payload());
