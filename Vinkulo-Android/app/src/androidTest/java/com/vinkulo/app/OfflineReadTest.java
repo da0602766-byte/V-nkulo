@@ -8,9 +8,7 @@ import androidx.test.core.app.ActivityScenario;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
-import androidx.test.uiautomator.By;
 import androidx.test.uiautomator.UiDevice;
-import androidx.test.uiautomator.Until;
 import androidx.webkit.WebViewFeature;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -102,22 +100,17 @@ public class OfflineReadTest {
                 store.install(grant(),binding,System.currentTimeMillis(),SystemClock.elapsedRealtime(),Settings.Global.getInt(context.getContentResolver(),Settings.Global.BOOT_COUNT,-1),10);
             }
             try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
-                if(!device.wait(Until.hasObject(By.text("Aparelho preparado")),15000)) {
-                    OfflineUiEvidence.capture(device,"reader-failure");fail("Missing prepared reader");
-                }
-                scrollTo(device,"Aviso offline de teste");
+                requireReader(scenario,true);
                 OfflineUiEvidence.capture(device,"mural");
-                scrollTo(device,"Agenda");device.findObject(By.text("Agenda")).click();
-                scrollTo(device,"Encontro offline de teste");
+                tapTab(scenario,device,"agenda","Encontro offline de teste");
                 OfflineUiEvidence.capture(device,"agenda");
-                scrollTo(device,"Minhas escalas");device.findObject(By.text("Minhas escalas")).click();
-                scrollTo(device,"Escala offline de teste");
+                tapTab(scenario,device,"escalas","Escala offline de teste");
                 OfflineUiEvidence.capture(device,"escalas");
                 scenario.recreate();
-                requireRecreatedReader(scenario,true);
+                requireReader(scenario,true);
                 OfflineUiEvidence.capture(device,"reader-restored");
                 setCookie("different-session");scenario.recreate();
-                requireRecreatedReader(scenario,false);
+                requireReader(scenario,false);
                 OfflineUiEvidence.capture(device,"reader-cleared");
             }
         } finally {
@@ -131,31 +124,50 @@ public class OfflineReadTest {
                 NativePolicy.ORIGIN,"__Host-adote_session="+value+"; Secure; Path=/; SameSite=Lax",ok->done.countDown()));
         assertTrue(done.await(5,TimeUnit.SECONDS));
     }
-    private void requireRecreatedReader(ActivityScenario<MainActivity> scenario,boolean prepared) throws Exception {
-        long deadline=SystemClock.elapsedRealtime()+15000;
+    private void requireReader(ActivityScenario<MainActivity> scenario,boolean prepared) throws Exception {
         String script="(function(){var r=document.getElementById('reader'),i=document.getElementById('items'),s=document.getElementById('context-title');return location.href==='"+OfflinePolicy.HOME+"'&&document.readyState==='complete'&&!document.hidden&&!!r&&!!i&&!!s&&"+
             (prepared?"!r.hidden&&s.textContent==='Aparelho preparado'&&i.textContent.indexOf('Aviso offline de teste')>=0":"r.hidden&&s.textContent==='Preparação necessária'&&i.textContent===''" )+";})()";
+        requireDom(scenario,script);
+        if(prepared)evaluate(scenario,"document.getElementById('items').scrollIntoView({block:'center'})");
+        awaitDraw(scenario);
+    }
+    // Some emulator WebViews omit their accessibility tree even while rendering correctly.
+    // Locate in the real DOM, then inject a physical tap (not JS click) and assert the result.
+    // This does not replace the pending physical-device TalkBack acceptance test.
+    private void tapTab(ActivityScenario<MainActivity> scenario,UiDevice device,String tab,String title) throws Exception {
+        String id="tab-"+tab;
+        evaluate(scenario,"document.getElementById('"+id+"').scrollIntoView({block:'center'})");
+        awaitDraw(scenario);
+        JSONArray point=new JSONArray(evaluate(scenario,"(function(){var e=document.getElementById('"+id+"'),r=e.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2;return [x,y,window.innerWidth,window.innerHeight,document.elementFromPoint(x,y)===e];})()"));
+        assertTrue("Tab is not hittable",point.getBoolean(4));
+        double x=point.getDouble(0),y=point.getDouble(1),width=point.getDouble(2);
+        assertTrue(x>0&&x<width&&y>0&&y<point.getDouble(3));
+        int[] position=new int[2];int[] viewWidth={0};
+        scenario.onActivity(a->{android.webkit.WebView view=a.findViewById(R.id.webview);view.getLocationOnScreen(position);viewWidth[0]=view.getWidth();});
+        double scale=viewWidth[0]/width;
+        assertTrue(device.click(position[0]+(int)Math.round(x*scale),position[1]+(int)Math.round(y*scale)));
+        requireDom(scenario,"document.getElementById('"+id+"').getAttribute('aria-pressed')==='true'&&document.getElementById('items').textContent.indexOf('"+title+"')>=0");
+        evaluate(scenario,"document.getElementById('items').scrollIntoView({block:'center'})");
+        awaitDraw(scenario);
+    }
+    private String evaluate(ActivityScenario<MainActivity> scenario,String script) throws Exception {
+        CountDownLatch checked=new CountDownLatch(1);String[] result={null};
+        scenario.onActivity(a->((android.webkit.WebView)a.findViewById(R.id.webview)).evaluateJavascript(script,value->{result[0]=value;checked.countDown();}));
+        assertTrue("WebView evaluation timed out",checked.await(5,TimeUnit.SECONDS));return result[0];
+    }
+    private void awaitDraw(ActivityScenario<MainActivity> scenario) throws Exception {
+        CountDownLatch drawn=new CountDownLatch(1);
+        scenario.onActivity(a->{android.webkit.WebView view=a.findViewById(R.id.webview);
+            view.postVisualStateCallback(2,new android.webkit.WebView.VisualStateCallback(){@Override public void onComplete(long id){drawn.countDown();}});
+        });assertTrue("WebView did not draw",drawn.await(5,TimeUnit.SECONDS));
+    }
+    private void requireDom(ActivityScenario<MainActivity> scenario,String script) throws Exception {
+        long deadline=SystemClock.elapsedRealtime()+15000;
         while(SystemClock.elapsedRealtime()<deadline){
-            CountDownLatch checked=new CountDownLatch(1);boolean[] valid={false};
-            scenario.onActivity(a->((android.webkit.WebView)a.findViewById(R.id.webview)).evaluateJavascript(script,value->{valid[0]="true".equals(value);checked.countDown();}));
-            assertTrue(checked.await(3,TimeUnit.SECONDS));
-            if(valid[0]){
-                CountDownLatch drawn=new CountDownLatch(1);
-                scenario.onActivity(a->{android.webkit.WebView view=a.findViewById(R.id.webview);
-                    if(prepared)view.evaluateJavascript("document.getElementById('items').scrollIntoView()",null);
-                    view.postVisualStateCallback(2,new android.webkit.WebView.VisualStateCallback(){@Override public void onComplete(long id){drawn.countDown();}});
-                });assertTrue(drawn.await(5,TimeUnit.SECONDS));return;
-            }SystemClock.sleep(200);
+            if("true".equals(evaluate(scenario,script)))return;
+            SystemClock.sleep(200);
         }
         OfflineUiEvidence.capture(UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()),"reader-failure");
-        fail("Reader DOM did not reach expected state after recreation: "+prepared);
-    }
-    private void scrollTo(UiDevice device,String label) throws Exception {
-        if(device.wait(Until.hasObject(By.text(label)),3000)) return;
-        int x=device.getDisplayWidth()/2, top=device.getDisplayHeight()/3, bottom=device.getDisplayHeight()*4/5;
-        for(int i=0;i<8;i++) {device.swipe(x,bottom,x,top,25);if(device.wait(Until.hasObject(By.text(label)),1000))return;}
-        for(int i=0;i<8;i++) {device.swipe(x,top,x,bottom,25);if(device.wait(Until.hasObject(By.text(label)),1000))return;}
-        OfflineUiEvidence.capture(device,"reader-failure");
-        assertTrue("Missing local reader text: "+label,device.hasObject(By.text(label)));
+        fail("Reader DOM did not reach expected state: "+script);
     }
 }
