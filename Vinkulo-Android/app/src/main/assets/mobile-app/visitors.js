@@ -1,10 +1,10 @@
 (() => {
   const bridge=window.VinkuloVisitors, el=id=>document.getElementById('visitor-'+id);
-  let requestId=0,busy=false,prepared=false,editing='',expiry,lastAction='';
+  let requestId=0,busy=false,prepared=false,editing='',expiry,lastAction='',rowsSignature='';
   const fields=['name','phone','email','date'];
   const labels={DRAFT:'Rascunho: ainda não enviado',PENDING:'Na fila de envio',SENDING:'Enviando: aguardando confirmação',RETRY:'Aguardando nova tentativa',CONFIRMED:'Confirmado',CONFLICT:'Revisão necessária: possível duplicidade',REJECTED:'Recusado: revise o cadastro'};
   function reset(){editing='';fields.forEach(k=>el(k).value='');el('date').value=new Date().toLocaleDateString('sv-SE');}
-  function clear(){prepared=false;window.clearTimeout(expiry);el('workspace').hidden=true;el('rows').textContent='';el('community').textContent='';reset();}
+  function clear(){prepared=false;rowsSignature='';window.clearTimeout(expiry);el('workspace').hidden=true;el('rows').textContent='';el('community').textContent='';reset();}
   function send(action,extra={}) {
     if(!bridge||(busy&&action!=='lock'))return;busy=true;lastAction=action;el('save').disabled=true;el('prepare').disabled=true;
     bridge.postMessage(JSON.stringify({action,requestId:++requestId,...extra}));
@@ -19,6 +19,8 @@
     prepared=true;el('workspace').hidden=false;el('community').textContent=state.communityName;
     if(state.savedId){editing=state.savedId;el('status').textContent='Rascunho salvo no aparelho. Ainda não enviado.';}
     else if(lastAction!=='status')el('status').textContent='Estado local atualizado. Confira o resultado de cada cadastro abaixo.';
+    expiry=window.setTimeout(()=>{clear();el('status').textContent='Autorização vencida. Trabalho salvo preservado; prepare novamente.';send('status');},Math.max(0,Number(state.validForMs)||0));
+    const signature=JSON.stringify(state.rows||[]);if(signature===rowsSignature)return;rowsSignature=signature;
     const container=el('rows');container.textContent='';
     (state.rows||[]).forEach(row=>{
       const article=document.createElement('article');article.className='entry';
@@ -34,7 +36,6 @@
       });
       container.appendChild(article);
     });
-    expiry=window.setTimeout(()=>{clear();el('status').textContent='Autorização vencida. Trabalho salvo preservado; prepare novamente.';send('status');},Math.max(0,Number(state.validForMs)||0));
   }
   if(bridge)bridge.onmessage=event=>{if(document.hidden)return;try{const state=JSON.parse(event.data);if(state.requestId===requestId)render(state);}catch{busy=false;clear();el('status').textContent='Não foi possível ler o estado local.';}};
   else{el('prepare').disabled=true;el('status').textContent='Atualize o Android System WebView para usar os rascunhos protegidos.';}
@@ -44,6 +45,6 @@
   el('sync').addEventListener('click',()=>send('sync'));
   el('lock').addEventListener('click',()=>{clear();send('lock');});
   document.addEventListener('visibilitychange',()=>{clear();busy=false;requestId++;if(!document.hidden)send('status');});
-  window.setInterval(()=>{if(!document.hidden&&!busy)send('status');},5000);
+  window.setInterval(()=>{if(!document.hidden&&!busy)send('status');},15000);
   reset();send('status');
 })();

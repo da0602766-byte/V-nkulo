@@ -11,16 +11,21 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 
 final class OfflineCipher {
+    private static final Object KEY_LOCK = new Object();
     private final String alias;
+    private SecretKey cachedKey;
     OfflineCipher(String alias) { this.alias = alias; }
-    private synchronized SecretKey key() throws Exception {
+    private SecretKey key() throws Exception {
+        synchronized (KEY_LOCK) {
+        if (cachedKey != null) return cachedKey;
         KeyStore store = KeyStore.getInstance("AndroidKeyStore"); store.load(null);
-        if (store.containsAlias(alias)) return (SecretKey) store.getKey(alias, null);
+        if (store.containsAlias(alias)) { cachedKey = (SecretKey) store.getKey(alias, null); return cachedKey; }
         KeyGenerator generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore");
         generator.init(new KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
                 .setBlockModes(KeyProperties.BLOCK_MODE_GCM).setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                 .setKeySize(256).setRandomizedEncryptionRequired(true).build());
-        return generator.generateKey();
+        cachedKey = generator.generateKey(); return cachedKey;
+        }
     }
     byte[] seal(byte[] plaintext, String scope) throws Exception {
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding"); cipher.init(Cipher.ENCRYPT_MODE, key());

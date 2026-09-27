@@ -25,6 +25,17 @@ public class VisitorOutboxTest {
         @Override public void close(){db.close();}
     }
     private JSONObject payload() throws Exception {return new JSONObject().put("nomeCompleto","Visitante fictício offline").put("telefone","11999991234").put("email","offline@example.test").put("dataEntrada","2026-09-27");}
+    @Test public void concurrentReadersAndWriterNeverReplaceEachOthersKeystoreKey() throws Exception {
+        String alias="test-shared-key-"+UUID.randomUUID();java.util.concurrent.ExecutorService workers=java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            CountDownLatch start=new CountDownLatch(1);
+            java.util.concurrent.Future<byte[]> a=workers.submit(()->{start.await();return new OfflineCipher(alias).seal("a".getBytes(java.nio.charset.StandardCharsets.UTF_8),"scope");});
+            java.util.concurrent.Future<byte[]> b=workers.submit(()->{start.await();return new OfflineCipher(alias).seal("b".getBytes(java.nio.charset.StandardCharsets.UTF_8),"scope");});
+            start.countDown();OfflineCipher reopened=new OfflineCipher(alias);
+            assertEquals("a",new String(reopened.open(a.get(10,TimeUnit.SECONDS),"scope"),java.nio.charset.StandardCharsets.UTF_8));
+            assertEquals("b",new String(reopened.open(b.get(10,TimeUnit.SECONDS),"scope"),java.nio.charset.StandardCharsets.UTF_8));
+        }finally{workers.shutdownNow();}
+    }
     private void cookies(String value) throws Exception {
         CountDownLatch done=new CountDownLatch(1);
         InstrumentationRegistry.getInstrumentation().runOnMainSync(()->CookieManager.getInstance().setCookie(NativePolicy.ORIGIN,"__Host-adote_session="+value+"; Path=/; Secure; HttpOnly",ok->done.countDown()));
