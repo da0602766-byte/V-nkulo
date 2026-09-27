@@ -46,7 +46,7 @@ export async function GET(request: Request) {
   // One D1 batch supplies a consistent set. No publishing/notification side effects.
   const queries = [
     db.prepare(`SELECT p.id, substr(p.titulo,1,200) AS titulo,
-      substr(p.conteudo,1,6000) AS texto, p.criado_em AS data,
+      substr(p.conteudo,1,6000) AS texto, strftime('%Y-%m-%dT%H:%M:%fZ',p.criado_em) AS data,
       substr(COALESCE(u.nome,''),1,160) AS autor
       FROM publicacoes_piloto p LEFT JOIN usuarios u ON u.id = p.criado_por
       WHERE p.comunidade_id = ? AND p.canal_feed = 1 AND p.status = 'PUBLICADA'

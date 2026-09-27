@@ -56,6 +56,9 @@ test('mobile read: published text only; community, audience and personal boundar
   assert.equal(body.expiresAt-body.issuedAt,8*3600000);assert.deepEqual(body.capabilities,['shell.open','snapshot.read']);
   const titles=name=>s[name].items.map(x=>x.titulo);
   for(const title of ['Visible','Own ministry']) assert.ok(titles('mural').includes(title));
+  // SQLite's CURRENT_TIMESTAMP is UTC without a suffix. Send an unambiguous
+  // ISO value so Android does not interpret it as the phone's local timezone.
+  for(const item of s.mural.items) assert.match(item.data,/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/);
   for(const title of ['Other tenant','Draft','Sidebar','Private ministry']) assert.ok(!titles('mural').includes(title),title);
   assert.deepEqual(titles('eventos'),['Event']);assert.deepEqual(titles('compromissos'),['Mine']);assert.deepEqual(titles('escalas'),['My assignment']);
   const raw=JSON.stringify(body);assert.doesNotMatch(raw,/share_token|inscritos|email|imagem_url|senha|token_hash|foto_perfil/);
