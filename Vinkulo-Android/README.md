@@ -2,7 +2,34 @@
 
 Aplicativo Android conectado à plataforma oficial do Vínkulo.
 
-Versão estável de distribuição geral: **1.7.1** (`versionCode 10`). Candidato para homologação: **1.9.0** (`versionCode 12`).
+Versão estável de distribuição geral: **1.7.1** (`versionCode 10`). Candidato para homologação: **1.10.0** (`versionCode 13`).
+
+## Rascunhos e fila de visitantes — candidato 1.10.0
+
+Ativação separada e explícita, somente para quem pode cadastrar visitantes. Nome,
+telefone/e-mail opcionais e data de entrada; detalhes adicionais ficam online.
+Salvar confirma persistência cifrada no Room/schema 2; colocar na fila é outra
+ação explícita. Campos ainda não salvos são limpos ao ocultar a tela.
+
+- Um registro cifrado contém payload, UUID e estado, sem uma segunda gravação
+  para criar a intenção de envio. Limite de 200 registros operacionais; não
+  apagar automaticamente pendências ou permitir descartar resultado incerto.
+- `POST /api/mobile/write-bootstrap` autoriza `visitor.create` por até 8h.
+  Token restrito cifrado nativamente, vinculado a sessão/comunidade/instalação;
+  `POST /api/mobile/visitors` exige token e sessão própria ainda autorizada.
+  Credenciais nunca chegam ao JavaScript. Não é atestado de hardware.
+- WorkManager com rede, backoff/jitter e respeito a Retry-After. Recibo/UUID
+  impede duplicação após resposta perdida; conflito exige revisão online.
+  Worker atrasado não sobrescreve resultado de uma reserva mais recente.
+- Sair/bloquear/expirar preserva trabalho e impede novas operações. Preparar
+  novamente com a mesma conta/comunidade recupera as pendências. Uma requisição
+  já aceita pelo servidor não pode ser desfeita pelo logout.
+- Leituras de status locais em primeiro plano; listas inalteradas não são
+  redesenhadas. Criação da chave Keystore serializada entre leitor e worker.
+
+Testes sintéticos não substituem homologação física autenticada de modo avião,
+morte do processo, bateria do fabricante, TalkBack, OAuth e notificações. Não
+desinstalar ou fazer downgrade de um aparelho com trabalho pendente.
 
 ## Consultas offline — candidato 1.9.0
 

@@ -114,10 +114,11 @@ public class OfflineReadTest {
                 scrollTo(device,"Escala offline de teste");
                 OfflineUiEvidence.capture(device,"escalas");
                 scenario.recreate();
-                scrollTo(device,"Aviso offline de teste");
+                requireRecreatedReader(scenario,true);
+                OfflineUiEvidence.capture(device,"reader-restored");
                 setCookie("different-session");scenario.recreate();
-                assertTrue(device.wait(Until.hasObject(By.text("Preparação necessária")),15000));
-                assertFalse(device.hasObject(By.text("Aviso offline de teste")));
+                requireRecreatedReader(scenario,false);
+                OfflineUiEvidence.capture(device,"reader-cleared");
             }
         } finally {
             try(OfflineStore store=new OfflineStore(OfflineDatabase.open(context,"vinkulo-offline.db"),new OfflineCipher("vinkulo-offline-v1"))) {store.lock();}
@@ -129,6 +130,25 @@ public class OfflineReadTest {
         InstrumentationRegistry.getInstrumentation().runOnMainSync(()->CookieManager.getInstance().setCookie(
                 NativePolicy.ORIGIN,"__Host-adote_session="+value+"; Secure; Path=/; SameSite=Lax",ok->done.countDown()));
         assertTrue(done.await(5,TimeUnit.SECONDS));
+    }
+    private void requireRecreatedReader(ActivityScenario<MainActivity> scenario,boolean prepared) throws Exception {
+        long deadline=SystemClock.elapsedRealtime()+15000;
+        String script="(function(){var r=document.getElementById('reader'),i=document.getElementById('items'),s=document.getElementById('context-title');return location.href==='"+OfflinePolicy.HOME+"'&&document.readyState==='complete'&&!document.hidden&&!!r&&!!i&&!!s&&"+
+            (prepared?"!r.hidden&&s.textContent==='Aparelho preparado'&&i.textContent.indexOf('Aviso offline de teste')>=0":"r.hidden&&s.textContent==='Preparação necessária'&&i.textContent===''" )+";})()";
+        while(SystemClock.elapsedRealtime()<deadline){
+            CountDownLatch checked=new CountDownLatch(1);boolean[] valid={false};
+            scenario.onActivity(a->((android.webkit.WebView)a.findViewById(R.id.webview)).evaluateJavascript(script,value->{valid[0]="true".equals(value);checked.countDown();}));
+            assertTrue(checked.await(3,TimeUnit.SECONDS));
+            if(valid[0]){
+                CountDownLatch drawn=new CountDownLatch(1);
+                scenario.onActivity(a->{android.webkit.WebView view=a.findViewById(R.id.webview);
+                    if(prepared)view.evaluateJavascript("document.getElementById('items').scrollIntoView()",null);
+                    view.postVisualStateCallback(2,new android.webkit.WebView.VisualStateCallback(){@Override public void onComplete(long id){drawn.countDown();}});
+                });assertTrue(drawn.await(5,TimeUnit.SECONDS));return;
+            }SystemClock.sleep(200);
+        }
+        OfflineUiEvidence.capture(UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()),"reader-failure");
+        fail("Reader DOM did not reach expected state after recreation: "+prepared);
     }
     private void scrollTo(UiDevice device,String label) throws Exception {
         if(device.wait(Until.hasObject(By.text(label)),3000)) return;

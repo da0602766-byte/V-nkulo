@@ -122,6 +122,8 @@ public class VisitorOutboxTest {
             boolean saved=false;deadline=android.os.SystemClock.elapsedRealtime()+8000;
             while(android.os.SystemClock.elapsedRealtime()<deadline){try(VisitorAccess access=new VisitorAccess(context)){synchronized(VisitorDrafts.MUTEX){if(access.drafts.list(scope).length()==1){saved=true;break;}}}android.os.SystemClock.sleep(200);}assertTrue(saved);
             android.os.SystemClock.sleep(1000);OfflineUiEvidence.capture(device,"visitors");
+            scenario.onActivity(a->((android.webkit.WebView)a.findViewById(com.vinkulo.app.R.id.webview)).evaluateJavascript("document.getElementById('visitor-rows').scrollIntoView()",null));
+            android.os.SystemClock.sleep(500);OfflineUiEvidence.capture(device,"visitors-draft");
             scenario.recreate();android.os.SystemClock.sleep(1500);
             try(VisitorAccess access=new VisitorAccess(context)){assertEquals("DRAFT",access.drafts.list(scope).getJSONObject(0).getString("state"));}
         }finally{try(VisitorAccess access=new VisitorAccess(context)){for(int i=0;i<access.drafts.list(scope).length();i++){String id=access.drafts.list(scope).getJSONObject(i).getString("id");access.drafts.discard(scope,id);}}VisitorAccess.lock(context);}
