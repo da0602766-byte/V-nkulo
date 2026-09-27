@@ -134,7 +134,9 @@ public class OfflineReadTest {
         // The test runner uninstalls the disposable app after tests. Preserve
         // only synthetic QA screenshots outside its deleted app directory.
         device.executeShellCommand("screencap -p /sdcard/vinkulo-reader-"+section+".png");
-        device.executeShellCommand("uiautomator dump /sdcard/vinkulo-reader-"+section+".xml");
+        File hierarchy=new File(context.getExternalFilesDir(null),"reader-"+section+".xml");
+        device.dumpWindowHierarchy(hierarchy);
+        device.executeShellCommand("cp "+hierarchy.getAbsolutePath()+" /sdcard/vinkulo-reader-"+section+".xml");
     }
     private void scrollTo(UiDevice device,String label) throws Exception {
         if(device.wait(Until.hasObject(By.text(label)),3000)) return;
