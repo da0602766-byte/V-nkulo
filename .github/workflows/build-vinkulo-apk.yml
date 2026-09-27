@@ -14,6 +14,10 @@ permissions:
 jobs:
   apk:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [29, 35]
     defaults:
       run:
         working-directory: Vinkulo-Android
@@ -56,13 +60,13 @@ jobs:
           sha256sum app/build/outputs/apk/release/app-release.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: Vinkulo-Android-1.8.0-homologacao
+          name: Vinkulo-Android-1.8.0-homologacao-api${{ matrix.api }}
           path: Vinkulo-Android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: Vinkulo-Android-1.8.0-validacao
+          name: Vinkulo-Android-1.8.0-validacao-api${{ matrix.api }}
           path: |
             Vinkulo-Android/app/build/reports/
             Vinkulo-Android/app/build/test-results/
@@ -76,7 +80,7 @@ jobs:
       - name: Validar atualização assinada e base offline no emulador
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 29
+          api-level: ${{ matrix.api }}
           arch: x86_64
           target: default
           disable-animations: true
@@ -101,7 +105,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: Vinkulo-Android-1.8.0-emulador
+          name: Vinkulo-Android-1.8.0-emulador-api${{ matrix.api }}
           path: |
             Vinkulo-Android/app/build/reports/androidTests/
             Vinkulo-Android/app/build/outputs/androidTest-results/

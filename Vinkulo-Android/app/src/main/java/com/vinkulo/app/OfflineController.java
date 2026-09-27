@@ -1,6 +1,8 @@
 package com.vinkulo.app;
 
 import android.app.Activity;
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.SystemClock;
 import android.provider.Settings;
 import android.webkit.CookieManager;
@@ -19,6 +21,7 @@ import javax.net.ssl.HttpsURLConnection;
 final class OfflineController {
     private final Activity activity;
     private final Runnable changed;
+    private final SharedPreferences barriers;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final AtomicLong generation = new AtomicLong();
     private OfflineStore store;
@@ -26,7 +29,11 @@ final class OfflineController {
     private volatile String result = "idle";
     private long lastAttempt;
 
-    OfflineController(Activity activity, Runnable changed) { this.activity = activity; this.changed = changed; }
+    OfflineController(Activity activity, Runnable changed) {
+        this.activity = activity; this.changed = changed;
+        barriers = activity.getSharedPreferences("offline-lock", Context.MODE_PRIVATE);
+        blocked = barriers.getBoolean("locked", false);
+    }
     private OfflineStore store() {
         if (store == null) store = new OfflineStore(OfflineDatabase.open(activity, "vinkulo-offline.db"), new OfflineCipher("vinkulo-offline-v1"));
         return store;
@@ -37,6 +44,8 @@ final class OfflineController {
 
     void lock() {
         blocked = true; generation.incrementAndGet(); result = "locked";
+        // Persist the barrier before queued database work, including process death.
+        if (!barriers.edit().putBoolean("locked", true).commit()) result = "storage-error";
         if (closed) return;
         executor.execute(() -> { try { store().lock(); } catch (Exception ignored) { result = "storage-error"; } notifyChanged(); });
     }
@@ -51,7 +60,8 @@ final class OfflineController {
                 JSONObject saved = blocked ? null : store().read(requestedBinding, System.currentTimeMillis(), SystemClock.elapsedRealtime(), boot());
                 state.put("prepared", saved != null).put("result", result).put("refreshing", refreshing);
                 if (saved != null) state.put("communityName", saved.getString("communityName"))
-                        .put("preparedAt", saved.getLong("serverIssuedAt"));
+                        .put("preparedAt", saved.getLong("serverIssuedAt"))
+                        .put("validForMs", Math.max(0, saved.getLong("duration") - (SystemClock.elapsedRealtime() - saved.getLong("elapsed"))));
             } catch (Exception ignored) {
                 blocked = true;
                 try { state.put("prepared", false).put("result", "storage-error"); } catch (Exception impossible) { }
@@ -85,7 +95,9 @@ final class OfflineController {
                 connection.setRequestProperty("X-Vinkulo-Client", "android-foundation-1");
                 int status = connection.getResponseCode();
                 if (status == 401 || status == 403) {
-                    if (generation.get() == ticket) { blocked = true; store().lock(); result = "locked"; }
+                    if (generation.get() == ticket) {
+                        blocked = true; barriers.edit().putBoolean("locked", true).commit(); store().lock(); result = "locked";
+                    }
                     return;
                 }
                 if (status != 200 || !String.valueOf(connection.getContentType()).startsWith("application/json")) throw new java.io.IOException("Unavailable");
@@ -102,7 +114,10 @@ final class OfflineController {
                 if (generation.get() != ticket || !requestedBinding.equals(binding())) return;
                 store().install(grant, requestedBinding, System.currentTimeMillis(), SystemClock.elapsedRealtime(), boot(), SystemClock.elapsedRealtime() - started);
                 activity.runOnUiThread(() -> {
-                    if (!closed && generation.get() == ticket && requestedBinding.equals(binding())) { blocked = false; result = "ready"; notifyChanged(); }
+                    if (!closed && generation.get() == ticket && requestedBinding.equals(binding())) {
+                        blocked = !barriers.edit().putBoolean("locked", false).commit();
+                        result = blocked ? "storage-error" : "ready"; notifyChanged();
+                    }
                 });
             } catch (Exception ignored) {
                 if (generation.get() == ticket) result = "unavailable";

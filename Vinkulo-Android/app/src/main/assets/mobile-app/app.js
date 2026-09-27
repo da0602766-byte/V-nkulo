@@ -2,8 +2,10 @@
   const byId = id => document.getElementById(id);
   const bridge = window.VinkuloOffline;
   let waiting = false;
+  let expiryTimer;
   const send = action => { if (bridge) bridge.postMessage(JSON.stringify({ action })); };
   function render(state) {
+    window.clearTimeout(expiryTimer);
     waiting = !!state.refreshing;
     byId('prepare').disabled = waiting;
     byId('context-title').textContent = state.prepared ? 'Aparelho preparado' : 'Preparação necessária';
@@ -20,11 +22,12 @@
     byId('community').textContent = state.prepared ? state.communityName : '';
     byId('prepared-at').textContent = state.prepared ? `Preparado em ${new Date(state.preparedAt).toLocaleString('pt-BR')}` : '';
     byId('lock').hidden = !state.prepared;
+    if (state.prepared) expiryTimer = window.setTimeout(() => { render({result:'locked'}); send('status'); }, Math.max(0, Number(state.validForMs) || 0));
   }
   function connection() {
     byId('connection').textContent = navigator.onLine ? 'Os recursos online dependem de conexão com o servidor.' : 'Sem conexão. Esta tela continua disponível.';
   }
-  if (bridge) bridge.onmessage = event => { try { render(JSON.parse(event.data)); } catch { render({result:'storage-error'}); } };
+  if (bridge) bridge.onmessage = event => { try { render(JSON.parse(event.data)); } catch (error) { render({result:'storage-error'}); } };
   else {
     byId('context-title').textContent = 'Atualize o Android System WebView';
     byId('context-detail').textContent = 'A preparação protegida precisa de uma versão compatível do WebView. Você pode continuar no sistema online.';
@@ -34,9 +37,9 @@
   byId('prepare').addEventListener('click', () => { if (waiting) return; waiting = true; byId('prepare').disabled = true; send('refresh'); });
   byId('lock').addEventListener('click', () => { render({result:'locked'}); send('lock'); });
   window.addEventListener('vinkulo:offline-status', () => send('status'));
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) send('status'); });
+  document.addEventListener('visibilitychange', () => { render({result:'locked'}); if (!document.hidden) send('status'); });
   window.addEventListener('online', connection); window.addEventListener('offline', connection);
   // Periodic expiry check is foreground-only; no operational sync in this stage.
-  window.setInterval(() => { if (!document.hidden) send('status'); }, 30_000);
+  window.setInterval(() => { if (!document.hidden) send('status'); }, 30000);
   connection(); send('status');
 })();

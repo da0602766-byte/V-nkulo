@@ -10,6 +10,7 @@ import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.uiautomator.By;
 import androidx.test.uiautomator.UiDevice;
 import androidx.test.uiautomator.Until;
+import androidx.webkit.WebViewFeature;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.Test;
@@ -98,9 +99,13 @@ public class OfflineFoundationTest {
         UiDevice device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
         try (ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
             assertTrue(device.wait(Until.hasObject(By.text("Seu Vínkulo começa aqui.")),15000));
-            assertTrue(device.wait(Until.hasObject(By.text("Preparação necessária")),15000));
+            boolean supportsBridge = WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER);
+            if (android.os.Build.VERSION.SDK_INT >= 35) assertTrue("Modern WebView must exercise the bridge", supportsBridge);
+            String expected = supportsBridge ? "Preparação necessária" : "Atualize o Android System WebView";
+            assertTrue("Local JavaScript must render a usable state", device.wait(Until.hasObject(By.text(expected)),15000));
             scenario.recreate();
             assertTrue(device.wait(Until.hasObject(By.text("Seu Vínkulo começa aqui.")),15000));
+            assertTrue(device.wait(Until.hasObject(By.text(expected)),15000));
         }
     }
 }
