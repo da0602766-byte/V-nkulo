@@ -45,6 +45,7 @@ final class VisitorAccess implements AutoCloseable {
         grant.put("scope","visitors:"+OfflinePolicy.digest(grant.getLong("accountId")+":"+grant.getLong("communityId")))
             .put("binding",expectedBinding).put("wall",System.currentTimeMillis()).put("elapsed",SystemClock.elapsedRealtime()).put("boot",boot()).put("duration",duration);
         drafts.put("write-config","grant",grant);
+        drafts.resume(grant.getString("scope"));
         if(!preferences.edit().putBoolean("locked",false).commit())throw new IllegalStateException("Não foi possível ativar.");
     }
     @Override public void close(){database.close();}

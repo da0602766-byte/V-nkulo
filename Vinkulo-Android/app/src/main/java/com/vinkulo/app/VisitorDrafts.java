@@ -70,12 +70,27 @@ final class VisitorDrafts {
         for(OfflineDatabase.RecordRow stored:db.storage().list(scope)) {
             JSONObject row=get(scope,stored.recordId);String state=row.getString("state");
             if((state.equals("PENDING")||state.equals("RETRY")||(state.equals("SENDING")&&row.optLong("leaseUntil")<=now)) && row.optLong("nextAttemptAt")<=now) {
-                row.put("state","SENDING").put("leaseUntil",now+120000).put("attempts",row.optInt("attempts")+1);
+                row.put("state","SENDING").put("leaseId",UUID.randomUUID().toString()).put("leaseUntil",now+120000).put("attempts",row.optInt("attempts")+1);
                 put(scope,stored.recordId,row);return row;
             }
         }return null;
     }
     boolean pending(String scope) throws Exception {
         JSONArray rows=list(scope);for(int i=0;i<rows.length();i++)if(java.util.Arrays.asList("PENDING","RETRY","SENDING").contains(rows.getJSONObject(i).getString("state")))return true;return false;
+    }
+    boolean finish(String scope,JSONObject row) throws Exception {
+        JSONObject current=get(scope,row.getString("id"));
+        if(current==null||!"SENDING".equals(current.optString("state"))||!current.optString("leaseId").equals(row.optString("leaseId")))return false;
+        put(scope,row.getString("id"),row);return true;
+    }
+    void resume(String scope) throws Exception {
+        // Reauthorization also recovers leases/retry deadlines after a reboot or
+        // wall-clock change. A late worker may only finish its own lease.
+        for(OfflineDatabase.RecordRow stored:db.storage().list(scope)) {
+            JSONObject row=get(scope,stored.recordId);String state=row.getString("state");
+            if(state.equals("SENDING")||state.equals("RETRY")) {
+                row.put("state","PENDING").put("leaseId","").put("leaseUntil",0).put("nextAttemptAt",0);put(scope,stored.recordId,row);
+            }
+        }
     }
 }

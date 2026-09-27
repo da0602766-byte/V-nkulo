@@ -47,6 +47,11 @@ public class VisitorOutboxTest {
                 VisitorDrafts drafts=new VisitorDrafts(db,new OfflineCipher("test-visitors"));
                 assertEquals(id,drafts.claim(scope,122000).getString("id"));
                 assertEquals(2,drafts.get(scope,id).getInt("attempts"));
+                JSONObject stale=drafts.get(scope,id);drafts.resume(scope);
+                JSONObject fresh=drafts.claim(scope,122001);assertNotEquals(stale.getString("leaseId"),fresh.getString("leaseId"));
+                assertTrue(drafts.finish(scope,fresh.put("state","CONFIRMED").put("visitorId",90)));
+                assertFalse(drafts.finish(scope,stale.put("state","RETRY")));
+                assertEquals("CONFIRMED",drafts.get(scope,id).getString("state"));
                 db.storage().lock();assertNotNull(drafts.get(scope,id));
             }
         } finally{context.deleteDatabase(database);}

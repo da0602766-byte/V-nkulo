@@ -45,7 +45,9 @@ public final class VisitorSyncWorker extends Worker {
                 }catch(Exception ignored){/* Never log payloads, contacts, cookies or tokens. */}
                 synchronized(VisitorDrafts.MUTEX){row.put("state",state).put("message",message).put("leaseUntil",0)
                     .put("nextAttemptAt",state.equals("RETRY")&&!pause?System.currentTimeMillis()+Math.max(30000,retryAfter)+java.util.concurrent.ThreadLocalRandom.current().nextLong(1000,5000):0);
-                    if(visitorId>0)row.put("visitorId",visitorId);access.drafts.put(scope,row.getString("id"),row);if(pause)access.preferences.edit().putBoolean("locked",true).commit();}
+                    if(visitorId>0)row.put("visitorId",visitorId);access.drafts.finish(scope,row);
+                    JSONObject current=access.drafts.get("write-config","grant");
+                    if(pause&&current!=null&&grant.getString("token").equals(current.optString("token")))access.preferences.edit().putBoolean("locked",true).commit();}
                 if(pause)return Result.success();if(state.equals("RETRY"))return Result.retry();
             }
             return stopped.getAsBoolean()?Result.success():Result.retry();
