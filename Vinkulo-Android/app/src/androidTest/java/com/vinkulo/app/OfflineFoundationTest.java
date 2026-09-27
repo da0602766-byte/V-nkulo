@@ -108,15 +108,16 @@ public class OfflineFoundationTest {
             assertTrue("Local JavaScript must render a usable state", device.wait(Until.hasObject(By.text(expected)),15000));
             if (!supportsBridge) assertTrue(device.hasObject(By.clazz("android.widget.Button").text("ATUALIZAR WEBVIEW"))
                     || device.hasObject(By.clazz("android.widget.Button").text("Atualizar WebView")));
-            scenario.recreate();
-            requireVisible(device,"Seu Vínkulo começa aqui.");
-            requireVisible(device,expected);
+            for(int repeat=0;repeat<5;repeat++) {
+                scenario.recreate();
+                requireVisible(device,"Seu Vínkulo começa aqui.");
+                requireVisible(device,expected);
+            }
         }
     }
     private void requireVisible(UiDevice device,String text) throws Exception {
         if(device.wait(Until.hasObject(By.text(text)),15000)) return;
-        device.takeScreenshot(new java.io.File(context.getExternalFilesDir(null),"foundation-failure.png"));
-        device.dumpWindowHierarchy(new java.io.File(context.getExternalFilesDir(null),"foundation-failure.xml"));
+        OfflineUiEvidence.capture(device,"foundation-failure");
         fail("Missing local screen: "+text);
     }
 }

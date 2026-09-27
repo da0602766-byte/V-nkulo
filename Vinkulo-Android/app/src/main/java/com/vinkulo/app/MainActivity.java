@@ -72,6 +72,9 @@ public class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
         applySafeSystemInsets();
         webView = findViewById(R.id.webview);
+        // Navigation is restored explicitly below, not again by View hierarchy
+        // restoration after onCreate (which can replace the new local document).
+        webView.setSaveEnabled(false);
         offlineAssets = new OfflineAssets(getApplicationContext());
         offline = new OfflineController(this, () -> {
             if (webView != null && OfflinePolicy.localPage(webView.getUrl())) {
@@ -183,7 +186,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (webView != null) { webView.resumeTimers(); webView.onResume(); dispatchNotificationRefresh(); }
+        if (webView != null) { webView.onResume(); dispatchNotificationRefresh(); }
     }
 
     @Override
@@ -193,10 +196,9 @@ public class MainActivity extends Activity {
         super.onPause();
     }
 
-    @Override protected void onStop() {
-        if (webView != null) webView.pauseTimers();
-        super.onStop();
-    }
+    // pauseTimers is process-global and pauses parsing/layout of replacement
+    // WebViews too. Use per-view lifecycle and foreground-only JS polling,
+    // avoiding a global pause during Activity recreation/destruction.
 
     @Override protected void onDestroy() {
         if (offline != null) offline.close();

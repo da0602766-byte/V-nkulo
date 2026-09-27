@@ -16,7 +16,6 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import java.io.File;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -103,15 +102,17 @@ public class OfflineReadTest {
                 store.install(grant(),binding,System.currentTimeMillis(),SystemClock.elapsedRealtime(),Settings.Global.getInt(context.getContentResolver(),Settings.Global.BOOT_COUNT,-1),10);
             }
             try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
-                assertTrue(device.wait(Until.hasObject(By.text("Aparelho preparado")),15000));
+                if(!device.wait(Until.hasObject(By.text("Aparelho preparado")),15000)) {
+                    OfflineUiEvidence.capture(device,"reader-failure");fail("Missing prepared reader");
+                }
                 scrollTo(device,"Aviso offline de teste");
-                capture(device,"mural");
+                OfflineUiEvidence.capture(device,"mural");
                 scrollTo(device,"Agenda");device.findObject(By.text("Agenda")).click();
                 scrollTo(device,"Encontro offline de teste");
-                capture(device,"agenda");
+                OfflineUiEvidence.capture(device,"agenda");
                 scrollTo(device,"Minhas escalas");device.findObject(By.text("Minhas escalas")).click();
                 scrollTo(device,"Escala offline de teste");
-                capture(device,"escalas");
+                OfflineUiEvidence.capture(device,"escalas");
                 scenario.recreate();
                 scrollTo(device,"Aviso offline de teste");
                 setCookie("different-session");scenario.recreate();
@@ -129,22 +130,12 @@ public class OfflineReadTest {
                 NativePolicy.ORIGIN,"__Host-adote_session="+value+"; Secure; Path=/; SameSite=Lax",ok->done.countDown()));
         assertTrue(done.await(5,TimeUnit.SECONDS));
     }
-    private void capture(UiDevice device,String section) throws Exception {
-        device.waitForIdle(); SystemClock.sleep(1500);
-        // The test runner uninstalls the disposable app after tests. Preserve
-        // only synthetic QA screenshots outside its deleted app directory.
-        device.executeShellCommand("screencap -p /sdcard/vinkulo-reader-"+section+".png");
-        File hierarchy=new File(context.getExternalFilesDir(null),"reader-"+section+".xml");
-        device.dumpWindowHierarchy(hierarchy);
-        device.executeShellCommand("cp "+hierarchy.getAbsolutePath()+" /sdcard/vinkulo-reader-"+section+".xml");
-    }
     private void scrollTo(UiDevice device,String label) throws Exception {
         if(device.wait(Until.hasObject(By.text(label)),3000)) return;
         int x=device.getDisplayWidth()/2, top=device.getDisplayHeight()/3, bottom=device.getDisplayHeight()*4/5;
         for(int i=0;i<8;i++) {device.swipe(x,bottom,x,top,25);if(device.wait(Until.hasObject(By.text(label)),1000))return;}
         for(int i=0;i<8;i++) {device.swipe(x,top,x,bottom,25);if(device.wait(Until.hasObject(By.text(label)),1000))return;}
-        device.takeScreenshot(new File(context.getExternalFilesDir(null),"reader-failure.png"));
-        device.dumpWindowHierarchy(new File(context.getExternalFilesDir(null),"reader-failure.xml"));
+        OfflineUiEvidence.capture(device,"reader-failure");
         assertTrue("Missing local reader text: "+label,device.hasObject(By.text(label)));
     }
 }
