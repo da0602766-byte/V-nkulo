@@ -20,8 +20,11 @@ final class VisitorDrafts {
         return row==null?null:new JSONObject(new String(cipher.open(row.sealed,aad(scope,id)),StandardCharsets.UTF_8));
     }
     void put(String scope,String id,JSONObject value) throws Exception {
+        putBounded(scope,id,value,8192);
+    }
+    void putBounded(String scope,String id,JSONObject value,int limit) throws Exception {
         byte[] bytes=value.toString().getBytes(StandardCharsets.UTF_8);
-        if(bytes.length>8192) throw new IllegalArgumentException("Limite do registro excedido.");
+        if(bytes.length>limit) throw new IllegalArgumentException("Limite do registro excedido.");
         if(db.storage().get(scope,id)==null && db.storage().recordCount()>=201) throw new IllegalStateException("Limite local atingido. Remova rascunhos ou recibos já conferidos.");
         OfflineDatabase.RecordRow row=new OfflineDatabase.RecordRow();row.scope=scope;row.recordId=id;row.sealed=cipher.seal(bytes,aad(scope,id));db.storage().put(row);
     }

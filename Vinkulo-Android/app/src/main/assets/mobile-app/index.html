@@ -5,6 +5,7 @@
   <meta name="color-scheme" content="light dark"><title>Vínkulo no aparelho</title>
   <link rel="stylesheet" href="/mobile-app/app.css"><script src="/mobile-app/app.js" defer></script>
   <script src="/mobile-app/visitors.js" defer></script>
+  <script src="/mobile-app/modules.js" defer></script>
 </head>
 <body>
 <main>
@@ -60,7 +61,27 @@
       <button id="visitor-lock" type="button" class="quiet">Bloquear cadastros locais sem apagar</button>
     </div>
   </section>
-  <button id="lock" class="quiet" type="button">Desativar e apagar consultas locais</button>
+  <section class="next" aria-labelledby="module-title">
+    <h2 id="module-title">Trabalhar por módulo</h2>
+    <label for="module-kind">Escolha o módulo</label>
+    <select id="module-kind"><option value="requests">Pedidos</option><option value="notes">Minhas anotações</option><option value="followups">Meus acompanhamentos</option><option value="checklists">Ministérios, equipes e checklists</option><option value="cells">Minhas células</option><option value="parking">Estacionamento</option></select>
+    <p id="module-help" class="footnote"></p>
+    <button id="module-prepare" class="secondary" type="button">Preparar / atualizar este módulo</button>
+    <p class="footnote">Somente este módulo será preparado, por até 8 horas. Até 50 registros autorizados, sem mídias. Rascunhos são cifrados. Salvar não envia: cada envio exige confirmação. Limite compartilhado de 201 registros locais.</p>
+    <p id="module-status" role="status" aria-live="polite"></p>
+    <div id="module-workspace" hidden>
+      <p id="module-community"></p><p id="module-updated" class="muted"></p>
+      <details><summary>Consultar última cópia salva</summary><div id="module-items"></div></details>
+      <h3>Rascunho</h3><div id="module-fields"></div>
+      <button id="module-save" class="primary" type="button">Salvar rascunho no aparelho</button>
+      <button id="module-new" class="quiet" type="button">Limpar formulário / novo rascunho</button>
+      <button id="module-sync" class="secondary" type="button">Tentar enviar pendências deste módulo</button>
+      <p class="footnote">Salve antes de sair. Em caso de conflito, confira online antes de refazer; não há sobrescrita automática. Textos limitados a 3.500 bytes por rascunho.</p>
+      <div id="module-rows"></div>
+    </div>
+    <button id="module-lock" class="quiet" type="button">Bloquear todos os módulos sem apagar rascunhos</button>
+  </section>
+  <button id="lock" class="quiet" type="button">Desativar e apagar consultas de mural, agenda, escalas e pedidos</button>
   <p class="footnote">O bloqueio local não encerra a sessão online. Para sair da conta, use Sair dentro do sistema.</p>
 </main>
 </body></html>

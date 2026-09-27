@@ -20,6 +20,7 @@ final class OfflineAssets {
                         case "index.html": mime = "text/html"; break;
                         case "app.js": mime = "application/javascript"; break;
                         case "visitors.js": mime = "application/javascript"; break;
+                        case "modules.js": mime = "application/javascript"; break;
                         case "app.css": mime = "text/css"; break;
                         default: return missing();
                     }
