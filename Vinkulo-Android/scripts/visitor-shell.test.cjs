@@ -32,3 +32,9 @@ test('visitor errors do not loop requests and old WebView has a clear fallback',
   const s=shell();s.send({error:'Storage unavailable'});assert.equal(s.requests.length,1);assert.equal(s.el('status').textContent,'Storage unavailable');
   const old=shell(false);assert.equal(old.el('prepare').disabled,true);assert.match(old.el('status').textContent,/WebView/);
 });
+test('visitor lock preempts an in-flight save and rejected save keeps the expiry timer',()=>{
+  const s=shell();s.send(state);s.el('save').handlers.click();s.el('lock').handlers.click();
+  assert.equal(s.requests.at(-1).action,'lock');assert.equal(s.el('workspace').hidden,true);
+  const other=shell();other.send(state);other.el('save').handlers.click();other.send({prepared:true,error:'Cannot save'});
+  assert.equal(other.timers.size,1);[...other.timers.values()][0]();assert.equal(other.el('workspace').hidden,true);
+});

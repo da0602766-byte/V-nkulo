@@ -6,14 +6,15 @@
   function reset(){editing='';fields.forEach(k=>el(k).value='');el('date').value=new Date().toLocaleDateString('sv-SE');}
   function clear(){prepared=false;window.clearTimeout(expiry);el('workspace').hidden=true;el('rows').textContent='';el('community').textContent='';reset();}
   function send(action,extra={}) {
-    if(!bridge||busy)return;busy=true;lastAction=action;el('save').disabled=true;el('prepare').disabled=true;
+    if(!bridge||(busy&&action!=='lock'))return;busy=true;lastAction=action;el('save').disabled=true;el('prepare').disabled=true;
     bridge.postMessage(JSON.stringify({action,requestId:++requestId,...extra}));
   }
   function text(parent,tag,value){const node=document.createElement(tag);node.textContent=value;parent.appendChild(node);return node;}
   function button(parent,label,fn){const node=text(parent,'button',label);node.type='button';node.className='secondary';node.addEventListener('click',()=>{if(!busy)fn();});}
   function render(state) {
-    window.clearTimeout(expiry);busy=false;el('save').disabled=false;el('prepare').disabled=!bridge;
-    if(state.error){el('status').textContent=state.error;return;}
+    busy=false;el('save').disabled=false;el('prepare').disabled=!bridge;
+    if(state.error){if(state.prepared!==true)clear();el('status').textContent=state.error;return;}
+    window.clearTimeout(expiry);
     if(!state.prepared){clear();el('status').textContent='Cadastros bloqueados. Prepare com internet e a mesma conta/comunidade para recuperar o trabalho salvo.';return;}
     prepared=true;el('workspace').hidden=false;el('community').textContent=state.communityName;
     if(state.savedId){editing=state.savedId;el('status').textContent='Rascunho salvo no aparelho. Ainda não enviado.';}
