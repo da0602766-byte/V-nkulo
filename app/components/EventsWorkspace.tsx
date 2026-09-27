@@ -67,7 +67,10 @@ export default function EventsWorkspace({
   communityName: string;
   communitySlug: string;
 }) {
+  const [eventSearch, setEventSearch] = useState("");
+  const [eventStatus, setEventStatus] = useState("TODOS");
   const [events, setEvents] = useState<CommunityEvent[]>([]);
+  const [now] = useState(() => Date.now());
   const [loading, setLoading] = useState(true);
   const [workingId, setWorkingId] = useState<number | "form" | null>(null);
   const [feedback, setFeedback] = useState("");
@@ -82,6 +85,7 @@ export default function EventsWorkspace({
   const detailsRef = useRef<HTMLDetailsElement>(null);
   const canManage = permissions.includes("events.manage");
   const canRsvp = permissions.includes("events.rsvp");
+  const displayedEvents = useMemo(() => events.filter(item => (eventStatus === "TODOS" || item.status === eventStatus) && `${item.titulo} ${item.local} ${item.descricao}`.toLocaleLowerCase("pt-BR").includes(eventSearch.trim().toLocaleLowerCase("pt-BR"))), [events,eventSearch,eventStatus]);
   const registrantSearchEvent = useMemo(
     () => events.find((item) => item.id === registrantSearchEventId) || null,
     [events, registrantSearchEventId],
@@ -386,17 +390,16 @@ export default function EventsWorkspace({
   }
 
   return (
-    <section className="events-workspace">
+    <section className="events-workspace events-studio">
       <header className="workspace-heading">
         <div>
-          <p className="pilot-kicker">EVENTOS E CALENDÁRIO</p>
-          <h1>Agenda de {communityName}</h1>
+          <p className="pilot-kicker">ENCONTROS QUE APROXIMAM</p>
+          <h1>Vamos nos encontrar.</h1>
           <p>
-            Eventos persistentes no tenant ativo, com confirmação individual e
-            cancelamento auditado.
+            A programação de {communityName}, suas escalas e seus compromissos em um só lugar.
           </p>
         </div>
-        <span className="scope-badge">Escopo do servidor</span>
+        <div className="events-studio-count"><strong>{events.filter(item => item.status === "PUBLICADO" && Date.parse(item.inicia_em) >= now).length}</strong><span>próximos eventos</span></div>
       </header>
 
       {/* O calendário reúne, em camadas, o que já existe espalhado: eventos da
@@ -417,13 +420,7 @@ export default function EventsWorkspace({
         }
       />
 
-      <div className="operations-notice">
-        <strong>Dados separados por comunidade</strong>
-        <span>
-          A página pública recebe somente eventos marcados como públicos e
-          publicados.
-        </span>
-      </div>
+
 
       {canManage && (
         <details
@@ -432,7 +429,7 @@ export default function EventsWorkspace({
           key={editing?.id || "new"}
         >
           <summary className="event-form-summary">
-            <span aria-hidden="true">＋</span><div><strong>{editing ? `Editar: ${editing.titulo}` : "Novo evento"}</strong><small>Abra uma caixa simples e preserve todos os detalhes.</small></div><i aria-hidden="true">⌄</i>
+            <span aria-hidden="true">＋</span><div><strong>{editing ? `Editar: ${editing.titulo}` : "Novo evento"}</strong><small>Organize os detalhes, a participação e a divulgação.</small></div><i aria-hidden="true">⌄</i>
           </summary>
           <form className="pilot-form event-form" onSubmit={saveEvent}>
             <label className="event-wide-field">
@@ -659,9 +656,11 @@ export default function EventsWorkspace({
           <span />
           <span />
         </div>
-      ) : events.length ? (
+      ) : events.length ? (<>
+        <div className="events-studio-directory"><div><small>PROGRAMAÇÃO DA COMUNIDADE</small><h2>Encontros e eventos</h2></div><label><span className="sr-only">Buscar eventos</span><input type="search" value={eventSearch} onChange={event => setEventSearch(event.target.value)} placeholder="Buscar evento ou local…" /></label><label><span className="sr-only">Estado dos eventos</span><select value={eventStatus} onChange={event=>setEventStatus(event.target.value)}><option value="TODOS">Todos os estados</option><option value="PUBLICADO">Publicados</option>{canManage && <option value="RASCUNHO">Rascunhos</option>}<option value="CANCELADO">Cancelados</option></select></label></div>
+        {!displayedEvents.length && <p className="agenda-vazio">Nenhum evento corresponde à busca.</p>}
         <div className="event-grid">
-          {events.map((item) => {
+          {displayedEvents.map((item) => {
             const isPublished = item.status === "PUBLICADO";
             const isConfirmed = item.minha_confirmacao === "CONFIRMADO";
             const isFull =
@@ -824,12 +823,11 @@ export default function EventsWorkspace({
             );
           })}
         </div>
-      ) : (
+      </>) : (
         <div className="pilot-empty-state event-empty">
           <strong>Nenhum evento nesta comunidade</strong>
           <p>
-            O calendário começa vazio e não reutiliza registros de outro
-            tenant.
+            A comunidade ainda não publicou sua programação. Os próximos encontros aparecerão aqui.
           </p>
         </div>
       )}

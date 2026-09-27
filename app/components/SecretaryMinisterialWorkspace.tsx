@@ -798,6 +798,7 @@ export default function SecretaryMinisterialWorkspace({
   // assim, no celular, o toque sempre produz uma resposta visível mesmo antes
   // de a recarga silenciosa terminar.
   async function toggleFioStep(schedule: Schedule, step: FioStep) {
+    if (busy || !schedule.fio_etapas.some((item) => item.id === step.id)) return;
     const feito = !step.feito;
     const applyStepState = (nextFeito: boolean) => {
       setSchedules((current) => current.map((item) => item.id !== schedule.id
@@ -827,6 +828,12 @@ export default function SecretaryMinisterialWorkspace({
         body: JSON.stringify({ acao: "FIO_ETAPA", etapaId: step.id, feito }),
       });
       const result = await readJson<{ error?: string }>(response);
+      if (response.status === 404) {
+        setSchedules((current) => current.map((item) => item.id === schedule.id ? { ...item, fio_etapas: item.fio_etapas.filter((candidate) => candidate.id !== step.id) } : item));
+        await loadData(true);
+        setFeedback("As etapas desta escala mudaram. A lista foi atualizada.");
+        return;
+      }
       if (!response.ok) throw new Error(result.error || "Não foi possível atualizar esta etapa.");
       setFeedback(feito ? "Etapa concluída no fio." : "Etapa reaberta no fio.");
       await loadData(true);

@@ -28,7 +28,7 @@ test("a carga inicial não expõe posts de outra comunidade, outro ministério o
 test("destaques reutilizam publicações autorizadas e não carregam exemplos do protótipo", async () => {
   const home = await read("app/components/CommunityHome.tsx");
   const highlights = await read("app/components/feed/FeedHighlights.tsx");
-  assert.match(home, /posts\.filter\(\(post\) => post\.status === "PUBLICADA"\)\.slice\(0, 8\)/);
+  assert.match(home, /posts\.filter\(\(post\) => post\.status === "PUBLICADA" && !seenHighlights\.includes\(post\.id\)\)\.slice\(0, 8\)/);
   assert.match(highlights, /if \(!items.length\) return null/);
   assert.doesNotMatch(highlights, /avatar-ana|story-cultos|124 participantes|Juliana/);
   assert.match(home, /setFeedSearch\(""\);\s*setFeedFilter\("TODOS"\)/);

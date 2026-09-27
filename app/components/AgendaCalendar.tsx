@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type Camada = "EVENTO" | "ESCALA" | "PESSOAL";
 
@@ -39,13 +39,6 @@ const CATEGORIAS_PESSOAIS = [
 
 const DIAS_CURTOS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 
-// A grade de horas precisa de um piso e um teto: sem isso, um compromisso às
-// 5h esticaria a tela inteira para mostrar horas vazias.
-const HORA_MIN_PADRAO = 7;
-const HORA_MAX_PADRAO = 22;
-const ALTURA_HORA = 56;
-const DURACAO_PADRAO_MIN = 60;
-
 function inicioDoDia(data: Date) {
   return new Date(data.getFullYear(), data.getMonth(), data.getDate());
 }
@@ -81,42 +74,9 @@ function hora(iso: string) {
   return `${String(data.getHours()).padStart(2, "0")}${m ? `:${String(m).padStart(2, "0")}` : "h"}`;
 }
 
-function minutosDoDia(iso: string) {
-  const d = new Date(iso);
-  return d.getHours() * 60 + d.getMinutes();
-}
-
 function duracaoMin(item: ItemAgenda) {
-  if (!item.terminaEm) return DURACAO_PADRAO_MIN;
-  const dur = (Date.parse(item.terminaEm) - Date.parse(item.iniciaEm)) / 60000;
-  return dur > 0 ? dur : DURACAO_PADRAO_MIN;
-}
-
-// Compromissos que se cruzam dividem a largura da coluna, em vez de um cobrir
-// o outro. É o mínimo para a semana continuar legível num domingo cheio.
-function distribuirColunas(itens: ItemAgenda[]) {
-  const ordenados = [...itens].sort(
-    (a, b) => minutosDoDia(a.iniciaEm) - minutosDoDia(b.iniciaEm),
-  );
-  const faixas: ItemAgenda[][] = [];
-  for (const item of ordenados) {
-    const inicio = minutosDoDia(item.iniciaEm);
-    let alocado = false;
-    for (const faixa of faixas) {
-      const ultimo = faixa[faixa.length - 1];
-      if (minutosDoDia(ultimo.iniciaEm) + duracaoMin(ultimo) <= inicio) {
-        faixa.push(item);
-        alocado = true;
-        break;
-      }
-    }
-    if (!alocado) faixas.push([item]);
-  }
-  const mapa = new Map<string, { coluna: number; total: number }>();
-  faixas.forEach((faixa, coluna) => {
-    for (const item of faixa) mapa.set(item.id, { coluna, total: faixas.length });
-  });
-  return mapa;
+  const duration = item.terminaEm ? (Date.parse(item.terminaEm) - Date.parse(item.iniciaEm)) / 60000 : 60;
+  return duration > 0 ? duration : 60;
 }
 
 export default function AgendaCalendar({
@@ -131,7 +91,7 @@ export default function AgendaCalendar({
   aoCriarEvento?: () => void;
 }) {
   const [referencia, setReferencia] = useState(() => inicioDoDia(new Date()));
-  const [visao, setVisao] = useState<Visao>("semana");
+  const [visao, setVisao] = useState<Visao>("mes");
   const [itens, setItens] = useState<ItemAgenda[]>([]);
   const [camadasAtivas, setCamadasAtivas] = useState<Camada[]>(["EVENTO", "ESCALA", "PESSOAL"]);
   const [carregando, setCarregando] = useState(true);
@@ -146,7 +106,11 @@ export default function AgendaCalendar({
     return [referencia];
   }, [referencia, visao]);
 
+  const requestRef = useRef<AbortController | null>(null);
   const carregar = useCallback(async () => {
+    requestRef.current?.abort();
+    const request = new AbortController();
+    requestRef.current = request;
     setCarregando(true);
     setErro("");
     try {
@@ -155,18 +119,20 @@ export default function AgendaCalendar({
       ate.setHours(23, 59, 59, 999);
       const resposta = await fetch(
         `/api/pilot/agenda?de=${encodeURIComponent(de.toISOString())}&ate=${encodeURIComponent(ate.toISOString())}`,
-        { cache: "no-store" },
+        { cache: "no-store", signal: request.signal },
       );
       const dados = (await resposta.json()) as { itens?: ItemAgenda[]; error?: string };
       if (!resposta.ok) throw new Error(dados.error || "Não foi possível carregar a agenda.");
-      setItens(dados.itens || []);
+      if (!request.signal.aborted) setItens(dados.itens || []);
     } catch (motivo) {
+      if (request.signal.aborted) return;
       setErro(motivo instanceof Error ? motivo.message : "Não foi possível carregar a agenda.");
       setItens([]);
     } finally {
-      setCarregando(false);
+      if (!request.signal.aborted) setCarregando(false);
     }
   }, [dias]);
+  useEffect(() => () => requestRef.current?.abort(), []);
 
   useEffect(() => {
     // Adiar a busca tira o setState do corpo síncrono do efeito, que dispara
@@ -190,24 +156,6 @@ export default function AgendaCalendar({
     }
     return mapa;
   }, [visiveis]);
-
-  // A faixa de horas acompanha o conteúdo: se há algo às 6h, a grade abre às 6h.
-  const [horaMin, horaMax] = useMemo(() => {
-    let min = HORA_MIN_PADRAO;
-    let max = HORA_MAX_PADRAO;
-    for (const item of visiveis) {
-      const inicio = Math.floor(minutosDoDia(item.iniciaEm) / 60);
-      const fim = Math.ceil((minutosDoDia(item.iniciaEm) + duracaoMin(item)) / 60);
-      if (inicio < min) min = inicio;
-      if (fim > max) max = fim;
-    }
-    return [Math.max(0, min), Math.min(24, Math.max(max, min + 4))];
-  }, [visiveis]);
-
-  const horas = useMemo(
-    () => Array.from({ length: horaMax - horaMin }, (_, i) => horaMin + i),
-    [horaMin, horaMax],
-  );
 
   function alternarCamada(camada: Camada) {
     setCamadasAtivas((atuais) =>
@@ -312,19 +260,8 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
         ? `${dias[0].toLocaleDateString("pt-BR", { day: "numeric", month: "short" })} – ${dias[6].toLocaleDateString("pt-BR", { day: "numeric", month: "short", year: "numeric" })}`
         : referencia.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
-  function blocoEstilo(item: ItemAgenda, coluna: number, total: number) {
-    const topo = ((minutosDoDia(item.iniciaEm) - horaMin * 60) / 60) * ALTURA_HORA;
-    const altura = Math.max((duracaoMin(item) / 60) * ALTURA_HORA, 26);
-    return {
-      top: `${topo}px`,
-      height: `${altura}px`,
-      left: `calc(${(coluna / total) * 100}% + 2px)`,
-      width: `calc(${100 / total}% - 4px)`,
-    };
-  }
-
   return (
-    <section className="agenda-calendario" aria-label="Calendário da agenda">
+    <section className="agenda-calendario agenda-studio" aria-label="Calendário da agenda">
       <header className="agenda-calendario-topo">
         <div className="agenda-calendario-periodo">
           <button type="button" onClick={() => mover(-1)} aria-label="Período anterior">‹</button>
@@ -394,6 +331,7 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
 
       {erro && <p className="agenda-erro" role="alert">{erro}</p>}
 
+      <div className="agenda-studio-layout"><div className="agenda-studio-planner">
       {/* O formulário fica ao lado do calendário, não empurrando-o para baixo:
           quem está marcando algo precisa continuar vendo os dias ocupados. */}
       <div className={`agenda-corpo${formAberto ? " com-form" : ""}`}>
@@ -483,53 +421,11 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
       {/* SEMANA — grade de horas: cada compromisso ocupa a altura da sua
           duração, e os que se cruzam dividem a largura. */}
       {visao === "semana" && (
-        <div className="agenda-semana" aria-busy={carregando}>
-          <div className="agenda-semana-cabecalho">
-            <span className="agenda-semana-canto" />
-            {dias.map((dia) => (
-              <span
-                key={chaveDia(dia)}
-                className={`agenda-semana-dia${chaveDia(dia) === hojeChave ? " hoje" : ""}`}
-              >
-                <small>{DIAS_CURTOS[dia.getDay()]}</small>
-                <b>{dia.getDate()}</b>
-              </span>
-            ))}
-          </div>
-          <div className="agenda-semana-corpo" style={{ height: `${horas.length * ALTURA_HORA}px` }}>
-            <div className="agenda-semana-horas">
-              {horas.map((h) => (
-                <span key={h} style={{ height: `${ALTURA_HORA}px` }}>{String(h).padStart(2, "0")}h</span>
-              ))}
-            </div>
-            {dias.map((dia) => {
-              const doDia = porDia.get(chaveDia(dia)) || [];
-              const colunas = distribuirColunas(doDia);
-              return (
-                <div className="agenda-semana-coluna" key={chaveDia(dia)}>
-                  {horas.map((h) => (
-                    <span key={h} className="agenda-semana-linha" style={{ height: `${ALTURA_HORA}px` }} />
-                  ))}
-                  {doDia.map((item) => {
-                    const pos = colunas.get(item.id) || { coluna: 0, total: 1 };
-                    return (
-                      <button
-                        type="button"
-                        key={item.id}
-                        className={`agenda-bloco camada-${item.camada.toLowerCase()}`}
-                        style={blocoEstilo(item, pos.coluna, pos.total)}
-                        onClick={() => { setVisao("dia"); setReferencia(inicioDoDia(dia)); }}
-                        title={`${hora(item.iniciaEm)} — ${item.titulo}`}
-                      >
-                        <b>{hora(item.iniciaEm)}</b>
-                        <span>{item.titulo}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
+        <div className="agenda-week-list" aria-busy={carregando}>
+          {dias.map((dia) => { const items = porDia.get(chaveDia(dia)) || []; return <section key={chaveDia(dia)} className={chaveDia(dia) === hojeChave ? "today" : ""}>
+            <button type="button" className="agenda-week-date" onClick={() => { setReferencia(inicioDoDia(dia)); setVisao("dia"); }}><small>{DIAS_CURTOS[dia.getDay()]}</small><strong>{dia.getDate()}</strong></button>
+            <div>{items.length ? items.map((item) => <button type="button" key={item.id} className={"agenda-week-entry camada-" + item.camada.toLowerCase()} onClick={() => { setReferencia(inicioDoDia(dia)); setVisao("dia"); }}><time>{item.diaInteiro ? "Dia inteiro" : hora(item.iniciaEm)}</time><strong>{item.titulo}</strong><span>{item.local || CAMADAS.find(layer => layer.id === item.camada)?.rotulo}</span></button>) : <p>Dia livre</p>}</div>
+          </section>; })}
         </div>
       )}
 
@@ -609,6 +505,9 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
         </div>
       )}
       </div>
+      </div><aside className="agenda-studio-upcoming"><header><small>NO PERÍODO SELECIONADO</small><h2>Na sua agenda</h2><span>{visiveis.length} compromisso(s)</span></header>
+      {carregando ? <p role="status">Carregando compromissos…</p> : !visiveis.length ? <div className="agenda-studio-empty"><span aria-hidden="true">♡</span><strong>Tempo para novos encontros</strong><p>Não há compromissos nas categorias selecionadas. Adicione um ou navegue para outro período.</p></div> : <ol>{[...visiveis].sort((a,b) => Date.parse(a.iniciaEm)-Date.parse(b.iniciaEm)).map(item => <li key={item.id}><button type="button" onClick={() => { setReferencia(inicioDoDia(new Date(item.iniciaEm))); setVisao("dia"); }}><time dateTime={item.iniciaEm}><b>{new Date(item.iniciaEm).getDate()}</b><span>{new Date(item.iniciaEm).toLocaleDateString("pt-BR",{month:"short"})}</span></time><div><small>{CAMADAS.find(layer => layer.id === item.camada)?.rotulo}</small><strong>{item.titulo}</strong><span>{item.diaInteiro ? "Dia inteiro" : hora(item.iniciaEm)}{item.local ? ` · ${item.local}` : ""}</span></div><span aria-hidden="true">→</span></button></li>)}</ol>}
+      <a href="/painel?view=fio">Acompanhar o Fio do dia →</a></aside></div>
     </section>
   );
 }

@@ -928,7 +928,7 @@ export async function PATCH(request: Request, context: Context) {
         { status: 403 },
       );
     }
-    const steps = parseFioSteps(schedule.fio_etapas);
+    const steps = parseFioSteps(parseStoredArray(schedule.fio_etapas));
     if ("error" in steps) {
       return Response.json({ error: steps.error }, { status: 400 });
     }
@@ -976,7 +976,7 @@ export async function PATCH(request: Request, context: Context) {
     if ("error" in incoming) {
       return Response.json({ error: incoming.error }, { status: 400 });
     }
-    const current = parseFioSteps(schedule.fio_etapas);
+    const current = parseFioSteps(parseStoredArray(schedule.fio_etapas));
     const previous = new Map(
       ("error" in current ? [] : current.value).map((step) => [step.id, step]),
     );
@@ -1102,6 +1102,13 @@ export async function PATCH(request: Request, context: Context) {
       }
     }
   }
+}
+
+function parseStoredArray(value: string): unknown[] {
+  try {
+    const parsed: unknown = JSON.parse(value || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch { return []; }
 }
 
 function parseObject(value: unknown): Record<string, unknown> {

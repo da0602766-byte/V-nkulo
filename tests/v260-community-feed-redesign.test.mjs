@@ -19,7 +19,8 @@ test("o feed mantém filtros locais sem buscar a comunidade novamente", () => {
 test("o novo compositor aproveita a publicação existente e não duplica a rota", () => {
   const source = read("app/components/CommunityHome.tsx");
   assert.match(source, /FeedComposerBar/);
-  assert.match(read("app/components/feed/FeedComposerBar.tsx"), /worship-composer-prompt/);
+  assert.match(read("app/components/feed/FeedComposerBar.tsx"), /worship-composer-tools/);
+  assert.match(source, /community-composer-inline/);
   assert.match(source, /\/api\/pilot\/publicacoes/);
   assert.match(source, /NativeImageUpload/);
   assert.match(source, /audienciaTipo/);

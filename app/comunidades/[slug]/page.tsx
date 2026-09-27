@@ -165,7 +165,7 @@ export default async function PublicCommunityPage({
         ) : (
           <div className="pilot-empty-state">
             <strong>Nenhum evento público agendado</strong>
-            <p>Rascunhos e eventos internos nunca aparecem aqui.</p>
+            <p>Estamos preparando os próximos encontros. Volte em breve para acompanhar a programação.</p>
           </div>
         )}
       </section>
@@ -174,6 +174,7 @@ export default async function PublicCommunityPage({
         <header><div><p className="pilot-kicker">CÉLULAS ABERTAS</p><h2>Encontre uma comunidade perto de você</h2></div><span>Informações autorizadas pela liderança</span></header>
         <div className="public-cells-grid-v2">{cells.map((cell) => <article key={cell.id}><header><span aria-hidden="true">⌂</span><div><small>{cell.dias.map((day) => ({DOM:"Dom",SEG:"Seg",TER:"Ter",QUA:"Qua",QUI:"Qui",SEX:"Sex",SAB:"Sáb"}[day] || day)).join(" · ")}</small><h3>{cell.nome}</h3></div></header><p>{cell.descricao}</p><dl><div><dt>Local</dt><dd>{cell.endereco || "Consulte a liderança"}</dd></div><div><dt>Liderança</dt><dd>{cell.lider}</dd></div><div><dt>Participantes</dt><dd>{cell.membros}</dd></div></dl>{cell.proximoEncontro && <time dateTime={cell.proximoEncontro}>Próximo: {formatDateTime(cell.proximoEncontro)}</time>}<PublicCellRequest cellId={cell.id} cellName={cell.nome} userName={user?.nome} userEmail={user?.email} /></article>)}</div>
       </section>}
+      <footer className="public-community-footer"><div><strong>{community.nome}</strong><p>Conexões que aproximam. Uma comunidade para caminhar junto.</p></div><a href="/comunidades">Conhecer outras comunidades →</a></footer>
       <PublicMobileNav active="communities" />
     </main>
   );

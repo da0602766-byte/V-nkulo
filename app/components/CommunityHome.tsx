@@ -171,15 +171,24 @@ export default function CommunityHome({
     setEditingId(null);
     setPostActionsId(null);
   }, []);
-  useFeedDialog(composerOpen ? "composer" : editingId !== null ? `edit-${editingId}` : postActionsId !== null ? `actions-${postActionsId}` : "", closeDialog);
+  useFeedDialog(editingId !== null ? `edit-${editingId}` : postActionsId !== null ? `actions-${postActionsId}` : "", closeDialog);
 
   function openComposer(intent: ComposerIntent = "text") {
     setComposerIntent(intent);
     setComposerOpen(true);
+    requestAnimationFrame(() => {
+      const form = composerTitleRef.current?.form;
+      const target = intent === "event" ? form?.querySelector<HTMLElement>('[name="eventId"]') : intent === "image" ? form?.querySelector<HTMLElement>(".composer-image-option") : composerTitleRef.current;
+      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+      target?.focus({ preventScroll: true });
+    });
   }
   useEffect(() => {
     if (!canPublish) return;
-    const open = () => { setComposerIntent("text"); setComposerOpen(true); };
+    const open = () => {
+      setComposerIntent("text"); setComposerOpen(true);
+      requestAnimationFrame(() => { composerTitleRef.current?.scrollIntoView({ block: "center" }); composerTitleRef.current?.focus({ preventScroll: true }); });
+    };
     window.addEventListener("vinkulo:new-publication", open);
     return () => window.removeEventListener("vinkulo:new-publication", open);
   }, [canPublish]);
@@ -385,8 +394,16 @@ export default function CommunityHome({
     if (feedFilter === "MINISTERIOS") return post.audiencia_tipo === "MINISTERIOS" || ["JUVENTUDE", "ACAO_SOCIAL"].includes(post.categoria);
     return post.categoria !== "EVENTO" && post.audiencia_tipo !== "MINISTERIOS";
   }), [feedFilter, feedSearch, posts, communityName]);
-  const highlights = useMemo(() => posts.filter((post) => post.status === "PUBLICADA").slice(0, 8), [posts]);
+  const [seenHighlights, setSeenHighlights] = useState<number[]>([]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try { const saved: unknown = JSON.parse(sessionStorage.getItem(`vinkulo:seen-highlights:${communitySlug}`) || "[]"); setSeenHighlights(Array.isArray(saved) ? saved.filter((id): id is number => typeof id === "number") : []); } catch { setSeenHighlights([]); }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [communitySlug]);
+  const highlights = useMemo(() => posts.filter((post) => post.status === "PUBLICADA" && !seenHighlights.includes(post.id)).slice(0, 8), [posts, seenHighlights]);
   function openHighlight(id: number) {
+    setSeenHighlights((current) => { const next = [...new Set([...current, id])]; try { sessionStorage.setItem(`vinkulo:seen-highlights:${communitySlug}`, JSON.stringify(next)); } catch {} return next; });
     setFeedSearch("");
     setFeedFilter("TODOS");
     window.requestAnimationFrame(() => {
@@ -643,19 +660,12 @@ export default function CommunityHome({
           <FeedHighlights items={highlights} onSelect={openHighlight} onCreate={canPublish ? () => openComposer() : undefined} />
       {canPublish && (
         <section className="worship-composer">
-          <FeedComposerBar name={userName} photo={userPhotoUrl} hasEvents={myEvents.length > 0} onOpen={openComposer} onRequest={!readOnlyFeed && onNavigate ? () => onNavigate("solicitacoes", true) : undefined} />
-          {composerOpen && typeof document !== "undefined" && createPortal(
-            <div
-              className="community-composer-overlay"
-              role="presentation"
-              onMouseDown={(event) => {
-                if (event.target === event.currentTarget && !working) setComposerOpen(false);
-              }}
-            >
-          <form data-feed-dialog className="pilot-form community-composer-dialog community-composer-organized" role="dialog" aria-modal="true" aria-label="Criar publicação" onSubmit={createPost}>
+          <FeedComposerBar hasEvents={myEvents.length > 0} onOpen={openComposer} onRequest={!readOnlyFeed && onNavigate ? () => onNavigate("solicitacoes", true) : undefined} />
+          <form className="pilot-form community-composer-inline" aria-label="Criar publicação" onSubmit={createPost}>
             <header>
-              <div><small>NOVA PUBLICAÇÃO</small><strong>Criar publicação</strong></div>
-              <button type="button" className="community-composer-close" aria-label="Fechar criação de publicação" onClick={() => setComposerOpen(false)}>×</button>
+              <span className="worship-avatar" aria-hidden="true">{userPhotoUrl ? <img src={userPhotoUrl} alt="" width="36" height="36" /> : userName.split(/\s+/).filter(Boolean).slice(0,2).map(part => part[0]).join("")}</span>
+              <div><small>COMPARTILHAR COM A COMUNIDADE</small><strong>O que você quer compartilhar?</strong></div>
+
             </header>
             <label>
               Título
@@ -663,8 +673,11 @@ export default function CommunityHome({
             </label>
             <label className="composer-wide">
               Conteúdo
-              <textarea ref={composerContentRef} name="conteudo" required maxLength={3000} rows={5} />
+              <textarea ref={composerContentRef} name="conteudo" required maxLength={3000} rows={3} placeholder="Escreva uma mensagem para sua comunidade…" />
             </label>
+            <details className="composer-options composer-wide" open={composerOpen} onToggle={(event) => setComposerOpen(event.currentTarget.open)}>
+            <summary>Imagem, evento e opções de publicação</summary>
+            <div className="composer-options-fields">
             {myEvents.length > 0 && (
               <label className="composer-wide community-event-publish-field">
                 Puxar um evento criado por você
@@ -689,7 +702,7 @@ export default function CommunityHome({
                 <small>Ao selecionar, os dados do evento e o link próprio de inscrição são incluídos automaticamente.</small>
               </label>
             )}
-            <div className="composer-wide" tabIndex={composerIntent === "image" ? 0 : undefined} data-initial-focus={composerIntent === "image" ? "" : undefined}>
+            <div className="composer-wide composer-image-option" tabIndex={composerIntent === "image" ? 0 : undefined}>
               <NativeImageUpload
                 label="Imagem da publicação (opcional)"
                 value={composerImageUrl}
@@ -754,14 +767,12 @@ export default function CommunityHome({
               />
               <span>Permitir comentários de usuários com conta ativa</span>
             </label>
+            </div></details>
             {error && <p className="operations-feedback error composer-wide" role="alert">{error}</p>}
             <button disabled={working}>
               {working ? "Salvando…" : "Salvar publicação"}
             </button>
           </form>
-            </div>,
-            document.body,
-          )}
         </section>
       )}
 

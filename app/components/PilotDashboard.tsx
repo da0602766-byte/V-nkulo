@@ -166,20 +166,12 @@ function PersonalizationControls({
   onDecrease,
   onReset,
   onIncrease,
-  glassOpacity,
-  onGlassOpacityChange,
-  dataSaver,
-  onDataSaverChange,
 }: {
   userEmail: string;
   fontScale: number;
   onDecrease: () => void;
   onReset: () => void;
   onIncrease: () => void;
-  glassOpacity: number;
-  onGlassOpacityChange: (value: number) => void;
-  dataSaver: boolean;
-  onDataSaverChange: (value: boolean) => void;
 }) {
   return (
     <div className="account-personalization-v4" role="group" aria-label="Aparência individual">
@@ -195,16 +187,6 @@ function PersonalizationControls({
         <button type="button" onClick={onIncrease} disabled={fontScale >= MAX_FONT_SCALE} aria-label="Aumentar todo o sistema" title="Aumentar">
           <MagnifierIcon operation="plus" />
         </button>
-      </div>
-      <div className="account-surface-preferences">
-        <label>
-          <span>Intensidade do vidro <b>{glassOpacity}%</b></span>
-          <input type="range" min="55" max="88" step="1" value={glassOpacity} onChange={(event) => onGlassOpacityChange(Number(event.target.value))} />
-        </label>
-        <label className="account-data-saver">
-          <input type="checkbox" checked={dataSaver} onChange={(event) => onDataSaverChange(event.target.checked)} />
-          <span><strong>Economizar dados</strong><small>Imagens leves e menos animações</small></span>
-        </label>
       </div>
     </div>
   );
@@ -255,8 +237,6 @@ export default function PilotDashboard({
   const [viewLoading, setViewLoading] = useState(false);
   const [fontScale, setFontScale] = useState(1);
   const [fontScaleHydrated, setFontScaleHydrated] = useState(false);
-  const [glassOpacity, setGlassOpacity] = useState(62);
-  const [dataSaver, setDataSaver] = useState(false);
   const [inviteMessage, setInviteMessage] = useState("");
   const [inviteLink, setInviteLink] = useState("");
   const [inviteLoading, setInviteLoading] = useState(false);
@@ -309,9 +289,6 @@ export default function PilotDashboard({
         if (Number.isFinite(saved)) {
           setFontScale(Math.min(MAX_FONT_SCALE, Math.max(MIN_FONT_SCALE, Math.round(saved * 100) / 100)));
         }
-        const savedGlass = Number(window.localStorage.getItem("vinkulo:glass-opacity"));
-        if (Number.isFinite(savedGlass) && savedGlass >= 55 && savedGlass <= 88) setGlassOpacity(savedGlass);
-        setDataSaver(window.localStorage.getItem("vinkulo:data-saver") === "true");
       } catch {
         // Mantém o tamanho padrão quando a preferência local não está disponível.
       } finally {
@@ -328,21 +305,19 @@ export default function PilotDashboard({
     root.style.setProperty("--vinkulo-ui-scale", String(fontScale));
     root.style.setProperty("--vinkulo-ui-scale-inverse", String(1 / fontScale));
     root.dataset.vinkuloScale = fontScale > 1 ? "ampliado" : fontScale < 1 ? "reduzido" : "normal";
-    root.style.setProperty("--vinkulo-glass-alpha", String(glassOpacity / 100));
-    root.dataset.dataSaver = dataSaver ? "true" : "false";
+    root.style.setProperty("--vinkulo-glass-alpha", "0.62");
+    root.dataset.dataSaver = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData ? "true" : "false";
     try {
       window.localStorage.setItem(
         `vinkulo:font-scale:${userEmail.trim().toLowerCase()}`,
         String(fontScale),
       );
       window.localStorage.setItem("vinkulo:font-scale", String(fontScale));
-      window.localStorage.setItem("vinkulo:glass-opacity", String(glassOpacity));
-      window.localStorage.setItem("vinkulo:data-saver", String(dataSaver));
     } catch {
       // A preferência continua ativa na sessão atual.
     }
     window.dispatchEvent(new CustomEvent("vinkulo:network-mode"));
-  }, [dataSaver, fontScale, fontScaleHydrated, glassOpacity, userEmail]);
+  }, [fontScale, fontScaleHydrated, userEmail]);
 
   function changeFontScale(delta: number) {
     setFontScale((current) => Math.min(MAX_FONT_SCALE, Math.max(MIN_FONT_SCALE, Math.round((current + delta) * 100) / 100)));
@@ -1066,7 +1041,7 @@ export default function PilotDashboard({
                   </nav>
                 </details>
               )}
-              <PersonalizationControls userEmail={userEmail} fontScale={fontScale} onDecrease={() => changeFontScale(-0.05)} onReset={() => setFontScale(1)} onIncrease={() => changeFontScale(0.05)} glassOpacity={glassOpacity} onGlassOpacityChange={setGlassOpacity} dataSaver={dataSaver} onDataSaverChange={setDataSaver} />
+              <PersonalizationControls userEmail={userEmail} fontScale={fontScale} onDecrease={() => changeFontScale(-0.05)} onReset={() => setFontScale(1)} onIncrease={() => changeFontScale(0.05)} />
               <button type="button" onClick={() => openView("conta")}>Minha conta</button>
               {active.isOwner && <Link href="/proprietario" showLoading loadingLabel="Abrindo a Área do proprietário…">Área do proprietário</Link>}
               <Link href={`/comunidades/${active.comunidadeSlug}`} showLoading loadingLabel="Abrindo a página pública…">Página pública</Link>
@@ -1796,7 +1771,7 @@ export default function PilotDashboard({
                     Abrir seletor de ministérios
                   </button>
                 </details>
-                <PersonalizationControls userEmail={userEmail} fontScale={fontScale} onDecrease={() => changeFontScale(-0.05)} onReset={() => setFontScale(1)} onIncrease={() => changeFontScale(0.05)} glassOpacity={glassOpacity} onGlassOpacityChange={setGlassOpacity} dataSaver={dataSaver} onDataSaverChange={setDataSaver} />
+                <PersonalizationControls userEmail={userEmail} fontScale={fontScale} onDecrease={() => changeFontScale(-0.05)} onReset={() => setFontScale(1)} onIncrease={() => changeFontScale(0.05)} />
                 <Link href={`/comunidades/${active.comunidadeSlug}`} showLoading loadingLabel="Abrindo a página pública…">Ver página pública</Link>
                 <a className="pilot-mobile-logout" href="/api/auth/logout">Sair da plataforma</a>
               </div>
