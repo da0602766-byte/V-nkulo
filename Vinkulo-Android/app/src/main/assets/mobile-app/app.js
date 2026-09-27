@@ -27,7 +27,7 @@
   function connection() {
     byId('connection').textContent = navigator.onLine ? 'Os recursos online dependem de conexão com o servidor.' : 'Sem conexão. Esta tela continua disponível.';
   }
-  if (bridge) bridge.onmessage = event => { try { render(JSON.parse(event.data)); } catch (error) { render({result:'storage-error'}); } };
+  if (bridge) bridge.onmessage = event => { if (document.hidden) return; try { render(JSON.parse(event.data)); } catch (error) { render({result:'storage-error'}); } };
   else {
     byId('context-title').textContent = 'Atualize o Android System WebView';
     byId('context-detail').textContent = 'A preparação protegida precisa de uma versão compatível do WebView. Você pode continuar no sistema online.';
@@ -37,7 +37,7 @@
   byId('prepare').addEventListener('click', () => { if (waiting) return; waiting = true; byId('prepare').disabled = true; send('refresh'); });
   byId('lock').addEventListener('click', () => { render({result:'locked'}); send('lock'); });
   window.addEventListener('vinkulo:offline-status', () => send('status'));
-  document.addEventListener('visibilitychange', () => { render({result:'locked'}); if (!document.hidden) send('status'); });
+  document.addEventListener('visibilitychange', () => { if (!bridge) return; render({result:'locked'}); if (!document.hidden) send('status'); });
   window.addEventListener('online', connection); window.addEventListener('offline', connection);
   // Periodic expiry check is foreground-only; no operational sync in this stage.
   window.setInterval(() => { if (!document.hidden) send('status'); }, 30000);

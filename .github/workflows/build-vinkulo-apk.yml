@@ -48,7 +48,9 @@ jobs:
         env:
           VINKULO_SIGNING_STORE_FILE: ${{ runner.temp }}/vinkulo-release.p12
           VINKULO_SIGNING_PASSWORD: ${{ secrets.ANDROID_SIGNING_PASSWORD }}
-        run: gradle testDebugUnitTest lintRelease assembleRelease
+        run: |
+          node --test scripts/offline-shell.test.cjs
+          gradle testDebugUnitTest lintRelease assembleRelease
       - name: Conferir assinatura e continuidade das atualizações
         run: |
           signer="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)"
@@ -95,6 +97,7 @@ jobs:
             diff /tmp/vinkulo-first-install.txt /tmp/vinkulo-after-update.txt
             adb shell svc wifi disable
             adb shell svc data disable
+            if [ "${{ matrix.api }}" -ge 33 ]; then adb shell pm grant com.vinkulo.app android.permission.POST_NOTIFICATIONS; fi
             adb shell am start -W -n com.vinkulo.app/.MainActivity
             sleep 3
             adb shell uiautomator dump /sdcard/vinkulo-foundation.xml

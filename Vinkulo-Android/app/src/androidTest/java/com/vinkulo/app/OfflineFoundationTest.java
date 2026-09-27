@@ -95,8 +95,11 @@ public class OfflineFoundationTest {
         assertNull(assets.intercept(Uri.parse("https://evil.test/mobile-app/index.html")));
     }
 
-    @Test public void localScreenOpensWithoutServerAndSurvivesActivityRecreation() {
+    @Test public void localScreenOpensWithoutServerAndSurvivesActivityRecreation() throws Exception {
         UiDevice device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
+        // Only the disposable instrumentation app; avoid a permission dialog
+        // obscuring the UI under test on Android 13+.
+        if (android.os.Build.VERSION.SDK_INT >= 33) device.executeShellCommand("pm grant com.vinkulo.app android.permission.POST_NOTIFICATIONS");
         try (ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
             assertTrue(device.wait(Until.hasObject(By.text("Seu Vínkulo começa aqui.")),15000));
             boolean supportsBridge = WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER);
