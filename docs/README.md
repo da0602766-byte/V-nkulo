@@ -51,6 +51,8 @@ Documentação funcional de módulos específicos.
 
 ## `relatorios/`
 
+- [`APK_REFORMA_VISUAL_2_2026-09-28.md`](relatorios/APK_REFORMA_VISUAL_2_2026-09-28.md) — telas offline dedicadas, proteção de formulários e paleta autorizada.
+
 - [`APK_REFORMA_VISUAL_1_2026-09-28.md`](relatorios/APK_REFORMA_VISUAL_1_2026-09-28.md) — nova entrada offline, atalhos e identidade visual; validação e limites da primeira entrega.
 
 Relatórios fechados de entregas já publicadas — histórico, não fluxo ativo.

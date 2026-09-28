@@ -18,7 +18,11 @@ async function fixture(t) {
   const access={user:{id,ativo:true},context:{comunidadeId:1,comunidadeNome:'Teste',permissions:[...permissions],communityAccess:'MEMBER'}};
   let current=access, hash='read-session',requestsDenied=false;
   const exports={};
+  const themeExports={};
+  const themeSource=await readFile(new URL('../app/lib/community-theme.ts',import.meta.url),'utf8');
+  runInNewContext(ts.transpileModule(themeSource,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:themeExports});
   const deps={
+    '../../../lib/community-theme':themeExports,
     '../../../../db':{getD1:()=>d1},
     '../../../lib/local-auth':{getCurrentSessionTokenHash:async()=>hash},
     '../../../lib/tenant':{requireTenantPermission:async (p,resource)=>{assert.equal(p,'dashboard.view');assert.ok(resource===undefined||resource==='requests');return resource==='requests'&&requestsDenied?{error:Response.json({},{status:403})}:current;}},
@@ -45,6 +49,22 @@ async function fixture(t) {
 }
 
 const requestsRead = f => f.route.GET(request({'x-vinkulo-client':'android-read-3','x-vinkulo-requests':'own'}));
+
+test('mobile theme: opt-in colors match the platform, tenant-scoped and without media',async t=>{
+  const f=await fixture(t);
+  f.db.prepare("INSERT OR REPLACE INTO configuracoes(chave,valor,atualizado_por) VALUES('community_theme:1',?,'test')").run(JSON.stringify({paletteId:'ACOLHEDOR',logoUrl:'https://private.test/logo.png'}));
+  f.db.prepare("INSERT OR REPLACE INTO configuracoes(chave,valor,atualizado_por) VALUES('community_theme:2',?,'test')").run(JSON.stringify({paletteId:'NOITE_OCEANO'}));
+  assert.equal((await f.read()).theme,undefined);
+  assert.equal((await (await f.route.GET(request({'x-vinkulo-client':'android-read-3'}))).json()).theme,undefined);
+  const readTheme=async()=> (await (await f.route.GET(request({'x-vinkulo-client':'android-read-3','x-vinkulo-theme':'palette-1'}))).json()).theme;
+  let theme=await readTheme();assert.equal(theme.paletteId,'ACOLHEDOR');assert.equal(theme.light.primary,'#9b4938');
+  assert.equal(theme.version,1);assert.doesNotMatch(JSON.stringify(theme),/url|private|logo|shadow/i);
+  for(const mode of ['light','dark']) {assert.equal(Object.keys(theme[mode]).length,9);for(const value of Object.values(theme[mode]))assert.match(value,/^#[0-9a-f]{6}$/i);}
+  f.access.context.comunidadeId=2;theme=await readTheme();assert.equal(theme.paletteId,'NOITE_OCEANO');
+  f.db.prepare("UPDATE configuracoes SET valor='invalid' WHERE chave='community_theme:2'").run();
+  assert.equal((await readTheme()).paletteId,'MODERNO');
+  f.setAccess({error:Response.json({},{status:401})});assert.equal(await readTheme(),undefined);
+});
 function addOwnRequest(f,{user=f.id,community=1,status='ABERTA',title='Pedido pessoal',date='2026-09-27 12:00:00'}={}) {
   return Number(f.db.prepare("INSERT INTO solicitacoes_comunidade(comunidade_id,solicitante_id,tipo,titulo,descricao,visibilidade,status,atualizado_em) VALUES(?,?,'ORACAO',?,'Texto sensível pessoal','PRIVADA',?,?)").run(community,user,title,status,date).lastInsertRowid);
 }

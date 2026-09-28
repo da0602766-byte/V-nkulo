@@ -1,6 +1,7 @@
 import { getD1 } from "../../../../db";
 import { getCurrentSessionTokenHash } from "../../../lib/local-auth";
 import { requireTenantPermission } from "../../../lib/tenant";
+import { communityThemeStyle, parseCommunityTheme } from "../../../lib/community-theme";
 
 const reply = (value: unknown, status = 200) => Response.json(value, {
   status, headers: { "Cache-Control": "no-store, private", Vary: "Cookie, Origin" },
@@ -120,6 +121,10 @@ export async function GET(request: Request) {
     communityName: access.context.comunidadeNome.slice(0, 160), issuedAt,
     expiresAt: Math.min(sessionExpires, issuedAt + 8 * 60 * 60 * 1000),
     capabilities: ["shell.open", "snapshot.read"],
+    // Optional additive contract: old APKs receive exactly the previous shape.
+    ...(extended && request.headers.get("x-vinkulo-theme") === "palette-1" ? {
+      theme: await offlineTheme(db, comunidadeId),
+    } : {}),
     snapshot: { from, until, ...data, ...(extended ? {
       pedidos: { allowed: ownRequestsAllowed, hasMore: requestRows.length > 50, items: requestRows.slice(0,50) },
     } : {}) },
@@ -128,4 +133,17 @@ export async function GET(request: Request) {
     return reply({ error: "Conteúdo acima do limite seguro. Consulte online." }, 413);
   }
   return reply(value);
+}
+
+async function offlineTheme(db: ReturnType<typeof getD1>, communityId: number) {
+  const row = await db.prepare("SELECT valor FROM configuracoes WHERE chave = ? LIMIT 1")
+    .bind(`community_theme:${communityId}`).first<{ valor: string }>();
+  let source;
+  try { source = JSON.parse(row?.valor || "{}"); } catch { source = {}; }
+  const { paletteId } = parseCommunityTheme(source);
+  const styles = communityThemeStyle(paletteId) as Record<string, string>;
+  const colors = ["bg", "surface", "surface-2", "text", "muted", "line", "primary", "on-primary", "link"];
+  const mode = (name: string) => Object.fromEntries(colors.map(key => [key, styles[`--community-${name}-${key}`]]));
+  // No media, URLs, arbitrary CSS, preference cookies or additional user data.
+  return { version: 1, paletteId, light: mode("light"), dark: mode("dark") };
 }
