@@ -26,7 +26,7 @@
       const l=text(el('fields'),'label',label);l.htmlFor='module-input-'+key;
       const field=document.createElement(Array.isArray(kind)||kind==='options'?'select':typeof kind==='number'&&kind>200?'textarea':'input');field.id=l.htmlFor;field.autocomplete='off';
       if(Array.isArray(kind)||kind==='options'){
-        const options=kind==='options'?[{id:0,label:'Selecione'},...(snapshot.options||[])]:kind.map(id=>({id,label:id.replaceAll('_',' ')}));
+        const options=kind==='options'?[{id:0,label:'Selecione'},...(snapshot.options||[])]:kind.map(id=>({id,label:id.replace(/_/g,' ')}));
         for(const option of options){const o=text(field,'option',option.label);o.value=String(option.id);}
         if(kind==='options'&&payload&&!options.some(o=>String(o.id)===String(payload[key]))){const o=text(field,'option','Registro salvo — confira autorização online');o.value=String(payload[key]);}
       }else if(kind==='date')field.type='date';else field.maxLength=kind;

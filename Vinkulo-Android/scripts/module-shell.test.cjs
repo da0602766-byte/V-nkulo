@@ -1,5 +1,6 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const source=fs.readFileSync(path.join(__dirname,'../app/src/main/assets/mobile-app/modules.js'),'utf8');
+test('module shell avoids replaceAll so bridge-capable older WebViews render selectors',()=>assert.doesNotMatch(source,/\.replaceAll\(/));
 function shell(supported=true){
  const elements=new Map(),requests=[],events={},timers=new Map();let tick=0;
  function node(){let content='';const n={value:'',hidden:false,disabled:false,children:[],handlers:{},focus(){},addEventListener(k,f){this.handlers[k]=f;},appendChild(c){this.children.push(c);if(c.id)elements.set(c.id,c);}};Object.defineProperty(n,'textContent',{get:()=>content,set:v=>{content=v;n.children=[];}});return n;}
