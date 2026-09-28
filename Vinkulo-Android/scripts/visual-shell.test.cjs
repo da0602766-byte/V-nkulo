@@ -44,6 +44,8 @@ const csp="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'se
       await page.screenshot({path:path.join(output,'settings-'+scheme+'-'+width+'.png')});
       await page.evaluate(()=>{document.documentElement.style.fontSize='200%';window.scrollTo(0,0);});
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'200% overflow '+width);
+      assert.ok((await page.locator('.app-header > div').boundingBox()).width>=256,'Header must wrap rather than squeeze the brand');
+      assert.ok((await page.locator('.feature').first().boundingBox()).width>=256,'Cards must reflow for large text');
       assert.deepEqual(await page.evaluate(()=>Array.from(document.querySelectorAll('button,a,input,select,textarea,summary')).filter(e=>e.getClientRects().length&&e.getBoundingClientRect().height<48).map(e=>e.id||e.textContent)),[]);
       await page.screenshot({path:path.join(output,'large-'+scheme+'-'+width+'.png')});
       await page.evaluate(()=>{window.qaPrepared=false;window.dispatchEvent(new Event('vinkulo:offline-status'));});
@@ -55,3 +57,4 @@ const csp="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'se
     console.log('Visual QA: 6 viewports/themes, fonts, shortcuts, consent, expiry, 200% text and 48px targets passed. '+output);
   } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}
 })().catch(e=>{console.error(e);process.exitCode=1;});
+

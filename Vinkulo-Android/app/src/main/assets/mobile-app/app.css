@@ -12,8 +12,8 @@ html { scroll-padding-block: 1rem; }
 body { margin: 0; overflow-wrap: anywhere; }
 main { max-width: 600px; margin: auto; padding: 1.125rem 1.125rem 2rem; }
 .icon-library { position: absolute; width: 0; height: 0; overflow: hidden; }
-.app-header { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; padding: .375rem 0 1.125rem; border-bottom: 1px solid var(--line); }
-.app-header > div { min-width: 0; }
+.app-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: .75rem; padding: .375rem 0 1.125rem; border-bottom: 1px solid var(--line); }
+.app-header > div { min-width: 0; flex: 1 1 8rem; }
 .brand { font-weight: 700; font-size: 1.25rem; letter-spacing: .14rem; }
 .brand span { color: var(--primary); }
 #community { font-size: .8125rem; color: var(--muted); margin: .25rem 0 0; }
@@ -38,8 +38,8 @@ button, .back-top, .text-action { min-height: 48px; border-radius: .75rem; paddi
 button { width: 100%; cursor: pointer; font-weight: 650; }
 a { color: var(--primary); text-underline-offset: .2em; }
 .text-action { display: flex; align-items: center; justify-content: space-between; padding-inline: 0; text-decoration: none; font-size: .8125rem; font-weight: 650; }
-.feature-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .625rem; }
-.feature { min-height: 116px; display: flex; flex-direction: column; align-items: flex-start; gap: .125rem; border: 1px solid var(--line); border-radius: 1rem; padding: .875rem; background: var(--surface); color: var(--ink); text-decoration: none; }
+.feature-grid { display: flex; flex-wrap: wrap; gap: .625rem; }
+.feature { flex: 1 0 calc(50% - .625rem); min-width: 8rem; min-height: 116px; display: flex; flex-direction: column; align-items: flex-start; gap: .125rem; border: 1px solid var(--line); border-radius: 1rem; padding: .875rem; background: var(--surface); color: var(--ink); text-decoration: none; }
 .feature svg { width: 2rem; height: 2rem; flex: none; padding: .3125rem; margin-bottom: .375rem; background: var(--accent-soft); color: var(--primary); border-radius: .625rem; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; fill: none; }
 .feature strong { font-size: .9375rem; line-height: 1.25; font-weight: 650; }
 .feature span { font-size: .75rem; line-height: 1.4; color: var(--muted); }
@@ -94,3 +94,4 @@ summary { min-height: 48px; padding: .75rem 0; cursor: pointer; font-weight: 650
   .dot { border: 1px solid CanvasText; }
   button, input, select, textarea, .card, .feature { forced-color-adjust: auto; }
 }
+
