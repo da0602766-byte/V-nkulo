@@ -10,6 +10,10 @@ Antes de usar sem internet: entre na conta, escolha a comunidade e prepare
 as consultas/módulos desejados. A preparação tem prazo e exige conexão
 novamente após reiniciar o celular.
 
+Na versão 1.15.0, as consultas ficam nos cartões da tela inicial. Para ativar,
+atualizar ou remover cópias, use Gerenciar offline. Visitantes e Mais funções
+mantêm preparação própria. Salvar rascunho não significa enviar ao servidor.
+
 Se um envio ficar pendente: reconecte, abra o aplicativo e, se solicitado,
 entre com a mesma conta/comunidade e prepare o módulo novamente. Aguarde o
 recibo. Não recrie manualmente um envio cujo resultado é desconhecido.

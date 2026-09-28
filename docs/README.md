@@ -51,6 +51,8 @@ Documentação funcional de módulos específicos.
 
 ## `relatorios/`
 
+- [`APK_REFORMA_VISUAL_1_2026-09-28.md`](relatorios/APK_REFORMA_VISUAL_1_2026-09-28.md) — nova entrada offline, atalhos e identidade visual; validação e limites da primeira entrega.
+
 Relatórios fechados de entregas já publicadas — histórico, não fluxo ativo.
 
 - [`APK_ETAPA_1_2026-09-27.md`](relatorios/APK_ETAPA_1_2026-09-27.md) — diagnóstico sem deploy: origem/assinatura do APK, baseline disponível e limites da homologação Android.
