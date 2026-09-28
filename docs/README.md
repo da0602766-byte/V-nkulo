@@ -55,7 +55,8 @@ Relatórios fechados de entregas já publicadas — histórico, não fluxo ativo
 - [`APK_ETAPA_2_2026-09-27.md`](relatorios/APK_ETAPA_2_2026-09-27.md) — entrada local, contexto cifrado e validação do candidato Android 1.8.0 de homologação.
 - [`APK_ETAPA_3_2026-09-27.md`](relatorios/APK_ETAPA_3_2026-09-27.md) — consultas offline autorizadas de mural, agenda e escalas próprias; candidato 1.9.0 de homologação.
 - [`APK_ETAPA_4_2026-09-27.md`](relatorios/APK_ETAPA_4_2026-09-27.md) — rascunhos cifrados e fila de cadastro básico de visitante, recibos idempotentes e limites de homologação.
-- [`APK_ETAPA_5A_2026-09-27.md`](relatorios/APK_ETAPA_5A_2026-09-27.md) — primeiro bloco da etapa 5: consulta offline dos próprios pedidos com consentimento separado; demais módulos ainda abertos.
+- [`APK_ETAPA_5A_2026-09-27.md`](relatorios/APK_ETAPA_5A_2026-09-27.md) — histórico do primeiro bloco: consulta offline dos próprios pedidos; complementado pelo relatório integral da etapa 5 abaixo.
+- [`APK_ETAPA_5_2026-09-27.md`](relatorios/APK_ETAPA_5_2026-09-27.md) — conclusão do recorte de módulos: pedidos, notas, acompanhamentos, checklists, células e estacionamento, com validação e gates físicos separados.
 
 - [`RELATORIO_IMPLEMENTACAO_MENU_VISITANTES_COMPARTILHAMENTO.md`](relatorios/RELATORIO_IMPLEMENTACAO_MENU_VISITANTES_COMPARTILHAMENTO.md)
 - [`RELATORIO_IMPLEMENTACAO_VINKULO_2026-08-08.md`](relatorios/RELATORIO_IMPLEMENTACAO_VINKULO_2026-08-08.md)

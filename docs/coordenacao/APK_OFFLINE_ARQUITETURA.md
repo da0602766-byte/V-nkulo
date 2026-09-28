@@ -1,6 +1,6 @@
 # APK Vínkulo — arquitetura e sequência de evolução
 
-Data: 27/09/2026. Estado: etapas 1–4 implementadas; APK 1.10.0 publicado para homologação no Sites 323. Etapa 5 autorizada e iniciada pelo bloco 5A (consultas dos próprios pedidos); não declarar a etapa inteira concluída. Etapas 6–7 aguardam autorização. Testes físicos e métricas Android continuam pendentes. Evidências nos relatórios APK das etapas 1–4.
+Data-base: 27/09/2026. Estado: etapas 1–4 e recorte integral de implementação da etapa 5 realizados. APK 1.12.0 candidato em validação/publicação de homologação; bloco 5A/1.11.0 publicado no Sites 324. Não confundir implementação com aprovação física/distribuição geral. Etapas 6–7 aguardam autorização. Testes físicos e métricas Android continuam pendentes. Evidências nos relatórios APK das etapas 1–5.
 
 ## Objetivo e limites
 
@@ -109,6 +109,10 @@ O worker não depende de JavaScript/WebView abertos. Antes de habilitá-lo, impl
 Web/PWA: sincronizar ao abrir, retomar e reconectar; não prometer equivalência ao worker Android nem cifragem baseada em Keystore. Habilitar dados sensíveis no navegador apenas após política de proteção específica.
 
 ## Matriz inicial de módulos
+
+### Conclusão do recorte da etapa 5
+
+Após a solicitação “Termine a etapa”, os blocos restantes foram implementados: rascunhos/fila de pedidos, notas pessoais e acompanhamentos; checklists próprios com versão; células L/R; comprovantes próprios e ocorrências de estacionamento. Preparação por módulo, snapshots limitados por substituição integral, grants nativos até 8h, fila durável e recibos transacionais. Não promete deltas, mídias, administração offline ou funcionamento integral do painel sem rede. Detalhes, validação, publicação e gates em `docs/relatorios/APK_ETAPA_5_2026-09-27.md`. A seção 5A abaixo é histórico, não o estado final da implementação.
 
 ### Etapa 5 autorizada — primeiro bloco 5A (27/09/2026)
 
