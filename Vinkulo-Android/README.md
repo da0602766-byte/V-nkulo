@@ -117,7 +117,7 @@ Entrada local com ativação explícita de mural, agenda (eventos e compromissos
 - Atualizar manualmente na entrada local, ou ao abrir o painel após consentimento no mesmo vínculo. Sem sincronização operacional em segundo plano. Desativar remove a cópia consultável, mas não encerra a sessão online.
 - Testes de homologação: testes Java/JS, armazenamento cifrado, migração, limites, expiração, troca de vínculo, leitura local/recriação e cadeia de atualização assinada 1.7.1 → 1.8.0 → 1.9.0 em emuladores API 29/35. WebView antigo sem ponte segura só oferece atualização do WebView e sistema online.
 
-Distribuição geral depende de testes físicos autenticados e integrações, desempenho medido, Gradle Wrapper/checksum, dependências verificadas/travadas e actions fixadas por SHA. Não prometer funcionamento majoritariamente offline nem build bit a bit reproduzível nesta etapa.
+Distribuição geral depende de testes físicos autenticados e integrações e desempenho medido. A consolidação do Wrapper/checksum, dependências verificadas/travadas e actions fixadas está descrita na etapa 7 acima. Não prometer funcionamento majoritariamente offline nem build bit a bit reproduzível.
 
 ## Melhorias da versão 1.7.0
 

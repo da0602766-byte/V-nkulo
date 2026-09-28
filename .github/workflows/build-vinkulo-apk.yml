@@ -58,7 +58,7 @@ jobs:
       - name: Compilar versão anterior para teste de preservação de dados
         run: |
           mkdir -p "$RUNNER_TEMP/vinkulo-previous"
-          git archive f4cacf1ef16eda70eec59b4d574456435e3f5106 Vinkulo-Android | tar -x -C "$RUNNER_TEMP/vinkulo-previous"
+          git -C "$GITHUB_WORKSPACE" archive f4cacf1ef16eda70eec59b4d574456435e3f5106 Vinkulo-Android | tar -x -C "$RUNNER_TEMP/vinkulo-previous"
           cp app/google-services.json "$RUNNER_TEMP/vinkulo-previous/Vinkulo-Android/app/google-services.json"
           ./gradlew -p "$RUNNER_TEMP/vinkulo-previous/Vinkulo-Android" assembleDebug
       - name: Conferir assinatura e continuidade das atualizações
@@ -80,6 +80,7 @@ jobs:
         with:
           name: Vinkulo-Android-1.14.0-validacao-api${{ matrix.api }}
           path: |
+            Vinkulo-Android/build/reports/dependency-verification/
             Vinkulo-Android/app/build/reports/
             Vinkulo-Android/app/build/test-results/
             Vinkulo-Android/app/build/outputs/mapping/release/mapping.txt
