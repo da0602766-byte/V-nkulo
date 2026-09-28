@@ -2,9 +2,28 @@
 
 Aplicativo Android conectado à plataforma oficial do Vínkulo.
 
-Versão estável de distribuição geral: **1.7.1** (`versionCode 10`). Candidato para homologação: **1.14.0** (`versionCode 17`).
+Versão estável de distribuição geral: **1.7.1** (`versionCode 10`). Candidato para homologação: **1.15.0** (`versionCode 18`).
 
-## Atualização e distribuição — candidato 1.14.0
+## Reforma offline — primeira entrega visual
+
+Atalhos de Mural, Agenda, Escalas, Pedidos, Visitantes e Mais funções aparecem
+antes dos controles de preparação. Consultas indicam disponibilidade real e
+abrem a aba correspondente; ausência de acesso leva à preparação, sem consentir
+nem enviar automaticamente. Status compacto, prazo e última atualização;
+preparação/remoção ficam em Gerenciar offline, com avisos preservados.
+
+Paleta-base Moderno clara/escura da plataforma, tipografia Instrument Sans
+embutida (licença OFL incluída) e ícones SVG locais. Nenhuma dependência de CDN.
+A escolha automática da paleta personalizada da comunidade ainda não é
+transportada pelo protocolo offline; não confundir esta base visual com essa
+integração. Telas dedicadas por módulo e central unificada de pendências são as
+próximas entregas, sem mudança em criptografia, permissões ou filas nesta etapa.
+
+Validação de navegador: `scripts/visual-shell.test.cjs` exige Playwright instalado;
+aceita VINKULO_PLAYWRIGHT, VINKULO_BROWSER_CHANNEL e VINKULO_QA_DIR. Usa somente
+fixtures de teste, nunca contas reais. Não substitui testes Android/TalkBack.
+
+## Atualização e distribuição — candidato 1.15.0
 
 Use `./gradlew` (ou `gradlew.bat`) com Java 17 e Android SDK 35. O Wrapper 8.10.2
 tem checksum oficial de distribuição e JAR. Dependências ficam em
@@ -29,7 +48,7 @@ não deve prometer recuperar conteúdo cifrado quando a chave foi perdida.
 
 A CI verifica separadamente a cadeia de APKs release assinados e a atualização
 de dados com builds debug da fonte anterior e atual. Neste segundo ensaio,
-sete registros cifrados/estados são criados na 1.13.0, o processo é encerrado,
+sete registros cifrados/estados são criados na 1.14.0, o processo é encerrado,
 o APK é atualizado sem desinstalação e o teste verifica conteúdo, UUID,
 cifragem, isolamento e recuperação de lease após atualização/reabertura.
 Fixtures e runners de teste não integram o APK release.

@@ -89,6 +89,28 @@
     selected = 'mural';
     ['mural','agenda','escalas','pedidos'].forEach(tab => byId('tab-' + tab).setAttribute('aria-pressed', String(tab === selected)));
   }
+  function available(name) {
+    if (!snapshot) return false;
+    const names = name === 'agenda' ? ['eventos', 'compromissos'] : [name];
+    return names.some(key => snapshot[key] && snapshot[key].allowed);
+  }
+  function home(state) {
+    const ready = !!(state.prepared && state.snapshot);
+    byId('context-dot').setAttribute('data-ready', String(ready));
+    // validForMs is remaining lifetime, not duration since preparedAt.
+    const validUntil = ready ? new Date(Date.now() + Math.max(0, Number(state.validForMs) || 0)) : null;
+    setText(byId('home-notice'), waiting ? 'Conferindo seu acesso…' : ready
+      ? 'Cópia salva · acesso até ' + validUntil.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'}) + '.'
+      : state.result === 'storage-error' ? 'Não foi possível ler as consultas. Seus dados não foram apagados.'
+      : 'Prepare com internet para consultar depois.');
+    if (ready && state.result === 'unavailable') setText(byId('home-notice'), 'Atualização indisponível. A cópia anterior continua com prazo limitado.');
+    ['mural','agenda','escalas','pedidos'].forEach(name => {
+      const allowed = available(name), link = byId('shortcut-' + name);
+      link.setAttribute('href', allowed ? '#reader' : '#offline-settings');
+      link.setAttribute('data-ready', String(allowed));
+      setText(byId('shortcut-' + name + '-status'), allowed ? 'Consulta salva' : !bridge ? 'Requer WebView atualizado' : !ready ? 'Preparar com internet' : name === 'pedidos' ? 'Verificar acesso / ativar' : 'Não autorizado nesta cópia');
+    });
+  }
   function render(state) {
     window.clearTimeout(expiryTimer);
     waiting = !!state.refreshing;
@@ -106,7 +128,7 @@
     byId('community').hidden = !state.prepared;
     byId('prepared-at').hidden = !state.prepared;
     byId('community').textContent = state.prepared ? state.communityName : '';
-    byId('prepared-at').textContent = state.prepared ? `Preparado em ${new Date(state.preparedAt).toLocaleString('pt-BR')}` : '';
+    byId('prepared-at').textContent = state.prepared ? `Atualizado em ${new Date(state.preparedAt).toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}` : '';
     // An expired copy must remain removable without requiring a new login.
     byId('lock').hidden = !bridge;
     byId('prepare').textContent = state.prepared && state.snapshot ? 'Atualizar consultas offline' : 'Ativar consultas offline';
@@ -128,9 +150,11 @@
     } else clearSnapshot();
     if (state.prepared && state.result === 'unavailable') setText(byId('context-detail'), 'Não foi possível atualizar. A cópia anterior permanece disponível apenas até o vencimento.');
     if (state.prepared && state.result === 'requests-denied') setText(byId('context-detail'), 'Meus pedidos não estão disponíveis para este acesso ou plano. As demais consultas autorizadas foram atualizadas.');
+    home(state);
     if (state.prepared) expiryTimer = window.setTimeout(() => { render({result:'locked'}); send('status'); }, Math.max(0, Number(state.validForMs) || 0));
   }
   function connection() {
+    byId('network-badge').textContent = navigator.onLine ? 'No aparelho' : 'Sem conexão';
     byId('connection').textContent = navigator.onLine ? 'Os recursos online dependem de conexão com o servidor.' : 'Sem conexão. Esta tela continua disponível.';
   }
   if (bridge) bridge.onmessage = event => { if (document.hidden) return; try {
@@ -140,6 +164,8 @@
     byId('context-title').textContent = 'Atualize o Android System WebView';
     byId('context-detail').textContent = 'A preparação protegida precisa de uma versão compatível do WebView. Você pode continuar no sistema online.';
     byId('prepare').disabled = true; byId('prepare-requests').disabled = true; byId('lock').hidden = true;
+    home({});
+    setText(byId('home-notice'), 'Atualize o WebView para preparar consultas. O sistema online continua acessível.');
   }
   byId('open').addEventListener('click', () => { window.location.assign('/painel'); });
   byId('prepare').addEventListener('click', () => { if (waiting) return; waiting = true; byId('prepare').disabled = true; send('refresh'); });
@@ -151,6 +177,14 @@
     ['mural', 'agenda', 'escalas', 'pedidos'].forEach(tab => byId('tab-' + tab).setAttribute('aria-pressed', String(tab === selected)));
     renderItems();
   }));
+  ['mural', 'agenda', 'escalas', 'pedidos'].forEach(name => byId('shortcut-' + name).addEventListener('click', () => {
+    // Recheck at click time: expiration or revocation can change a shortcut.
+    if (!available(name)) { byId('offline-settings').open = true; return; }
+    selected = name; byId('search').value = '';
+    ['mural','agenda','escalas','pedidos'].forEach(tab => byId('tab-' + tab).setAttribute('aria-pressed', String(tab === selected)));
+    renderItems();
+  }));
+  byId('manage-offline').addEventListener('click', () => { byId('offline-settings').open = true; });
   byId('search').addEventListener('input', scheduleRenderItems);
   window.addEventListener('vinkulo:offline-status', () => send('status'));
   document.addEventListener('visibilitychange', () => { if (!bridge) return; render({result:'locked'}); if (!document.hidden) send('status'); });
@@ -159,8 +193,9 @@
   window.setInterval(() => { if (!document.hidden) send('status'); }, 30000);
   function focusHashTarget() {
     const id = String(window.location.hash || '').slice(1);
-    if (!['main-content','reader','visitor-section','module-section'].includes(id)) return;
+    if (!['top','main-content','reader','visitor-section','module-section','offline-settings'].includes(id)) return;
     const target = byId(id); if (!target || target.hidden) return;
+    if (id === 'offline-settings') target.open = true;
     frame(() => { target.focus({preventScroll:true}); target.scrollIntoView({block:'start'}); });
   }
   if (document.querySelectorAll) Array.prototype.forEach.call(document.querySelectorAll('a[href^="#"]'), link => link.addEventListener('click', () => frame(focusHashTarget)));

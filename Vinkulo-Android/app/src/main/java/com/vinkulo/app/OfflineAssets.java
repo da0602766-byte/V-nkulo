@@ -22,12 +22,13 @@ final class OfflineAssets {
                         case "visitors.js": mime = "application/javascript"; break;
                         case "modules.js": mime = "application/javascript"; break;
                         case "app.css": mime = "text/css"; break;
+                        case "instrument-sans.woff2": mime = "font/woff2"; break;
                         default: return missing();
                     }
                     try {
                         Map<String, String> headers = new HashMap<>();
                         headers.put("Cache-Control", "no-store"); headers.put("X-Content-Type-Options", "nosniff");
-                        headers.put("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");
+                        headers.put("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");
                         return new WebResourceResponse(mime, "UTF-8", 200, "OK", headers, context.getAssets().open("mobile-app/" + path));
                     } catch (java.io.IOException ignored) { return missing(); }
                 }).build();

@@ -18,7 +18,7 @@ public class UpgradeContinuityTest {
     private static final String SCOPE = "visitors:" + OfflinePolicy.digest("9701:33");
 
     @Test public void seedPreviousVersion() throws Exception {
-        assertEquals("1.13.0", context.getPackageManager().getPackageInfo(context.getPackageName(), 0).versionName);
+        assertEquals("1.14.0", context.getPackageManager().getPackageInfo(context.getPackageName(), 0).versionName);
         JSONArray expected = new JSONArray();
         try (VisitorAccess access = new VisitorAccess(context)) {
             assertEquals(0, access.database.storage().recordCount());
@@ -46,7 +46,7 @@ public class UpgradeContinuityTest {
     }
 
     @Test public void verifyUpdatedVersionAndRecovery() throws Exception {
-        assertEquals("1.14.0", context.getPackageManager().getPackageInfo(context.getPackageName(),0).versionName);
+        assertEquals("1.15.0", context.getPackageManager().getPackageInfo(context.getPackageName(),0).versionName);
         JSONArray expected = new JSONArray(context.getSharedPreferences(PREFS,0).getString("expected","[]"));
         assertEquals(7,expected.length());
         try (VisitorAccess access = new VisitorAccess(context)) {

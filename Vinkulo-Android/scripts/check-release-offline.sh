@@ -8,7 +8,7 @@ ready=0
 for attempt in $(seq 1 12); do
   adb shell uiautomator dump /sdcard/vinkulo-foundation.xml >/dev/null 2>&1 || true
   adb pull /sdcard/vinkulo-foundation.xml app/build/reports/vinkulo-release-offline.xml >/dev/null 2>&1 || true
-  if grep -q 'Seu Vínkulo começa aqui' app/build/reports/vinkulo-release-offline.xml &&
+  if grep -q 'O que vamos fazer?' app/build/reports/vinkulo-release-offline.xml &&
      grep -Eq 'Preparação necessária|Atualize o Android System WebView' app/build/reports/vinkulo-release-offline.xml; then
     ready=1
     break

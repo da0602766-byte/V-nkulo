@@ -58,7 +58,7 @@ jobs:
       - name: Compilar versão anterior para teste de preservação de dados
         run: |
           mkdir -p "$RUNNER_TEMP/vinkulo-previous"
-          git -C "$GITHUB_WORKSPACE" archive f4cacf1ef16eda70eec59b4d574456435e3f5106 Vinkulo-Android | tar -x -C "$RUNNER_TEMP/vinkulo-previous"
+          git -C "$GITHUB_WORKSPACE" archive 45072c1b53b7786544b18d58cf1a0d40f0e38eb1 Vinkulo-Android | tar -x -C "$RUNNER_TEMP/vinkulo-previous"
           cp app/google-services.json "$RUNNER_TEMP/vinkulo-previous/Vinkulo-Android/app/google-services.json"
           ./gradlew -p "$RUNNER_TEMP/vinkulo-previous/Vinkulo-Android" assembleDebug
       - name: Conferir assinatura e continuidade das atualizações
@@ -72,13 +72,13 @@ jobs:
           sha256sum app/build/outputs/apk/release/app-release.apk
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: Vinkulo-Android-1.14.0-homologacao-api${{ matrix.api }}
+          name: Vinkulo-Android-1.15.0-homologacao-api${{ matrix.api }}
           path: Vinkulo-Android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: Vinkulo-Android-1.14.0-validacao-api${{ matrix.api }}
+          name: Vinkulo-Android-1.15.0-validacao-api${{ matrix.api }}
           path: |
             Vinkulo-Android/build/reports/dependency-verification/
             Vinkulo-Android/app/build/reports/
@@ -121,6 +121,9 @@ jobs:
             curl --fail --location https://adote-gestao.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.13.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.13.0.apk
             echo '227398fad70fec0ecb1c081521123e1f400831f03b8521dc0a6a2d482a4077b5  /tmp/vinkulo-1.13.0.apk' | sha256sum --check
             adb install -r /tmp/vinkulo-1.13.0.apk
+            curl --fail --location https://adote-gestao.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.14.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.14.0.apk
+            echo '4ab64689c3d9e7ee96022c9e43754ca738fd68679dfb1ab95db0c551c1f0be09  /tmp/vinkulo-1.14.0.apk' | sha256sum --check
+            adb install -r /tmp/vinkulo-1.14.0.apk
             adb install -r app/build/outputs/apk/release/app-release.apk
             adb shell dumpsys package com.vinkulo.app | grep firstInstallTime > /tmp/vinkulo-after-update.txt
             diff /tmp/vinkulo-first-install.txt /tmp/vinkulo-after-update.txt
@@ -134,7 +137,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: Vinkulo-Android-1.14.0-emulador-api${{ matrix.api }}
+          name: Vinkulo-Android-1.15.0-emulador-api${{ matrix.api }}
           path: |
             Vinkulo-Android/app/build/reports/androidTests/
             Vinkulo-Android/app/build/outputs/androidTest-results/

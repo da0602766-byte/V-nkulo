@@ -28,3 +28,14 @@ test('Android back delegates local focus and anchors before leaving the activity
   assert.match(app,/window\.VinkuloLocalBack/);assert.match(app,/window\.history\.back\(\)/);
   assert.match(activity,/VinkuloLocalBack&&window\.VinkuloLocalBack/);assert.match(activity,/finishWebBack\(\)/);
 });
+
+test('home places six shortcuts ahead of optional consent and includes a local licensed font',()=>{
+  assert.equal((html.match(/class="feature"/g)||[]).length,6);
+  assert.ok(html.indexOf('class="feature-grid"')<html.indexOf('id="prepare"'));
+  assert.match(html,/<details id="offline-settings"/);
+  assert.doesNotMatch(html,/<details id="offline-settings"[^>]*\sopen/);
+  assert.match(css,/font-display: swap/);
+  assert.match(css,/src: url\("\/mobile-app\/instrument-sans.woff2"\)/);
+  assert.match(read('app/src/main/assets/mobile-app/InstrumentSans-OFL.txt'),/SIL OPEN FONT LICENSE/);
+  assert.match(read('app/src/main/java/com/vinkulo/app/OfflineAssets.java'),/font-src 'self'; connect-src 'none'/);
+});

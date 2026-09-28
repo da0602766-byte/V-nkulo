@@ -130,3 +130,41 @@ test('own request text is literal, searchable and visibly historical; revoked co
   assert.equal(app.elements.get('tab-mural').attributes['aria-pressed'],'true');
   assert.match(app.elements.get('context-detail').textContent,/acesso ou plano/);
 });
+
+test('home shortcuts select a saved section without sending a consent or clearing a draft', () => {
+  const app=shell(), data=snapshot();
+  app.send({prepared:true,preparedAt:1,validForMs:1000,snapshot:data});
+  assert.equal(app.elements.get('shortcut-agenda').attributes.href,'#reader');
+  const count=app.requests.length;
+  app.elements.get('search').value='consulta antiga';
+  app.elements.get('shortcut-agenda').handlers.click();
+  assert.equal(app.elements.get('tab-agenda').attributes['aria-pressed'],'true');
+  assert.equal(app.elements.get('search').value,'');
+  assert.equal(app.requests.length,count);
+  assert.equal(app.elements.get('shortcut-pedidos').attributes.href,'#offline-settings');
+  app.elements.get('shortcut-pedidos').handlers.click();
+  assert.equal(app.elements.get('offline-settings').open,true);
+  assert.equal(app.requests.length,count);
+});
+
+test('home availability is cleared on expiry, lock and denied sections', () => {
+  const app=shell(), data=snapshot();
+  data.mural.allowed=false;data.mural.items=[];
+  app.send({prepared:true,preparedAt:1,validForMs:1000,snapshot:data});
+  assert.equal(app.elements.get('shortcut-mural').attributes['data-ready'],'false');
+  assert.match(app.elements.get('shortcut-mural-status').textContent,/Não autorizado/);
+  assert.equal(app.elements.get('context-dot').attributes['data-ready'],'true');
+  [...app.timers.values()][0]();
+  for(const name of ['mural','agenda','escalas','pedidos']) {
+    assert.equal(app.elements.get('shortcut-'+name).attributes.href,'#offline-settings');
+    assert.equal(app.elements.get('shortcut-'+name).attributes['data-ready'],'false');
+  }
+  assert.equal(app.elements.get('context-dot').attributes['data-ready'],'false');
+  assert.doesNotMatch(app.elements.get('home-notice').textContent,/acesso até/);
+});
+
+test('network availability does not claim confirmed server connectivity', () => {
+  const app=shell();
+  assert.equal(app.elements.get('network-badge').textContent,'Sem conexão');
+  assert.doesNotMatch(source,/textContent\s*=\s*navigator.onLine\s*\?\s*'Online'/);
+});
