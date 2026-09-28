@@ -110,6 +110,10 @@ Web/PWA: sincronizar ao abrir, retomar e reconectar; não prometer equivalência
 
 ## Matriz inicial de módulos
 
+### Conclusão da etapa 6
+
+O candidato **1.13.0/code 16** aplica renderização em lote, busca agrupada por frame, navegação/foco semânticos, suporte a fonte 200%, alvos mínimos de 48 px e tratamento explícito de teclado/Voltar. A permissão de notificações passou a ser solicitada somente no fluxo de ativação do push. O CI `36365428266` aprovou API 29/35, incluindo 20 testes instrumentados na API 35 e comparação de 100 registros/20 amostras: inserções no DOM conectado caíram de 100 para 1, p50 ficou em 7,9 ms e p95 caiu de 9,6 para 8,3 ms no WebView 124 do emulador. Não há ampliação de dados/permissões; TalkBack e desempenho físicos continuam gate. Evidências completas em `docs/relatorios/APK_ETAPA_6_2026-09-27.md`.
+
 ### Conclusão do recorte da etapa 5
 
 Após a solicitação “Termine a etapa”, os blocos restantes foram implementados: rascunhos/fila de pedidos, notas pessoais e acompanhamentos; checklists próprios com versão; células L/R; comprovantes próprios e ocorrências de estacionamento. Preparação por módulo, snapshots limitados por substituição integral, grants nativos até 8h, fila durável e recibos transacionais. Não promete deltas, mídias, administração offline ou funcionamento integral do painel sem rede. Detalhes, validação, publicação e gates em `docs/relatorios/APK_ETAPA_5_2026-09-27.md`. A seção 5A abaixo é histórico, não o estado final da implementação.

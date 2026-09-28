@@ -57,6 +57,7 @@ Relatórios fechados de entregas já publicadas — histórico, não fluxo ativo
 - [`APK_ETAPA_4_2026-09-27.md`](relatorios/APK_ETAPA_4_2026-09-27.md) — rascunhos cifrados e fila de cadastro básico de visitante, recibos idempotentes e limites de homologação.
 - [`APK_ETAPA_5A_2026-09-27.md`](relatorios/APK_ETAPA_5A_2026-09-27.md) — histórico do primeiro bloco: consulta offline dos próprios pedidos; complementado pelo relatório integral da etapa 5 abaixo.
 - [`APK_ETAPA_5_2026-09-27.md`](relatorios/APK_ETAPA_5_2026-09-27.md) — conclusão do recorte de módulos: pedidos, notas, acompanhamentos, checklists, células e estacionamento, com validação e gates físicos separados.
+- [`APK_ETAPA_6_2026-09-27.md`](relatorios/APK_ETAPA_6_2026-09-27.md) — fluidez e usabilidade transversal do shell offline: renderização em lote, teclado/Voltar, fonte ampliada, semântica e métricas controladas.
 
 - [`RELATORIO_IMPLEMENTACAO_MENU_VISITANTES_COMPARTILHAMENTO.md`](relatorios/RELATORIO_IMPLEMENTACAO_MENU_VISITANTES_COMPARTILHAMENTO.md)
 - [`RELATORIO_IMPLEMENTACAO_VINKULO_2026-08-08.md`](relatorios/RELATORIO_IMPLEMENTACAO_VINKULO_2026-08-08.md)
