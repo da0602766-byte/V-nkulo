@@ -26,7 +26,7 @@ type CareNote = {
 };
 
 type StoredNotes = { notes: CareNote[] };
-type StoredRow = { configuracao: string };
+type StoredRow = { configuracao: string; versao: number };
 
 function scopeFor(userId: number) {
   return `care-notes:user:${userId}`;
@@ -90,29 +90,33 @@ function normalizeNote(value: unknown, previous?: CareNote): CareNote | null {
 
 async function readNotes(communityId: number, userId: number) {
   const row = await getD1().prepare(
-    `SELECT configuracao FROM layouts_interface
+    `SELECT configuracao, versao FROM layouts_interface
      WHERE comunidade_id = ? AND escopo = ? LIMIT 1`,
   ).bind(communityId, scopeFor(userId)).first<StoredRow>();
-  return parseStored(row?.configuracao);
+  return { ...parseStored(row?.configuracao), version: row?.versao ?? 0 };
 }
 
-async function saveNotes(communityId: number, userId: number, notes: CareNote[]) {
-  await getD1().prepare(
+async function saveNotes(communityId: number, userId: number, notes: CareNote[], version: number) {
+  const result = await getD1().prepare(
     `INSERT INTO layouts_interface
      (comunidade_id, usuario_id, escopo, tipo, nome, configuracao, atualizado_por)
-     VALUES (?, ?, ?, 'PESSOAL', 'Post-its de cuidado', ?, ?)
+     SELECT ?, ?, ?, 'PESSOAL', 'Post-its de cuidado', ?, ?
+     WHERE ? = 0 OR EXISTS(SELECT 1 FROM layouts_interface WHERE comunidade_id=? AND escopo=?)
      ON CONFLICT(comunidade_id, escopo) DO UPDATE SET
        configuracao = excluded.configuracao,
        versao = layouts_interface.versao + 1,
        atualizado_por = excluded.atualizado_por,
-       atualizado_em = CURRENT_TIMESTAMP`,
+       atualizado_em = CURRENT_TIMESTAMP
+     WHERE layouts_interface.versao = ?`,
   ).bind(
     communityId,
     userId,
     scopeFor(userId),
     JSON.stringify({ notes: notes.slice(0, MAX_NOTES) }),
     userId,
+    version, communityId, scopeFor(userId), version,
   ).run();
+  return result.meta.changes === 1;
 }
 
 export async function GET() {
@@ -149,7 +153,7 @@ export async function POST(request: Request) {
   if (!note) return Response.json({ error: "Escreva um título ou uma anotação." }, { status: 400 });
   const stored = await readNotes(access.context.comunidadeId, access.user.id);
   const notes = [note, ...stored.notes.filter((item) => item.id !== note.id)].slice(0, MAX_NOTES);
-  await saveNotes(access.context.comunidadeId, access.user.id, notes);
+  if (!await saveNotes(access.context.comunidadeId, access.user.id, notes, stored.version)) return Response.json({ error: "As anotações mudaram. Atualize e tente novamente." }, { status: 409 });
   await recordTenantAudit(getD1(), access.context, access.user.id, "ANOTACAO_CUIDADO_CRIADA", "SUCESSO", { noteId: note.id });
   return Response.json({ anotacao: note });
 }
@@ -166,7 +170,7 @@ export async function PATCH(request: Request) {
   const note = normalizeNote({ ...previous, ...body, id }, previous);
   if (!note) return Response.json({ error: "A anotação não pode ficar vazia." }, { status: 400 });
   const notes = stored.notes.map((item) => item.id === id ? note : item);
-  await saveNotes(access.context.comunidadeId, access.user.id, notes);
+  if (!await saveNotes(access.context.comunidadeId, access.user.id, notes, stored.version)) return Response.json({ error: "As anotações mudaram. Atualize e tente novamente." }, { status: 409 });
   return Response.json({ anotacao: note });
 }
 
@@ -176,7 +180,7 @@ export async function DELETE(request: Request) {
   const id = cleanText(new URL(request.url).searchParams.get("id"), 80);
   if (!id) return Response.json({ error: "Anotação inválida." }, { status: 400 });
   const stored = await readNotes(access.context.comunidadeId, access.user.id);
-  await saveNotes(access.context.comunidadeId, access.user.id, stored.notes.filter((item) => item.id !== id));
+  if (!await saveNotes(access.context.comunidadeId, access.user.id, stored.notes.filter((item) => item.id !== id), stored.version)) return Response.json({ error: "As anotações mudaram. Atualize e tente novamente." }, { status: 409 });
   await recordTenantAudit(getD1(), access.context, access.user.id, "ANOTACAO_CUIDADO_REMOVIDA", "SUCESSO", { noteId: id });
   return Response.json({ ok: true });
 }

@@ -6,7 +6,9 @@ migração nova, leia isto.
 
 ## Próximo número livre
 
-**`0082`**. Use o próximo inteiro disponível a partir daí — não reaproveite
+`0082_mobile_modules.sql`: grants/recibos de operações móveis e versões de checklists com trigger de UPDATE, inclusive para alterações feitas online. Aditiva, sem backfill de conteúdo pessoal nem reset de filas; bootstrap autenticado em `app/lib/mobile-module-storage.ts` espelha o DDL. Validada em SQLite e D1/Miniflare.
+
+**`0083`**. Use o próximo inteiro disponível a partir daí — não reaproveite
 um número já usado, mesmo que o arquivo tenha sido escrito à mão.
 
 `0081_mobile_visitor_outbox.sql` cria concessões restritas de envio e recibos de

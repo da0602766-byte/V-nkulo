@@ -3172,3 +3172,23 @@ export const mobileVisitorReceipts = sqliteTable('mobile_visitor_receipts', {
   createdAt: text('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
 }, table => [primaryKey({ columns: [table.usuarioId, table.comunidadeId, table.operationId] }),
   check('mobile_visitor_receipt_result', sql`${table.result} IN ('PENDING','CONFIRMED','CONFLICT')`)]);
+
+export const mobileModuleGrants = sqliteTable('mobile_module_grants', {
+  usuarioId: integer('usuario_id').notNull().references(() => usuarios.id, { onDelete: 'cascade' }),
+  comunidadeId: integer('comunidade_id').notNull().references(() => comunidades.id, { onDelete: 'cascade' }),
+  deviceId: text('device_id').notNull(), module: text('module').notNull(), sessionHash: text('session_hash').notNull(),
+  tokenHash: text('token_hash').notNull(), expiresAt: integer('expires_at').notNull(),
+}, table => [primaryKey({ columns: [table.usuarioId, table.comunidadeId, table.deviceId, table.module] })]);
+export const mobileModuleReceipts = sqliteTable('mobile_module_receipts', {
+  usuarioId: integer('usuario_id').notNull().references(() => usuarios.id, { onDelete: 'cascade' }),
+  comunidadeId: integer('comunidade_id').notNull().references(() => comunidades.id, { onDelete: 'cascade' }),
+  operationId: text('operation_id').notNull(), module: text('module').notNull(), payloadHash: text('payload_hash').notNull(),
+  result: text('result').notNull(), resultId: text('result_id'), processed: integer('processed').notNull().default(0),
+  createdAt: text('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+}, table => [primaryKey({ columns: [table.usuarioId, table.comunidadeId, table.operationId] }),
+  check('mobile_module_receipt_result', sql`${table.result} IN ('PENDING','CONFIRMED','CONFLICT')`)]);
+// AFTER UPDATE trigger in 0082 also observes writes made by the online API.
+export const mobileChecklistVersions = sqliteTable('mobile_checklist_versions', {
+  itemId: integer('item_id').primaryKey().references(() => ministerioChecklistItens.id, { onDelete: 'cascade' }),
+  version: integer('version').notNull().default(0),
+});
