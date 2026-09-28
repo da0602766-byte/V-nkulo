@@ -10,9 +10,16 @@ Antes de usar sem internet: entre na conta, escolha a comunidade e prepare
 as consultas/módulos desejados. A preparação tem prazo e exige conexão
 novamente após reiniciar o celular.
 
-Na versão 1.16.0, cada função abre sua própria tela. Para ativar,
+Na versão 1.17.0, cada função abre sua própria tela. Para ativar,
 atualizar ou remover cópias, use Gerenciar offline. Visitantes e Mais funções
 mantêm preparação própria. Salvar rascunho não significa enviar ao servidor.
+
+A Central de pendências reúne rascunhos, fila, revisão e confirmações dos
+módulos com acesso válido. Atualizar lista local não envia nada. Tentar
+sincronizar fila pede confirmação e tenta apenas operações já enfileiradas;
+rascunhos, recusas e conflitos não são enviados por esse botão. Tentativa
+solicitada não é confirmação: aguarde o recibo. Módulos bloqueados podem ter
+trabalho salvo que só reaparece depois de preparar o mesmo acesso.
 
 A navegação avisa antes de descartar alterações não salvas. Cancelar mantém
 o formulário. Salve antes de minimizar ou fechar: campos não salvos ainda
