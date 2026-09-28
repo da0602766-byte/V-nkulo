@@ -121,3 +121,18 @@ test('notes: online compare-and-set cannot overwrite an intervening offline appe
   const after=await exports.readNotes(1,f.id);assert.equal(after.notes.length,2);
   assert.equal(await exports.saveNotes(1,f.id,after.notes,after.version),true);
 });
+test('modules: cells, parking and personal notes export no unrelated people or contact fields',async t=>{
+  const f=await fixture(t),run=(sql,...params)=>Number(f.db.prepare(sql).run(...params).lastInsertRowid);
+  const other=await createPilotUser(f.db,{nome:'Other reader',email:'other-reader@example.test',senha:'Teste123!'});
+  const cell=(name,members,created)=>run("INSERT INTO celulas(comunidade_id,nome,responsavel,membros,criado_por,ativo,escopo_confirmado) VALUES(1,?,'Responsible',?,?,1,1)",name,JSON.stringify(members),created);
+  const mine=cell('Own cell',[{kind:'COMMUNITY',userId:f.id,name:'My name'},{kind:'COMMUNITY',userId:other,name:'Do not export'}],'not-me');
+  cell('Other cell',[{kind:'COMMUNITY',userId:other}], 'not-me');cell('Legacy array',['Legacy name'], 'not-me');
+  const cells=await f.prepare('cells');assert.deepEqual(cells.snapshot.items.map(i=>i.id),[mine]);assert.doesNotMatch(JSON.stringify(cells.snapshot),/Do not export|Legacy name|Other cell/);assert.equal(cells.canWrite,false);
+  assert.equal((await f.write('cells',{celulaId:mine,data:'2026-09-27',observacoes:'Draft'})).status,422);
+  const sector=run("INSERT INTO estacionamento_setores(comunidade_id,nome) VALUES(1,'Module sector')"),space=run("INSERT INTO estacionamento_vagas(comunidade_id,setor_id,codigo) VALUES(1,?,'TEST-01')",sector);
+  const reserve=(user,code)=>run("INSERT INTO estacionamento_reservas(comunidade_id,vaga_id,usuario_id,nome_completo,email,documento_hash,documento_mascarado,inicio_em,fim_em,codigo) VALUES(1,?,?,'Private person','private@example.test','secret-hash','secret-doc','2026-09-27','2026-09-28',?)",space,user,code);
+  const own=reserve(f.id,'OWN-RECEIPT');reserve(other,'OTHER-RECEIPT');const parking=await f.prepare('parking');assert.deepEqual(parking.snapshot.items.map(i=>i.id),[own]);assert.match(JSON.stringify(parking.snapshot),/OWN-RECEIPT/);assert.doesNotMatch(JSON.stringify(parking.snapshot),/OTHER-RECEIPT|private@example|secret-doc|secret-hash|Private person/);
+  run("INSERT INTO layouts_interface(comunidade_id,usuario_id,escopo,configuracao) VALUES(1,?,?,?)",other,'care-notes:user:'+other,JSON.stringify({notes:[{id:'other',titulo:'Secret note',texto:'Other private data'}]}));
+  assert.equal((await f.prepare('notes')).snapshot.items.length,0);
+  f.db.prepare('UPDATE mobile_module_grants SET expires_at=0').run();assert.equal((await f.write('notes',note)).status,401);
+});
