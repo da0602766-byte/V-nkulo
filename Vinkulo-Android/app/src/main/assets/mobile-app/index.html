@@ -7,6 +7,7 @@
   <script src="/mobile-app/navigation.js" defer></script><script src="/mobile-app/theme.js" defer></script><script src="/mobile-app/app.js" defer></script>
   <script src="/mobile-app/visitors.js" defer></script>
   <script src="/mobile-app/modules.js" defer></script>
+  <script src="/mobile-app/pending.js" defer></script>
 </head>
 <body id="top">
 <svg class="icon-library" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
@@ -40,6 +41,7 @@
     <a class="feature" href="#visitor-section"><svg aria-hidden="true" focusable="false"><use href="#i-visitantes"/></svg><strong>Visitantes</strong><span>Rascunhos e envios</span></a>
     <a class="feature" href="#module-section"><svg aria-hidden="true" focusable="false"><use href="#i-modulos"/></svg><strong>Mais funções</strong><span>Anotações, células e mais</span></a>
   </nav>
+  <a class="pending-shortcut" href="#pending-section"><strong>Central de pendências <span aria-hidden="true">→</span></strong><span id="pending-home-status">Rascunhos, envios e confirmações</span></a>
   <div class="online-action"><button id="open" class="secondary" type="button">Ir para o sistema online <span aria-hidden="true">↗</span></button><p id="connection" class="muted" role="status" aria-live="polite" aria-atomic="true"></p></div>
   <a id="quick-reader" class="back-top" href="#reader" hidden>Ver consultas salvas</a>
   </div>
@@ -99,6 +101,18 @@
       <div id="visitor-rows" role="list" aria-label="Rascunhos e envios de visitantes"></div>
       <button id="visitor-lock" type="button" class="quiet">Bloquear cadastros locais sem apagar</button>
     </div>
+    <a class="back-top" href="#top">Voltar ao início</a>
+  </section>
+  <section id="pending-section" hidden aria-labelledby="pending-title" tabindex="-1">
+    <h2 id="pending-title" class="muted">Seu trabalho salvo neste aparelho</h2>
+    <p id="pending-status" role="status" aria-live="polite" aria-atomic="true">Conferindo os módulos preparados.</p>
+    <p id="pending-checked" class="muted"></p>
+    <div class="pending-actions"><button id="pending-refresh" class="secondary" type="button">Atualizar lista local</button><button id="pending-sync" class="primary" type="button" disabled>Tentar sincronizar fila</button></div>
+    <p class="footnote">Só operações já colocadas na fila. Rascunhos não são enviados. A tentativa depende de conexão e acesso válido; aguarde o recibo.</p>
+    <div id="pending-filters" class="tabs" role="group" aria-label="Filtrar trabalho salvo"></div>
+    <p id="pending-result" class="muted" role="status" aria-live="polite"></p>
+    <div id="pending-list" role="list" aria-label="Rascunhos, envios e recibos"></div>
+    <details class="help-details"><summary>Módulos e acesso offline</summary><p class="footnote">Módulos bloqueados não revelam registros nem contagens. Prepare novamente com a mesma conta e comunidade para consultar seu trabalho.</p><div id="pending-access"></div></details>
     <a class="back-top" href="#top">Voltar ao início</a>
   </section>
   <section id="module-menu" hidden aria-label="Escolher função offline">

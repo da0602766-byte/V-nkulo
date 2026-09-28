@@ -2,10 +2,11 @@
   const el = id => document.getElementById(id);
   const moduleNames = {requests:'Pedidos',notes:'Minhas anotações',followups:'Meus acompanhamentos',checklists:'Ministérios e checklists',cells:'Minhas células',parking:'Estacionamento'};
   const readerNames = {mural:'Mural',agenda:'Agenda',escalas:'Minhas escalas',pedidos:'Meus pedidos'};
-  const screens = ['home-screen','offline-settings','reader','visitor-section','module-menu','module-section'];
+  const screens = ['home-screen','offline-settings','reader','visitor-section','module-menu','module-section','pending-section'];
   const guards = {};
   let current = '#top', stack = [];
   function route(hash) {
+    if (hash === '#pending-section') return {id:'pending-section',title:'Central de pendências'};
     if (hash === '#offline-settings') return {id:'offline-settings',title:'Gerenciar offline'};
     if (hash === '#visitor-section') return {id:'visitor-section',title:'Visitantes'};
     if (hash === '#module-section') return {id:'module-menu',title:'Mais funções'};
@@ -30,6 +31,7 @@
     if (next.id === 'offline-settings') el(next.id).open = true;
     if (next.module && window.VinkuloModuleScreen) window.VinkuloModuleScreen.open(next.module);
     if (next.reader && window.VinkuloReaderSelect) window.VinkuloReaderSelect(next.reader);
+    if (window.VinkuloPendingScreen && ['pending-section','home-screen'].includes(next.id)) window.VinkuloPendingScreen.refresh();
     document.title = next.title + ' · Vínkulo offline';
     if (focus) {
       const target = next.id === 'home-screen' ? el('home-title') : el('screen-title');

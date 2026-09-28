@@ -2,7 +2,24 @@
 
 Aplicativo Android conectado à plataforma oficial do Vínkulo.
 
-Versão estável de distribuição geral: **1.7.1** (`versionCode 10`). Candidato para homologação: **1.16.0** (`versionCode 19`).
+Versão estável de distribuição geral: **1.7.1** (`versionCode 10`). Candidato para homologação: **1.17.0** (`versionCode 20`).
+
+## Reforma offline — terceira entrega visual
+
+Central de pendências no início: rascunhos, fila, revisão e recibos em uma tela,
+com filtros e retorno ao módulo. É uma projeção das filas cifradas existentes,
+sem nova base, cópia persistente, mudança de estado ou envio de rascunhos.
+Cada módulo exige autorização local ativa; bloqueados não expõem registros,
+títulos ou contagens. Campos completos, contatos e credenciais não saem pela
+nova ponte. Expiração, bloqueio e segundo plano limpam a exibição.
+
+Atualizar lista é leitura local. Tentar sincronizar exige confirmação e apenas
+agenda os workers existentes para operações já na fila e com acesso de escrita.
+Não reenvia conflitos/recusas nem transforma rascunho em operação. Resultado
+desconhecido continua diferente de recibo confirmado. A lista se atualiza a cada
+15 segundos somente quando aberta; consultas interrompidas liberam nova tentativa.
+Não use esta central como confirmação em tempo real ou substituto da homologação
+física/TalkBack. Não há promoção da versão estável nesta entrega.
 
 ## Reforma offline — segunda entrega visual
 
@@ -26,8 +43,8 @@ Claro/escuro segue o aparelho; a preferência manual da interface online não é
 copiada. Preparações antigas usam Moderno até atualizar as consultas. Expiração,
 bloqueio e segundo plano removem a paleta do documento junto da identidade.
 
-Central unificada de pendências permanece a terceira etapa. Homologação física
-continua obrigatória; este candidato não substitui a versão estável geral.
+Central unificada entregue na etapa 3 acima. Homologação física continua
+obrigatória; este candidato não substitui a versão estável geral.
 
 ## Reforma offline — primeira entrega visual
 

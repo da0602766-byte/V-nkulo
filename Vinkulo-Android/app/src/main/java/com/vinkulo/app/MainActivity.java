@@ -63,6 +63,7 @@ public class MainActivity extends Activity {
     private OfflineController offline;
     private VisitorController visitors;
     private ModuleController modules;
+    private PendingController pending;
     private OfflineAssets offlineAssets;
     private View legacyOfflineView;
     private ValueCallback<Uri[]> fileCallback;
@@ -83,6 +84,7 @@ public class MainActivity extends Activity {
         offlineAssets = new OfflineAssets(getApplicationContext());
         visitors = new VisitorController(this);
         modules = new ModuleController(this);
+        pending = new PendingController(this);
         offline = new OfflineController(this, () -> {
             if (webView != null && OfflinePolicy.localPage(webView.getUrl())) {
                 webView.evaluateJavascript("window.dispatchEvent(new Event('vinkulo:offline-status'))", null);
@@ -107,6 +109,7 @@ public class MainActivity extends Activity {
         installOfflineBridge();
         installVisitorBridge();
         installModuleBridge();
+        installPendingBridge();
         webView.setDownloadListener((url, userAgent, disposition, mimeType, length) ->
                 downloadDocument(url, userAgent, disposition, mimeType));
         webView.setWebViewClient(new WebViewClient() {
@@ -118,11 +121,12 @@ public class MainActivity extends Activity {
                         offline.lock();
                         visitors.lock();
                         modules.lock();
+                        pending.invalidate();
                     }
                 }
             }
             @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
-                if (NativePolicy.trusted(request.getUrl().toString()) && "/api/auth/logout".equals(request.getUrl().getPath())) { offline.lock(); visitors.lock(); modules.lock(); }
+                if (NativePolicy.trusted(request.getUrl().toString()) && "/api/auth/logout".equals(request.getUrl().getPath())) { offline.lock(); visitors.lock(); modules.lock(); pending.invalidate(); }
                 return offlineAssets.intercept(request.getUrl());
             }
             @Override public void onPageFinished(WebView view, String url) {
@@ -214,6 +218,7 @@ public class MainActivity extends Activity {
         if (offline != null) offline.close();
         if (visitors != null) visitors.close();
         if (modules != null) modules.close();
+        if (pending != null) pending.close();
         pendingPushReply = null;
         if (fileCallback != null) { fileCallback.onReceiveValue(null); fileCallback = null; }
         while (!pendingMediaRequests.isEmpty()) pendingMediaRequests.poll().deny();
@@ -387,7 +392,7 @@ public class MainActivity extends Activity {
                 try {
                     JSONObject command=new JSONObject(message.getData());int requestId=command.getInt("requestId");
                     if(requestId<=0)return;
-                    if("lock".equals(command.optString("action"))){visitors.lock();command.put("action","status");}
+                    if("lock".equals(command.optString("action"))){pending.invalidate();visitors.lock();command.put("action","status");}
                     visitors.command(command,state->{
                         if(webView!=null&&OfflinePolicy.localPage(webView.getUrl()))try{state.put("requestId",requestId);reply.postMessage(state.toString());}catch(Exception ignored){}
                     });
@@ -401,8 +406,20 @@ public class MainActivity extends Activity {
             if(!mainFrame||!NativePolicy.trusted(origin.toString())||!OfflinePolicy.localPage(view.getUrl())||message.getType()!=WebMessageCompat.TYPE_STRING||message.getData()==null||message.getData().length()>4096)return;
             try{JSONObject command=new JSONObject(message.getData());int requestId=command.getInt("requestId");
                 if(requestId<=0||!ModuleAccess.valid(command.optString("module")))return;
-                if("lock".equals(command.optString("action"))){modules.lock();command.put("action","status");}
+                if("lock".equals(command.optString("action"))){pending.invalidate();modules.lock();command.put("action","status");}
                 modules.command(command,state->{if(webView!=null&&OfflinePolicy.localPage(webView.getUrl()))try{state.put("requestId",requestId);reply.postMessage(state.toString());}catch(Exception ignored){}});
+            }catch(JSONException ignored){}
+        });
+    }
+
+    private void installPendingBridge() {
+        if(!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER))return;
+        WebViewCompat.addWebMessageListener(webView,"VinkuloPending",Collections.singleton(APP_URL),(view,message,origin,mainFrame,reply)->{
+            if(!mainFrame||!NativePolicy.trusted(origin.toString())||!OfflinePolicy.localPage(view.getUrl())||message.getType()!=WebMessageCompat.TYPE_STRING||message.getData()==null||message.getData().length()>256)return;
+            try {
+                JSONObject command=new JSONObject(message.getData());int requestId=command.getInt("requestId");String action=command.getString("action");
+                if(command.length()!=2||requestId<=0||(!action.equals("status")&&!action.equals("sync")))return;
+                pending.command(action,state->{if(webView!=null&&OfflinePolicy.localPage(webView.getUrl()))try{state.put("requestId",requestId);reply.postMessage(state.toString());}catch(Exception ignored){}});
             }catch(JSONException ignored){}
         });
     }

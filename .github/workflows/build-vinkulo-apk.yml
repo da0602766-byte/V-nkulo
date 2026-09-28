@@ -50,7 +50,7 @@ jobs:
           VINKULO_SIGNING_STORE_FILE: ${{ runner.temp }}/vinkulo-release.p12
           VINKULO_SIGNING_PASSWORD: ${{ secrets.ANDROID_SIGNING_PASSWORD }}
         run: |
-          node --test scripts/offline-shell.test.cjs scripts/visitor-shell.test.cjs scripts/module-shell.test.cjs scripts/usability-shell.test.cjs scripts/navigation-shell.test.cjs
+          node --test scripts/offline-shell.test.cjs scripts/visitor-shell.test.cjs scripts/module-shell.test.cjs scripts/usability-shell.test.cjs scripts/navigation-shell.test.cjs scripts/pending-shell.test.cjs
           echo '2db75c40782f5e8ba1fc278a5574bab070adccb2d21ca5a6e5ed840888448046  gradle/wrapper/gradle-wrapper.jar' | sha256sum --check
           chmod +x gradlew
           ./gradlew --dependency-verification strict testDebugUnitTest lintRelease assembleRelease assembleDebug assembleDebugAndroidTest
@@ -58,7 +58,7 @@ jobs:
       - name: Compilar versão anterior para teste de preservação de dados
         run: |
           mkdir -p "$RUNNER_TEMP/vinkulo-previous"
-          git -C "$GITHUB_WORKSPACE" archive 24053ab8650d76a243e3da612296dc944c5133e8 Vinkulo-Android | tar -x -C "$RUNNER_TEMP/vinkulo-previous"
+          git -C "$GITHUB_WORKSPACE" archive 4665ba228347b4d2e43560aa10d66ff69177d46a Vinkulo-Android | tar -x -C "$RUNNER_TEMP/vinkulo-previous"
           cp app/google-services.json "$RUNNER_TEMP/vinkulo-previous/Vinkulo-Android/app/google-services.json"
           ./gradlew -p "$RUNNER_TEMP/vinkulo-previous/Vinkulo-Android" assembleDebug
       - name: Conferir assinatura e continuidade das atualizações
@@ -72,13 +72,13 @@ jobs:
           sha256sum app/build/outputs/apk/release/app-release.apk
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: Vinkulo-Android-1.16.0-homologacao-api${{ matrix.api }}
+          name: Vinkulo-Android-1.17.0-homologacao-api${{ matrix.api }}
           path: Vinkulo-Android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: Vinkulo-Android-1.16.0-validacao-api${{ matrix.api }}
+          name: Vinkulo-Android-1.17.0-validacao-api${{ matrix.api }}
           path: |
             Vinkulo-Android/build/reports/dependency-verification/
             Vinkulo-Android/app/build/reports/
@@ -127,6 +127,9 @@ jobs:
             curl --fail --location https://adote-gestao.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.15.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.15.0.apk
             echo '1124db700bd019190af8dc8eec5a6c68b3623b335671f7f8a53db800b3b89b18  /tmp/vinkulo-1.15.0.apk' | sha256sum --check
             adb install -r /tmp/vinkulo-1.15.0.apk
+            curl --fail --location https://adote-gestao.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.16.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.16.0.apk
+            echo 'fdf7da2ed4ea75043d5fe469431dea7e1a9625ea25561542cafddacb958bd685  /tmp/vinkulo-1.16.0.apk' | sha256sum --check
+            adb install -r /tmp/vinkulo-1.16.0.apk
             adb install -r app/build/outputs/apk/release/app-release.apk
             adb shell dumpsys package com.vinkulo.app | grep firstInstallTime > /tmp/vinkulo-after-update.txt
             diff /tmp/vinkulo-first-install.txt /tmp/vinkulo-after-update.txt
@@ -140,7 +143,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: Vinkulo-Android-1.16.0-emulador-api${{ matrix.api }}
+          name: Vinkulo-Android-1.17.0-emulador-api${{ matrix.api }}
           path: |
             Vinkulo-Android/app/build/reports/androidTests/
             Vinkulo-Android/app/build/outputs/androidTest-results/

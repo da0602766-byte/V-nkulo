@@ -21,6 +21,7 @@ final class OfflineAssets {
                         case "app.js": mime = "application/javascript"; break;
                         case "theme.js": mime = "application/javascript"; break;
                         case "navigation.js": mime = "application/javascript"; break;
+                        case "pending.js": mime = "application/javascript"; break;
                         case "visitors.js": mime = "application/javascript"; break;
                         case "modules.js": mime = "application/javascript"; break;
                         case "app.css": mime = "text/css"; break;
