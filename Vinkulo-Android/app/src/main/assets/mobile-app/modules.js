@@ -14,7 +14,7 @@
     followups:'Histórico próprio e pessoas que você já acompanhou. Para o primeiro acompanhamento de uma pessoa, use o sistema online. Novos registros exigem permissão atual no envio.',
     checklists:'Seus ministérios, equipes e tarefas de escalas publicadas. Só tarefas atribuídas a você. Mudança online desde a preparação gera conflito; atualizar a consulta não muda a versão de um rascunho já salvo.',
     cells:'Células em que você participa ou atua como responsável. Relatórios são rascunhos locais: publicar, aprovar e gerenciar integrantes exige o sistema online.',
-    parking:'Comprovantes das suas reservas na última consulta, sem garantia de vaga atual. Ocorrências podem entrar na fila com permissão. Reserva, entrada e saída definitivas permanecem online.',
+    parking:'Comprovantes das suas reservas na última consulta, sem garantia de vaga atual. Ocorrências podem entrar na fila com permissão. Reserva, entrada e saída definitivas permanecem online. A fila não garante aviso imediato: em uma urgência, contate a equipe diretamente.',
   };
   const states={DRAFT:'Rascunho — não enviado',PENDING:'Na fila',SENDING:'Aguardando confirmação',RETRY:'Aguardando nova tentativa',CONFIRMED:'Confirmado no servidor',CONFLICT:'Revisão necessária',REJECTED:'Recusado'};
   let module=el('kind').value,requestId=0,busy=false,prepared=false,editing='',version=0,snapshot={},canWrite=false,expiry,signature='',lastAction='';
@@ -54,6 +54,8 @@
     el('items').textContent='';for(const item of [...(snapshot.memberships||[]),...(snapshot.items||[])]){const a=text(el('items'),'article','');a.className='entry';text(a,'h3',item.label);text(a,'p',item.text);if(item.status)text(a,'p',item.status);if(item.date)text(a,'p',item.date);}
     if(!(snapshot.items||[]).length)text(el('items'),'p','Nenhum registro nesta cópia limitada. Consulte o sistema online para outros registros.');
     el('rows').textContent='';for(const row of s.rows||[]){const a=text(el('rows'),'article','');a.className='entry';text(a,'h3',row.payload.titulo||row.payload.resultado||row.payload.tipo||'Rascunho salvo');text(a,'p',states[row.state]||'Estado desconhecido');if(row.message)text(a,'p',row.message);if(row.resultId)text(a,'p','Recibo: '+row.resultId);
+      const detail=text(a,'details','');text(detail,'summary','Conferir os dados salvos');for(const [key,label] of definitions[module])text(detail,'p',label+': '+String(row.payload[key]??''));
+      if(['CONFLICT','REJECTED'].includes(row.state))button(a,'Revisar em um novo rascunho',()=>{if(window.confirm('Confira o resultado online antes de repetir. Esta ação copia os dados para um novo rascunho, sem enviar.')){editing='';form(row.payload);el('status').textContent='Dados copiados para revisão. Salve para criar um novo rascunho; nada foi enviado.';}});
       if(row.state==='DRAFT'){
         button(a,'Abrir rascunho',()=>{editing=row.id;form(row.payload);el('fields').firstElementChild?.nextElementSibling?.focus();});
         if(canWrite&&module!=='cells')button(a,'Colocar na fila de envio',()=>{if(window.confirm('Enviar este registro quando houver conexão? '+(module==='requests'?help.requests:'Depois de enfileirado, não poderá ser editado.'))){if(editing===row.id){editing='';form();}send('enqueue',{id:row.id});}});
