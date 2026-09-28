@@ -39,3 +39,7 @@ test('home places six shortcuts ahead of optional consent and includes a local l
   assert.match(read('app/src/main/assets/mobile-app/InstrumentSans-OFL.txt'),/SIL OPEN FONT LICENSE/);
   assert.match(read('app/src/main/java/com/vinkulo/app/OfflineAssets.java'),/font-src 'self'; connect-src 'none'/);
 });
+
+test('release smoke script keeps Linux-compatible line endings',()=>{
+  assert.doesNotMatch(read('scripts/check-release-offline.sh'),/\r/);
+});

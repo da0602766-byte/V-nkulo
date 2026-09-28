@@ -31,4 +31,3 @@ adb pull /sdcard/vinkulo-offline-settled.png app/build/reports/vinkulo-release-o
 adb logcat -d -t 1500 > app/build/reports/vinkulo-release-logcat.txt || echo 'Optional logcat capture unavailable'
 adb shell dumpsys webviewupdate > app/build/reports/vinkulo-release-webview.txt || echo 'Optional WebView diagnostic unavailable'
 test "$ready" = 1
-
