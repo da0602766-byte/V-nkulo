@@ -33,6 +33,8 @@ para ser integrada e publicada.
 
 ## `guias/`
 
+- [`APK_ATUALIZACAO_E_RECUPERACAO.md`](guias/APK_ATUALIZACAO_E_RECUPERACAO.md) — instalação por atualização, filas pendentes, recuperação e critérios de homologação física.
+
 Guias de configuração e verificação, principalmente de integração Google.
 
 - [`GOOGLE_DRIVE_SETUP.md`](guias/GOOGLE_DRIVE_SETUP.md)
@@ -58,6 +60,7 @@ Relatórios fechados de entregas já publicadas — histórico, não fluxo ativo
 - [`APK_ETAPA_5A_2026-09-27.md`](relatorios/APK_ETAPA_5A_2026-09-27.md) — histórico do primeiro bloco: consulta offline dos próprios pedidos; complementado pelo relatório integral da etapa 5 abaixo.
 - [`APK_ETAPA_5_2026-09-27.md`](relatorios/APK_ETAPA_5_2026-09-27.md) — conclusão do recorte de módulos: pedidos, notas, acompanhamentos, checklists, células e estacionamento, com validação e gates físicos separados.
 - [`APK_ETAPA_6_2026-09-27.md`](relatorios/APK_ETAPA_6_2026-09-27.md) — fluidez e usabilidade transversal do shell offline: renderização em lote, teclado/Voltar, fonte ampliada, semântica e métricas controladas.
+- [`APK_ETAPA_7_2026-09-27.md`](relatorios/APK_ETAPA_7_2026-09-27.md) — build verificado, atualização com fila pendente, recuperação e distribuição; promoção geral depende da homologação física.
 
 - [`RELATORIO_IMPLEMENTACAO_MENU_VISITANTES_COMPARTILHAMENTO.md`](relatorios/RELATORIO_IMPLEMENTACAO_MENU_VISITANTES_COMPARTILHAMENTO.md)
 - [`RELATORIO_IMPLEMENTACAO_VINKULO_2026-08-08.md`](relatorios/RELATORIO_IMPLEMENTACAO_VINKULO_2026-08-08.md)

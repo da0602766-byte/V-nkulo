@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "packageName": "com.vinkulo.app",
+  "signingCertificateSha256": "2eddeaea4f33a6984deb195086e852d8f03fabdb7e67096a03209c8dd651ae1c",
+  "instructions": "/downloads/VINKULO_ANDROID_LEIA-ME.txt",
+  "stable": {
+    "versionName": "1.7.1",
+    "versionCode": 10,
+    "file": "VINKULO_ANDROID_1.7.1.apk",
+    "bytes": 382230,
+    "sha256": "901e1d4e73bdc990d7d5d500ef10a422636777155cb821b6980e0cd083da7e8e"
+  },
+  "homologation": {
+    "versionName": "1.14.0",
+    "versionCode": 17,
+    "file": "VINKULO_ANDROID_1.14.0_HOMOLOGACAO.apk",
+    "bytes": 586966,
+    "sha256": "4ab64689c3d9e7ee96022c9e43754ca738fd68679dfb1ab95db0c551c1f0be09",
+    "sourceCommit": "45072c1b53b7786544b18d58cf1a0d40f0e38eb1",
+    "workflowRun": "https://github.com/da0602766-byte/V-nkulo/actions/runs/36368018420",
+    "physicalValidation": "pending"
+  }
+}

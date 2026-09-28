@@ -1,6 +1,6 @@
 # APK Vínkulo — arquitetura e sequência de evolução
 
-Data-base: 27/09/2026. Estado: etapas 1–5 implementadas e publicadas para homologação. APK 1.12.0/Sites 325, fonte web 4fd38e8 e Android b19477fe; CI 36361838604 aprovado API 29/35, 548 testes web. Não confundir implementação com aprovação física/distribuição geral (mantida em 1.7.1). Etapas 6–7 aguardam autorização. Testes físicos e métricas Android continuam pendentes. Evidências nos relatórios APK das etapas 1–5.
+Data-base: 27/09/2026. Estado: etapas 1–6 implementadas e publicadas para homologação; etapa 7 autorizada e em validação. Último candidato publicado: APK 1.13.0/Sites 326. Não confundir implementação com aprovação física/distribuição geral (mantida em 1.7.1). Testes físicos e métricas Android continuam pendentes. Evidências nos relatórios APK de cada etapa.
 
 ## Objetivo e limites
 
@@ -198,7 +198,7 @@ Medir PSS após início e após 10 minutos de uso, quadros lentos, tráfego e en
 3. Versão do app, protocolo, schema local e schema servidor são independentes. Guardar versões mínimas compatíveis e testar migrações sem recriação destrutiva de banco.
 4. Corrigir uma versão Android ruim com APK de versionCode maior; downgrade simples pode ser impedido pelo Android e por migração do banco. Desligar uma capacidade não pode apagar a fila.
 5. Reter artefato, SHA-256, certificado público, commit, CI e testes de instalação. Segredos ficam no mecanismo de CI já existente. Não colocar Firebase administrativo, senha ou chave de assinatura no pacote.
-6. Gradle Wrapper com checksum, travamento/verificação de dependências e actions fixadas por SHA permanecem pendências antes da distribuição geral. O candidato de homologação ainda usa Gradle 8.10.2 instalado no CI e versões explícitas de bibliotecas, sem wrapper/lockfiles versionados; não afirmar build bit a bit reproduzível. Essa limitação não foi ocultada como tarefa concluída.
+6. No candidato 1.14.0, Gradle Wrapper 8.10.2/checksums, lockfile, verificação estrita de dependências e actions fixadas por SHA estão implementados e aprovados no CI 36368018420. Não afirmar build bit a bit reproduzível nem auditoria integral das dependências. Homologação física e promoção geral continuam pendentes; ver `docs/relatorios/APK_ETAPA_7_2026-09-27.md` e `docs/guias/APK_ATUALIZACAO_E_RECUPERACAO.md`.
 
 ## Decisões a validar durante a etapa 2
 

@@ -1,0 +1,23 @@
+VÍNKULO — ATUALIZAÇÃO ANDROID
+
+Use somente o APK oficial do canal escolhido. HOMOLOGACAO indica uma versão
+em testes acompanhados. A versão estável continua disponível separadamente.
+
+Instale a atualização por cima do aplicativo existente. NÃO desinstale,
+limpe os dados ou faça downgrade se houver rascunhos/envios pendentes.
+
+Antes de usar sem internet: entre na conta, escolha a comunidade e prepare
+as consultas/módulos desejados. A preparação tem prazo e exige conexão
+novamente após reiniciar o celular.
+
+Se um envio ficar pendente: reconecte, abra o aplicativo e, se solicitado,
+entre com a mesma conta/comunidade e prepare o módulo novamente. Aguarde o
+recibo. Não recrie manualmente um envio cujo resultado é desconhecido.
+
+Se aparecer conflito ou recusa, confira o motivo e use o fluxo de revisão.
+Na troca de aparelho, sincronize antes: dados locais cifrados não são
+transferidos por backup. Se os dados/chaves forem apagados, rascunhos que
+não chegaram ao servidor podem não ser recuperáveis.
+
+O arquivo android-release.json informa as versões, tamanhos e hashes
+SHA-256 dos APKs de cada canal. Nenhuma atualização é instalada automaticamente.
