@@ -65,7 +65,21 @@ são etapas 2 e 3, não concluídas aqui.
   `1124db700bd019190af8dc8eec5a6c68b3623b335671f7f8a53db800b3b89b18`.
   Certificado original mantido: `2eddeaea4f33a6984deb195086e852d8f03fabdb7e67096a03209c8dd651ae1c`.
   Artefato final 10950751477 da repetição API35. Estável 1.7.1 e candidato
-  anterior 1.14.0 preservados. Publicação a registrar após o deploy.
+  anterior 1.14.0 preservados.
+
+## Publicação e conferência
+
+- Publicado para homologação no **Sites 328**, fonte web
+  `62e8dc536328530dfceb66cfbdd8c3484d1caa7e`, deployment
+  `appgdep_6ab9e390ec5c819194bb967356ad240a`, concluído em
+  28/09/2026 às 00h48 Brasília (03:48:57 UTC).
+- [APK 1.15.0 de homologação](https://adote-gestao.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.15.0_HOMOLOGACAO.apk):
+  arquivo público baixado e conferido: 621.085 bytes e SHA-256 idêntico ao
+  artefato validado acima. Manifesto público aponta 1.15.0/code18, fonte e CI
+  corretos, mantendo `physicalValidation: pending` e estável 1.7.1.
+- Login e instruções de instalação responderam HTTP 200 após a publicação.
+- PR 16 mantida em rascunho, sem mesclar a base web histórica. Este registro
+  documental é posterior ao deploy; o fonte publicado continua sendo `62e8dc5`.
 
 Não promover para distribuição geral sem homologação física. Instalar por cima
 da versão existente; não desinstalar nem limpar dados com rascunhos pendentes.
