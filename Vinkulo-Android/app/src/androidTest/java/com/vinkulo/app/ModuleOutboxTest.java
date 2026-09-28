@@ -49,11 +49,15 @@ public class ModuleOutboxTest {
         }finally{clear(user);}
     }
     private String evaluate(ActivityScenario<MainActivity> scenario,String script)throws Exception{String[] result={""};CountDownLatch done=new CountDownLatch(1);scenario.onActivity(a->((android.webkit.WebView)a.findViewById(R.id.webview)).evaluateJavascript(script,v->{result[0]=v;done.countDown();}));assertTrue(done.await(5,TimeUnit.SECONDS));return result[0];}
-    private void awaitDom(ActivityScenario<MainActivity> scenario,String script)throws Exception{long end=android.os.SystemClock.elapsedRealtime()+15000;while(android.os.SystemClock.elapsedRealtime()<end){if("true".equals(evaluate(scenario,script)))return;android.os.SystemClock.sleep(150);}fail("DOM not ready: "+script);}
+    private void awaitDom(ActivityScenario<MainActivity> scenario,String script)throws Exception{long end=android.os.SystemClock.elapsedRealtime()+15000;while(android.os.SystemClock.elapsedRealtime()<end){if("true".equals(evaluate(scenario,script)))return;android.os.SystemClock.sleep(150);}OfflineUiEvidence.capture(UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()),"module-failure");fail("DOM not ready: "+script+"; "+evaluate(scenario,"JSON.stringify({hidden:document.hidden,status:document.getElementById('module-status')?.textContent,url:location.pathname})"));}
     @Test public void allModuleFormsRenderOfflineAndSaveThroughRestrictedBridge()throws Exception{
         assumeTrue(WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER));cookies("module-ui");long user=8903;
         for(String module:ModuleAccess.MODULES)try(ModuleAccess a=new ModuleAccess(context,module)){a.install(grant(a,user),VisitorAccess.binding(),a.device(),1);}
         UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
+        // This class can run before the foundation fixture. Grant only in the
+        // disposable CI app, as the reader fixture already does, so the system
+        // dialog does not hide the document and correctly clear its private UI.
+        if(android.os.Build.VERSION.SDK_INT>=33)device.executeShellCommand("pm grant com.vinkulo.app android.permission.POST_NOTIFICATIONS");
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             awaitDom(scenario,"!!document.getElementById('module-workspace')&&!document.getElementById('module-workspace').hidden");
             for(String module:ModuleAccess.MODULES){
