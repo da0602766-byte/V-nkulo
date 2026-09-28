@@ -35,7 +35,7 @@
       if(key==='itemId')field.addEventListener('change',()=>{version=(snapshot.options||[]).find(o=>String(o.id)===field.value)?.version??0;});
     }
   }
-  function clear(){prepared=false;snapshot={};signature='';editing='';window.clearTimeout(expiry);el('workspace').hidden=true;el('rows').textContent='';el('items').textContent='';el('fields').textContent='';el('community').textContent='';el('updated').textContent='';}
+  function clear(){prepared=false;snapshot={};signature='';editing='';window.clearTimeout(expiry);el('workspace').hidden=true;el('rows').textContent='';el('items').textContent='';el('fields').textContent='';el('community').textContent='';el('updated').textContent='';el('status').textContent='';}
   function send(action,extra={}){
     if(!bridge||(busy&&action!=='lock'))return;busy=true;lastAction=action;el('save').disabled=true;el('prepare').disabled=true;el('kind').disabled=true;
     bridge.postMessage(JSON.stringify({action,module,requestId:++requestId,...extra}));
@@ -46,7 +46,7 @@
     if(!s.prepared){clear();el('status').textContent='Prepare este módulo com internet e a mesma conta/comunidade para acessar o trabalho salvo.';return;}
     const first=!prepared;prepared=true;canWrite=s.canWrite;snapshot=s.snapshot||{};el('workspace').hidden=false;el('community').textContent=s.communityName;
     el('updated').textContent='Última consulta: '+new Date(s.issuedAt).toLocaleString('pt-BR')+'. Não representa mudanças posteriores.';
-    if(first)form();
+    if(first){form();el('status').textContent='Consulta preparada. Novos rascunhos só ficam salvos ao tocar em Salvar.';}
     if(s.savedId){editing=s.savedId;el('status').textContent='Rascunho salvo no aparelho. Ainda não enviado.';}else if(lastAction!=='status')el('status').textContent='Estado atualizado. Confira cada registro abaixo.';
     el('sync').hidden=!canWrite||module==='cells';
     window.clearTimeout(expiry);expiry=window.setTimeout(()=>{clear();el('status').textContent='Autorização vencida; trabalho salvo preservado. Prepare novamente.';send('status');},Math.max(0,Number(s.validForMs)||0));

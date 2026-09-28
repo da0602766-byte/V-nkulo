@@ -67,6 +67,9 @@ public class ModuleOutboxTest {
                 CountDownLatch drawn=new CountDownLatch(1);scenario.onActivity(a->((android.webkit.WebView)a.findViewById(R.id.webview)).postVisualStateCallback(3,new android.webkit.WebView.VisualStateCallback(){@Override public void onComplete(long id){drawn.countDown();}}));assertTrue(drawn.await(5,TimeUnit.SECONDS));
                 assertEquals("true",evaluate(scenario,"document.documentElement.scrollWidth<=window.innerWidth"));
                 OfflineUiEvidence.capture(device,"module-"+module);
+                evaluate(scenario,"document.getElementById('module-fields').scrollIntoView()");
+                assertEquals("true",evaluate(scenario,"document.getElementById('module-fields').children.length>=6&&document.documentElement.scrollWidth<=window.innerWidth"));
+                OfflineUiEvidence.capture(device,"module-form-"+module);
                 if(module.equals("notes")){
                     evaluate(scenario,"document.getElementById('module-input-titulo').value='Anotação fictícia';document.getElementById('module-input-texto').value='Texto protegido no aparelho';document.getElementById('module-save').click()");
                     awaitDom(scenario,"document.getElementById('module-status').textContent.includes('Rascunho salvo')");
