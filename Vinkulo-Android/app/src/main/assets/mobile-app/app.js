@@ -173,5 +173,11 @@
   }
   document.addEventListener('focusin', keepFocusedControlVisible);
   if (window.visualViewport) window.visualViewport.addEventListener('resize', keepFocusedControlVisible);
+  window.VinkuloLocalBack = () => {
+    const active = document.activeElement;
+    if (active && /^(INPUT|SELECT|TEXTAREA)$/.test(active.tagName || '')) { active.blur(); return true; }
+    if (window.location.hash) { window.history.back(); return true; }
+    return false;
+  };
   connection(); send('status');
 })();

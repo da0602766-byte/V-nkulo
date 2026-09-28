@@ -24,3 +24,7 @@ test('notifications are requested from explicit feature use, never at startup',(
   assert.doesNotMatch(activity,/requestStartupPermissions\(\)/);assert.match(activity,/case "push-token": requestPushToken\(reply\)/);
   assert.match(activity,/version:'1\.13\.0'/);
 });
+test('Android back delegates local focus and anchors before leaving the activity',()=>{
+  assert.match(app,/window\.VinkuloLocalBack/);assert.match(app,/window\.history\.back\(\)/);
+  assert.match(activity,/VinkuloLocalBack&&window\.VinkuloLocalBack/);assert.match(activity,/finishWebBack\(\)/);
+});

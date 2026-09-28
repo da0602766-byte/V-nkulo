@@ -69,6 +69,7 @@ public class MainActivity extends Activity {
     private JavaScriptReplyProxy pendingPushReply;
     private final ArrayDeque<PermissionRequest> pendingMediaRequests = new ArrayDeque<>();
     private boolean awaitingMediaPermissionResult;
+    private boolean resolvingLocalBack;
 
     @Override
     public void onCreate(Bundle state) {
@@ -738,7 +739,20 @@ public class MainActivity extends Activity {
     @Override
     public void onBackPressed() {
         if (legacyOfflineView != null) { super.onBackPressed(); return; }
-        if (webView.canGoBack()) webView.goBack(); else super.onBackPressed();
+        if (webView != null && OfflinePolicy.localPage(webView.getUrl())) {
+            if (resolvingLocalBack) return;
+            resolvingLocalBack = true;
+            webView.evaluateJavascript("!!(window.VinkuloLocalBack&&window.VinkuloLocalBack())",handled -> {
+                resolvingLocalBack = false;
+                if (!"true".equals(handled)) finishWebBack();
+            });
+            return;
+        }
+        finishWebBack();
+    }
+
+    private void finishWebBack() {
+        if (webView != null && webView.canGoBack()) webView.goBack(); else super.onBackPressed();
     }
 
     @Override
