@@ -3,8 +3,9 @@ const source=fs.readFileSync(path.join(__dirname,'../app/src/main/assets/mobile-
 test('module shell avoids replaceAll so bridge-capable older WebViews render selectors',()=>assert.doesNotMatch(source,/\.replaceAll\(/));
 function shell(supported=true){
  const elements=new Map(),requests=[],events={},timers=new Map();let tick=0;
- function node(){let content='';const n={value:'',hidden:false,disabled:false,children:[],handlers:{},focus(){},addEventListener(k,f){this.handlers[k]=f;},appendChild(c){this.children.push(c);if(c.id)elements.set(c.id,c);}};Object.defineProperty(n,'textContent',{get:()=>content,set:v=>{content=v;n.children=[];}});return n;}
- const document={hidden:false,getElementById(id){if(!elements.has(id))elements.set(id,node());return elements.get(id);},createElement:node,addEventListener(k,f){events[k]=f;}};
+ function node(tag='div'){let content='';const n={tagName:tag.toUpperCase(),value:'',hidden:false,disabled:false,children:[],handlers:{},attributes:{},focus(){},setAttribute(k,v){this.attributes[k]=v;},addEventListener(k,f){this.handlers[k]=f;},appendChild(c){if(c.isFragment)this.children.push(...c.children);else this.children.push(c);if(c.id)elements.set(c.id,c);}};Object.defineProperty(n,'textContent',{get:()=>content,set:v=>{content=v;n.children=[];}});return n;}
+ function fragment(){return {isFragment:true,children:[],appendChild(c){this.children.push(c);}};}
+ const document={hidden:false,getElementById(id){if(!elements.has(id))elements.set(id,node());return elements.get(id);},createElement:node,createDocumentFragment:fragment,addEventListener(k,f){events[k]=f;}};
  document.getElementById('module-kind').value='requests';
  const window={confirm:()=>true,setInterval(){},setTimeout(f){timers.set(++tick,f);return tick;},clearTimeout(i){timers.delete(i);}};
  if(supported)window.VinkuloModules={postMessage:s=>requests.push(JSON.parse(s))};vm.runInNewContext(source,{document,window});

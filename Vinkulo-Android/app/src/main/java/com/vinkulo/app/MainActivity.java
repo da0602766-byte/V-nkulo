@@ -37,6 +37,7 @@ import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.webkit.WebViewCompat;
 import androidx.webkit.WebViewFeature;
 import androidx.webkit.WebMessageCompat;
+import androidx.webkit.JavaScriptReplyProxy;
 import androidx.webkit.ServiceWorkerControllerCompat;
 import org.json.JSONObject;
 import org.json.JSONException;
@@ -65,6 +66,7 @@ public class MainActivity extends Activity {
     private OfflineAssets offlineAssets;
     private View legacyOfflineView;
     private ValueCallback<Uri[]> fileCallback;
+    private JavaScriptReplyProxy pendingPushReply;
     private final ArrayDeque<PermissionRequest> pendingMediaRequests = new ArrayDeque<>();
     private boolean awaitingMediaPermissionResult;
 
@@ -168,7 +170,6 @@ public class MainActivity extends Activity {
         });
 
         createNotificationChannel();
-        requestStartupPermissions();
         if (state == null) {
             String coldStartPath = notificationPathFromIntent(getIntent());
             if (coldStartPath != null) webView.loadUrl(APP_URL + coldStartPath);
@@ -212,6 +213,7 @@ public class MainActivity extends Activity {
         if (offline != null) offline.close();
         if (visitors != null) visitors.close();
         if (modules != null) modules.close();
+        pendingPushReply = null;
         if (fileCallback != null) { fileCallback.onReceiveValue(null); fileCallback = null; }
         while (!pendingMediaRequests.isEmpty()) pendingMediaRequests.poll().deny();
         if (webView != null) {
@@ -287,22 +289,7 @@ public class MainActivity extends Activity {
                                 if (!text.trim().isEmpty() && text.length() <= 8000) openWhatsAppShare(text);
                                 break;
                             case "google": openGoogleAuthorization(data.optString("url")); break;
-                            case "push-token":
-                                FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
-                                    if (!task.isSuccessful() || isFinishing() || isDestroyed()) return;
-                                    String token = task.getResult();
-                                    FirebaseDeviceState.updateToken(MainActivity.this, token);
-                                    boolean permission = Build.VERSION.SDK_INT < 33 || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
-                                    NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-                                    permission = permission && manager != null && manager.areNotificationsEnabled();
-                                    if (!permission) FirebaseDeviceState.clearBinding(MainActivity.this);
-                                    try {
-                                        JSONObject result = new JSONObject().put("token", token).put("permission", permission)
-                                                .put("projectId", FirebaseApp.getInstance().getOptions().getProjectId());
-                                        reply.postMessage(result.toString());
-                                    } catch (JSONException | IllegalStateException ignored) { }
-                                });
-                                break;
+                            case "push-token": requestPushToken(reply); break;
                             case "push-bind": FirebaseDeviceState.bind(MainActivity.this, data.optString("token"), data.optString("bindingId")); break;
                             case "push-clear": FirebaseDeviceState.clearBinding(MainActivity.this); break;
                             case "notification":
@@ -313,7 +300,7 @@ public class MainActivity extends Activity {
                         }
                     } catch (JSONException ignored) { /* Ignore malformed messages without logging their content. */ }
                 });
-        String script = "if(window===window.top){VinkuloNative.onmessage=function(e){try{window.dispatchEvent(new CustomEvent('vinkulo:fcm-token',{detail:JSON.parse(e.data)}));}catch(ignore){}};window.VinkuloAndroid=Object.freeze({version:'1.12.0',"
+        String script = "if(window===window.top){VinkuloNative.onmessage=function(e){try{window.dispatchEvent(new CustomEvent('vinkulo:fcm-token',{detail:JSON.parse(e.data)}));}catch(ignore){}};window.VinkuloAndroid=Object.freeze({version:'1.13.0',"
                 + "requestPushToken:function(){VinkuloNative.postMessage(JSON.stringify({action:'push-token'}));},"
                 + "setPushBinding:function(token,bindingId){VinkuloNative.postMessage(JSON.stringify({action:'push-bind',token:token,bindingId:bindingId}));},"
                 + "clearPushBinding:function(){VinkuloNative.postMessage(JSON.stringify({action:'push-clear'}));},"
@@ -668,11 +655,35 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void requestStartupPermissions() {
+    private void requestPushToken(JavaScriptReplyProxy reply) {
         if (Build.VERSION.SDK_INT >= 33 &&
                 checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            // Ask only after the authenticated page explicitly enables alerts.
+            // Startup remains usable offline and is never covered by a prompt.
+            if (pendingPushReply != null) return;
+            pendingPushReply = reply;
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, NOTIFICATION_PERMISSION);
+            return;
         }
+        replyPushToken(reply);
+    }
+
+    private void replyPushToken(JavaScriptReplyProxy reply) {
+        FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
+            if (!task.isSuccessful() || isFinishing() || isDestroyed()) return;
+            String token = task.getResult();
+            FirebaseDeviceState.updateToken(MainActivity.this, token);
+            boolean permission = Build.VERSION.SDK_INT < 33 ||
+                    checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
+            NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            permission = permission && manager != null && manager.areNotificationsEnabled();
+            if (!permission) FirebaseDeviceState.clearBinding(MainActivity.this);
+            try {
+                JSONObject result = new JSONObject().put("token", token).put("permission", permission)
+                        .put("projectId", FirebaseApp.getInstance().getOptions().getProjectId());
+                reply.postMessage(result.toString());
+            } catch (JSONException | IllegalStateException ignored) { }
+        });
     }
 
     private void showNotificationEnabledConfirmation() {
@@ -709,6 +720,9 @@ public class MainActivity extends Activity {
             }
         } else if (requestCode == NOTIFICATION_PERMISSION) {
             if (granted) showNotificationEnabledConfirmation();
+            JavaScriptReplyProxy reply = pendingPushReply;
+            pendingPushReply = null;
+            if (reply != null) replyPushToken(reply);
         }
     }
 

@@ -19,17 +19,20 @@
   const states={DRAFT:'Rascunho — não enviado',PENDING:'Na fila',SENDING:'Aguardando confirmação',RETRY:'Aguardando nova tentativa',CONFIRMED:'Confirmado no servidor',CONFLICT:'Revisão necessária',REJECTED:'Recusado'};
   let module=el('kind').value,requestId=0,busy=false,prepared=false,editing='',version=0,snapshot={},canWrite=false,expiry,signature='',lastAction='';
   function text(parent,tag,value){const node=document.createElement(tag);node.textContent=String(value??'');parent.appendChild(node);return node;}
-  function button(parent,label,fn){const b=text(parent,'button',label);b.type='button';b.className='secondary';b.addEventListener('click',()=>{if(!busy)fn();});}
+  function setText(node,value){const next=String(value??'');if(node.textContent!==next)node.textContent=next;}
+  function replaceList(container,build){const fragment=document.createDocumentFragment();container.setAttribute('aria-busy','true');build(fragment);container.textContent='';container.appendChild(fragment);container.setAttribute('aria-busy','false');}
+  function button(parent,label,fn,context){const b=text(parent,'button',label);b.type='button';b.className='secondary';if(context)b.setAttribute('aria-label',label+': '+context);b.addEventListener('click',()=>{if(!busy)fn();});}
   function form(payload){
     el('fields').textContent='';version=payload?.version??0;
     for(const [key,label,kind] of definitions[module]){
       const l=text(el('fields'),'label',label);l.htmlFor='module-input-'+key;
-      const field=document.createElement(Array.isArray(kind)||kind==='options'?'select':typeof kind==='number'&&kind>200?'textarea':'input');field.id=l.htmlFor;field.autocomplete='off';
+      const field=document.createElement(Array.isArray(kind)||kind==='options'?'select':typeof kind==='number'&&kind>200?'textarea':'input');field.id=l.htmlFor;field.autocomplete='off';field.setAttribute('aria-describedby','module-help');
       if(Array.isArray(kind)||kind==='options'){
         const options=kind==='options'?[{id:0,label:'Selecione'},...(snapshot.options||[])]:kind.map(id=>({id,label:id.replace(/_/g,' ')}));
         for(const option of options){const o=text(field,'option',option.label);o.value=String(option.id);}
         if(kind==='options'&&payload&&!options.some(o=>String(o.id)===String(payload[key]))){const o=text(field,'option','Registro salvo — confira autorização online');o.value=String(payload[key]);}
       }else if(kind==='date')field.type='date';else field.maxLength=kind;
+      field.enterKeyHint=field.tagName==='TEXTAREA'?'done':'next';
       if(payload)field.value=String(payload[key]??'');
       el('fields').appendChild(field);
       if(key==='itemId')field.addEventListener('change',()=>{version=(snapshot.options||[]).find(o=>String(o.id)===field.value)?.version??0;});
@@ -42,26 +45,26 @@
   }
   function render(s){
     busy=false;el('save').disabled=false;el('prepare').disabled=!bridge;el('kind').disabled=false;
-    if(s.error){if(s.prepared!==true)clear();el('status').textContent=s.error;return;}
-    if(!s.prepared){clear();el('status').textContent='Prepare este módulo com internet e a mesma conta/comunidade para acessar o trabalho salvo.';return;}
+    if(s.error){if(s.prepared!==true)clear();setText(el('status'),s.error);return;}
+    if(!s.prepared){clear();setText(el('status'),'Prepare este módulo com internet e a mesma conta/comunidade para acessar o trabalho salvo.');return;}
     const first=!prepared;prepared=true;canWrite=s.canWrite;snapshot=s.snapshot||{};el('workspace').hidden=false;el('community').textContent=s.communityName;
     el('updated').textContent='Última consulta: '+new Date(s.issuedAt).toLocaleString('pt-BR')+'. Não representa mudanças posteriores.';
-    if(first){form();el('status').textContent='Consulta preparada. Novos rascunhos só ficam salvos ao tocar em Salvar.';}
-    if(s.savedId){editing=s.savedId;el('status').textContent='Rascunho salvo no aparelho. Ainda não enviado.';}else if(lastAction!=='status')el('status').textContent='Estado atualizado. Confira cada registro abaixo.';
+    if(first){form();setText(el('status'),'Consulta preparada. Novos rascunhos só ficam salvos ao tocar em Salvar.');}
+    if(s.savedId){editing=s.savedId;setText(el('status'),'Rascunho salvo no aparelho. Ainda não enviado.');}else if(lastAction!=='status')setText(el('status'),'Estado atualizado. Confira cada registro abaixo.');
     el('sync').hidden=!canWrite||module==='cells';
     window.clearTimeout(expiry);expiry=window.setTimeout(()=>{clear();el('status').textContent='Autorização vencida; trabalho salvo preservado. Prepare novamente.';send('status');},Math.max(0,Number(s.validForMs)||0));
     const next=JSON.stringify([s.rows,snapshot]);if(next===signature)return;signature=next;
-    el('items').textContent='';for(const item of [...(snapshot.memberships||[]),...(snapshot.items||[])]){const a=text(el('items'),'article','');a.className='entry';text(a,'h3',item.label);text(a,'p',item.text);if(item.status)text(a,'p',item.status);if(item.date)text(a,'p',item.date);}
-    if(!(snapshot.items||[]).length)text(el('items'),'p','Nenhum registro nesta cópia limitada. Consulte o sistema online para outros registros.');
-    el('rows').textContent='';for(const row of s.rows||[]){const a=text(el('rows'),'article','');a.className='entry';text(a,'h3',row.payload.titulo||row.payload.resultado||row.payload.tipo||'Rascunho salvo');text(a,'p',states[row.state]||'Estado desconhecido');if(row.message)text(a,'p',row.message);if(row.resultId)text(a,'p','Recibo: '+row.resultId);
-      const detail=text(a,'details','');text(detail,'summary','Conferir os dados salvos');for(const [key,label] of definitions[module])text(detail,'p',label+': '+String(row.payload[key]??''));
-      if(['CONFLICT','REJECTED'].includes(row.state))button(a,'Revisar em um novo rascunho',()=>{if(window.confirm('Confira o resultado online antes de repetir. Esta ação copia os dados para um novo rascunho, sem enviar.')){editing='';form(row.payload);el('status').textContent='Dados copiados para revisão. Salve para criar um novo rascunho; nada foi enviado.';}});
+    const savedItems=[...(snapshot.memberships||[]),...(snapshot.items||[])];
+    replaceList(el('items'),fragment=>{for(const [index,item] of savedItems.entries()){const a=text(fragment,'article','');a.className='entry';a.setAttribute('role','listitem');const h=text(a,'h3',item.label);h.id='module-saved-'+index;a.setAttribute('aria-labelledby',h.id);text(a,'p',item.text);if(item.status)text(a,'p',item.status);if(item.date)text(a,'p',item.date);}if(!savedItems.length)text(fragment,'p','Nenhum registro nesta cópia limitada. Consulte o sistema online para outros registros.');});
+    replaceList(el('rows'),fragment=>{for(const [index,row] of (s.rows||[]).entries()){const title=row.payload.titulo||row.payload.resultado||row.payload.tipo||'Rascunho salvo';const a=text(fragment,'article','');a.className='entry';a.setAttribute('role','listitem');const h=text(a,'h3',title);h.id='module-row-'+index;a.setAttribute('aria-labelledby',h.id);text(a,'p',states[row.state]||'Estado desconhecido');if(row.message)text(a,'p',row.message);if(row.resultId)text(a,'p','Recibo: '+row.resultId);
+      const detail=text(a,'details','');const summary=text(detail,'summary','Conferir os dados salvos');summary.setAttribute('aria-label','Conferir os dados salvos: '+title);for(const [key,label] of definitions[module])text(detail,'p',label+': '+String(row.payload[key]??''));
+      if(['CONFLICT','REJECTED'].includes(row.state))button(a,'Revisar em um novo rascunho',()=>{if(window.confirm('Confira o resultado online antes de repetir. Esta ação copia os dados para um novo rascunho, sem enviar.')){editing='';form(row.payload);setText(el('status'),'Dados copiados para revisão. Salve para criar um novo rascunho; nada foi enviado.');}},title);
       if(row.state==='DRAFT'){
-        button(a,'Abrir rascunho',()=>{editing=row.id;form(row.payload);el('fields').firstElementChild?.nextElementSibling?.focus();});
-        if(canWrite&&module!=='cells')button(a,'Colocar na fila de envio',()=>{if(window.confirm('Enviar este registro quando houver conexão? '+(module==='requests'?help.requests:'Depois de enfileirado, não poderá ser editado.'))){if(editing===row.id){editing='';form();}send('enqueue',{id:row.id});}});
+        button(a,'Abrir rascunho',()=>{editing=row.id;form(row.payload);el('fields').firstElementChild?.nextElementSibling?.focus();},title);
+        if(canWrite&&module!=='cells')button(a,'Colocar na fila de envio',()=>{if(window.confirm('Enviar este registro quando houver conexão? '+(module==='requests'?help.requests:'Depois de enfileirado, não poderá ser editado.'))){if(editing===row.id){editing='';form();}send('enqueue',{id:row.id});}},title);
       }
-      if(['DRAFT','CONFIRMED','CONFLICT','REJECTED'].includes(row.state))button(a,'Remover cópia do aparelho',()=>{if(window.confirm('Apagar somente esta cópia local?')){if(editing===row.id){editing='';form();}send('discard',{id:row.id});}});
-    }
+      if(['DRAFT','CONFIRMED','CONFLICT','REJECTED'].includes(row.state))button(a,'Remover cópia do aparelho',()=>{if(window.confirm('Apagar somente esta cópia local?')){if(editing===row.id){editing='';form();}send('discard',{id:row.id});}},title);
+    }});
   }
   if(bridge)bridge.onmessage=e=>{if(document.hidden)return;try{const s=JSON.parse(e.data);if(s.requestId===requestId&&(!s.module||s.module===module))render(s);}catch{busy=false;clear();el('status').textContent='Resposta local indisponível.';}};
   else{el('prepare').disabled=true;el('status').textContent='Atualize o Android System WebView para usar os módulos protegidos.';}

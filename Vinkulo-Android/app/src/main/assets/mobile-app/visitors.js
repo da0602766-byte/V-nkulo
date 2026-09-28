@@ -10,32 +10,33 @@
     bridge.postMessage(JSON.stringify({action,requestId:++requestId,...extra}));
   }
   function text(parent,tag,value){const node=document.createElement(tag);node.textContent=value;parent.appendChild(node);return node;}
-  function button(parent,label,fn){const node=text(parent,'button',label);node.type='button';node.className='secondary';node.addEventListener('click',()=>{if(!busy)fn();});}
+  function setText(node,value){const next=String(value??'');if(node.textContent!==next)node.textContent=next;}
+  function button(parent,label,fn,context){const node=text(parent,'button',label);node.type='button';node.className='secondary';if(context)node.setAttribute('aria-label',label+': '+context);node.addEventListener('click',()=>{if(!busy)fn();});}
+  function replaceList(container,build){const fragment=document.createDocumentFragment();container.setAttribute('aria-busy','true');build(fragment);container.textContent='';container.appendChild(fragment);container.setAttribute('aria-busy','false');}
   function render(state) {
     busy=false;el('save').disabled=false;el('prepare').disabled=!bridge;
-    if(state.error){if(state.prepared!==true)clear();el('status').textContent=state.error;return;}
+    if(state.error){if(state.prepared!==true)clear();setText(el('status'),state.error);return;}
     window.clearTimeout(expiry);
-    if(!state.prepared){clear();el('status').textContent='Cadastros bloqueados. Prepare com internet e a mesma conta/comunidade para recuperar o trabalho salvo.';return;}
+    if(!state.prepared){clear();setText(el('status'),'Cadastros bloqueados. Prepare com internet e a mesma conta/comunidade para recuperar o trabalho salvo.');return;}
     prepared=true;el('workspace').hidden=false;el('community').textContent=state.communityName;
-    if(state.savedId){editing=state.savedId;el('status').textContent='Rascunho salvo no aparelho. Ainda não enviado.';}
-    else if(lastAction!=='status')el('status').textContent='Estado local atualizado. Confira o resultado de cada cadastro abaixo.';
+    if(state.savedId){editing=state.savedId;setText(el('status'),'Rascunho salvo no aparelho. Ainda não enviado.');}
+    else if(lastAction!=='status')setText(el('status'),'Estado local atualizado. Confira o resultado de cada cadastro abaixo.');
     expiry=window.setTimeout(()=>{clear();el('status').textContent='Autorização vencida. Trabalho salvo preservado; prepare novamente.';send('status');},Math.max(0,Number(state.validForMs)||0));
     const signature=JSON.stringify(state.rows||[]);if(signature===rowsSignature)return;rowsSignature=signature;
-    const container=el('rows');container.textContent='';
-    (state.rows||[]).forEach(row=>{
-      const article=document.createElement('article');article.className='entry';
-      text(article,'h3',row.visitor.nomeCompleto||'Rascunho sem nome');
+    const container=el('rows');replaceList(container,fragment=>(state.rows||[]).forEach((row,index)=>{
+      const title=row.visitor.nomeCompleto||'Rascunho sem nome';const article=document.createElement('article');article.className='entry';article.setAttribute('role','listitem');
+      const heading=text(article,'h3',title);heading.id='visitor-row-'+index;article.setAttribute('aria-labelledby',heading.id);
       text(article,'p',labels[row.state]||'Estado desconhecido');
       if(row.message)text(article,'p',row.message);if(row.visitorId)text(article,'p','Cadastro nº '+row.visitorId);
       if(row.state==='DRAFT'){
-        button(article,'Editar rascunho',()=>{editing=row.id;el('name').value=row.visitor.nomeCompleto;el('phone').value=row.visitor.telefone;el('email').value=row.visitor.email;el('date').value=row.visitor.dataEntrada;el('name').focus();});
-        button(article,'Colocar na fila de envio',()=>{if(window.confirm('Enviar este cadastro quando houver conexão? Após entrar na fila, ele não poderá ser editado.')){if(editing===row.id)reset();send('enqueue',{id:row.id});}});
+        button(article,'Editar rascunho',()=>{editing=row.id;el('name').value=row.visitor.nomeCompleto;el('phone').value=row.visitor.telefone;el('email').value=row.visitor.email;el('date').value=row.visitor.dataEntrada;el('name').focus();},title);
+        button(article,'Colocar na fila de envio',()=>{if(window.confirm('Enviar este cadastro quando houver conexão? Após entrar na fila, ele não poderá ser editado.')){if(editing===row.id)reset();send('enqueue',{id:row.id});}},title);
       }
       if(['DRAFT','CONFIRMED','CONFLICT','REJECTED'].includes(row.state))button(article,'Remover este registro do aparelho',()=>{
         if(window.confirm('Remover esta cópia local? Isso não apaga um cadastro já confirmado no servidor.')){if(editing===row.id)reset();send('discard',{id:row.id});}
-      });
-      container.appendChild(article);
-    });
+      },title);
+      fragment.appendChild(article);
+    }));
   }
   if(bridge)bridge.onmessage=event=>{if(document.hidden)return;try{const state=JSON.parse(event.data);if(state.requestId===requestId)render(state);}catch{busy=false;clear();el('status').textContent='Não foi possível ler o estado local.';}};
   else{el('prepare').disabled=true;el('status').textContent='Atualize o Android System WebView para usar os rascunhos protegidos.';}

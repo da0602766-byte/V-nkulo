@@ -2,7 +2,27 @@
 
 Aplicativo Android conectado à plataforma oficial do Vínkulo.
 
-Versão estável de distribuição geral: **1.7.1** (`versionCode 10`). Candidato para homologação: **1.11.0** (`versionCode 14`).
+Versão estável de distribuição geral: **1.7.1** (`versionCode 10`). Candidato para homologação: **1.13.0** (`versionCode 16`).
+
+## Fluidez e usabilidade — candidato 1.13.0
+
+- A entrada local não pede mais notificação ao iniciar. No Android 13 ou
+  superior, o pedido aparece somente quando a pessoa ativa alertas na área
+  autenticada que precisa deles.
+- Atalhos internos e histórico do documento tornam o botão Voltar previsível
+  entre consultas, visitantes e módulos. O foco acompanha o destino sem apagar
+  campos ou rascunhos; controles com teclado permanecem visíveis quando a área
+  útil muda.
+- Listas são montadas fora da árvore visível e anexadas em um único lote. Busca
+  local agrupa eventos no próximo quadro, evitando reconstruções repetidas ao
+  digitar. Atualizações iguais continuam sem redesenho.
+- Regiões, listas, itens, estados e ações repetidas têm nomes explícitos para
+  leitor de tela. Alvos mantêm pelo menos 48 px, texto usa unidades escaláveis,
+  foco é visível e o layout é verificado com fonte a 200% sem rolagem lateral.
+- A CI compara 20 amostras do renderizador anterior e do renderizador em lote,
+  com 100 registros no mesmo WebView/emulador, e retém os valores brutos. Essa
+  comparação não substitui métricas de abertura, bateria e TalkBack em aparelho
+  físico.
 
 ## Meus pedidos — bloco 5A / candidato 1.11.0
 
@@ -88,7 +108,8 @@ O Google abre em uma aba segura sobre o aplicativo, como exigido pelo provedor. 
 
 - **Câmera:** solicitada quando o recurso da página oficial precisar dela, sem pedido automático na abertura.
 - **Microfone:** concedido apenas quando um recurso da página solicitar áudio.
-- **Notificações:** solicitada na primeira abertura em Android 13 ou superior.
+- **Notificações:** solicitada somente quando a pessoa ativa alertas na área
+  autenticada que usa esse recurso, em Android 13 ou superior.
 
 ## Compartilhamento no WhatsApp
 

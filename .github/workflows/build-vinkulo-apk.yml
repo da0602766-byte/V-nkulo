@@ -49,7 +49,7 @@ jobs:
           VINKULO_SIGNING_STORE_FILE: ${{ runner.temp }}/vinkulo-release.p12
           VINKULO_SIGNING_PASSWORD: ${{ secrets.ANDROID_SIGNING_PASSWORD }}
         run: |
-          node --test scripts/offline-shell.test.cjs scripts/visitor-shell.test.cjs scripts/module-shell.test.cjs
+          node --test scripts/offline-shell.test.cjs scripts/visitor-shell.test.cjs scripts/module-shell.test.cjs scripts/usability-shell.test.cjs
           gradle testDebugUnitTest lintRelease assembleRelease
       - name: Conferir assinatura e continuidade das atualizações
         run: |
@@ -62,13 +62,13 @@ jobs:
           sha256sum app/build/outputs/apk/release/app-release.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: Vinkulo-Android-1.12.0-homologacao-api${{ matrix.api }}
+          name: Vinkulo-Android-1.13.0-homologacao-api${{ matrix.api }}
           path: Vinkulo-Android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: Vinkulo-Android-1.12.0-validacao-api${{ matrix.api }}
+          name: Vinkulo-Android-1.13.0-validacao-api${{ matrix.api }}
           path: |
             Vinkulo-Android/app/build/reports/
             Vinkulo-Android/app/build/test-results/
@@ -104,12 +104,14 @@ jobs:
             curl --fail --location https://adote-gestao.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.11.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.11.0.apk
             echo '02286b0a8bf3171097138330226a38271d6537384fae7fa13e4304eb8948ee51  /tmp/vinkulo-1.11.0.apk' | sha256sum --check
             adb install -r /tmp/vinkulo-1.11.0.apk
+            curl --fail --location https://adote-gestao.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.12.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.12.0.apk
+            echo '1d222d14da23ba94483c00339781d263731475249d5405b0e1b83d2c7fa539b8  /tmp/vinkulo-1.12.0.apk' | sha256sum --check
+            adb install -r /tmp/vinkulo-1.12.0.apk
             adb install -r app/build/outputs/apk/release/app-release.apk
             adb shell dumpsys package com.vinkulo.app | grep firstInstallTime > /tmp/vinkulo-after-update.txt
             diff /tmp/vinkulo-first-install.txt /tmp/vinkulo-after-update.txt
             adb shell svc wifi disable
             adb shell svc data disable
-            if [ "${{ matrix.api }}" -ge 33 ]; then adb shell pm grant com.vinkulo.app android.permission.POST_NOTIFICATIONS; fi
             adb shell am start -W -n com.vinkulo.app/.MainActivity
             bash scripts/check-release-offline.sh
             adb uninstall com.vinkulo.app
@@ -117,7 +119,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: Vinkulo-Android-1.12.0-emulador-api${{ matrix.api }}
+          name: Vinkulo-Android-1.13.0-emulador-api${{ matrix.api }}
           path: |
             Vinkulo-Android/app/build/reports/androidTests/
             Vinkulo-Android/app/build/outputs/androidTest-results/

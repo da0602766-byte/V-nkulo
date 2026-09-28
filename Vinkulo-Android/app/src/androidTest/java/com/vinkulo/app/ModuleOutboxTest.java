@@ -54,10 +54,6 @@ public class ModuleOutboxTest {
         assumeTrue(WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER));cookies("module-ui");long user=8903;
         for(String module:ModuleAccess.MODULES)try(ModuleAccess a=new ModuleAccess(context,module)){a.install(grant(a,user),VisitorAccess.binding(),a.device(),1);}
         UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
-        // This class can run before the foundation fixture. Grant only in the
-        // disposable CI app, as the reader fixture already does, so the system
-        // dialog does not hide the document and correctly clear its private UI.
-        if(android.os.Build.VERSION.SDK_INT>=33)device.executeShellCommand("pm grant com.vinkulo.app android.permission.POST_NOTIFICATIONS");
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             awaitDom(scenario,"!!document.getElementById('module-workspace')&&!document.getElementById('module-workspace').hidden");
             for(String module:ModuleAccess.MODULES){

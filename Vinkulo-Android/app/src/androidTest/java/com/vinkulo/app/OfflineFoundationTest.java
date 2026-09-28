@@ -97,9 +97,6 @@ public class OfflineFoundationTest {
 
     @Test public void localScreenOpensWithoutServerAndSurvivesActivityRecreation() throws Exception {
         UiDevice device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
-        // Only the disposable instrumentation app; avoid a permission dialog
-        // obscuring the UI under test on Android 13+.
-        if (android.os.Build.VERSION.SDK_INT >= 33) device.executeShellCommand("pm grant com.vinkulo.app android.permission.POST_NOTIFICATIONS");
         try (ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
             requireVisible(device,"Seu Vínkulo começa aqui.");
             boolean supportsBridge = WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER);

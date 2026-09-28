@@ -11,17 +11,19 @@ function shell(supported = true) {
   function element() {
     return {textContent:'', value:'', hidden:false, disabled:false, children:[], handlers:{}, attributes:{},
       addEventListener(name, fn) {this.handlers[name]=fn;}, setAttribute(name,value) {this.attributes[name]=value;},
-      appendChild(child) {this.children.push(child);},
+      appendChild(child) {if(child.isFragment)this.children.push(...child.children);else this.children.push(child);},
     };
   }
+  function fragment(){return {isFragment:true,children:[],appendChild(child){this.children.push(child);}};}
   const document = { hidden: false,
     createElement: element,
+    createDocumentFragment: fragment,
     getElementById(id) {
       if (!elements.has(id)) elements.set(id, element());
       return elements.get(id);
     }, addEventListener(name, fn) { events[name] = fn; },
   };
-  const window = {location:{assign(){}}, addEventListener(){}, setInterval(){},
+  const window = {location:{hash:'',assign(){}}, addEventListener(){}, setInterval(){},requestAnimationFrame(fn){fn();return 1;},cancelAnimationFrame(){},
     setTimeout(fn) { timers.set(++nextTimer, fn); return nextTimer; }, clearTimeout(id) { timers.delete(id); },
   };
   if (supported) window.VinkuloOffline = {postMessage(raw) { requests.push(JSON.parse(raw)); }};

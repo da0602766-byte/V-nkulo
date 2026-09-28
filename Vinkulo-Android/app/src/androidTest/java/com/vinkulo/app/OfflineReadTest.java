@@ -119,7 +119,6 @@ public class OfflineReadTest {
     @Test public void readerDisplaysCachedTextOfflineAfterRecreationAndClearsOnSessionChange() throws Exception {
         assumeTrue(WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER));
         UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
-        if(android.os.Build.VERSION.SDK_INT>=33) device.executeShellCommand("pm grant com.vinkulo.app android.permission.POST_NOTIFICATIONS");
         setCookie("fixture-read-session");
         String binding=OfflinePolicy.digest(OfflinePolicy.sessionCookies(CookieManager.getInstance().getCookie(NativePolicy.ORIGIN)));
         context.getSharedPreferences("offline-lock",Context.MODE_PRIVATE).edit().putBoolean("locked",false).remove("read-consent").putString("requests-consent",binding).commit();

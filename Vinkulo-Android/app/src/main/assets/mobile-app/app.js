@@ -7,6 +7,9 @@
   let snapshot = null;
   let snapshotTime = 0;
   let selected = 'mural';
+  let renderFrame = 0;
+  const frame = window.requestAnimationFrame || (callback => window.setTimeout(callback, 0));
+  const cancelFrame = window.cancelAnimationFrame || window.clearTimeout;
   const send = action => { if (bridge) bridge.postMessage(JSON.stringify({ action, requestId: ++requestId })); };
   const date = value => {
     if (!value) return '';
@@ -17,11 +20,24 @@
     const element = document.createElement(tag);
     element.textContent = value; if (className) element.className = className;
     parent.appendChild(element);
+    return element;
+  }
+  function setText(element, value) {
+    const next = String(value || '');
+    if (element.textContent !== next) element.textContent = next;
+  }
+  function replaceList(container, build) {
+    const fragment = document.createDocumentFragment();
+    container.setAttribute('aria-busy', 'true');
+    build(fragment);
+    container.textContent = '';
+    container.appendChild(fragment);
+    container.setAttribute('aria-busy', 'false');
   }
   function renderItems() {
-    const container = byId('items'); container.textContent = '';
+    const container = byId('items');
     byId('requests-notice').hidden = !snapshot || selected !== 'pedidos';
-    if (!snapshot) return;
+    if (!snapshot) { container.textContent = ''; return; }
     const names = selected === 'agenda' ? ['eventos', 'compromissos'] : [selected];
     let rows = [], more = false, denied = false;
     names.forEach(name => {
@@ -33,12 +49,13 @@
     const query = byId('search').value.trim().toLocaleLowerCase('pt-BR');
     rows = rows.filter(row => [row.item.titulo, row.item.texto, row.item.local, row.item.ministerio, row.item.autor, row.item.tipo, row.item.status]
       .join(' ').toLocaleLowerCase('pt-BR').indexOf(query) !== -1);
-    byId('list-status').textContent = rows.length + ' item(ns) salvo(s)' + (query ? ' nesta busca.' : '.')
-      + (more ? ' Há mais itens disponíveis online.' : '') + (denied ? ' Parte desta consulta não foi autorizada.' : '');
-    if (!rows.length) text(container, 'p', query ? 'Nenhum texto salvo corresponde à busca.' : 'Nenhum item salvo nesta consulta. Confira o período e atualize com internet.', 'muted');
-    rows.forEach(row => {
-      const item = row.item, article = document.createElement('article'); article.className = 'entry';
-      text(article, 'h3', item.titulo || 'Sem título');
+    setText(byId('list-status'), rows.length + ' item(ns) salvo(s)' + (query ? ' nesta busca.' : '.')
+      + (more ? ' Há mais itens disponíveis online.' : '') + (denied ? ' Parte desta consulta não foi autorizada.' : ''));
+    replaceList(container, fragment => {
+      if (!rows.length) text(fragment, 'p', query ? 'Nenhum texto salvo corresponde à busca.' : 'Nenhum item salvo nesta consulta. Confira o período e atualize com internet.', 'muted');
+      rows.forEach((row, index) => {
+      const item = row.item, article = document.createElement('article'); article.className = 'entry'; article.setAttribute('role', 'listitem');
+      const heading = text(article, 'h3', item.titulo || 'Sem título'); heading.id = 'reader-item-' + selected + '-' + index; article.setAttribute('aria-labelledby', heading.id);
       const label = row.name === 'pedidos' ? 'Meu pedido' : row.name === 'compromissos' ? 'Meu compromisso' : row.name === 'eventos' ? 'Evento' : row.name === 'escalas' ? 'Minha escala' : 'Publicação';
       text(article, 'p', label + ' · ' + date(item.data) + (item.fim ? ' até ' + date(item.fim) : ''), 'muted');
       if (item.autor) text(article, 'p', item.autor, 'muted');
@@ -54,11 +71,18 @@
         text(article, 'p', 'Atualização do pedido: ' + date(item.atualizado), 'muted');
       }
       if (item.texto) text(article, 'p', item.texto, 'body');
-      container.appendChild(article);
+      fragment.appendChild(article);
+      });
     });
   }
+  function scheduleRenderItems() {
+    if (renderFrame) cancelFrame(renderFrame);
+    renderFrame = frame(() => { renderFrame = 0; renderItems(); });
+  }
   function clearSnapshot() {
+    if (renderFrame) { cancelFrame(renderFrame); renderFrame = 0; }
     snapshot = null; snapshotTime = 0; byId('reader').hidden = true;
+    byId('quick-reader').hidden = true;
     byId('items').textContent = ''; byId('search').value = ''; byId('window').textContent = '';
     byId('list-status').textContent = '';
     byId('tab-pedidos').hidden = true; byId('requests-notice').hidden = true;
@@ -70,7 +94,7 @@
     waiting = !!state.refreshing;
     byId('prepare').disabled = waiting;
     byId('prepare-requests').disabled = waiting;
-    byId('context-title').textContent = state.prepared ? 'Aparelho preparado' : 'Preparação necessária';
+    setText(byId('context-title'), state.prepared ? 'Aparelho preparado' : 'Preparação necessária');
     const message = state.prepared
       ? state.snapshot ? 'Consultas protegidas disponíveis por tempo limitado. Esta é uma cópia da última atualização, não uma confirmação em tempo real.' : 'Identificação preparada na versão anterior. Ative as consultas offline para salvar conteúdo autorizado.'
       : state.result === 'storage-error'
@@ -78,7 +102,7 @@
         : state.result === 'unavailable'
           ? 'Não foi possível preparar agora. Confira a conexão e tente novamente.'
           : 'Entre na sua conta com internet para preparar a identificação local. Após reiniciar o celular ou expirar o acesso, será preciso reconectar.';
-    byId('context-detail').textContent = waiting ? 'Conferindo seu acesso com segurança…' : message;
+    setText(byId('context-detail'), waiting ? 'Conferindo seu acesso com segurança…' : message);
     byId('community').hidden = !state.prepared;
     byId('prepared-at').hidden = !state.prepared;
     byId('community').textContent = state.prepared ? state.communityName : '';
@@ -95,14 +119,15 @@
     }
     if (state.prepared && state.snapshot) {
       byId('reader').hidden = false;
+      byId('quick-reader').hidden = false;
       if (!snapshot || snapshotTime !== state.preparedAt || !!(snapshot.pedidos && snapshot.pedidos.allowed) !== requestsAllowed) {
         snapshot = state.snapshot; snapshotTime = state.preparedAt;
         byId('window').textContent = 'Agenda e escalas: ' + date(snapshot.from) + ' a ' + date(snapshot.until) + '.';
         renderItems();
       }
     } else clearSnapshot();
-    if (state.prepared && state.result === 'unavailable') byId('context-detail').textContent = 'Não foi possível atualizar. A cópia anterior permanece disponível apenas até o vencimento.';
-    if (state.prepared && state.result === 'requests-denied') byId('context-detail').textContent = 'Meus pedidos não estão disponíveis para este acesso ou plano. As demais consultas autorizadas foram atualizadas.';
+    if (state.prepared && state.result === 'unavailable') setText(byId('context-detail'), 'Não foi possível atualizar. A cópia anterior permanece disponível apenas até o vencimento.');
+    if (state.prepared && state.result === 'requests-denied') setText(byId('context-detail'), 'Meus pedidos não estão disponíveis para este acesso ou plano. As demais consultas autorizadas foram atualizadas.');
     if (state.prepared) expiryTimer = window.setTimeout(() => { render({result:'locked'}); send('status'); }, Math.max(0, Number(state.validForMs) || 0));
   }
   function connection() {
@@ -126,11 +151,27 @@
     ['mural', 'agenda', 'escalas', 'pedidos'].forEach(tab => byId('tab-' + tab).setAttribute('aria-pressed', String(tab === selected)));
     renderItems();
   }));
-  byId('search').addEventListener('input', renderItems);
+  byId('search').addEventListener('input', scheduleRenderItems);
   window.addEventListener('vinkulo:offline-status', () => send('status'));
   document.addEventListener('visibilitychange', () => { if (!bridge) return; render({result:'locked'}); if (!document.hidden) send('status'); });
   window.addEventListener('online', connection); window.addEventListener('offline', connection);
   // Foreground expiry checks are local; never poll the server or write remotely.
   window.setInterval(() => { if (!document.hidden) send('status'); }, 30000);
+  function focusHashTarget() {
+    const id = String(window.location.hash || '').slice(1);
+    if (!['main-content','reader','visitor-section','module-section'].includes(id)) return;
+    const target = byId(id); if (!target || target.hidden) return;
+    frame(() => { target.focus({preventScroll:true}); target.scrollIntoView({block:'start'}); });
+  }
+  if (document.querySelectorAll) Array.prototype.forEach.call(document.querySelectorAll('a[href^="#"]'), link => link.addEventListener('click', () => frame(focusHashTarget)));
+  window.addEventListener('hashchange', focusHashTarget);
+  window.addEventListener('popstate', focusHashTarget);
+  function keepFocusedControlVisible() {
+    const active = document.activeElement;
+    if (!active || !/^(INPUT|SELECT|TEXTAREA)$/.test(active.tagName || '')) return;
+    frame(() => active.scrollIntoView({block:'center',inline:'nearest'}));
+  }
+  document.addEventListener('focusin', keepFocusedControlVisible);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', keepFocusedControlVisible);
   connection(); send('status');
 })();
