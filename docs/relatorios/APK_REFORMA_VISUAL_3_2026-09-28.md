@@ -57,8 +57,18 @@ Artefato API35 `10970649998`, 630.444 bytes, SHA-256
 Certificado original `2eddeaea4f33a6984deb195086e852d8f03fabdb7e67096a03209c8dd651ae1c`.
 Relatórios/capturas API35 `10971811385` e API29 `10971703007`.
 Estável 1.7.1 e candidatos anteriores preservados. Manifesto e hash local
-verificados; publicação e conferência do download público serão registradas
-após o deploy.
+verificados. Publicado no **Sites 330**, fonte web
+`320db7cc93ca5555fb5847cff5dda6cce50e55d1`, deployment
+`appgdep_6aba695aa56481918461b6fa9e54bed9`, concluído em 28/09/2026 às
+**10h19 Brasília** (13:19:47 UTC).
+
+[APK 1.17.0 de homologação](https://adote-gestao.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.17.0_HOMOLOGACAO.apk)
+baixado novamente: HTTP200, 630.444 bytes e hash idêntico ao artefato aprovado.
+Manifesto público aponta 1.17.0/fonte Android correta, mantendo estável 1.7.1.
+Login e instruções HTTP200; snapshot sem sessão/cabeçalhos completos negado
+com HTTP403/no-store; com cabeçalhos válidos e sem sessão, HTTP401/no-store.
+Sem migração ou mudança de audiência. Este registro
+documental é posterior ao deploy; o fonte publicado permanece `320db7c`.
 
 Homologação física com sessão real, TalkBack, dois aparelhos, rede instável,
 OAuth/push/anexos e desempenho/bateria continua pendente. As três entregas
