@@ -4,5 +4,8 @@ plugins {
 }
 
 allprojects {
-    dependencyLocking { lockAllConfigurations() }
+    dependencyLocking {
+        lockAllConfigurations()
+        lockMode.set(LockMode.STRICT)
+    }
 }

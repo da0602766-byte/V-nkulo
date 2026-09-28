@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 result=0
-gradle connectedDebugAndroidTest || result=$?
+./gradlew --dependency-verification strict connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.notClass=com.vinkulo.app.UpgradeContinuityTest || result=$?
 mkdir -p app/build/reports/vinkulo-reader
 for name in mural agenda escalas requests recreated reader-restored reader-cleared visitors visitors-draft foundation-failure reader-failure module-failure module-requests module-notes module-followups module-checklists module-cells module-parking module-form-requests module-form-notes module-form-followups module-form-checklists module-form-cells module-form-parking usability-large-text-keyboard; do
   for extension in png xml; do

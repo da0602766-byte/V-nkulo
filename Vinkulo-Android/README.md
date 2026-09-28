@@ -2,7 +2,41 @@
 
 Aplicativo Android conectado à plataforma oficial do Vínkulo.
 
-Versão estável de distribuição geral: **1.7.1** (`versionCode 10`). Candidato para homologação: **1.13.0** (`versionCode 16`).
+Versão estável de distribuição geral: **1.7.1** (`versionCode 10`). Candidato para homologação: **1.14.0** (`versionCode 17`).
+
+## Atualização e distribuição — candidato 1.14.0
+
+Use `./gradlew` (ou `gradlew.bat`) com Java 17 e Android SDK 35. O Wrapper 8.10.2
+tem checksum oficial de distribuição e JAR. Dependências ficam em
+`app/gradle.lockfile` e `gradle/verification-metadata.xml`; o build de CI verifica
+ambos em modo estrito e todas as actions externas estão fixadas por commit.
+Os hashes iniciais vieram dos repositórios Google/Maven Central/Plugin Portal
+no CI e foram revisados; fixar hashes não é uma auditoria de cada biblioteca.
+O ambiente homologado é Linux do CI. Não há promessa de build bit a bit idêntico.
+
+Atualize instalando por cima da versão existente, com o mesmo pacote e assinatura.
+Não desinstale, limpe dados nem instale uma versão mais antiga para corrigir erro:
+isso pode eliminar filas locais e a chave necessária para abrir rascunhos.
+Antes de trocar de celular, sincronize e confira os recibos. Dados locais são
+vinculados ao Keystore e explicitamente excluídos de backup/transferência Android.
+
+Se um envio ficar pendente: reconecte, entre com a mesma conta/comunidade e
+prepare novamente o módulo. A intenção mantém o UUID; aguarde a confirmação.
+Se houver conflito ou recusa, confira a mensagem e use o fluxo de revisão.
+Não refaça manualmente um envio cujo resultado ainda é desconhecido.
+Erro de chave/armazenamento exige suporte antes de limpar dados; o aplicativo
+não deve prometer recuperar conteúdo cifrado quando a chave foi perdida.
+
+A CI verifica separadamente a cadeia de APKs release assinados e a atualização
+de dados com builds debug da fonte anterior e atual. Neste segundo ensaio,
+sete registros cifrados/estados são criados na 1.13.0, o processo é encerrado,
+o APK é atualizado sem desinstalação e o teste verifica conteúdo, UUID,
+cifragem, isolamento e recuperação de lease após atualização/reabertura.
+Fixtures e runners de teste não integram o APK release.
+
+O candidato exige homologação física de sessão, push, OAuth, câmera/anexos,
+TalkBack, fonte/teclado, bateria e concorrência entre dois aparelhos antes da
+promoção geral. AAB/Play depende de um canal Play configurado; o canal atual é APK.
 
 ## Fluidez e usabilidade — candidato 1.13.0
 

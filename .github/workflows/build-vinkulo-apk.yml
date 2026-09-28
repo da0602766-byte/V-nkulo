@@ -13,7 +13,8 @@ permissions:
 
 jobs:
   apk:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
@@ -22,14 +23,14 @@ jobs:
       run:
         working-directory: Vinkulo-Android
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
           java-version: "17"
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.10.2"
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
       - name: Preparar chave estável de produção
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_SIGNING_KEYSTORE_BASE64 }}
@@ -50,19 +51,16 @@ jobs:
           VINKULO_SIGNING_PASSWORD: ${{ secrets.ANDROID_SIGNING_PASSWORD }}
         run: |
           node --test scripts/offline-shell.test.cjs scripts/visitor-shell.test.cjs scripts/module-shell.test.cjs scripts/usability-shell.test.cjs
-          gradle wrapper --gradle-version 8.10.2 --distribution-type bin --gradle-distribution-sha256-sum 31c55713e40233a8303827ceb42ca48a47267a0ad4bab9177123121e71524c26
-          gradle --write-locks --write-verification-metadata sha256 testDebugUnitTest lintRelease assembleRelease assembleDebugAndroidTest
-      - name: Recolher metadados de build para revisão
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: stage7-build-metadata-api${{ matrix.api }}
-          path: |
-            Vinkulo-Android/gradlew
-            Vinkulo-Android/gradlew.bat
-            Vinkulo-Android/gradle/
-            Vinkulo-Android/gradle.lockfile
-            Vinkulo-Android/app/gradle.lockfile
-          if-no-files-found: error
+          echo '2db75c40782f5e8ba1fc278a5574bab070adccb2d21ca5a6e5ed840888448046  gradle/wrapper/gradle-wrapper.jar' | sha256sum --check
+          chmod +x gradlew
+          ./gradlew --dependency-verification strict testDebugUnitTest lintRelease assembleRelease assembleDebug assembleDebugAndroidTest
+          git diff --exit-code -- gradle app/gradle.lockfile gradle.lockfile
+      - name: Compilar versão anterior para teste de preservação de dados
+        run: |
+          mkdir -p "$RUNNER_TEMP/vinkulo-previous"
+          git archive f4cacf1ef16eda70eec59b4d574456435e3f5106 Vinkulo-Android | tar -x -C "$RUNNER_TEMP/vinkulo-previous"
+          cp app/google-services.json "$RUNNER_TEMP/vinkulo-previous/Vinkulo-Android/app/google-services.json"
+          ./gradlew -p "$RUNNER_TEMP/vinkulo-previous/Vinkulo-Android" assembleDebug
       - name: Conferir assinatura e continuidade das atualizações
         run: |
           signer="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)"
@@ -72,15 +70,15 @@ jobs:
           test -n "$old_digest"
           test "$old_digest" = "$new_digest"
           sha256sum app/build/outputs/apk/release/app-release.apk
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: Vinkulo-Android-1.13.0-homologacao-api${{ matrix.api }}
+          name: Vinkulo-Android-1.14.0-homologacao-api${{ matrix.api }}
           path: Vinkulo-Android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: Vinkulo-Android-1.13.0-validacao-api${{ matrix.api }}
+          name: Vinkulo-Android-1.14.0-validacao-api${{ matrix.api }}
           path: |
             Vinkulo-Android/app/build/reports/
             Vinkulo-Android/app/build/test-results/
@@ -92,7 +90,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - name: Validar atualização assinada e base offline no emulador
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
           api-level: ${{ matrix.api }}
           arch: x86_64
@@ -119,6 +117,9 @@ jobs:
             curl --fail --location https://adote-gestao.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.12.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.12.0.apk
             echo '1d222d14da23ba94483c00339781d263731475249d5405b0e1b83d2c7fa539b8  /tmp/vinkulo-1.12.0.apk' | sha256sum --check
             adb install -r /tmp/vinkulo-1.12.0.apk
+            curl --fail --location https://adote-gestao.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.13.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.13.0.apk
+            echo '227398fad70fec0ecb1c081521123e1f400831f03b8521dc0a6a2d482a4077b5  /tmp/vinkulo-1.13.0.apk' | sha256sum --check
+            adb install -r /tmp/vinkulo-1.13.0.apk
             adb install -r app/build/outputs/apk/release/app-release.apk
             adb shell dumpsys package com.vinkulo.app | grep firstInstallTime > /tmp/vinkulo-after-update.txt
             diff /tmp/vinkulo-first-install.txt /tmp/vinkulo-after-update.txt
@@ -127,13 +128,15 @@ jobs:
             adb shell am start -W -n com.vinkulo.app/.MainActivity
             bash scripts/check-release-offline.sh
             adb uninstall com.vinkulo.app
+            bash scripts/check-upgrade-continuity.sh "$RUNNER_TEMP/vinkulo-previous/Vinkulo-Android/app/build/outputs/apk/debug/app-debug.apk"
             bash scripts/check-offline-tests.sh ${{ matrix.api }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: Vinkulo-Android-1.13.0-emulador-api${{ matrix.api }}
+          name: Vinkulo-Android-1.14.0-emulador-api${{ matrix.api }}
           path: |
             Vinkulo-Android/app/build/reports/androidTests/
             Vinkulo-Android/app/build/outputs/androidTest-results/
             Vinkulo-Android/app/build/reports/vinkulo-release-*
             Vinkulo-Android/app/build/reports/vinkulo-reader/
+            Vinkulo-Android/app/build/reports/vinkulo-upgrade/

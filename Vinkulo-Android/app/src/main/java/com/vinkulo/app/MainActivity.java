@@ -301,7 +301,7 @@ public class MainActivity extends Activity {
                         }
                     } catch (JSONException ignored) { /* Ignore malformed messages without logging their content. */ }
                 });
-        String script = "if(window===window.top){VinkuloNative.onmessage=function(e){try{window.dispatchEvent(new CustomEvent('vinkulo:fcm-token',{detail:JSON.parse(e.data)}));}catch(ignore){}};window.VinkuloAndroid=Object.freeze({version:'1.13.0',"
+        String script = "if(window===window.top){VinkuloNative.onmessage=function(e){try{window.dispatchEvent(new CustomEvent('vinkulo:fcm-token',{detail:JSON.parse(e.data)}));}catch(ignore){}};window.VinkuloAndroid=Object.freeze({version:'" + BuildConfig.VERSION_NAME + "',"
                 + "requestPushToken:function(){VinkuloNative.postMessage(JSON.stringify({action:'push-token'}));},"
                 + "setPushBinding:function(token,bindingId){VinkuloNative.postMessage(JSON.stringify({action:'push-bind',token:token,bindingId:bindingId}));},"
                 + "clearPushBinding:function(){VinkuloNative.postMessage(JSON.stringify({action:'push-clear'}));},"
