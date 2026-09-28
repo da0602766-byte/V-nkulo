@@ -8,8 +8,13 @@ ready=0
 for attempt in $(seq 1 12); do
   adb shell uiautomator dump /sdcard/vinkulo-foundation.xml >/dev/null 2>&1 || true
   adb pull /sdcard/vinkulo-foundation.xml app/build/reports/vinkulo-release-offline.xml >/dev/null 2>&1 || true
-  if grep -q 'O que vamos fazer?' app/build/reports/vinkulo-release-offline.xml &&
-     grep -Eq 'Preparação necessária|Atualize o Android System WebView' app/build/reports/vinkulo-release-offline.xml; then
+  # A WebView too old for the protected bridge uses a separate native screen,
+  # not the HTML dashboard. Verify each surface against its own expected UI.
+  if { grep -Fq 'O que vamos fazer?' app/build/reports/vinkulo-release-offline.xml &&
+       grep -Fq 'Preparação necessária' app/build/reports/vinkulo-release-offline.xml; } ||
+     { grep -Fq 'Seu Vínkulo começa aqui.' app/build/reports/vinkulo-release-offline.xml &&
+       grep -Fq 'Atualize o Android System WebView' app/build/reports/vinkulo-release-offline.xml &&
+       grep -Fq 'ATUALIZAR WEBVIEW' app/build/reports/vinkulo-release-offline.xml; }; then
     ready=1
     break
   fi
@@ -26,3 +31,4 @@ adb pull /sdcard/vinkulo-offline-settled.png app/build/reports/vinkulo-release-o
 adb logcat -d -t 1500 > app/build/reports/vinkulo-release-logcat.txt || echo 'Optional logcat capture unavailable'
 adb shell dumpsys webviewupdate > app/build/reports/vinkulo-release-webview.txt || echo 'Optional WebView diagnostic unavailable'
 test "$ready" = 1
+

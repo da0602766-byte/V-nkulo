@@ -98,8 +98,8 @@ public class OfflineFoundationTest {
     @Test public void localScreenOpensWithoutServerAndSurvivesActivityRecreation() throws Exception {
         UiDevice device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
         try (ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
-            requireVisible(device,"O que vamos fazer?");
             boolean supportsBridge = WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER);
+            requireVisible(device,supportsBridge ? "O que vamos fazer?" : "Seu Vínkulo começa aqui.");
             if (android.os.Build.VERSION.SDK_INT >= 35) assertTrue("Modern WebView must exercise the bridge", supportsBridge);
             String expected = supportsBridge ? "Preparação necessária" : "Atualize o Android System WebView";
             assertTrue("Local JavaScript must render a usable state", device.wait(Until.hasObject(By.text(expected)),15000));
@@ -108,7 +108,7 @@ public class OfflineFoundationTest {
             for(int repeat=0;repeat<5;repeat++) {
                 scenario.recreate();
                 if(supportsBridge) requireLocalDocument(scenario,expected);
-                else { requireVisible(device,"O que vamos fazer?");requireVisible(device,expected); }
+                else { requireVisible(device,"Seu Vínkulo começa aqui.");requireVisible(device,expected); }
             }
             if(supportsBridge) OfflineUiEvidence.capture(device,"recreated");
         }
@@ -150,3 +150,4 @@ public class OfflineFoundationTest {
         fail("Invalid recreated local document: "+String.valueOf(last));
     }
 }
+
