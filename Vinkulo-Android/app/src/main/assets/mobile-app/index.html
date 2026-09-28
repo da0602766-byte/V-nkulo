@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="color-scheme" content="light dark"><title>Vínkulo no aparelho</title>
-  <link rel="stylesheet" href="/mobile-app/app.css"><script src="/mobile-app/app.js" defer></script>
+  <link rel="stylesheet" href="/mobile-app/app.css">
+  <script src="/mobile-app/navigation.js" defer></script><script src="/mobile-app/theme.js" defer></script><script src="/mobile-app/app.js" defer></script>
   <script src="/mobile-app/visitors.js" defer></script>
   <script src="/mobile-app/modules.js" defer></script>
 </head>
@@ -22,7 +23,9 @@
     <div><div class="brand" aria-label="Vínkulo">V<span>Í</span>NKULO</div><p id="community" hidden></p></div>
     <span id="network-badge" class="network-badge">No aparelho</span>
   </header>
-  <div class="home-heading"><div><p class="eyebrow">SEU ESPAÇO OFFLINE</p><h1>O que vamos fazer?</h1></div></div>
+  <div id="screen-nav" class="screen-nav" hidden><button id="screen-back" class="back-button" type="button" aria-label="Voltar à tela anterior">← Voltar</button><h1 id="screen-title" tabindex="-1"></h1></div>
+  <div id="home-screen">
+  <div class="home-heading"><div><p class="eyebrow">SEU ESPAÇO OFFLINE</p><h1 id="home-title" tabindex="-1">O que vamos fazer?</h1></div></div>
   <section class="card" aria-labelledby="context-title">
     <div class="status-heading"><span id="context-dot" class="dot" aria-hidden="true"></span><h2 id="context-title">Verificando este aparelho</h2></div>
     <p id="prepared-at" class="muted" hidden></p>
@@ -39,10 +42,12 @@
   </nav>
   <div class="online-action"><button id="open" class="secondary" type="button">Ir para o sistema online <span aria-hidden="true">↗</span></button><p id="connection" class="muted" role="status" aria-live="polite" aria-atomic="true"></p></div>
   <a id="quick-reader" class="back-top" href="#reader" hidden>Ver consultas salvas</a>
-  <details id="offline-settings" class="settings" tabindex="-1">
+  </div>
+  <details id="offline-settings" class="settings" tabindex="-1" hidden>
     <summary>Gerenciar offline <span class="summary-hint">Preparação e privacidade</span></summary>
     <div class="settings-content">
     <p id="context-detail" role="status" aria-live="polite" aria-atomic="true">Aguarde um instante.</p>
+    <p class="footnote">A paleta da comunidade acompanha a última consulta preparada. Claro e escuro seguem o aparelho. Fotos, logotipo e papel de parede não são baixados.</p>
     <h2>Consultas no aparelho</h2>
   <button id="prepare" class="secondary" type="button">Ativar consultas offline</button>
   <p class="footnote">Ao ativar, você permite salvar textos autorizados neste aparelho por até 8 horas. A atualização acontece ao abrir o painel online ou tocar neste botão. Sem baixar fotos ou arquivos.</p>
@@ -55,6 +60,8 @@
   </details>
   <section id="reader" class="reader" hidden aria-labelledby="reader-title" tabindex="-1">
     <h2 id="reader-title">Consultar no aparelho</h2>
+    <div id="reader-locked"><p>Esta consulta precisa ser preparada ou teve o acesso encerrado.</p><a class="back-top" href="#offline-settings">Preparar com internet</a></div>
+    <div id="reader-content" hidden>
     <p id="window" class="muted"></p>
     <div class="tabs" role="group" aria-label="Escolher consulta">
       <button id="tab-mural" type="button" aria-pressed="true">Mural</button>
@@ -66,24 +73,26 @@
     <input id="search" type="search" maxlength="100" placeholder="Título, texto ou local" autocomplete="off" enterkeyhint="search" aria-describedby="list-status">
     <p id="list-status" class="muted" role="status" aria-live="polite" aria-atomic="true"></p>
     <div id="items" role="list" aria-label="Itens da consulta selecionada"></div>
-    <p id="requests-notice" class="footnote" hidden>Consulta dos seus pedidos na última atualização; não confirma atendimento agora. Para criar e enfileirar um novo pedido offline, use Trabalhar por módulo → Pedidos. Públicos avançados e respostas continuam no sistema online.</p>
+    <div id="requests-notice" hidden><p class="footnote">Consulta da última atualização; não confirma atendimento agora. Públicos avançados e respostas continuam online.</p><a class="back-top" href="#module-requests">Criar pedido / ver rascunhos</a></div>
     <p class="footnote">Cópia da última atualização: alterações e cancelamentos posteriores podem não aparecer. Para confirmar participação, responder à escala, ver mídias ou consultar todos os detalhes, abra o sistema online.</p>
-    <a class="back-top" href="#top">Voltar ao início</a>
+    </div><a class="back-top" href="#top">Voltar ao início</a>
   </section>
-  <section id="visitor-section" class="next" aria-labelledby="visitor-title" tabindex="-1">
+  <section id="visitor-section" class="next" aria-labelledby="visitor-title" tabindex="-1" hidden>
     <h2 id="visitor-title">Receber um visitante</h2>
+    <details id="visitor-settings" class="help-details" open><summary>Acesso e preparação</summary>
     <p>Salve um rascunho protegido no aparelho e escolha quando colocá-lo na fila. Envio pendente não é cadastro confirmado.</p>
     <button id="visitor-prepare" class="secondary" type="button">Ativar cadastros offline</button>
+    <p class="footnote">Autorização de até 8 horas. O Android tentará enviar a fila com internet; o horário não é garantido. Ao vencer ou sair, os rascunhos ficam bloqueados até preparar novamente com a mesma conta/comunidade.</p></details>
     <p id="visitor-status" role="status" aria-live="polite" aria-atomic="true" class="muted">Entre com internet e permissão de cadastrar visitantes para preparar.</p>
     <div id="visitor-workspace" role="group" aria-labelledby="visitor-form-title" hidden>
       <p id="visitor-community"></p>
-      <p class="footnote">Autorização de até 8 horas. O Android tentará enviar a fila com internet; o horário não é garantido. Ao vencer ou sair, os rascunhos ficam bloqueados até preparar novamente com a mesma conta/comunidade.</p>
       <h3 id="visitor-form-title">Rascunho de visitante</h3>
       <label for="visitor-name">Nome completo</label><input id="visitor-name" maxlength="120" autocomplete="off" enterkeyhint="next">
       <label for="visitor-phone">Telefone (opcional)</label><input id="visitor-phone" type="tel" inputmode="tel" maxlength="30" autocomplete="off" enterkeyhint="next">
       <label for="visitor-email">E-mail (opcional)</label><input id="visitor-email" type="email" inputmode="email" maxlength="180" autocomplete="off" enterkeyhint="next">
       <label for="visitor-date">Data de entrada</label><input id="visitor-date" type="date">
-      <p id="visitor-form-help" class="footnote">Toque em Salvar antes de sair desta tela. Campos adicionais ficam no cadastro online.</p>
+      <p id="visitor-form-help" class="footnote">Salve antes de minimizar ou fechar o aplicativo: campos não salvos são limpos por privacidade. Campos adicionais ficam online.</p>
+      <p id="visitor-dirty" class="draft-notice" role="status" aria-live="polite" hidden>Alterações não salvas neste formulário.</p>
       <button id="visitor-save" type="button" class="primary">Salvar rascunho no aparelho</button>
       <button id="visitor-new" type="button" class="quiet">Limpar formulário / novo rascunho</button>
       <button id="visitor-sync" type="button" class="secondary">Tentar enviar pendências</button>
@@ -92,25 +101,39 @@
     </div>
     <a class="back-top" href="#top">Voltar ao início</a>
   </section>
-  <section id="module-section" class="next" aria-labelledby="module-title" tabindex="-1">
+  <section id="module-menu" hidden aria-label="Escolher função offline">
+    <p class="muted">Cada função tem sua própria preparação e seus rascunhos. Salvar não envia.</p>
+    <nav class="module-grid" aria-label="Módulos offline">
+      <a class="module-link" href="#module-requests"><strong>Pedidos</strong><span>Criar pedidos e conferir rascunhos</span></a>
+      <a class="module-link" href="#module-notes"><strong>Minhas anotações</strong><span>Consultar e registrar ideias</span></a>
+      <a class="module-link" href="#module-followups"><strong>Meus acompanhamentos</strong><span>Registrar contatos já autorizados</span></a>
+      <a class="module-link" href="#module-checklists"><strong>Ministérios e checklists</strong><span>Consultar equipes e minhas tarefas</span></a>
+      <a class="module-link" href="#module-cells"><strong>Minhas células</strong><span>Consultar e rascunhar relatórios</span></a>
+      <a class="module-link" href="#module-parking"><strong>Estacionamento</strong><span>Comprovantes e ocorrências</span></a>
+    </nav><a class="back-top" href="#top">Voltar ao início</a>
+  </section>
+  <section id="module-section" class="next" aria-labelledby="module-title" tabindex="-1" hidden>
     <h2 id="module-title">Trabalhar por módulo</h2>
-    <label for="module-kind">Escolha o módulo</label>
-    <select id="module-kind"><option value="requests">Pedidos</option><option value="notes">Minhas anotações</option><option value="followups">Meus acompanhamentos</option><option value="checklists">Ministérios, equipes e checklists</option><option value="cells">Minhas células</option><option value="parking">Estacionamento</option></select>
+    <div hidden><label for="module-kind">Escolha o módulo</label><select id="module-kind"><option value="requests">Pedidos</option><option value="notes">Minhas anotações</option><option value="followups">Meus acompanhamentos</option><option value="checklists">Ministérios, equipes e checklists</option><option value="cells">Minhas células</option><option value="parking">Estacionamento</option></select></div>
+    <details id="module-settings" class="help-details" open><summary>Acesso e preparação</summary>
     <p id="module-help" class="footnote"></p>
     <button id="module-prepare" class="secondary" type="button">Preparar / atualizar este módulo</button>
     <p class="footnote">Somente este módulo será preparado, por até 8 horas. Até 50 registros autorizados, sem mídias. Rascunhos são cifrados. Salvar não envia: cada envio exige confirmação. Limite compartilhado de 201 registros locais.</p>
+    </details>
     <p id="module-status" role="status" aria-live="polite" aria-atomic="true"></p>
     <div id="module-workspace" hidden>
       <p id="module-community"></p><p id="module-updated" class="muted"></p>
       <details><summary>Consultar última cópia salva</summary><div id="module-items" role="list" aria-label="Registros autorizados do módulo"></div></details>
       <h3>Rascunho</h3><div id="module-fields"></div>
+      <p id="module-dirty" class="draft-notice" role="status" aria-live="polite" hidden>Alterações não salvas neste formulário.</p>
       <button id="module-save" class="primary" type="button">Salvar rascunho no aparelho</button>
       <button id="module-new" class="quiet" type="button">Limpar formulário / novo rascunho</button>
       <button id="module-sync" class="secondary" type="button">Tentar enviar pendências deste módulo</button>
-      <p class="footnote">Salve antes de sair. Em caso de conflito, confira online antes de refazer; não há sobrescrita automática. Textos limitados a 3.500 bytes por rascunho.</p>
+      <p class="footnote">Salve antes de minimizar ou fechar: campos não salvos são limpos por privacidade. Em caso de conflito, confira online antes de refazer; não há sobrescrita automática. Textos limitados a 3.500 bytes por rascunho.</p>
       <div id="module-rows" role="list" aria-label="Rascunhos e envios deste módulo"></div>
     </div>
     <button id="module-lock" class="quiet" type="button">Bloquear todos os módulos sem apagar rascunhos</button>
+    <a class="back-top" href="#module-section">Escolher outra função</a>
     <a class="back-top" href="#top">Voltar ao início</a>
   </section>
 </main>

@@ -2,7 +2,32 @@
 
 Aplicativo Android conectado à plataforma oficial do Vínkulo.
 
-Versão estável de distribuição geral: **1.7.1** (`versionCode 10`). Candidato para homologação: **1.15.0** (`versionCode 18`).
+Versão estável de distribuição geral: **1.7.1** (`versionCode 10`). Candidato para homologação: **1.16.0** (`versionCode 19`).
+
+## Reforma offline — segunda entrega visual
+
+Início, consultas, visitantes, menu de funções e cada módulo têm telas próprias,
+com título, foco e Voltar local. Trocar de tela, abrir outro rascunho, preparar
+novamente ou bloquear pede confirmação se houver alterações não salvas. Cancelar
+mantém os campos; confirmar descarta apenas o formulário, nunca a fila. Durante
+uma operação pendente de confirmação, a navegação aguarda a resposta. Salvar só
+fica confirmado após persistência nativa; edições posteriores ao envio continuam
+marcadas como não salvas. Não há salvamento nem envio automáticos pela navegação.
+
+Minimizar/fechar, bloqueio ou expiração ainda limpam campos não salvos por
+privacidade. Salve explicitamente antes: proteção de navegação não recupera um
+formulário após morte do processo. Rascunhos já salvos permanecem cifrados.
+
+O cabeçalho nativo opcional `X-Vinkulo-Theme: palette-1` recebe a paleta da
+comunidade no snapshot autorizado do protocolo 3. Somente cores hexadecimais
+limitadas, sem mídia/URLs/CSS livre; armazenamento na mesma linha cifrada,
+isolamento e vencimento do snapshot. Protocolos/APKs anteriores não mudam.
+Claro/escuro segue o aparelho; a preferência manual da interface online não é
+copiada. Preparações antigas usam Moderno até atualizar as consultas. Expiração,
+bloqueio e segundo plano removem a paleta do documento junto da identidade.
+
+Central unificada de pendências permanece a terceira etapa. Homologação física
+continua obrigatória; este candidato não substitui a versão estável geral.
 
 ## Reforma offline — primeira entrega visual
 

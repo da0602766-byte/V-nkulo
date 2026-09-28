@@ -74,7 +74,7 @@ function snapshot() {
 test('reader uses literal text, filters local data and clears operational content on lock', () => {
   const app=shell();
   app.send({prepared:true,communityName:'Teste',preparedAt:1000,validForMs:1000,snapshot:snapshot()});
-  assert.equal(app.elements.get('reader').hidden,false);
+  assert.equal(app.elements.get('reader-content').hidden,false);
   assert.equal(app.elements.get('items').children[0].children[0].textContent,'<img src=x onerror=alert(1)>');
   assert.doesNotMatch(source,/innerHTML|localStorage|indexedDB|fetch\(/);
   app.elements.get('tab-agenda').handlers.click();
@@ -82,7 +82,7 @@ test('reader uses literal text, filters local data and clears operational conten
   app.elements.get('search').value='inexistente'; app.elements.get('search').handlers.input();
   assert.match(app.elements.get('list-status').textContent,/0 item/);
   app.elements.get('lock').handlers.click();
-  assert.equal(app.elements.get('reader').hidden,true); assert.equal(app.elements.get('items').textContent,'');
+  assert.equal(app.elements.get('reader-content').hidden,true); assert.equal(app.elements.get('items').textContent,'');
   assert.equal(app.elements.get('search').value,'');
   assert.equal(app.requests.at(-1).action,'lock');
 });
@@ -90,9 +90,9 @@ test('out-of-order replies cannot restore a snapshot after lock; expiry removes 
   const app=shell(), ready={prepared:true,communityName:'Teste',preparedAt:1000,validForMs:1000,snapshot:snapshot()};
   app.send(ready); const oldId=app.requests.at(-1).requestId;
   app.elements.get('lock').handlers.click(); app.send({...ready,requestId:oldId});
-  assert.equal(app.elements.get('reader').hidden,true);
+  assert.equal(app.elements.get('reader-content').hidden,true);
   app.send(ready); [...app.timers.values()][0]();
-  assert.equal(app.elements.get('reader').hidden,true); assert.equal(app.elements.get('items').textContent,'');
+  assert.equal(app.elements.get('reader-content').hidden,true); assert.equal(app.elements.get('items').textContent,'');
 });
 test('revoked sections, empty content and capped results are explained', () => {
   const app=shell(), data=snapshot(); data.mural={allowed:false,hasMore:false,items:[]};
@@ -134,7 +134,7 @@ test('own request text is literal, searchable and visibly historical; revoked co
 test('home shortcuts select a saved section without sending a consent or clearing a draft', () => {
   const app=shell(), data=snapshot();
   app.send({prepared:true,preparedAt:1,validForMs:1000,snapshot:data});
-  assert.equal(app.elements.get('shortcut-agenda').attributes.href,'#reader');
+  assert.equal(app.elements.get('shortcut-agenda').attributes.href,'#read-agenda');
   const count=app.requests.length;
   app.elements.get('search').value='consulta antiga';
   app.elements.get('shortcut-agenda').handlers.click();

@@ -130,13 +130,13 @@ public class OfflineFoundationTest {
             java.util.concurrent.atomic.AtomicReference<JSONObject> result=new java.util.concurrent.atomic.AtomicReference<>();
             scenario.onActivity(activity->{
                 android.webkit.WebView view=activity.findViewById(R.id.webview);
-                view.evaluateJavascript("(function(){var h=document.querySelector('h1'),s=document.getElementById('context-title'),p=document.getElementById('prepare'),r=h&&h.getBoundingClientRect();return JSON.stringify({url:location.href,title:h&&h.textContent,status:s&&s.textContent,ready:document.readyState,button:!!p&&!p.disabled,visible:!document.hidden&&!!r&&r.width>0&&r.height>0&&r.top>=0&&r.bottom<=innerHeight});})()",value->{
+                view.evaluateJavascript("(function(){var h=document.getElementById('home-title'),s=document.getElementById('context-title'),p=document.getElementById('prepare'),r=h&&h.getBoundingClientRect();return JSON.stringify({url:location.href,title:h&&h.textContent,status:s&&s.textContent,ready:document.readyState,button:!!p&&!p.disabled,visible:!document.hidden&&!!r&&r.width>0&&r.height>0&&r.top>=0&&r.bottom<=innerHeight});})()",value->{
                     try {result.set(new JSONObject(new JSONArray("["+value+"]").getString(0)));}catch(Exception ignored) { }
                     queried.countDown();
                 });
             });
             queried.await(2,java.util.concurrent.TimeUnit.SECONDS);last=result.get();
-            if(last!=null && OfflinePolicy.HOME.equals(last.optString("url")) && "complete".equals(last.optString("ready"))
+            if(last!=null && (OfflinePolicy.HOME+"#top").equals(last.optString("url")) && "complete".equals(last.optString("ready"))
                     && "O que vamos fazer?".equals(last.optString("title")) && expected.equals(last.optString("status"))
                     && last.optBoolean("visible") && last.optBoolean("button")) {
                 java.util.concurrent.CountDownLatch drawn=new java.util.concurrent.CountDownLatch(1);
@@ -150,4 +150,3 @@ public class OfflineFoundationTest {
         fail("Invalid recreated local document: "+String.valueOf(last));
     }
 }
-

@@ -37,11 +37,11 @@ public class OfflineUsabilityTest {
             }
             assertEquals("true",evaluate(scenario,"(function(){document.documentElement.style.fontSize='200%';var controls=[].slice.call(document.querySelectorAll('button,a,input,select,textarea')).filter(function(x){return !x.hidden&&x.getClientRects().length});return document.documentElement.scrollWidth<=innerWidth+1&&controls.every(function(x){return x.getBoundingClientRect().height>=48;});})()"));
             evaluate(scenario,"document.querySelector('a[href=\"#module-section\"]').click()");
-            await(scenario,"location.hash==='#module-section'&&document.activeElement.id==='module-section'");
+            await(scenario,"location.hash==='#module-section'&&document.activeElement.id==='screen-title'&&!document.getElementById('module-menu').hidden");
             device.pressBack();
             await(scenario,"location.hash===''||location.hash==='#top'");
 
-            evaluate(scenario,"document.getElementById('visitor-workspace').hidden=false;document.getElementById('visitor-name').scrollIntoView({block:'center'});");
+            evaluate(scenario,"window.VinkuloNavigation.go('#visitor-section');document.getElementById('visitor-workspace').hidden=false;document.getElementById('visitor-name').scrollIntoView({block:'center'});");
             JSONArray point=new JSONArray(evaluate(scenario,"(function(){var e=document.getElementById('visitor-name'),r=e.getBoundingClientRect();return [r.left+r.width/2,r.top+r.height/2,innerWidth,innerHeight];})()"));
             int[] origin={0,0};int[] width={1};scenario.onActivity(a->{android.webkit.WebView view=a.findViewById(R.id.webview);view.getLocationOnScreen(origin);width[0]=view.getWidth();});
             double scale=width[0]/point.getDouble(2);assertTrue(device.click(origin[0]+(int)(point.getDouble(0)*scale),origin[1]+(int)(point.getDouble(1)*scale)));

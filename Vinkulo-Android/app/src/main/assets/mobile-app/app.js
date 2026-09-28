@@ -36,6 +36,8 @@
   }
   function renderItems() {
     const container = byId('items');
+    byId('reader-content').hidden = !available(selected);
+    byId('reader-locked').hidden = available(selected);
     byId('requests-notice').hidden = !snapshot || selected !== 'pedidos';
     if (!snapshot) { container.textContent = ''; return; }
     const names = selected === 'agenda' ? ['eventos', 'compromissos'] : [selected];
@@ -81,12 +83,12 @@
   }
   function clearSnapshot() {
     if (renderFrame) { cancelFrame(renderFrame); renderFrame = 0; }
-    snapshot = null; snapshotTime = 0; byId('reader').hidden = true;
+    snapshot = null; snapshotTime = 0; byId('reader-content').hidden = true; byId('reader-locked').hidden = false;
     byId('quick-reader').hidden = true;
     byId('items').textContent = ''; byId('search').value = ''; byId('window').textContent = '';
     byId('list-status').textContent = '';
     byId('tab-pedidos').hidden = true; byId('requests-notice').hidden = true;
-    selected = 'mural';
+    if (!window.VinkuloNavigation) selected = 'mural';
     ['mural','agenda','escalas','pedidos'].forEach(tab => byId('tab-' + tab).setAttribute('aria-pressed', String(tab === selected)));
   }
   function available(name) {
@@ -106,12 +108,13 @@
     if (ready && state.result === 'unavailable') setText(byId('home-notice'), 'Atualização indisponível. A cópia anterior continua com prazo limitado.');
     ['mural','agenda','escalas','pedidos'].forEach(name => {
       const allowed = available(name), link = byId('shortcut-' + name);
-      link.setAttribute('href', allowed ? '#reader' : '#offline-settings');
+      link.setAttribute('href', allowed ? '#read-' + name : '#offline-settings');
       link.setAttribute('data-ready', String(allowed));
       setText(byId('shortcut-' + name + '-status'), allowed ? 'Consulta salva' : !bridge ? 'Requer WebView atualizado' : !ready ? 'Preparar com internet' : name === 'pedidos' ? 'Verificar acesso / ativar' : 'Não autorizado nesta cópia');
     });
   }
   function render(state) {
+    if (window.VinkuloTheme) window.VinkuloTheme(state);
     window.clearTimeout(expiryTimer);
     waiting = !!state.refreshing;
     byId('prepare').disabled = waiting;
@@ -135,12 +138,12 @@
     const requestsAllowed = !!(state.prepared && state.snapshot && state.snapshot.pedidos && state.snapshot.pedidos.allowed);
     byId('prepare-requests').textContent = requestsAllowed ? 'Atualizar meus pedidos offline' : 'Incluir meus pedidos nas consultas offline';
     byId('tab-pedidos').hidden = !requestsAllowed;
-    if (selected === 'pedidos' && !requestsAllowed) {
+    if (selected === 'pedidos' && !requestsAllowed && !window.VinkuloNavigation) {
       selected = 'mural';
       ['mural','agenda','escalas','pedidos'].forEach(tab => byId('tab-' + tab).setAttribute('aria-pressed', String(tab === selected)));
     }
     if (state.prepared && state.snapshot) {
-      byId('reader').hidden = false;
+      byId('reader-content').hidden = !available(selected);
       byId('quick-reader').hidden = false;
       if (!snapshot || snapshotTime !== state.preparedAt || !!(snapshot.pedidos && snapshot.pedidos.allowed) !== requestsAllowed) {
         snapshot = state.snapshot; snapshotTime = state.preparedAt;
@@ -167,16 +170,23 @@
     home({});
     setText(byId('home-notice'), 'Atualize o WebView para preparar consultas. O sistema online continua acessível.');
   }
-  byId('open').addEventListener('click', () => { window.location.assign('/painel'); });
+  byId('open').addEventListener('click', () => { if (!window.VinkuloNavigation || window.VinkuloNavigation.allow()) window.location.assign('/painel'); });
   byId('prepare').addEventListener('click', () => { if (waiting) return; waiting = true; byId('prepare').disabled = true; send('refresh'); });
   byId('prepare-requests').addEventListener('click', () => { if (waiting) return; waiting = true; byId('prepare-requests').disabled = true; send('refresh-requests'); });
   byId('lock').addEventListener('click', () => { render({result:'locked'}); send('lock'); });
   ['mural', 'agenda', 'escalas', 'pedidos'].forEach(name => byId('tab-' + name).addEventListener('click', () => {
+    if (window.VinkuloNavigation) { window.VinkuloNavigation.go('#read-' + name); return; }
     if (name === 'pedidos' && (!snapshot || !snapshot.pedidos || !snapshot.pedidos.allowed)) return;
     selected = name;
     ['mural', 'agenda', 'escalas', 'pedidos'].forEach(tab => byId('tab-' + tab).setAttribute('aria-pressed', String(tab === selected)));
     renderItems();
   }));
+  window.VinkuloReaderSelect = name => {
+    if (!['mural','agenda','escalas','pedidos'].includes(name)) return;
+    selected = name; byId('search').value = '';
+    ['mural','agenda','escalas','pedidos'].forEach(tab => byId('tab-' + tab).setAttribute('aria-pressed', String(tab === selected)));
+    renderItems();
+  };
   ['mural', 'agenda', 'escalas', 'pedidos'].forEach(name => byId('shortcut-' + name).addEventListener('click', () => {
     // Recheck at click time: expiration or revocation can change a shortcut.
     if (!available(name)) { byId('offline-settings').open = true; return; }
@@ -192,6 +202,7 @@
   // Foreground expiry checks are local; never poll the server or write remotely.
   window.setInterval(() => { if (!document.hidden) send('status'); }, 30000);
   function focusHashTarget() {
+    if (window.VinkuloNavigation) return;
     const id = String(window.location.hash || '').slice(1);
     if (!['top','main-content','reader','visitor-section','module-section','offline-settings'].includes(id)) return;
     const target = byId(id); if (!target || target.hidden) return;
@@ -211,6 +222,7 @@
   window.VinkuloLocalBack = () => {
     const active = document.activeElement;
     if (active && /^(INPUT|SELECT|TEXTAREA)$/.test(active.tagName || '')) { active.blur(); return true; }
+    if (window.VinkuloNavigation) return window.VinkuloNavigation.back();
     if (window.location.hash) { window.history.back(); return true; }
     return false;
   };

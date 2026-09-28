@@ -30,6 +30,10 @@ final class OfflineStore implements AutoCloseable {
                 .put("binding", binding).put("wall", wall).put("elapsed", elapsed).put("boot", boot)
                 .put("duration", expires - issued - requestDuration).put("serverIssuedAt", issued);
         if (protocol >= 2) saved.put("snapshot", grant.getJSONObject("snapshot"));
+        if (protocol == 3 && grant.has("theme")) {
+            OfflineTheme.validate(grant.getJSONObject("theme"));
+            saved.put("theme", grant.getJSONObject("theme"));
+        }
         // One encrypted row, one atomic replacement: deletions, lost permissions,
         // other accounts and communities never accumulate in a merged cache.
         OfflineDatabase.ContextRow row = new OfflineDatabase.ContextRow();

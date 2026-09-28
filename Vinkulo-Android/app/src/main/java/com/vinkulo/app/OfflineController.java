@@ -66,6 +66,7 @@ final class OfflineController {
                 if (saved != null) state.put("communityName", saved.getString("communityName"))
                         .put("preparedAt", saved.getLong("serverIssuedAt"))
                         .put("snapshot", saved.optJSONObject("snapshot"))
+                        .put("theme", saved.optJSONObject("theme"))
                         .put("validForMs", Math.max(0, saved.getLong("duration") - (SystemClock.elapsedRealtime() - saved.getLong("elapsed"))));
             } catch (Exception ignored) {
                 blocked = true;
@@ -104,6 +105,7 @@ final class OfflineController {
                 connection.setRequestProperty("Origin", NativePolicy.ORIGIN);
                 connection.setRequestProperty("X-Vinkulo-Challenge", challenge);
                 connection.setRequestProperty("X-Vinkulo-Client", "android-read-3");
+                connection.setRequestProperty("X-Vinkulo-Theme", "palette-1");
                 if(includeRequests) connection.setRequestProperty("X-Vinkulo-Requests","own");
                 int status = connection.getResponseCode();
                 if (status == 401 || status == 403) {

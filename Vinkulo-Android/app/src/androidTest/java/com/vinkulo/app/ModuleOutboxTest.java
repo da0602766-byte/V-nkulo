@@ -67,6 +67,9 @@ public class ModuleOutboxTest {
                 assertEquals("true",evaluate(scenario,"document.getElementById('module-fields').children.length>=6&&document.documentElement.scrollWidth<=window.innerWidth"));
                 OfflineUiEvidence.capture(device,"module-form-"+module);
                 if(module.equals("notes")){
+                    evaluate(scenario,"document.getElementById('module-input-titulo').value='Não perder';window.qaConfirm=window.confirm;window.confirm=function(){return false};window.VinkuloNavigation.go('#top');");
+                    assertEquals("true",evaluate(scenario,"location.hash==='#module-notes'&&document.getElementById('module-input-titulo').value==='Não perder'"));
+                    evaluate(scenario,"window.confirm=window.qaConfirm;delete window.qaConfirm;");
                     evaluate(scenario,"document.getElementById('module-input-titulo').value='Anotação fictícia';document.getElementById('module-input-texto').value='Texto protegido no aparelho';document.getElementById('module-save').click()");
                     awaitDom(scenario,"document.getElementById('module-status').textContent.includes('Rascunho salvo')");
                     try(ModuleAccess a=new ModuleAccess(context,module)){assertEquals(1,a.drafts.list(a.active().getString("scope")).length());}

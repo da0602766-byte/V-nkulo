@@ -15,6 +15,7 @@ import org.json.JSONObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import java.util.UUID;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import static org.junit.Assert.*;
@@ -147,6 +148,25 @@ public class OfflineReadTest {
             setCookie("");
         }
     }
+    @Test public void communityThemeIsValidatedEncryptedAndScopedWithItsSnapshot() throws Exception {
+        JSONObject colors=new JSONObject();
+        for(String key:new String[]{"bg","surface","surface-2","text","muted","line","primary","on-primary","link"})colors.put(key,"#112233");
+        JSONObject theme=new JSONObject().put("version",1).put("paletteId","CLASSICO").put("light",colors).put("dark",new JSONObject(colors.toString()));
+        String database="test-theme-"+java.util.UUID.randomUUID()+".db";
+        try(OfflineStore store=new OfflineStore(OfflineDatabase.open(context,database),new OfflineCipher("test-theme"))) {
+            JSONObject themed=requestsGrant().put("theme",theme);
+            store.install(themed,"community-a",1000,100,1,1);
+            assertEquals("CLASSICO",store.read("community-a",1100,200,1).getJSONObject("theme").getString("paletteId"));
+            assertFalse(new String(store.database.storage().context().sealed,StandardCharsets.UTF_8).contains("CLASSICO"));
+            assertNull(store.read("community-b",1100,200,1));
+            colors.put("primary","url(https://evil.test)");
+            try { store.install(themed,"community-a",1000,100,1,1);fail("Unsafe CSS accepted"); } catch(IllegalArgumentException expected) { }
+            assertEquals("CLASSICO",store.read("community-a",1100,200,1).getJSONObject("theme").getString("paletteId"));
+            store.install(requestsGrant(),"community-a",1000,100,1,1);
+            assertFalse(store.read("community-a",1100,200,1).has("theme"));
+            store.lock();assertNull(store.read("community-a",1100,200,1));
+        }finally{context.deleteDatabase(database);}
+    }
     private void setCookie(String value) throws Exception {
         CountDownLatch done=new CountDownLatch(1);
         InstrumentationRegistry.getInstrumentation().runOnMainSync(()->CookieManager.getInstance().setCookie(
@@ -154,10 +174,10 @@ public class OfflineReadTest {
         assertTrue(done.await(5,TimeUnit.SECONDS));
     }
     private void requireReader(ActivityScenario<MainActivity> scenario,boolean prepared) throws Exception {
-        String script="(function(){var r=document.getElementById('reader'),i=document.getElementById('items'),s=document.getElementById('context-title');return location.href==='"+OfflinePolicy.HOME+"'&&document.readyState==='complete'&&!document.hidden&&!!r&&!!i&&!!s&&"+
+        String script="(function(){var r=document.getElementById('reader-content'),i=document.getElementById('items'),s=document.getElementById('context-title');return location.href.split('#')[0]==='"+OfflinePolicy.HOME+"'&&document.readyState==='complete'&&!document.hidden&&!!r&&!!i&&!!s&&"+
             (prepared?"!r.hidden&&s.textContent==='Aparelho preparado'&&i.textContent.indexOf('Aviso offline de teste')>=0":"r.hidden&&s.textContent==='Preparação necessária'&&i.textContent===''" )+";})()";
         requireDom(scenario,script);
-        if(prepared)evaluate(scenario,"document.getElementById('items').scrollIntoView({block:'center'})");
+        if(prepared)evaluate(scenario,"window.VinkuloNavigation.go('#read-mural');document.getElementById('items').scrollIntoView({block:'center'})");
         awaitDraw(scenario);
     }
     // Some emulator WebViews omit their accessibility tree even while rendering correctly.
