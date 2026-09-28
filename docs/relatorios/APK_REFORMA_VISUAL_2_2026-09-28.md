@@ -62,7 +62,16 @@ Certificado original `2eddeaea4f33a6984deb195086e852d8f03fabdb7e67096a03209c8dd6
 Cadeia de APKs assinados até 1.15→1.16 conferida. Estável 1.7.1 preservado.
 Uma rodada anterior recebeu HTTP500 ao baixar APK antigo; a rodada final passou
 integralmente sem enfraquecer assertivas ou remover verificações de atualização.
-Publicação e conferência pública a registrar após o deploy.
+Publicado no **Sites 329**, fonte web `2d7a03019e1fadc48e2decc162807c906374a5dc`,
+deployment `appgdep_6aba610998ac81918d6496f214a52037`, concluído em
+28/09/2026 às **09h44 Brasília** (12:44:20 UTC).
+
+[APK 1.16.0 de homologação](https://adote-gestao.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.16.0_HOMOLOGACAO.apk)
+baixado novamente da URL pública: 625.254 bytes e SHA-256 idêntico ao artefato
+validado. Manifesto público correto, estável 1.7.1 preservado, instruções/login
+HTTP200. Snapshot com cabeçalho de tema e sem sessão retorna HTTP401/no-store.
+PR16 permanece em rascunho, sem merge da base web histórica. Este registro
+documental é posterior ao deploy, cujo fonte permanece `2d7a030`.
 
 Não promover à distribuição geral sem homologação física. Instalar por cima da
 versão existente; não desinstalar nem limpar dados com trabalho pendente.
