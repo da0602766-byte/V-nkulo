@@ -168,3 +168,11 @@ test('network availability does not claim confirmed server connectivity', () => 
   assert.equal(app.elements.get('network-badge').textContent,'Sem conexão');
   assert.doesNotMatch(source,/textContent\s*=\s*navigator.onLine\s*\?\s*'Online'/);
 });
+
+test('direct route to an unprepared request section shows preparation without reading absent data', () => {
+  const app=shell();app.send({prepared:true,preparedAt:1,validForMs:1000,snapshot:snapshot()});
+  app.window.VinkuloReaderSelect('pedidos');
+  assert.equal(app.elements.get('reader-content').hidden,true);
+  assert.equal(app.elements.get('reader-locked').hidden,false);
+  assert.equal(app.elements.get('items').textContent,'');
+});

@@ -39,7 +39,7 @@
     byId('reader-content').hidden = !available(selected);
     byId('reader-locked').hidden = available(selected);
     byId('requests-notice').hidden = !snapshot || selected !== 'pedidos';
-    if (!snapshot) { container.textContent = ''; return; }
+    if (!snapshot || !available(selected)) { container.textContent = ''; setText(byId('list-status'), 'Esta consulta não foi autorizada ou precisa ser preparada.'); return; }
     const names = selected === 'agenda' ? ['eventos', 'compromissos'] : [selected];
     let rows = [], more = false, denied = false;
     names.forEach(name => {
