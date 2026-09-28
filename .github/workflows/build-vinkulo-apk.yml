@@ -50,7 +50,19 @@ jobs:
           VINKULO_SIGNING_PASSWORD: ${{ secrets.ANDROID_SIGNING_PASSWORD }}
         run: |
           node --test scripts/offline-shell.test.cjs scripts/visitor-shell.test.cjs scripts/module-shell.test.cjs scripts/usability-shell.test.cjs
-          gradle testDebugUnitTest lintRelease assembleRelease
+          gradle wrapper --gradle-version 8.10.2 --distribution-type bin --gradle-distribution-sha256-sum 31c55713e40233a8303827ceb42ca48a47267a0ad4bab9177123121e71524c26
+          gradle --write-locks --write-verification-metadata sha256 testDebugUnitTest lintRelease assembleRelease assembleDebugAndroidTest
+      - name: Recolher metadados de build para revisão
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: stage7-build-metadata-api${{ matrix.api }}
+          path: |
+            Vinkulo-Android/gradlew
+            Vinkulo-Android/gradlew.bat
+            Vinkulo-Android/gradle/
+            Vinkulo-Android/gradle.lockfile
+            Vinkulo-Android/app/gradle.lockfile
+          if-no-files-found: error
       - name: Conferir assinatura e continuidade das atualizações
         run: |
           signer="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)"
