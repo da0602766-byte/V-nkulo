@@ -1,6 +1,6 @@
 # APK Vínkulo — arquitetura e sequência de evolução
 
-Data-base: 27/09/2026. Estado: etapas 1–6 implementadas e publicadas para homologação; etapa 7 autorizada e em validação. Último candidato publicado: APK 1.13.0/Sites 326. Não confundir implementação com aprovação física/distribuição geral (mantida em 1.7.1). Testes físicos e métricas Android continuam pendentes. Evidências nos relatórios APK de cada etapa.
+Data-base: 27/09/2026. Estado: etapas 1–6 implementadas e publicadas para homologação; parte técnica da etapa 7 validada e publicada. Último candidato: APK 1.14.0/Sites 327, CI 36368018420 aprovado API 29/35, incluindo atualização com fila e recuperação. O encerramento integral da etapa 7 depende da homologação física e promoção geral (estável mantido em 1.7.1). Testes físicos e métricas Android continuam pendentes. Evidências nos relatórios APK de cada etapa.
 
 ## Objetivo e limites
 
