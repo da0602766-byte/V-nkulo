@@ -89,6 +89,7 @@ public class OfflineFoundationTest {
     @Test public void packagedAssetsNeverInterceptApiOrExternalOrigin() {
         OfflineAssets assets = new OfflineAssets(context);
         assertEquals(200,assets.intercept(Uri.parse(OfflinePolicy.HOME)).getStatusCode());
+        assertEquals(200,assets.intercept(Uri.parse(OfflinePolicy.CONNECTION_ERROR)).getStatusCode());
         assertEquals(404,assets.intercept(Uri.parse(NativePolicy.ORIGIN+"/mobile-app/unknown.html")).getStatusCode());
         assertEquals(404,assets.intercept(Uri.parse(NativePolicy.ORIGIN+"/mobile-app/%2e%2e/api/mobile/bootstrap")).getStatusCode());
         assertNull(assets.intercept(Uri.parse(NativePolicy.ORIGIN+"/api/mobile/bootstrap")));

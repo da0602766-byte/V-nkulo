@@ -2,7 +2,19 @@
 
 Aplicativo Android conectado à plataforma oficial do Vínkulo.
 
-Versão estável de distribuição geral: **1.7.1** (`versionCode 10`). Candidato para homologação: **1.18.0** (`versionCode 21`).
+Versão estável de distribuição geral: **1.7.1** (`versionCode 10`). Candidato para homologação: **1.19.0** (`versionCode 22`).
+
+## Perda de internet com o aplicativo aberto — candidato 1.19.0
+
+O Android agora troca o painel já aberto pelo espaço local quando perde a rede
+validada, inclusive quando a capacidade da rede deixa de ser validada sem uma
+navegação nova. Falha de carregamento do quadro principal nunca deixa a página
+de erro padrão do WebView visível: ausência de internet abre o espaço local;
+rede ativa com falha do sistema abre uma página de tentativa separada. Ações
+online tocadas sem rede e notificações recebidas desconectado também ficam no
+espaço local; o destino seguro da notificação é retomado quando a conexão volta.
+Ao reconectar, o retorno respeita o aviso de alterações não salvas no formulário
+local. A CI reproduz a desconexão com o app aberto e a reconexão em API 29/35.
 
 ## Entrada conectada e espaço local — candidato 1.18.0
 
@@ -82,7 +94,7 @@ Validação de navegador: `scripts/visual-shell.test.cjs` exige Playwright insta
 aceita VINKULO_PLAYWRIGHT, VINKULO_BROWSER_CHANNEL e VINKULO_QA_DIR. Usa somente
 fixtures de teste, nunca contas reais. Não substitui testes Android/TalkBack.
 
-## Atualização e distribuição — candidato 1.18.0
+## Atualização e distribuição — candidato 1.19.0
 
 Use `./gradlew` (ou `gradlew.bat`) com Java 17 e Android SDK 35. O Wrapper 8.10.2
 tem checksum oficial de distribuição e JAR. Dependências ficam em

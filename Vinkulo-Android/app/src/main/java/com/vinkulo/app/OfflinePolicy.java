@@ -8,11 +8,16 @@ import java.util.TreeMap;
 
 final class OfflinePolicy {
     static final String HOME = NativePolicy.ORIGIN + "/mobile-app/index.html";
+    static final String CONNECTION_ERROR = NativePolicy.ORIGIN + "/mobile-app/connection-error.html";
     static final long MAX_AGE = 86_400_000L;
     private OfflinePolicy() { }
 
     static boolean localPage(String url) {
         return NativePolicy.trusted(url) && "/mobile-app/index.html".equals(URI.create(url).getRawPath());
+    }
+
+    static boolean errorPage(String url) {
+        return NativePolicy.trusted(url) && "/mobile-app/connection-error.html".equals(URI.create(url).getRawPath());
     }
 
     static String sessionCookies(String raw) {

@@ -22,8 +22,12 @@ public class OfflinePolicyTest {
     }
     @Test public void localBridgeIsOnlyForTheExactPackagedPage() {
         assertTrue(OfflinePolicy.localPage(OfflinePolicy.HOME));
+        assertTrue(OfflinePolicy.errorPage(OfflinePolicy.CONNECTION_ERROR));
+        assertFalse(OfflinePolicy.localPage(OfflinePolicy.CONNECTION_ERROR));
+        assertFalse(OfflinePolicy.errorPage(OfflinePolicy.HOME));
         assertFalse(OfflinePolicy.localPage(NativePolicy.ORIGIN + "/painel"));
         assertFalse(OfflinePolicy.localPage("https://evil.test/mobile-app/index.html"));
+        assertFalse(OfflinePolicy.errorPage("https://evil.test/mobile-app/connection-error.html"));
         assertFalse(OfflinePolicy.localPage(NativePolicy.ORIGIN + "/mobile-app/%69ndex.html"));
         assertFalse(OfflinePolicy.localPage("file:///mobile-app/index.html"));
     }

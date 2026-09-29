@@ -65,6 +65,8 @@ public class MainActivity extends Activity {
     private WebView webView;
     private ConnectivityManager connectivityManager;
     private ConnectivityManager.NetworkCallback connectivityCallback;
+    private boolean hadValidatedInternet;
+    private String deferredNotificationPath;
     private OfflineController offline;
     private VisitorController visitors;
     private ModuleController modules;
@@ -76,6 +78,7 @@ public class MainActivity extends Activity {
     private final ArrayDeque<PermissionRequest> pendingMediaRequests = new ArrayDeque<>();
     private boolean awaitingMediaPermissionResult;
     private boolean resolvingLocalBack;
+    private boolean localDocumentLoading;
 
     @Override
     public void onCreate(Bundle state) {
@@ -119,6 +122,7 @@ public class MainActivity extends Activity {
                 downloadDocument(url, userAgent, disposition, mimeType));
         webView.setWebViewClient(new WebViewClient() {
             @Override public void onPageStarted(WebView view, String url, Bitmap icon) {
+                localDocumentLoading = OfflinePolicy.localPage(url) || OfflinePolicy.errorPage(url);
                 if (NativePolicy.trusted(url)) {
                     String path = Uri.parse(url).getPath();
                     if ("/api/auth/logout".equals(path) || "/login".equals(path)) {
@@ -140,12 +144,20 @@ public class MainActivity extends Activity {
                     dispatchLocalNetworkStatus(connected);
                     if (connected) returnToOnlinePlatform();
                 }
-                if (NativePolicy.trusted(url) && "/painel".equals(Uri.parse(url).getPath())) offline.refresh(false);
+                if (OfflinePolicy.errorPage(url)) {
+                    if (!hasValidatedInternet()) showOfflineEntry();
+                    return;
+                }
+                if (hasValidatedInternet() && NativePolicy.trusted(url)
+                        && "/painel".equals(Uri.parse(url).getPath())) offline.refresh(false);
             }
             @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-                if (request.isForMainFrame() && NativePolicy.trusted(request.getUrl().toString())
-                        && !OfflinePolicy.localPage(request.getUrl().toString()) && !hasValidatedInternet()) {
-                    showOfflineEntry();
+                if (!localDocumentLoading && request.isForMainFrame()
+                        && NativePolicy.trusted(request.getUrl().toString())
+                        && !OfflinePolicy.localPage(request.getUrl().toString())
+                        && !OfflinePolicy.errorPage(request.getUrl().toString())) {
+                    if (hasValidatedInternet()) view.loadUrl(OfflinePolicy.CONNECTION_ERROR);
+                    else showOfflineEntry();
                 }
             }
             @Override
@@ -189,9 +201,11 @@ public class MainActivity extends Activity {
         createNotificationChannel();
         if (state == null) {
             String coldStartPath = notificationPathFromIntent(getIntent());
-            if (coldStartPath != null) webView.loadUrl(APP_URL + coldStartPath);
-            else if (hasValidatedInternet()) webView.loadUrl(APP_URL + "/painel");
-            else showOfflineEntry();
+            if (!hasValidatedInternet()) {
+                deferredNotificationPath = coldStartPath;
+                showOfflineEntry();
+            } else if (coldStartPath != null) webView.loadUrl(APP_URL + coldStartPath);
+            else webView.loadUrl(APP_URL + "/painel");
         } else if (state.getBoolean("vinkulo.localOffline", false) || state.getBoolean("vinkulo.legacyOffline", false)) {
             // The local reader has no navigation/form state to restore. Loading
             // after restoreState races the renderer's own history restoration.
@@ -204,7 +218,8 @@ public class MainActivity extends Activity {
             // data. Recreate the stateless local document and its native bridge
             // explicitly; identity is always read again from protected storage.
             if (state.getBoolean("vinkulo.legacyOffline", false) || restored == null || restored.getCurrentItem() == null
-                    || OfflinePolicy.localPage(restored.getCurrentItem().getUrl())) {
+                    || OfflinePolicy.localPage(restored.getCurrentItem().getUrl())
+                    || OfflinePolicy.errorPage(restored.getCurrentItem().getUrl())) {
                 if (hasValidatedInternet()) webView.loadUrl(APP_URL + "/painel"); else showOfflineEntry();
             }
             handleNotificationTap(getIntent());
@@ -217,7 +232,7 @@ public class MainActivity extends Activity {
         super.onResume();
         if (webView != null) {
             webView.onResume(); dispatchNotificationRefresh();
-            if (hasValidatedInternet()) returnToOnlinePlatform();
+            reconcileInternetAccess();
         }
     }
 
@@ -256,19 +271,16 @@ public class MainActivity extends Activity {
     private void monitorInternetAccess() {
         connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
         if (connectivityManager == null) return;
+        hadValidatedInternet = hasValidatedInternet();
         connectivityCallback = new ConnectivityManager.NetworkCallback() {
             @Override public void onCapabilitiesChanged(Network network, NetworkCapabilities capabilities) {
-                if (capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                        && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
-                    runOnUiThread(() -> {
-                        dispatchLocalNetworkStatus(true);
-                        returnToOnlinePlatform();
-                    });
-                }
+                runOnUiThread(() -> reconcileInternetAccess());
             }
             @Override public void onLost(Network network) {
                 runOnUiThread(() -> {
-                    if (!hasValidatedInternet()) dispatchLocalNetworkStatus(false);
+                    reconcileInternetAccess();
+                    // The active-network snapshot can lag behind onLost briefly.
+                    if (webView != null) webView.postDelayed(() -> reconcileInternetAccess(), 500);
                 });
             }
         };
@@ -288,17 +300,39 @@ public class MainActivity extends Activity {
         } catch (RuntimeException ignored) { return false; }
     }
 
+    private void reconcileInternetAccess() {
+        if (webView == null) return;
+        boolean connected = hasValidatedInternet();
+        boolean restored = connected && !hadValidatedInternet;
+        hadValidatedInternet = connected;
+        if (connected) {
+            dispatchLocalNetworkStatus(true);
+            if (!OfflinePolicy.errorPage(webView.getUrl()) || restored) returnToOnlinePlatform();
+        } else {
+            dispatchLocalNetworkStatus(false);
+            showOfflineEntry();
+        }
+    }
+
     private void returnToOnlinePlatform() {
         if (!hasValidatedInternet() || webView == null) return;
+        String path = deferredNotificationPath == null ? "/painel" : deferredNotificationPath;
         if (legacyOfflineView != null) {
-            hideLegacyOfflineEntry(); webView.loadUrl(APP_URL + "/painel"); return;
+            deferredNotificationPath = null;
+            hideLegacyOfflineEntry(); webView.loadUrl(APP_URL + path); return;
+        }
+        if (OfflinePolicy.errorPage(webView.getUrl())) {
+            deferredNotificationPath = null;
+            webView.loadUrl(APP_URL + path); return;
         }
         if (!OfflinePolicy.localPage(webView.getUrl())) return;
         String permission = "(!window.VinkuloNavigation || window.VinkuloNavigation.allow())";
         webView.evaluateJavascript(permission, allowed -> {
             if ("true".equals(allowed) && hasValidatedInternet() && webView != null
-                    && OfflinePolicy.localPage(webView.getUrl())) {
-                hideLegacyOfflineEntry(); webView.loadUrl(APP_URL + "/painel");
+                    && OfflinePolicy.localPage(webView.getUrl())
+                    && (deferredNotificationPath == null || deferredNotificationPath.equals(path))) {
+                deferredNotificationPath = null;
+                hideLegacyOfflineEntry(); webView.loadUrl(APP_URL + path);
             }
         });
     }
@@ -404,6 +438,7 @@ public class MainActivity extends Activity {
     }
 
     private void showOfflineEntry() {
+        if (webView == null || legacyOfflineView != null || OfflinePolicy.localPage(webView.getUrl())) return;
         if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
             hideLegacyOfflineEntry(); webView.loadUrl(OfflinePolicy.HOME); return;
         }
@@ -566,7 +601,13 @@ public class MainActivity extends Activity {
     private void handleNotificationTap(Intent intent) {
         String path = notificationPathFromIntent(intent);
         if (path == null || webView == null) return;
-        if (legacyOfflineView != null || OfflinePolicy.localPage(webView.getUrl())) {
+        if (!hasValidatedInternet()) {
+            deferredNotificationPath = path;
+            showOfflineEntry(); return;
+        }
+        deferredNotificationPath = null;
+        if (legacyOfflineView != null || OfflinePolicy.localPage(webView.getUrl())
+                || OfflinePolicy.errorPage(webView.getUrl())) {
             hideLegacyOfflineEntry(); webView.loadUrl(APP_URL + path); return;
         }
         webView.post(() -> webView.evaluateJavascript(
@@ -607,6 +648,13 @@ public class MainActivity extends Activity {
             String host = uri.getHost();
             if (NativePolicy.trusted(uri.toString())) {
                 if ("/api/auth/logout".equals(uri.getPath()) || "/login".equals(uri.getPath())) FirebaseDeviceState.clearBinding(this);
+                String path = uri.getPath();
+                if ((path == null || !path.startsWith("/mobile-app/")) && !hasValidatedInternet()) {
+                    if ("/api/auth/logout".equals(uri.getPath()) || "/login".equals(uri.getPath())) {
+                        offline.lock(); visitors.lock(); modules.lock(); pending.invalidate();
+                    }
+                    showOfflineEntry(); return true;
+                }
                 return false;
             }
             if (GOOGLE_AUTH_HOST.equalsIgnoreCase(host)) {
@@ -834,6 +882,11 @@ public class MainActivity extends Activity {
     @Override
     public void onBackPressed() {
         if (legacyOfflineView != null) { super.onBackPressed(); return; }
+        if (webView != null && OfflinePolicy.errorPage(webView.getUrl())) {
+            if (hasValidatedInternet()) webView.loadUrl(APP_URL + "/painel");
+            else showOfflineEntry();
+            return;
+        }
         if (webView != null && OfflinePolicy.localPage(webView.getUrl())) {
             if (resolvingLocalBack) return;
             resolvingLocalBack = true;
@@ -853,7 +906,8 @@ public class MainActivity extends Activity {
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         outState.putBoolean("vinkulo.legacyOffline", legacyOfflineView != null);
-        boolean local = legacyOfflineView != null || OfflinePolicy.localPage(webView.getUrl());
+        boolean local = legacyOfflineView != null || OfflinePolicy.localPage(webView.getUrl())
+                || OfflinePolicy.errorPage(webView.getUrl());
         outState.putBoolean("vinkulo.localOffline", local);
         if (!local) webView.saveState(outState);
         super.onSaveInstanceState(outState);

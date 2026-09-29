@@ -23,6 +23,10 @@ main { max-width: 600px; margin: auto; padding: 1.125rem 1.125rem 2rem; }
 .network-badge[data-online="false"]::before { background: var(--danger); }
 .network-badge[data-online="true"]::before { background: var(--success); }
 .home-heading { margin: 1.25rem 0 1rem; }
+.connection-error { padding-top: clamp(1.5rem, 8vh, 4rem); }
+.connection-error .card { padding: 1.25rem; }
+.connection-error .card p { margin: .75rem 0 0; font-size: .9375rem; }
+.retry-action { display: block; margin-top: 1.25rem; padding: .875rem 1rem; border-radius: .875rem; background: var(--primary); color: var(--on-primary); text-align: center; text-decoration: none; font-weight: 700; }
 .offline-notice { display: grid; grid-template-columns: 2.5rem minmax(0,1fr); gap: .75rem; align-items: center; padding: .875rem 1rem; margin-bottom: .875rem; border: 1px solid color-mix(in srgb,var(--danger) 24%,var(--line)); border-radius: 1rem; background: color-mix(in srgb,var(--danger) 5%,var(--surface)); }
 .offline-notice > span:last-child { display: grid; gap: .125rem; }
 .offline-notice strong { font-size: .875rem; }

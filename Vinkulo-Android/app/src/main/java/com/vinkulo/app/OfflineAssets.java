@@ -18,6 +18,7 @@ final class OfflineAssets {
                     String mime;
                     switch (path) {
                         case "index.html": mime = "text/html"; break;
+                        case "connection-error.html": mime = "text/html"; break;
                         case "app.js": mime = "application/javascript"; break;
                         case "theme.js": mime = "application/javascript"; break;
                         case "navigation.js": mime = "application/javascript"; break;
