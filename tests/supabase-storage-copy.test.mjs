@@ -88,6 +88,11 @@ test("cópia de imagens exige proprietário e confere bytes sem apagar o R2", as
     const fallback = await worker.fetch(new Request(`http://localhost/api/pilot/uploads/${key}`), runtime, context);
     assert.equal(fallback.status, 200);
     assert.equal(await fallback.text(), "the original image bytes");
+    const intact = remote;
+    remote = new TextEncoder().encode("changed image bytes").buffer;
+    const rejectedFallback = await worker.fetch(new Request(`http://localhost/api/pilot/uploads/${key}`), runtime, context);
+    assert.equal(rejectedFallback.status, 503);
+    remote = intact;
     runtime.BUCKET.get = r2Get;
     const changedBucket = await worker.fetch(new Request("http://localhost/api/proprietario/integracoes/supabase", {
       method: "PATCH", headers: { cookie: ownerCookie, "content-type": "application/json" },

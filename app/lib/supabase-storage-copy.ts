@@ -133,8 +133,8 @@ export async function deleteSupabaseStoredImage(key: string) {
 
 export async function readCopiedImage(key: string): Promise<Response | null> {
   if (!isSafeUploadKey(key)) return null;
-  const record = await getD1().prepare("SELECT project_ref,bucket FROM supabase_storage_copies WHERE object_key=?")
-    .bind(key).first<{ project_ref: string; bucket: string }>();
+  const record = await getD1().prepare("SELECT project_ref,bucket,sha256 FROM supabase_storage_copies WHERE object_key=?")
+    .bind(key).first<{ project_ref: string; bucket: string; sha256: string }>();
   if (!record) return null;
   const saved = await readIntegration();
   if (!saved?.config.ativa || !saved.config.serviceRoleKey || new URL(saved.config.url).hostname.split(".")[0] !== record.project_ref
@@ -145,7 +145,12 @@ export async function readCopiedImage(key: string): Promise<Response | null> {
     secret: await reveal(saved.config.serviceRoleKey, `${saved.config.url}:serviceRoleKey`) };
   const response = await storageFetch(config, key, { method: "GET" });
   if (!response.ok) throw new SupabaseStorageCopyError("A cópia do arquivo não pôde ser lida no Supabase.", 503);
-  return response;
+  if (!response.body) throw new SupabaseStorageCopyError("A cópia do arquivo está vazia no Supabase.", 503);
+  const bytes = await readBounded(response.body);
+  if (await digest(bytes) !== record.sha256) {
+    throw new SupabaseStorageCopyError("A cópia do arquivo no Supabase não corresponde ao original conferido.", 503);
+  }
+  return new Response(bytes, { headers: { "Content-Type": response.headers.get("content-type") || "application/octet-stream" } });
 }
 
 export async function rollbackStorageCopyPage() {
