@@ -152,6 +152,9 @@ test('exclusão definitiva remove também as cópias registradas no Supabase', a
   const nativeFetch = globalThis.fetch;
   let remoteDeletes = 0;
   globalThis.fetch = async (url, init = {}) => {
+    if (new URL(String(url)).pathname.endsWith('/vinkulo_catalog_copy_counts')) {
+      return Response.json([{ tenants: 0, profiles: 0, memberships: 0, profile_details: 0, linked_auth: 0 }]);
+    }
     assert.equal(new URL(String(url)).pathname, `/storage/v1/object/private-images/${key}`);
     assert.equal(init.method, 'DELETE');
     remoteDeletes++;
@@ -182,6 +185,9 @@ test('falha ao excluir cópia Supabase preserva credencial e permite nova tentat
   const nativeFetch = globalThis.fetch;
   let available = false;
   globalThis.fetch = async (url, init = {}) => {
+    if (new URL(String(url)).pathname.endsWith('/vinkulo_catalog_copy_counts')) {
+      return Response.json([{ tenants: 0, profiles: 0, memberships: 0, profile_details: 0, linked_auth: 0 }]);
+    }
     assert.equal(init.method, 'DELETE');
     assert.equal(new URL(String(url)).pathname, `/storage/v1/object/private-images/${key}`);
     return available ? Response.json({ message: 'Successfully deleted' }) : new Response('unavailable', { status: 503 });

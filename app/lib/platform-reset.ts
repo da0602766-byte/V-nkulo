@@ -3,6 +3,9 @@ import { getRuntimeEnv } from '../../db/runtime-env';
 import { privateHash, secureToken } from './access-security';
 import { deleteSupabaseStoredImage } from './supabase-storage-copy';
 import { hasTrackedProfileDetails } from './supabase-profile-details-copy-state';
+import { getCatalogCopyCounts, totalCatalogCopies } from './supabase-catalog-cleanup';
+import { readIntegration } from './supabase-integration';
+import { getAutoSyncStatus } from './supabase-auto-sync';
 
 export class ResetError extends Error {}
 type Table = { name: string; sql: string };
@@ -57,7 +60,15 @@ async function fileKeys() {
 
 async function inspect(ownerId: number) {
   const db = getD1();
+  const autoSync = await getAutoSyncStatus(db);
+  if (autoSync.enabled || autoSync.running) throw new ResetError('Pause e conclua a sincronização Supabase antes de reinicializar a plataforma.');
   if (await hasTrackedProfileDetails(db)) throw new ResetError('Remova a cópia dos dados cadastrais no Supabase antes de reinicializar a plataforma.');
+  if (await readIntegration()) {
+    let remoteCount: number;
+    try { const counts = await getCatalogCopyCounts(); remoteCount = totalCatalogCopies(counts) + counts.linked_auth; }
+    catch { throw new ResetError('Confira as cópias dos catálogos no Supabase antes de reinicializar a plataforma. A migração SQL 0009 precisa estar disponível.'); }
+    if (remoteCount) throw new ResetError('Remova as cópias de comunidades, perfis e vínculos no Supabase antes de reinicializar a plataforma.');
+  }
   const { list, schemaCount } = await tables();
   const pending = await db.prepare("SELECT COUNT(*) AS n FROM platform_reset_files WHERE disposition='DELETE_PENDING'").first<{ n: number }>();
   if (pending?.n) throw new ResetError('Conclua a exclusão dos arquivos pendentes no histórico antes de iniciar outra reinicialização.');

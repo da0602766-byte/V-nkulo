@@ -63,6 +63,9 @@ test("dados cadastrais são copiados ao serviço e a API devolve apenas contagen
       remoteDetails = [];
       return Response.json([{ deleted_count: removedCount }]);
     }
+    if (path.endsWith("/vinkulo_catalog_copy_counts")) {
+      return Response.json([{ tenants: 0, profiles: 0, memberships: 0, profile_details: 0, linked_auth: 0 }]);
+    }
     throw new Error(`Unexpected Supabase request: ${url}`);
   };
   try {
