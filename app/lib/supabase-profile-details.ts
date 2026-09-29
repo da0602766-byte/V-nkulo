@@ -41,6 +41,17 @@ function bounded(value: unknown, max: number): string | null {
   return value;
 }
 
+function assertNoCredentialFields(value: unknown, depth = 0) {
+  if (depth > 8) throw new ProfileDetailsError("Há dados de cadastro profundos demais para conferir.", 422);
+  if (!value || typeof value !== "object") return;
+  for (const [key, item] of Object.entries(value)) {
+    if (/operacao|token|senha|password|secret|session|sessao|cpf_hash/i.test(key)) {
+      throw new ProfileDetailsError("Há um marcador ou credencial no cadastro. Revise o registro antes da transferência.", 409);
+    }
+    assertNoCredentialFields(item, depth + 1);
+  }
+}
+
 export async function loadSourceProfileDetails(): Promise<ProfileDetailsItem[]> {
   const result = await getD1().prepare(`SELECT id,perfil,permissoes,foto_perfil,telefone,cadastro_dados,
     data_nascimento,endereco,celula,ministerio,observacoes,nome_pais,diaconia_equipe_id,
@@ -58,6 +69,7 @@ export async function loadSourceProfileDetails(): Promise<ProfileDetailsItem[]> 
       || JSON.stringify(registrationData).length > 16_000) {
       throw new ProfileDetailsError("Há dados de cadastro incompatíveis no D1.", 422);
     }
+    assertNoCredentialFields(registrationData);
     const profilePhoto = bounded(row.foto_perfil, 2048);
     if (profilePhoto?.startsWith("data:")) {
       throw new ProfileDetailsError("Há foto incorporada ao cadastro. Migre o arquivo antes de copiar os detalhes.", 409);
