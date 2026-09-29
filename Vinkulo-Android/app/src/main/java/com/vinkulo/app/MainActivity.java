@@ -80,6 +80,7 @@ public class MainActivity extends Activity {
     private boolean resolvingLocalBack;
     private boolean localDocumentLoading;
     private int mainFrameLoadGeneration;
+    private int reconnectLoadGeneration;
 
     @Override
     public void onCreate(Bundle state) {
@@ -331,11 +332,11 @@ public class MainActivity extends Activity {
         String path = deferredNotificationPath == null ? "/painel" : deferredNotificationPath;
         if (legacyOfflineView != null) {
             deferredNotificationPath = null;
-            hideLegacyOfflineEntry(); webView.loadUrl(APP_URL + path); return;
+            hideLegacyOfflineEntry(); loadOnlineAfterReconnect(path); return;
         }
         if (OfflinePolicy.errorPage(webView.getUrl())) {
             deferredNotificationPath = null;
-            webView.loadUrl(APP_URL + path); return;
+            loadOnlineAfterReconnect(path); return;
         }
         if (!OfflinePolicy.localPage(webView.getUrl())) return;
         String permission = "(!window.VinkuloNavigation || window.VinkuloNavigation.allow())";
@@ -344,9 +345,23 @@ public class MainActivity extends Activity {
                     && OfflinePolicy.localPage(webView.getUrl())
                     && (deferredNotificationPath == null || deferredNotificationPath.equals(path))) {
                 deferredNotificationPath = null;
-                hideLegacyOfflineEntry(); webView.loadUrl(APP_URL + path);
+                hideLegacyOfflineEntry(); loadOnlineAfterReconnect(path);
             }
         });
+    }
+
+    private void loadOnlineAfterReconnect(String path) {
+        String target = APP_URL + path;
+        int generation = ++reconnectLoadGeneration;
+        webView.loadUrl(target);
+        // A WebView can stall before onPageStarted/onReceivedError after the
+        // radios return. Watch this explicit retry, not only page callbacks.
+        webView.postDelayed(() -> {
+            if (webView == null || generation != reconnectLoadGeneration
+                    || !target.equals(webView.getUrl()) || webView.getProgress() == 100) return;
+            if (hasValidatedInternet()) webView.loadUrl(OfflinePolicy.CONNECTION_ERROR);
+            else showOfflineEntry();
+        }, 20_000);
     }
 
     private void dispatchLocalNetworkStatus(boolean connected) {
