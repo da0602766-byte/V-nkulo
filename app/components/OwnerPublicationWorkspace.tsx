@@ -10,6 +10,7 @@ import SupabaseReadBenchmark from "./SupabaseReadBenchmark";
 import SupabaseAutoSync from "./SupabaseAutoSync";
 import SupabaseDivergences from "./SupabaseDivergences";
 import SupabaseStorageCopy from "./SupabaseStorageCopy";
+import SupabaseProfileDetails from "./SupabaseProfileDetails";
 
 type Audit = { id: number; evento: string; resultado: string; criado_em: string; usuario_nome?: string };
 type ConnectionState = { ativa?: boolean; lastCheck?: { ok: boolean; checkedAt: string } | null } | null;
@@ -50,6 +51,7 @@ export default function OwnerPublicationWorkspace() {
     <SupabaseTenantFoundation />
     <SupabaseTenantCatalog />
     <SupabaseProfileCatalog />
+    <SupabaseProfileDetails />
     <SupabaseMembershipCatalog />
     <SupabaseAutoSync />
     <SupabaseDivergences />
