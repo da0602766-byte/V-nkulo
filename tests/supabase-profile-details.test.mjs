@@ -94,5 +94,10 @@ test("dados cadastrais são copiados ao serviço e a API devolve apenas contagen
     assert.equal(invalid.status, 422);
     assert.match((await invalid.json()).error, /formato inválido/);
     assert.equal(remoteDetails.length, preview.sourceCount);
+    database.prepare("UPDATE usuarios SET cadastro_dados=? WHERE id=?")
+      .run(JSON.stringify({ origem: "LINK_CADASTRO_MEMBROS", operacao: "private-token" }), ownerId);
+    const marker = await call(ownerCookie);
+    assert.equal(marker.status, 409);
+    assert.match((await marker.json()).error, /marcador ou credencial/);
   } finally { globalThis.fetch = nativeFetch; }
 });

@@ -39,7 +39,7 @@ export default function SupabaseProfileDetails() {
 
   return <article className="publication-panel" aria-busy={loading}>
     <h3>Dados cadastrais no Supabase</h3>
-    <p>Compare e copie contatos, endereço, dados de cadastro, ministério e preferências dos perfis. O destino fica restrito ao servidor. Senhas, sessões, CPF e tokens não entram nesta carga. O cadastro continua operando pelo D1 até a migração do módulo.</p>
+    <p>Compare e copie contatos, endereço, campos personalizados de cadastro, ministério e preferências dos perfis. O destino fica restrito ao servidor. As tabelas de senhas, sessões, tokens e identidade CPF não entram nesta carga. O cadastro continua operando pelo D1 até a migração do módulo.</p>
     <div aria-live="polite">
       {loading && <p>Conferindo os dados cadastrais nos dois bancos.</p>}
       {error && <p role="alert">{error}</p>}
