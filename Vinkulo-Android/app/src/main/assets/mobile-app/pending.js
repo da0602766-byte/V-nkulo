@@ -1,7 +1,7 @@
 (() => {
   const el=id=>document.getElementById('pending-'+id),bridge=window.VinkuloPending;
   const names={visitors:'Visitantes',requests:'Pedidos',notes:'Minhas anotações',followups:'Meus acompanhamentos',checklists:'Ministérios e checklists',cells:'Minhas células',parking:'Estacionamento'};
-  const labels={DRAFT:'Rascunho — não enviado',PENDING:'Na fila',SENDING:'Aguardando confirmação',RETRY:'Aguardando nova tentativa',CONFIRMED:'Confirmado no servidor',CONFLICT:'Precisa de revisão',REJECTED:'Recusado — confira o motivo'};
+  const labels={DRAFT:'Rascunho — não enviado',PENDING:'Na fila · aguardando conexão',SENDING:'Aguardando confirmação',RETRY:'Aguardando conexão para nova tentativa',CONFIRMED:'Confirmado no servidor',CONFLICT:'Precisa de revisão',REJECTED:'Recusado — confira o motivo'};
   const filters={all:'Tudo',review:'Revisão',queued:'Na fila',drafts:'Rascunhos',confirmed:'Confirmados'};
   const group=state=>state==='DRAFT'?'drafts':state==='CONFIRMED'?'confirmed':['PENDING','SENDING','RETRY'].includes(state)?'queued':'review';
   const href=module=>module==='visitors'?'#visitor-section':'#module-'+module;
