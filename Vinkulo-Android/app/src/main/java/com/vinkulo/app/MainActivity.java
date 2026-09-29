@@ -883,8 +883,7 @@ public class MainActivity extends Activity {
     public void onBackPressed() {
         if (legacyOfflineView != null) { super.onBackPressed(); return; }
         if (webView != null && OfflinePolicy.errorPage(webView.getUrl())) {
-            if (hasValidatedInternet()) webView.loadUrl(APP_URL + "/painel");
-            else showOfflineEntry();
+            super.onBackPressed();
             return;
         }
         if (webView != null && OfflinePolicy.localPage(webView.getUrl())) {
@@ -892,7 +891,10 @@ public class MainActivity extends Activity {
             resolvingLocalBack = true;
             webView.evaluateJavascript("!!(window.VinkuloLocalBack&&window.VinkuloLocalBack())",handled -> {
                 resolvingLocalBack = false;
-                if (!"true".equals(handled)) finishWebBack();
+                if (!"true".equals(handled)) {
+                    if (hasValidatedInternet()) finishWebBack();
+                    else MainActivity.super.onBackPressed();
+                }
             });
             return;
         }
