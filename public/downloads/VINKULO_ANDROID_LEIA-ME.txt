@@ -10,10 +10,12 @@ Antes de usar sem internet: entre na conta, escolha a comunidade e prepare
 as consultas/módulos desejados. A preparação tem prazo e exige conexão
 novamente após reiniciar o celular.
 
-Na versão 1.18.0, com internet validada o app prioriza o sistema online;
-o espaço local aparece quando o aparelho não tem acesso à internet. Ao
-reconectar, o app oferece voltar ao sistema online e preserva formulários
-com alterações não salvas até você decidir.
+Na versão 1.19.0, com internet validada o app prioriza o sistema online.
+Se a conexão cair com o app aberto, o espaço local substitui o painel,
+sem exibir a página de erro do navegador. Falha do sistema ou carregamento
+travado com internet ativa mostra uma tela própria para tentar novamente.
+Ao reconectar, o app oferece voltar ao sistema online e pede confirmação
+antes de descartar alterações não salvas nos formulários locais.
 
 Cada função offline abre sua própria tela. Para ativar, atualizar ou remover
 cópias, use Gerenciar offline. Visitantes e Mais funções
