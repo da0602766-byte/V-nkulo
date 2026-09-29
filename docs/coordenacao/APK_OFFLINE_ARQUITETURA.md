@@ -1,6 +1,6 @@
 # APK Vínkulo — arquitetura e sequência de evolução
 
-Data-base: 28/09/2026. Estado: etapas 1–6 implementadas e publicadas para homologação; parte técnica da etapa 7 validada e publicada. Última publicação: APK 1.17.0/Sites 330, fonte web `320db7c`. O candidato 1.17.0 implementa a etapa visual 3, central unificada de pendências, validada no CI 36426415596 (API29/35), publicada em 28/09 às 10h19 Brasília; download público/hash/manifesto conferidos. As entregas visuais anteriores trouxeram entrada, atalhos, telas dedicadas, proteção de formulários e paleta da comunidade. Evidências em [Reforma visual — etapa 3](../relatorios/APK_REFORMA_VISUAL_3_2026-09-28.md). O encerramento integral da etapa 7 original depende da homologação física e promoção geral (estável mantido em 1.7.1). Testes físicos e métricas Android continuam pendentes.
+Data-base: 29/09/2026. Etapas 1–6 implementadas e publicadas para homologação; parte técnica da etapa 7 validada e publicada. Última publicação: APK 1.18.0/Sites 331. Candidato 1.18.0 prioriza o painel online com internet validada e apresenta o espaço local apenas sem internet; reconexão respeita formulários não salvos. Página PWA offline redesenhada. CI 36508309325 aprovado em API29/35, inclusive atualização 1.17→1.18 sem remover dados; download/hash/manifesto conferidos após publicação. Estável geral permanece 1.7.1. A etapa 7 original só se encerra após homologação física e decisão de promoção; TalkBack, integrações reais, bateria, concorrência e medições em aparelhos continuam pendentes.
 
 ## Objetivo e limites
 

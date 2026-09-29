@@ -10,8 +10,13 @@ Antes de usar sem internet: entre na conta, escolha a comunidade e prepare
 as consultas/módulos desejados. A preparação tem prazo e exige conexão
 novamente após reiniciar o celular.
 
-Na versão 1.17.0, cada função abre sua própria tela. Para ativar,
-atualizar ou remover cópias, use Gerenciar offline. Visitantes e Mais funções
+Na versão 1.18.0, com internet validada o app prioriza o sistema online;
+o espaço local aparece quando o aparelho não tem acesso à internet. Ao
+reconectar, o app oferece voltar ao sistema online e preserva formulários
+com alterações não salvas até você decidir.
+
+Cada função offline abre sua própria tela. Para ativar, atualizar ou remover
+cópias, use Gerenciar offline. Visitantes e Mais funções
 mantêm preparação própria. Salvar rascunho não significa enviar ao servidor.
 
 A Central de pendências reúne rascunhos, fila, revisão e confirmações dos

@@ -69,7 +69,7 @@ informam que a consulta está indisponível, sem expor dados ou contagens.
 6. Tipografia escalável, espaçamento em múltiplos de 4/8 px, foco visível,
    áreas de toque de ao menos 48 px e suporte ao modo claro/escuro.
 
-## Estado desta entrega
+## Estado da implementação
 
 O fluxo de entrada/retorno e o aviso de estado de conexão foram alterados no
 checkout Android auxiliar `.task-tools/android-p3/Vinkulo-Android`. A tela de
@@ -78,7 +78,11 @@ hierarquia mais curta, estado, segurança dos dados salvos e ação de tentar
 novamente. A regra de navegação do service worker existente já mostra esse
 fallback apenas após falha da navegação online.
 
-O fonte Android ainda não foi compilado/publicado como APK nesta entrega. O
-candidato publicado permanece 1.17.0 até a próxima versão Android incorporar o
-ajuste. Esta descrição distingue o que já está no site do que ainda precisa
-entrar na próxima homologação do APK.
+O fluxo nativo Android e os avisos locais foram publicados no candidato
+**1.18.0** (homologação), mantendo a 1.7.1 estável intacta. A tela local passa
+a ser inicial somente sem internet validada pelo Android; reconexão retorna ao
+sistema online respeitando formulários não salvos. A CI 36508309325 passou nas
+APIs 29 e 35, incluindo instalação sobre 1.17.0, teste instrumentado da tela
+offline e captura acessível. Hash/tamanho definitivos estão no manifesto
+`public/downloads/android-release.json`. A experiência em aparelhos físicos
+segue pendente antes de qualquer promoção do canal estável.
