@@ -10,7 +10,8 @@ O Android agora troca o painel já aberto pelo espaço local quando perde a rede
 validada, inclusive quando a capacidade da rede deixa de ser validada sem uma
 navegação nova. Falha de carregamento do quadro principal nunca deixa a página
 de erro padrão do WebView visível: ausência de internet abre o espaço local;
-rede ativa com falha do sistema abre uma página de tentativa separada. Ações
+rede ativa com falha do sistema ou carregamento travado abre uma página de
+tentativa separada após um prazo limitado. Ações
 online tocadas sem rede e notificações recebidas desconectado também ficam no
 espaço local; o destino seguro da notificação é retomado quando a conexão volta.
 Ao reconectar, o retorno respeita o aviso de alterações não salvas no formulário

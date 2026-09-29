@@ -77,6 +77,27 @@ public class NetworkTransitionTest {
                 + device.hasObject(By.textContains("Página da Web não disponível"));
     }
 
+    private boolean waitForRecoveredScreen(ActivityScenario<MainActivity> scenario) {
+        long deadline = SystemClock.elapsedRealtime() + 45_000;
+        while (SystemClock.elapsedRealtime() < deadline) {
+            AtomicBoolean ready = new AtomicBoolean();
+            scenario.onActivity(activity -> {
+                WebView view = activity.findViewById(R.id.webview);
+                String url = view.getUrl();
+                // An unreachable server with validated internet is a separate,
+                // branded retry state. It must never leave the WebView error up.
+                ready.set(NativePolicy.trusted(url) && !OfflinePolicy.localPage(url)
+                        && view.getProgress() == 100);
+            });
+            if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+                ready.set(ready.get() && !device.hasObject(By.text("Seu Vínkulo começa aqui.")));
+            }
+            if (ready.get()) return true;
+            SystemClock.sleep(250);
+        }
+        return false;
+    }
+
     @Test public void openOnlineLoseInternetShowLocalAndReturnOnline() throws Exception {
         Assume.assumeTrue("Run only in the dedicated online-to-offline CI phase",
                 "1".equals(InstrumentationRegistry.getArguments().getString("vinkulo.liveDisconnect")));
@@ -95,10 +116,14 @@ public class NetworkTransitionTest {
             device.executeShellCommand("svc wifi enable");
             device.executeShellCommand("svc data enable");
             assertTrue("The emulator must reconnect", waitForNetwork(true));
-            if (!waitForScreen(scenario, false)) {
+            if (!waitForRecoveredScreen(scenario)) {
                 OfflineUiEvidence.capture(device, "reconnect-failure");
-                fail("The app must return to the online system: " + screenState(scenario));
+                fail("Reconnection must render the system or its local retry state: " + screenState(scenario));
             }
+            System.out.println("VINKULO_RECONNECTED " + screenState(scenario));
+            assertFalse("The WebView error must not reappear after reconnection",
+                    device.hasObject(By.textContains("Página da Web não disponível")));
+            OfflineUiEvidence.capture(device, "reconnected");
         } finally {
             device.executeShellCommand("svc wifi disable");
             device.executeShellCommand("svc data disable");

@@ -79,6 +79,7 @@ public class MainActivity extends Activity {
     private boolean awaitingMediaPermissionResult;
     private boolean resolvingLocalBack;
     private boolean localDocumentLoading;
+    private int mainFrameLoadGeneration;
 
     @Override
     public void onCreate(Bundle state) {
@@ -122,7 +123,18 @@ public class MainActivity extends Activity {
                 downloadDocument(url, userAgent, disposition, mimeType));
         webView.setWebViewClient(new WebViewClient() {
             @Override public void onPageStarted(WebView view, String url, Bitmap icon) {
+                int generation = ++mainFrameLoadGeneration;
                 localDocumentLoading = OfflinePolicy.localPage(url) || OfflinePolicy.errorPage(url);
+                if (NativePolicy.trusted(url) && !localDocumentLoading) {
+                    // Some older WebViews remain at a blank partial load after
+                    // connectivity returns without reporting onReceivedError.
+                    view.postDelayed(() -> {
+                        if (webView != view || generation != mainFrameLoadGeneration
+                                || localDocumentLoading || view.getProgress() == 100) return;
+                        if (hasValidatedInternet()) view.loadUrl(OfflinePolicy.CONNECTION_ERROR);
+                        else showOfflineEntry();
+                    }, 20_000);
+                }
                 if (NativePolicy.trusted(url)) {
                     String path = Uri.parse(url).getPath();
                     if ("/api/auth/logout".equals(path) || "/login".equals(path)) {
