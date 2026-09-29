@@ -20,15 +20,7 @@ main { max-width: 600px; margin: auto; padding: 1.125rem 1.125rem 2rem; }
 #community { font-size: .8125rem; color: var(--muted); margin: .25rem 0 0; }
 .network-badge { flex-shrink: 0; display: inline-flex; align-items: center; gap: .375rem; border: 1px solid var(--line); padding: .3125rem .625rem; border-radius: 2rem; font-size: .75rem; font-weight: 650; background: var(--surface); }
 .network-badge::before { content: ""; width: .375rem; height: .375rem; border-radius: 50%; background: var(--muted); }
-.network-badge[data-online="false"]::before { background: var(--danger); }
-.network-badge[data-online="true"]::before { background: var(--success); }
 .home-heading { margin: 1.25rem 0 1rem; }
-.offline-notice { display: grid; grid-template-columns: 2.5rem minmax(0,1fr); gap: .75rem; align-items: center; padding: .875rem 1rem; margin-bottom: .875rem; border: 1px solid color-mix(in srgb,var(--danger) 24%,var(--line)); border-radius: 1rem; background: color-mix(in srgb,var(--danger) 5%,var(--surface)); }
-.offline-notice > span:last-child { display: grid; gap: .125rem; }
-.offline-notice strong { font-size: .875rem; }
-.offline-notice > span:last-child > span { color: var(--muted); font-size: .8125rem; }
-.offline-notice-icon { display: grid; width: 2.5rem; height: 2.5rem; place-items: center; border-radius: .75rem; background: color-mix(in srgb,var(--danger) 9%,var(--surface)); color: var(--danger); }
-.offline-notice-icon svg { width: 1.35rem; height: 1.35rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .eyebrow { margin: 0 0 .375rem; color: var(--link); font-size: .6875rem; letter-spacing: .1em; font-weight: 700; }
 h1 { font-size: clamp(1.5rem, 6vw, 1.875rem); line-height: 1.15; margin: 0; letter-spacing: -.04em; }
 h2 { font-size: 1.125rem; line-height: 1.35; margin: 0 0 .625rem; letter-spacing: -.02em; }

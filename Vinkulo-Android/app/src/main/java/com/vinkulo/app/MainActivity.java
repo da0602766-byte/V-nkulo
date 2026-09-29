@@ -11,9 +11,6 @@ import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
-import android.net.ConnectivityManager;
-import android.net.Network;
-import android.net.NetworkCapabilities;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -63,8 +60,6 @@ public class MainActivity extends Activity {
     private static final String EXTRA_NOTIFICATION_URL = "vinkulo_notification_url";
 
     private WebView webView;
-    private ConnectivityManager connectivityManager;
-    private ConnectivityManager.NetworkCallback connectivityCallback;
     private OfflineController offline;
     private VisitorController visitors;
     private ModuleController modules;
@@ -135,16 +130,10 @@ public class MainActivity extends Activity {
                 return offlineAssets.intercept(request.getUrl());
             }
             @Override public void onPageFinished(WebView view, String url) {
-                if (OfflinePolicy.localPage(url)) {
-                    boolean connected = hasValidatedInternet();
-                    dispatchLocalNetworkStatus(connected);
-                    if (connected) returnToOnlinePlatform();
-                }
                 if (NativePolicy.trusted(url) && "/painel".equals(Uri.parse(url).getPath())) offline.refresh(false);
             }
             @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-                if (request.isForMainFrame() && NativePolicy.trusted(request.getUrl().toString())
-                        && !OfflinePolicy.localPage(request.getUrl().toString()) && !hasValidatedInternet()) {
+                if (request.isForMainFrame() && NativePolicy.trusted(request.getUrl().toString()) && !OfflinePolicy.localPage(request.getUrl().toString())) {
                     showOfflineEntry();
                 }
             }
@@ -185,18 +174,16 @@ public class MainActivity extends Activity {
             }
         });
 
-        monitorInternetAccess();
         createNotificationChannel();
         if (state == null) {
             String coldStartPath = notificationPathFromIntent(getIntent());
             if (coldStartPath != null) webView.loadUrl(APP_URL + coldStartPath);
-            else if (hasValidatedInternet()) webView.loadUrl(APP_URL + "/painel");
             else showOfflineEntry();
         } else if (state.getBoolean("vinkulo.localOffline", false) || state.getBoolean("vinkulo.legacyOffline", false)) {
             // The local reader has no navigation/form state to restore. Loading
             // after restoreState races the renderer's own history restoration.
             // Recreate it directly and ask native storage for authorized data.
-            if (hasValidatedInternet()) webView.loadUrl(APP_URL + "/painel"); else showOfflineEntry();
+            showOfflineEntry();
             handleNotificationTap(getIntent());
         } else {
             android.webkit.WebBackForwardList restored = webView.restoreState(state);
@@ -204,9 +191,7 @@ public class MainActivity extends Activity {
             // data. Recreate the stateless local document and its native bridge
             // explicitly; identity is always read again from protected storage.
             if (state.getBoolean("vinkulo.legacyOffline", false) || restored == null || restored.getCurrentItem() == null
-                    || OfflinePolicy.localPage(restored.getCurrentItem().getUrl())) {
-                if (hasValidatedInternet()) webView.loadUrl(APP_URL + "/painel"); else showOfflineEntry();
-            }
+                    || OfflinePolicy.localPage(restored.getCurrentItem().getUrl())) showOfflineEntry();
             handleNotificationTap(getIntent());
         }
         handleGoogleReturn(getIntent());
@@ -215,10 +200,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (webView != null) {
-            webView.onResume(); dispatchNotificationRefresh();
-            if (hasValidatedInternet()) returnToOnlinePlatform();
-        }
+        if (webView != null) { webView.onResume(); dispatchNotificationRefresh(); }
     }
 
     @Override
@@ -233,10 +215,6 @@ public class MainActivity extends Activity {
     // avoiding a global pause during Activity recreation/destruction.
 
     @Override protected void onDestroy() {
-        if (connectivityManager != null && connectivityCallback != null) {
-            try { connectivityManager.unregisterNetworkCallback(connectivityCallback); } catch (IllegalArgumentException ignored) { }
-            connectivityCallback = null;
-        }
         if (offline != null) offline.close();
         if (visitors != null) visitors.close();
         if (modules != null) modules.close();
@@ -251,62 +229,6 @@ public class MainActivity extends Activity {
             webView = null;
         }
         super.onDestroy();
-    }
-
-    private void monitorInternetAccess() {
-        connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
-        if (connectivityManager == null) return;
-        connectivityCallback = new ConnectivityManager.NetworkCallback() {
-            @Override public void onCapabilitiesChanged(Network network, NetworkCapabilities capabilities) {
-                if (capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                        && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
-                    runOnUiThread(() -> {
-                        dispatchLocalNetworkStatus(true);
-                        returnToOnlinePlatform();
-                    });
-                }
-            }
-            @Override public void onLost(Network network) {
-                runOnUiThread(() -> {
-                    if (!hasValidatedInternet()) dispatchLocalNetworkStatus(false);
-                });
-            }
-        };
-        try { connectivityManager.registerDefaultNetworkCallback(connectivityCallback); }
-        catch (RuntimeException ignored) { connectivityCallback = null; }
-    }
-
-    /** VALIDATED is Android's confirmation that this network has public internet access. */
-    private boolean hasValidatedInternet() {
-        if (connectivityManager == null) return false;
-        try {
-            Network active = connectivityManager.getActiveNetwork();
-            NetworkCapabilities capabilities = active == null ? null : connectivityManager.getNetworkCapabilities(active);
-            return capabilities != null
-                    && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                    && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
-        } catch (RuntimeException ignored) { return false; }
-    }
-
-    private void returnToOnlinePlatform() {
-        if (!hasValidatedInternet() || webView == null) return;
-        if (legacyOfflineView != null) {
-            hideLegacyOfflineEntry(); webView.loadUrl(APP_URL + "/painel"); return;
-        }
-        if (!OfflinePolicy.localPage(webView.getUrl())) return;
-        String permission = "(!window.VinkuloNavigation || window.VinkuloNavigation.allow())";
-        webView.evaluateJavascript(permission, allowed -> {
-            if ("true".equals(allowed) && hasValidatedInternet() && webView != null
-                    && OfflinePolicy.localPage(webView.getUrl())) {
-                hideLegacyOfflineEntry(); webView.loadUrl(APP_URL + "/painel");
-            }
-        });
-    }
-
-    private void dispatchLocalNetworkStatus(boolean connected) {
-        if (webView == null || !OfflinePolicy.localPage(webView.getUrl())) return;
-        webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('vinkulo:native-network',{detail:'"
-                + (connected ? "online" : "offline") + "'}))", null);
     }
 
     private void applySafeSystemInsets() {
