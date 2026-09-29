@@ -1,7 +1,7 @@
 import { readIntegration, reveal } from "./supabase-integration";
 
 export type CatalogCopyCounts = { tenants: number; profiles: number; memberships: number;
-  profile_details: number; linked_auth: number };
+  profile_details: number; linked_auth: number }; // A partir de 0010 inclui contas Auth criadas e ainda não vinculadas.
 type RemovedCounts = Omit<CatalogCopyCounts, "linked_auth">;
 export type CatalogCleanupProject = { url: string; projectRef: string };
 

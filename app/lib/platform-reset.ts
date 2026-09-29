@@ -6,6 +6,7 @@ import { hasTrackedProfileDetails } from './supabase-profile-details-copy-state'
 import { getCatalogCopyCounts, totalCatalogCopies } from './supabase-catalog-cleanup';
 import { readIntegration } from './supabase-integration';
 import { getAutoSyncStatus } from './supabase-auto-sync';
+import { activeAuthLinkLeases } from './supabase-auth-link';
 
 export class ResetError extends Error {}
 type Table = { name: string; sql: string };
@@ -62,6 +63,7 @@ async function inspect(ownerId: number) {
   const db = getD1();
   const autoSync = await getAutoSyncStatus(db);
   if (autoSync.enabled || autoSync.running) throw new ResetError('Pause e conclua a sincronização Supabase antes de reinicializar a plataforma.');
+  if (await activeAuthLinkLeases(db)) throw new ResetError('Aguarde os vínculos Auth em andamento antes de reinicializar a plataforma.');
   if (await hasTrackedProfileDetails(db)) throw new ResetError('Remova a cópia dos dados cadastrais no Supabase antes de reinicializar a plataforma.');
   if (await readIntegration()) {
     let remoteCount: number;

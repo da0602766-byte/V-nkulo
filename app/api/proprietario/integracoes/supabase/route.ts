@@ -6,6 +6,7 @@ import { getAutoSyncStatus } from "../../../../lib/supabase-auto-sync";
 import { setProfileDetailsAutoSyncEnabled } from "../../../../lib/supabase-profile-details-auto-sync";
 import { hasTrackedProfileDetails } from "../../../../lib/supabase-profile-details-copy-state";
 import { CatalogCleanupError, getCatalogCopyCounts, totalCatalogCopies } from "../../../../lib/supabase-catalog-cleanup";
+import { activeAuthLinkLeases, setAuthLinkEnabled } from "../../../../lib/supabase-auth-link";
 
 export const reply = (value: unknown, status=200) => Response.json(value,{status,headers:{"Cache-Control":"no-store"}});
 export async function requireIntegrationOwner(request?: Request) {
@@ -34,6 +35,10 @@ export async function PATCH(request: Request) {
     if (!payload || Array.isArray(payload) || typeof payload !== "object" || payload.confirm !== true) return reply({error:"Confirme explicitamente a alteração da integração."},400);
     const saved = await readIntegration();
     const config = await parseIntegration(payload,saved?.config || null);
+    if (saved && (saved.config.url !== config.url || saved.config.projectRef !== config.projectRef || !config.serviceRoleKey)
+      && await activeAuthLinkLeases(getD1())) {
+      return reply({error:"Aguarde os vínculos Auth em andamento antes de mudar o projeto ou a chave protegida."},409);
+    }
     if (saved?.config.serviceRoleKey && !config.serviceRoleKey) {
       const localFiles = await getD1().prepare("SELECT COUNT(*) AS total FROM supabase_storage_copies")
         .first<{ total: number }>();
@@ -72,6 +77,7 @@ export async function PATCH(request: Request) {
     await writeIntegration(config,access.user.id);
     if (!config.ativa || (saved && saved.config.url !== config.url)) {
       await setProfileDetailsAutoSyncEnabled(getD1(), false, access.user.id);
+      await setAuthLinkEnabled(getD1(), false, access.user.id);
     }
     await recordTenantAudit(getD1(),{comunidadeId:null},access.user.id,"INTEGRACAO_SUPABASE_ATUALIZADA","SUCESSO",{ambiente:config.ambiente,host:new URL(config.url).hostname,campos:Object.keys(config).filter(key=>JSON.stringify(saved?.config[key as keyof typeof config]) !== JSON.stringify(config[key as keyof typeof config]))});
     return GET();
@@ -92,6 +98,7 @@ export async function DELETE(request: Request) {
     if (await hasTrackedProfileDetails(getD1())) return reply({error:"Há dados cadastrais copiados no Supabase. Remova a cópia antes de desligar a integração."},409);
     const sync = await getAutoSyncStatus(getD1());
     if (sync.enabled || sync.running) return reply({error:"Pause e conclua a sincronização automática antes de remover a integração."},409);
+    if (await activeAuthLinkLeases(getD1())) return reply({error:"Aguarde os vínculos Auth em andamento antes de remover a integração."},409);
     const saved = await readIntegration();
     if (saved) {
       const catalogCounts = await getCatalogCopyCounts();
@@ -100,6 +107,7 @@ export async function DELETE(request: Request) {
       }
     }
     await setProfileDetailsAutoSyncEnabled(getD1(), false, access.user.id);
+    await setAuthLinkEnabled(getD1(), false, access.user.id);
     await getD1().prepare("DELETE FROM configuracoes WHERE chave = 'supabase_integration'").run();
     await recordTenantAudit(getD1(),{comunidadeId:null},access.user.id,"INTEGRACAO_SUPABASE_REMOVIDA","SUCESSO",{ambiente:saved?.config.ambiente,host:saved ? new URL(saved.config.url).hostname : null});
     return reply({integration:null});
