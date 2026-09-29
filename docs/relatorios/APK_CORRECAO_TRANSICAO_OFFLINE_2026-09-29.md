@@ -52,7 +52,11 @@ notificação também podia tentar carregar a plataforma sem rede.
   `2eddeaea4f33a6984deb195086e852d8f03fabdb7e67096a03209c8dd651ae1c`.
   Código-fonte Android: `f299d2b70b20c939b0c030c31af3c9310c27b678`.
 
-Publicação do download público: pendente nesta fase.
+Publicado para homologação no Sites 332 em 29/09/2026 às 13h30 Brasília,
+fonte web `618930f9713eefab70ff3fcd37bcc88a88b80bdc`, deployment
+`appgdep_6abbe7909b548191a424615c081d1322`. Manifesto e página offline
+responderam HTTP 200; o APK baixado do endereço público tinha 633037 bytes e
+SHA-256 idêntico ao artefato aprovado.
 
 A versão geral 1.7.1 permanece separada; homologação em aparelhos físicos e
 decisão de promoção continuam pendentes.
