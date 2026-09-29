@@ -3192,3 +3192,11 @@ export const mobileChecklistVersions = sqliteTable('mobile_checklist_versions', 
   itemId: integer('item_id').primaryKey().references(() => ministerioChecklistItens.id, { onDelete: 'cascade' }),
   version: integer('version').notNull().default(0),
 });
+
+export const supabaseStorageCopies = sqliteTable('supabase_storage_copies', {
+  objectKey: text('object_key').primaryKey(),
+  projectRef: text('project_ref').notNull(),
+  bucket: text('bucket').notNull(),
+  sha256: text('sha256').notNull(),
+  copiedAt: text('copied_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+}, table => [index('supabase_storage_copies_project_idx').on(table.projectRef, table.bucket)]);

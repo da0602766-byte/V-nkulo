@@ -1,12 +1,13 @@
 import { getD1 } from '../../db';
 import { getRuntimeEnv } from '../../db/runtime-env';
 import { privateHash, secureToken } from './access-security';
+import { deleteSupabaseStoredImage } from './supabase-storage-copy';
 
 export class ResetError extends Error {}
 type Table = { name: string; sql: string };
 type Column = { name: string; pk: number };
 export type ResetSummary = { users: number; communities: number; rows: number; files: number; archives: number; tables: { name: string; rows: number }[] };
-const PRESERVED = new Set(['planos_plataforma', 'planos_rede', 'controlled_auth_rate_limits', 'auth_rate_limits']);
+const PRESERVED = new Set(['planos_plataforma', 'planos_rede', 'controlled_auth_rate_limits', 'auth_rate_limits', 'supabase_storage_copies']);
 const INTERNAL = /^(sqlite_|_cf_|__drizzle|platform_reset_)|^d1_migrations$/;
 const encoder = new TextEncoder();
 const MAX_ARCHIVE_BYTES = 16 * 1024 * 1024;
@@ -17,6 +18,7 @@ function predicate(table: string, ownerId: number) {
   if (!Number.isSafeInteger(ownerId) || ownerId < 1) throw new ResetError('Proprietário inválido.');
   if (table === 'usuarios') return `id <> ${ownerId}`;
   if (table === 'identidades_cpf' || table === 'sessoes') return `usuario_id <> ${ownerId}`;
+  if (table === 'configuracoes') return "chave <> 'supabase_integration'";
   return '1=1';
 }
 
@@ -31,7 +33,12 @@ async function tables() {
 // The binding belongs exclusively to this application. Never enumerate a personal Drive.
 async function fileKeys() {
   const bucket = getRuntimeEnv().BUCKET;
-  if (!bucket) return [] as string[];
+  const copies = await getD1().prepare('SELECT object_key FROM supabase_storage_copies ORDER BY object_key')
+    .all<{ object_key: string }>();
+  if (!bucket) {
+    if (copies.results.length > 10000) throw new ResetError('Mais de 10 mil arquivos: use uma manutenção técnica para este volume. Nenhum dado foi apagado.');
+    return copies.results.map(row => row.object_key);
+  }
   if (!bucket.list) throw new ResetError('Não foi possível conferir os arquivos da plataforma. A limpeza foi bloqueada.');
   const keys: string[] = [];
   let cursor: string | undefined;
@@ -42,7 +49,9 @@ async function fileKeys() {
     cursor = page.truncated ? page.cursor : undefined;
     if (page.truncated && !cursor) throw new ResetError('Não foi possível concluir a conferência dos arquivos.');
   } while (cursor);
-  return keys.sort();
+  const all = [...new Set([...keys, ...copies.results.map(row => row.object_key)])].sort();
+  if (all.length > 10000) throw new ResetError('Mais de 10 mil arquivos: use uma manutenção técnica para este volume. Nenhum dado foi apagado.');
+  return all;
 }
 
 async function inspect(ownerId: number) {
@@ -154,6 +163,8 @@ export async function executeReset(ownerId: number, token: string, mode: 'ARCHIV
   // Remove community-specific profile fields without changing the protected login identity.
   statements.push(db.prepare(`UPDATE usuarios SET foto_perfil=NULL,telefone=NULL,cadastro_dados='{}',data_nascimento=NULL,endereco=NULL,celula=NULL,ministerio=NULL,observacoes=NULL,nome_pais=NULL,diaconia_equipe_id=NULL WHERE id=?`).bind(ownerId));
   ordered.forEach(table => statements.push(db.prepare(`DELETE FROM ${quoted(table.name)} WHERE ${predicate(table.name, ownerId)}`)));
+  if (mode === 'DELETE') statements.push(db.prepare("UPDATE configuracoes SET atualizado_por='reset-pending' WHERE chave='supabase_integration' AND EXISTS(SELECT 1 FROM supabase_storage_copies)"));
+  statements.push(db.prepare("DELETE FROM configuracoes WHERE chave='supabase_integration' AND NOT EXISTS(SELECT 1 FROM supabase_storage_copies)"));
   // Assert that every scoped row disappeared, including anything inserted by a trigger.
   summary.tables.forEach(table => statements.push(db.prepare(`INSERT INTO platform_reset_guard(ok) SELECT COUNT(*)=0 FROM ${quoted(table.name)} WHERE ${predicate(table.name, ownerId)}`)));
   statements.push(db.prepare('UPDATE platform_reset_control SET challenge_hash=NULL,expires_at=0,summary=NULL,generation=generation+1 WHERE id=1'));
@@ -172,10 +183,12 @@ export async function cleanupResetFiles() {
   // A failed object deletion remains visible and retryable; never label it complete.
   for (const row of rows.results) {
     try {
+      await deleteSupabaseStoredImage(row.object_key);
       await bucket.delete(row.object_key);
       await db.prepare("UPDATE platform_reset_files SET disposition='DELETED' WHERE object_key=? AND disposition='DELETE_PENDING'").bind(row.object_key).run();
     } catch { /* Preserve the durable pending item. */ }
   }
+  await db.prepare("DELETE FROM configuracoes WHERE chave='supabase_integration' AND atualizado_por='reset-pending' AND NOT EXISTS(SELECT 1 FROM supabase_storage_copies)").run();
 }
 
 export async function downloadResetArchive(id: string) {
