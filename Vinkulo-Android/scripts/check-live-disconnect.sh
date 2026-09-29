@@ -12,6 +12,8 @@ adb shell am instrument -w -r -e vinkulo.liveDisconnect 1 -e class com.vinkulo.a
   | tee app/build/reports/vinkulo-reader/live-disconnect-test.txt || result=$?
 adb pull /sdcard/vinkulo-reader-live-disconnect.png app/build/reports/vinkulo-reader/live-disconnect.png >/dev/null 2>&1 || true
 adb pull /sdcard/vinkulo-reader-live-disconnect.xml app/build/reports/vinkulo-reader/live-disconnect.xml >/dev/null 2>&1 || true
+adb pull /sdcard/vinkulo-reader-reconnect-failure.png app/build/reports/vinkulo-reader/reconnect-failure.png >/dev/null 2>&1 || true
+adb pull /sdcard/vinkulo-reader-reconnect-failure.xml app/build/reports/vinkulo-reader/reconnect-failure.xml >/dev/null 2>&1 || true
 grep -q 'OK (1 test)' app/build/reports/vinkulo-reader/live-disconnect-test.txt || result=1
 test -s app/build/reports/vinkulo-reader/live-disconnect.png || result=1
 test -s app/build/reports/vinkulo-reader/live-disconnect.xml || result=1

@@ -17,6 +17,7 @@ import org.junit.Test;
 import org.junit.Assume;
 import org.junit.runner.RunWith;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.Assert.*;
 
 /** Exercises the real network transition that previously left WebView's ERR_FAILED page visible. */
@@ -64,6 +65,18 @@ public class NetworkTransitionTest {
         return false;
     }
 
+    private String screenState(ActivityScenario<MainActivity> scenario) {
+        AtomicReference<String> state = new AtomicReference<>("unavailable");
+        scenario.onActivity(activity -> {
+            WebView view = activity.findViewById(R.id.webview);
+            state.set("url=" + view.getUrl() + ", progress=" + view.getProgress()
+                    + ", webViewVisible=" + (view.getVisibility() == android.view.View.VISIBLE));
+        });
+        return state.get() + ", validated=" + validated() + ", legacyVisible="
+                + device.hasObject(By.text("Seu Vínkulo começa aqui.")) + ", webErrorVisible="
+                + device.hasObject(By.textContains("Página da Web não disponível"));
+    }
+
     @Test public void openOnlineLoseInternetShowLocalAndReturnOnline() throws Exception {
         Assume.assumeTrue("Run only in the dedicated online-to-offline CI phase",
                 "1".equals(InstrumentationRegistry.getArguments().getString("vinkulo.liveDisconnect")));
@@ -82,7 +95,10 @@ public class NetworkTransitionTest {
             device.executeShellCommand("svc wifi enable");
             device.executeShellCommand("svc data enable");
             assertTrue("The emulator must reconnect", waitForNetwork(true));
-            assertTrue("The app must return to the online system", waitForScreen(scenario, false));
+            if (!waitForScreen(scenario, false)) {
+                OfflineUiEvidence.capture(device, "reconnect-failure");
+                fail("The app must return to the online system: " + screenState(scenario));
+            }
         } finally {
             device.executeShellCommand("svc wifi disable");
             device.executeShellCommand("svc data disable");
