@@ -31,6 +31,7 @@ export default function SupabaseIntegrationForm() {
     finally {setLoading(false);}
   },[apply]);
   useEffect(()=>{const timer=setTimeout(()=>void load(),0);return ()=>clearTimeout(timer);},[load]);
+  useEffect(()=>{const update=()=>void load();window.addEventListener("vinkulo:supabase-integration-changed",update);return ()=>window.removeEventListener("vinkulo:supabase-integration-changed",update);},[load]);
   async function save() {
     if (!window.confirm("Salvar estas configurações da integração Supabase?")) return;
     setBusy(true);setError("");setNotice("");
@@ -81,7 +82,7 @@ export default function SupabaseIntegrationForm() {
             {([{key:"url",label:"URL do projeto",type:"url",required:true},{key:"projectRef",label:"Referência do projeto",type:"text"},{key:"anonKey",label:"Chave pública (anon)",type:"text",required:true},{key:"serviceRoleKey",label:"Chave secreta do servidor",type:"password",required:!saved?.serviceRoleKey.defined},{key:"jwtSecret",label:"Segredo do JWT (opcional)",type:"password"},{key:"schema",label:"Schema padrão",type:"text"},{key:"bucket",label:"Bucket do Storage (opcional)",type:"text"}] as const).map(field=><label key={field.key} htmlFor={"supabase-"+field.key}>{field.label}<input id={"supabase-"+field.key} type={field.type} value={form[field.key]} required={"required" in field && field.required} autoComplete={field.type==="password" ? "new-password" : "off"} maxLength={4096} spellCheck={false} onChange={e=>setForm({...form,[field.key]:e.target.value})}/>{field.type==="password" && <small>{saved?.[field.key as "serviceRoleKey" | "jwtSecret"].defined ? "Configurado: " + saved[field.key as "serviceRoleKey" | "jwtSecret"].mask + ". Deixe vazio para manter." : "Ainda não configurado."}</small>}</label>)}
           </div>
           <label className="publication-toggle" htmlFor="supabase-ativa"><input id="supabase-ativa" type="checkbox" checked={form.ativa} onChange={e=>setForm({...form,ativa:e.target.checked})}/>Integração ativa</label>
-          <p className="sensitive-action-note">Com a integração desligada, nenhuma chamada ao Supabase é feita. A chave secreta é cifrada no servidor e nunca é devolvida ao navegador.</p>
+          <p className="sensitive-action-note">Com a integração desligada, a sincronização fica pausada. A conferência protegida das cópias continua disponível para limpeza. A chave secreta é cifrada no servidor e nunca é devolvida ao navegador.</p>
           <div className="publication-actions"><button type="submit">{busy ? "Aguarde…" : "Salvar conexão"}</button>{saved && <button type="button" className="secondary" onClick={()=>void testConnection()}>Testar conexão</button>}<button type="button" className="secondary" onClick={()=>void load()}>Recarregar configuração</button>{saved && <button type="button" className="danger" onClick={()=>void remove()}>Remover conexão</button>}</div>
         </fieldset>
       </form>
