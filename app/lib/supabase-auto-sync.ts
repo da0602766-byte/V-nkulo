@@ -3,6 +3,9 @@ import { readIntegration } from "./supabase-integration";
 import { loadSourceTenantCatalog, previewTenantCatalog, syncTenantCatalog } from "./supabase-tenant-catalog";
 import { loadSourceProfiles, previewProfiles, syncProfiles } from "./supabase-profile-catalog";
 import { loadSourceMemberships, previewMemberships, syncMemberships } from "./supabase-membership-catalog";
+import { getProfileDetailsAutoSyncEnabled } from "./supabase-profile-details-auto-sync";
+import { loadSourceProfileDetails, previewProfileDetails, syncProfileDetails } from "./supabase-profile-details";
+import { markProfileDetailsCopy } from "./supabase-profile-details-copy-state";
 import { createSystemNotification } from "./system-notifications";
 
 const KEY = "supabase_auto_sync";
@@ -19,7 +22,8 @@ export type AutoSyncStatus = {
   lastSuccessAt: string | null;
   nextRunAt: string | null;
   lastError: string | null;
-  lastResult: { tenants: CatalogResult; profiles: CatalogResult; memberships: CatalogResult } | null;
+  lastResult: { tenants: CatalogResult; profiles: CatalogResult; memberships: CatalogResult;
+    profileDetails?: CatalogResult | null } | null;
 };
 type StoredStatus = AutoSyncStatus & { lockUntil: string | null; lockToken: string | null; lastAlertAt: string | null };
 type StatusRow = { valor: string };
@@ -83,7 +87,7 @@ async function automaticActorId(db: D1Database): Promise<number> {
   return user.id;
 }
 
-async function reconcile(actorId: number): Promise<NonNullable<AutoSyncStatus["lastResult"]>> {
+async function reconcile(db: D1Database, actorId: number): Promise<NonNullable<AutoSyncStatus["lastResult"]>> {
   const tenants = await loadSourceTenantCatalog();
   const tenantBefore = await previewTenantCatalog(tenants);
   if (tenantBefore.extraDestinationCount) throw new Error("Há comunidades extras no Supabase; revisão manual necessária.");
@@ -107,10 +111,23 @@ async function reconcile(actorId: number): Promise<NonNullable<AutoSyncStatus["l
     await syncMemberships(memberships, actorId);
     if (!(await previewMemberships()).ready) throw new Error("A conferência dos vínculos falhou após a atualização.");
   }
+  let profileDetails: CatalogResult | null = null;
+  if (await getProfileDetailsAutoSyncEnabled(db)) {
+    const details = await loadSourceProfileDetails();
+    const before = await previewProfileDetails(details);
+    if (before.extraDestinationCount) throw new Error("Há dados cadastrais extras no Supabase; revisão manual necessária.");
+    if (details.length || before.destinationCount) await markProfileDetailsCopy(db, actorId);
+    if (!before.ready) {
+      await syncProfileDetails(details, actorId);
+      if (!(await previewProfileDetails()).ready) throw new Error("A conferência dos dados cadastrais falhou após a atualização.");
+    }
+    profileDetails = { source: details.length, destination: details.length, changed: before.pendingCount };
+  }
   return {
     tenants: { source: tenants.length, destination: tenants.length, changed: tenantBefore.pendingCount },
     profiles: { source: profiles.length, destination: profiles.length, changed: profileBefore.pendingCount },
     memberships: { source: memberships.length, destination: memberships.length, changed: membershipBefore.pendingCount },
+    profileDetails,
   };
 }
 
@@ -131,7 +148,7 @@ export async function runAutoSyncIfDue(db: D1Database, options: { force?: boolea
     lockUntil: new Date(now + LOCK_MS).toISOString(), lastAttemptAt: new Date(now).toISOString(), lastError: null };
   if (!(await replaceStatus(db, current.raw, locked))) return getAutoSyncStatus(db);
   try {
-    const result = await reconcile(options.actorId ?? await automaticActorId(db));
+    const result = await reconcile(db, options.actorId ?? await automaticActorId(db));
     const finished = new Date();
     const completed: StoredStatus = { ...locked, running: false, lockToken: null, lockUntil: null,
       lastSuccessAt: finished.toISOString(), nextRunAt: new Date(finished.getTime() + INTERVAL_MS).toISOString(),
@@ -144,7 +161,7 @@ export async function runAutoSyncIfDue(db: D1Database, options: { force?: boolea
     if (!lastAlertAt || failed.getTime() - Date.parse(lastAlertAt) >= 6 * 60 * 60_000) {
       try {
         await createSystemNotification(db, { tipo: "IMPORTANTE", titulo: "Falha na sincronização Supabase",
-          mensagem: "A cópia de comunidades, perfis ou vínculos precisa de revisão. Abra Publicação do sistema para ver o motivo.",
+          mensagem: "A cópia de comunidades, perfis, vínculos ou dados cadastrais precisa de revisão. Abra Publicação do sistema para ver o motivo.",
           area: "MENU", usuarioId: await automaticActorId(db), destinoRota: "/proprietario", criadoPor: "sistema" });
         lastAlertAt = failed.toISOString();
       } catch { /* O alerta não pode impedir o registro da falha. */ }

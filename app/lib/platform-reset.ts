@@ -2,6 +2,7 @@ import { getD1 } from '../../db';
 import { getRuntimeEnv } from '../../db/runtime-env';
 import { privateHash, secureToken } from './access-security';
 import { deleteSupabaseStoredImage } from './supabase-storage-copy';
+import { hasTrackedProfileDetails } from './supabase-profile-details-copy-state';
 
 export class ResetError extends Error {}
 type Table = { name: string; sql: string };
@@ -56,6 +57,7 @@ async function fileKeys() {
 
 async function inspect(ownerId: number) {
   const db = getD1();
+  if (await hasTrackedProfileDetails(db)) throw new ResetError('Remova a cópia dos dados cadastrais no Supabase antes de reinicializar a plataforma.');
   const { list, schemaCount } = await tables();
   const pending = await db.prepare("SELECT COUNT(*) AS n FROM platform_reset_files WHERE disposition='DELETE_PENDING'").first<{ n: number }>();
   if (pending?.n) throw new ResetError('Conclua a exclusão dos arquivos pendentes no histórico antes de iniciar outra reinicialização.');

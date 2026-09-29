@@ -44,6 +44,7 @@ test("dados cadastrais são copiados ao serviço e a API devolve apenas contagen
       active: Boolean(row.ativo), created_at: iso(row.criado_em) }));
   let remoteDetails = [];
   let privatePayload = null;
+  let removedCount = null;
   const nativeFetch = globalThis.fetch;
   globalThis.fetch = async (url, init = {}) => {
     const path = new URL(String(url)).pathname;
@@ -56,6 +57,11 @@ test("dados cadastrais são copiados ao serviço e a API devolve apenas contagen
       remoteDetails = privatePayload.payload;
       return Response.json([{ run_id: "run-1", source_count: remoteDetails.length,
         inserted_count: remoteDetails.length, updated_count: 0, unchanged_count: 0 }]);
+    }
+    if (path.endsWith("/vinkulo_clear_profile_details")) {
+      removedCount = remoteDetails.length;
+      remoteDetails = [];
+      return Response.json([{ deleted_count: removedCount }]);
     }
     throw new Error(`Unexpected Supabase request: ${url}`);
   };
@@ -80,6 +86,18 @@ test("dados cadastrais são copiados ao serviço e a API devolve apenas contagen
     assert.equal(copied.status, 200, await copied.clone().text());
     const responseText = await copied.text();
     assert.equal(JSON.parse(responseText).preview.ready, true);
+    assert.equal((await (await call(ownerCookie)).json()).copyTracked, true);
+    const resetBlocked = await worker.fetch(new Request("http://localhost/api/proprietario/reset", {
+      method: "POST", headers: { cookie: ownerCookie, "content-type": "application/json" },
+      body: JSON.stringify({ action: "PREVIEW" }),
+    }), runtime, context);
+    assert.equal(resetBlocked.status, 409);
+    assert.match((await resetBlocked.json()).error, /cópia dos dados cadastrais/);
+    const integrationDelete = () => worker.fetch(new Request("http://localhost/api/proprietario/integracoes/supabase", {
+      method: "DELETE", headers: { cookie: ownerCookie, "content-type": "application/json" },
+      body: JSON.stringify({ confirm: "REMOVER_INTEGRACAO_SUPABASE" }),
+    }), runtime, context);
+    assert.equal((await integrationDelete()).status, 409);
     assert.equal(privatePayload.payload.length, preview.sourceCount);
     const ownerDetails = privatePayload.payload.find(item => item.legacy_d1_id === ownerId).details;
     assert.equal(ownerDetails.phone, "11999990000");
@@ -99,5 +117,15 @@ test("dados cadastrais são copiados ao serviço e a API devolve apenas contagen
     const marker = await call(ownerCookie);
     assert.equal(marker.status, 409);
     assert.match((await marker.json()).error, /marcador ou credencial/);
+    assert.equal((await call(ownerCookie, "DELETE", { confirm: "REMOVER_COPIA_DADOS_CADASTRAIS", destinationCount: remoteDetails.length + 1 })).status, 409);
+    assert.equal(remoteDetails.length, preview.sourceCount);
+    database.prepare("UPDATE usuarios SET cadastro_dados=? WHERE id=?").run("{}", ownerId);
+    const removed = await call(ownerCookie, "DELETE", { confirm: "REMOVER_COPIA_DADOS_CADASTRAIS", destinationCount: remoteDetails.length });
+    assert.equal(removed.status, 200, await removed.clone().text());
+    assert.equal((await removed.json()).deleted, preview.sourceCount);
+    assert.equal(removedCount, preview.sourceCount);
+    assert.equal(remoteDetails.length, 0);
+    assert.equal((await (await call(ownerCookie)).json()).copyTracked, false);
+    assert.equal((await integrationDelete()).status, 200);
   } finally { globalThis.fetch = nativeFetch; }
 });
