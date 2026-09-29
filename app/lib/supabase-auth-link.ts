@@ -1,4 +1,5 @@
 import { getD1 } from "../../db";
+import { auditAccess } from "./access-security";
 import { readIntegration, reveal } from "./supabase-integration";
 
 const KEY = "supabase_auth_link_policy";
@@ -155,5 +156,20 @@ export async function linkAuthAfterVerifiedLogin(userId: number, email: string, 
     return created ? "LINKED" : "UPDATED";
   } finally {
     await db.prepare("DELETE FROM configuracoes WHERE chave=?").bind(lease).run().catch(() => {});
+  }
+}
+
+/** Uma troca de senha concluída no D1 também é uma prova válida para atualizar o Auth. */
+export async function syncAuthAfterPasswordChange(userId: number, password: string,
+  source: "FIRST_ACCESS" | "RESET") {
+  const user = await getD1().prepare("SELECT email FROM usuarios WHERE id=? AND ativo=1 LIMIT 1")
+    .bind(userId).first<{ email: string }>();
+  if (!user) return;
+  try {
+    const outcome = await linkAuthAfterVerifiedLogin(userId, user.email, password);
+    if (outcome !== "SKIPPED") await auditAccess("SUPABASE_AUTH_LINK", userId, { outcome, source });
+  } catch (error) {
+    await auditAccess("SUPABASE_AUTH_LINK", userId,
+      { reason: error instanceof AuthLinkError ? error.code : "UNAVAILABLE", source }, null, "ERRO").catch(() => {});
   }
 }
