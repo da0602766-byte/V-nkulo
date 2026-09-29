@@ -83,6 +83,9 @@ O fluxo nativo Android e os avisos locais foram publicados no candidato
 a ser inicial somente sem internet validada pelo Android; reconexão retorna ao
 sistema online respeitando formulários não salvos. A CI 36508309325 passou nas
 APIs 29 e 35, incluindo instalação sobre 1.17.0, teste instrumentado da tela
-offline e captura acessível. Hash/tamanho definitivos estão no manifesto
-`public/downloads/android-release.json`. A experiência em aparelhos físicos
-segue pendente antes de qualquer promoção do canal estável.
+offline e captura acessível. A página offline web e o APK foram publicados em
+Sites 331 (deployment `appgdep_6abb199af680819198aad16f86a6cc05`). O fallback e
+manifesto respondem HTTP 200; o APK público confere com os 631532 bytes e o
+SHA-256 `474f28013671cee988aae97f4b7f3694d049f8a4da44195346a4b7366b5c5bd0`
+registrados em `public/downloads/android-release.json`. A experiência em
+aparelhos físicos segue pendente antes de qualquer promoção do canal estável.
