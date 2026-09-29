@@ -428,7 +428,7 @@ export async function consumeResetToken(token: string, password: string) {
     db.prepare("DELETE FROM sessoes WHERE usuario_id=? AND EXISTS(SELECT 1 FROM usuarios WHERE id=? AND senha_hash=?)").bind(row.usuario_id,row.usuario_id,hash),
     db.prepare("INSERT INTO auditoria_piloto(usuario_id,evento,resultado,metadados) SELECT id,'SENHA_REDEFINIDA','SUCESSO','{}' FROM usuarios WHERE id=? AND senha_hash=?").bind(row.usuario_id,hash),
   ]);
-  return Number(result[0].meta.changes)>0;
+  return Number(result[0].meta.changes)>0 ? row.usuario_id : null;
 }
 
 export async function sha256(value: string) {

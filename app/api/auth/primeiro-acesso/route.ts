@@ -5,6 +5,7 @@ import {
   normalizeEmail,
   validatePassword,
 } from "../../../lib/local-auth";
+import { syncAuthAfterPasswordChange } from "../../../lib/supabase-auth-link";
 
 type FirstAccessPayload = {
   token?: string;
@@ -49,6 +50,7 @@ export async function POST(request: Request) {
     return Response.json({ error: message }, { status: result.reason === "SAME_PASSWORD" ? 400 : 401 });
   }
 
+  await syncAuthAfterPasswordChange(result.userId, password, "FIRST_ACCESS").catch(() => {});
   const session = await createSession(result.userId);
   return attachSessionCookie(
     Response.json(

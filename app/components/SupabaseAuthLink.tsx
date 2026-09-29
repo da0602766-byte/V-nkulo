@@ -36,7 +36,7 @@ export default function SupabaseAuthLink() {
 
   return <article className="publication-panel" aria-busy={busy}>
     <h3>Vínculo progressivo com Supabase Auth</h3>
-    <p>Após CPF e senha serem validados no D1, o servidor cria ou confere a conta correspondente no Supabase Auth. Conflitos de identidade não são vinculados automaticamente. O aplicativo ainda emite e revoga sessões pelo D1.</p>
+    <p>Após login CPF válido, primeiro acesso ou redefinição de senha, o servidor cria ou confere a conta correspondente no Supabase Auth. Conflitos de identidade não são vinculados automaticamente. O aplicativo ainda emite e revoga sessões pelo D1.</p>
     <div aria-live="polite">
       {busy && <p>Conferindo os vínculos Auth…</p>}
       {error && <p role="alert">{error}</p>}

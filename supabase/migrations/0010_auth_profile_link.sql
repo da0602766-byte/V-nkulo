@@ -8,6 +8,14 @@ alter table public.vinkulo_migration_runs add constraint vinkulo_migration_runs_
   check (scope in ('TENANCY_FOUNDATION', 'TENANTS', 'PROFILES', 'MEMBERSHIPS',
     'PROFILE_DETAILS', 'CATALOG_COPIES_CLEAR', 'AUTH_LINK'));
 
+-- Ainda não há sessão Supabase no aplicativo nem revogação integrada com D1.
+-- As cópias de preparação só são acessíveis pelo serviço até o corte completo.
+revoke select on public.vinkulo_tenants, public.vinkulo_profiles,
+  public.vinkulo_memberships from authenticated;
+drop policy if exists vinkulo_tenants_read_isolated on public.vinkulo_tenants;
+drop policy if exists vinkulo_profiles_read_self_or_owner on public.vinkulo_profiles;
+drop policy if exists vinkulo_memberships_read_self_or_owner on public.vinkulo_memberships;
+
 -- A contagem de segurança inclui contas criadas antes de um vínculo interrompido.
 -- O nome da coluna permanece estável para os clientes da migração 0009.
 create or replace function public.vinkulo_catalog_copy_counts()

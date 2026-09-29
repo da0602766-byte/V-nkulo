@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { createPilotD1, createPilotUser } from "./helpers/sqlite-d1.mjs";
 import { cpfLoginRequest } from "./helpers/cpf-login.mjs";
 
@@ -128,6 +129,32 @@ test("Auth é vinculado após CPF válido, recupera interrupção e preserva o l
     assert.equal((await call(owner.cookie, "DISABLE")).status, 200);
     await login("member.auth-link@example.test", "Member123");
     assert.equal(writes.length, 2);
+    assert.equal((await call(owner.cookie, "ENABLE", "ATIVAR_VINCULO_AUTH")).status, 200);
+    const firstToken = `fa_${"a".repeat(64)}`;
+    const digest = value => createHash("sha256").update(value).digest("hex");
+    database.prepare("INSERT INTO redefinicoes_senha(usuario_id,token_hash,expira_em,usado) VALUES(?,?,datetime('now','+1 day'),0)")
+      .run(memberId, `first:${digest(firstToken)}`);
+    const first = await worker.fetch(new Request("http://localhost/api/auth/primeiro-acesso", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token: firstToken, email: "member.auth-link@example.test",
+        temporaryPassword: "Member123", password: "First1234", confirmPassword: "First1234" }),
+    }), runtime, context);
+    assert.equal(first.status, 200);
+    assert.equal(writes.at(-1).method, "PUT");
+    assert.equal(writes.at(-1).body.password, "First1234");
+    const resetToken = "b".repeat(64);
+    database.prepare("INSERT INTO redefinicoes_senha(usuario_id,token_hash,expira_em,usado) VALUES(?,?,datetime('now','+1 day'),0)")
+      .run(memberId, digest(resetToken));
+    const reset = await worker.fetch(new Request("http://localhost/api/auth/redefinir-senha", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token: resetToken, senha: "Reset1234" }),
+    }), runtime, context);
+    assert.equal(reset.status, 200);
+    assert.equal(writes.at(-1).method, "PUT");
+    assert.equal(writes.at(-1).body.password, "Reset1234");
+    assert.equal(writes.length, 4);
+    assert.equal((await login("member.auth-link@example.test", "First1234")).cookie, undefined);
+    assert.ok((await login("member.auth-link@example.test", "Reset1234")).cookie);
     assert.equal(database.prepare("SELECT COUNT(*) AS n FROM configuracoes WHERE chave LIKE 'supabase_auth_link_lease:%'").get().n, 0);
   } finally { globalThis.fetch = nativeFetch; await Promise.all(tasks.splice(0)); database.close(); }
   assert.ok(ownerId > 0);
@@ -140,4 +167,6 @@ test("SQL Auth exige identidade confirmada, metadados confiáveis e bloqueia lim
   assert.match(sql, /auth\.users u where u\.raw_app_meta_data \? 'vinkulo_legacy_d1_id'/);
   assert.match(sql, /select u\.id from auth\.users u where u\.raw_app_meta_data \? 'vinkulo_legacy_d1_id'/);
   assert.match(sql, /linked auth email mismatch/);
+  assert.match(sql, /revoke select on public\.vinkulo_tenants, public\.vinkulo_profiles/);
+  assert.match(sql, /drop policy if exists vinkulo_memberships_read_self_or_owner/);
 });
