@@ -12,9 +12,8 @@ for attempt in $(seq 1 12); do
   # not the HTML dashboard. Verify each surface against its own expected UI.
   if { grep -Fq 'O que vamos fazer?' app/build/reports/vinkulo-release-offline.xml &&
        grep -Fq 'Preparação necessária' app/build/reports/vinkulo-release-offline.xml; } ||
-     { grep -Fq 'Seu Vínkulo começa aqui.' app/build/reports/vinkulo-release-offline.xml &&
-       grep -Fq 'Atualize o Android System WebView' app/build/reports/vinkulo-release-offline.xml &&
-       grep -Fq 'ATUALIZAR WEBVIEW' app/build/reports/vinkulo-release-offline.xml; }; then
+     { grep -Fq 'Seu espaço salvo' app/build/reports/vinkulo-release-offline.xml &&
+       grep -Fq 'Sem acesso à internet' app/build/reports/vinkulo-release-offline.xml; }; then
     ready=1
     break
   fi
