@@ -138,3 +138,67 @@ test('falha no armazenamento permanece pendente e pode ser retomada sem refazer 
   assert.equal((await retry.json()).history[0].pending_files, 0);
   assert.equal(f.files.size, 0);
 });
+
+test('exclusão definitiva remove também as cópias registradas no Supabase', async () => {
+  const f = await fixture();
+  const config = { confirm: true, ambiente: 'PRODUCAO', url: 'https://example-project.supabase.co',
+    projectRef: 'example-project', anonKey: 'sb_publishable_abcdefghijklmnopqrstuvwxyz',
+    serviceRoleKey: 'sb_secret_abcdefghijklmnopqrstuvwxyz', jwtSecret: '', schema: 'public',
+    bucket: 'private-images', ativa: true };
+  const configured = await f.call('/api/proprietario/integracoes/supabase', { method: 'PATCH', body: config });
+  assert.equal(configured.status, 200, await configured.clone().text());
+  f.db.prepare('INSERT INTO supabase_storage_copies(object_key,project_ref,bucket,sha256) VALUES(?,?,?,?)')
+    .run(key, 'example-project', 'private-images', 'a'.repeat(64));
+  const nativeFetch = globalThis.fetch;
+  let remoteDeletes = 0;
+  globalThis.fetch = async (url, init = {}) => {
+    assert.equal(new URL(String(url)).pathname, `/storage/v1/object/private-images/${key}`);
+    assert.equal(init.method, 'DELETE');
+    remoteDeletes++;
+    return Response.json({ message: 'Successfully deleted' });
+  };
+  try {
+    const preview = await f.preview();
+    assert.equal(preview.summary.files, 1);
+    const response = await f.execute(preview);
+    assert.equal(response.status, 200, await response.clone().text());
+    assert.equal(remoteDeletes, 1);
+    assert.equal(f.files.size, 0);
+    assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM supabase_storage_copies').get().n, 0);
+    assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM platform_reset_files WHERE disposition='DELETE_PENDING'").get().n, 0);
+    assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM configuracoes WHERE chave='supabase_integration'").get().n, 0);
+  } finally { globalThis.fetch = nativeFetch; }
+});
+
+test('falha ao excluir cópia Supabase preserva credencial e permite nova tentativa', async () => {
+  const f = await fixture();
+  const config = { confirm: true, ambiente: 'PRODUCAO', url: 'https://example-project.supabase.co',
+    projectRef: 'example-project', anonKey: 'sb_publishable_abcdefghijklmnopqrstuvwxyz',
+    serviceRoleKey: 'sb_secret_abcdefghijklmnopqrstuvwxyz', jwtSecret: '', schema: 'public',
+    bucket: 'private-images', ativa: true };
+  assert.equal((await f.call('/api/proprietario/integracoes/supabase', { method: 'PATCH', body: config })).status, 200);
+  f.db.prepare('INSERT INTO supabase_storage_copies(object_key,project_ref,bucket,sha256) VALUES(?,?,?,?)')
+    .run(key, 'example-project', 'private-images', 'a'.repeat(64));
+  const nativeFetch = globalThis.fetch;
+  let available = false;
+  globalThis.fetch = async (url, init = {}) => {
+    assert.equal(init.method, 'DELETE');
+    assert.equal(new URL(String(url)).pathname, `/storage/v1/object/private-images/${key}`);
+    return available ? Response.json({ message: 'Successfully deleted' }) : new Response('unavailable', { status: 503 });
+  };
+  try {
+    const response = await f.execute(await f.preview());
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).history[0].pending_files, 1);
+    assert.equal(f.db.prepare('SELECT atualizado_por FROM configuracoes WHERE chave=?').get('supabase_integration').atualizado_por, 'reset-pending');
+    assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM supabase_storage_copies').get().n, 1);
+    assert.equal(f.files.size, 1);
+    available = true;
+    const retry = await f.call('/api/proprietario/reset', { body: { action: 'RETRY_FILES', password } });
+    assert.equal(retry.status, 200);
+    assert.equal((await retry.json()).history[0].pending_files, 0);
+    assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM supabase_storage_copies').get().n, 0);
+    assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM configuracoes WHERE chave='supabase_integration'").get().n, 0);
+    assert.equal(f.files.size, 0);
+  } finally { globalThis.fetch = nativeFetch; }
+});

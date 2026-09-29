@@ -31,6 +31,13 @@ export async function PATCH(request: Request) {
     if (!payload || Array.isArray(payload) || typeof payload !== "object" || payload.confirm !== true) return reply({error:"Confirme explicitamente a alteração da integração."},400);
     const saved = await readIntegration();
     const config = await parseIntegration(payload,saved?.config || null);
+    if (saved && (saved.config.url !== config.url || saved.config.bucket !== config.bucket)) {
+      const copies = await getD1().prepare("SELECT COUNT(*) AS total FROM supabase_storage_copies")
+        .first<{ total: number }>();
+      if (Number(copies?.total || 0) > 0) {
+        return reply({error:"Há imagens copiadas no projeto Supabase atual. Remova essas cópias antes de trocar o projeto ou o bucket."},409);
+      }
+    }
     if (saved?.config.url !== config.url && (await getAutoSyncStatus(getD1())).enabled) {
       return reply({error:"Pause a sincronização automática antes de trocar o projeto Supabase."},409);
     }
@@ -48,6 +55,9 @@ export async function DELETE(request: Request) {
   try {
     const payload = await request.json();
     if (payload?.confirm !== "REMOVER_INTEGRACAO_SUPABASE") return reply({error:"Confirme a remoção da conexão com o Supabase."},400);
+    const copies = await getD1().prepare("SELECT COUNT(*) AS total FROM supabase_storage_copies")
+      .first<{ total: number }>();
+    if (Number(copies?.total || 0) > 0) return reply({error:"Há imagens copiadas no Supabase. Remova essas cópias antes de desligar a integração."},409);
     const saved = await readIntegration();
     await getD1().prepare("DELETE FROM configuracoes WHERE chave = 'supabase_integration'").run();
     await recordTenantAudit(getD1(),{comunidadeId:null},access.user.id,"INTEGRACAO_SUPABASE_REMOVIDA","SUCESSO",{ambiente:saved?.config.ambiente,host:saved ? new URL(saved.config.url).hostname : null});
