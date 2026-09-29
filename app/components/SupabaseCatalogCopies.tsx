@@ -49,8 +49,8 @@ export default function SupabaseCatalogCopies() {
       {error && <p role="alert">{error}</p>}
       {counts && <div className={`publication-check ${counts.linked_auth ? "danger" : total ? "" : "success"}`} role="status">
         <p>Supabase: {counts.tenants} comunidades, {counts.profiles} perfis, {counts.memberships} vínculos e {counts.profile_details} detalhes cadastrais.</p>
-        <p>Perfis vinculados ao Auth: {counts.linked_auth}.</p>
-        {counts.linked_auth > 0 && <p>Revise os vínculos Auth antes de remover esses catálogos.</p>}
+        <p>Contas Auth criadas ou vinculadas: {counts.linked_auth}.</p>
+        {counts.linked_auth > 0 && <p>Revise essas contas Auth antes de remover os catálogos.</p>}
         {removed && <p>As cópias foram removidas e a integração foi pausada.</p>}
       </div>}
     </div>

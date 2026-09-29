@@ -5,6 +5,7 @@ import { getAutoSyncStatus, setAutoSyncEnabled } from "../../../../../lib/supaba
 import { clearProfileDetailsCopyState } from "../../../../../lib/supabase-profile-details-copy-state";
 import { setProfileDetailsAutoSyncEnabled } from "../../../../../lib/supabase-profile-details-auto-sync";
 import { readIntegration } from "../../../../../lib/supabase-integration";
+import { activeAuthLinkLeases, setAuthLinkEnabled } from "../../../../../lib/supabase-auth-link";
 import { recordTenantAudit } from "../../../../../lib/tenant-audit";
 import { reply, requireIntegrationOwner } from "../route";
 
@@ -44,18 +45,20 @@ export async function DELETE(request: Request) {
     if (!saved?.config.serviceRoleKey) return reply({ error: "A conexão protegida com o Supabase não está configurada." }, 409);
     await setAutoSyncEnabled(getD1(), false);
     await setProfileDetailsAutoSyncEnabled(getD1(), false, access.user.id);
+    await setAuthLinkEnabled(getD1(), false, access.user.id);
     if ((await getAutoSyncStatus(getD1())).running) return reply({ error: "Aguarde a sincronização em andamento antes de remover as cópias." }, 409);
+    if (await activeAuthLinkLeases(getD1())) return reply({ error: "Aguarde as tentativas de vínculo Auth em andamento antes de remover as cópias." }, 409);
     const project = { url: saved.config.url, projectRef: saved.config.projectRef };
     const before = await getCatalogCopyCounts(project);
-    if (before.linked_auth) return reply({ error: "Há perfis vinculados ao Supabase Auth. Revise esses vínculos antes de remover os catálogos." }, 409);
+    if (before.linked_auth) return reply({ error: "Há contas Supabase Auth criadas ou vinculadas. Revise essas contas antes de remover os catálogos." }, 409);
     if (keys.some(key => before[key] !== expected[key])) return reply({ error: "As contagens mudaram. Atualize a conferência antes de remover." }, 409);
-    const removed = await clearCatalogCopies(expected, access.user.id, project);
-    const after = await getCatalogCopyCounts(project);
-    if (totalCatalogCopies(after) || after.linked_auth) throw new CatalogCleanupError("A conferência após a remoção não ficou vazia.", 409);
     const next = JSON.stringify({ ...saved.config, ativa: false, lastCheck: null });
     const updated = await getD1().prepare(`UPDATE configuracoes SET valor=?, atualizado_por=?, atualizado_em=CURRENT_TIMESTAMP
       WHERE chave='supabase_integration' AND valor=?`).bind(next, String(access.user.id), saved.raw).run();
     if (Number(updated.meta?.changes || 0) !== 1) throw new CatalogCleanupError("A configuração Supabase mudou durante a remoção. Atualize o painel.", 409);
+    const removed = await clearCatalogCopies(expected, access.user.id, project);
+    const after = await getCatalogCopyCounts(project);
+    if (totalCatalogCopies(after) || after.linked_auth) throw new CatalogCleanupError("A conferência após a remoção não ficou vazia.", 409);
     await clearProfileDetailsCopyState(getD1());
     await recordTenantAudit(getD1(), { comunidadeId: null }, access.user.id,
       "INTEGRACAO_SUPABASE_CATALOGOS_REMOVIDOS", "SUCESSO", removed);

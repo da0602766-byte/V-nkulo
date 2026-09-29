@@ -3,6 +3,7 @@ import { attachSessionCookie, createFirstAccessToken, createSession, isSystemOwn
 import { normalizeCpf } from './cpf';
 import { privateHash, rateLimit, auditAccess } from './access-security';
 import { safeRelativeReturnPath } from './safe-return-path';
+import { AuthLinkError, linkAuthAfterVerifiedLogin } from './supabase-auth-link';
 
 export async function loginWithCpf(request: Request, owner: boolean) {
   const form = /application\/x-www-form-urlencoded|multipart\/form-data/.test(request.headers.get('content-type') || '');
@@ -32,6 +33,13 @@ export async function loginWithCpf(request: Request, owner: boolean) {
     return form ? new Response(null,{status:303,headers:{Location:new URL(redirect,request.url).toString()}}) : Response.json({ok:true,redirect});
   }
   const session = await createSession(user.id, owner ? 'owner' : 'member');
+  try {
+    const outcome = await linkAuthAfterVerifiedLogin(user.id, user.email, senha);
+    if (outcome !== 'SKIPPED') await auditAccess('SUPABASE_AUTH_LINK', user.id, { outcome });
+  } catch (error) {
+    await auditAccess('SUPABASE_AUTH_LINK', user.id,
+      { reason: error instanceof AuthLinkError ? error.code : 'UNAVAILABLE' }, null, 'ERRO').catch(() => {});
+  }
   await auditAccess(owner ? 'LOGIN_PROPRIETARIO' : 'LOGIN_CPF', user.id);
   return attachSessionCookie(form ? new Response(null,{status:303,headers:{Location:new URL(redirect,request.url).toString(),'Cache-Control':'no-store'}}) : Response.json({ok:true,redirect}),session);
 }
