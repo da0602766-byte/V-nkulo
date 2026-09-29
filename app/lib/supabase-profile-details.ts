@@ -152,3 +152,17 @@ export async function syncProfileDetails(source: ProfileDetailsItem[], actorId: 
   if (!run?.run_id || run.source_count !== source.length) throw new ProfileDetailsError("O Supabase não confirmou os detalhes de perfis.");
   return run;
 }
+
+export async function remoteProfileDetailsCount(): Promise<number> {
+  const destination = await rpc<ProfileDetailsItem[]>("vinkulo_profile_details_snapshot", {});
+  if (!Array.isArray(destination) || destination.length > 1000) throw new ProfileDetailsError("O Supabase devolveu detalhes incompatíveis.");
+  return destination.length;
+}
+
+export async function clearRemoteProfileDetails(actorId: number): Promise<number> {
+  if (!Number.isSafeInteger(actorId) || actorId < 1) throw new ProfileDetailsError("Responsável inválido.", 400);
+  const result = await rpc<Array<{ deleted_count: number }>>("vinkulo_clear_profile_details", { actor_legacy_d1_id: actorId });
+  const deleted = Array.isArray(result) ? result[0]?.deleted_count : null;
+  if (!Number.isSafeInteger(deleted) || Number(deleted) < 0) throw new ProfileDetailsError("O Supabase não confirmou a remoção dos dados cadastrais.");
+  return Number(deleted);
+}

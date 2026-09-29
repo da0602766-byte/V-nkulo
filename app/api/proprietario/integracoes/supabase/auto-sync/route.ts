@@ -31,7 +31,7 @@ export async function POST(request: Request) {
       "INTEGRACAO_SUPABASE_AUTO_SYNC", status.lastError ? "ERRO" : "SUCESSO",
       { action: body.action, enabled: status.enabled, running: status.running,
         tenants: status.lastResult?.tenants, profiles: status.lastResult?.profiles,
-        memberships: status.lastResult?.memberships });
+        memberships: status.lastResult?.memberships, profileDetails: status.lastResult?.profileDetails });
     return reply({ status });
   } catch {
     return reply({ error: "Não foi possível alterar a sincronização automática." }, 503);

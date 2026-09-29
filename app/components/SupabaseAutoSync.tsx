@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 type Catalog = { source: number; destination: number; changed: number };
 type Status = { enabled: boolean; running: boolean; lastAttemptAt: string | null;
   lastSuccessAt: string | null; nextRunAt: string | null; lastError: string | null;
-  lastResult: { tenants: Catalog; profiles: Catalog; memberships: Catalog } | null };
+  lastResult: { tenants: Catalog; profiles: Catalog; memberships: Catalog; profileDetails?: Catalog | null } | null };
 type ScheduleStatus = { installedAt: string | null; lastHeartbeatAt: string | null; jobId: number | null };
 
 export default function SupabaseAutoSync() {
@@ -63,7 +63,7 @@ export default function SupabaseAutoSync() {
   const stale = Boolean(schedule?.installedAt && schedule.lastHeartbeatAt && checkedAt - Date.parse(schedule.lastHeartbeatAt) > 15 * 60_000);
   return <article className="publication-panel" aria-busy={loading}>
     <h3>Sincronização automática</h3>
-    <p>Confere comunidades, perfis mínimos e vínculos nessa ordem. Após alterações relevantes, a cópia é atualizada em segundo plano. Com o agendamento ativo, uma conferência adicional é disparada a cada cinco minutos, mesmo sem acessos ao site. Login, senhas, sessões e permissões especiais continuam somente no D1.</p>
+    <p>Confere comunidades, perfis mínimos e vínculos nessa ordem. Os dados cadastrais entram somente após ativação no painel próprio. Após alterações relevantes, a cópia é atualizada em segundo plano. Com o agendamento ativo, uma conferência adicional é disparada a cada cinco minutos, mesmo sem acessos ao site. Login, senhas, sessões e tokens continuam somente no D1.</p>
     <div aria-live="polite">
       {loading && <p>Consultando a sincronização…</p>}
       {error && <p role="alert">{error}</p>}
@@ -71,6 +71,7 @@ export default function SupabaseAutoSync() {
         <strong>{status.running ? "Sincronizando" : status.enabled ? "Automática ativa" : "Automática pausada"}</strong>
         <p>Última conferência concluída: {format(status.lastSuccessAt)}.</p>
         {status.lastResult && <p>Na última conferência: {status.lastResult.tenants.source} comunidades, {status.lastResult.profiles.source} perfis e {status.lastResult.memberships.source} vínculos. Atualizados: {status.lastResult.tenants.changed}, {status.lastResult.profiles.changed} e {status.lastResult.memberships.changed}, respectivamente.</p>}
+        {status.lastResult?.profileDetails && <p>Dados cadastrais: {status.lastResult.profileDetails.source} perfis conferidos; {status.lastResult.profileDetails.changed} atualizados na última execução.</p>}
         {status.lastError && <p>Revisão necessária: {status.lastError}</p>}
       </div>}
       {schedule && <div className={`publication-check ${stale ? "danger" : schedule.installedAt ? "success" : ""}`} role="status">

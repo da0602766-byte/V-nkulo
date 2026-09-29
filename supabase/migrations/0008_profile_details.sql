@@ -105,4 +105,25 @@ revoke all on function public.vinkulo_sync_profile_details(jsonb, bigint) from p
 grant execute on function public.vinkulo_profile_details_snapshot() to service_role;
 grant execute on function public.vinkulo_sync_profile_details(jsonb, bigint) to service_role;
 
+create or replace function public.vinkulo_clear_profile_details(actor_legacy_d1_id bigint)
+returns table(deleted_count integer)
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+declare
+  removed integer;
+begin
+  if actor_legacy_d1_id is null or actor_legacy_d1_id < 1 then
+    raise exception 'invalid actor';
+  end if;
+  delete from public.vinkulo_profile_details;
+  get diagnostics removed = row_count;
+  insert into public.vinkulo_migration_runs(scope, status, summary, finished_at, initiated_by_legacy_d1_id)
+  values('PROFILE_DETAILS', 'SUCCEEDED', jsonb_build_object('deleted_count', removed), now(), actor_legacy_d1_id);
+  return query select removed;
+end;
+$$;
+
+revoke all on function public.vinkulo_clear_profile_details(bigint) from public, anon, authenticated;
+grant execute on function public.vinkulo_clear_profile_details(bigint) to service_role;
+
 notify pgrst, 'reload schema';

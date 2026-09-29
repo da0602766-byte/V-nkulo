@@ -56,7 +56,7 @@ test("conciliação automática é exclusiva do proprietário, ordenada, pausáv
     legacy_d1_id: row.id, legacy_user_id: row.usuario_id, legacy_tenant_id: row.comunidade_id,
     role: row.papel, status: row.status, created_at: iso(row.criado_em),
   }));
-  const destination = { tenants: [], profiles: [], memberships: [] };
+  const destination = { tenants: [], profiles: [], memberships: [], profileDetails: [] };
   const writes = [];
   const nativeFetch = globalThis.fetch;
   globalThis.fetch = async (request, init = {}) => {
@@ -65,9 +65,11 @@ test("conciliação automática é exclusiva do proprietário, ordenada, pausáv
       { table_key: "tenants", present: true, rls_enabled: true }, { table_key: "profiles", present: true, rls_enabled: true },
       { table_key: "memberships", present: true, rls_enabled: true }, { table_key: "migrationRuns", present: true, rls_enabled: true },
     ]);
-    const snapshots = { vinkulo_tenant_catalog_snapshot: "tenants", vinkulo_profile_snapshot: "profiles", vinkulo_membership_snapshot: "memberships" };
+    const snapshots = { vinkulo_tenant_catalog_snapshot: "tenants", vinkulo_profile_snapshot: "profiles", vinkulo_membership_snapshot: "memberships",
+      vinkulo_profile_details_snapshot: "profileDetails" };
     for (const [name, key] of Object.entries(snapshots)) if (url.endsWith(`/rpc/${name}`)) return Response.json(destination[key]);
-    const syncs = { vinkulo_sync_tenant_catalog: "tenants", vinkulo_sync_profiles: "profiles", vinkulo_sync_memberships: "memberships" };
+    const syncs = { vinkulo_sync_tenant_catalog: "tenants", vinkulo_sync_profiles: "profiles", vinkulo_sync_memberships: "memberships",
+      vinkulo_sync_profile_details: "profileDetails" };
     for (const [name, key] of Object.entries(syncs)) if (url.endsWith(`/rpc/${name}`)) {
       const body = JSON.parse(init.body);
       writes.push({ key, body });
@@ -88,6 +90,29 @@ test("conciliação automática é exclusiva do proprietário, ordenada, pausáv
     assert.deepEqual(Object.keys(writes[1].body.payload[0]).sort(), ["active", "created_at", "display_name", "email", "legacy_d1_id"]);
     assert.equal(JSON.stringify(writes).includes("Owner123"), false);
     assert.equal(JSON.stringify(enabled).includes("@example.test"), false);
+    const detailsEndpoint = "http://localhost/api/proprietario/integracoes/supabase/profile-details";
+    const detailsCall = (method, body, cookie = ownerCookie) => worker.fetch(new Request(detailsEndpoint, {
+      method, headers: { cookie, "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined,
+    }), runtime, context);
+    assert.equal((await detailsCall("PATCH", { action: "ENABLE" }, memberCookie)).status, 403);
+    assert.equal((await detailsCall("PATCH", { action: "ENABLE" })).status, 409);
+    const detailsBefore = (await (await detailsCall("GET")).json()).preview;
+    assert.equal(detailsBefore.pendingCount, profiles.length);
+    assert.equal((await detailsCall("POST", { confirm: "SINCRONIZAR_DADOS_CADASTRAIS", sourceCount: detailsBefore.sourceCount })).status, 200);
+    assert.equal((await (await detailsCall("PATCH", { action: "ENABLE" })).json()).autoSyncEnabled, true);
+    const memberId = profiles.find(profile => profile.email === "member.auto@example.test").legacy_d1_id;
+    database.prepare("UPDATE usuarios SET telefone = ?, atualizado_em = ? WHERE id = ?")
+      .run("11987654321", "2026-09-29 15:00:00", memberId);
+    const detailsUpdated = (await (await call("RECONCILE")).json()).status;
+    assert.equal(detailsUpdated.lastError, null);
+    assert.equal(detailsUpdated.lastResult.profileDetails.changed, 1);
+    assert.equal(destination.profileDetails.find(item => item.legacy_d1_id === memberId).details.phone, "11987654321");
+    assert.equal((await (await detailsCall("PATCH", { action: "DISABLE" })).json()).autoSyncEnabled, false);
+    database.prepare("UPDATE usuarios SET telefone = ?, atualizado_em = ? WHERE id = ?")
+      .run("11876543210", "2026-09-29 15:01:00", memberId);
+    const detailsPaused = (await (await call("RECONCILE")).json()).status;
+    assert.equal(detailsPaused.lastResult.profileDetails, null);
+    assert.equal(destination.profileDetails.find(item => item.legacy_d1_id === memberId).details.phone, "11987654321");
     const changedProject = await worker.fetch(new Request("http://localhost/api/proprietario/integracoes/supabase", {
       method: "PATCH", headers: { cookie: ownerCookie, "content-type": "application/json" },
       body: JSON.stringify({ ...configuration, url: "https://another-project.supabase.co", projectRef: "another-project" }),
