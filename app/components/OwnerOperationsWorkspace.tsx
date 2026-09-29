@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import OwnerPushDelivery from "./OwnerPushDelivery";
+import OwnerPublicationWorkspace from "./OwnerPublicationWorkspace";
 
 export type OwnerOperationsScreen = "passwords" | "deleted" | "finance" | "realtime" | "performance" | "publication" | "incidents";
 
@@ -90,7 +91,7 @@ export default function OwnerOperationsWorkspace({ screen, data }: { screen: Own
   if (screen === "finance") return <UnavailableWorkspace screen={screen} source="Fonte não conectada" title="Dados financeiros indisponíveis" text="A API do proprietário ainda não fornece cobranças, pagamentos, valores ou renovações. Nenhuma estimativa é exibida para evitar dados falsos." needs={["Integração com o sistema de cobrança", "Status confirmado pelo provedor de pagamento", "Histórico de competências e renovações"]} />;
   if (screen === "realtime") return <RealtimeWorkspace data={data} />;
   if (screen === "performance") return <PerformanceWorkspace data={data} />;
-  if (screen === "publication") return <div className="ops-stack"><UnavailableWorkspace screen={screen} source="Integração não disponível" title="Releases e migração de dados não conectados" text="Este ambiente não expõe um pipeline de deploy nem uma integração de migração D1 → Supabase. Nenhuma publicação ou migração será executada por esta tela." needs={["Histórico de versões e implantações", "Conexão verificada com o destino dos dados", "Validação de integridade e autorização antes de publicar"]} /><FilteredAuditWorkspace screen={screen} data={data} /></div>;
+  if (screen === "publication") return <OwnerPublicationWorkspace />;
   return <IncidentWorkspace data={data} />;
 }
 
