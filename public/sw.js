@@ -1,4 +1,4 @@
-const CACHE = "vinkulo-shell-v6";
+const CACHE = "vinkulo-shell-v7";
 const RUNTIME_CACHE = "vinkulo-static-v6";
 const IS_LOCAL_PREVIEW = ["localhost", "127.0.0.1", "[::1]"].includes(self.location.hostname);
 const APP_SHELL = ["/", "/offline.html", "/manifest.webmanifest", "/vinkulo-app-icon-192.png", "/vinkulo-app-icon-512.png"];
