@@ -165,7 +165,7 @@ test('home availability is cleared on expiry, lock and denied sections', () => {
 
 test('network availability does not claim confirmed server connectivity', () => {
   const app=shell();
-  assert.equal(app.elements.get('network-badge').textContent,'Sem internet');
+  assert.equal(app.elements.get('network-badge').textContent,'Sem conexão');
   assert.doesNotMatch(source,/textContent\s*=\s*navigator.onLine\s*\?\s*'Online'/);
 });
 

@@ -2,7 +2,24 @@
 
 Aplicativo Android conectado à plataforma oficial do Vínkulo.
 
-Versão estável de distribuição geral: **1.7.1** (`versionCode 10`). Candidato para homologação: **1.17.0** (`versionCode 20`).
+Versão estável de distribuição geral: **1.7.1** (`versionCode 10`). Candidato para homologação: **1.18.0** (`versionCode 21`).
+
+## Entrada conectada e espaço local — candidato 1.18.0
+
+Ao abrir, o app prioriza o sistema online quando o Android confirma acesso
+validado à internet; a primeira tela local só aparece sem esse acesso. A tela
+local identifica claramente a ausência de conexão e informa que o que já foi
+salvo no aparelho continua protegido. Se a rede retornar, o app oferece retorno
+ao sistema online, respeitando a confirmação de descarte de formulário não salvo.
+O estado de rede é acompanhado pelo Android, incluindo a recuperação durante o
+uso. A interface do APK marca itens em fila como “Na fila · aguardando conexão”
+e tentativas de novo envio como “Aguardando conexão para nova tentativa”.
+
+O fallback web offline também recebeu uma página mais limpa e acessível, com
+ação de tentar novamente e explicação de que cópias locais não equivalem a dados
+em tempo real. A instalação PWA atualiza a página armazenada no próximo ciclo do
+service worker. O modo offline permanece limitado aos módulos e dados já
+explicitamente preparados/salvos; esta mudança não amplia permissões de dados.
 
 ## Reforma offline — terceira entrega visual
 
@@ -65,7 +82,7 @@ Validação de navegador: `scripts/visual-shell.test.cjs` exige Playwright insta
 aceita VINKULO_PLAYWRIGHT, VINKULO_BROWSER_CHANNEL e VINKULO_QA_DIR. Usa somente
 fixtures de teste, nunca contas reais. Não substitui testes Android/TalkBack.
 
-## Atualização e distribuição — candidato 1.15.0
+## Atualização e distribuição — candidato 1.18.0
 
 Use `./gradlew` (ou `gradlew.bat`) com Java 17 e Android SDK 35. O Wrapper 8.10.2
 tem checksum oficial de distribuição e JAR. Dependências ficam em
@@ -90,7 +107,7 @@ não deve prometer recuperar conteúdo cifrado quando a chave foi perdida.
 
 A CI verifica separadamente a cadeia de APKs release assinados e a atualização
 de dados com builds debug da fonte anterior e atual. Neste segundo ensaio,
-sete registros cifrados/estados são criados na 1.14.0, o processo é encerrado,
+sete registros cifrados/estados são criados na versão anterior, o processo é encerrado,
 o APK é atualizado sem desinstalação e o teste verifica conteúdo, UUID,
 cifragem, isolamento e recuperação de lease após atualização/reabertura.
 Fixtures e runners de teste não integram o APK release.

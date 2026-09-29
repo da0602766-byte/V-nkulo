@@ -6,6 +6,7 @@
   let requestId = 0;
   let snapshot = null;
   let snapshotTime = 0;
+  let nativeConnectivity = null;
   let selected = 'mural';
   let renderFrame = 0;
   const frame = window.requestAnimationFrame || (callback => window.setTimeout(callback, 0));
@@ -157,8 +158,14 @@
     if (state.prepared) expiryTimer = window.setTimeout(() => { render({result:'locked'}); send('status'); }, Math.max(0, Number(state.validForMs) || 0));
   }
   function connection() {
-    byId('network-badge').textContent = navigator.onLine ? 'No aparelho' : 'Sem conexão';
-    byId('connection').textContent = navigator.onLine ? 'Os recursos online dependem de conexão com o servidor.' : 'Sem conexão. Esta tela continua disponível.';
+    const online = nativeConnectivity === null ? navigator.onLine : nativeConnectivity;
+    byId('network-badge').textContent = online ? 'Internet disponível' : 'Sem internet';
+    byId('network-badge').setAttribute('data-online', String(online));
+    byId('offline-notice').hidden = online;
+    byId('open').textContent = online ? 'Abrir sistema online' : 'Tentar conexão novamente';
+    byId('connection').textContent = online
+      ? 'A internet está disponível. As consultas locais são cópias da última atualização.'
+      : 'Sem acesso à internet. Seu trabalho salvo neste aparelho continua guardado.';
   }
   if (bridge) bridge.onmessage = event => { if (document.hidden) return; try {
     const state = JSON.parse(event.data); if (state.requestId !== requestId) return; render(state);
@@ -199,6 +206,11 @@
   window.addEventListener('vinkulo:offline-status', () => send('status'));
   document.addEventListener('visibilitychange', () => { if (!bridge) return; render({result:'locked'}); if (!document.hidden) send('status'); });
   window.addEventListener('online', connection); window.addEventListener('offline', connection);
+  window.addEventListener('vinkulo:native-network', event => {
+    if (event.detail === 'online' || event.detail === 'offline') {
+      nativeConnectivity = event.detail === 'online'; connection();
+    }
+  });
   // Foreground expiry checks are local; never poll the server or write remotely.
   window.setInterval(() => { if (!document.hidden) send('status'); }, 30000);
   function focusHashTarget() {
