@@ -1,6 +1,7 @@
-import { getRuntimeEnv } from "../../../../../db/runtime-env";
+import { getRuntimeEnv, type R2BucketBinding } from "../../../../../db/runtime-env";
 import { isSafeUploadKey } from "../../../../lib/upload-key-policy.mjs";
 import { readCopiedImage } from "../../../../lib/supabase-storage-copy";
+import { getStorageReadPolicy } from "../../../../lib/supabase-storage-routing";
 
 export async function GET(
   request: Request,
@@ -11,14 +12,36 @@ export async function GET(
     return new Response("Imagem inválida.", { status: 400 });
   }
   const db = getRuntimeEnv().DB;
-  if (db && await db.prepare('SELECT 1 FROM platform_reset_files WHERE object_key=? LIMIT 1').bind(key).first()) {
+  let policy;
+  try { policy = db ? await getStorageReadPolicy(key) : { source: "R2", deleted: false }; }
+  catch { return new Response("Armazenamento indisponível.", { status: 503, headers: { "Cache-Control": "no-store" } }); }
+  if (policy.deleted) {
     return new Response('Imagem não encontrada.', { status: 404, headers: { 'Cache-Control': 'no-store' } });
   }
-  const object = await getRuntimeEnv().BUCKET?.get(key);
+  let object: Awaited<ReturnType<R2BucketBinding["get"]>> | undefined;
   let copied: Response | null = null;
-  if (!object) {
+  let storageFailed = false;
+  const preferSupabase = policy.source === "SUPABASE";
+  if (preferSupabase) {
     try { copied = await readCopiedImage(key); }
-    catch { return new Response("Armazenamento indisponível.", { status: 503 }); }
+    catch { storageFailed = true; }
+  }
+  if (!copied) {
+    try { object = await getRuntimeEnv().BUCKET?.get(key); }
+    catch { storageFailed = true; }
+  }
+  if (!object && !copied && !preferSupabase) {
+    try { copied = await readCopiedImage(key); }
+    catch { storageFailed = true; }
+  }
+  if (!object && !copied && storageFailed) {
+    return new Response("Armazenamento indisponível.", { status: 503, headers: { "Cache-Control": "no-store" } });
+  }
+  // Uma exclusão iniciada durante a leitura também bloqueia a resposta.
+  if (db && await db.prepare('SELECT 1 FROM platform_reset_files WHERE object_key=? LIMIT 1').bind(key).first()) {
+    await object?.body.cancel();
+    await copied?.body?.cancel();
+    return new Response('Imagem não encontrada.', { status: 404, headers: { 'Cache-Control': 'no-store' } });
   }
   if (!object && !copied) return new Response("Imagem não encontrada.", { status: 404 });
   const download = new URL(request.url).searchParams.get("download") === "1";
@@ -31,6 +54,7 @@ export async function GET(
         ? { "Content-Disposition": `attachment; filename="${fileName}"` }
         : {}),
       "X-Content-Type-Options": "nosniff",
+      "X-Vinkulo-Storage": copied ? "supabase" : "r2",
     },
   });
 }

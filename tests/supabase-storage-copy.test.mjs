@@ -55,11 +55,17 @@ test("cópia de imagens exige proprietário e confere bytes sem apagar o R2", as
 
   let remote = null;
   let uploads = 0;
+  let remoteReads = 0;
+  let remoteMode = "normal";
   const nativeFetch = globalThis.fetch;
   globalThis.fetch = async (url, init = {}) => {
     const path = new URL(String(url)).pathname;
     if (path === "/storage/v1/bucket") return Response.json([{ id: "private-images", name: "private-images", public: false }]);
     if (path.includes("/storage/v1/object/authenticated/private-images/")) {
+      remoteReads++;
+      assert.equal(init.redirect, "manual");
+      if (remoteMode === "failure") return new Response("unavailable", { status: 503 });
+      if (remoteMode === "slow-body") return new Response(new ReadableStream({ start() {} }));
       return remote ? new Response(remote) : Response.json({ statusCode: "404", error: "not_found", message: "Object not found" }, { status: 400 });
     }
     if (path.includes("/storage/v1/object/private-images/")) {
@@ -84,6 +90,79 @@ test("cópia de imagens exige proprietário e confere bytes sem apagar o R2", as
     assert.equal(calls.get, 2);
     assert.equal(database.prepare("SELECT COUNT(*) AS n FROM supabase_storage_copies").get().n, 1);
     const r2Get = runtime.BUCKET.get;
+    const imageRequest = (suffix = "") => worker.fetch(new Request(`http://localhost/api/pilot/uploads/${key}${suffix}`), runtime, context);
+    const changeSource = (source, cookie = ownerCookie, origin = "http://localhost") => worker.fetch(new Request(endpoint, {
+      method: "PATCH", headers: { ...(cookie ? { cookie } : {}), origin, "content-type": "application/json" },
+      body: JSON.stringify({ source, confirm: "ALTERAR_LEITURA_IMAGENS" }),
+    }), runtime, context);
+    assert.equal((await changeSource("SUPABASE", "")).status, 401);
+    assert.equal((await changeSource("SUPABASE", memberCookie)).status, 403);
+    assert.equal((await changeSource("SUPABASE", ownerCookie, "https://attacker.test")).status, 403);
+    assert.equal((await changeSource("UNKNOWN")).status, 400);
+    const readsBeforeDefault = remoteReads;
+    assert.equal((await imageRequest()).headers.get("X-Vinkulo-Storage"), "r2");
+    assert.equal(remoteReads, readsBeforeDefault, "R2 continues to be the default");
+    const activated = await changeSource("SUPABASE");
+    assert.equal(activated.status, 200);
+    assert.equal((await activated.json()).readSource, "SUPABASE");
+    const r2BeforePrimary = calls.get;
+    const primary = await imageRequest("?download=1");
+    assert.equal(primary.status, 200);
+    assert.equal(primary.headers.get("X-Vinkulo-Storage"), "supabase");
+    assert.equal(primary.headers.get("Content-Type"), "image/jpeg");
+    assert.match(primary.headers.get("Cache-Control"), /no-store/);
+    assert.match(primary.headers.get("Content-Disposition"), /attachment/);
+    assert.equal(await primary.text(), "the original image bytes");
+    assert.equal(calls.get, r2BeforePrimary, "primary Supabase read skips R2");
+    const benchmarkUrl = "http://localhost/api/proprietario/integracoes/supabase/storage-read-benchmark";
+    const measure = cookie => worker.fetch(new Request(benchmarkUrl, { method: "POST", headers: cookie ? { cookie } : {} }), runtime, context);
+    assert.equal((await measure()).status, 401);
+    assert.equal((await measure(memberCookie)).status, 403);
+    const measured = await measure(ownerCookie);
+    assert.equal(measured.status, 200);
+    const measuredResult = (await measured.json()).result;
+    assert.equal(measuredResult.matching, true);
+    assert.equal(measuredResult.samples.length, 3);
+    assert.equal(measuredResult.sizeBytes, bytes.byteLength);
+    assert.equal(JSON.stringify(measuredResult).includes(key), false);
+    assert.equal(JSON.stringify(measuredResult).includes("original image"), false);
+    remoteMode = "failure";
+    assert.equal((await imageRequest()).headers.get("X-Vinkulo-Storage"), "r2");
+    runtime.BUCKET.get = async () => { throw new Error("R2 unavailable"); };
+    const unavailable = await imageRequest();
+    assert.equal(unavailable.status, 503);
+    assert.equal(unavailable.headers.get("Cache-Control"), "no-store");
+    runtime.BUCKET.get = r2Get;
+    remoteMode = "slow-body";
+    const started = performance.now();
+    assert.equal((await imageRequest()).headers.get("X-Vinkulo-Storage"), "r2");
+    assert.ok(performance.now() - started < 4000, "slow body must fall back within bounded time");
+    remoteMode = "normal";
+    const intactPrimary = remote;
+    remote = new TextEncoder().encode("tampered").buffer;
+    assert.equal((await imageRequest()).headers.get("X-Vinkulo-Storage"), "r2", "hash mismatch cannot expose corrupted bytes");
+    remote = intactPrimary;
+    database.prepare("INSERT INTO platform_reset_history(id,mode,owner_id,summary) VALUES('storage-test','DELETE',1,'{}')").run();
+    database.prepare("INSERT INTO platform_reset_files(object_key,reset_id,disposition) VALUES(?,'storage-test','DELETE_PENDING')").run(key);
+    const beforeDeletedRead = remoteReads;
+    assert.equal((await imageRequest()).status, 404);
+    assert.equal(remoteReads, beforeDeletedRead, "deleted files never reach Supabase");
+    database.prepare("DELETE FROM platform_reset_files WHERE object_key=?").run(key);
+    // A setting belongs to one exact target and cannot follow a project/bucket change.
+    const preference = database.prepare("SELECT valor FROM configuracoes WHERE chave='supabase_storage_read_source'").get().valor;
+    database.prepare("UPDATE configuracoes SET valor=? WHERE chave='supabase_storage_read_source'")
+      .run(JSON.stringify({ ...JSON.parse(preference), bucket: "other" }));
+    const beforeWrongBucket = remoteReads;
+    assert.equal((await imageRequest()).headers.get("X-Vinkulo-Storage"), "r2");
+    assert.equal(remoteReads, beforeWrongBucket);
+    database.prepare("UPDATE configuracoes SET valor=? WHERE chave='supabase_storage_read_source'").run(preference);
+    assert.equal((await changeSource("R2")).status, 200);
+    runtime.BUCKET.get = async value => {
+      database.prepare("INSERT INTO platform_reset_files(object_key,reset_id,disposition) VALUES(?,'storage-test','DELETE_PENDING')").run(key);
+      return r2Get(value);
+    };
+    assert.equal((await imageRequest()).status, 404, "deletion during download must block the response");
+    database.prepare("DELETE FROM platform_reset_files WHERE object_key=?").run(key);
     runtime.BUCKET.get = async () => null;
     const fallback = await worker.fetch(new Request(`http://localhost/api/pilot/uploads/${key}`), runtime, context);
     assert.equal(fallback.status, 200);
@@ -116,10 +195,13 @@ test("cópia de imagens exige proprietário e confere bytes sem apagar o R2", as
     assert.equal((await rollbackRequest()).status, 409);
     assert.equal(database.prepare("SELECT COUNT(*) AS n FROM supabase_storage_copies").get().n, 1);
     remote = originalRemote;
+    assert.equal((await changeSource("SUPABASE")).status, 200);
     const rollback = await rollbackRequest();
     assert.equal(rollback.status, 200);
     assert.deepEqual((await rollback.json()).result, { removed: 1, remaining: 0 });
     assert.equal(database.prepare("SELECT COUNT(*) AS n FROM supabase_storage_copies").get().n, 0);
     assert.equal(calls.delete, 0);
+    assert.equal(JSON.parse(database.prepare("SELECT valor FROM configuracoes WHERE chave='supabase_storage_read_source'").get().valor).source, "R2");
+    assert.equal((await changeSource("SUPABASE")).status, 409);
   } finally { globalThis.fetch = nativeFetch; }
 });

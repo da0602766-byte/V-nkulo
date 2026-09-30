@@ -2,6 +2,7 @@ import { getD1 } from "../../../../../../db";
 import { copyStoragePage, rollbackStorageCopyPage, SupabaseStorageCopyError } from "../../../../../lib/supabase-storage-copy";
 import { recordTenantAudit } from "../../../../../lib/tenant-audit";
 import { reply, requireIntegrationOwner } from "../route";
+import { getStorageReadSource, setStorageReadSource } from "../../../../../lib/supabase-storage-routing";
 
 export async function GET() {
   const access = await requireIntegrationOwner();
@@ -9,8 +10,26 @@ export async function GET() {
   try {
     const row = await getD1().prepare("SELECT COUNT(*) AS total FROM supabase_storage_copies")
       .first<{ total: number }>();
-    return reply({ copies: Number(row?.total || 0) });
+    return reply({ copies: Number(row?.total || 0), readSource: await getStorageReadSource() });
   } catch { return reply({ error: "Não foi possível consultar as cópias." }, 503); }
+}
+
+export async function PATCH(request: Request) {
+  const access = await requireIntegrationOwner(request);
+  if ("error" in access) return access.error;
+  try {
+    const body = await request.json() as { source?: unknown; confirm?: unknown };
+    if ((body?.source !== "R2" && body?.source !== "SUPABASE") || body.confirm !== "ALTERAR_LEITURA_IMAGENS") {
+      return reply({ error: "Confirme a origem de leitura das imagens." }, 400);
+    }
+    await setStorageReadSource(body.source, access.user.id);
+    await recordTenantAudit(getD1(), { comunidadeId: null }, access.user.id,
+      "INTEGRACAO_SUPABASE_LEITURA_IMAGENS", "SUCESSO", { source: body.source });
+    return GET();
+  } catch (error) {
+    return reply({ error: error instanceof SupabaseStorageCopyError ? error.message : "Não foi possível alterar a leitura das imagens." },
+      error instanceof SupabaseStorageCopyError ? error.status : 503);
+  }
 }
 
 export async function POST(request: Request) {
@@ -42,6 +61,7 @@ export async function DELETE(request: Request) {
   try {
     const body = await request.json() as { confirm?: unknown };
     if (body?.confirm !== "REMOVER_COPIAS_SUPABASE") return reply({ error: "Confirme a remoção das cópias." }, 400);
+    await setStorageReadSource("R2", access.user.id);
     const result = await rollbackStorageCopyPage();
     await recordTenantAudit(getD1(), { comunidadeId: null }, access.user.id,
       "INTEGRACAO_SUPABASE_ARQUIVOS_REVERTIDOS", "SUCESSO", result);

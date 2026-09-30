@@ -22,6 +22,14 @@ Data: 29/09/2026. Base: repositório local a partir de `41b7f6c`.
 
 O Supabase só será a origem de um módulo quando o esquema, dados, políticas RLS, operações, auditoria, exclusão, recuperação e testes de isolamento estiverem completos; quando a contagem e os campos baterem por comunidade; e quando a versão publicada for verificada usando o destino real. Até lá o D1 continua sendo a origem desse módulo.
 
+## Início do corte de leitura — 29/09/2026
+
+- Medição em produção em `2026-09-30T01:09:50.929Z`: 21 vínculos iguais; mediana D1 de 205 ms e Supabase de 460 ms em três leituras. Esta amostra favorece o D1 e não mede páginas completas. Mudar a origem não garante ganho de desempenho.
+- O painel de imagens passa a oferecer comparação de três leituras de uma imagem conferida e escolha reversível entre R2 e Supabase. O padrão continua R2; a ativação exige proprietário, origem HTTP válida, bucket privado e uma cópia com hash correto. A preferência é vinculada ao projeto e ao bucket.
+- Quando ativado, o Supabase atende somente imagens registradas e verificadas por SHA-256; ausência, erro ou transferência acima de dois segundos recorre ao R2. Sem nenhuma origem disponível, a resposta é 503 sem cache. A exclusão é conferida antes e depois da leitura; download mantém o anexo e a política sem cache. Desfazer cópias ou pausar a integração retorna a preferência para R2.
+- Novos uploads continuam no R2. Não foi feito corte de gravação nem migração de Google Drive, arquivos locais, sessões ou tabelas operacionais.
+- Validação local: build, TypeScript e 13 testes de Storage, integração, Auth, limpeza de catálogos e reinicialização aprovados. Testes usam dados sintéticos; não executam reinicialização em produção.
+
 ## Etapa em desenvolvimento nesta alteração
 
 A rota protegida `POST /api/proprietario/integracoes/supabase/storage-copy` e o painel do proprietário permitem copiar uma página de até 20 objetos R2 por vez. Apenas chaves de imagem no formato conhecido são aceitas. A rotina exige bucket privado, compara bytes antes e depois do envio e interrompe em conflito. Cada objeto conferido é registrado em `supabase_storage_copies`. A leitura pública recorre à cópia apenas se o R2 não encontrar o objeto e respeita o bloqueio de arquivos excluídos. O proprietário pode desfazer as cópias em páginas, desde que o original no R2 continue idêntico. Ainda não há corte de escrita de mídia, nem transferência de Google Drive ou arquivos locais.

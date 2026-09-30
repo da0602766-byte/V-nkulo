@@ -7,6 +7,7 @@ import { setProfileDetailsAutoSyncEnabled } from "../../../../lib/supabase-profi
 import { hasTrackedProfileDetails } from "../../../../lib/supabase-profile-details-copy-state";
 import { CatalogCleanupError, getCatalogCopyCounts, totalCatalogCopies } from "../../../../lib/supabase-catalog-cleanup";
 import { activeAuthLinkLeases, setAuthLinkEnabled } from "../../../../lib/supabase-auth-link";
+import { setStorageReadSource } from "../../../../lib/supabase-storage-routing";
 
 export const reply = (value: unknown, status=200) => Response.json(value,{status,headers:{"Cache-Control":"no-store"}});
 export async function requireIntegrationOwner(request?: Request) {
@@ -76,6 +77,7 @@ export async function PATCH(request: Request) {
     }
     await writeIntegration(config,access.user.id);
     if (!config.ativa || (saved && saved.config.url !== config.url)) {
+      await setStorageReadSource("R2", access.user.id);
       await setProfileDetailsAutoSyncEnabled(getD1(), false, access.user.id);
       await setAuthLinkEnabled(getD1(), false, access.user.id);
     }

@@ -10,7 +10,7 @@ export class SupabaseStorageCopyError extends Error {
   constructor(message: string, public readonly status = 424) { super(message); }
 }
 
-async function target() {
+export async function verifiedStorageTarget() {
   const saved = await readIntegration();
   if (!saved?.config.ativa || !saved.config.serviceRoleKey || !saved.config.bucket) {
     throw new SupabaseStorageCopyError("Ative a integração e configure um bucket privado antes de copiar arquivos.", 409);
@@ -36,12 +36,12 @@ async function target() {
   } finally { clearTimeout(timeout); }
 }
 
-function objectUrl(config: Awaited<ReturnType<typeof target>>, key: string, method: string) {
+function objectUrl(config: Awaited<ReturnType<typeof verifiedStorageTarget>>, key: string, method: string) {
   const access = method === "GET" ? "authenticated/" : "";
   return `${config.url}/storage/v1/object/${access}${encodeURIComponent(config.bucket)}/${key.split("/").map(encodeURIComponent).join("/")}`;
 }
 
-async function storageFetch(config: Awaited<ReturnType<typeof target>>, key: string, init: RequestInit) {
+async function storageFetch(config: Awaited<ReturnType<typeof verifiedStorageTarget>>, key: string, init: RequestInit) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20_000);
   try {
@@ -50,7 +50,7 @@ async function storageFetch(config: Awaited<ReturnType<typeof target>>, key: str
       headers: { apikey: config.secret, Authorization: `Bearer ${config.secret}`, ...init.headers },
       redirect: "manual",
       cache: "no-store",
-      signal: controller.signal,
+      signal: init.signal || controller.signal,
     });
   } finally {
     clearTimeout(timeout);
@@ -61,20 +61,27 @@ async function digest(bytes: ArrayBuffer) {
   return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), byte => byte.toString(16).padStart(2, "0")).join("");
 }
 
-async function readBounded(stream: ReadableStream) {
+export async function readStorageImageBytes(stream: ReadableStream, signal?: AbortSignal) {
   const reader = stream.getReader();
+  const cancel = () => { void reader.cancel().catch(() => {}); };
+  signal?.addEventListener("abort", cancel, { once: true });
   const parts: Uint8Array[] = [];
   let size = 0;
   try {
     while (true) {
+      signal?.throwIfAborted();
       const { done, value } = await reader.read();
+      signal?.throwIfAborted();
       if (done) break;
       const part = value instanceof Uint8Array ? value : new Uint8Array(value);
       size += part.byteLength;
       if (size > MAX_OBJECT_BYTES) throw new SupabaseStorageCopyError("Um arquivo excede o limite de 16 MB. A cópia foi interrompida.", 409);
       parts.push(part);
     }
-  } finally { await reader.cancel().catch(() => {}); }
+  } finally {
+    signal?.removeEventListener("abort", cancel);
+    await reader.cancel().catch(() => {});
+  }
   if (size < 1) throw new SupabaseStorageCopyError("Um arquivo está vazio.", 409);
   const bytes = new Uint8Array(size);
   let offset = 0;
@@ -82,7 +89,7 @@ async function readBounded(stream: ReadableStream) {
   return bytes.buffer;
 }
 
-async function compareRemote(config: Awaited<ReturnType<typeof target>>, key: string, source: ArrayBuffer) {
+async function compareRemote(config: Awaited<ReturnType<typeof verifiedStorageTarget>>, key: string, source: ArrayBuffer) {
   const remote = await storageFetch(config, key, { method: "GET" });
   if (remote.status === 400 || remote.status === 404) {
     const body = await remote.json().catch(() => null) as {
@@ -101,14 +108,14 @@ async function compareRemote(config: Awaited<ReturnType<typeof target>>, key: st
     throw new SupabaseStorageCopyError("Um arquivo no Supabase excede o limite de conferência.", 409);
   }
   if (!remote.body) throw new SupabaseStorageCopyError("O Supabase não devolveu o conteúdo do arquivo.");
-  const bytes = await readBounded(remote.body);
+  const bytes = await readStorageImageBytes(remote.body);
   if (await digest(bytes) !== await digest(source)) {
     throw new SupabaseStorageCopyError("Um arquivo já existe no Supabase com conteúdo diferente. A cópia foi interrompida.", 409);
   }
   return "equal" as const;
 }
 
-async function recordCopy(key: string, config: Awaited<ReturnType<typeof target>>, bytes: ArrayBuffer) {
+async function recordCopy(key: string, config: Awaited<ReturnType<typeof verifiedStorageTarget>>, bytes: ArrayBuffer) {
   const projectRef = new URL(config.url).hostname.split(".")[0];
   const db = getD1();
   const current = await db.prepare("SELECT project_ref,bucket FROM supabase_storage_copies WHERE object_key=?")
@@ -137,7 +144,7 @@ export async function deleteSupabaseStoredImage(key: string) {
   await db.prepare("DELETE FROM supabase_storage_copies WHERE object_key=?").bind(key).run();
 }
 
-export async function readCopiedImage(key: string): Promise<Response | null> {
+export async function readCopiedImage(key: string, timeoutMs = 2000): Promise<Response | null> {
   if (!isSafeUploadKey(key)) return null;
   const record = await getD1().prepare("SELECT project_ref,bucket,sha256 FROM supabase_storage_copies WHERE object_key=?")
     .bind(key).first<{ project_ref: string; bucket: string; sha256: string }>();
@@ -149,14 +156,26 @@ export async function readCopiedImage(key: string): Promise<Response | null> {
   }
   const config = { url: saved.config.url, bucket: record.bucket,
     secret: await reveal(saved.config.serviceRoleKey, `${saved.config.url}:serviceRoleKey`) };
-  const response = await storageFetch(config, key, { method: "GET" });
-  if (!response.ok) throw new SupabaseStorageCopyError("A cópia do arquivo não pôde ser lida no Supabase.", 503);
-  if (!response.body) throw new SupabaseStorageCopyError("A cópia do arquivo está vazia no Supabase.", 503);
-  const bytes = await readBounded(response.body);
-  if (await digest(bytes) !== record.sha256) {
-    throw new SupabaseStorageCopyError("A cópia do arquivo no Supabase não corresponde ao original conferido.", 503);
+  // O limite cobre também a transferência do corpo, antes de recorrer ao R2.
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await storageFetch(config, key, { method: "GET", signal: controller.signal });
+    if (!response.ok) {
+      await response.body?.cancel();
+      throw new SupabaseStorageCopyError("A cópia do arquivo não pôde ser lida no Supabase.", 503);
+    }
+    if (!response.body) throw new SupabaseStorageCopyError("A cópia do arquivo está vazia no Supabase.", 503);
+    const bytes = await readStorageImageBytes(response.body, controller.signal);
+    if (await digest(bytes) !== record.sha256) {
+      throw new SupabaseStorageCopyError("A cópia do arquivo no Supabase não corresponde ao original conferido.", 503);
+    }
+    const contentType = key.toLowerCase().endsWith(".png") ? "image/png"
+      : key.toLowerCase().endsWith(".webp") ? "image/webp" : "image/jpeg";
+    return new Response(bytes, { headers: { "Content-Type": contentType } });
+  } finally {
+    clearTimeout(timeout);
   }
-  return new Response(bytes, { headers: { "Content-Type": response.headers.get("content-type") || "application/octet-stream" } });
 }
 
 export async function rollbackStorageCopyPage() {
@@ -169,7 +188,7 @@ export async function rollbackStorageCopyPage() {
   for (const row of rows.results) {
     const original = await bucket.get(row.object_key);
     if (!original) throw new SupabaseStorageCopyError("O original no R2 não foi encontrado. A cópia foi preservada.", 409);
-    const bytes = await readBounded(original.body);
+    const bytes = await readStorageImageBytes(original.body);
     if (await digest(bytes) !== row.sha256) {
       throw new SupabaseStorageCopyError("O original no R2 mudou. A cópia foi preservada para revisão.", 409);
     }
@@ -200,7 +219,7 @@ export async function copyStoragePage(cursor?: string) {
   } catch {
     throw new SupabaseStorageCopyError("A migração 0083 do D1 precisa ser aplicada antes de copiar arquivos.", 409);
   }
-  const config = await target();
+  const config = await verifiedStorageTarget();
   const page = await bucket.list({ cursor, limit: PAGE_SIZE });
   if (page.truncated && !page.cursor) throw new SupabaseStorageCopyError("O R2 não devolveu a próxima página.", 503);
   const result = { scanned: page.objects.length, copied: 0, verified: 0, skipped: 0,
@@ -211,7 +230,7 @@ export async function copyStoragePage(cursor?: string) {
     if (!isSafeUploadKey(key)) { result.skipped += 1; continue; }
     const object = await bucket.get(key);
     if (!object) throw new SupabaseStorageCopyError("Um arquivo do R2 desapareceu durante a cópia. Tente novamente.", 409);
-    const bytes = await readBounded(object.body);
+    const bytes = await readStorageImageBytes(object.body);
     const state = await compareRemote(config, key, bytes);
     if (state === "equal") { await recordCopy(key, config, bytes); result.verified += 1; continue; }
     const uploaded = await storageFetch(config, key, {
