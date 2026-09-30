@@ -18,4 +18,4 @@ Não houve mudança de regras de autorização, banco de origem, sessão ou sinc
 
 ## Publicação
 
-Pendente.
+Publicada no Sites versão 339, commit `c172634b84f2f622c09bd6b5faee8b78bebf9c78`, deployment `appgdep_6abc691c54108191b904b3173cb02349`, em `https://adote-gestao.da0602766.chatgpt.site`.
