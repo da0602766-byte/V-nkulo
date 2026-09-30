@@ -1,5 +1,7 @@
 "use client";
 
+import TransientFeedback from "../TransientFeedback";
+
 import { useEffect, useMemo, useState } from "react";
 import { initialsOf } from "./format";
 import type { CellsData } from "./useCellsData";
@@ -112,9 +114,9 @@ export default function CellMemberPortal({
 function OperationFeedback({ message, error }: { message: string; error: string }) {
   if (!message && !error) return null;
   return (
-    <p className={`operations-feedback ${error ? "error" : ""}`} role="status">
+    <TransientFeedback className={`operations-feedback ${error ? "error" : ""}`} role="status">
       {error || message}
-    </p>
+    </TransientFeedback>
   );
 }
 

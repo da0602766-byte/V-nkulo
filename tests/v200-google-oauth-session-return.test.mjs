@@ -70,7 +70,9 @@ test("toda ação com o Google termina em um aviso animado", async () => {
   ]);
 
   // Os três estados e o tempo de saída de cada um.
-  assert.match(toast, /pending: 0,\s*\n\s*success: 5200,\s*\n\s*error: 0,/);
+  // Resultados são temporários; andamento espera a conclusão. Foco pausa a saída.
+  assert.match(toast, /pending: 0,\s*\n\s*success: 5200,\s*\n\s*error: 9000,/);
+  assert.match(toast, /onFocusCapture/);
   assert.match(toast, /role=\{variant === "error" \? "alert" : "status"\}/);
 
   // As animações precisam existir de fato no CSS publicado.

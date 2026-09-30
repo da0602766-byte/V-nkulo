@@ -1,5 +1,7 @@
 "use client";
 
+import TransientFeedback from "./TransientFeedback";
+
 import { FormEvent, useEffect, useState } from "react";
 import type { PlatformThemePreset } from "../lib/platform-branding";
 import NativeImageUpload from "./NativeImageUpload";
@@ -122,7 +124,7 @@ export default function PlatformBrandingWorkspace() {
           purpose="platform-feed-banner"
           onChange={setFeedBannerUrl}
         />
-        {message && <p className="operations-feedback" role="status">{message}</p>}
+        {message && <TransientFeedback className="operations-feedback" role="status">{message}</TransientFeedback>}
         <button disabled={saving}>
           {saving ? "Salvando…" : "Salvar página principal"}
         </button>

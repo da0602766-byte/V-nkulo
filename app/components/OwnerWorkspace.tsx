@@ -1,5 +1,7 @@
 "use client";
 
+import TransientFeedback from "./TransientFeedback";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent } from "react";
 import { useSearchParams } from "next/navigation";
@@ -372,8 +374,8 @@ export default function OwnerWorkspace({
         {(["performance", "incidents", "realtime"] as OwnerTab[]).includes(tab) && <nav className="oc-subnav" aria-label="Confiabilidade">{(["performance", "incidents", "realtime"] as OwnerTab[]).map(id => <button type="button" key={id} aria-current={tab === id ? "page" : undefined} onClick={() => selectTab(id)}><OwnerTabIcon tab={id} />{tabLabel(id)}</button>)}</nav>}
         {(["decisions", "requests", "feedback"] as OwnerTab[]).includes(tab) && <nav className="oc-subnav" aria-label="Pendências e históricos">{(["decisions", "requests", "feedback"] as OwnerTab[]).map(id => <button type="button" key={id} aria-current={tab === id ? "page" : undefined} onClick={() => selectTab(id)}>{tabLabel(id)}</button>)}</nav>}
         {tab === "decisions" && data && <OwnerDecisionQueue data={data} onSelect={selectTab} />}
-          {message && <p className="operations-feedback" role="status">{message}</p>}
-          {loadError && <div className="owner-load-error"><p className="operations-feedback error" role="alert">{loadError}</p><button type="button" onClick={() => void load()}>Tentar novamente</button></div>}
+          {message && <TransientFeedback className="operations-feedback" role="status">{message}</TransientFeedback>}
+          {loadError && <div className="owner-load-error"><TransientFeedback className="operations-feedback error" role="alert">{loadError}</TransientFeedback><button type="button" onClick={() => void load()}>Tentar novamente</button></div>}
           {loading && !data ? <div className="owner-loading">Carregando controles globais…</div> : null}
 
           {tab === "overview" && data && <OwnerExecutiveOverview data={data} gridPreset={gridPreset} metricOrder={metricOrder} draggingMetric={draggingMetric} onSelectTab={selectTab} onOpenCommunity={openCommunity} onSaveLayout={saveOwnerLayout} onDragStart={setDraggingMetric} onDragEnd={() => setDraggingMetric(null)} onDropMetric={reorderMetric} onMoveMetric={moveMetric} />}

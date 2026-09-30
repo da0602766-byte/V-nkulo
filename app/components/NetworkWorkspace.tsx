@@ -1,5 +1,7 @@
 "use client";
 
+import TransientFeedback from "./TransientFeedback";
+
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 type Network = {
@@ -203,7 +205,7 @@ export default function NetworkWorkspace() {
   if (error && !data) {
     return (
       <section className="network-workspace">
-        <div className="operations-feedback error" role="alert">{error}</div>
+        <TransientFeedback className="operations-feedback error" role="alert">{error}</TransientFeedback>
         <button className="network-retry" type="button" onClick={() => void load()}>
           Tentar novamente
         </button>
@@ -225,8 +227,8 @@ export default function NetworkWorkspace() {
         <span className="network-secure-badge">Isolamento por unidade</span>
       </header>
 
-      {feedback && <p className="operations-feedback" role="status">{feedback}</p>}
-      {error && <p className="operations-feedback error" role="alert">{error}</p>}
+      {feedback && <TransientFeedback className="operations-feedback" role="status">{feedback}</TransientFeedback>}
+      {error && <TransientFeedback className="operations-feedback error" role="alert">{error}</TransientFeedback>}
 
       <div className="network-metrics">
         <Metric value={data?.redes.length || 0} label="Redes acessíveis" tone="purple" />

@@ -57,6 +57,12 @@ export type PilotFeedItem = {
   atualizado_em: string;
   links_json?: string;
   autor_nome?: string | null;
+  criado_por?: number | null;
+  can_edit?: number;
+  can_hide?: number;
+  can_delete?: number;
+  reacoes_json?: string;
+  minhas_reacoes_json?: string;
 };
 
 export type PilotFeatureState = {
@@ -246,12 +252,22 @@ export async function getPilotFeed(
   comunidadeId: number,
   userId: number,
   canModerate = false,
+  systemOwner = false,
 ): Promise<PilotFeedItem[]> {
   const result = await getD1()
     .prepare(
       `SELECT id, titulo, resumo, conteudo, categoria, visibilidade, status,
         origem, criado_por, comentarios_habilitados, links_json,
-        criado_em, atualizado_em
+        criado_em, atualizado_em,
+        CASE WHEN criado_por = ? THEN 1 ELSE 0 END AS can_edit,
+        CASE WHEN criado_por = ? OR ? = 1 THEN 1 ELSE 0 END AS can_hide,
+        CASE WHEN criado_por = ? OR ? = 1 THEN 1 ELSE 0 END AS can_delete,
+        COALESCE((SELECT json_group_object(tipo, total) FROM (
+          SELECT tipo, COUNT(*) AS total FROM reacoes_publicacao
+          WHERE publicacao_id = publicacoes_piloto.id GROUP BY tipo
+        )), '{}') AS reacoes_json,
+        COALESCE((SELECT json_group_array(tipo) FROM reacoes_publicacao
+          WHERE publicacao_id = publicacoes_piloto.id AND usuario_id = ?), '[]') AS minhas_reacoes_json
       FROM publicacoes_piloto
         WHERE comunidade_id = ? AND status = 'PUBLICADA' AND canal_feed = 1
           AND (audiencia_tipo <> 'MINISTERIOS' OR ? = 1 OR EXISTS (
@@ -262,7 +278,8 @@ export async function getPilotFeed(
           ))
       ORDER BY criado_em DESC, id DESC LIMIT 10`,
     )
-      .bind(comunidadeId, canModerate ? 1 : 0, userId)
+      .bind(userId, userId, canModerate ? 1 : 0, userId, systemOwner ? 1 : 0,
+        userId, comunidadeId, canModerate ? 1 : 0, userId)
     .all<PilotFeedItem>();
   return result.results;
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import TransientFeedback from "./TransientFeedback";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 type Assignment = {
@@ -280,15 +282,15 @@ export default function DiaconiaWorkspace({
       </div>
 
       {feedback && (
-        <p className="operations-feedback" role="status">
+        <TransientFeedback className="operations-feedback" role="status">
           {feedback}
-        </p>
+        </TransientFeedback>
       )}
       {error && (
-        <div className="operations-feedback error" role="alert">
+        <TransientFeedback className="operations-feedback error" role="alert">
           <span>{error}</span>
           <button onClick={() => void loadData()}>Tentar novamente</button>
-        </div>
+        </TransientFeedback>
       )}
 
       {loading ? (

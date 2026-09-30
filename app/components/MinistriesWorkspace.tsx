@@ -1,5 +1,7 @@
 "use client";
 
+import TransientFeedback from "./TransientFeedback";
+
 import {
   FormEvent,
   useCallback,
@@ -773,17 +775,17 @@ export default function MinistriesWorkspace({
       </div>
 
       {feedback && (
-        <p className="operations-feedback" role="status">
+        <TransientFeedback className="operations-feedback" role="status">
           {feedback}
-        </p>
+        </TransientFeedback>
       )}
       {error && (
-        <div className="operations-feedback error" role="alert">
+        <TransientFeedback className="operations-feedback error" role="alert">
           <span>{error}</span>
           <button className="event-inline-action" onClick={() => void loadData()}>
             Tentar novamente
           </button>
-        </div>
+        </TransientFeedback>
       )}
 
       {loading ? (

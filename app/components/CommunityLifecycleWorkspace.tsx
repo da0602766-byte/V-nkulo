@@ -1,5 +1,7 @@
 "use client";
 
+import TransientFeedback from "./TransientFeedback";
+
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 type LifecycleRequest = {
@@ -431,8 +433,8 @@ export default function CommunityLifecycleWorkspace({
           <p>{data.mfa.dependency} A aprovação final permanece bloqueada até essa integração.</p>
         </div>
       </div>
-      {feedback && <p className="operations-feedback" role="status">{feedback}</p>}
-      {error && <p className="operations-feedback error" role="alert">{error}</p>}
+      {feedback && <TransientFeedback className="operations-feedback" role="status">{feedback}</TransientFeedback>}
+      {error && <TransientFeedback className="operations-feedback error" role="alert">{error}</TransientFeedback>}
     </section>
   );
 }

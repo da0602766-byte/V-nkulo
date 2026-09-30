@@ -1,5 +1,7 @@
 "use client";
 
+import TransientFeedback from "./TransientFeedback";
+
 import { FormEvent, useEffect, useState } from "react";
 import {
   COMMUNITY_PALETTES,
@@ -193,7 +195,7 @@ export default function CommunityThemeEditor() {
           )}
         </div>
         <footer className="community-theme-footer">
-          {message && <p className="operations-feedback" role="status">{message}</p>}
+          {message && <TransientFeedback className="operations-feedback" role="status">{message}</TransientFeedback>}
           <button type="submit" disabled={saving}>{saving ? "Salvando…" : "Salvar configurações"}</button>
         </footer>
       </form>

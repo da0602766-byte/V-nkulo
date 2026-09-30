@@ -1,5 +1,7 @@
 "use client";
 
+import TransientFeedback from "./TransientFeedback";
+
 import { useCallback, useEffect, useState } from "react";
 import type { LandingPlan } from "../lib/platform-plans";
 import { useTransientMessage } from "../lib/use-transient-message";
@@ -68,7 +70,7 @@ export default function PlatformPlansWorkspace() {
   return <form className="owner-plans-workspace" aria-label="Configuração comercial de planos" onSubmit={event => { event.preventDefault(); void save(); }}>
     <header className="owner-plans-hero"><div><p className="pilot-kicker">CONFIGURAÇÃO COMERCIAL</p><p>Edite a configuração carregada da fonte oficial. As alterações só entram em vigor após salvar.</p></div><button type="submit" disabled={saving}>{saving ? "Salvando…" : "Salvar alterações"}</button></header>
     <div className="owner-plans-source"><span aria-hidden="true">i</span><p>Somente configurações salvas são carregadas. Novos planos começam em branco e só são gravados após salvar.</p></div>
-    {message && <p className="operations-feedback" role="status">{message}</p>}
+    {message && <TransientFeedback className="operations-feedback" role="status">{message}</TransientFeedback>}
     <div className="owner-plans-catalog">
       <aside className="owner-plan-index" aria-label="Planos disponíveis"><header><strong>Planos disponíveis</strong><small>Selecione para editar</small></header>{plans.map((item, index) => <button type="button" key={`plan-index-${index}`} className={selectedPlan === index ? "active" : ""} onClick={() => setSelectedPlan(index)}><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{item.name || "Sem nome"}</strong><small>{item.price}{item.period || ""}</small></div><i>{item.featured ? "Destaque" : "Editar"}</i></button>)}</aside>
       <article className="owner-plan-card owner-plan-editor" key={`plan-${selectedPlan}`}>

@@ -1,5 +1,7 @@
 "use client";
 
+import TransientFeedback from "../TransientFeedback";
+
 import { type FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import NativeImageUpload from "../NativeImageUpload";
@@ -45,9 +47,9 @@ export default function CellManagementConsole({
 function OperationFeedback({ message, error }: { message: string; error: string }) {
   if (!message && !error) return null;
   return (
-    <p className={`operations-feedback ${error ? "error" : ""}`} role="status">
+    <TransientFeedback className={`operations-feedback ${error ? "error" : ""}`} role="status">
       {error || message}
-    </p>
+    </TransientFeedback>
   );
 }
 

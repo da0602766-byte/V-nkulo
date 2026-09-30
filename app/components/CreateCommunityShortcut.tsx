@@ -1,5 +1,7 @@
 "use client";
 
+import TransientFeedback from "./TransientFeedback";
+
 import Link from "./StableLink";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -329,9 +331,9 @@ export default function CreateCommunityShortcut({
                 </ul>
               </div>
               {message && (
-                <p className="operations-feedback error create-community-feedback-v81" role="alert">
+                <TransientFeedback className="operations-feedback error create-community-feedback-v81" role="alert">
                   {message}
-                </p>
+                </TransientFeedback>
               )}
               <footer className="create-community-actions create-community-actions-v81">
                 <button type="button" className="secondary" onClick={step === 1 ? closeDialog : () => setStep(step - 1)}>

@@ -1,0 +1,193 @@
+.workspace .titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  color: var(--pilot-text);
+}
+
+.workspace .titlebar h1 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: -.025em;
+}
+
+.workspace .introToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--pilot-line);
+  border-radius: 9px;
+  background: var(--pilot-surface);
+  color: var(--pilot-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.intro {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition: grid-template-rows 400ms ease, opacity 280ms ease, visibility 400ms;
+  animation: introEnter 450ms ease backwards;
+}
+
+.intro[data-open="false"] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.introClip {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.workspace .introContent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 8px 0 22px;
+  color: var(--pilot-text);
+}
+
+.introContent > div { min-width: 0; }
+.workspace .introContent h2 {
+  margin: 0;
+  font-size: clamp(26px, 3vw, 40px);
+  line-height: 1.12;
+  letter-spacing: -.035em;
+}
+
+.introContent p:last-child {
+  max-width: 600px;
+  margin: 10px 0 0;
+  color: var(--pilot-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* Root + component selectors keep these overrides local, regardless of global CSS order. */
+.calendar:global(.agenda-studio) { gap: 10px; min-width: 0; }
+.calendar:global(.agenda-studio) :global(.agenda-calendario-topo) {
+  gap: 10px 16px;
+  padding: 0;
+  border: 0;
+}
+
+.calendar:global(.agenda-studio) :global(.agenda-calendario-periodo) {
+  display: grid;
+  grid-template-columns: 36px 36px minmax(0, 1fr) auto;
+  flex: 1 1 340px;
+  min-width: 0;
+  gap: 5px;
+}
+
+.calendar:global(.agenda-studio) :global(.agenda-calendario-periodo) > strong {
+  order: 0;
+  min-width: 0;
+  margin: 0 6px;
+  font-size: clamp(14px, 1.7vw, 18px);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  color: var(--pilot-text);
+}
+
+.calendar:global(.agenda-studio) :global(.agenda-calendario-acoes) {
+  width: auto;
+  gap: 10px;
+}
+
+.calendar:global(.agenda-studio) :global(.agenda-calendario-visoes) { padding: 3px; gap: 2px; }
+.calendar:global(.agenda-studio) :global(.agenda-calendario-visoes) button {
+  min-width: 44px;
+  min-height: 30px;
+  padding: 0 10px;
+}
+
+.calendar:global(.agenda-studio) :global(.agenda-fio-link) {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  font-size: 12px;
+}
+
+.calendar:global(.agenda-studio) :global(.agenda-camadas) {
+  gap: 8px 16px;
+  justify-content: space-between;
+  padding: 0 0 10px;
+  border-bottom: 1px solid var(--pilot-line);
+}
+
+.layers, .createActions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.createActions { margin-left: auto; }
+.calendar:global(.agenda-studio) .layers :global(.agenda-camada) {
+  min-height: 34px;
+  padding: 5px 10px;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.3;
+  background: transparent;
+}
+
+.calendar:global(.agenda-studio) .layers :global(.agenda-camada.active) {
+  background: color-mix(in srgb, var(--pilot-primary) 9%, var(--pilot-surface));
+}
+
+.calendar:global(.agenda-studio) :global(.agenda-camadas) .createActions > button {
+  flex: 0 1 auto;
+  width: auto;
+  margin: 0;
+  min-height: 36px;
+  padding: 6px 12px;
+  font-size: 12px;
+  line-height: 1.3;
+  border-radius: 9px;
+}
+
+.calendar:global(.agenda-studio) :global(.agenda-camadas) .createActions > :global(.agenda-novo) {
+  background: var(--community-primary, var(--pilot-primary));
+  color: var(--community-on-primary, #fff);
+}
+
+.workspace .introToggle:hover,
+.calendar :global(.agenda-calendario-topo) button:hover,
+.calendar .layers button:hover { border-color: var(--pilot-primary); color: var(--pilot-text); }
+
+.workspace .introToggle:focus-visible,
+.calendar :global(.agenda-calendario-topo) :is(button, a):focus-visible,
+.calendar :global(.agenda-camadas) button:focus-visible {
+  outline: 2px solid var(--pilot-primary);
+  outline-offset: 3px;
+}
+
+@keyframes introEnter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 600px) {
+  .workspace .introContent { align-items: flex-start; gap: 12px; }
+  .introContent :global(.events-studio-count) { max-width: 76px; }
+  .calendar:global(.agenda-studio) :global(.agenda-calendario-acoes) { width: 100%; justify-content: space-between; }
+  .createActions { margin-left: 0; width: 100%; }
+  .calendar:global(.agenda-studio) :global(.agenda-camadas) .createActions > button { flex: 1 1 120px; }
+}
+
+@media (pointer: coarse) {
+  .workspace .introToggle,
+  .calendar:global(.agenda-studio) :global(.agenda-calendario-topo) :is(button, a),
+  .calendar:global(.agenda-studio) .layers :global(.agenda-camada),
+  .calendar:global(.agenda-studio) :global(.agenda-camadas) .createActions > button { min-height: 44px; }
+  .calendar:global(.agenda-studio) :global(.agenda-calendario-periodo) { grid-template-columns: 44px 44px minmax(0, 1fr) auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intro { animation: none; transition: none; }
+}

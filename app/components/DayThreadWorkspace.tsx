@@ -1,5 +1,7 @@
 "use client";
 
+import TransientFeedback from "./TransientFeedback";
+
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import CareNotesBoard from "./CareNotesBoard";
 
@@ -376,9 +378,9 @@ export default function DayThreadWorkspace({
       )}
 
       {(erro || aviso) && (
-        <p className={`operations-feedback ${erro ? "error" : ""}`} role="status">
+        <TransientFeedback className={`operations-feedback ${erro ? "error" : ""}`} role="status">
           {erro || aviso}
-        </p>
+        </TransientFeedback>
       )}
 
       <div className="day-thread-body-v5">

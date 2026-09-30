@@ -21,6 +21,8 @@ import FeedHighlights from "./feed/FeedHighlights";
 import FeedComposerBar, { type ComposerIntent } from "./feed/FeedComposerBar";
 import FeedIcon from "./feed/FeedIcon";
 import useFeedDialog from "./feed/useFeedDialog";
+import FeedChannelChoices from "./feed/FeedChannelChoices";
+import TransientFeedback from "./TransientFeedback";
 
 type FeedItem = {
   id: number;
@@ -482,8 +484,8 @@ export default function CommunityHome({
           eventId: form.get("eventId") || undefined,
           audienciaTipo: audienceType,
           ministerioIds: audienceType === "MINISTERIOS" ? selectedMinistries : [],
-          canalFeed: form.get("canalFeed") === "on",
-          canalLateral: form.get("canalLateral") === "on",
+          canalFeed: form.get("publicationChannel") !== "sidebar",
+          canalLateral: form.get("publicationChannel") !== "feed",
         }),
       });
       const result = (await response.json()) as { error?: string; message?: string };
@@ -611,7 +613,7 @@ export default function CommunityHome({
       if (!response.ok) {
         throw new Error(result.error || "Não foi possível excluir.");
       }
-      setFeedback("Publicação excluída pelo proprietário.");
+      setFeedback("Publicação excluída.");
       await refreshFeed();
     } catch (deleteError) {
       setError((deleteError as Error).message);
@@ -650,9 +652,9 @@ export default function CommunityHome({
       )}
 
       {(feedback || error) && (
-        <p className={`operations-feedback ${error ? "error" : ""}`} role="status">
+        <TransientFeedback className={`operations-feedback ${error ? "error" : ""}`} role="status">
           {error || feedback}
-        </p>
+        </TransientFeedback>
       )}
 
       <div className={`worship-layout ${readOnlyFeed ? "feed-only" : ""}`}>
@@ -754,11 +756,7 @@ export default function CommunityHome({
                 {!ministries.length && <small>Nenhum ministério ativo disponível.</small>}
               </fieldset>
             )}
-            <fieldset className="composer-channels composer-wide">
-              <legend>Onde deve aparecer</legend>
-              <label><input type="checkbox" name="canalFeed" defaultChecked /><span>Feed</span></label>
-              <label><input type="checkbox" name="canalLateral" /><span>Lateral</span></label>
-            </fieldset>
+            <FeedChannelChoices />
             <label className="composer-share">
               <input
                 type="checkbox"
@@ -768,7 +766,7 @@ export default function CommunityHome({
               <span>Permitir comentários de usuários com conta ativa</span>
             </label>
             </div></details>
-            {error && <p className="operations-feedback error composer-wide" role="alert">{error}</p>}
+            {error && <TransientFeedback className="operations-feedback error composer-wide" role="alert">{error}</TransientFeedback>}
             <button disabled={working}>
               {working ? "Salvando…" : "Salvar publicação"}
             </button>
@@ -1001,7 +999,7 @@ export default function CommunityHome({
                         />
                         <span>Permitir comentários</span>
                       </label>
-                      {error && <p className="operations-feedback error composer-wide" role="alert">{error}</p>}
+                      {error && <TransientFeedback className="operations-feedback error composer-wide" role="alert">{error}</TransientFeedback>}
                       <div className="community-post-edit-actions">
                         <button disabled={working}>Salvar alterações</button>
                         <button

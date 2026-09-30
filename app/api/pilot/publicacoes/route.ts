@@ -54,7 +54,7 @@ export async function GET(request: Request) {
         WHERE publicacao_id = p.id AND usuario_id = ?), '[]') AS minhas_reacoes_json,
       CASE WHEN p.criado_por = ? THEN 1 ELSE 0 END AS can_edit,
       CASE WHEN p.criado_por = ? OR ? = 1 THEN 1 ELSE 0 END AS can_hide,
-      CASE WHEN ? = 1 THEN 1 ELSE 0 END AS can_delete
+      CASE WHEN p.criado_por = ? OR ? = 1 THEN 1 ELSE 0 END AS can_delete
     FROM publicacoes_piloto p
     LEFT JOIN usuarios u ON u.id = p.criado_por
     WHERE p.comunidade_id = ?
@@ -78,6 +78,7 @@ export async function GET(request: Request) {
           access.user.id,
           access.user.id,
           canModerate ? 1 : 0,
+          access.user.id,
           canDelete ? 1 : 0,
           access.context.comunidadeId,
           canModerate ? 1 : 0,
@@ -96,6 +97,7 @@ export async function GET(request: Request) {
           access.user.id,
           access.user.id,
           canModerate ? 1 : 0,
+          access.user.id,
           canDelete ? 1 : 0,
           access.context.comunidadeId,
           canModerate ? 1 : 0,

@@ -1,5 +1,7 @@
 "use client";
 
+import TransientFeedback from "./TransientFeedback";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import CommunityThemeEditor from "./CommunityThemeEditor";
 import MemberRegistrationLinkManager from "./MemberRegistrationLinkManager";
@@ -286,9 +288,9 @@ export default function CommunityAdminWorkspace({
       )}
 
       {(feedback || error) && (
-        <p className={`operations-feedback ${error ? "error" : ""}`} role="status">
+        <TransientFeedback className={`operations-feedback ${error ? "error" : ""}`} role="status">
           {error || feedback}
-        </p>
+        </TransientFeedback>
       )}
 
       {secaoAtiva === "solicitacoes" && canManageRequests && <section className="join-requests-panel">

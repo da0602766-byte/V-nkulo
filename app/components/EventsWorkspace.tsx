@@ -4,12 +4,15 @@ import {
   FormEvent,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
 } from "react";
 import { createPortal } from "react-dom";
 import AgendaCalendar from "./AgendaCalendar";
+import TransientFeedback from "./TransientFeedback";
+import styles from "./EventsAgenda.module.css";
 
 type CommunityEvent = {
   id: number;
@@ -73,6 +76,16 @@ export default function EventsWorkspace({
   communityName: string;
   communitySlug: string;
 }) {
+  const introId = useId();
+  const [introState, setIntroState] = useState<"auto" | "open" | "closed">("auto");
+  const introOpen = introState !== "closed";
+
+  useEffect(() => {
+    if (introState !== "auto") return;
+    const timer = window.setTimeout(() => setIntroState("closed"), 5_200);
+    return () => window.clearTimeout(timer);
+  }, [introState]);
+
   const [eventSearch, setEventSearch] = useState("");
   const [eventStatus, setEventStatus] = useState("TODOS");
   const [events, setEvents] = useState<CommunityEvent[]>([]);
@@ -82,6 +95,7 @@ export default function EventsWorkspace({
   const [workingId, setWorkingId] = useState<number | "form" | null>(null);
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
   const [editing, setEditing] = useState<CommunityEvent | null>(null);
   const [newEventDay, setNewEventDay] = useState("");
   const [newEventDraft, setNewEventDraft] = useState(0);
@@ -114,7 +128,6 @@ export default function EventsWorkspace({
 
   const loadEvents = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
-    if (!quiet) setError("");
     try {
       const response = await fetch("/api/pilot/eventos", {
         cache: "no-store",
@@ -124,9 +137,10 @@ export default function EventsWorkspace({
         throw new Error(result.error || "Não foi possível carregar os eventos.");
       }
       setEvents(result.eventos || []);
+      setLoadError("");
       setAgendaRevision((value) => value + 1);
     } catch (loadError) {
-      if (!quiet) setError((loadError as Error).message);
+      setLoadError(loadError instanceof Error ? loadError.message : "Não foi possível carregar os eventos.");
     } finally {
       if (!quiet) setLoading(false);
     }
@@ -399,17 +413,34 @@ export default function EventsWorkspace({
   }
 
   return (
-    <section className="events-workspace events-studio">
-      <header className="workspace-heading">
-        <div>
-          <p className="pilot-kicker">ENCONTROS QUE APROXIMAM</p>
-          <h1>Vamos nos encontrar.</h1>
-          <p>
-            A programação de {communityName}, suas escalas e seus compromissos em um só lugar.
-          </p>
-        </div>
-        <div className="events-studio-count"><strong>{events.filter(item => item.status === "PUBLICADO" && Date.parse(item.inicia_em) >= now).length}</strong><span>próximos eventos</span></div>
+    <section className={`events-workspace events-studio ${styles.workspace}`}>
+      <header className={styles.titlebar}>
+        <h1>Eventos</h1>
+        <button
+          type="button"
+          className={styles.introToggle}
+          aria-expanded={introOpen}
+          aria-controls={introId}
+          onClick={() => setIntroState(introOpen ? "closed" : "open")}
+        >
+          {introOpen ? "Recolher apresentação" : "Sobre a agenda"}
+          <span aria-hidden="true">{introOpen ? "−" : "+"}</span>
+        </button>
       </header>
+      <div id={introId} className={styles.intro} data-open={introOpen} aria-hidden={!introOpen}>
+        <div className={styles.introClip}>
+          <div className={styles.introContent}>
+            <div>
+              <p className="pilot-kicker">ENCONTROS QUE APROXIMAM</p>
+              <h2>Vamos nos encontrar.</h2>
+              <p>
+                A programação de {communityName}, suas escalas e seus compromissos em um só lugar.
+              </p>
+            </div>
+            <div className="events-studio-count"><strong>{events.filter(item => item.status === "PUBLICADO" && Date.parse(item.inicia_em) >= now).length}</strong><span>próximos eventos</span></div>
+          </div>
+        </div>
+      </div>
 
       {/* O calendário reúne, em camadas, o que já existe espalhado: eventos da
           comunidade, as escalas desta pessoa e os compromissos que ela mesma
@@ -657,17 +688,25 @@ export default function EventsWorkspace({
       )}
 
       {feedback && (
-        <p className="operations-feedback" role="status">
+        <TransientFeedback className="operations-feedback" role="status">
           {feedback}
-        </p>
+        </TransientFeedback>
       )}
       {error && (
-        <div className="operations-feedback error" role="alert">
+        <TransientFeedback className="operations-feedback error" role="alert">
           <span>{error}</span>
           <button className="event-inline-action" onClick={() => void loadEvents()}>
             Tentar novamente
           </button>
-        </div>
+        </TransientFeedback>
+      )}
+      {loadError && (
+        <TransientFeedback className="operations-feedback error" role="alert">
+          <span>{loadError}</span>
+          <button type="button" className="event-inline-action" onClick={() => void loadEvents()}>
+            Tentar novamente
+          </button>
+        </TransientFeedback>
       )}
 
       {loading ? (
@@ -678,7 +717,7 @@ export default function EventsWorkspace({
         </div>
       ) : events.length ? (<>
         <div className="events-studio-directory"><div><small>PROGRAMAÇÃO DA COMUNIDADE</small><h2>Encontros e eventos</h2></div><label><span className="sr-only">Buscar eventos</span><input type="search" value={eventSearch} onChange={event => setEventSearch(event.target.value)} placeholder="Buscar evento ou local…" /></label><label><span className="sr-only">Estado dos eventos</span><select value={eventStatus} onChange={event=>setEventStatus(event.target.value)}><option value="TODOS">Todos os estados</option><option value="PUBLICADO">Publicados</option>{canManage && <option value="RASCUNHO">Rascunhos</option>}<option value="CANCELADO">Cancelados</option></select></label></div>
-        {!displayedEvents.length && <p className="agenda-vazio">Nenhum evento corresponde à busca.</p>}
+        {!displayedEvents.length && <p className="agenda-vazio">{loadError ? "Não foi possível atualizar os eventos. Tente novamente para confirmar os resultados." : "Nenhum evento corresponde à busca."}</p>}
         <div className="event-grid">
           {displayedEvents.map((item) => {
             const isPublished = item.status === "PUBLICADO";
@@ -845,7 +884,13 @@ export default function EventsWorkspace({
             );
           })}
         </div>
-      </>) : (
+      </>) : loadError ? (
+        <div className="pilot-empty-state event-empty">
+          <strong>Eventos indisponíveis no momento</strong>
+          <p>Não foi possível consultar a programação da comunidade.</p>
+          <button type="button" className="event-inline-action" onClick={() => void loadEvents()}>Tentar novamente</button>
+        </div>
+      ) : (
         <div className="pilot-empty-state event-empty">
           <strong>Nenhum evento nesta comunidade</strong>
           <p>
@@ -904,7 +949,7 @@ export default function EventsWorkspace({
         </div>,
         document.body,
       )}
-      {shareFeedback && <p className="operations-feedback" role="status">{shareFeedback}</p>}
+      {shareFeedback && <TransientFeedback className="operations-feedback" role="status">{shareFeedback}</TransientFeedback>}
     </section>
   );
 }

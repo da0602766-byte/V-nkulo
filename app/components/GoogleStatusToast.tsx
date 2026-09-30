@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type GoogleToastVariant = "pending" | "success" | "error";
 
@@ -10,14 +10,14 @@ export type GoogleToastState = {
   detail?: string;
 } | null;
 
-// Erros ficam na tela até o usuário fechar: quem não conseguiu conectar precisa
-// ler o motivo. Sucesso e andamento sozinhos não pedem ação e se retiram.
+// Resultados desaparecem; o estado da conexão continua disponível na conta.
+// Andamento permanece enquanto a operação estiver em curso.
 // Este valor também alimenta a animação de saída em CSS (google-toast-cycle),
 // por isso ele é aplicado como animation-duration no próprio elemento.
 const AUTO_DISMISS_MS: Record<GoogleToastVariant, number> = {
   pending: 0,
   success: 5200,
-  error: 0,
+  error: 9000,
 };
 
 export default function GoogleStatusToast({
@@ -27,6 +27,7 @@ export default function GoogleStatusToast({
   state: GoogleToastState;
   onDismiss: () => void;
 }) {
+  const [paused, setPaused] = useState(false);
   // O callback costuma ser uma arrow inline, que muda a cada render do pai.
   // Guardá-lo numa ref evita reiniciar o cronômetro a cada render.
   const dismissRef = useRef(onDismiss);
@@ -35,12 +36,12 @@ export default function GoogleStatusToast({
   });
 
   useEffect(() => {
-    if (!state) return;
+    if (!state || paused) return;
     const delay = AUTO_DISMISS_MS[state.variant];
     if (!delay) return;
     const timer = window.setTimeout(() => dismissRef.current(), delay);
     return () => window.clearTimeout(timer);
-  }, [state]);
+  }, [state, paused]);
 
   if (!state) return null;
   const { variant, title, detail } = state;
@@ -48,7 +49,11 @@ export default function GoogleStatusToast({
   return (
     <div
       className={`google-toast google-toast-${variant}`}
-      style={autoDismissMs ? { animationDuration: `${autoDismissMs}ms` } : undefined}
+      style={autoDismissMs ? { animationDuration: `${autoDismissMs}ms`, animationPlayState: paused ? "paused" : "running" } : undefined}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocusCapture={() => setPaused(true)}
+      onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget)) setPaused(false); }}
       role={variant === "error" ? "alert" : "status"}
       aria-live={variant === "error" ? "assertive" : "polite"}
     >
@@ -68,7 +73,7 @@ export default function GoogleStatusToast({
       {autoDismissMs > 0 && (
         <span
           className="google-toast-timer"
-          style={{ animationDuration: `${autoDismissMs}ms` }}
+          style={{ animationDuration: `${autoDismissMs}ms`, animationPlayState: paused ? "paused" : "running" }}
           aria-hidden="true"
         />
       )}

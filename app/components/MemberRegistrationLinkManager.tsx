@@ -1,5 +1,7 @@
 "use client";
 
+import TransientFeedback from "./TransientFeedback";
+
 import { FormEvent, useCallback, useEffect, useState } from "react";
 
 type LinkItem = {
@@ -166,7 +168,7 @@ export default function MemberRegistrationLinkManager() {
         <label className="member-link-auto-delete"><input name="autoDelete" type="checkbox" /><span><strong>Limpeza automática</strong><small>Excluir o link quando for cancelado ou expirar</small></span></label>
         <button disabled={working === "create"}>{working === "create" ? "Criando…" : "Criar link temporário"}</button>
       </form>
-      {(feedback || error) && <p className={`operations-feedback ${error ? "error" : ""}`} role="status">{error || feedback}</p>}
+      {(feedback || error) && <TransientFeedback className={`operations-feedback ${error ? "error" : ""}`} role="status">{error || feedback}</TransientFeedback>}
       {createdPath && <div className="member-link-created"><label>Novo link<input readOnly value={typeof window === "undefined" ? createdPath : new URL(createdPath, window.location.origin).toString()} onFocus={(event) => event.currentTarget.select()} /></label><button type="button" onClick={() => void copyPath(createdPath)}>Copiar link</button></div>}
       <div className="member-link-list">
         {links.map((link) => <form key={link.id} onSubmit={(event) => void saveLink(event, link.id)}>

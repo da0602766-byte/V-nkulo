@@ -134,12 +134,6 @@ export async function PATCH(request: Request, context: Context) {
 export async function DELETE(_request: Request, context: Context) {
   const access = await requireTenantPermission("feed.view");
   if ("error" in access) return access.error;
-  if (access.user.system_owner !== true) {
-    return Response.json(
-      { error: "Somente o proprietário da plataforma pode excluir definitivamente." },
-      { status: 403 },
-    );
-  }
   const id = Number((await context.params).id);
   if (!Number.isInteger(id) || id <= 0) {
     return Response.json({ error: "Publicação inválida." }, { status: 400 });
@@ -147,21 +141,28 @@ export async function DELETE(_request: Request, context: Context) {
   const db = getD1();
   const existing = await db
     .prepare(
-      `SELECT id, titulo FROM publicacoes_piloto
+      `SELECT id, titulo, criado_por FROM publicacoes_piloto
        WHERE id = ? AND comunidade_id = ?`,
     )
     .bind(id, access.context.comunidadeId)
-    .first<{ id: number; titulo: string }>();
+    .first<{ id: number; titulo: string; criado_por: number | null }>();
   if (!existing) {
     return Response.json({ error: "Publicação não encontrada." }, { status: 404 });
+  }
+  const isAuthor = existing.criado_por === access.user.id;
+  if (!isAuthor && access.user.system_owner !== true) {
+    return Response.json(
+      { error: "Somente o autor ou o proprietário da plataforma pode excluir esta publicação." },
+      { status: 403 },
+    );
   }
   await recordTenantAudit(
     db,
     access.context,
     access.user.id,
-    "PUBLICACAO_V473_EXCLUIDA_PELO_PROPRIETARIO",
+    "PUBLICACAO_EXCLUIDA_DEFINITIVAMENTE",
     "SUCESSO",
-    { publicacaoId: id, titulo: existing.titulo },
+    { publicacaoId: id, titulo: existing.titulo, autorId: existing.criado_por, isAuthor },
   );
   await db
     .prepare(

@@ -1,5 +1,7 @@
 "use client";
 
+import TransientFeedback from "./TransientFeedback";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 type Leader = {
@@ -275,7 +277,7 @@ export default function LeadershipWorkspace({
         </section>
       )}
 
-      {message && <p className="operations-feedback" role="status">{message}</p>}
+      {message && <TransientFeedback className="operations-feedback" role="status">{message}</TransientFeedback>}
 
       <div className="leadership-content-grid">
         <section className="leadership-list-card">

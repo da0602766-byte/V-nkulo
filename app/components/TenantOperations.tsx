@@ -1,5 +1,7 @@
 "use client";
 
+import TransientFeedback from "./TransientFeedback";
+
 import {
   type CSSProperties,
   FormEvent,
@@ -1942,12 +1944,12 @@ function OperationFeedback({
 }) {
   if (!message && !error) return null;
   return (
-    <p
+    <TransientFeedback
       className={`operations-feedback ${error ? "error" : ""}`}
       role="status"
     >
       {error || message}
-    </p>
+    </TransientFeedback>
   );
 }
 

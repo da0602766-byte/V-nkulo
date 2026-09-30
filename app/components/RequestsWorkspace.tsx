@@ -1,5 +1,7 @@
 "use client";
 
+import TransientFeedback from "./TransientFeedback";
+
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type RequestType = "ORACAO" | "VISITA" | "ACONSELHAMENTO" | "APOIO" | "MINISTERIO" | "OUTRO" | "INFORMACAO";
@@ -493,7 +495,7 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
       </nav>}
     </header>
 
-    {(feedback || error) && <p className={`operations-feedback request-global-feedback ${error ? "error" : ""}`} role="status">{error || feedback}</p>}
+    {(feedback || error) && <TransientFeedback className={`operations-feedback request-global-feedback ${error ? "error" : ""}`} role="status">{error || feedback}</TransientFeedback>}
 
     {mode === "member" ? <div className="request-member-view">
       <section className="request-welcome" data-guide="request-start-guide" aria-labelledby="request-welcome-title">

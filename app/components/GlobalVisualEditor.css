@@ -1,0 +1,100 @@
+/* Deliberately scoped to the inspector and its own inserted blocks. */
+.ve-studio {
+  --studio-ink: #202938;
+  --studio-muted: #657084;
+  --studio-line: #e1e5ed;
+  --studio-accent: #6245d5;
+  color: var(--studio-ink);
+  font: 13px/1.5 ui-sans-serif, system-ui, sans-serif;
+  color-scheme: light;
+}
+
+.ve-studio .global-editor-panel {
+  display: flex;
+  flex-direction: column;
+  width: min(420px, calc(100vw - 16px));
+  height: min(900px, calc(100dvh - 32px));
+  border: 1px solid #d8dce6;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 24px 80px #141b3433, 0 4px 16px #141b3414;
+  isolation: isolate;
+}
+.ve-studio .global-editor-panel > * { flex-shrink: 0; }
+.ve-studio .global-editor-panel.is-minimized { width: 270px; height: auto; }
+.ve-studio .global-editor-panel > header { padding: 15px 18px; background: #fcfbff; }
+.ve-studio .global-editor-panel > header strong { font-size: 16px; letter-spacing: -.3px; }
+.ve-studio .global-editor-panel > header small { max-width: 245px; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; font-size: 11px; }
+.ve-studio .global-editor-panel > header > div:first-child > span { background: #ede8ff; color: var(--studio-accent); width: 38px; height: 38px; }
+.ve-studio .global-editor-panel > header button { width: 32px; height: 32px; background: transparent; }
+.ve-studio .ve-context { padding: 14px 18px 12px; border-bottom: 1px solid var(--studio-line); }
+.ve-studio .ve-eyebrow { color: var(--studio-muted); font-size: 10px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+.ve-studio .ve-context p { margin: 8px 0 5px; font-size: 12px; color: var(--studio-muted); }
+.ve-studio .ve-screen-label { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 650; color: var(--studio-accent); }
+.ve-studio .ve-segmented { display: flex; gap: 4px; padding: 4px; margin-top: 8px; background: #f0f1f6; border-radius: 10px; }
+.ve-studio .ve-segmented button { flex: 1; min-height: 34px; border: 0; border-radius: 7px; background: transparent; color: var(--studio-muted); font: inherit; font-weight: 700; cursor: pointer; }
+.ve-studio .ve-segmented button[aria-pressed="true"] { color: var(--studio-accent); background: #fff; box-shadow: 0 1px 4px #20293814; }
+.ve-studio .ve-command-bar { display: flex; gap: 6px; padding: 10px 18px 6px; }
+.ve-studio .ve-command-bar button { border: 1px solid var(--studio-line); border-radius: 7px; min-height: 32px; padding: 5px 9px; background: white; color: #49546a; font: inherit; font-size: 11px; cursor: pointer; }
+.ve-studio .ve-command-bar button:last-child { margin-left: auto; color: var(--studio-accent); }
+.ve-studio .ve-command-bar button[aria-pressed="true"] { background: #ede8ff; border-color: #c9bbf5; }
+.ve-studio .global-editor-navigation-lock { margin: 0; padding: 7px 18px 11px; border: 0; border-radius: 0; background: transparent; color: var(--studio-muted); font: inherit; font-size: 11px; text-align: left; cursor: pointer; }
+.ve-studio .global-editor-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 0 18px; }
+.ve-studio .global-editor-tabs button { min-height: 40px; font-size: 12px; font-weight: 700; }
+.ve-studio .global-editor-tabs button.active { color: var(--studio-accent); border-color: var(--studio-accent); }
+.ve-studio .global-editor-body { flex: 1 1 auto; min-height: 0; min-width: 0; margin: 0; border: 0; padding: 16px 18px; background: #f6f7fa; }
+.ve-studio .global-editor-body section { gap: 13px; margin-bottom: 12px; padding: 16px; border-color: var(--studio-line); border-radius: 12px; box-shadow: 0 2px 3px #20293803; }
+.ve-studio .global-editor-body section:last-child { margin-bottom: 0; }
+.ve-studio .global-editor-body h3 { color: var(--studio-ink); font-size: 13px; font-weight: 750; }
+.ve-studio .global-editor-body p, .ve-studio .global-editor-body small { font-size: 12px; line-height: 1.55; color: var(--studio-muted); }
+.ve-studio .global-editor-body label { font-size: 12px; font-weight: 650; }
+.ve-studio .global-editor-color-grid { gap: 10px; }
+.ve-studio .global-editor-color-grid label { display: grid; grid-template-columns: minmax(0, 1fr); padding: 0; border: 0; }
+.ve-studio .global-editor-body select, .ve-studio .global-editor-body textarea, .ve-studio .global-editor-body input:not([type="checkbox"]) { min-width: 0; font-size: 12px; font-weight: 500; border-radius: 8px; }
+.ve-studio .global-editor-body input[type="range"] { min-height: 26px; accent-color: var(--studio-accent); }
+.ve-studio .global-editor-body input[aria-invalid="true"] { border-color: #bf3950; }
+.ve-studio .global-editor-reset, .ve-studio .global-editor-secondary-action, .ve-studio .ve-layer-row { min-height: 36px; padding: 8px 10px; border: 1px solid var(--studio-line); border-radius: 8px; background: #fff; color: #4c5570; font: inherit; font-size: 11px; cursor: pointer; }
+.ve-studio .global-editor-delete { font-size: 12px; font-weight: 650; border-radius: 8px; }
+.ve-studio .ve-template-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.ve-studio .ve-template-grid button { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-height: 150px; padding: 12px 9px; border: 1px solid #ded8f2; border-radius: 10px; background: #fcfbff; text-align: left; cursor: pointer; }
+.ve-studio .ve-template-grid button:hover { border-color: var(--studio-accent); background: #f3efff; }
+.ve-studio .ve-template-grid b { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: #ede8ff; color: var(--studio-accent); font-size: 17px; }
+.ve-studio .ve-template-grid strong { color: var(--studio-ink); font-size: 12px; }
+.ve-studio .ve-template-grid small { font-size: 10px; }
+.ve-studio .ve-layer-row { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.ve-studio .ve-notice { padding: 12px; border-radius: 8px; background: #ede8ff; }
+.ve-studio .global-editor-panel > footer { gap: 9px; padding: 14px 18px 16px; box-shadow: 0 -4px 16px #20293805; }
+.ve-studio .global-editor-panel > footer label { grid-template-columns: 1fr; gap: 6px; }
+.ve-studio .global-editor-panel > footer select { width: 100%; min-width: 0; font-size: 12px; }
+.ve-studio .global-editor-panel > footer > div { grid-template-columns: 1fr 1.5fr; }
+.ve-studio .global-editor-panel > footer button { font-size: 12px; font-weight: 700; border-radius: 8px; }
+.ve-studio .global-editor-panel > footer .global-editor-save { background: var(--studio-accent); border-color: var(--studio-accent); }
+.ve-studio .global-editor-panel > footer > small { text-align: left; font-size: 11px; line-height: 1.4; }
+.ve-studio button:disabled, .ve-studio select:disabled { opacity: .48; cursor: default; }
+.ve-studio :is(button, input, select, textarea):focus-visible { outline: 3px solid #9b80ec; outline-offset: 2px; }
+.ve-block-layer .ve-block { min-width: 0; box-sizing: border-box; }
+.ve-block-layer .ve-block-callout { border-left: 4px solid #a58b49; padding: 14px 16px; }
+.ve-block-layer .ve-block-link a { display: block; pointer-events: auto; color: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+
+@media (max-width: 760px) {
+  .ve-studio .global-editor-panel { max-height: calc(100dvh - 16px); height: min(820px, calc(100dvh - 16px)); border-radius: 14px; }
+  .ve-studio .ve-context { padding-top: 9px; padding-bottom: 8px; }
+  .ve-studio .ve-context p { font-size: 11px; margin-top: 5px; }
+  .ve-studio .global-editor-body { padding: 12px; }
+  .ve-studio .global-editor-panel > footer { padding: 10px 14px; }
+}
+@media (max-height: 800px) {
+  .ve-studio .global-editor-panel > header { padding: 10px 18px; }
+  .ve-studio .ve-context { padding: 8px 18px; }
+  .ve-studio .ve-context p { display: none; }
+  .ve-studio .ve-screen-label { margin-top: 5px; }
+  .ve-studio .ve-command-bar { padding-top: 7px; padding-bottom: 4px; }
+  .ve-studio .global-editor-navigation-lock { padding-top: 4px; padding-bottom: 6px; }
+  .ve-studio .global-editor-panel > footer { gap: 6px; padding: 10px 18px; }
+  .ve-studio .ve-template-grid button { min-height: 120px; }
+}
+@media (max-height: 650px) {
+  .ve-studio .ve-context p, .ve-studio .ve-screen-label, .ve-studio .global-editor-navigation-lock { display: none; }
+  .ve-studio .ve-context, .ve-studio .global-editor-panel > header { padding-top: 8px; padding-bottom: 8px; }
+  .ve-studio .global-editor-panel > footer { padding-top: 8px; padding-bottom: 8px; }
+}

@@ -1,5 +1,7 @@
 "use client";
 
+import TransientFeedback from "./TransientFeedback";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTransientMessage } from "../lib/use-transient-message";
 
@@ -111,12 +113,12 @@ export default function PlatformOptimizerWorkspace() {
   }
 
   if (loadError && !status) {
-    return <section className="platform-optimizer"><p className="operations-feedback error" role="alert">{loadError}</p><button type="button" onClick={() => void load()}>Tentar novamente</button></section>;
+    return <section className="platform-optimizer"><TransientFeedback className="operations-feedback error" role="alert">{loadError}</TransientFeedback><button type="button" onClick={() => void load()}>Tentar novamente</button></section>;
   }
 
   return (
     <section className="platform-optimizer" aria-labelledby="optimizer-title">
-      {loadError && <p className="operations-feedback error" role="alert">{loadError}</p>}
+      {loadError && <TransientFeedback className="operations-feedback error" role="alert">{loadError}</TransientFeedback>}
       <header className="platform-optimizer-heading">
         <div>
           <p className="pilot-kicker">MANUTENÇÃO SEGURA</p>

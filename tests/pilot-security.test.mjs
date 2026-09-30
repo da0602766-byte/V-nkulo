@@ -113,7 +113,9 @@ test("governança V4.7.2 mantém exclusões protegidas, conta neutra e temas iso
   assert.match(themeRoute, /community_theme:/);
   assert.match(themeRoute, /community\.theme\.manage/);
   assert.match(dashboard, /searchParams\.set\("view"/);
-  assert.match(editor, /Excluir deste layout/);
+  assert.match(editor, /Ocultar neste alcance/);
+  assert.match(editor, /updateRule\(selectedKey,\s*\{\s*hiddenDesktop:\s*true,\s*hiddenMobile:\s*true/);
+  assert.match(editor, /Oculta apenas a apresentação\. Dados e permissões do aplicativo permanecem iguais\./);
   assert.match(editor, /hiddenDesktop:\s*true/);
   assert.match(editor, /hiddenMobile:\s*true/);
 });
@@ -322,7 +324,11 @@ test("páginas, temas e responsividade do VÍNKULO permanecem explícitos", asyn
   assert.match(visualEditor, /setPointerCapture/);
   assert.match(visualEditor, /aria-label="Minimizar editor"/);
   assert.match(visualEditor, /aria-label="Restaurar editor"/);
-  assert.match(visualEditor, /Caixa de texto livre/);
+  assert.match(visualEditor, /Inserir blocos/);
+  assert.match(visualEditor, /onClick=\{\(\) => addTextBox\("text"\)\}[\s\S]*?<strong>Texto<\/strong>/);
+  assert.match(visualEditor, /onClick=\{\(\) => addTextBox\("callout"\)\}[\s\S]*?<strong>Aviso<\/strong>/);
+  assert.match(visualEditor, /onClick=\{\(\) => addTextBox\("link"\)\}[\s\S]*?<strong>Link<\/strong>/);
+  assert.match(visualEditor, /const textBox: VisualTextBox = \{[\s\S]*?screen: screenId/);
   assert.match(visualEditor, /event\.key !== "Delete"/);
   assert.match(visualEditor, /createPortal\(pencilButton/);
   assert.match(styles, /\.global-editor-panel\.is-minimized/);
@@ -394,7 +400,11 @@ test("Ministérios, Diaconia, uploads e Aparência mantêm os novos bloqueios", 
   assert.match(diaconia, /Somente leitura/);
   assert.doesNotMatch(diaconia, /function updateItem/);
   assert.match(editor, /navigationLocked/);
-  assert.match(editor, /Restaurar todas as cores/);
+  assert.match(editor, /onClick=\{resetAllColors\}\s*>\s*Restaurar paleta/);
+  assert.match(editor, /function resetAllColors\(\)\s*\{\s*updateAppearance\(\{ accentColor: DEFAULT_GLOBAL_VISUAL_CONFIG\.accentColor, surfaceColor: "" \}\)/);
+  assert.match(editor, /changeConfig\(target === "global" \? \{ \.\.\.current, \.\.\.patch \} : \{/);
+  assert.match(editor, /onClick=\{resetSelectedAppearance\}\s*>\s*Restaurar todos os ajustes do elemento/);
+  assert.match(editor, /setVisualRules\(configRef\.current, screen, \{ \.\.\.rules, \[selectedKey\]: \{\} \}\)/);
   assert.match(editor, /background-color:/);
   assert.match(upload, /saveImageOutsidePlatform/);
   const mediaUpload = await readFile(

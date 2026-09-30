@@ -1,8 +1,7 @@
 import { getD1 } from "../../../../db";
 import {
-  DEFAULT_GLOBAL_VISUAL_CONFIG,
+  mergeVisualConfigs as mergeConfigs,
   parseGlobalVisualConfig,
-  type GlobalVisualConfig,
 } from "../../../lib/global-visual-editor";
 import { getSessionUser } from "../../../lib/local-auth";
 import { recordTenantAudit } from "../../../lib/tenant-audit";
@@ -18,31 +17,6 @@ function parseJson(value?: string | null) {
   } catch {
     return {};
   }
-}
-
-function mergeConfigs(
-  ...configs: Array<GlobalVisualConfig | null>
-): GlobalVisualConfig {
-  let merged = DEFAULT_GLOBAL_VISUAL_CONFIG;
-  for (const config of configs) {
-    if (!config) continue;
-    merged = {
-      ...merged,
-      ...config,
-      rules: { ...merged.rules, ...config.rules },
-      textBoxes: mergeTextBoxes(merged.textBoxes, config.textBoxes),
-    };
-  }
-  return parseGlobalVisualConfig(merged);
-}
-
-function mergeTextBoxes(
-  current: GlobalVisualConfig["textBoxes"],
-  incoming: GlobalVisualConfig["textBoxes"],
-) {
-  const byId = new Map(current.map((item) => [item.id, item]));
-  for (const item of incoming) byId.set(item.id, item);
-  return Array.from(byId.values());
 }
 
 async function readLayout(
@@ -63,6 +37,10 @@ async function readLayout(
 }
 
 export async function GET(request: Request) {
+  const audience = new URL(request.url).searchParams.get("audience") || "PERSONAL";
+  if (!["PERSONAL", "COMMUNITY", "PLATFORM"].includes(audience)) {
+    return Response.json({ error: "Público inválido." }, { status: 400 });
+  }
   const publicSurface =
     new URL(request.url).searchParams.get("surface") === "public";
   const db = getD1();
@@ -100,7 +78,7 @@ export async function GET(request: Request) {
     `visual:user:${access.user.id}`,
   );
   return Response.json({
-    config: mergeConfigs(platform, community, personal),
+    config: mergeConfigs(platform, audience === "PLATFORM" ? null : community, audience === "PERSONAL" ? personal : null),
     canEdit:
       access.context.isOwner &&
       access.context.communityAccess === "OWNER",
@@ -127,6 +105,9 @@ export async function PATCH(request: Request) {
       surface?: string;
     };
   } catch {
+    return Response.json({ error: "Configuração inválida." }, { status: 400 });
+  }
+  if (!body || typeof body !== "object" || !body.config || typeof body.config !== "object" || Array.isArray(body.config)) {
     return Response.json({ error: "Configuração inválida." }, { status: 400 });
   }
   const publicSurface = body.surface === "public";

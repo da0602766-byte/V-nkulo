@@ -1,5 +1,7 @@
 "use client";
 
+import TransientFeedback from "./TransientFeedback";
+
 import { FormEvent, useEffect, useState } from "react";
 import NativeImageUpload from "./NativeImageUpload";
 import StoragePrivacyWorkspace from "./StoragePrivacyWorkspace";
@@ -185,7 +187,7 @@ export default function AccountProfileWorkspace({
             )) : <p className="account-profile-empty">Nenhum campo complementar foi solicitado.</p>}
           </div>
         </details>
-        {message && <p className="operations-feedback" role="status">{message}</p>}
+        {message && <TransientFeedback className="operations-feedback" role="status">{message}</TransientFeedback>}
         <button className="account-profile-submit" type="submit" disabled={saving}>
           {saving ? "Salvando…" : "Salvar minha conta"}
         </button>

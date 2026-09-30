@@ -1,5 +1,7 @@
 "use client";
 
+import TransientFeedback from "./TransientFeedback";
+
 import { useEffect, useState } from "react";
 import GoogleStatusToast, { type GoogleToastState } from "./GoogleStatusToast";
 
@@ -272,7 +274,7 @@ export default function StoragePrivacyWorkspace() {
         <li>Conteúdo antigo de fotos e arquivos só será apagado da plataforma depois da migração confirmada.</li>
         <li>Mensagens privadas não entram nessa migração: ficam só no sistema e são apagadas por completo toda semana, sem exceção.</li>
       </ul>
-      {message && <p className="operations-feedback" role="status">{message}</p>}
+      {message && <TransientFeedback className="operations-feedback" role="status">{message}</TransientFeedback>}
 
       <GoogleStatusToast state={googleToast} onDismiss={() => setGoogleToast(null)} />
     </section>

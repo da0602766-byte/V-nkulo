@@ -1,5 +1,7 @@
 "use client";
 
+import TransientFeedback from "./TransientFeedback";
+
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import VerifiedOwnerName from "./VerifiedOwnerName";
 
@@ -411,9 +413,9 @@ export default function PeopleWorkspace({
       </div>
 
       {(message || error) && (
-        <p className={`operations-feedback ${error ? "error" : ""}`} role="status">
+        <TransientFeedback className={`operations-feedback ${error ? "error" : ""}`} role="status">
           {error || message}
-        </p>
+        </TransientFeedback>
       )}
 
       <div className="people-toolbar">
@@ -766,9 +768,9 @@ function SelfProfile({
             {saving ? "Salvando…" : "Salvar meus dados"}
           </button>
           {(message || error) && (
-            <p className={`operations-feedback ${error ? "error" : ""}`} role="status">
+            <TransientFeedback className={`operations-feedback ${error ? "error" : ""}`} role="status">
               {error || message}
-            </p>
+            </TransientFeedback>
           )}
         </form>
       </div>
