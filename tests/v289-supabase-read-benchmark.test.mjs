@@ -90,6 +90,6 @@ test("consultas independentes do contexto de acesso rodam juntas sem mudar a ord
   const block = source.slice(source.indexOf("export async function getActiveTenantContext"), source.indexOf("async function getCommunityModules"));
   assert.match(block, /Promise\.all\(\[\s*getDiaconiaPermissions[\s\S]*getNetworkPermissions[\s\S]*getActiveParkingAssignment[\s\S]*getParkingLeaderPermissions/);
   assert.match(block, /for \(const permission of diaconiaPermissions\)[\s\S]*for \(const permission of networkPermissions\)[\s\S]*if \(parkingAssignment\)[\s\S]*for \(const permission of parkingLeaderPermissions\)/);
-  assert.match(block, /const temporaryGrant[\s\S]*const configuredModules = await getCommunityModules/);
+  assert.match(block, /const \[subscription, configuredModules\] = await Promise\.all\(\[\s*getSubscription\(membership\.comunidadeId\),\s*getCommunityModules\(membership\.comunidadeId\)/);
   assert.match(block, /filterPlanPermissions/);
 });

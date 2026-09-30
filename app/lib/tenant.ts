@@ -290,8 +290,12 @@ export async function getActiveTenantContext(
     permissions.push("community.lifecycle.review");
   }
 
-  const subscription = await getSubscription(membership.comunidadeId);
-  const configuredModules = await getCommunityModules(membership.comunidadeId);
+  // Both reads use the selected community and neither depends on the other.
+  // Run them together to avoid adding a full D1 round trip to access checks.
+  const [subscription, configuredModules] = await Promise.all([
+    getSubscription(membership.comunidadeId),
+    getCommunityModules(membership.comunidadeId),
+  ]);
   const modules = subscription ? configuredModules.filter(key => subscription.active && subscription.plan.modulos.includes(key)) : configuredModules;
   permissions = filterPermissionsForCommunityModules(permissions, modules);
   permissions = filterPlanPermissions(permissions, subscription?.plan || null, subscription?.active ?? true);
