@@ -162,6 +162,7 @@ test("Auth é vinculado após CPF válido, recupera interrupção e preserva o l
 
 test("SQL Auth exige identidade confirmada, metadados confiáveis e bloqueia limpeza com contas criadas", async () => {
   const sql = await readFile(new URL("../supabase/migrations/0010_auth_profile_link.sql", import.meta.url), "utf8");
+  const typeFix = await readFile(new URL("../supabase/migrations/0011_auth_link_state_type_cast.sql", import.meta.url), "utf8");
   assert.match(sql, /email_confirmed_at is null/);
   assert.match(sql, /raw_app_meta_data->>'vinkulo_legacy_d1_id' is distinct from legacy_user_id::text/);
   assert.match(sql, /auth\.users u where u\.raw_app_meta_data \? 'vinkulo_legacy_d1_id'/);
@@ -169,4 +170,6 @@ test("SQL Auth exige identidade confirmada, metadados confiáveis e bloqueia lim
   assert.match(sql, /linked auth email mismatch/);
   assert.match(sql, /revoke select on public\.vinkulo_tenants, public\.vinkulo_profiles/);
   assert.match(sql, /drop policy if exists vinkulo_memberships_read_self_or_owner/);
+  assert.match(typeFix, /select c\.email::text from candidates/);
+  assert.match(typeFix, /grant execute on function public\.vinkulo_auth_link_state\(bigint\) to service_role/);
 });
