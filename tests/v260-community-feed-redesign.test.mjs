@@ -31,7 +31,8 @@ test("reações são persistentes, limitadas a tipos aceitos e isoladas por comu
   const migration = read("drizzle/0076_feed_reactions.sql");
   assert.match(route, /requireTenantPermission\("feed\.view"\)/);
   assert.match(route, /comunidade_id = \?/);
-  assert.match(route, /INSERT OR IGNORE INTO reacoes_publicacao/);
+  assert.match(route, /INSERT INTO reacoes_publicacao/);
+  assert.match(route, /await db.batch/);
   assert.match(route, /DELETE FROM reacoes_publicacao/);
   assert.match(route, /const TYPES = \["AMEM", "CORACAO", "ORACAO", "ALEGRIA"\]/);
   assert.match(migration, /CREATE UNIQUE INDEX `reacoes_publicacao_unica_idx`/);

@@ -24,11 +24,13 @@ async function responseFor(postId: number, userId: number) {
   const db = getD1();
   const [countResult, ownResult] = await Promise.all([
     db.prepare(
-      `SELECT tipo, COUNT(*) AS total FROM reacoes_publicacao
-       WHERE publicacao_id = ? GROUP BY tipo`,
+      `SELECT tipo, COUNT(*) AS total FROM reacoes_publicacao r
+       WHERE publicacao_id = ? AND r.id = (SELECT MAX(latest.id) FROM reacoes_publicacao latest
+         WHERE latest.publicacao_id = r.publicacao_id AND latest.usuario_id = r.usuario_id)
+       GROUP BY tipo`,
     ).bind(postId).all<{ tipo: ReactionType; total: number }>(),
     db.prepare(
-      `SELECT tipo FROM reacoes_publicacao WHERE publicacao_id = ? AND usuario_id = ?`,
+      `SELECT tipo FROM reacoes_publicacao WHERE publicacao_id = ? AND usuario_id = ? ORDER BY id DESC LIMIT 1`,
     ).bind(postId, userId).all<{ tipo: ReactionType }>(),
   ]);
   const contagens = Object.fromEntries(TYPES.map((type) => [type, 0])) as Record<ReactionType, number>;
@@ -49,15 +51,20 @@ async function toggle(request: Request, routeContext: Context, adding: boolean) 
   if (!context) return Response.json({ error: "Publicação não encontrada." }, { status: 404 });
   const db = getD1();
   if (adding) {
-    await db.prepare(
-      `INSERT OR IGNORE INTO reacoes_publicacao (publicacao_id, usuario_id, tipo)
-       VALUES (?, ?, ?)`,
-    ).bind(postId, context.user.id, type).run();
+    // D1 executes the batch as one transaction: competing choices cannot
+    // leave two reactions. Replace legacy multi-selection rows for this user.
+    await db.batch([
+      db.prepare(`DELETE FROM reacoes_publicacao WHERE publicacao_id = ? AND usuario_id = ?`)
+        .bind(postId, context.user.id),
+      db.prepare(`INSERT INTO reacoes_publicacao (publicacao_id, usuario_id, tipo) VALUES (?, ?, ?)`)
+        .bind(postId, context.user.id, type),
+    ]);
   } else {
     await db.prepare(
       `DELETE FROM reacoes_publicacao
-       WHERE publicacao_id = ? AND usuario_id = ? AND tipo = ?`,
-    ).bind(postId, context.user.id, type).run();
+       WHERE publicacao_id = ? AND usuario_id = ?
+         AND ? = (SELECT tipo FROM reacoes_publicacao WHERE publicacao_id = ? AND usuario_id = ? ORDER BY id DESC LIMIT 1)`,
+    ).bind(postId, context.user.id, type, postId, context.user.id).run();
   }
   return responseFor(postId, context.user.id);
 }

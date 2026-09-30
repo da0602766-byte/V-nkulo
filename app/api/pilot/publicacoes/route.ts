@@ -47,11 +47,12 @@ export async function GET(request: Request) {
       (SELECT COUNT(*) FROM comentarios_publicacao cp
        WHERE cp.publicacao_id = p.id AND cp.status = 'PUBLICADO') AS total_comentarios,
       COALESCE((SELECT json_group_object(tipo, total) FROM (
-        SELECT tipo, COUNT(*) AS total FROM reacoes_publicacao
-        WHERE publicacao_id = p.id GROUP BY tipo
+        SELECT tipo, COUNT(*) AS total FROM reacoes_publicacao r
+        WHERE publicacao_id = p.id AND r.id = (SELECT MAX(latest.id) FROM reacoes_publicacao latest
+          WHERE latest.publicacao_id = r.publicacao_id AND latest.usuario_id = r.usuario_id) GROUP BY tipo
       )), '{}') AS reacoes_json,
-      COALESCE((SELECT json_group_array(tipo) FROM reacoes_publicacao
-        WHERE publicacao_id = p.id AND usuario_id = ?), '[]') AS minhas_reacoes_json,
+      COALESCE((SELECT json_group_array(tipo) FROM (SELECT tipo FROM reacoes_publicacao
+        WHERE publicacao_id = p.id AND usuario_id = ? ORDER BY id DESC LIMIT 1)), '[]') AS minhas_reacoes_json,
       CASE WHEN p.criado_por = ? THEN 1 ELSE 0 END AS can_edit,
       CASE WHEN p.criado_por = ? OR ? = 1 THEN 1 ELSE 0 END AS can_hide,
       CASE WHEN p.criado_por = ? OR ? = 1 THEN 1 ELSE 0 END AS can_delete

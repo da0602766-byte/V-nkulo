@@ -18,7 +18,7 @@ function parseTypes(value?: string) {
   try {
     const parsed = JSON.parse(value || "[]");
     return Array.isArray(parsed)
-      ? parsed.filter((item): item is ReactionType => REACTIONS.some((reaction) => reaction.type === item))
+      ? parsed.filter((item): item is ReactionType => REACTIONS.some((reaction) => reaction.type === item)).slice(-1)
       : [];
   } catch {
     return [];
@@ -104,16 +104,13 @@ export default function CommunityPostReactions({
     const previousMine = new Set(mine);
     const previousCounts = { ...counts };
     setWorking(type);
-    setMine((current) => {
-      const next = new Set(current);
-      if (hadReaction) next.delete(type);
-      else next.add(type);
+    setMine(hadReaction ? new Set() : new Set([type]));
+    setCounts((current) => {
+      const next = { ...current };
+      for (const previous of mine) next[previous] = Math.max(0, (next[previous] || 0) - 1);
+      if (!hadReaction) next[type] = (next[type] || 0) + 1;
       return next;
     });
-    setCounts((current) => ({
-      ...current,
-      [type]: Math.max(0, (current[type] || 0) + (hadReaction ? -1 : 1)),
-    }));
     try {
       const response = await fetch(`/api/pilot/publicacoes/${postId}/reacoes`, {
         method: hadReaction ? "DELETE" : "POST",
@@ -123,7 +120,7 @@ export default function CommunityPostReactions({
       const payload = await response.json() as { error?: string; contagens?: Record<ReactionType, number>; minhas?: ReactionType[] };
       if (!response.ok) throw new Error(payload.error || "Não foi possível registrar a reação.");
       if (payload.contagens) setCounts(payload.contagens);
-      if (payload.minhas) setMine(new Set(payload.minhas));
+      if (payload.minhas) setMine(new Set(payload.minhas.slice(-1)));
       const label = REACTIONS.find((reaction) => reaction.type === type)?.label;
       setAnnouncement(`${label}: reação ${hadReaction ? "removida" : "adicionada"}.`);
       const restoreFocus = pickerRef.current?.contains(document.activeElement);
@@ -182,7 +179,7 @@ export default function CommunityPostReactions({
           <strong id={`${pickerId}-title`}>Um gesto de carinho</strong>
           <button type="button" className="feed-reaction-close" aria-label="Fechar reações" onClick={() => { setPickerOpen(false); triggerRef.current?.focus({ preventScroll: true }); }}>×</button>
         </div>
-        <span id={`${pickerId}-hint`} className="feed-interaction-sr-only">Escolha uma ou mais reações. Toque novamente para remover.</span>
+        <span id={`${pickerId}-hint`} className="feed-interaction-sr-only">Escolha uma reação. Outra escolha substitui a anterior. Toque na selecionada para remover.</span>
         <div className="feed-reaction-options" role="group" aria-label="Reações" aria-busy={working !== null} onKeyDown={(event) => {
           const keys = ["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp", "Home", "End"];
           if (!keys.includes(event.key)) return;

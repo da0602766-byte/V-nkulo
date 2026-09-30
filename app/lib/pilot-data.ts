@@ -263,11 +263,12 @@ export async function getPilotFeed(
         CASE WHEN criado_por = ? OR ? = 1 THEN 1 ELSE 0 END AS can_hide,
         CASE WHEN criado_por = ? OR ? = 1 THEN 1 ELSE 0 END AS can_delete,
         COALESCE((SELECT json_group_object(tipo, total) FROM (
-          SELECT tipo, COUNT(*) AS total FROM reacoes_publicacao
-          WHERE publicacao_id = publicacoes_piloto.id GROUP BY tipo
+          SELECT tipo, COUNT(*) AS total FROM reacoes_publicacao r
+          WHERE publicacao_id = publicacoes_piloto.id AND r.id = (SELECT MAX(latest.id) FROM reacoes_publicacao latest
+            WHERE latest.publicacao_id = r.publicacao_id AND latest.usuario_id = r.usuario_id) GROUP BY tipo
         )), '{}') AS reacoes_json,
-        COALESCE((SELECT json_group_array(tipo) FROM reacoes_publicacao
-          WHERE publicacao_id = publicacoes_piloto.id AND usuario_id = ?), '[]') AS minhas_reacoes_json
+        COALESCE((SELECT json_group_array(tipo) FROM (SELECT tipo FROM reacoes_publicacao
+          WHERE publicacao_id = publicacoes_piloto.id AND usuario_id = ? ORDER BY id DESC LIMIT 1)), '[]') AS minhas_reacoes_json
       FROM publicacoes_piloto
         WHERE comunidade_id = ? AND status = 'PUBLICADA' AND canal_feed = 1
           AND (audiencia_tipo <> 'MINISTERIOS' OR ? = 1 OR EXISTS (

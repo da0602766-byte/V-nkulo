@@ -33,8 +33,9 @@ async function fixture(t) {
   const dependencies = {
     "../../../../db": { getD1: () => d1 },
     "../../../../../db": { getD1: () => d1 },
+    "../../../../../../db": { getD1: () => d1 },
   };
-  for (const prefix of ["../../../lib/", "../../../../lib/"]) {
+  for (const prefix of ["../../../lib/", "../../../../lib/", "../../../../../lib/"]) {
     Object.assign(dependencies, {
       [`${prefix}tenant`]: { requireTenantPermission: async (permission) => { assert.equal(permission, "feed.view"); return access; } },
       [`${prefix}tenant-audit`]: { recordTenantAudit: async (...args) => audit.push(args) },
@@ -47,6 +48,7 @@ async function fixture(t) {
   }
   const list = compile("app/api/pilot/publicacoes/route.ts", dependencies);
   const item = compile("app/api/pilot/publicacoes/[id]/route.ts", dependencies);
+  const reactions = compile("app/api/pilot/publicacoes/[id]/reacoes/route.ts", dependencies);
   const initial = compile("app/lib/pilot-data.ts", { "../../db": { getD1: () => d1 }, "./community-theme": {} });
   function as(userId, { tenant = 1, moderate = false, owner = false, publish = false } = {}) {
     access = { user: { id: userId, system_owner: owner }, context: { comunidadeId: tenant, permissions: ["feed.view", ...(moderate ? ["feed.moderate"] : []), ...(publish ? ["feed.publish"] : [])] } };
@@ -58,6 +60,9 @@ async function fixture(t) {
       .run(tenant, status, creator, feed, sidebar).lastInsertRowid);
   }
   return { database, author, member, moderator, audit, as, post,
+    react: (id, type, method = "POST") => reactions[method](new Request(`http://localhost/api/pilot/publicacoes/${id}/reacoes`, {
+      method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tipo: type }),
+    }), { params: Promise.resolve({ id: String(id) }) }),
     deny: () => { access = { error: Response.json({ error: "Sessão inválida" }, { status: 401 }) }; },
     get: async (query = "limit=20") => list.GET(new Request(`http://localhost/api/pilot/publicacoes?${query}`)),
     initial: () => initial.getPilotFeed(access.context.comunidadeId, access.user.id, access.context.permissions.includes("feed.moderate"), access.user.system_owner),
@@ -142,15 +147,56 @@ test("feed: initial render restores persisted counts and only the current user's
   insert.run(id, f.author, "CORACAO");
   insert.run(id, f.member, "CORACAO");
   insert.run(id, f.member, "AMEM");
-  for (const [user, expected] of [[f.author, ["CORACAO"]], [f.member, ["AMEM", "CORACAO"]], [f.moderator, []]]) {
+  for (const [user, expected] of [[f.author, ["CORACAO"]], [f.member, ["AMEM"]], [f.moderator, []]]) {
     f.as(user);
     const ssr = (await f.initial()).find((post) => post.id === id);
     const api = (await (await f.get()).json()).publicacoes.find((post) => post.id === id);
-    assert.deepEqual(JSON.parse(ssr.reacoes_json), { AMEM: 1, CORACAO: 2 });
+    assert.deepEqual(JSON.parse(ssr.reacoes_json), { AMEM: 1, CORACAO: 1 });
     assert.deepEqual(JSON.parse(ssr.minhas_reacoes_json).sort(), expected);
     assert.deepEqual(JSON.parse(ssr.reacoes_json), JSON.parse(api.reacoes_json));
     assert.deepEqual(JSON.parse(ssr.minhas_reacoes_json).sort(), JSON.parse(api.minhas_reacoes_json).sort());
   }
+});
+
+test("reactions: replacing, retrying and removing retain one choice per user and preserve others", async (t) => {
+  const f = await fixture(t);
+  const id = f.post();
+  f.as(f.author);
+  await f.react(id, "AMEM");
+  f.as(f.member);
+  await f.react(id, "AMEM");
+  for (const type of ["CORACAO", "ORACAO", "ALEGRIA", "ALEGRIA"]) {
+    const response = await f.react(id, type);
+    assert.equal(response.status, 200);
+    const result = await response.json();
+    assert.deepEqual(result.minhas, [type]);
+    assert.equal(Object.values(result.contagens).reduce((sum, n) => sum + n, 0), 2);
+    assert.equal(f.database.prepare("SELECT COUNT(*) n FROM reacoes_publicacao WHERE publicacao_id = ? AND usuario_id = ?").get(id, f.member).n, 1);
+  }
+  await f.react(id, "AMEM", "DELETE"); // stale removal must not erase a newer selection
+  assert.deepEqual((await (await f.react(id, "ALEGRIA")).json()).minhas, ["ALEGRIA"]);
+  const removed = await (await f.react(id, "ALEGRIA", "DELETE")).json();
+  assert.deepEqual(removed.minhas, []);
+  assert.equal(removed.contagens.AMEM, 1);
+  const foreign = f.post({ tenant: 2 });
+  assert.equal((await f.react(foreign, "AMEM")).status, 404);
+  assert.equal((await f.react(id, "invalid")).status, 400);
+  f.deny();
+  assert.equal((await f.react(id, "AMEM")).status, 401);
+});
+
+test("reactions: legacy multi-selection is counted once and cleared atomically on next choice", async (t) => {
+  const f = await fixture(t);
+  const id = f.post();
+  f.as(f.member);
+  for (const type of ["AMEM", "CORACAO", "ORACAO"]) f.database.prepare("INSERT INTO reacoes_publicacao (publicacao_id,usuario_id,tipo) VALUES (?,?,?)").run(id, f.member, type);
+  const removed = await (await f.react(id, "ORACAO", "DELETE")).json();
+  assert.deepEqual(removed.minhas, []);
+  assert.equal(f.database.prepare("SELECT COUNT(*) n FROM reacoes_publicacao WHERE publicacao_id=?").get(id).n, 0);
+  await f.react(id, "CORACAO");
+  f.database.exec("CREATE TRIGGER fail_reaction BEFORE INSERT ON reacoes_publicacao WHEN NEW.tipo = 'ALEGRIA' BEGIN SELECT RAISE(ABORT, 'test write failure'); END");
+  await assert.rejects(f.react(id, "ALEGRIA"), /test write failure/);
+  assert.equal(f.database.prepare("SELECT tipo FROM reacoes_publicacao WHERE publicacao_id=?").get(id).tipo, "CORACAO", "failed replacement rolls back deletion");
 });
 
 test("feed: paginated and sidebar listings preserve per-post delete authorization", async (t) => {
@@ -228,6 +274,24 @@ test("reactions: optimistic toggle guards double clicks, rolls back failures and
   tree = f.render(props);
   assert.equal(amem().props["aria-pressed"], false);
   assert.match(find((node) => node.props?.role === "status").props.children, /removida/);
+});
+
+test("reactions: optimistic replacement changes only the choice, not the user's total", async () => {
+  let respond;
+  const f = harness("app/components/CommunityPostReactions.tsx", { fetch: () => new Promise((resolve) => { respond = resolve; }) });
+  const props = { postId: 10, initialCounts: '{"AMEM":2,"CORACAO":3}', initialMine: '["AMEM"]' };
+  let tree = f.render(props);
+  const choice = (type) => nodes(tree).find((node) => node.props?.["data-reaction"] === type);
+  choice("CORACAO").props.onClick();
+  tree = f.render(props);
+  assert.equal(choice("AMEM").props["aria-pressed"], false);
+  assert.equal(choice("CORACAO").props["aria-pressed"], true);
+  assert.match(nodes(tree).find((node) => node.props?.role === "img").props["aria-label"], /5 reações: Amém: 1, Amei: 4/);
+  respond(Response.json({ error: "Falha" }, { status: 503 }));
+  await settle();
+  tree = f.render(props);
+  assert.equal(choice("AMEM").props["aria-pressed"], true);
+  assert.equal(choice("CORACAO").props["aria-pressed"], false);
 });
 
 test("presence: actions are adjacent to the selected person and use refreshed message permission", () => {
