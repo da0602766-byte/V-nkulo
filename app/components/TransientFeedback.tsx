@@ -4,6 +4,7 @@ import { Children, isValidElement, useEffect, useId, useRef, useState, useSyncEx
 import { createPortal } from "react-dom";
 import { createFeedbackStore, type FeedbackEntry, type FeedbackTone } from "../lib/transient-feedback-store";
 import "../transient-feedback.css";
+import useFeedbackPosition from "./useFeedbackPosition";
 
 const store = createFeedbackStore<ReactNode>();
 const empty: FeedbackEntry<ReactNode>[] = [];
@@ -15,7 +16,7 @@ function describe(children: ReactNode): { text: string; actions: number } {
   Children.forEach(children, child => {
     if (typeof child === "string" || typeof child === "number") text += ` ${child}`;
     else if (isValidElement<{ children?: ReactNode }>(child)) {
-      if (child.type === "button") actions += 1;
+      if (child.type === "button" || child.type === "a") actions += 1;
       else { const nested = describe(child.props.children); text += nested.text; actions += nested.actions; }
     }
   });
@@ -23,15 +24,15 @@ function describe(children: ReactNode): { text: string; actions: number } {
 }
 
 /** Declarative replacement for an inline operational notice. Callbacks remain React-owned. */
-export default function TransientFeedback({ children, className = "", role, tone }: HTMLAttributes<HTMLDivElement> & { tone?: FeedbackTone }) {
+export default function TransientFeedback({ children, className = "", role, tone, onDismiss, durationMs, noticeKey = "" }: HTMLAttributes<HTMLDivElement> & { tone?: FeedbackTone; onDismiss?: () => void; durationMs?: number; noticeKey?: string }) {
   const id = useId();
   useEffect(() => {
     const description = describe(children);
     if (!description.text) { store.remove(id); return; }
     const kind = tone ?? (/error|erro|danger/.test(className) || role === "alert" ? "error" : "info");
-    store.publish({ id, content: children, tone: kind, actions: description.actions,
-      fingerprint: `${kind}:${description.text}` });
-  }, [children, className, id, role, tone]);
+    store.publish({ id, content: children, tone: kind, actions: description.actions, onDismiss, durationMs,
+      fingerprint: `${kind}:${noticeKey}:${description.text}` });
+  }, [children, className, id, role, tone, onDismiss, durationMs, noticeKey]);
   useEffect(() => () => store.remove(id), [id]);
   return null;
 }
@@ -41,7 +42,7 @@ function ToastCard({ entry, history = false }: { entry: FeedbackEntry<ReactNode>
   const [focused, setFocused] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const card = useRef<HTMLDivElement>(null);
-  const duration = entry.tone === "error" || entry.actions ? 9000 : 5500;
+  const duration = entry.durationMs ?? (entry.tone === "error" || entry.actions ? 9000 : 5500);
   const paused = hovered || focused;
   useEffect(() => {
     if (history || paused) return;
@@ -68,6 +69,7 @@ export function TransientFeedbackViewport() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const historyButton = useRef<HTMLButtonElement>(null);
   const region = useRef<HTMLElement>(null);
+  useFeedbackPosition(region);
   useEffect(() => {
     if (!historyOpen) return;
     const outside = (event: PointerEvent) => { if (event.target instanceof Node && !region.current?.contains(event.target)) setHistoryOpen(false); };

@@ -1,4 +1,6 @@
 "use client";
+import SafeImage from "./SafeImage";
+
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import VerifiedOwnerName from "./VerifiedOwnerName";
@@ -165,8 +167,7 @@ export default function CommunityPresencePanel() {
             >
               <span className="presence-avatar" aria-hidden="true">
                 {person.avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img loading="lazy" src={person.avatarUrl} alt="" />
+                  <SafeImage loading="lazy" fallbackName={person.name} fallbackKind="avatar" src={person.avatarUrl} alt="" />
                 ) : (
                   initials(person.name)
                 )}

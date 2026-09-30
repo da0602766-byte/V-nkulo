@@ -1,3 +1,4 @@
+import SafeImage from "./SafeImage";
 import Link from "./StableLink";
 import { getSessionUser } from "../lib/local-auth";
 import CreateCommunityShortcut from "./CreateCommunityShortcut";
@@ -29,7 +30,7 @@ export default async function PublicMobileNav({
         loadingLabel={user?.system_owner ? "Abrindo a Área do proprietário…" : "Abrindo seu painel…"}
       >
         <span className="public-mobile-profile-avatar" aria-hidden="true">
-          {user?.foto_perfil ? <img loading="lazy" src={user.foto_perfil} alt="" /> : user ? initials : <PublicIcon name="user" size={18} />}
+          {user?.foto_perfil ? <SafeImage loading="lazy" fallbackName={user.nome} fallbackKind="avatar" src={user.foto_perfil} alt="" /> : user ? initials : <PublicIcon name="user" size={18} />}
         </span>
         {user?.system_owner ? "Proprietário ✓" : user ? "Meu perfil" : "Entrar"}
       </Link>

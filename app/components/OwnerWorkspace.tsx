@@ -1,4 +1,6 @@
 "use client";
+import SafeImage from "./SafeImage";
+
 
 import TransientFeedback from "./TransientFeedback";
 
@@ -640,7 +642,7 @@ function FeedbackRepository({
           <summary><span className={`owner-feedback-type type-${String(item.tipo).toLowerCase()}`}>{String(item.tipo) === "PROBLEMA" ? "!" : String(item.tipo) === "SUGESTAO" ? "✦" : String(item.tipo) === "MELHORIA" ? "↗" : "⚑"}</span><div><small>{humanize(String(item.tipo))} · {humanize(String(item.categoria))}</small><strong>{String(item.usuario_nome || "Usuário")}</strong><p>{String(item.mensagem || "")}</p></div><b>{humanize(currentStatus)}</b><i aria-hidden="true">⌄</i></summary>
           <div className="owner-feedback-detail">
             <dl><div><dt>Usuário</dt><dd>{String(item.usuario_nome || "—")}<small>{String(item.usuario_email || "")}</small></dd></div><div><dt>Origem</dt><dd>{String(item.comunidade_nome || "Plataforma")}<small>{String(item.pagina || "/")}</small></dd></div><div><dt>Enviado</dt><dd>{formatDate(String(item.criado_em || ""))}</dd></div>{Number(item.entidade_id || 0) > 0 ? <div><dt>Publicação denunciada</dt><dd><button type="button" className="owner-reported-post-link" onClick={() => void onOpenPost(Number(item.comunidade_id || 0), Number(item.entidade_id))}>Abrir somente a publicação #{Number(item.entidade_id)} →</button></dd></div> : null}</dl>
-            <article><h3>Mensagem</h3><p>{String(item.mensagem || "")}</p>{hasImage && <a href={`/api/feedback/${id}/imagem`} target="_blank" rel="noreferrer"><img loading="lazy" src={`/api/feedback/${id}/imagem`} alt={`Foto anexada por ${String(item.usuario_nome || "usuário")}`} /><span>Ampliar foto</span></a>}</article>
+            <article><h3>Mensagem</h3><p>{String(item.mensagem || "")}</p>{hasImage && <a href={`/api/feedback/${id}/imagem`} target="_blank" rel="noreferrer"><SafeImage loading="lazy" src={`/api/feedback/${id}/imagem`} alt={`Foto anexada por ${String(item.usuario_nome || "usuário")}`} /><span>Ampliar foto</span></a>}</article>
             {Boolean(item.resposta_proprietario) && <aside><strong>Resposta enviada</strong><p>{String(item.resposta_proprietario)}</p><small>{String(item.respondido_por_nome || "Proprietário")} · {formatDate(String(item.respondido_em || item.atualizado_em || ""))}</small></aside>}
             <form onSubmit={(event) => { event.preventDefault(); const resposta = String(new FormData(event.currentTarget).get("resposta") || ""); void onAction(id, "FEEDBACK_RESPONDER", resposta); }}><label>Responder ao usuário<textarea name="resposta" rows={3} maxLength={2000} required defaultValue={String(item.resposta_proprietario || "")} placeholder="Escreva a resposta que será enviada nas notificações" /></label><button disabled={working === id}>Responder</button></form>
             <footer>{currentStatus === "PENDENTE" && <button type="button" disabled={working === id} onClick={() => void onAction(id, "FEEDBACK_EM_ANALISE")}>Marcar em análise</button>}{currentStatus === "ARQUIVADO" ? <button type="button" disabled={working === id} onClick={() => void onAction(id, "FEEDBACK_REABRIR")}>Reabrir</button> : <button type="button" disabled={working === id} onClick={() => void onAction(id, "FEEDBACK_ARQUIVAR")}>Arquivar</button>}<button type="button" className="danger" disabled={working === id} onClick={() => void onAction(id, "FEEDBACK_EXCLUIR")}>Excluir</button></footer>
@@ -692,7 +694,7 @@ function Empty({ title, text }: { title: string; text: string }) { return <div c
 function OwnerImage({ src, fallback }: { src?: string | null; fallback: string }) {
   const [failed, setFailed] = useState(false);
   if (!src || failed) return <>{fallback}</>;
-  return <img loading="lazy" src={src} alt="" onError={() => setFailed(true)} />;
+  return <SafeImage loading="lazy" src={src} alt="" onError={() => setFailed(true)} />;
 }
 function OwnerAvatar({ image = "", name }: { image?: string; name: string }) {
   return <span className="owner-profile-avatar"><OwnerImage src={image} fallback={initials(name)} /></span>;

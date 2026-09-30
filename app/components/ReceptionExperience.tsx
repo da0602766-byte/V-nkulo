@@ -1,4 +1,6 @@
 "use client";
+import SafeImage from "./SafeImage";
+
 
 import { useEffect, useRef, useState } from "react";
 import Link from "./StableLink";
@@ -359,7 +361,7 @@ export default function ReceptionExperience({
             <article key={community.id}>
               <figure>
                 {community.logoUrl ? (
-                  <img loading="lazy" src={community.logoUrl} alt="" />
+                  <SafeImage loading="lazy" src={community.logoUrl} alt="" />
                 ) : (
                   community.nome.slice(0, 1)
                 )}

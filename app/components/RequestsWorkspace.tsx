@@ -1,4 +1,6 @@
 "use client";
+import SafeImage from "./SafeImage";
+
 
 import TransientFeedback from "./TransientFeedback";
 
@@ -590,7 +592,7 @@ function MemberRequestDialog({ item, busy, onClose, onConfirm }: { item: Communi
 
 function Metric({ icon, label, value, tone }: { icon: IconType; label: string; value: number; tone: string }) { return <article className={`request-metric tone-${tone}`}><span><RequestIcon type={icon} /></span><div><small>{label}</small><strong>{value}</strong></div></article>; }
 function StatusChip({ label, tone }: { label: string; tone: string }) { return <span className={`request-care-status tone-${tone}`}>{label}</span>; }
-function Avatar({ name, photo }: { name: string; photo: string }) { return photo ? <img loading="lazy" src={photo} alt="" /> : <span className="request-avatar-fallback">{name.slice(0, 1).toUpperCase()}</span>; }
+function Avatar({ name, photo }: { name: string; photo: string }) { return photo ? <SafeImage loading="lazy" fallbackName={name} fallbackKind="avatar" src={photo} alt="" /> : <span className="request-avatar-fallback">{name.slice(0, 1).toUpperCase()}</span>; }
 function AudienceGroup({ title, items, selected, onChange }: { title: string; items: Array<{ key: string; label: string; detail?: string }>; selected: string[]; onChange: (value: string[]) => void }) { if (!items.length) return null; return <section><strong>{title}</strong><div>{items.map((item) => <label key={item.key}><input type="checkbox" checked={selected.includes(item.key)} onChange={() => onChange(selected.includes(item.key) ? selected.filter((key) => key !== item.key) : [...selected, item.key])} /><span>{item.label}{item.detail ? <small>{item.detail}</small> : null}</span></label>)}</div></section>; }
 function parseAudienceKey(key: string) { const [type, raw] = key.split(":"); return type === "USUARIO" || type === "MINISTERIO" ? { type, id: Number(raw) } : { type, value: raw }; }
 function normalize(value: string) { return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").trim(); }

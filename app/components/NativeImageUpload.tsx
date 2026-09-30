@@ -1,4 +1,6 @@
 "use client";
+import SafeImage from "./SafeImage";
+
 
 import { DragEvent, useId, useRef, useState } from "react";
 import { saveImageOutsidePlatform } from "../lib/media-upload-client";
@@ -83,7 +85,7 @@ export default function NativeImageUpload({
         onDragLeave={() => setDragging(false)}
         onDrop={drop}
       >
-        {value ? <img loading="lazy" src={value} alt="Prévia da imagem selecionada" /> : <b>＋</b>}
+        {value ? <SafeImage loading="lazy" src={value} alt="Prévia da imagem selecionada" /> : <b>＋</b>}
         <span>
           <strong>{uploading ? "Enviando…" : "Arraste ou escolha uma imagem"}</strong>
           <small>{help}</small>

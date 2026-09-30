@@ -1,4 +1,6 @@
 "use client";
+import SafeImage from "./SafeImage";
+
 
 import { useEffect, useState } from "react";
 import type { PublicCommunity } from "../lib/pilot-data";
@@ -67,13 +69,13 @@ export default function CommunityDirectoryCarousel({
         <article className="directory-community-profile" key={community.id}>
           <div className="directory-profile-visual">
             {community.bannerUrl ? (
-              <img loading="lazy" src={community.bannerUrl} alt="" />
+              <SafeImage loading="lazy" src={community.bannerUrl} alt="" />
             ) : (
               <span className="directory-profile-placeholder" aria-hidden="true" />
             )}
             <div className="directory-profile-identity">
               <span className="directory-profile-avatar">
-                {community.logoUrl ? <img loading="lazy" src={community.logoUrl} alt="" /> : community.nome.slice(0, 1)}
+                {community.logoUrl ? <SafeImage loading="lazy" src={community.logoUrl} alt="" /> : community.nome.slice(0, 1)}
               </span>
               <p><small>COMUNIDADE</small><strong>{community.nome}</strong></p>
             </div>

@@ -2,6 +2,8 @@ export type FeedbackTone = "info" | "error" | "success";
 export type FeedbackEntry<T> = {
   id: string; fingerprint: string; content: T; tone: FeedbackTone;
   revision: number; dismissed: boolean; actions: number;
+  onDismiss?: () => void;
+  durationMs?: number;
 };
 
 /** Memory only: notices and their callbacks disappear with their owning screen. */
@@ -32,8 +34,11 @@ export function createFeedbackStore<T>() {
     },
     remove(id: string) { if (entries.delete(id)) emit(); },
     dismiss(fingerprint: string) {
+      const callbacks = new Set<() => void>();
+      for (const entry of entries.values()) if (entry.fingerprint === fingerprint && !entry.dismissed && entry.onDismiss) callbacks.add(entry.onDismiss);
       for (const [id, entry] of entries) if (entry.fingerprint === fingerprint) entries.set(id, { ...entry, dismissed: true });
       emit();
+      callbacks.forEach(callback => callback());
     },
   };
 }

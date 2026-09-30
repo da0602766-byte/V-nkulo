@@ -1,4 +1,5 @@
 "use client";
+import StorageOnboarding from "./StorageOnboarding";
 
 import { useCallback, useMemo, useState } from "react";
 import type { IntroductionState, PromotionNotice } from "../lib/recepcao";
@@ -147,6 +148,8 @@ export default function RecepcaoAvisos({
   const [introState, setIntroState] = useState(introducao);
   const [step, setStep] = useState(0);
   const [closing, setClosing] = useState(false);
+  const [storageReady, setStorageReady] = useState(false);
+  const finishStorage = useCallback(() => setStorageReady(true), []);
 
   const introKind = useMemo<"PLATAFORMA" | "COMUNIDADE" | null>(() => {
     if (notice) return null;
@@ -202,6 +205,9 @@ export default function RecepcaoAvisos({
     },
     [introKind, send, step],
   );
+
+  // Serialize first-visit dialogs; never place two onboarding overlays on top of each other.
+  if (!storageReady) return <StorageOnboarding onComplete={finishStorage} />;
 
   if (notice) {
     return (

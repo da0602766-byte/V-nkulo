@@ -1,4 +1,6 @@
 "use client";
+import SafeImage from "./SafeImage";
+
 
 import {
   FormEvent,
@@ -64,7 +66,7 @@ export function ParkingReservationQr({
   return (
     <div className="parking-reservation-qr">
       {source ? (
-        <img loading="lazy" src={source} alt={`QR Code da reserva ${label}`} />
+        <SafeImage loading="lazy" src={source} alt={`QR Code da reserva ${label}`} />
       ) : (
         <span className="pilot-loader" aria-label="Gerando QR Code" />
       )}

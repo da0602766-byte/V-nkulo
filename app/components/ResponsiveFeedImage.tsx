@@ -1,4 +1,6 @@
 "use client";
+import SafeImage from "./SafeImage";
+
 
 import { useEffect, useState } from "react";
 import FeedImageLightbox from "./feed/FeedImageLightbox";
@@ -73,8 +75,8 @@ export default function ResponsiveFeedImage({
         <>
           <span className="feed-image-placeholder" aria-hidden="true" />
           <button type="button" className="feed-image-preview" onClick={() => setLightboxOpen(true)} aria-label={`Ampliar imagem: ${alt || "publicação"}`}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+
+          <SafeImage
             src={optimizedSource}
             srcSet={
               !dataSaver && thumbnail && thumbnail !== src

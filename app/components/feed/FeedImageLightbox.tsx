@@ -1,4 +1,6 @@
 "use client";
+import SafeImage from "../SafeImage";
+
 
 import { useEffect, useRef, useState } from "react";
 
@@ -25,8 +27,7 @@ export default function FeedImageLightbox({ src, alt, onClose }: { src: string; 
       <header><span>Imagem da publicação</span><button type="button" autoFocus onClick={onClose} aria-label="Fechar imagem ampliada">× <span>Fechar</span></button></header>
       {failed ? <p role="alert">Não foi possível abrir a imagem. Feche e tente novamente.</p> : (
         // Full resolution is requested only after the user chooses to enlarge.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt={alt || "Imagem da publicação"} onError={() => setFailed(true)} />
+        <SafeImage src={src} alt={alt || "Imagem da publicação"} onError={() => setFailed(true)} />
       )}
     </dialog>
   );

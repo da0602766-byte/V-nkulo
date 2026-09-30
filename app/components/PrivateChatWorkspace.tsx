@@ -1,4 +1,6 @@
 "use client";
+import SafeImage from "./SafeImage";
+
 
 import { ChangeEvent, FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 
@@ -594,7 +596,7 @@ function Avatar({
 }) {
   return (
     <span className={`private-chat-avatar${compact ? " compact" : ""}${hidden ? " placeholder" : ""}`} aria-hidden={hidden || undefined}>
-      {photo ? <img loading="lazy" src={photo} alt="" /> : initials(name)}
+      {photo ? <SafeImage loading="lazy" fallbackName={name} fallbackKind="avatar" src={photo} alt="" /> : initials(name)}
       {!compact && <i className={online ? "online" : ""} />}
     </span>
   );

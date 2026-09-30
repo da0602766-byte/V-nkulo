@@ -1,4 +1,6 @@
 "use client";
+import SafeImage from "./SafeImage";
+
 
 import { FormEvent, useEffect, useState } from "react";
 import GoogleStatusToast, { type GoogleToastState } from "./GoogleStatusToast";
@@ -344,7 +346,7 @@ export default function LoginPortal({
       </div>
       {config.backgroundImageUrl && (
         <figure className="login-v2-top-banner">
-          <img
+          <SafeImage
             src={config.backgroundImageUrl}
             alt={`Banner de acesso do ${siteName}`}
             loading="eager"
@@ -356,7 +358,7 @@ export default function LoginPortal({
       <div className="login-v2-controls-row">
         <div className="login-v2-page-brand" aria-label={siteName}>
           {config.logoUrl
-            ? <img loading="lazy" src={config.logoUrl} alt="" />
+            ? <SafeImage loading="lazy" src={config.logoUrl} alt="" />
             : <VinkuloMark />}
           <div>
             <strong>vínkulo</strong>

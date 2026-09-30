@@ -26,6 +26,7 @@ import GlobalFeedbackLauncher from "./components/GlobalFeedbackLauncher";
 import SystemExperienceController from "./components/SystemExperienceController";
 import NativeNotificationSync from "./components/NativeNotificationSync";
 import { TransientFeedbackViewport } from "./components/TransientFeedback";
+import MediaConnectionFeedback from "./components/MediaConnectionFeedback";
 import { THEME_BOOTSTRAP_SCRIPT } from "./lib/theme-preference";
 
 const instrumentSans = Instrument_Sans({
@@ -106,6 +107,7 @@ export default function RootLayout({
         <SystemExperienceController />
         <NativeNotificationSync />
         <TransientFeedbackViewport />
+        <MediaConnectionFeedback />
         <GlobalFeedbackLauncher />
         <MobileAppInstall />
       </body>

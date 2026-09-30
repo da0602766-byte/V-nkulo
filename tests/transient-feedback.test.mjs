@@ -48,3 +48,16 @@ test("trocar de tela remove avisos e callbacks, sem histórico persistente de ou
   store.publish(notice("other-screen"));
   assert.equal(notifications, 2);
 });
+
+test("dispensar um toast chama cada callback uma única vez e preserva outros avisos", () => {
+  const store = exports.createFeedbackStore();
+  let dismissed = 0;
+  const onDismiss = () => dismissed++;
+  store.publish({ ...notice("google"), onDismiss, durationMs: 9000 });
+  store.publish({ ...notice("duplicate"), onDismiss });
+  store.publish(notice("calendar", "Evento salvo"));
+  store.dismiss("error:Falha ao carregar");
+  store.dismiss("error:Falha ao carregar");
+  assert.equal(dismissed, 1);
+  assert.equal(store.getSnapshot().find(entry => entry.id === "calendar").dismissed, false);
+});

@@ -1,4 +1,6 @@
 "use client";
+import SafeImage from "./SafeImage";
+
 
 import { FormEvent, useEffect, useState } from "react";
 import type {
@@ -350,7 +352,7 @@ export default function LoginCustomizationWorkspace() {
           } as React.CSSProperties}
         >
           <div>
-            {config.logoUrl ? <img loading="lazy" src={config.logoUrl} alt="" /> : <b>{config.siteName.slice(0, 1)}</b>}
+            {config.logoUrl ? <SafeImage loading="lazy" src={config.logoUrl} alt="" /> : <b>{config.siteName.slice(0, 1)}</b>}
             <strong>{config.siteName}</strong>
           </div>
           <p>{config.kicker}</p>

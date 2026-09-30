@@ -10,7 +10,7 @@ test("capa fica na lista à direita com degradê sem remover dados do cartão", 
     read("app/components/SecretaryMinisterialWorkspace.tsx"),
   ]);
   assert.match(workspace, /secretary-ministry-tile-media \$\{ministry\.banner_url/);
-  assert.match(workspace, /ministry\.banner_url \? <img src=\{ministry\.banner_url\}/);
+  assert.match(workspace, /ministry\.banner_url \? <SafeImage src=\{ministry\.banner_url\}/);
   assert.match(css, /\.secretary-ministry-tile-media \{[\s\S]*inset: 0 0 0 auto/);
   assert.match(css, /mask-image:\s*linear-gradient\(to right,transparent 0%/);
   assert.match(css, /\.secretary-ministry-tile\.has-banner::before/);

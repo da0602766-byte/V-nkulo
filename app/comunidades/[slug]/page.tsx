@@ -1,3 +1,4 @@
+import SafeImage from "../../components/SafeImage";
 import { notFound } from "next/navigation";
 import JoinCommunityCard from "../../components/JoinCommunityCard";
 import PublicHeader from "../../components/PublicHeader";
@@ -63,12 +64,12 @@ export default async function PublicCommunityPage({
           aria-label={community.bannerUrl ? `Capa da comunidade ${community.nome}` : `Identidade da comunidade ${community.nome}`}
         >
           {community.bannerUrl && (
-            <img src={community.bannerUrl} loading="lazy" alt="" />
+            <SafeImage src={community.bannerUrl} loading="lazy" alt="" />
           )}
         </div>
         <div className="community-profile-identity-v120">
           <span className="community-public-avatar" aria-hidden="true">
-            {community.logoUrl ? <img loading="lazy" src={community.logoUrl} alt="" /> : community.nome.slice(0, 1)}
+            {community.logoUrl ? <SafeImage loading="lazy" src={community.logoUrl} alt="" /> : community.nome.slice(0, 1)}
           </span>
           <div className="community-profile-copy">
             <p className="pilot-kicker">PÁGINA PÚBLICA DA COMUNIDADE</p>

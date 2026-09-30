@@ -1,3 +1,4 @@
+import SafeImage from "../SafeImage";
 import { useEffect, useState } from "react";
 import FeedIcon from "./FeedIcon";
 
@@ -24,7 +25,7 @@ export default function FeedHighlights({ items, onSelect, onCreate }: {
         {items.map((item) => (
           <button className="worship-story" key={item.id} type="button" onClick={() => onSelect(item.id)} aria-label={`Abrir publicação: ${item.titulo}`} title={item.titulo}>
             <span className="worship-story-ring">
-              {imagesEnabled && item.imagem_url ? <img src={item.imagem_thumbnail_url || item.imagem_url} alt="" width="60" height="60" loading="lazy" decoding="async" /> : <span className="worship-story-initial">{item.titulo.slice(0, 1).toLocaleUpperCase("pt-BR")}</span>}
+              {imagesEnabled && item.imagem_url ? <SafeImage src={item.imagem_thumbnail_url || item.imagem_url} alt="" width="60" height="60" loading="lazy" decoding="async" /> : <span className="worship-story-initial">{item.titulo.slice(0, 1).toLocaleUpperCase("pt-BR")}</span>}
             </span>
             <span>{item.titulo}</span>
           </button>

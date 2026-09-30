@@ -1,3 +1,4 @@
+import SafeImage from "../../../components/SafeImage";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getD1 } from "../../../../db";
@@ -107,7 +108,7 @@ export default async function SharedPublicationPage({ params }: { params: Promis
           <p>{post.conteudo || post.resumo}</p>
           {links.length > 0 && <nav aria-label="Links da publicação">{links.map((link) => <a key={link} href={link} target="_blank" rel="noreferrer">Abrir link ↗</a>)}</nav>}
         </div>
-        {image && <img loading="lazy" src={image} alt={post.imagem_alt || post.titulo} />}
+        {image && <SafeImage loading="lazy" src={image} alt={post.imagem_alt || post.titulo} />}
         <footer><span>Compartilhado pelo VÍNKULO</span><a href="/login">Acessar a comunidade</a></footer>
       </article>
     </main>

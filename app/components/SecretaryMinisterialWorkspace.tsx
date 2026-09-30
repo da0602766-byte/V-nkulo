@@ -1,4 +1,6 @@
 "use client";
+import SafeImage from "./SafeImage";
+
 
 import {
   type CSSProperties,
@@ -1346,7 +1348,7 @@ export default function SecretaryMinisterialWorkspace({
                   onClick={() => openMinistry(ministry)}
                 >
                   <span className={`secretary-ministry-tile-media ${ministry.banner_url ? "" : "is-placeholder"}`} aria-hidden="true">
-                    {ministry.banner_url ? <img src={ministry.banner_url} alt="" loading="lazy" /> : <span>{ministrySymbol(ministry.categoria)}</span>}
+                    {ministry.banner_url ? <SafeImage src={ministry.banner_url} alt="" loading="lazy" /> : <span>{ministrySymbol(ministry.categoria)}</span>}
                   </span>
                   <span className="secretary-ministry-copy">
                     {ministry.categoria !== "OUTRO" && (CATEGORY_LABELS[ministry.categoria] || ministry.categoria).toLocaleLowerCase("pt-BR") !== ministry.nome.toLocaleLowerCase("pt-BR") && <small>{CATEGORY_LABELS[ministry.categoria] || ministry.categoria}</small>}
@@ -1678,7 +1680,7 @@ export default function SecretaryMinisterialWorkspace({
       >
         {selectedMinistry.banner_url && (
           <div className="secretary-hero-media">
-            <img
+            <SafeImage
               src={selectedMinistry.banner_url}
               alt={`Capa do ministério ${selectedMinistry.nome}`}
               loading="eager"
@@ -3203,7 +3205,7 @@ function MinistryAccessHistory({ schedules }: { schedules: Schedule[] }) {
       <div className="secretary-access-history-text">
         {entries.map((entry) => (
           <article key={entry.id}>
-            <span className="secretary-whatsapp-avatar">{entry.beneficiarioFoto ? <img src={entry.beneficiarioFoto} alt="" loading="lazy" /> : initials(entry.beneficiarioNome)}</span>
+            <span className="secretary-whatsapp-avatar">{entry.beneficiarioFoto ? <SafeImage src={entry.beneficiarioFoto} alt="" loading="lazy" /> : initials(entry.beneficiarioNome)}</span>
             <p><strong>{entry.beneficiarioNome}</strong> recebeu acesso a <b>{entry.recursoLabel}</b> na escala “{entry.scheduleTitle}”, de {formatDate(entry.iniciaEm)} até {formatDate(entry.terminaEm)}.</p>
             <small data-status={entry.status.toLowerCase()}>{entry.status.replaceAll("_", " ")}</small>
             <div className="secretary-access-history-actions">
@@ -3450,7 +3452,7 @@ function ShareDialogV2({
               >
                 <span className="secretary-whatsapp-avatar">
                   {assignment.foto_perfil
-                    ? <img src={assignment.foto_perfil} alt="" loading="lazy" />
+                    ? <SafeImage src={assignment.foto_perfil} alt="" loading="lazy" />
                     : initials(assignment.nome)}
                 </span>
                 <div>

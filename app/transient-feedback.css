@@ -34,13 +34,6 @@ html[data-theme="dark"] .app-toast-viewport, html[data-pilot-theme="escuro"] .ap
 }
 @media (prefers-reduced-motion: reduce) { .app-toast-card { animation: none; } .app-toast-card.is-leaving { transition: none; transform: none; } }
 
-/* Existing specialized notices share the same lower notification area. */
-body .message-arrival-toast { top: auto; right: auto; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 16001; animation: app-message-enter .25s ease both; }
-body .google-toast { bottom: 24px; z-index: 16001; }
-body:has(.message-arrival-toast, .google-toast) .app-toast-viewport { bottom: 160px; }
-@keyframes app-message-enter { from { opacity: 0; translate: 0 12px; } to { opacity: 1; translate: 0 0; } }
-@media (max-width: 760px) {
-  body .message-arrival-toast, body .google-toast { top: auto; right: auto; left: 50%; width: calc(100vw - 24px); bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
-  body:has(.message-arrival-toast, .google-toast) .app-toast-viewport { bottom: calc(220px + env(safe-area-inset-bottom, 0px)); }
-}
-@media (prefers-reduced-motion: reduce) { body .message-arrival-toast { animation: none; } }
+/* One measured notification lane. Help moves above it instead of covering its actions. */
+body .app-toast-viewport { bottom: var(--app-feedback-bottom, calc(96px + env(safe-area-inset-bottom, 0px))); }
+body:has(.app-toast-viewport) .global-feedback-launcher { bottom: var(--app-feedback-help-bottom, calc(220px + env(safe-area-inset-bottom, 0px))); }

@@ -1,3 +1,4 @@
+import SafeImage from "./SafeImage";
 import Link from "./StableLink";
 import { getSessionUser } from "../lib/local-auth";
 import GlobalVisualEditor from "./GlobalVisualEditorLazy";
@@ -77,7 +78,7 @@ export default async function PublicHeader({
             <details className="public-account-menu">
               <summary className="reception-account-summary" aria-label="Abrir menu da conta">
                 <span className="public-account-avatar">
-                  {user.foto_perfil ? <img loading="lazy" src={user.foto_perfil} alt="" /> : initials(user.nome)}
+                  {user.foto_perfil ? <SafeImage loading="lazy" fallbackName={user.nome} fallbackKind="avatar" src={user.foto_perfil} alt="" /> : initials(user.nome)}
                 </span>
                 <span className="public-account-copy">
                   <strong>{firstName(user.nome)}</strong>
@@ -89,7 +90,7 @@ export default async function PublicHeader({
               <div className="public-account-popover">
                 <header>
                   <span className="public-account-avatar">
-                    {user.foto_perfil ? <img loading="lazy" src={user.foto_perfil} alt="" /> : initials(user.nome)}
+                    {user.foto_perfil ? <SafeImage loading="lazy" fallbackName={user.nome} fallbackKind="avatar" src={user.foto_perfil} alt="" /> : initials(user.nome)}
                   </span>
                   <div>
                     <strong>{user.nome}{user.system_owner ? " ✓" : ""}</strong>

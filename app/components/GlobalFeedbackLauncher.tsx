@@ -1,4 +1,6 @@
 "use client";
+import SafeImage from "./SafeImage";
+
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { prepareImageForUpload } from "../lib/client-image";
@@ -153,7 +155,7 @@ export default function GlobalFeedbackLauncher() {
               <span>Foto {type === "PROBLEMA" ? "(obrigatória)" : "(opcional)"}</span>
               <input ref={inputRef} type="file" accept="image/*" onChange={(event) => { void selectImage(event.target.files?.[0]); event.target.value = ""; }} />
               <button type="button" onClick={() => inputRef.current?.click()}>{image ? "Trocar foto" : "Adicionar foto"}</button>
-              {imagePreview && <figure><img loading="lazy" src={imagePreview} alt="Prévia da foto anexada" /><button type="button" onClick={() => { setImage(null); setImagePreview(""); }}>Remover</button></figure>}
+              {imagePreview && <figure><SafeImage loading="lazy" src={imagePreview} alt="Prévia da foto anexada" /><button type="button" onClick={() => { setImage(null); setImagePreview(""); }}>Remover</button></figure>}
               <small>JPG, PNG ou WebP. A imagem é otimizada antes do envio.</small>
             </div>
             {type === "DENUNCIA" && <p className="global-feedback-note">A denúncia será analisada pelo Proprietário. A pessoa denunciada não verá seu nome por este formulário.</p>}

@@ -1,4 +1,6 @@
 "use client";
+import SafeImage from "./SafeImage";
+
 
 import { useEffect, useRef, useState, type ReactNode, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import Link from "./StableLink";
@@ -105,14 +107,14 @@ export default function OwnerConsoleShell({ tab, onSelect, onSearchDirectory, da
       event.preventDefault(); buttons[0].click();
     }
   }
-  const brand = <Link href="/" className="oc-brand">{brandLogo ? <img src={brandLogo} alt="" /> : <span className="oc-brand-mark">{brandName.slice(0, 1)}</span>}<span><strong>{brandName}</strong><small>Console do proprietário</small></span></Link>;
+  const brand = <Link href="/" className="oc-brand">{brandLogo ? <SafeImage src={brandLogo} alt="" /> : <span className="oc-brand-mark">{brandName.slice(0, 1)}</span>}<span><strong>{brandName}</strong><small>Console do proprietário</small></span></Link>;
   return <div className={`oc-shell${collapsed ? " is-collapsed" : ""}`}>
     <a href="#owner-console-content" className="oc-skip">Ir para o conteúdo</a>
     <aside className="oc-sidebar" ref={sidebar}>
       <div className="oc-brand-row">{brand}<button type="button" className="oc-collapse" aria-label={collapsed ? "Expandir menu" : "Recolher menu"} aria-expanded={!collapsed} onClick={() => setCollapsed(value => !value)}><ConsoleIcon name="collapse" /></button></div>
       <div className="oc-scope"><i /><div><strong>Escopo global</strong><small>Administração da plataforma</small></div></div>
       {navigation()}
-      <footer className="oc-sidebar-footer"><Link href="/painel?view=conta" className="oc-user">{ownerPhoto ? <img src={ownerPhoto} alt="" /> : <span>{ownerName.split(" ").map(n => n[0]).slice(0, 2).join("")}</span>}<div><strong><VerifiedOwnerName name={ownerName} verified /></strong><small>Proprietário global</small></div></Link><Link href="/painel" className="oc-community-link">↗ <span>Abrir painel da comunidade</span></Link></footer>
+      <footer className="oc-sidebar-footer"><Link href="/painel?view=conta" className="oc-user">{ownerPhoto ? <SafeImage src={ownerPhoto} alt="" /> : <span>{ownerName.split(" ").map(n => n[0]).slice(0, 2).join("")}</span>}<div><strong><VerifiedOwnerName name={ownerName} verified /></strong><small>Proprietário global</small></div></Link><Link href="/painel" className="oc-community-link">↗ <span>Abrir painel da comunidade</span></Link></footer>
     </aside>
     <header className="oc-topbar"><button type="button" className="oc-icon-button oc-menu-button" aria-label="Abrir menu" onClick={() => setModal("menu")}><ConsoleIcon name="menu" /></button><button type="button" className="oc-search-trigger" onClick={() => setModal("search")}><ConsoleIcon name="search" /><span>Buscar área ou ação…</span><kbd>Ctrl K</kbd></button><div className="oc-top-spacer" /><span className="oc-env">Acesso do proprietário</span><ThemeControl compact cycle /><button type="button" className="oc-icon-button" aria-label={`Central de alertas administrativos${data ? `, ${pending.length} pendências` : ""}`} onClick={() => setModal("alerts")}><OwnerTabIcon tab="decisions" />{pending.length > 0 && <i className="oc-notification-dot" />}</button><PilotNotificationCenter /><span id="global-editor-toolbar-slot" className="global-editor-toolbar-slot" aria-label="Editor de aparência" /></header>
     <div className="oc-main"><section id="owner-console-content" className="owner-workspace oc-content" tabIndex={-1}>{children}</section></div>

@@ -215,6 +215,8 @@ export async function disconnectGoogleDrive(userId: number) {
   ).bind(userId).run();
 }
 
+export class DriveReconnectRequired extends Error {}
+
 export async function getDriveAccessToken(userId: number) {
   const connection = await getGoogleConnection(userId);
   if (
@@ -224,7 +226,7 @@ export async function getDriveAccessToken(userId: number) {
     !connection.refresh_token_ciphertext ||
     !connection.refresh_token_iv
   ) {
-    throw new Error("Conecte seu Google Drive antes de continuar.");
+    throw new DriveReconnectRequired("Conecte seu Google Drive antes de continuar.");
   }
   const env = requireGoogleConfig();
   const refreshToken = await decryptSecret(connection.refresh_token_ciphertext, connection.refresh_token_iv);
@@ -254,7 +256,7 @@ export async function getDriveAccessToken(userId: number) {
              drive_enabled = 0, revoked_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
          WHERE usuario_id = ?`,
       ).bind(userId).run();
-      throw new Error("A autorização do Google Drive expirou ou foi revogada. Conecte o Drive novamente para continuar.");
+      throw new DriveReconnectRequired("A autorização do Google Drive expirou ou foi revogada. Conecte o Drive novamente para continuar.");
     }
     throw new Error(body.error_description || "A autorização do Google Drive expirou.");
   }

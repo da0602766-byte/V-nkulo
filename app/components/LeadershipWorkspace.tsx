@@ -1,4 +1,6 @@
 "use client";
+import SafeImage from "./SafeImage";
+
 
 import TransientFeedback from "./TransientFeedback";
 
@@ -292,7 +294,7 @@ export default function LeadershipWorkspace({
               <article key={leader.membership_id}>
                 <span>
                   {leader.foto_perfil ? (
-                    <img loading="lazy" src={leader.foto_perfil} alt="" />
+                    <SafeImage loading="lazy" fallbackName={leader.nome} fallbackKind="avatar" src={leader.foto_perfil} alt="" />
                   ) : (
                     initials(leader.nome)
                   )}

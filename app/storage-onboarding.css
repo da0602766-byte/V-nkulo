@@ -1,0 +1,16 @@
+.storage-onboarding { position: fixed; inset: 0; margin: auto; width: min(440px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); overflow: auto; padding: 30px 24px 24px; border: 1px solid #dcd3ea; border-radius: 26px; background: var(--surface, #fff); color: var(--ink, #2c233b); box-shadow: 0 24px 80px #23153533; font-family: var(--font-body), sans-serif; animation: storage-choice-enter .24s ease-out; }
+.storage-onboarding::backdrop { background: #21133280; backdrop-filter: blur(4px); }
+.storage-choice-close { position: absolute; right: 10px; top: 8px; width: 44px; height: 44px; border: 0; border-radius: 12px; background: transparent; color: inherit; font-size: 26px; cursor: pointer; }
+.storage-choice-mark { display: grid; place-items: center; width: 58px; height: 58px; border-radius: 18px; background: #eee8f6; color: #68518d; font-size: 32px; }
+.storage-onboarding .storage-choice-eyebrow { margin-top: 20px; color: #80639f; font-size: 10px; font-weight: 800; letter-spacing: .12em; }
+.storage-onboarding h2 { margin: 10px 0 12px; font-size: 24px; line-height: 1.2; }
+.storage-onboarding p, .storage-onboarding small { font-size: 14px; line-height: 1.6; }
+.storage-onboarding small { display: block; font-size: 12px; opacity: .8; }
+.storage-choice-actions { display: grid; gap: 10px; margin: 22px 0 16px; }
+.storage-choice-actions button { min-height: 48px; padding: 12px 16px; border: 1px solid #dcd3ea; border-radius: 14px; background: #f3eef9; color: #584171; font: inherit; font-weight: 700; cursor: pointer; }
+.storage-choice-actions .storage-choice-primary { background: #6941a5; color: white; border-color: #6941a5; }
+.storage-onboarding button:disabled { opacity: .55; cursor: wait; }
+.storage-onboarding button:focus-visible { outline: 3px solid #ad91d1; outline-offset: 3px; }
+.storage-choice-error { color: #ac1937; }
+@keyframes storage-choice-enter { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .storage-onboarding { animation: none; } }

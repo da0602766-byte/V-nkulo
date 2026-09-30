@@ -1,4 +1,6 @@
 "use client";
+import SafeImage from "../SafeImage";
+
 
 import TransientFeedback from "../TransientFeedback";
 
@@ -694,7 +696,7 @@ function MemberProfileDialog({ member, onClose }: { member: CellMember; onClose:
     <div className="cgestao-member-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <section className="cgestao-member-dialog" role="dialog" aria-modal="true" aria-label={`Perfil de ${member.name}`}>
         <header>
-          <span>{member.fotoPerfil ? <img loading="lazy" src={member.fotoPerfil} alt="" /> : initialsOf(member.name)}</span>
+          <span>{member.fotoPerfil ? <SafeImage loading="lazy" fallbackName={member.name} fallbackKind="avatar" src={member.fotoPerfil} alt="" /> : initialsOf(member.name)}</span>
           <div>
             <p className="cgestao-kicker">PERFIL DO MEMBRO</p>
             <h2>{member.name}</h2>

@@ -1,4 +1,6 @@
 "use client";
+import SafeImage from "./SafeImage";
+
 
 import Link from "./StableLink";
 import CommunityPresencePanel from "./CommunityPresencePanel";
@@ -665,7 +667,7 @@ export default function CommunityHome({
           <FeedComposerBar hasEvents={myEvents.length > 0} onOpen={openComposer} onRequest={!readOnlyFeed && onNavigate ? () => onNavigate("solicitacoes", true) : undefined} />
           <form className="pilot-form community-composer-inline" aria-label="Criar publicação" onSubmit={createPost}>
             <header>
-              <span className="worship-avatar" aria-hidden="true">{userPhotoUrl ? <img src={userPhotoUrl} alt="" width="36" height="36" /> : userName.split(/\s+/).filter(Boolean).slice(0,2).map(part => part[0]).join("")}</span>
+              <span className="worship-avatar" aria-hidden="true">{userPhotoUrl ? <SafeImage fallbackName={userName} fallbackKind="avatar" src={userPhotoUrl} alt="" width="36" height="36" /> : userName.split(/\s+/).filter(Boolean).slice(0,2).map(part => part[0]).join("")}</span>
               <div><small>COMPARTILHAR COM A COMUNIDADE</small><strong>O que você quer compartilhar?</strong></div>
 
             </header>
@@ -807,7 +809,7 @@ export default function CommunityHome({
                 >
                   <header>
                     <span className="worship-avatar">
-                      {post.autor_foto ? <img loading="lazy" src={post.autor_foto} alt="" /> : getInitials(post.autor_nome || communityName)}
+                      {post.autor_foto ? <SafeImage fallbackName={post.autor_nome || communityName} fallbackKind="avatar" loading="lazy" src={post.autor_foto} alt="" /> : getInitials(post.autor_nome || communityName)}
                     </span>
                     <div>
                       <VerifiedOwnerName
@@ -1178,7 +1180,7 @@ export default function CommunityHome({
                                       checked={replacementVolunteerId === candidate.voluntarioId}
                                       onChange={() => setReplacementVolunteerId(candidate.voluntarioId)}
                                     />
-                                    {candidate.fotoPerfil ? <img loading="lazy" src={candidate.fotoPerfil} alt="" /> : <span aria-hidden="true">{getInitials(candidate.nome)}</span>}
+                                    {candidate.fotoPerfil ? <SafeImage fallbackName={candidate.nome} fallbackKind="avatar" loading="lazy" src={candidate.fotoPerfil} alt="" /> : <span aria-hidden="true">{getInitials(candidate.nome)}</span>}
                                     <span><b>{candidate.nome}</b><small>{candidate.funcao}</small></span>
                                   </label>
                                 ))}

@@ -61,19 +61,23 @@ test("o cadastro público é fechado e o login encaminha interessados ao LOG1", 
 });
 
 test("toda ação com o Google termina em um aviso animado", async () => {
-  const [toast, css, portal, storage, appReturn] = await Promise.all([
+  const [toast, css, portal, storage, appReturn, sharedToast, sharedCss] = await Promise.all([
     read("app/components/GoogleStatusToast.tsx"),
     read("app/globals.css"),
     read("app/components/LoginPortal.tsx"),
     read("app/components/StoragePrivacyWorkspace.tsx"),
     read("app/components/GoogleAppReturn.tsx"),
+    read("app/components/TransientFeedback.tsx"),
+    read("app/transient-feedback.css"),
   ]);
 
-  // Os três estados e o tempo de saída de cada um.
-  // Resultados são temporários; andamento espera a conclusão. Foco pausa a saída.
-  assert.match(toast, /pending: 0,\s*\n\s*success: 5200,\s*\n\s*error: 9000,/);
-  assert.match(toast, /onFocusCapture/);
-  assert.match(toast, /role=\{variant === "error" \? "alert" : "status"\}/);
+  // Google usa a mesma fila temporária das abas; foco pausa a saída.
+  assert.match(toast, /<TransientFeedback/);
+  assert.match(toast, /5500 : 9000/);
+  assert.match(sharedToast, /onFocusCapture/);
+  assert.match(sharedToast, /entry.tone === "error" \? "alert" : "status"/);
+  assert.match(sharedCss, /@keyframes app-toast-enter/);
+  assert.match(sharedCss, /prefers-reduced-motion: reduce/);
 
   // As animações precisam existir de fato no CSS publicado.
   for (const frames of [
