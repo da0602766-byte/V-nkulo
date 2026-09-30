@@ -115,11 +115,25 @@ export default function AgendaCalendar({
   }, [referencia, visao]);
 
   const requestRef = useRef<AbortController | null>(null);
+  const loadedRangeRef = useRef("");
+  const [loadedRange, setLoadedRange] = useState("");
+  const rangeKey = `${dias[0].toISOString()}/${dias[dias.length - 1].toISOString()}`;
+  const hasCurrentData = loadedRange === rangeKey;
+  const blockingLoadError = Boolean(erroCarregamento) && !hasCurrentData;
   const carregar = useCallback(async () => {
     requestRef.current?.abort();
     const request = new AbortController();
     requestRef.current = request;
-    setCarregando(true);
+    // Refresh the current period without unmounting the selected day or
+    // replacing existing content with loading UI on every polling cycle.
+    let preserveData = loadedRangeRef.current === rangeKey;
+    setCarregando(!preserveData);
+    if (!preserveData) {
+      loadedRangeRef.current = "";
+      setLoadedRange("");
+      setItens([]);
+      setErroCarregamento("");
+    }
     try {
       const de = inicioDoDia(dias[0]);
       const ate = new Date(dias[dias.length - 1]);
@@ -128,20 +142,30 @@ export default function AgendaCalendar({
         `/api/pilot/agenda?de=${encodeURIComponent(de.toISOString())}&ate=${encodeURIComponent(ate.toISOString())}`,
         { cache: "no-store", signal: request.signal },
       );
+      if (!resposta.ok && resposta.status < 500) preserveData = false;
       const dados = (await resposta.json()) as { itens?: ItemAgenda[]; error?: string };
-      if (!resposta.ok) throw new Error(dados.error || "Não foi possível carregar a agenda.");
+      if (!resposta.ok) {
+        // Never retain private content after authentication/access is revoked.
+        throw new Error(dados.error || "Não foi possível carregar a agenda.");
+      }
       if (!request.signal.aborted) {
+        loadedRangeRef.current = rangeKey;
+        setLoadedRange(rangeKey);
         setItens(dados.itens || []);
         setErroCarregamento("");
       }
     } catch (motivo) {
       if (request.signal.aborted) return;
       setErroCarregamento(motivo instanceof Error ? motivo.message : "Não foi possível carregar a agenda.");
-      setItens([]);
+      if (!preserveData) {
+        loadedRangeRef.current = "";
+        setLoadedRange("");
+        setItens([]);
+      }
     } finally {
       if (!request.signal.aborted) setCarregando(false);
     }
-  }, [dias]);
+  }, [dias, rangeKey]);
   useEffect(() => () => requestRef.current?.abort(), []);
 
   useEffect(() => {
@@ -380,8 +404,8 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
       </TransientFeedback>}
 
       <div className="agenda-studio-layout"><div className="agenda-studio-planner">
-      {!erroCarregamento && !carregando && diaSelecionado && <section className="agenda-day-actions" aria-label="Planejar dia selecionado">
-        <div><small>DIA SELECIONADO</small><strong>{new Date(`${diaSelecionado}T12:00:00`).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}</strong><span>{(porDia.get(diaSelecionado) || []).length ? `${(porDia.get(diaSelecionado) || []).length} compromisso(s) neste dia` : "Que tal planejar um novo encontro?"}</span></div>
+      {diaSelecionado && <section className="agenda-day-actions" aria-label="Planejar dia selecionado">
+        <div><small>DIA SELECIONADO</small><strong>{new Date(`${diaSelecionado}T12:00:00`).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}</strong><span>{carregando ? "Carregando compromissos…" : erroCarregamento ? (hasCurrentData ? "Última consulta exibida; não foi possível atualizar." : "Compromissos indisponíveis no momento.") : (porDia.get(diaSelecionado) || []).length ? `${(porDia.get(diaSelecionado) || []).length} compromisso(s) neste dia` : "Que tal planejar um novo encontro?"}</span></div>
         <div className="agenda-day-buttons">
           {aoCriarEvento && <button type="button" onClick={() => aoCriarEvento(diaSelecionado)}>Criar evento</button>}
           <button type="button" onClick={() => abrirCompromisso(diaSelecionado)}>Novo compromisso</button>
@@ -436,12 +460,12 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
 
       {/* DIA — linha do tempo vertical: a hora à esquerda, um marcador por
           camada e o cartão com os detalhes à direita. */}
-      {erroCarregamento && <div className="agenda-studio-empty">
+      {blockingLoadError && <div className="agenda-studio-empty">
         <strong>Agenda indisponível no momento</strong>
         <p>Não foi possível consultar os compromissos deste período.</p>
         <button type="button" disabled={carregando} onClick={() => void carregar()}>{carregando ? "Tentando novamente…" : "Tentar novamente"}</button>
       </div>}
-      {!erroCarregamento && visao === "dia" && (
+      {!blockingLoadError && visao === "dia" && (
         <div className="agenda-linha-tempo" aria-busy={carregando}>
           {(porDia.get(chaveDia(referencia)) || []).length === 0 ? (
             <p className="agenda-vazio">{carregando ? "Carregando compromissos…" : "Nada marcado neste dia."}</p>
@@ -481,7 +505,7 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
 
       {/* SEMANA — grade de horas: cada compromisso ocupa a altura da sua
           duração, e os que se cruzam dividem a largura. */}
-      {!erroCarregamento && visao === "semana" && (
+      {!blockingLoadError && visao === "semana" && (
         <div className="agenda-week-list" aria-busy={carregando}>
           {dias.map((dia) => { const items = porDia.get(chaveDia(dia)) || []; return <section key={chaveDia(dia)} className={chaveDia(dia) === hojeChave ? "today" : ""}>
             <button type="button" className="agenda-week-date" onClick={() => { setReferencia(inicioDoDia(dia)); setVisao("dia"); }}><small>{DIAS_CURTOS[dia.getDay()]}</small><strong>{dia.getDate()}</strong></button>
@@ -491,7 +515,7 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
       )}
 
       {/* MÊS — visão de planejamento: chips compactos e "+N" quando não cabe. */}
-      {!erroCarregamento && visao === "mes" && (
+      {!blockingLoadError && visao === "mes" && (
         <div className="agenda-grade" aria-busy={carregando}>
           {DIAS_CURTOS.map((dia) => (
             <span className="agenda-grade-cabecalho" key={dia}>{dia}</span>
