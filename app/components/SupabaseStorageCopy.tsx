@@ -125,7 +125,7 @@ export default function SupabaseStorageCopy() {
       {benchmark.matching && <p>Mais rápido nesta amostra: {benchmark.recommendation}. A medição não altera a leitura.</p>}
     </div>}
     {started && <p role="status">{total.scanned} objetos examinados · {total.copied} copiados · {total.verified} já conferidos · {total.skipped} fora do escopo desta cópia. {cursor ? "Há outra página." : "Inventário concluído."}</p>}
-    {(!started || cursor) && <button type="button" disabled={busy} onClick={() => void copyPage()}>{busy ? "Copiando…" : started ? "Copiar próxima página" : "Iniciar cópia conferida"}</button>}
+    {(!started || cursor) && <button type="button" disabled={busy} onClick={() => void copyPage()}>{busy ? "Aguarde…" : started ? "Copiar próxima página" : "Iniciar cópia conferida"}</button>}
     {Boolean(copies) && <button type="button" className="secondary" disabled={busy} onClick={() => void rollback()}>Desfazer até 20 cópias</button>}
   </section>;
 }

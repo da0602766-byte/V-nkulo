@@ -29,6 +29,8 @@ O Supabase só será a origem de um módulo quando o esquema, dados, políticas 
 - Quando ativado, o Supabase atende somente imagens registradas e verificadas por SHA-256; ausência, erro ou transferência acima de dois segundos recorre ao R2. Sem nenhuma origem disponível, a resposta é 503 sem cache. A exclusão é conferida antes e depois da leitura; download mantém o anexo e a política sem cache. Desfazer cópias ou pausar a integração retorna a preferência para R2.
 - Novos uploads continuam no R2. Não foi feito corte de gravação nem migração de Google Drive, arquivos locais, sessões ou tabelas operacionais.
 - Validação local: build, TypeScript e 13 testes de Storage, integração, Auth, limpeza de catálogos e reinicialização aprovados. Testes usam dados sintéticos; não executam reinicialização em produção.
+- Verificação em produção na versão 337: imagem de 67 KB idêntica nas três leituras; mediana R2 de 215 ms e Supabase de 1.072 ms, incluindo consultas e conferência do hash no caminho Supabase. Preferência mantida em R2 com base nessa amostra. O recurso está publicado, mas o corte para Supabase não está ativado.
+- Após login real do proprietário: 1 conta Auth vinculada, 16 perfis e nenhuma tentativa pendente. Conferência às 22:22:58 de 29/09/2026: 4 comunidades, 16 perfis e 21 vínculos sem ausentes, diferenças, extras ou registros sem ID.
 
 ## Etapa em desenvolvimento nesta alteração
 
