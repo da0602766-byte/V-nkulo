@@ -60,7 +60,7 @@ test("cópia de imagens exige proprietário e confere bytes sem apagar o R2", as
     const path = new URL(String(url)).pathname;
     if (path === "/storage/v1/bucket") return Response.json([{ id: "private-images", name: "private-images", public: false }]);
     if (path.includes("/storage/v1/object/authenticated/private-images/")) {
-      return remote ? new Response(remote) : Response.json({ code: "NoSuchKey" }, { status: 404 });
+      return remote ? new Response(remote) : Response.json({ statusCode: "404", error: "not_found", message: "Object not found" }, { status: 400 });
     }
     if (path.includes("/storage/v1/object/private-images/")) {
       if (init.method === "DELETE") { remote = null; return Response.json({ message: "Successfully deleted" }); }

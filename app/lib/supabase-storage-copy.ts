@@ -84,9 +84,15 @@ async function readBounded(stream: ReadableStream) {
 
 async function compareRemote(config: Awaited<ReturnType<typeof target>>, key: string, source: ArrayBuffer) {
   const remote = await storageFetch(config, key, { method: "GET" });
-  if (remote.status === 404) {
-    const body = await remote.json().catch(() => null) as { code?: string; error?: string } | null;
-    if (body?.code === "NoSuchKey" || body?.error === "not_found") return "missing" as const;
+  if (remote.status === 400 || remote.status === 404) {
+    const body = await remote.json().catch(() => null) as {
+      code?: string; error?: string; message?: string; statusCode?: string | number;
+    } | null;
+    const missing = body?.code === "NoSuchKey"
+      || body?.error === "not_found"
+      || String(body?.statusCode || "") === "404"
+      || /object not found/i.test(body?.message || "");
+    if (missing) return "missing" as const;
     throw new SupabaseStorageCopyError("O bucket configurado não foi encontrado ou está indisponível no Supabase.", 409);
   }
   if (!remote.ok) throw new SupabaseStorageCopyError(`Não foi possível conferir um arquivo no Supabase (HTTP ${remote.status}).`);
