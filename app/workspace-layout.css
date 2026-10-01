@@ -1,0 +1,213 @@
+/* The grid owns desktop navigation width; only small screens use a drawer. */
+html body .pilot-dashboard[data-ui-version="v2"][data-sidebar-collapsed] {
+  --navigation-width: 260px;
+  --navigation-top: var(--pilot-header-height,72px);
+}
+html body .pilot-dashboard[data-ui-version="v2"][data-sidebar-collapsed="true"] { --navigation-width: 72px; }
+html body .pilot-dashboard[data-ui-version="v2"] .pilot-workspace { min-width: 0 !important; box-sizing: border-box; }
+@media (min-width:1024px) {
+  html body .pilot-dashboard[data-ui-version="v2"][data-sidebar-collapsed] .pilot-dashboard-layout {
+    display: grid !important; grid-template-columns: var(--navigation-width) minmax(0,1fr) !important;
+    transition: grid-template-columns .24s cubic-bezier(.22,1,.36,1);
+  }
+  html body .pilot-dashboard[data-ui-version="v2"][data-sidebar-collapsed] .pilot-sidebar {
+    display: flex !important; position: sticky !important; inset: auto !important; top: var(--navigation-top) !important;
+    width: var(--navigation-width) !important; min-width: 0 !important; max-width: 100% !important;
+    height: calc(100dvh * var(--vinkulo-ui-scale-inverse,1) - var(--navigation-top)) !important;
+    align-self: start; overflow-x: hidden !important; overflow-y: auto !important;
+    box-sizing: border-box; padding: 14px 12px 20px !important; transform: none !important;
+    box-shadow: none !important; z-index: 20; transition: width .24s cubic-bezier(.22,1,.36,1);
+  }
+  html body .pilot-dashboard[data-ui-version="v2"][data-sidebar-collapsed="false"] .pilot-sidebar nav :is(button,a) {
+    display: grid !important; grid-template-columns:28px minmax(0,1fr) !important; width:100% !important;
+    min-height:44px !important; justify-content: start !important; gap:8px !important; padding:8px !important;
+  }
+  html body .pilot-dashboard[data-ui-version="v2"][data-sidebar-collapsed="false"] .pilot-sidebar-label {
+    display:block !important; width:auto !important; max-width:none !important; opacity:1; transform:scale(1); white-space:nowrap;
+  }
+  html body .pilot-dashboard[data-ui-version="v2"] .pilot-sidebar-label { transition: opacity .18s, transform .18s; font-size:14px; }
+  html body .pilot-dashboard[data-ui-version="v2"][data-sidebar-collapsed="true"] .pilot-sidebar { align-items:center !important; padding-inline:10px !important; }
+  html body .pilot-dashboard[data-ui-version="v2"][data-sidebar-collapsed="true"] .pilot-sidebar nav :is(button,a) {
+    display:flex !important; justify-content:center !important; width:44px !important; min-width:44px !important; min-height:44px !important; padding:8px !important; gap:0 !important;
+  }
+  html body .pilot-dashboard[data-ui-version="v2"][data-sidebar-collapsed="true"] .pilot-sidebar nav .pilot-sidebar-label {
+    display:block !important; width:0 !important; max-width:0 !important; overflow:hidden !important; opacity:0; transform:scale(.9);
+  }
+  html body .pilot-dashboard[data-ui-version="v2"][data-sidebar-collapsed="true"] .pilot-sidebar :is(.worship-sidebar-art,.pilot-sidebar-note,.pilot-sidebar-group>h2,.pilot-sidebar-toggle>strong,.editorial-sidebar-schedule) { display:none !important; }
+  html body .pilot-dashboard[data-ui-version="v2"][data-sidebar-collapsed="true"] .pilot-profile-card { display:grid !important; width:44px !important; padding:0 0 14px !important; }
+  html body .pilot-dashboard[data-ui-version="v2"][data-sidebar-collapsed="true"] .pilot-profile-card>div { display:none !important; }
+  html body .pilot-dashboard[data-ui-version="v2"][data-sidebar-collapsed="false"] .pilot-profile-card { display:grid !important; grid-template-columns:40px minmax(0,1fr) !important; width:auto !important; }
+  html body .pilot-dashboard[data-ui-version="v2"][data-sidebar-collapsed="false"] .pilot-profile-card>div { display:grid !important; }
+  html body .pilot-dashboard[data-ui-version="v2"] .pilot-mobile-nav { display:none !important; }
+}
+@media (max-width:1023px) {
+  html body .global-feedback-launcher { bottom:calc(94px + env(safe-area-inset-bottom)) !important; }
+  html body .pilot-dashboard[data-ui-version="v2"][data-sidebar-collapsed] .pilot-dashboard-layout { display:block !important; }
+  html body .pilot-dashboard[data-ui-version="v2"][data-sidebar-collapsed] .pilot-sidebar { display:none !important; }
+  html body .pilot-dashboard[data-ui-version="v2"] .pilot-workspace { padding:20px 16px calc(100px + env(safe-area-inset-bottom)) !important; }
+  html body .pilot-dashboard[data-ui-version="v2"] nav.pilot-mobile-nav {
+    display:grid !important; grid-template-columns:repeat(5,minmax(0,1fr)) !important;
+    position:fixed !important; inset:auto 0 0 !important; width:auto !important; max-width:none !important;
+    transform:none !important; z-index:60 !important; border-radius:0 !important;
+    border:0 !important; border-top:1px solid var(--pilot-line) !important; background:var(--pilot-surface) !important;
+    padding:6px 8px calc(6px + env(safe-area-inset-bottom)) !important;
+  }
+  html body .pilot-dashboard[data-ui-version="v2"] .pilot-mobile-nav>button { min-width:0; min-height:54px; display:grid; place-content:center; justify-items:center; gap:3px; padding:4px 3px; border:0; border-radius:12px; background:transparent; color:var(--pilot-muted); font:650 12px/1.1 inherit; cursor:pointer; }
+  html body .pilot-dashboard[data-ui-version="v2"] .pilot-mobile-nav svg { width:24px; height:24px; fill:none; stroke:currentColor; stroke-width:1.8; }
+  html body .pilot-dashboard[data-ui-version="v2"] .pilot-mobile-nav-icon { width:28px; height:28px; display:grid; place-items:center; }
+  html body .pilot-dashboard[data-ui-version="v2"] .pilot-mobile-nav-label { font-size:12px; line-height:1.1; }
+  html body .pilot-dashboard[data-ui-version="v2"] .pilot-mobile-list-icon { width:24px; height:24px; display:flex; flex-direction:column; justify-content:center; gap:5px; }
+  html body .pilot-dashboard[data-ui-version="v2"] .pilot-mobile-list-icon i { width:20px; height:2px; background:currentColor; border-radius:2px; }
+  html body .pilot-dashboard[data-ui-version="v2"] .pilot-mobile-create-icon { width:32px; height:32px; display:grid; place-items:center; font-size:26px; line-height:1; border-radius:10px; background:var(--community-primary); color:var(--community-on-primary); }
+  html body .pilot-dashboard[data-ui-version="v2"] .pilot-mobile-overlay { position:fixed; inset:0; background:#100c2059; backdrop-filter:blur(8px); z-index:100; }
+  html body .pilot-dashboard[data-ui-version="v2"] .pilot-mobile-overlay:has(.pilot-navigation-drawer) { padding:0 !important; align-items:stretch !important; justify-content:flex-start !important; }
+  html body .pilot-dashboard[data-ui-version="v2"] .pilot-navigation-drawer {
+    width:min(360px,calc(90vw * var(--vinkulo-ui-scale-inverse,1))) !important; max-height:calc(100dvh * var(--vinkulo-ui-scale-inverse,1)) !important; height:calc(100dvh * var(--vinkulo-ui-scale-inverse,1)) !important; min-height:0 !important;
+    border-radius:0 16px 16px 0 !important; padding:20px 16px !important; overflow-y:auto !important;
+    display:flex !important; flex-direction:column; align-self:stretch !important;
+    background:var(--pilot-surface-opaque,var(--community-surface)) !important; animation:navigation-drawer-in .24s cubic-bezier(.22,1,.36,1) both !important;
+  }
+  html body .pilot-navigation-drawer>header { flex:none; }
+  html body .pilot-navigation-drawer>.pilot-mobile-menu-content { flex:1; min-height:0; overflow-y:auto; }
+}
+@keyframes navigation-drawer-in { from { transform:translateX(-100%); } to { transform:translateX(0); } }
+
+/* Feed layout follows its available container width, including sidebar reflow. */
+html body .pilot-dashboard[data-ui-version="v2"] .community-feed-redesign { container-type:inline-size; }
+html body .pilot-dashboard[data-ui-version="v2"] .community-feed-redesign .worship-layout { padding-left:0 !important; grid-template-columns:minmax(0,1fr) 260px !important; gap:20px; }
+html body .pilot-dashboard[data-ui-version="v2"] .community-feed-redesign .worship-welcome { padding-left:0 !important; }
+.community-feed-redesign .worship-welcome h2 { font:400 clamp(26px,2.7vw,38px)/1.12 Georgia,"Times New Roman",serif; letter-spacing:-1px; color:var(--w-ink); }
+.community-feed-redesign .worship-welcome h2 em { color:var(--w-violet); font-style:normal; }
+html body .pilot-dashboard[data-ui-version="v2"] .worship-posts { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr)); align-items:start; gap:16px; }
+html body .pilot-dashboard[data-ui-version="v2"] .worship-post { min-width:0; border-radius:14px; box-shadow:0 4px 20px -2px #0000000d; transition:box-shadow .24s cubic-bezier(.22,1,.36,1); }
+html body .pilot-dashboard[data-ui-version="v2"] .worship-post:hover { box-shadow:0 6px 24px -2px #00000014; }
+html body .pilot-dashboard[data-ui-version="v2"] .worship-composer-prompt { pointer-events:auto; min-height:48px; cursor:pointer; }
+html body .pilot-dashboard[data-ui-version="v2"] .worship-composer { padding:14px 16px 8px; }
+html body .pilot-dashboard[data-ui-version="v2"] .worship-composer-tools { margin-top:8px; }
+html body .pilot-dashboard[data-ui-version="v2"] .worship-composer-tools button { font-size:14px; min-height:44px; }
+.community-composer-reveal[hidden] { display:none !important; }
+.community-composer-inline>header { gap:10px; }
+.community-composer-inline>header .composer-close { margin-left:auto; width:40px; min-height:40px; padding:0; border:1px solid var(--pilot-line); background:var(--pilot-surface-2); color:var(--pilot-text); border-radius:10px; font-size:24px; cursor:pointer; }
+@container (max-width:900px) {
+  html body .pilot-dashboard[data-ui-version="v2"] .community-feed-redesign .worship-layout { grid-template-columns:minmax(0,1fr) !important; }
+  html body .community-feed-redesign .worship-rail { display:none !important; }
+  html body .community-feed-redesign .worship-rail[data-mobile-open="true"] { display:grid !important; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); grid-row:1; position:static; }
+  html body .community-feed-redesign .worship-context-nav { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
+  html body .community-feed-redesign .worship-signature { display:none; }
+}
+
+/* Directory: compact rows, with one focused record on demand. */
+html body .pilot-dashboard[data-ui-version="v2"] .pilot-workspace:has(>.people-directory) { width:100% !important; max-width:none !important; padding:26px clamp(16px,2.4vw,40px) 48px; }
+.people-directory { container-type:inline-size; }
+.people-directory .people-heading { margin-bottom:0; padding-bottom:16px; border-bottom:1px solid var(--pilot-line); }
+.people-directory .people-heading h1 { font-size:clamp(28px,3vw,40px); }
+.people-directory .people-heading p:last-child { font-size:14px; color:var(--pilot-muted); }
+html body .people-directory .people-metrics article { min-height:78px; padding:14px; border-radius:14px; box-shadow:none; background:var(--pilot-surface); }
+.people-directory .people-metrics small { font-size:14px; }
+.people-directory .people-metrics strong { font-size:26px; }
+.people-directory .owner-access-banner { font-size:14px; padding:12px 16px; }
+.people-directory .owner-access-banner p { font-size:14px; }
+html body .people-directory .people-tabs button.active { background:var(--community-primary); color:var(--community-on-primary); }
+.people-directory .people-tabs button { font-size:14px; }
+.people-directory .people-toolbar { flex-wrap:wrap; }
+.people-directory .people-toolbar>label { flex:1 1 240px; }
+html body .people-directory .people-directory-list { display:block; border:1px solid var(--pilot-line); border-radius:14px; background:var(--pilot-surface); }
+html body .people-directory :is(.people-directory-columns,.people-directory-row) { display:grid !important; grid-template-columns:minmax(210px,1.5fr) minmax(120px,1fr) minmax(170px,1.1fr) 100px 126px !important; gap:16px; align-items:center; }
+.people-directory-columns { padding:14px 18px; background:var(--pilot-surface-2); border-radius:14px 14px 0 0; color:var(--pilot-muted); font-size:12px; font-weight:650; }
+html body .people-directory .people-directory-row { padding:14px 18px !important; border:0 !important; border-bottom:1px solid var(--pilot-line) !important; border-radius:0 !important; background:transparent !important; box-shadow:none !important; margin:0 !important; min-height:82px; }
+html body .people-directory .people-directory-row:last-child { border-bottom:0 !important; }
+.people-directory-row>* { min-width:0; overflow-wrap:anywhere; }
+html body .people-directory .people-person-button { display:flex; align-items:center; gap:12px; padding:0; width:100%; border:0; background:none; color:var(--pilot-text); text-align:left; cursor:pointer; }
+.people-person-button>span:last-child { display:grid; gap:4px; min-width:0; }
+.people-person-button .verified-owner-name { font-size:16px; font-weight:650; }
+html body .people-directory .people-avatar { width:40px; height:40px; flex:0 0 40px; border-radius:12px; overflow:hidden; background:var(--community-soft); color:var(--community-primary); }
+.people-avatar img { width:100%; height:100%; object-fit:cover; }
+.people-directory-row small { font-size:13px; color:var(--pilot-muted); line-height:1.5; }
+html body .people-directory .people-card-contact { display:grid; gap:4px; font-size:14px; }
+.people-directory-ministry>span { font-size:14px; line-height:1.5; }
+.people-directory-schedules>span { display:inline-grid; place-items:center; min-width:32px; height:32px; background:var(--community-soft); color:var(--community-primary); border-radius:9px; font-weight:650; }
+html body .people-directory .people-card-actions { display:flex; align-items:center; flex-wrap:nowrap; gap:8px; }
+html body .people-directory .people-open-record { min-height:40px; padding:8px 12px; font-size:14px; border:1px solid var(--pilot-line); border-radius:10px; background:var(--pilot-surface-2); color:var(--community-primary); cursor:pointer; white-space:nowrap; }
+.people-row-menu { position:relative; }
+.people-row-menu>summary { cursor:pointer; list-style:none; display:grid; place-items:center; width:30px; min-height:40px; font-size:22px; }
+.people-row-menu>summary::-webkit-details-marker { display:none; }
+.people-row-menu>div { position:absolute; right:0; top:100%; z-index:5; display:grid; gap:6px; width:180px; padding:8px; border:1px solid var(--pilot-line); border-radius:12px; background:var(--pilot-surface); box-shadow:0 4px 20px #0002; }
+.people-row-menu button { text-align:left; font-size:14px; min-height:40px; }
+.people-mobile-label { display:none; }
+@container (max-width:1000px) {
+  html body .people-directory :is(.people-directory-columns,.people-directory-row) { grid-template-columns:minmax(200px,1.5fr) minmax(120px,1fr) minmax(140px,1.1fr) 126px !important; }
+  .people-directory-schedules,.people-directory-columns>span:nth-child(4) { display:none; }
+}
+@container (max-width:720px) {
+  .people-directory-columns { display:none !important; }
+  html body .people-directory .people-directory-columns { display:none !important; }
+  html body .people-directory .people-directory-row { grid-template-columns:minmax(0,1fr) auto !important; gap:12px; }
+  .people-directory-row .people-card-main { grid-column:1; }
+  .people-directory-row .people-card-actions { grid-column:2; grid-row:1; }
+  .people-directory-row .people-directory-ministry { grid-column:1/-1; display:flex; gap:8px; }
+  html body .people-directory-row .people-card-contact { grid-column:1/-1; display:flex; gap:12px; flex-wrap:wrap; }
+  .people-mobile-label { display:block; }
+  .people-directory .people-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .people-directory .people-toolbar>label { max-width:none; flex-basis:100%; }
+  .people-directory .scope-badge { display:none; }
+}
+
+.person-record { width:min(900px,calc(100vw - 32px)); max-width:100%; max-height:calc(100dvh - 32px); margin:auto; padding:0; border:1px solid var(--pilot-line); border-radius:16px; background:var(--pilot-surface); color:var(--pilot-text); box-shadow:0 20px 80px #0004; overflow:hidden; }
+.person-record[open] { display:flex; flex-direction:column; }
+.person-record::backdrop { background:#100c2059; backdrop-filter:blur(8px); }
+.person-record-header { display:flex; align-items:center; gap:16px; padding:24px; border-bottom:1px solid var(--pilot-line); flex:none; }
+.person-record-header>div { min-width:0; }
+.person-record-header small { font-size:12px; letter-spacing:.08em; color:var(--community-primary); }
+.person-record-header h2 { margin:4px 0; font-size:24px; overflow-wrap:anywhere; }
+.person-record-header p { margin:0; font-size:14px; color:var(--pilot-muted); }
+.person-record-avatar { width:56px; height:56px; flex:none; display:grid; place-items:center; background:var(--community-soft); color:var(--community-primary); border-radius:16px; font-size:20px; overflow:hidden; }
+.person-record-avatar img { width:100%; height:100%; object-fit:cover; }
+.person-record .record-close { margin-left:auto; flex:none; width:40px; min-height:40px; border-radius:10px; border:1px solid var(--pilot-line); background:var(--pilot-surface-2); color:var(--pilot-text); font-size:24px; cursor:pointer; }
+.person-record-tabs { display:flex; gap:8px; padding:12px 24px; border-bottom:1px solid var(--pilot-line); overflow-x:auto; flex:none; }
+.person-record-tabs button { flex:none; min-height:42px; border:0; border-radius:9px; padding:8px 12px; background:transparent; color:var(--pilot-muted); font:inherit; font-size:14px; cursor:pointer; }
+.person-record-tabs button[aria-pressed="true"] { background:var(--community-soft); color:var(--community-primary); font-weight:650; }
+.person-record-content { padding:24px; overflow-y:auto; min-height:0; font-size:16px; line-height:1.6; }
+.record-section+.record-section { margin-top:24px; padding-top:24px; border-top:1px solid var(--pilot-line); }
+.record-section h3 { font-size:18px; margin:0 0 16px; }
+.record-section h3>span { font-size:13px; font-weight:400; color:var(--pilot-muted); margin-left:8px; }
+.record-section>p { margin:8px 0; font-size:14px; color:var(--pilot-muted); }
+.record-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px 32px; margin:0; }
+.record-fields dt { font-size:14px; color:var(--pilot-muted); }
+.record-fields dd { margin:4px 0 0; font-size:16px; overflow-wrap:anywhere; }
+.record-field-wide { grid-column:1/-1; }
+.record-ministry,.record-schedule,.record-busy { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 0; border-bottom:1px solid var(--pilot-line); }
+.record-ministry>div,.record-schedule>div,.record-busy>div { display:grid; gap:4px; min-width:0; }
+.record-schedule>div:last-child { text-align:right; justify-items:end; flex:none; }
+.record-ministry strong,.record-schedule strong,.record-busy strong,.record-checklist strong { font-size:16px; }
+.record-ministry span,.record-busy span,.record-schedule span { font-size:14px; }
+.record-ministry small,.record-schedule small,.record-checklist small,.record-busy small { font-size:13px; color:var(--pilot-muted); }
+.person-record a { color:var(--community-primary); font-size:14px; }
+.record-availability { padding:16px; margin-top:12px; border:1px solid var(--pilot-line); border-radius:12px; }
+.record-availability>strong { display:block; margin-bottom:14px; }
+.record-tags { display:flex; flex-wrap:wrap; gap:8px; }
+.record-tags>span,.record-status { display:inline-block; border-radius:7px; background:var(--pilot-surface-2); color:var(--pilot-muted); padding:4px 8px; font-size:13px; }
+.record-status:is(.is-confirmada,.is-feito) { color:var(--community-primary); background:var(--community-soft); }
+.record-stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-bottom:24px; }
+.record-stats>article { padding:14px; border:1px solid var(--pilot-line); border-radius:12px; }
+.record-stats small { font-size:13px; color:var(--pilot-muted); }
+.record-stats strong { display:block; font-size:26px; }
+.record-note { font-size:13px !important; }
+.record-section progress { width:100%; height:8px; accent-color:var(--community-primary); }
+.record-checklist { display:grid; grid-template-columns:24px minmax(0,1fr) auto; align-items:center; gap:12px; padding:14px 0; border-bottom:1px solid var(--pilot-line); }
+.record-checklist>div { display:grid; gap:4px; }
+html body :is(.people-person-button,.people-open-record,.person-record button,.worship-composer-prompt,.worship-composer-tools button):focus-visible { outline:2px solid var(--community-primary); outline-offset:3px; }
+@media (max-width:600px) {
+  .person-record { width:calc(100vw - 16px); max-height:calc(100dvh - 16px); }
+  .person-record-header,.person-record-content { padding:16px; }
+  .person-record-header { gap:12px; }
+  .person-record-header h2 { font-size:20px; }
+  .person-record-tabs { padding-inline:16px; }
+  .record-fields { grid-template-columns:1fr; }
+  .record-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .record-schedule { align-items:flex-start; flex-wrap:wrap; }
+  .record-schedule>div:last-child { text-align:left; justify-items:start; }
+  .record-checklist { grid-template-columns:24px minmax(0,1fr); }
+  .record-checklist>.record-status { grid-column:2; justify-self:start; }
+  .community-feed-redesign .worship-welcome h2 { font-size:26px; }
+}
+@media (prefers-reduced-motion:reduce) { html body .pilot-dashboard[data-ui-version="v2"] :is(.pilot-dashboard-layout,.pilot-sidebar,.pilot-sidebar-label,.worship-post) { transition:none !important; } html body .pilot-dashboard[data-ui-version="v2"] .pilot-navigation-drawer { animation:none !important; } }

@@ -125,7 +125,8 @@ export async function GET(request: Request) {
   // junto, que é justamente o que a paginação evita.
   const address = new URL(request.url);
   const search = (address.searchParams.get("busca") || "").trim().slice(0, 80);
-  const officialsOnly = address.searchParams.get("aba") === "oficiais" ? 1 : 0;
+  const requestedTab = address.searchParams.get("aba");
+  const officialsOnly = requestedTab === "todos" ? -1 : requestedTab === "oficiais" ? 1 : 0;
   const cursor = decodePeopleCursor(address.searchParams.get("cursor"));
   const requestedSize = Number(address.searchParams.get("limite") || 0);
   const pageSize =
@@ -140,6 +141,16 @@ export async function GET(request: Request) {
         `SELECT uc.id AS membership_id, u.id AS usuario_id, u.nome, u.email,
           u.criado_em AS owner_criado_em,
           u.telefone, u.foto_perfil, uc.papel,
+          COALESCE((SELECT group_concat(m.nome, ', ')
+            FROM ministerio_voluntarios mv JOIN ministerios_comunidade m
+              ON m.id = mv.ministerio_id AND m.comunidade_id = mv.comunidade_id
+            WHERE mv.usuario_id = u.id AND mv.comunidade_id = uc.comunidade_id AND mv.ativo = 1
+              AND m.status = 'ATIVO'), '') AS ministerios,
+          (SELECT COUNT(DISTINCT d.escala_id) FROM escala_designacoes d
+            JOIN escalas_ministerio s ON s.id = d.escala_id AND s.comunidade_id = d.comunidade_id
+            WHERE d.usuario_id = u.id AND d.comunidade_id = uc.comunidade_id AND d.ativo = 1
+              AND d.status IN ('CONFIRMADA', 'PENDENTE') AND s.status IN ('PUBLICADA', 'AGUARDANDO_CHECKLIST')
+              AND datetime(s.termina_em) >= datetime('now')) AS proximas_escalas,
           CASE WHEN oc.id IS NULL THEN 0 ELSE 1 END AS oficial,
           COALESCE(oc.titulo, '') AS titulo_oficial,
           COALESCE(oc.permissoes, '') AS permissoes,
@@ -150,7 +161,7 @@ export async function GET(request: Request) {
          LEFT JOIN oficiais_comunidade oc
            ON oc.usuario_comunidade_id = uc.id
          WHERE uc.comunidade_id = ? AND u.ativo = 1
-           AND (CASE WHEN oc.id IS NULL THEN 0 ELSE 1 END) = ?
+           AND (? = -1 OR (CASE WHEN oc.id IS NULL THEN 0 ELSE 1 END) = ?)
            AND (
              ? = ''
              OR u.nome LIKE ?
@@ -167,6 +178,7 @@ export async function GET(request: Request) {
       )
       .bind(
         access.context.comunidadeId,
+        officialsOnly,
         officialsOnly,
         search,
         searchTerm,

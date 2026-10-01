@@ -427,7 +427,7 @@ export default function EventsWorkspace({
           <span aria-hidden="true">{introOpen ? "−" : "+"}</span>
         </button>
       </header>
-      <div id={introId} className={styles.intro} data-open={introOpen} aria-hidden={!introOpen}>
+      <div id={introId} className={styles.intro} data-open={introOpen} aria-hidden={!introOpen} inert={!introOpen}>
         <div className={styles.introClip}>
           <div className={styles.introContent}>
             <div>

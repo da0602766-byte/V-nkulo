@@ -584,6 +584,26 @@ export default function PilotDashboard({
   }, [communityInfoOpen, mobileMenu]);
 
   useEffect(() => {
+    if (!mobileMenu) return;
+    const sheet = document.getElementById("pilot-mobile-sheet");
+    const trigger = document.activeElement as HTMLElement | null;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const controls = () => [...(sheet?.querySelectorAll<HTMLElement>('button:not([disabled]),a[href],input:not([disabled]),select,textarea,[tabindex="0"]') || [])].filter(item => item.getClientRects().length);
+    controls()[0]?.focus();
+    const trapFocus = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const items = controls();
+      const first = items[0], last = items[items.length - 1];
+      if (!first) return;
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    sheet?.addEventListener("keydown", trapFocus);
+    return () => { sheet?.removeEventListener("keydown", trapFocus); document.body.style.overflow = originalOverflow; trigger?.focus(); };
+  }, [mobileMenu]);
+
+  useEffect(() => {
     const openSearch = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
@@ -1318,7 +1338,7 @@ export default function PilotDashboard({
               userName={userName}
               userPhotoUrl={userPhotoUrl}
               eventsEnabled={allowedMenu.some((item) => item.id === "eventos")}
-              onNavigate={(next, create) => openView(next, create ? { event: next === "eventos" ? "vinkulo:new-event" : "vinkulo:new-request" } : undefined)}
+              onNavigate={(next, create) => openView(next === "escalas" ? "ministerios" : next, create ? { event: next === "eventos" ? "vinkulo:new-event" : next === "escalas" ? "vinkulo:new-schedule" : "vinkulo:new-request" } : undefined)}
               readOnlyFeed={active.communityAccess === "FEED_ONLY"}
             />
           )}
@@ -1501,7 +1521,7 @@ export default function PilotDashboard({
         <div className="pilot-mobile-overlay" role="presentation" onMouseDown={() => setMobileMenu(null)}>
           <section
             id="pilot-mobile-sheet"
-            className="pilot-mobile-sheet"
+            className={`pilot-mobile-sheet${mobileMenu === "menu" ? " pilot-navigation-drawer" : ""}`}
             role="dialog"
             aria-modal="true"
             aria-label={

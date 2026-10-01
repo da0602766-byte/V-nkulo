@@ -8,6 +8,7 @@ import {
   FormEvent,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -25,6 +26,7 @@ import FeedIcon from "./feed/FeedIcon";
 import useFeedDialog from "./feed/useFeedDialog";
 import FeedChannelChoices from "./feed/FeedChannelChoices";
 import TransientFeedback from "./TransientFeedback";
+import introStyles from "./EventsAgenda.module.css";
 
 type FeedItem = {
   id: number;
@@ -125,7 +127,7 @@ export default function CommunityHome({
   userName: string;
   userPhotoUrl?: string;
   eventsEnabled?: boolean;
-  onNavigate?: (view: "eventos" | "solicitacoes", create?: boolean) => void;
+  onNavigate?: (view: "eventos" | "solicitacoes" | "escalas", create?: boolean) => void;
   readOnlyFeed?: boolean;
 }) {
   const [posts, setPosts] = useState<FeedItem[]>(initialFeed);
@@ -137,6 +139,15 @@ export default function CommunityHome({
   const [postActionsId, setPostActionsId] = useState<number | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerIntent, setComposerIntent] = useState<ComposerIntent>("text");
+  const [composerOptionsOpen, setComposerOptionsOpen] = useState(false);
+  const introId = useId();
+  const [introState, setIntroState] = useState<"auto" | "open" | "closed">("auto");
+  const introOpen = introState !== "closed";
+  useEffect(() => {
+    if (introState !== "auto") return;
+    const timer = window.setTimeout(() => setIntroState("closed"), 5_200);
+    return () => window.clearTimeout(timer);
+  }, [introState]);
   const [feedSearch, setFeedSearch] = useState("");
   const [contextOpen, setContextOpen] = useState(false);
   const [eventsError, setEventsError] = useState("");
@@ -180,6 +191,7 @@ export default function CommunityHome({
   function openComposer(intent: ComposerIntent = "text") {
     setComposerIntent(intent);
     setComposerOpen(true);
+    setComposerOptionsOpen(intent !== "text");
     requestAnimationFrame(() => {
       const form = composerTitleRef.current?.form;
       const target = intent === "event" ? form?.querySelector<HTMLElement>('[name="eventId"]') : intent === "image" ? form?.querySelector<HTMLElement>(".composer-image-option") : composerTitleRef.current;
@@ -625,14 +637,23 @@ export default function CommunityHome({
   }
 
   return (
-    <section className="worship-feed community-feed-redesign" aria-busy={loading}>
+    <section className={`worship-feed community-feed-redesign ${introStyles.workspace}`} aria-busy={loading}>
+      <div className={introStyles.titlebar}>
+        <h1>Mural</h1>
+        <button type="button" className={introStyles.introToggle} aria-expanded={introOpen} aria-controls={introId} onClick={() => setIntroState(introOpen ? "closed" : "open")}>
+          {introOpen ? "Recolher apresentação" : "Sobre a comunidade"}<span aria-hidden="true">{introOpen ? "−" : "+"}</span>
+        </button>
+      </div>
+      <div id={introId} className={introStyles.intro} data-open={introOpen} aria-hidden={!introOpen} inert={!introOpen}>
+      <div className={introStyles.introClip}>
       <header className="worship-welcome">
         <div><p className="worship-eyebrow">VIDA EM COMUNIDADE</p>
-          <h1>Fé que conecta pessoas.<br />Comunidade que <em>transforma.</em></h1>
+          <h2>Fé que conecta pessoas.<br />Comunidade que <em>transforma.</em></h2>
           <p className="worship-community-name">{communityName}</p>
         </div>
         <Link className="worship-signature" href={`/comunidades/${communitySlug}`} aria-label={`Página pública de ${communityName}`}>Juntos, por<br />algo maior.<FeedIcon name="heart" /></Link>
       </header>
+      </div></div>
       {!readOnlyFeed && <nav className="worship-context-nav" aria-label="Acontece na comunidade">
         {eventsEnabled && <button type="button" onClick={() => onNavigate?.("eventos")}><FeedIcon name="calendar" />Agenda</button>}
         <button type="button" onClick={() => onNavigate?.("solicitacoes")}><FeedIcon name="heart" />Pedidos</button>
@@ -664,12 +685,17 @@ export default function CommunityHome({
           <FeedHighlights items={highlights} onSelect={openHighlight} onCreate={canPublish ? () => openComposer() : undefined} />
       {canPublish && (
         <section className="worship-composer">
-          <FeedComposerBar hasEvents={myEvents.length > 0} onOpen={openComposer} onRequest={!readOnlyFeed && onNavigate ? () => onNavigate("solicitacoes", true) : undefined} />
-          <form className="pilot-form community-composer-inline" aria-label="Criar publicação" onSubmit={createPost}>
+          <button type="button" className="worship-composer-prompt" aria-expanded={composerOpen} aria-controls="community-publication-form" onClick={() => openComposer()}>
+            <span className="worship-avatar" aria-hidden="true">{userPhotoUrl ? <SafeImage fallbackName={userName} fallbackKind="avatar" src={userPhotoUrl} alt="" width="36" height="36" /> : userName.split(/\s+/).filter(Boolean).slice(0,2).map(part => part[0]).join("")}</span>
+            <strong>O que você quer compartilhar?</strong><FeedIcon name="plus" />
+          </button>
+          <FeedComposerBar hasEvents={myEvents.length > 0} onOpen={openComposer} onEvent={eventsEnabled && onNavigate ? () => onNavigate("eventos", true) : undefined} onSchedule={permissions.includes("schedules.manage") && onNavigate ? () => onNavigate("escalas", true) : undefined} onRequest={!readOnlyFeed && onNavigate ? () => onNavigate("solicitacoes", true) : undefined} />
+          <div className="community-composer-reveal" hidden={!composerOpen}>
+          <form id="community-publication-form" className="pilot-form community-composer-inline" aria-label="Criar publicação" onSubmit={createPost}>
             <header>
               <span className="worship-avatar" aria-hidden="true">{userPhotoUrl ? <SafeImage fallbackName={userName} fallbackKind="avatar" src={userPhotoUrl} alt="" width="36" height="36" /> : userName.split(/\s+/).filter(Boolean).slice(0,2).map(part => part[0]).join("")}</span>
               <div><small>COMPARTILHAR COM A COMUNIDADE</small><strong>O que você quer compartilhar?</strong></div>
-
+              <button type="button" className="composer-close" disabled={working} onClick={() => setComposerOpen(false)} aria-label="Recolher formulário de publicação">×</button>
             </header>
             <label>
               Título
@@ -679,7 +705,7 @@ export default function CommunityHome({
               Conteúdo
               <textarea ref={composerContentRef} name="conteudo" required maxLength={3000} rows={3} placeholder="Escreva uma mensagem para sua comunidade…" />
             </label>
-            <details className="composer-options composer-wide" open={composerOpen} onToggle={(event) => setComposerOpen(event.currentTarget.open)}>
+            <details className="composer-options composer-wide" open={composerOptionsOpen} onToggle={(event) => setComposerOptionsOpen(event.currentTarget.open)}>
             <summary>Imagem, evento e opções de publicação</summary>
             <div className="composer-options-fields">
             {myEvents.length > 0 && (
@@ -773,6 +799,7 @@ export default function CommunityHome({
               {working ? "Salvando…" : "Salvar publicação"}
             </button>
           </form>
+          </div>
         </section>
       )}
 

@@ -4,6 +4,8 @@ import TransientFeedback from "./TransientFeedback";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import VerifiedOwnerName from "./VerifiedOwnerName";
+import PersonRecord from "./PersonRecord";
+import SafeImage from "./SafeImage";
 
 type Person = {
   membership_id: number;
@@ -18,6 +20,8 @@ type Person = {
   permissoes: string;
   status: string;
   owner_verified?: number;
+  ministerios?: string;
+  proximas_escalas?: number;
 };
 
 type Me = {
@@ -172,7 +176,8 @@ export default function PeopleWorkspace({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [tab, setTab] = useState<"membros" | "oficiais">("membros");
+  const [tab, setTab] = useState<"todos" | "membros" | "oficiais">("todos");
+  const [record, setRecord] = useState<Person | null>(null);
   const [search, setSearch] = useState("");
   const [loadingMore, setLoadingMore] = useState(false);
   const [editing, setEditing] = useState<Person | null>(null);
@@ -363,14 +368,13 @@ export default function PeopleWorkspace({
   const totals = data.counts || { membros: 0, oficiais: 0, oficiaisSemTitulo: 0 };
   const members = totals.membros;
   return (
-    <section className="people-workspace">
+    <section className="people-workspace people-directory">
       <header className="workspace-heading people-heading">
         <div>
-          <p className="pilot-kicker">PESSOAS, MEMBROS E PERMISSÕES</p>
-          <h1>Equipe de {communityName}</h1>
+          <p className="pilot-kicker">COMUNIDADE · {communityName}</p>
+          <h1>Pessoas</h1>
           <p>
-            Membros ficam separados da lista de oficiais. Toda função e
-            permissão é verificada no servidor e registrada na auditoria.
+            Consulte os vínculos, a disponibilidade e a participação de cada pessoa.
           </p>
         </div>
         <span className="scope-badge">Escopo: comunidade ativa</span>
@@ -393,7 +397,7 @@ export default function PeopleWorkspace({
       <div className="people-metrics">
         <article>
           <span>◎</span>
-          <div><small>Pessoas vinculadas</small><strong>{data.people.length}</strong></div>
+          <div><small>Pessoas vinculadas</small><strong>{members + totals.oficiais}</strong></div>
         </article>
         <article>
           <span>○</span>
@@ -406,7 +410,7 @@ export default function PeopleWorkspace({
         <article>
           <span>◇</span>
           <div>
-            <small>Sem responsável</small>
+            <small>Oficiais sem título</small>
             <strong>{totals.oficiaisSemTitulo}</strong>
           </div>
         </article>
@@ -419,10 +423,12 @@ export default function PeopleWorkspace({
       )}
 
       <div className="people-toolbar">
-        <div className="people-tabs" role="tablist" aria-label="Tipo de pessoa">
+        <div className="people-tabs" aria-label="Tipo de pessoa">
+          <button type="button" className={tab === "todos" ? "active" : ""} aria-pressed={tab === "todos"} onClick={() => setTab("todos")}>Todas <span>{members + totals.oficiais}</span></button>
           <button
             type="button"
             className={tab === "membros" ? "active" : ""}
+            aria-pressed={tab === "membros"}
             onClick={() => setTab("membros")}
           >
             Membros <span>{members}</span>
@@ -430,6 +436,7 @@ export default function PeopleWorkspace({
           <button
             type="button"
             className={tab === "oficiais" ? "active" : ""}
+            aria-pressed={tab === "oficiais"}
             onClick={() => setTab("oficiais")}
           >
             Oficiais <span>{totals.oficiais}</span>
@@ -446,29 +453,25 @@ export default function PeopleWorkspace({
         </label>
       </div>
 
-      <div className="people-list">
+      <div className="people-list people-directory-list">
+        <div className="people-directory-columns" aria-hidden="true"><span>Pessoa / função</span><span>Ministérios</span><span>Contato</span><span>Próximas escalas</span><span>Ficha</span></div>
         {pagedPeople.map((person) => (
-          <article key={person.membership_id} className="people-card">
-            <span className="people-avatar">{getInitials(person.nome)}</span>
+          <article key={person.membership_id} className="people-card people-directory-row">
             <div className="people-card-main">
-              <div>
-                <VerifiedOwnerName name={person.nome} verified={Boolean(person.owner_verified)} />
-                <small>{person.email}</small>
-              </div>
-              <div className="people-badges">
-                <span>{roleLabel(person.papel)}</span>
-                {person.oficial ? (
-                  <em>{person.titulo_oficial || "Oficial"}</em>
-                ) : (
-                  <em className="member-badge">Membro</em>
-                )}
-              </div>
+              <button type="button" className="people-person-button" onClick={() => setRecord(person)} aria-label={`Abrir ficha de ${person.nome}`}>
+                <span className="people-avatar">{person.foto_perfil ? <SafeImage src={person.foto_perfil} alt="" fallbackName={person.nome} fallbackKind="avatar" /> : getInitials(person.nome)}</span>
+                <span><VerifiedOwnerName name={person.nome} verified={Boolean(person.owner_verified)} /><small>{person.oficial ? person.titulo_oficial || "Oficial" : roleLabel(person.papel)}</small></span>
+              </button>
             </div>
+            <div className="people-directory-ministry"><small className="people-mobile-label">Ministérios</small><span>{person.ministerios || "Sem vínculo ativo"}</span></div>
             <div className="people-card-contact">
-              <small>Contato</small>
+              <small>{person.email}</small>
               <span>{person.telefone || "Não informado"}</span>
             </div>
+            <div className="people-directory-schedules"><small className="people-mobile-label">Próximas escalas</small><span>{person.proximas_escalas || 0}</span></div>
             <div className="people-card-actions">
+              <button type="button" className="people-open-record" onClick={() => setRecord(person)} aria-label={`Ver ficha de ${person.nome}`}>Ver ficha</button>
+              {(data.canManage || data.canRemoveCommunity) && <details className="people-row-menu"><summary aria-label={`Mais ações para ${person.nome}`}>⋯</summary><div>
               {data.canManage && (
                 <button type="button" onClick={() => { const title = person.titulo_oficial || "LÍDER"; setEditing(person); setPermissionDraft(person.permissoes.split(",").filter(Boolean)); setPresetTitle(title); setOfficialTitle(title); setIsOfficial(Boolean(person.oficial)); }}>
                   Editar função
@@ -483,6 +486,7 @@ export default function PeopleWorkspace({
                   Remover pessoa
                 </button>
               )}
+              </div></details>}
             </div>
           </article>
         ))}
@@ -499,7 +503,7 @@ export default function PeopleWorkspace({
           <span>
             {filtered.length} {filtered.length === 1 ? "pessoa carregada" : "pessoas carregadas"}
             {" · "}
-            {tab === "oficiais" ? totals.oficiais : totals.membros} nesta aba
+            {tab === "todos" ? members + totals.oficiais : tab === "oficiais" ? totals.oficiais : totals.membros} nesta aba
           </span>
           {data.nextCursor && (
             <button
@@ -513,6 +517,7 @@ export default function PeopleWorkspace({
         </nav>
       )}
 
+      {record && <PersonRecord membershipId={record.membership_id} name={record.nome} permissionLabels={PERMISSION_LABELS} onClose={() => setRecord(null)} />}
       {editing && (
         <div className="people-modal-backdrop" onMouseDown={() => setEditing(null)}>
           <section

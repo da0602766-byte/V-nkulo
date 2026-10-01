@@ -413,6 +413,21 @@ export default function SecretaryMinisterialWorkspace({
   }, [ministries]);
 
   useEffect(() => {
+    if (loading) return;
+    const url = new URL(window.location.href);
+    const scheduleId = Number(url.searchParams.get("schedule"));
+    const selected = schedules.find((item) => item.id === scheduleId);
+    if (selected) {
+      setSelectedMinistryId(selected.ministerio_id);
+      setDesktopScheduleId(selected.id);
+      setTab("escalas");
+      const frame = window.requestAnimationFrame(() => document.getElementById(`person-schedule-${selected.id}`)?.scrollIntoView({ block: "start" }));
+      return () => window.cancelAnimationFrame(frame);
+    }
+    if (url.searchParams.get("tab") === "escalas") setTab("escalas");
+  }, [loading, schedules]);
+
+  useEffect(() => {
     const acertar = () => setAgora(Date.now());
     const primeiro = window.setTimeout(acertar, 0);
     const relogio = window.setInterval(acertar, 600000);
@@ -1477,7 +1492,7 @@ export default function SecretaryMinisterialWorkspace({
       },
     ].filter((group) => group.team || group.assignments.length > 0);
     const card = (
-      <article className="secretary-schedule-card" key={schedule.id}>
+      <article className="secretary-schedule-card" id={`person-schedule-${schedule.id}`} key={schedule.id}>
         <header>
           <time dateTime={schedule.inicia_em}><strong>{formatDay(schedule.inicia_em)}</strong><span>{formatMonth(schedule.inicia_em)}</span></time>
           <div><span className={`secretary-status ${schedule.status.toLowerCase()}`}>{schedule.status.replaceAll("_", " ")}</span><h2>{schedule.titulo}</h2><p>{formatDate(schedule.inicia_em)} · {schedule.local || "Local não informado"}</p>{schedule.status === "AGENDADA" && schedule.publicar_em && <SchedulePublicationCountdown opensAt={schedule.publicar_em} />}</div>
