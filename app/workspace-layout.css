@@ -221,6 +221,26 @@ html body :is(.people-person-button,.people-open-record,.person-record button,.w
 @media (prefers-reduced-motion:reduce) { html body .pilot-dashboard[data-ui-version="v2"] :is(.pilot-dashboard-layout,.pilot-sidebar,.pilot-sidebar-label,.worship-post) { transition:none !important; } html body .pilot-dashboard[data-ui-version="v2"] .pilot-navigation-drawer { animation:none !important; } }
 
 /* Modal surfaces own scrolling; the page and help launcher stay underneath. */
+@media (max-width:680px) {
+  html body .pilot-dashboard[data-ui-version="v2"] .pilot-workspace:has(.cpart-shell-mobile) { padding:16px 16px calc(104px + env(safe-area-inset-bottom)) !important; }
+  html body .cpart-shell.cpart-shell-mobile { width:100%; max-width:100%; min-width:0; padding:0; margin:0; }
+  .cpart-mobile-profile { display:grid; grid-template-columns:minmax(0,1fr); gap:16px; min-width:0; }
+  html body .cpart-mobile-profile .cpart-mobile-topbar { position:static; padding:0; min-height:44px; border:0; background:transparent; gap:8px; }
+  .cpart-mobile-profile .cpart-mobile-topbar>button { min-width:44px; min-height:44px; border:1px solid var(--line); border-radius:12px; background:var(--surf); color:var(--ink); cursor:pointer; }
+  .cpart-mobile-profile .cpart-mobile-topbar>.cpart-profile-management { margin-left:auto; padding:8px 12px; color:var(--acc); font-size:14px; }
+  html body .cpart-mobile-profile .cpart-mobile-cover { min-height:150px; padding:18px; border-radius:16px; overflow:hidden; }
+  .cpart-mobile-profile .cpart-mobile-cover h2 { font-size:24px; line-height:1.2; overflow-wrap:anywhere; }
+  html body .cpart-shell-mobile .cpart-mobile-profile .cpart-mobile-content { padding:0; display:grid; gap:16px; min-width:0; }
+  .cpart-mobile-profile .cpart-panel-grid { gap:10px; }
+  .cpart-mobile-profile .cpart-panel-grid>div { min-width:0; padding:12px; border:1px solid var(--line); background:var(--surf); }
+  .cpart-mobile-profile .cpart-panel-grid p { font-size:14px; margin-bottom:4px; }
+  .cpart-mobile-profile .cpart-panel-grid strong { font-size:16px; line-height:1.4; overflow-wrap:anywhere; }
+  .cpart-mobile-profile .cpart-panel-desc:empty { display:none; }
+  .cpart-mobile-profile .cpart-mobile-essentials { display:grid; gap:12px; min-width:0; }
+  .cpart-mobile-profile .cpart-mobile-card { min-width:0; padding:16px; }
+  .cpart-mobile-profile .cpart-mobile-card-title { margin:0 0 14px; font-size:16px; font-weight:700; }
+  .cpart-mobile-profile .cpart-mobile-card form :is(input,select) { min-height:44px; font-size:16px; }
+}
 html:has(.pilot-mobile-overlay,.pilot-notification-panel),
 body:has(.pilot-mobile-overlay,.pilot-notification-panel) { overflow:hidden !important; overscroll-behavior:none; }
 html body:has(.pilot-mobile-overlay,.pilot-notification-panel)>.global-feedback-launcher { display:none !important; }

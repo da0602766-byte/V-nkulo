@@ -478,12 +478,12 @@ function MobileDetail({
   onRequestEntry: (cell: Cell, nome: string, contato: string, mensagem: string) => Promise<boolean>;
 }) {
   return (
-    <div>
+    <div className="cpart-mobile-profile">
       <div className="cpart-mobile-topbar">
         <button type="button" onClick={onBack} aria-label="Voltar">←</button>
         <span>Perfil da célula</span>
+        {onBackToGestao && <button type="button" className="cpart-profile-management" onClick={onBackToGestao}>Gestão</button>}
       </div>
-      {onBackToGestao && <MobileManagementLink onClick={onBackToGestao} />}
       <div className="cpart-panel-cover cpart-mobile-cover">
         <h2>{cell.nome}</h2>
         <p>{cell.rede}</p>
