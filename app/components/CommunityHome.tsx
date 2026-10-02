@@ -195,7 +195,7 @@ export default function CommunityHome({
     requestAnimationFrame(() => {
       const form = composerTitleRef.current?.form;
       const target = intent === "event" ? form?.querySelector<HTMLElement>('[name="eventId"]') : intent === "image" ? form?.querySelector<HTMLElement>(".composer-image-option") : composerTitleRef.current;
-      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+      target?.scrollIntoView({ behavior: "smooth", block: "nearest" });
       target?.focus({ preventScroll: true });
     });
   }
@@ -685,17 +685,18 @@ export default function CommunityHome({
           <FeedHighlights items={highlights} onSelect={openHighlight} onCreate={canPublish ? () => openComposer() : undefined} />
       {canPublish && (
         <section className="worship-composer">
-          <button type="button" className="worship-composer-prompt" aria-label={composerOpen ? "Recolher formulário de publicação" : "O que você quer compartilhar?"} aria-expanded={composerOpen} aria-controls="community-publication-form" disabled={working} onClick={() => composerOpen ? setComposerOpen(false) : openComposer()}>
+          <button type="button" hidden={composerOpen} className="worship-composer-prompt" aria-label="O que você quer compartilhar?" aria-expanded={composerOpen} aria-controls="community-publication-form" disabled={working} onClick={() => openComposer()}>
             <span className="worship-avatar" aria-hidden="true">{userPhotoUrl ? <SafeImage fallbackName={userName} fallbackKind="avatar" src={userPhotoUrl} alt="" width="36" height="36" /> : userName.split(/\s+/).filter(Boolean).slice(0,2).map(part => part[0]).join("")}</span>
-            <strong>O que você quer compartilhar?</strong>{composerOpen ? <span aria-hidden="true">×</span> : <FeedIcon name="plus" />}
+            <strong>O que você quer compartilhar?</strong><FeedIcon name="plus" />
           </button>
+          <div className="composer-inline-title" hidden={!composerOpen}>
+            <span className="worship-avatar" aria-hidden="true">{userPhotoUrl ? <SafeImage fallbackName={userName} fallbackKind="avatar" src={userPhotoUrl} alt="" width="36" height="36" /> : userName.split(/\s+/).filter(Boolean).slice(0,2).map(part => part[0]).join("")}</span>
+            <input ref={composerTitleRef} form="community-publication-form" name="titulo" aria-label="Título da publicação" placeholder="O que você quer compartilhar?" required maxLength={140} />
+            <button type="button" disabled={working} onClick={() => setComposerOpen(false)} aria-label="Recolher formulário de publicação">×</button>
+          </div>
           <FeedComposerBar hasEvents={myEvents.length > 0} onOpen={openComposer} onEvent={eventsEnabled && onNavigate ? () => onNavigate("eventos", true) : undefined} onSchedule={permissions.includes("schedules.manage") && onNavigate ? () => onNavigate("escalas", true) : undefined} onRequest={!readOnlyFeed && onNavigate ? () => onNavigate("solicitacoes", true) : undefined} />
           <div className="community-composer-reveal" hidden={!composerOpen}>
           <form id="community-publication-form" className="pilot-form community-composer-inline" aria-label="Criar publicação" onSubmit={createPost}>
-            <label>
-              Título
-              <input data-initial-focus={composerIntent === "text" ? "" : undefined} ref={composerTitleRef} name="titulo" required maxLength={140} />
-            </label>
             <label className="composer-wide">
               Conteúdo
               <textarea ref={composerContentRef} name="conteudo" required maxLength={3000} rows={3} placeholder="Escreva uma mensagem para sua comunidade…" />

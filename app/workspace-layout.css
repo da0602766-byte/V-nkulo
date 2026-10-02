@@ -88,6 +88,12 @@ html body .pilot-dashboard[data-ui-version="v2"] .worship-composer { padding:14p
 html body .pilot-dashboard[data-ui-version="v2"] .worship-composer-tools { margin-top:8px; }
 html body .pilot-dashboard[data-ui-version="v2"] .worship-composer-tools button { font-size:14px; min-height:44px; }
 .community-composer-reveal[hidden] { display:none !important; }
+html body .worship-composer-prompt[hidden], html body .composer-inline-title[hidden] { display:none !important; }
+.composer-inline-title { display:flex; align-items:center; gap:12px; min-height:48px; }
+.composer-inline-title .worship-avatar { flex:none; }
+.composer-inline-title input { min-width:0; flex:1; width:100%; min-height:42px; padding:10px 14px; border:1px solid var(--pilot-line); border-radius:24px; background:var(--pilot-surface-2); color:var(--pilot-text); font:inherit; font-size:16px; }
+.composer-inline-title input:focus { outline:2px solid var(--community-primary); outline-offset:2px; }
+.composer-inline-title>button { flex:none; width:32px; height:40px; padding:0; border:0; background:transparent; color:var(--pilot-text); font-size:22px; cursor:pointer; }
 .community-composer-inline>header { gap:10px; }
 .community-composer-inline>header .composer-close { margin-left:auto; width:40px; min-height:40px; padding:0; border:1px solid var(--pilot-line); background:var(--pilot-surface-2); color:var(--pilot-text); border-radius:10px; font-size:24px; cursor:pointer; }
 @container (max-width:900px) {
