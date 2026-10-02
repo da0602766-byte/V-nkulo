@@ -685,18 +685,13 @@ export default function CommunityHome({
           <FeedHighlights items={highlights} onSelect={openHighlight} onCreate={canPublish ? () => openComposer() : undefined} />
       {canPublish && (
         <section className="worship-composer">
-          <button type="button" className="worship-composer-prompt" aria-expanded={composerOpen} aria-controls="community-publication-form" onClick={() => openComposer()}>
+          <button type="button" className="worship-composer-prompt" aria-label={composerOpen ? "Recolher formulário de publicação" : "O que você quer compartilhar?"} aria-expanded={composerOpen} aria-controls="community-publication-form" disabled={working} onClick={() => composerOpen ? setComposerOpen(false) : openComposer()}>
             <span className="worship-avatar" aria-hidden="true">{userPhotoUrl ? <SafeImage fallbackName={userName} fallbackKind="avatar" src={userPhotoUrl} alt="" width="36" height="36" /> : userName.split(/\s+/).filter(Boolean).slice(0,2).map(part => part[0]).join("")}</span>
-            <strong>O que você quer compartilhar?</strong><FeedIcon name="plus" />
+            <strong>O que você quer compartilhar?</strong>{composerOpen ? <span aria-hidden="true">×</span> : <FeedIcon name="plus" />}
           </button>
           <FeedComposerBar hasEvents={myEvents.length > 0} onOpen={openComposer} onEvent={eventsEnabled && onNavigate ? () => onNavigate("eventos", true) : undefined} onSchedule={permissions.includes("schedules.manage") && onNavigate ? () => onNavigate("escalas", true) : undefined} onRequest={!readOnlyFeed && onNavigate ? () => onNavigate("solicitacoes", true) : undefined} />
           <div className="community-composer-reveal" hidden={!composerOpen}>
           <form id="community-publication-form" className="pilot-form community-composer-inline" aria-label="Criar publicação" onSubmit={createPost}>
-            <header>
-              <span className="worship-avatar" aria-hidden="true">{userPhotoUrl ? <SafeImage fallbackName={userName} fallbackKind="avatar" src={userPhotoUrl} alt="" width="36" height="36" /> : userName.split(/\s+/).filter(Boolean).slice(0,2).map(part => part[0]).join("")}</span>
-              <div><small>COMPARTILHAR COM A COMUNIDADE</small><strong>O que você quer compartilhar?</strong></div>
-              <button type="button" className="composer-close" disabled={working} onClick={() => setComposerOpen(false)} aria-label="Recolher formulário de publicação">×</button>
-            </header>
             <label>
               Título
               <input data-initial-focus={composerIntent === "text" ? "" : undefined} ref={composerTitleRef} name="titulo" required maxLength={140} />
