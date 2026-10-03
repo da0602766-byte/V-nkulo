@@ -36,4 +36,4 @@ As prévias foram inspecionadas no navegador. Trata-se de uma única amostra de 
 
 ## Publicação
 
-Candidato validado para o site existente `https://adote-gestao.da0602766.chatgpt.site`. Comprovante de versão e deployment será acrescentado após a confirmação do Sites.
+Publicada no Sites **353**, fonte `c5386419bfbed0e3b5ce7b1b9d042fa4e36c6732`, deployment `appgdep_6ac188a9b3c881918aff2b90b4fcda71`, confirmado como `succeeded` em 03/10/2026 às 19h59 Brasília. URL: `https://adote-gestao.da0602766.chatgpt.site`. Público anterior preservado. Registro documental posterior ao deploy; nenhuma migração de banco foi aplicada.
