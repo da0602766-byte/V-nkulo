@@ -116,6 +116,7 @@ export type ParkingData = {
     id: number;
     nome: string;
     email: string;
+    cpfFinal?: string | null;
     papel: string;
     origemAcesso: "ESCALA_ATIVA" | "PERFIL_GESTOR" | "MEMBRO";
     escala: {

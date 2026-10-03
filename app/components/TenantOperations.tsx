@@ -1320,15 +1320,21 @@ export function VisitorsWorkspace({
                   <div><p className="pilot-kicker">CRESCIMENTO</p><strong id="visitor-panorama-growth">Pessoas ativas</strong></div>
                   <b>{counts.todos}</b>
                 </header>
-                <div className={`visitor-growth-chart-v6 ${!categoriesLoaded ? "is-loading" : ""}`} aria-busy={!categoriesLoaded}>
+                <div className={`visitor-growth-chart-v6 visitor-growth-chart-polished ${!categoriesLoaded ? "is-loading" : ""}`} aria-busy={!categoriesLoaded}>
                   {!categoriesLoaded && <p>Carregando crescimento…</p>}
-                  {categoriesLoaded && growthDashboard.points.map((point) => (
-                    <span key={point.month}>
-                      <i style={{ height: `${Math.max(6, Math.round((point.value / growthDashboard.max) * 100))}%` }} aria-hidden="true" />
-                      <b>{point.value}</b>
-                      <small>{formatGrowthMonth(point.month)}</small>
-                    </span>
-                  ))}
+                  {categoriesLoaded && growthDashboard.points.length > 0 && <>
+                    <div className="visitor-growth-plot" role="img" aria-label={`Pessoas ativas por mês: ${growthDashboard.points.map((point) => `${formatGrowthMonth(point.month)} ${point.value}`).join(", ")}`}>
+                      <div className="visitor-growth-scale" aria-hidden="true"><span>{growthDashboard.max}</span><span>{Math.round(growthDashboard.max / 2)}</span><span>0</span></div>
+                      <svg viewBox="0 0 600 160" preserveAspectRatio="none" aria-hidden="true">
+                        <defs><linearGradient id="visitor-growth-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--pilot-primary)" stopOpacity=".28" /><stop offset="100%" stopColor="var(--pilot-primary)" stopOpacity="0" /></linearGradient></defs>
+                        {[10, 78, 146].map((y) => <line key={y} x1="0" y1={y} x2="600" y2={y} className="visitor-growth-gridline" />)}
+                        <polygon points={`0,146 ${growthDashboard.points.map((point, index) => `${growthDashboard.points.length === 1 ? 300 : index * 600 / (growthDashboard.points.length - 1)},${146 - point.value / growthDashboard.max * 136}`).join(" ")} 600,146`} fill="url(#visitor-growth-fill)" />
+                        <polyline points={growthDashboard.points.map((point, index) => `${growthDashboard.points.length === 1 ? 300 : index * 600 / (growthDashboard.points.length - 1)},${146 - point.value / growthDashboard.max * 136}`).join(" ")} className="visitor-growth-line" />
+                        {growthDashboard.points.map((point, index) => <circle key={point.month} cx={growthDashboard.points.length === 1 ? 300 : index * 600 / (growthDashboard.points.length - 1)} cy={146 - point.value / growthDashboard.max * 136} r="5" className="visitor-growth-dot" />)}
+                      </svg>
+                    </div>
+                    <div className="visitor-growth-months" aria-hidden="true">{growthDashboard.points.map((point) => <span key={point.month}><b>{point.value}</b><small>{formatGrowthMonth(point.month)}</small></span>)}</div>
+                  </>}
                   {categoriesLoaded && !growthDashboard.points.length && <p>O gráfico aparece depois do primeiro cadastro.</p>}
                 </div>
                 {Boolean(categoryDashboards.length) && (

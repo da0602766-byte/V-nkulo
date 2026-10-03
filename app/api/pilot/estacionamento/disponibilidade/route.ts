@@ -5,13 +5,14 @@ export async function GET() {
   const access = await requireTenantPermission("parking.reserve");
   if ("error" in access) return access.error;
   const db = getD1();
-  const [config, stats, nextEvent] = await Promise.all([
+  const [config, stats, nextEvent, identity] = await Promise.all([
     db.prepare(`SELECT ativo,nome_modulo,cor_destaque,regras,atualizado_em FROM estacionamento_configuracoes WHERE comunidade_id=?`).bind(access.context.comunidadeId).first<Record<string,unknown>>(),
     db.prepare(`SELECT COUNT(*) AS total,SUM(CASE WHEN status='OCUPADA' THEN 1 ELSE 0 END) AS ocupadas,SUM(CASE WHEN status='LIVRE' THEN 1 ELSE 0 END) AS livres,SUM(CASE WHEN tipo IN ('RESERVADA','IDOSO','PCD') THEN 1 ELSE 0 END) AS especiais FROM estacionamento_vagas WHERE comunidade_id=? AND ativo=1`).bind(access.context.comunidadeId).first<Record<string,number>>(),
     db.prepare(`SELECT id,titulo,inicia_em,termina_em,escalas_abrem_em,reservas_abrem_em
       FROM eventos_comunidade WHERE comunidade_id=? AND status='PUBLICADO'
         AND datetime(COALESCE(termina_em,inicia_em),'+4 hours')>=datetime('now')
       ORDER BY inicia_em ASC LIMIT 1`).bind(access.context.comunidadeId).first<Record<string,unknown>>(),
+    db.prepare(`SELECT finais FROM identidades_cpf WHERE usuario_id=? LIMIT 1`).bind(access.user.id).first<{ finais: string }>(),
   ]);
   if (!config || !Boolean(config.ativo)) return Response.json({ error:"O módulo de estacionamento está desativado nesta comunidade." },{ status:423 });
   const rules = readRules(config.regras);
@@ -45,7 +46,7 @@ export async function GET() {
     stats:{ total:Number(stats?.total||0), ocupadas:Number(stats?.ocupadas||0), livres:availableSpaces, especiais:Number(stats?.especiais||0) },
     vagas:spaces.results,
     movimentacoes:[], ocorrencias:[], availableUsers:[], ministryMembers:[],
-    operator:{ id:access.user.id,nome:access.user.nome,email:access.user.email,papel:access.context.papel,origemAcesso:"MEMBRO",escala:null },
+    operator:{ id:access.user.id,nome:access.user.nome,email:access.user.email,papel:access.context.papel,origemAcesso:"MEMBRO",escala:null,cpfFinal:identity?.finais || null },
     permissions:access.context.permissions,
     reservationGate:{
       unlocked,

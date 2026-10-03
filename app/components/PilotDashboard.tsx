@@ -798,6 +798,9 @@ export default function PilotDashboard({
       : "inicio";
 
   function openView(nextView: View, focus?: NavigationFocus) {
+    if (nextView === "solicitacoes") {
+      window.setTimeout(() => window.dispatchEvent(new CustomEvent("vinkulo:requests-opened")), 320);
+    }
     if (nextView === "visual-editor") {
       setMobileMenu(null);
       window.dispatchEvent(new CustomEvent("vinkulo:open-visual-editor"));

@@ -54,10 +54,11 @@ export async function POST(request: Request) {
   const end = new Date(String(payload.fimEm || ""));
   const validEmail = /^\S+@\S+\.\S+$/.test(email);
   const validDocument = validateCpfCnpj(document);
-  if (!vagaId || nome.length < 5 || (!validEmail && !validDocument) || !phone || vehiclePlate.length < 6 || !["CARRO", "MOTO", "VAN", "OUTRO"].includes(vehicleType) || vehicleModel.length < 2 || !vehicleColor || !Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end <= start) {
+  const db = getD1();
+  const linkedCpf = await db.prepare(`SELECT cpf_hash, finais FROM identidades_cpf WHERE usuario_id=? LIMIT 1`).bind(access.user.id).first<{ cpf_hash: string; finais: string }>();
+  if (!vagaId || nome.length < 5 || (!validEmail && !validDocument && !linkedCpf) || !phone || vehiclePlate.length < 6 || !["CARRO", "MOTO", "VAN", "OUTRO"].includes(vehicleType) || vehicleModel.length < 2 || !vehicleColor || !Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end <= start) {
     return Response.json({ error: "Revise os dados do usuário, veículo, contato e período da reserva." }, { status: 400 });
   }
-  const db = getD1();
   let eventTitle = "";
   if (eventId) {
     const linkedEvent = await db.prepare(
@@ -74,13 +75,13 @@ export async function POST(request: Request) {
   const conflict = await db.prepare(`SELECT id FROM estacionamento_reservas WHERE comunidade_id = ? AND vaga_id = ? AND status IN ('PENDENTE','CONFIRMADA','CHECKIN') AND datetime(inicio_em) < datetime(?) AND datetime(fim_em) > datetime(?) LIMIT 1`)
     .bind(access.context.comunidadeId, vagaId, end.toISOString(), start.toISOString()).first();
   if (conflict) return Response.json({ error: "Essa vaga já possui reserva no período informado." }, { status: 409 });
-  const identityKey = validDocument ? document : email;
+  const identityKey = validDocument ? document : linkedCpf?.cpf_hash ? `CPF:${linkedCpf.cpf_hash}` : email;
   const hashBuffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${access.context.comunidadeId}:${identityKey}`));
   const documentHash = [...new Uint8Array(hashBuffer)].map((value) => value.toString(16).padStart(2, "0")).join("");
   const code = `VK-${crypto.randomUUID().replace(/-/g, "").slice(0, 24).toUpperCase()}`;
   const result = await db.prepare(`INSERT INTO estacionamento_reservas
     (comunidade_id,vaga_id,usuario_id,evento_id,evento_titulo,nome_completo,email,telefone,placa_veiculo,tipo_veiculo,modelo_veiculo,cor_veiculo,documento_hash,documento_mascarado,inicio_em,fim_em,codigo)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(access.context.comunidadeId,vagaId,access.user.id,eventId,eventTitle,nome,validEmail?email:"",phone,vehiclePlate,vehicleType,vehicleModel,vehicleColor,documentHash,validDocument?maskDocument(document):"Não informado",start.toISOString(),end.toISOString(),code).run();
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(access.context.comunidadeId,vagaId,access.user.id,eventId,eventTitle,nome,validEmail?email:"",phone,vehiclePlate,vehicleType,vehicleModel,vehicleColor,documentHash,validDocument?maskDocument(document):linkedCpf?.finais ? `***.***.***-${linkedCpf.finais}` : "Não informado",start.toISOString(),end.toISOString(),code).run();
   const managers = await db.prepare(`SELECT DISTINCT m.responsavel_usuario_id AS id FROM ministerios_comunidade m WHERE m.comunidade_id = ? AND m.status = 'ATIVO' AND m.categoria = 'ESTACIONAMENTO' AND m.responsavel_usuario_id IS NOT NULL`).bind(access.context.comunidadeId).all<{ id: number }>();
   await Promise.all(managers.results.map((manager) => notifyUser(db,{ userId:Number(manager.id), title:"Nova reserva de estacionamento", message:`${nome} solicitou a vaga${eventTitle ? ` para “${eventTitle}”` : ""} em ${start.toLocaleString("pt-BR")}.`, entityId:Number(result.meta.last_row_id), destination:"/painel?view=estacionamento", createdBy:access.user.email })));
   return Response.json({ id: Number(result.meta.last_row_id), codigo: code, status: "PENDENTE" }, { status: 201 });

@@ -258,8 +258,8 @@ export default function ParkingMemberPortal({
                 <label>E-mail <small>ou informe CPF/CNPJ</small>
                   <input type="email" value={contact.email} onChange={(event) => setContact((c) => ({ ...c, email: event.target.value }))} />
                 </label>
-                <label>CPF ou CNPJ <small>ou informe e-mail</small>
-                  <input inputMode="numeric" value={contact.documento} onChange={(event) => setContact((c) => ({ ...c, documento: event.target.value }))} />
+                <label>CPF ou CNPJ <small>{data.operator.cpfFinal ? "CPF da sua conta aplicado automaticamente" : "ou informe e-mail"}</small>
+                  <input inputMode="numeric" readOnly={Boolean(data.operator.cpfFinal)} value={data.operator.cpfFinal ? `***.***.***-${data.operator.cpfFinal}` : contact.documento} placeholder={data.operator.cpfFinal ? undefined : "Informe se não usar e-mail"} onChange={(event) => setContact((c) => ({ ...c, documento: event.target.value }))} />
                 </label>
                 <label>Celular
                   <input required inputMode="tel" placeholder="(47) 99999-9999" value={contact.telefone} onChange={(event) => setContact((c) => ({ ...c, telefone: event.target.value }))} />
