@@ -222,7 +222,6 @@ html body :is(.people-person-button,.people-open-record,.person-record button,.w
 
 /* Desktop mural: keep the familiar sidebar while the reading column stays compact. */
 @media (min-width: 961px) {
-  html body .pilot-dashboard[data-ui-version="v2"] .worship-feed.community-feed-redesign { max-width: 1160px !important; margin-inline: auto !important; }
   html body .pilot-dashboard[data-ui-version="v2"] .community-feed-redesign .worship-layout { grid-template-columns: minmax(0, 1fr) 260px !important; }
   html body .pilot-dashboard[data-ui-version="v2"] .community-feed-redesign .worship-main { width: min(100%, 680px); justify-self: center; }
   html body .pilot-dashboard[data-ui-version="v2"] .community-feed-redesign .worship-posts { grid-template-columns: minmax(0, 1fr); }
@@ -234,12 +233,14 @@ html body :is(.people-person-button,.people-open-record,.person-record button,.w
 }
 
 .visitor-growth-chart-v6.visitor-growth-chart-polished { display: block; min-height: 226px; padding: 18px 18px 12px; border: 1px solid var(--pilot-line); background: linear-gradient(180deg, color-mix(in srgb, var(--pilot-primary) 8%, var(--pilot-surface-2)), var(--pilot-surface-2)); }
-.visitor-growth-chart-polished .visitor-growth-plot { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 8px; height: 160px; }
-.visitor-growth-scale { display: flex; flex-direction: column; justify-content: space-between; padding-block: 1px 10px; color: var(--pilot-muted); font-size: 11px; text-align: right; }
-.visitor-growth-plot svg { width: 100%; height: 160px; overflow: visible; }
+.visitor-growth-chart-polished .visitor-growth-plot { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 8px; height: 160px; margin-block: 6px; }
+.visitor-growth-scale { position: relative; color: var(--pilot-muted); font-size: 12px; text-align: right; }
+.visitor-growth-scale > span { position: absolute; right: 0; transform: translateY(-50%); line-height: 1; }
+.visitor-growth-canvas { position: relative; min-width: 0; height: 160px; }
+.visitor-growth-canvas svg { display: block; width: 100%; height: 160px; overflow: visible; }
 .visitor-growth-gridline { stroke: var(--pilot-line); stroke-width: 1; stroke-dasharray: 4 5; vector-effect: non-scaling-stroke; }
 .visitor-growth-line { fill: none; stroke: var(--pilot-primary); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
-.visitor-growth-dot { fill: var(--pilot-surface); stroke: var(--pilot-primary); stroke-width: 3; vector-effect: non-scaling-stroke; }
+.visitor-growth-canvas .visitor-growth-dot { position: absolute; width: 9px; height: 9px; box-sizing: border-box; border: 2px solid var(--pilot-primary); border-radius: 50%; background: var(--pilot-surface); transform: translate(-50%,-50%); }
 .visitor-growth-months { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0,1fr); gap: 4px; margin: 6px 0 0 34px; text-align: center; }
 .visitor-growth-months span { display: grid; gap: 2px; }
 .visitor-growth-months b { color: var(--pilot-text); font-size: 12px; }
@@ -276,8 +277,16 @@ html body :is(.people-person-button,.people-open-record,.person-record button,.w
   .cpart-mobile-profile .cpart-mobile-card-title { margin:0 0 14px; font-size:16px; font-weight:700; }
   .cpart-mobile-profile .cpart-mobile-card form :is(input,select) { min-height:44px; font-size:16px; }
 }
-html:has(.pilot-mobile-overlay,.pilot-notification-panel),
-body:has(.pilot-mobile-overlay,.pilot-notification-panel) { overflow:hidden !important; overscroll-behavior:none; }
+html:has(.pilot-mobile-overlay),
+body:has(.pilot-mobile-overlay) { overflow:hidden !important; overscroll-behavior:none; }
+@media (min-width:1024px) {
+  html:has(.pilot-dashboard) { scrollbar-gutter:stable; }
+  html:has(.pilot-notification-panel) { overflow:hidden !important; overscroll-behavior:none; }
+}
+@media (max-width:1023px) {
+  html:has(.pilot-notification-panel),
+  body:has(.pilot-notification-panel) { overflow:hidden !important; overscroll-behavior:none; }
+}
 html body:has(.pilot-mobile-overlay,.pilot-notification-panel)>.global-feedback-launcher { display:none !important; }
 .pilot-notification-panel { outline:none; }
 .pilot-notification-list article { position:relative; }
