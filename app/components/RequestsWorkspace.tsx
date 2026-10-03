@@ -121,6 +121,7 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
   const [loadingOperationalRows, setLoadingOperationalRows] = useState(false);
   const [lastOperationalRefresh, setLastOperationalRefresh] = useState<Date | null>(null);
   const [central, setCentral] = useState<CentralData>(EMPTY_CENTRAL);
+  const [centralLoaded, setCentralLoaded] = useState(false);
   const [canManage, setCanManage] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
@@ -201,6 +202,7 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
           return next;
         });
       } catch (caught) { setError((caught as Error).message); }
+      finally { setCentralLoaded(true); }
     })();
     await Promise.all([requestsTask, centralTask]);
   }, []);
@@ -505,7 +507,7 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
     </header>
 
     {(feedback || error) && <TransientFeedback className={`operations-feedback request-global-feedback ${error ? "error" : ""}`} role="status">{error || feedback}</TransientFeedback>}
-    {entryNotice > 0 && <TransientFeedback noticeKey={`requests-entry-${entryNotice}`} role="status" durationMs={8000}>
+    {entryNotice > 0 && centralLoaded && <TransientFeedback noticeKey={`requests-entry-${entryNotice}`} role="status" durationMs={8000}>
       {central.canOperate && metrics.open > 0
         ? <span>Há {metrics.open} {metrics.open === 1 ? "pedido" : "pedidos"} para revisar. <button type="button" onClick={() => setMode("operations")}>Ver atendimento</button></span>
         : <span>Precisa de oração ou acompanhamento? <button type="button" onClick={() => { setMode("member"); openCreate("ORACAO"); }}>Fazer um pedido</button></span>}
