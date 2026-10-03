@@ -39,7 +39,13 @@ export async function savePreparedFile(file: File, source?: string) {
   }
   const objectUrl = URL.createObjectURL(file);
   const anchor = document.createElement("a");
-  anchor.href = objectUrl;
+  // Prefer an attachment response for system files. Embedded browsers can
+  // refuse blob downloads even when the regular browser handles them.
+  const downloadUrl = source ? new URL(source, location.origin) : null;
+  if (downloadUrl?.origin === location.origin && /^\/api\/(pilot\/uploads\/|storage\/media\/|storage\/copies|pilot\/(escalas|diaconia)\/\d+\/pdf)/.test(downloadUrl.pathname)) {
+    downloadUrl.searchParams.set("download", "1");
+    anchor.href = downloadUrl.href;
+  } else anchor.href = objectUrl;
   anchor.download = file.name;
   anchor.rel = "noopener";
   document.body.append(anchor);
