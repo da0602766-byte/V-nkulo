@@ -288,7 +288,8 @@ export async function getPilotFeed(
 export async function getPilotFeatureState(
   comunidadeId: number,
 ): Promise<PilotFeatureState> {
-  const flags = await getD1()
+  const [flags, policy] = await Promise.all([
+    getD1()
     .prepare(
       `SELECT flag_key, scope_type, scope_id, enabled, inicia_em, termina_em
       FROM feature_flags
@@ -319,13 +320,8 @@ export async function getPilotFeatureState(
       enabled: number;
       inicia_em: string | null;
       termina_em: string | null;
-    }>();
-  const resolved = new Map<string, boolean>();
-  for (const flag of flags.results) {
-    if (resolved.has(flag.flag_key) || !flagIsWithinWindow(flag)) continue;
-    resolved.set(flag.flag_key, Boolean(flag.enabled));
-  }
-  const policy = await getD1()
+    }>(),
+    getD1()
     .prepare(
       `SELECT modo, publicacao_automatica
       FROM politicas_editoriais_ia
@@ -335,7 +331,13 @@ export async function getPilotFeatureState(
       LIMIT 1`,
     )
     .bind(comunidadeId)
-    .first<{ modo: string; publicacao_automatica: number }>();
+    .first<{ modo: string; publicacao_automatica: number }>(),
+  ]);
+  const resolved = new Map<string, boolean>();
+  for (const flag of flags.results) {
+    if (resolved.has(flag.flag_key) || !flagIsWithinWindow(flag)) continue;
+    resolved.set(flag.flag_key, Boolean(flag.enabled));
+  }
   return {
     networkModuleEnabled: resolved.get("network_module_enabled") ?? false,
     affiliateCreationEnabled:
