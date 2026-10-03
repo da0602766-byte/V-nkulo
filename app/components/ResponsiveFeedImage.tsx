@@ -1,5 +1,6 @@
 "use client";
 import SafeImage from "./SafeImage";
+import FileSaveActions from "./FileSaveActions";
 
 
 import { useEffect, useState } from "react";
@@ -43,9 +44,6 @@ export default function ResponsiveFeedImage({
   if (!src) return null;
   const optimizedSource = dataSaver && thumbnail ? thumbnail : src;
   const showImage = requestedLoad || (presentation === "photo" && preferenceReady && !dataSaver);
-  const downloadUrl = src.startsWith("/api/")
-    ? `${src}${src.includes("?") ? "&" : "?"}download=1`
-    : src;
 
   return (
     <figure
@@ -107,9 +105,7 @@ export default function ResponsiveFeedImage({
           {requestedLoad ? "Fechar imagem" : "Visualizar imagem"}
         </button>
         )}
-        <a href={downloadUrl} download>
-          Baixar imagem
-        </a>
+        <FileSaveActions source={src} name="imagem-da-publicacao" />
       </div>
       {lightboxOpen && <FeedImageLightbox src={src} alt={alt} onClose={() => setLightboxOpen(false)} />}
     </figure>

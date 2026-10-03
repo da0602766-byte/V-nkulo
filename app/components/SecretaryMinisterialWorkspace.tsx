@@ -1,5 +1,6 @@
 "use client";
 import SafeImage from "./SafeImage";
+import FileSaveActions from "./FileSaveActions";
 
 
 import {
@@ -2485,7 +2486,7 @@ export default function SecretaryMinisterialWorkspace({
                   {ministrySchedules.map((schedule) => (
                     <article key={schedule.id}>
                       <div><strong>{schedule.titulo}</strong><span>{formatDate(schedule.inicia_em)} · {schedule.status}</span></div>
-                      <button type="button" onClick={() => void downloadSchedulePdf(schedule)} disabled={busy === `pdf-${schedule.id}`}>{busy === `pdf-${schedule.id}` ? "Preparando…" : "Baixar PDF"}</button>
+                      <FileSaveActions source={`/api/pilot/escalas/${schedule.id}/pdf?download=1`} name={`escala-${schedule.titulo}.pdf`} />
                       <button type="button" onClick={() => downloadScheduleImage(schedule)}>Baixar imagem</button>
                       <button type="button" onClick={() => addScheduleToCalendar(schedule)}>Adicionar ao calendário</button>
                     </article>
@@ -3532,7 +3533,7 @@ function ShareDialogV2({
               {directRecipient?.telefone && <button type="button" onClick={() => void shareGeneratedMessage(directRecipient.nome)}>Enviar para contato</button>}
               <a href={`https://t.me/share/url?url=${encodeURIComponent(generatedAccesses[0]?.url || "")}&text=${encodeURIComponent(safeMessage)}`} target="_blank" rel="noreferrer">Telegram</a>
               <a href={`mailto:?subject=${encodeURIComponent(`Acesso temporário — ${schedule.titulo}`)}&body=${encodeURIComponent(safeMessage)}`}>E-mail</a>
-              <button type="button" onClick={() => void downloadFileForDevice(`/api/pilot/escalas/${schedule.id}/pdf?download=1`, `escala-${schedule.titulo}.pdf`).catch((cause) => setShareStatus((cause as Error).message || "Não foi possível abrir o PDF."))}>Baixar PDF</button>
+              <FileSaveActions source={`/api/pilot/escalas/${schedule.id}/pdf?download=1`} name={`escala-${schedule.titulo}.pdf`} />
               <button type="button" onClick={() => downloadScheduleImage(schedule)}>Baixar imagem</button>
             </div>
             {shareStatus && <p className="secretary-share-status" role="status">{shareStatus}</p>}
