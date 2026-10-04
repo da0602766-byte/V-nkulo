@@ -1,6 +1,11 @@
-export type FeedIconName = "plus" | "text" | "image" | "calendar" | "heart" | "search" | "arrow" | "people";
+export type FeedIconName = "plus" | "text" | "image" | "calendar" | "heart" | "search" | "arrow" | "people" | "expand" | "download" | "drive" | "browser" | "close";
 
 const paths: Record<FeedIconName, string> = {
+  expand: "M8 3H3v5M16 3h5v5M21 16v5h-5M8 21H3v-5",
+  download: "M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5",
+  drive: "M9 3h6l7 12-3 6H5l-3-6L9 3Zm0 0 10 18M15 3 5 21M2 15h20",
+  browser: "M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2ZM3 8h18M7 5.5h.01M10 5.5h.01M8 14l3 3 5-5",
+  close: "m6 6 12 12M18 6 6 18",
   plus: "M12 5v14M5 12h14",
   text: "M4 5h16M12 5v15M8 20h8M4 5v3M20 5v3",
   image: "M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm-2 13 5-5 4 4 4-5 5 5M8 7h.01",
