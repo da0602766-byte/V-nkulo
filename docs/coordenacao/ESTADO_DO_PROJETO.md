@@ -1,8 +1,10 @@
 # ESTADO DO PROJETO — REFORMA OFICIAL DO VÍNKULO
 
-## Estacionamento — publicação autorizada em 06/10/2026
+## Estacionamento — publicado em 06/10/2026
 
-Redesign integrado sobre Sites 357, mantendo as mudanças recentes e o CPF da conta. Cancelamento próprio antes da entrada e atividade publicada obrigatória autorizados; aprovação da gestão preservada. Pré-publicação aprovada: 618/618 testes, TypeScript limpo, lint sem erros e build válido. Matriz de 24 cenários visuais e seis interações extras repetida com sucesso. Publicação em andamento, sem nova migração ou alteração direta de dados; homologação em aparelho/câmera físicos continua pendente. Detalhes no [relatório](../relatorios/ESTACIONAMENTO_REDESIGN_2026-10-06.md).
+Publicado Sites 358 em 06/10/2026 às 13h38 (Brasília), confirmado como succeeded pelo serviço. Fonte 61fa3bf212e05bab5dc3b7716fa51d3566600a00; deployment appgdep_6ac523d06018819189b25b97ee588fd0; URL https://adote-gestao.da0602766.chatgpt.site. Pré-publicação: 618/618 testes, TypeScript limpo, lint 0 erros/1 aviso, build válido; 24 cenários visuais e seis interações extras aprovados. Sem nova migração. Câmera/APK físicos permanecem pendentes.
+
+Redesign integrado sobre Sites 357, mantendo as mudanças recentes e o CPF da conta. Cancelamento próprio antes da entrada e atividade publicada obrigatória autorizados; aprovação da gestão preservada. Pré-publicação aprovada: 618/618 testes, TypeScript limpo, lint sem erros e build válido. Matriz de 24 cenários visuais e seis interações extras repetida com sucesso. Publicação concluída, sem nova migração ou alteração direta de dados; homologação em aparelho/câmera físicos continua pendente. Detalhes no [relatório](../relatorios/ESTACIONAMENTO_REDESIGN_2026-10-06.md).
 
 ## Identificação
 

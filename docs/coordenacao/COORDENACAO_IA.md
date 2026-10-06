@@ -17,6 +17,8 @@ Antes de alterar o código, leia este documento e atualize a seção **Trabalho 
 
 ## Trabalho em andamento
 
+Estacionamento — publicação concluída. Publicado Sites 358 em 06/10/2026 às 13h38 (Brasília), confirmado como succeeded pelo serviço. Fonte 61fa3bf212e05bab5dc3b7716fa51d3566600a00; deployment appgdep_6ac523d06018819189b25b97ee588fd0; URL https://adote-gestao.da0602766.chatgpt.site. Pré-publicação: 618/618 testes, TypeScript limpo, lint 0 erros/1 aviso, build válido; 24 cenários visuais e seis interações extras aprovados. Sem nova migração. Câmera/APK físicos permanecem pendentes. Registro documental posterior ao deploy.
+
 Complemento da publicação — corrigir bloqueios herdados da versão 357: PersonRecord (reinício ao trocar pessoa/tentar novamente), SavedFilesWorkspace (estado visual da sincronização), SecretaryMinisterialWorkspace (sincronização da URL após montagem), drizzle/README.md (próximo número livre) e quatro testes estáticos de feed/imagens para os componentes e rótulos atuais. Manter funcionalidades e asserções de comportamento.
 
 Publicação do estacionamento — Codex, 06/10/2026, autorizada pelo usuário (“Pode publicar”). Integrar a fonte Sites 357 preservando alterações existentes; resolver as duas rotas de estacionamento e este registro. Atualizar mocks SafeImage em tests/feed-interactions-access.test.mjs e tests/p1-theme-accessibility.test.mjs para executar a verificação obrigatória sem remover asserções. Validar build, suíte e navegador antes de publicar; registrar versão/URL no relatório e estado do projeto.

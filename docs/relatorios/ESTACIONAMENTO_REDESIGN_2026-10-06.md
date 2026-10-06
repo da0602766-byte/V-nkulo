@@ -123,6 +123,8 @@ Publicação autorizada pelo usuário em 06/10/2026 (“Pode publicar”). Candi
 
 Pré-publicação completa aprovada após a integração: 618 testes passaram, zero falhas; TypeScript limpo; lint zero erros e um aviso; build e Worker/manifesto válidos. Repetidos 24 cenários visuais e seis cenários extras de interação com o Worker compilado e dados sintéticos. Corrigidos bloqueios herdados de lint em três componentes, mocks e asserções antigas de imagem/feed e o próximo número livre do README de migrações (0085). Nenhuma migração nova ou alteração direta em dados de produção foi necessária.
 
-Envio/publicação em andamento; versão e URL serão registradas após confirmação nativa.
+Publicado Sites 358 em 06/10/2026 às 13h38 (Brasília), confirmado como succeeded pelo serviço. Fonte 61fa3bf212e05bab5dc3b7716fa51d3566600a00; deployment appgdep_6ac523d06018819189b25b97ee588fd0; URL https://adote-gestao.da0602766.chatgpt.site. Pré-publicação: 618/618 testes, TypeScript limpo, lint 0 erros/1 aviso, build válido; 24 cenários visuais e seis interações extras aprovados. Sem nova migração. Câmera/APK físicos permanecem pendentes.
+
+Empacotamento no Windows exigiu Git Bash no PATH e TAR_OPTIONS=--force-local. O helper oficial enviou a fonte e validou o arquivo; nenhuma adaptação de código foi necessária. Registro documental posterior ao deploy.
 
 Reversão: o trabalho está em branch isolada baseada em `6aa3458`; não há reversão de banco a executar. Caso os commits sejam integrados posteriormente, revertê-los restaura a implementação anterior, observando que reservas/cancelamentos já realizados são dados de negócio e devem manter seu histórico.
