@@ -82,12 +82,16 @@ test("interface explica destino e deixa anexos de publicação sob demanda", asy
     read("app/components/ResponsiveFeedImage.tsx"),
   ]);
   assert.match(privacy, /não mantém cópia do conteúdo/i);
-  assert.match(storage, /Seus conteúdos não ficam no Vínkulo/);
+  assert.match(storage, /O conteúdo compartilhado segue disponível na comunidade/);
   assert.match(storage, /Carregar os mais recentes automaticamente/);
-  assert.match(storage, /Permitir baixar arquivos neste aparelho/);
-  assert.match(image, /Visualizar imagem/);
-  assert.match(image, /Baixar imagem/);
-  assert.match(image, /download=1/);
+  assert.match(storage, /O download manual está sempre disponível/);
+  assert.match(image, /"Visualizar"/);
+  assert.match(image, /setRequestedLoad/);
+  assert.match(image, /<FileSaveActions source=\{src\}/);
+  const actions = await read("app/components/FileSaveActions.tsx");
+  assert.match(actions, /run\("download"\)/);
+  assert.match(actions, /Baixar no aparelho/);
+  assert.match(await read("app/lib/device-files.ts"), /anchor\.download = file\.name/);
 });
 
 test("login Google entrega a sessão de volta ao APK sem compartilhar cookies com o Chrome", async () => {

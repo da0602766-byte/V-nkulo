@@ -49,5 +49,8 @@ test("mídia fotográfica respeita economia de dados e mantém carregamento grad
   assert.match(image, /presentation === "photo" && preferenceReady && !dataSaver/);
   assert.match(image, /loading="lazy"/);
   assert.match(image, /decoding="async"/);
-  assert.match(image, /href=\{downloadUrl\} download/);
+  assert.match(image, /<FileSaveActions source=\{src\}/);
+  const actions = await read("app/components/FileSaveActions.tsx");
+  assert.match(actions, /run\("download"\)/);
+  assert.match(actions, /Baixar no aparelho/);
 });

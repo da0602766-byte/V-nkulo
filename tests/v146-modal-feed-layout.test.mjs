@@ -8,8 +8,8 @@ const read = (path) => readFileSync(new URL(path, root), "utf8");
 test("a criação de publicação usa editor direto com opções recolhíveis", () => {
   const source = read("app/components/CommunityHome.tsx");
   assert.match(source, /<FeedComposerBar[\s\S]{0,250}onOpen=\{openComposer\}/);
-  assert.match(source, /<form className="pilot-form community-composer-inline" aria-label="Criar publicação" onSubmit=\{createPost\}/);
-  assert.match(source, /<details className="composer-options composer-wide" open=\{composerOpen\}/);
+  assert.match(source, /<form id="community-publication-form" className="pilot-form community-composer-inline" aria-label="Criar publicação" onSubmit=\{createPost\}/);
+  assert.match(source, /<details className="composer-options composer-wide" open=\{composerOptionsOpen\}/);
   assert.doesNotMatch(source, /community-composer-overlay/);
   assert.match(source, /setComposerOpen\(true\)/);
   assert.match(source, /setComposerOpen\(false\)/);

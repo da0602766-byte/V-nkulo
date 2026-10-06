@@ -6,7 +6,7 @@ migração nova, leia isto.
 
 ## Próximo número livre
 
-**`0084`**. Use o próximo inteiro disponível a partir daí — não reaproveite
+**`0085`**. Use o próximo inteiro disponível a partir daí — não reaproveite
 um número já usado, mesmo que o arquivo tenha sido escrito à mão.
 
 `0083_supabase_storage_copies.sql` registra cada imagem R2 conferida no

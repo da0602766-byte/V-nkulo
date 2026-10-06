@@ -418,14 +418,16 @@ export default function SecretaryMinisterialWorkspace({
     const url = new URL(window.location.href);
     const scheduleId = Number(url.searchParams.get("schedule"));
     const selected = schedules.find((item) => item.id === scheduleId);
-    if (selected) {
-      setSelectedMinistryId(selected.ministerio_id);
-      setDesktopScheduleId(selected.id);
-      setTab("escalas");
-      const frame = window.requestAnimationFrame(() => document.getElementById(`person-schedule-${selected.id}`)?.scrollIntoView({ block: "start" }));
-      return () => window.cancelAnimationFrame(frame);
-    }
-    if (url.searchParams.get("tab") === "escalas") setTab("escalas");
+    let scrollFrame = 0;
+    const frame = window.requestAnimationFrame(() => {
+      if (selected) {
+        setSelectedMinistryId(selected.ministerio_id);
+        setDesktopScheduleId(selected.id);
+        setTab("escalas");
+        scrollFrame = window.requestAnimationFrame(() => document.getElementById(`person-schedule-${selected.id}`)?.scrollIntoView({ block: "start" }));
+      } else if (url.searchParams.get("tab") === "escalas") setTab("escalas");
+    });
+    return () => { window.cancelAnimationFrame(frame); window.cancelAnimationFrame(scrollFrame); };
   }, [loading, schedules]);
 
   useEffect(() => {

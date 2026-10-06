@@ -27,7 +27,11 @@ function days(value: string) {
   catch { return "Dias não informados"; }
 }
 
-export default function PersonRecord({ membershipId, name, onClose, permissionLabels }: { membershipId: number; name: string; onClose: () => void; permissionLabels: Record<string, string> }) {
+type PersonRecordProps = { membershipId: number; name: string; onClose: () => void; permissionLabels: Record<string, string> };
+export default function PersonRecord(props: PersonRecordProps) {
+  return <PersonRecordContent key={props.membershipId} {...props} />;
+}
+function PersonRecordContent({ membershipId, name, onClose, permissionLabels }: PersonRecordProps) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [data, setData] = useState<RecordData | null>(null);
   const [error, setError] = useState("");
@@ -43,10 +47,9 @@ export default function PersonRecord({ membershipId, name, onClose, permissionLa
   }, []);
   useEffect(() => {
     const controller = new AbortController();
-    setData(null); setError("");
     void fetch(`/api/pilot/pessoas/${membershipId}/ficha`, { cache: "no-store", signal: controller.signal })
       .then(async (response) => { const result = await response.json() as RecordData; if (!response.ok) throw new Error(result.error || "Não foi possível carregar a ficha."); return result; })
-      .then(setData).catch((issue: Error) => { if (issue.name !== "AbortError") setError(issue.message); });
+      .then(result => { if (!controller.signal.aborted) setData(result); }).catch((issue: Error) => { if (!controller.signal.aborted) setError(issue.message); });
     return () => controller.abort();
   }, [membershipId, revision]);
   const person = data?.person;
@@ -61,7 +64,7 @@ export default function PersonRecord({ membershipId, name, onClose, permissionLa
     </header>
     <nav className="person-record-tabs" aria-label="Seções da ficha">{([['perfil','Perfil e vínculos'],['disponibilidade','Disponibilidade'],['escalas','Participação'],['checklist','Checklist']] as const).map(([key,label]) => <button type="button" key={key} aria-pressed={tab === key} onClick={() => setTab(key)}>{label}</button>)}</nav>
     <div className="person-record-content" aria-busy={!data && !error}>
-      {error ? <div className="record-empty" role="alert"><p>{error}</p><button type="button" onClick={() => setRevision(value => value + 1)}>Tentar novamente</button></div> : !data || !person ? <p role="status">Carregando ficha…</p> : <>
+      {error ? <div className="record-empty" role="alert"><p>{error}</p><button type="button" onClick={() => { setData(null); setError(""); setRevision(value => value + 1); }}>Tentar novamente</button></div> : !data || !person ? <p role="status">Carregando ficha…</p> : <>
         {tab === "perfil" && <>
           <section className="record-section"><h3>Informações pessoais</h3><dl className="record-fields"><div><dt>E-mail</dt><dd>{person.email}</dd></div><div><dt>Telefone</dt><dd>{person.telefone || "Não informado"}</dd></div><div><dt>Data de nascimento</dt><dd>{date(person.data_nascimento)}</dd></div><div><dt>Vínculo com a comunidade</dt><dd>{date(person.vinculado_em)}</dd></div><div className="record-field-wide"><dt>Endereço</dt><dd>{person.endereco || "Não informado"}</dd></div><div><dt>Função</dt><dd>{LABELS[person.papel] || person.papel}</dd></div><div><dt>Título oficial</dt><dd>{person.titulo_oficial || "Não possui"}</dd></div></dl></section>
           <section className="record-section"><h3>Ministérios e equipes <span>{data.ministries.length}</span></h3>{!data.canViewMinistries ? <p>Seu perfil não permite consultar ministérios.</p> : !data.ministries.length ? <p>Nenhum vínculo ativo com ministérios.</p> : data.ministries.map(item => <article className="record-ministry" key={item.id}><div><strong>{item.nome}</strong><span>{item.funcao} · {LABELS[item.papel] || item.papel}</span><small>Equipe: {item.equipes || "Não vinculada"}</small></div><a href={`/painel?view=ministerios&ministry=${item.ministerio_id}`}>Ver ministério</a></article>)}</section>

@@ -134,7 +134,7 @@ function carousel() {
   const jsx = (type, props) => ({ type, props });
   const compiledCarousel = compile('app/components/CommunityDirectoryCarousel.tsx', { document, window: {
     matchMedia: () => media, setInterval: callback => { jobs.set(++nextJob, callback); return nextJob; }, clearInterval: id => jobs.delete(id),
-  } }, { react, 'react/jsx-runtime': { jsx, jsxs: jsx }, './StableLink': { default: 'a' }, './PublicIcon': { default: 'svg' } });
+  } }, { react, 'react/jsx-runtime': { jsx, jsxs: jsx }, './SafeImage': { default: 'img' }, './StableLink': { default: 'a' }, './PublicIcon': { default: 'svg' } });
   const communities = [1, 2].map(id => ({ id, nome: `Comunidade ${id}`, slug: `comunidade-${id}`, cidade: 'Cidade', descricao: 'Descrição', eventosPublicos: 0 }));
   const render = () => {
     stateIndex = 0; effectIndex = 0;

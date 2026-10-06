@@ -16,6 +16,7 @@ export default function SavedFilesWorkspace({ userId, profile, connected }: { us
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState("");
   const syncing = useRef(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   async function loadDrive(cursor?: string) {
     const response = await fetch(`/api/storage/copies${cursor ? `?before=${encodeURIComponent(cursor)}` : ""}`, { cache: "no-store" });
     const result = await response.json();
@@ -40,7 +41,7 @@ export default function SavedFilesWorkspace({ userId, profile, connected }: { us
   }, [userId, profile, connected]);
   async function syncLocal() {
     if (syncing.current) return;
-    syncing.current = true; setError("");
+    syncing.current = true; setIsSyncing(true); setError("");
     let completed = 0;
     try {
       for (const record of local) {
@@ -52,21 +53,21 @@ export default function SavedFilesWorkspace({ userId, profile, connected }: { us
     } catch (cause) {
       setProgress("");
       setError(`${completed} de ${local.length} concluídos. ${(cause as Error).message} Você pode tentar novamente sem duplicar os arquivos já enviados.`);
-    } finally { syncing.current = false; window.dispatchEvent(new Event("vinkulo:files-changed")); }
+    } finally { syncing.current = false; setIsSyncing(false); window.dispatchEvent(new Event("vinkulo:files-changed")); }
   }
   return <section className="saved-files-workspace" aria-labelledby="saved-files-title">
     <header><div><h3 id="saved-files-title">Fotos e arquivos</h3><p>Baixe no celular sem precisar do Drive ou salve uma cópia na sua Conta Google.</p></div>
-      <button type="button" disabled={loading || syncing.current} onClick={() => window.dispatchEvent(new Event("vinkulo:files-changed"))}>Atualizar lista</button></header>
+      <button type="button" disabled={loading || isSyncing} onClick={() => window.dispatchEvent(new Event("vinkulo:files-changed"))}>Atualizar lista</button></header>
     <p>Nas fotos do mural e nos PDFs, use as opções de salvar. Guardar no navegador permite recuperar a cópia neste aparelho; baixar permite guardar na pasta Arquivos ou Downloads.</p>
     <label className="saved-file-upload"><strong>Adicionar arquivo deste aparelho</strong><small>Até 20 MB por arquivo. Escolha o destino após selecionar.</small>
-      <input type="file" disabled={syncing.current} onChange={event => { setSelected(event.target.files?.[0] || null); event.target.value = ""; }} />
+      <input type="file" disabled={isSyncing} onChange={event => { setSelected(event.target.files?.[0] || null); event.target.value = ""; }} />
     </label>
     {selected && <div className="saved-file-row"><strong>{selected.name}</strong><FileSaveActions key={`${selected.name}:${selected.lastModified}`} file={selected} ownerId={userId} /><button type="button" onClick={() => setSelected(null)}>Fechar seleção</button></div>}
     {profile && !profile.startsWith("/local-media/") && <div className="saved-file-row"><strong>Sua foto de perfil</strong><FileSaveActions source={profile} name="foto-de-perfil" ownerId={userId} /></div>}
     <div className="saved-files-tabs" aria-label="Destino dos arquivos"><button type="button" aria-pressed={tab === "local"} onClick={() => setTab("local")}>Neste navegador · {local.length}</button><button type="button" aria-pressed={tab === "drive"} onClick={() => setTab("drive")}>Cópias no Drive</button></div>
     {loading && <p role="status">Carregando arquivos…</p>}
     {tab === "local" ? <>
-      {local.length > 0 && connected && <button type="button" disabled={syncing.current} onClick={() => void syncLocal()}>{syncing.current ? "Sincronizando…" : `Sincronizar ${local.length} arquivo(s) com o Drive`}</button>}
+      {local.length > 0 && connected && <button type="button" disabled={isSyncing} onClick={() => void syncLocal()}>{isSyncing ? "Sincronizando…" : `Sincronizar ${local.length} arquivo(s) com o Drive`}</button>}
       {!loading && !local.length && <p>Nenhuma cópia guardada neste navegador. Use “Guardar no navegador” em uma foto ou arquivo.</p>}
       {local.map(record => <div className="saved-file-row" key={record.id}><div><strong>{record.name}</strong><small>{sizeLabel(record.size)} · Guardado neste aparelho</small></div><FileSaveActions source={`/local-media/${record.id}`} name={record.name} ownerId={userId} /></div>)}
       <small>Limpar os dados do navegador pode apagar estas cópias. Faça o download ou sincronize com o Drive para conservá-las.</small>

@@ -228,7 +228,7 @@ function harness(path, globals = {}) {
     useRef(initial) { const key = index++; return slots[key] ??= { current: initial }; },
     useMemo: (fn) => fn(), useCallback: (fn) => fn, useEffect() {}, useId: () => "test-profile",
   };
-  const Component = compile(path, { react: hooks, "react/jsx-runtime": jsx, "./VerifiedOwnerName": { default: () => null }, "./feed/FeedPresencePopover": { default: () => null }, "./TransientFeedback": { default: () => null } }, { document: { activeElement: null }, ...globals }).default;
+  const Component = compile(path, { react: hooks, "react/jsx-runtime": jsx, "./SafeImage": { default: "img" }, "./VerifiedOwnerName": { default: () => null }, "./feed/FeedPresencePopover": { default: () => null }, "./TransientFeedback": { default: () => null } }, { document: { activeElement: null }, ...globals }).default;
   return { slots, render(props) { index = 0; return Component(props); } };
 }
 const settle = () => new Promise((resolve) => setImmediate(resolve));
