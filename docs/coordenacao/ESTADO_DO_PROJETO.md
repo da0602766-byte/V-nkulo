@@ -1,5 +1,9 @@
 # ESTADO DO PROJETO — REFORMA OFICIAL DO VÍNKULO
 
+## Entrega local de 06/10/2026 — Estacionamento
+
+Redesign implementado em branch isolada `codex/estacionamento-redesign-20261006`, baseada em `6aa3458`, conforme ZIP fornecido. Proprietário autorizou cancelamento próprio antes da entrada e obrigatoriedade de atividade publicada. Mantida aprovação pela gestão. Build/TypeScript aprovados, lint sem erros, 597/601 testes aprovados (quatro falhas de `SafeImage` reproduzidas na base), matriz visual com 24 cenários aprovada. Sem deploy, merge, migração ou alterações de dados de produção. A regra específica do ZIP exige autorização antes de publicar esta entrega. Detalhes, prévia reproduzível e limitações em [relatório do estacionamento](../relatorios/ESTACIONAMENTO_REDESIGN_2026-10-06.md).
+
 ## Identificação
 
 - **Versão-base:** V4.9.0, com Conta Google, Google Drive/local e política de conteúdo sem cópia persistente na plataforma concluídos em 31/08/2026.

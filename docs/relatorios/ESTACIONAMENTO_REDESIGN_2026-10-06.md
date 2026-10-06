@@ -1,0 +1,124 @@
+# Estacionamento — redesign de 06/10/2026
+
+Fonte: `VINKULO_ESTACIONAMENTO_ESPECIFICACAO_IMPLEMENTACAO.md` v1.0 e imagem do ZIP, ambos lidos antes da edição. Base local `6aa3458`, branch `codex/estacionamento-redesign-20261006`. Nenhum dado de produção utilizado para QA.
+
+Implementação e testes versionados no commit `84de2d4`. A cópia original do projeto permaneceu sem alterações rastreadas; o trabalho está no diretório `vinkulo` desta tarefa.
+
+## Inventário anterior à alteração
+
+| Capacidade | Situação encontrada | Evidência / encaminhamento |
+|---|---|---|
+| Rota e shell | Existente | `/painel?view=estacionamento`, `ParkingWorkspace.tsx`; preservar navegação e permissões. |
+| Membro | Parcial | `ParkingMemberPortal.tsx`: grade ignora coordenadas reais, atividade só no formulário. Integrar seleção de contexto antes do mapa. |
+| Gestão | Divergente do ZIP | `ParkingManagementConsole.tsx`: cartões de indicadores e resumo. Substituir por inventário/tabela, filtros e listas compactas. |
+| Dados | Existente | D1 via `getD1`, tabelas `estacionamento_*`, isolamento por `comunidade_id`; sem trocar banco/ORM. |
+| Reserva | Existente com falhas | `reservas/route.ts`: PENDENTE, aprovação pelo gestor, consulta e inserção separadas; tornar confirmação atômica e recuperável. Preservar aprovação. |
+| Disponibilidade | Parcial | `disponibilidade/route.ts`: próximo evento implícito e intervalo divergente do formulário; consultar atividade/período escolhido. |
+| Veículos | Local | `useParkingGarage.ts`: garagem por usuário no aparelho; não há cadastro de veículo persistido com titularidade no servidor. Preservar e identificar limite, sem inventar entidade. |
+| QR/câmera | Existente | `ParkingReservationQr.tsx`, validação pelo servidor; preservar, retirar solicitação automática de câmera na montagem. |
+| Entrada/saída | Parcial | Endpoints existentes, mas pré-consultas não garantem concorrência; corrigir efeitos condicionais atômicos. |
+| Editor | Parcial | Coordenadas persistidas e arraste; faltam conflito concorrente e alternativa por campos. Referências espaciais (entrada/corredor/obstáculo) não existem no modelo. Não desenhar referências fictícias. |
+| Escala/permissões | Existente | `tenant.ts`, `auxiliares`, `ParkingOperatorMobile.tsx`; revalidar servidor. |
+| Histórico | Parcial | LIMIT 80, busca local; implementar consulta paginada no servidor, preservar ações autorizadas existentes. |
+| Ocorrências/relatórios | Existente | Endpoints e UI específicos; reintegrar em listagens. |
+| Exportação | Ausente no estacionamento | Nenhum exportador a reintegrar; não adicionar formato ou serviço por suposição. |
+| Atualização | Parcial | Polling 12s, erros silenciosos e respostas obsoletas; acrescentar estado de sincronização, cancelamento e reconexão. |
+
+## Decisões e limites
+
+- Reservas permanecem pendentes até aprovação; a aprovação visual não muda essa política.
+- Decisão explícita do proprietário nesta conversa: permitir que o membro cancele a própria reserva antes da entrada, preservando o registro. O servidor nega cancelamento com check-in/permanência ativa.
+- Decisão explícita do proprietário nesta conversa: exigir atividade/evento publicado em toda nova reserva. Abertura de reservas é revalidada no servidor; não é exigido RSVP.
+- Garagem é local e não prova titularidade do veículo. Não há ID de veículo no contrato atual.
+- Não existe mapa de corredores/entradas; somente posições de vagas. Inventário sem posições será apresentado como lista, claramente identificado.
+- Não há hold, tarifa, multa ou política nova de prioridade.
+- Usar o fuso já adotado pelo módulo (`America/Sao_Paulo`) para apresentação; instantes enviados em ISO com fuso explícito.
+- Testes físicos de câmera/APK e leitor de tela dependem de ambiente disponível; não equivalem à emulação de navegador.
+
+## Implementado
+
+- Membro: seleção explícita de atividade e setor, mapa com posições persistidas, zoom/arraste, alternativa acessível em lista, legenda textual, seleção local, revisão, comprovante, minhas reservas, cancelamento e garagem local. Posições ausentes, duplicadas ou sobrepostas usam a lista com aviso para revisão da gestão.
+- Gestão: inventário e reservas separados, tabela com colunas corretas, filtros combinados, paginação real de reservas e movimentações, registros de entrada/saída, QR, ocorrências, relatórios, equipe e configuração. Cartões de indicadores foram retirados.
+- Operador: busca de placa/pessoa/vaga, leitura de QR por ação do usuário, saída com confirmação, contagem persistida do plantão, indicação de veículos ainda presentes e estado real do relatório.
+- Editor: posições por arraste ou campos numéricos; IDs preservados; validação de coordenadas, duplicidade e sobreposição; comparação da posição/nome/cor/ordem anterior impede sobrescrita silenciosa. O lote de coordenadas é aplicado integralmente ou recusado.
+- Disponibilidade: uma projeção compartilhada entre membro e gestão considera a janela escolhida, reservas pendentes/confirmadas sobrepostas e situação física. As categorias de capacidade são exclusivas; tipos especiais são um recorte adicional, não uma quinta parcela da soma.
+- Integridade: inserção condicional atômica, chave idempotente por solicitação, nova chave após resposta confirmada, proteção contra duas entradas simultâneas por vaga/placa, check-in concorrente e saída repetida. Reserva, cancelamento, entrada, aprovação/recusa e saída gravam a auditoria na mesma transação. Notificação é posterior; falha é diferenciada, registrada e não desfaz a reserva.
+- Relatórios: totais de entradas, saídas e ocorrências são calculados pelo banco no intervalo da escala. Enviar valores adulterados pelo navegador não altera esses totais.
+- Sincronização: requisições anteriores canceladas, sequência de respostas, atualização a cada 12 segundos com recuo após erros, pausa com aba oculta/offline, revalidação ao focar/reconectar, indicação de última sincronização e bloqueio de mutações com dados desatualizados. Não há serviço realtime novo.
+- Isolamento: mapa do membro contém somente situação/posição/tipo e indicação de reserva própria; nenhum nome, placa, contato, nota ou token de terceiros. Dados de gestão são descartados em respostas de autorização negada. A troca de comunidade recria o workspace.
+
+## Arquivos e contratos
+
+Componentes em `app/components/parking/`, importação do CSS em `ParkingWorkspace.tsx` e chave de comunidade em `PilotDashboard.tsx`. Novos componentes: `ParkingSpaceMap`, `ParkingReservationTable` e `ParkingMovementHistory`. Estilos novos usam prefixo `parking-v2-` para evitar colisões com CSS legado.
+
+| Contrato | Alteração |
+|---|---|
+| GET estacionamento / disponibilidade | `eventoId`, `inicioEm`, `fimEm`; contexto, eventos publicados, estado de abertura e horário do servidor; `Cache-Control: no-store`. |
+| GET reservas | `q`, `status`, `setorId`, `tipo`, `eventoId`, `page`, `pageSize` (até 80), `scope=mine`; total real e dados do usuário/permissão corrente. |
+| POST reservas | Evento obrigatório; `requestId` opcional para clientes anteriores e obrigatório no novo cliente; repetição do mesmo pedido retorna a reserva, payload alterado com mesma chave retorna 409. |
+| PATCH reservas | `CANCELAR_PROPRIA` restrito ao titular; `CHECKIN` rejeita atividade diferente quando há contexto selecionado; estados/conflitos revalidados. |
+| GET movimentacoes | Novo endpoint protegido, busca e filtro de status, 40 registros por página e total real. |
+| PATCH mapa | `previousX`/`previousY` para posição; `previousNome`/`previousCor`/`previousOrdem` para setor. Clientes com versão anterior precisam atualizar antes de editar. |
+| PATCH relatorios | Totais derivados do intervalo persistido da escala; o cliente informa somente a ação e o resumo. |
+
+Utilitários novos: `parking-context.ts`, `parking-shift-stats.ts`, `parking-audit.ts`. Nenhuma dependência de execução, tabela, migração ou provedor novo. Mantidos D1, autenticação, permissões, códigos QR opacos e trilha existentes.
+
+## Validação
+
+| Verificação executada | Resultado |
+|---|---|
+| Build do repositório e validação do Worker ESM/manifesto | Aprovados. |
+| `tsc --noEmit` | Aprovado. |
+| ESLint com os mesmos filtros do script do repositório (`dist`/`.next`) | 0 erros; 1 aviso preexistente em `PeopleWorkspace.tsx` (`TITLES` sem uso). |
+| ESLint dos componentes/APIs/utilitários de estacionamento e scripts de QA | 0 erros e 0 avisos. |
+| Suíte completa `node --test tests/*.test.mjs` | **601 testes: 597 aprovados, 4 falhas preexistentes**, nenhuma exclusão/skip. |
+| Integração nova do estacionamento | **8 grupos aprovados**, incluindo rollback de auditoria. |
+| Matriz visual Edge/Playwright | Membro e gestão em 320, 390, 430, 768, 1024 e 1440 px, temas claro/escuro: **24 cenários**, zero overflow lateral de página e zero erro JavaScript. |
+| Fluxos no navegador | Reserva pendente → aprovação → entrada → saída; vazio filtrado, offline; teclado/lista, arraste sem seleção acidental, reconexão, zoom CSS 200%/movimento reduzido, cancelamento próprio e nova solicitação com os mesmos dados: aprovados. |
+| Desempenho local | 600 vagas/5.000 reservas históricas: **29–56 ms** após agrupar a consulta, contra cerca de 490 ms antes. Medição SQLite local, sem extrapolação para produção. |
+| `git diff --check` | Aprovado. |
+
+As quatro falhas foram reproduzidas sem alterações no checkout original `6aa3458`: um caso em `feed-interactions-access.test.mjs` e três em `p1-theme-accessibility.test.mjs`. Os harnesses rejeitam a dependência `./SafeImage`; a falha antecede os fluxos que pretendem exercitar.
+
+Evidências locais: [resultado da matriz](../../outputs/parking/visual-results.json), [interações](../../outputs/parking/extra-results.json), [suíte completa](../../outputs/parking/tests-final.log), [falhas na base original](../../outputs/parking/baseline-failures.log), [build](../../outputs/parking/build.log) e [lint](../../outputs/parking/lint.log).
+
+Capturas inspecionadas: [membro 390 px claro](../../outputs/parking/member-390-claro.png), [membro 320 px escuro](../../outputs/parking/member-320-escuro.png), [gestão desktop escuro](../../outputs/parking/manager-1440-escuro.png), [gestão 390 px](../../outputs/parking/manager-390-claro.png), [filtro vazio](../../outputs/parking/manager-empty.png), [offline](../../outputs/parking/member-offline.png) e [ampliação 200%](../../outputs/parking/member-zoom-200.png). Arquivos em `outputs/` são evidências locais ignoradas pelo Git; os scripts versionados permitem recriá-los.
+
+Os testes de integração usam o Worker compilado, login real do sistema e SQLite em memória com as migrações existentes. O adaptador serializa os lotes transacionais para representar o comportamento de D1; isso não equivale a ensaio de carga na hospedagem.
+
+O erro `QA audit failure` no log é induzido por um teste: confirma rollback e recuperação posterior, e esse caso está aprovado. A matriz visual também verifica recorte interno das tabelas móveis, além da largura total da página.
+
+Cobertura nova em `tests/parking-redesign-runtime.test.mjs`: reserva concorrente, replay e payload divergente, atividade obrigatória/abertura, intervalos sobrepostos entre eventos e adjacentes, acesso anônimo, membro sem permissão administrativa, comunidade diferente, privacidade do mapa, cancelamento antes/depois da entrada, check-in simultâneo, saída repetida/inexistente, entrada manual simultânea, ocupação além do horário previsto, revogação de vínculo, editor obsoleto/sobreposto e lote integral, paginação além de 80 registros, totais de relatório, falha de notificação, falha de auditoria e consulta de 600 vagas com 5.000 reservas históricas.
+
+Testes existentes foram adaptados ao novo contrato/estrutura, mantendo a finalidade de cada verificação. Nenhum teste foi removido ou marcado como ignorado.
+
+## Prévia reproduzível
+
+Na raiz deste checkout, depois de instalar as dependências e compilar:
+
+```sh
+node scripts/qa/parking-preview.mjs
+```
+
+A prévia escuta somente `127.0.0.1:4178`. Abrir `http://localhost:4178/qa-login/member` ou `http://localhost:4178/qa-login/manager`. Os atalhos e usuários sintéticos existem somente nesse servidor de QA; não são rotas incluídas na aplicação. O banco vive em memória e é descartado ao encerrar o processo. Nenhuma credencial ou dado de produção é usado.
+
+Os scripts `scripts/qa/parking-visual-qa.mjs` e `parking-interaction-qa.mjs` usam Playwright com Edge e geram evidências em `outputs/parking`. Playwright é ferramenta opcional de QA, sem alteração do `package.json`; `PARKING_QA_PLAYWRIGHT_MODULE` permite apontar para o módulo instalado no ambiente. Execute os scripts nessa ordem sobre uma prévia recém-iniciada.
+
+## Limites herdados e não testado
+
+- A garagem é local por usuário/aparelho. Não existe cadastro de veículo do servidor com ID/titularidade para validar um suposto veículo de terceiro. Evoluir isso requer contrato de dados próprio; não foi simulada uma proteção inexistente.
+- Não existem referências espaciais para entradas/corredores/obstáculos, orientação/dimensões de vaga, hold de seleção, exportador ou integração com cancelas. A imagem não foi usada para fabricar esses dados.
+- O editor existente permite criar setores/vagas, alterar setor e mover posições. Não foram inventados endpoints de exclusão/inativação/bloqueio nem uma política para resolver uso futuro. Reserva administrativa continua disponível pela visão pessoal do gestor; não foi criado cadastro em nome de terceiros.
+- Situação física OCUPADA continua bloqueando novas reservas, inclusive futuras, até uma saída autorizada. É a proteção conservadora do modelo vigente; não foi inventada previsão de liberação.
+- Ocorrências e relatórios preservam os recortes existentes de 20 e 60 registros. A paginação nova contempla reservas e movimentações. Uma consulta integral/exportação de ocorrências e relatórios permanece como extensão separada.
+- O envio automático de relatório é o mecanismo existente acionado pela tela; não é um agendador garantido com a aplicação fechada. Não há encerramento automático de veículos.
+- Não executados: câmera física/decodificação óptica, PWA instalado, APK/WebView real, teclado virtual real, leitor de tela, carga e concorrência no D1 remoto. Zoom CSS a 200%, viewport reduzido e teclado do navegador não substituem esses ensaios.
+- A suíte geral possui falhas preexistentes do harness de `SafeImage`, reproduzidas na base original. Elas não foram ocultadas nem corrigidas fora do escopo.
+
+Os itens de homologação física e as lacunas acima permanecem explícitos. A entrega local não declara aprovação integral de todos os casos P1 da seção 22 do ZIP nem liberação para publicação.
+
+## Publicação
+
+Não publicada. Nenhum merge ou migração em produção autorizado nesta tarefa.
+
+Reversão: o trabalho está em branch isolada baseada em `6aa3458`; não há reversão de banco a executar. Caso os commits sejam integrados posteriormente, revertê-los restaura a implementação anterior, observando que reservas/cancelamentos já realizados são dados de negócio e devem manter seu histórico.
