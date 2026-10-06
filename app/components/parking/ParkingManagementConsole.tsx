@@ -7,6 +7,7 @@ import { spaceState } from "./ParkingSpaceMap";
 import { ParkingQrCheckin, type ParkingQrValidationResult } from "../ParkingReservationQr";
 import {
   formatTime,
+  parkingLabel,
   getParkingCanvasHeight,
   getParkingCanvasWidth,
   hasCustomParkingLayout,
@@ -43,6 +44,8 @@ export default function ParkingManagementConsole({
 
   const [tab, updateTab] = useState<Tab>("visao");
   const setTab = (next: Tab) => { if (next !== tab) parking.setReservationFilters(f => ({...f,status:"",page:1})); updateTab(next); };
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [exitSearch, setExitSearch] = useState("");
   const [mapEditing, setMapEditing] = useState(false);
   const [draggedSpace, setDraggedSpace] = useState<number | null>(null);
   const pointerDragRef = useRef<{ spaceId: number; offsetX: number; offsetY: number } | null>(null);
@@ -63,6 +66,18 @@ export default function ParkingManagementConsole({
 
   const activeMovements = (data.movimentacoes || []).filter((item) => item.status === "NO_LOCAL");
 
+  const sections: {id: Tab; label: string; show: boolean; description: string}[] = [
+    {id:"visao",label:"Vagas",show:true,description:"Encontre uma vaga para consultar as reservas ou registrar a saída."},
+    {id:"entradas",label:"Entradas e saídas",show:canEntry||canExit,description:"Use o QR de uma reserva aprovada ou registre uma entrada sem reserva. As saídas liberam a vaga."},
+    {id:"reservas",label:"Reservas",show:true,description:"Aprove as solicitações pendentes e acompanhe as entradas. Uma solicitação ainda não é uma aprovação."},
+    {id:"historico",label:"Histórico",show:canEntry||canExit||canEdit,description:"Consulte as movimentações de todas as atividades, inclusive veículos que já saíram."},
+    {id:"ocorrencias",label:"Ocorrências",show:canEdit,description:"Registre o que aconteceu e o nível de atenção necessário. A lista mostra os 20 registros mais recentes."},
+    {id:"relatorios",label:"Relatórios",show:true,description:"Acompanhe o envio e a revisão dos relatórios de plantão. São exibidos os 60 relatórios mais recentes."},
+    {id:"mapa",label:"Mapa e vagas",show:true,description:"Organize os setores e as posições. As cores mostram a situação física atual; consulte Vagas para disponibilidade por atividade."},
+    {id:"equipe",label:"Equipe e configuração",show:canConfigure||canManageHelpers,description:"Defina o responsável e as orientações. Auxiliares são convidados durante um plantão confirmado."},
+  ];
+  const activeSection = sections.find(item => item.id === tab);
+  const visibleMovements = activeMovements.filter(item => [item.placa,item.responsavel,item.vaga_codigo].join(" ").toLocaleLowerCase("pt-BR").includes(exitSearch.toLocaleLowerCase("pt-BR")));
   const filteredSpaces = data.vagas.filter(space=>{const f=parking.reservationFilters;return (!f.q || space.codigo.toLowerCase().includes(f.q.toLowerCase()))&&(!f.setorId||String(space.setor_id)===f.setorId)&&(!f.tipo||space.tipo===f.tipo)&&(!f.status||spaceState(space).className===f.status);});
 
   async function handleQr(code: string): Promise<ParkingQrValidationResult | boolean> {
@@ -123,17 +138,17 @@ export default function ParkingManagementConsole({
         </div>
         <div className="gestao-operator-chip">
           <strong>{data.operator.nome}</strong>
-          <small>{data.operator.origemAcesso === "ESCALA_ATIVA" ? `Em plantão · ${data.operator.escala?.titulo}` : `${data.operator.papel} · acesso permanente`}</small>
+          <small>{data.operator.origemAcesso === "ESCALA_ATIVA" ? `Em plantão · ${data.operator.escala?.titulo}` : `${parkingLabel(data.operator.papel)} · acesso permanente`}</small>
         </div>
       </header>
 
       {(feedback || error) && <p className={`gestao-feedback${error ? " is-error" : ""}`} role="status">{error || feedback}</p>}
 
-      <div className="parking-v2-context-bar"><label>Atividade<select value={parking.context.eventId} onChange={event=>{parking.setContext({eventId:event.target.value,start:'',end:''});parking.setReservationFilters(f=>({...f,page:1}));}}><option value="">Ocupação atual / todas as atividades</option>{parking.eventOptions.map(item=><option key={item.id} value={item.id}>{item.titulo} · {formatTime(item.inicia_em)}</option>)}</select></label></div>
       <div className="parking-v2-sync"><span>{parking.stale ? 'Informações desatualizadas' : parking.lastSync ? 'Atualizado às '+new Date(parking.lastSync).toLocaleTimeString('pt-BR') : 'Atualizando…'}</span><button type="button" onClick={()=>void parking.load(true)}>Atualizar</button></div>
+      <label className="parking-v3-mobile-tabs">Área de trabalho<select value={tab} onChange={event=>setTab(event.target.value as Tab)}>{sections.filter(item=>item.show).map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
       <nav className="gestao-tabs" aria-label="Seções da gestão">
         <TabButton id="visao" tab={tab} setTab={setTab}>Vagas</TabButton>
-        {(canEntry || canExit) && <TabButton id="entradas" tab={tab} setTab={setTab}>Operação</TabButton>}
+        {(canEntry || canExit) && <TabButton id="entradas" tab={tab} setTab={setTab}>Entradas e saídas</TabButton>}
         <TabButton id="reservas" tab={tab} setTab={setTab}>Reservas</TabButton>
         {(canEntry || canExit || canEdit) && <TabButton id="historico" tab={tab} setTab={setTab}>Histórico</TabButton>}
         {canEdit && <TabButton id="ocorrencias" tab={tab} setTab={setTab}>Ocorrências</TabButton>}
@@ -142,17 +157,19 @@ export default function ParkingManagementConsole({
         {(canConfigure || canManageHelpers) && <TabButton id="equipe" tab={tab} setTab={setTab}>Equipe e configuração</TabButton>}
       </nav>
 
-      <p className="parking-v2-summary">{parking.context.eventId ? 'Atividade selecionada' : 'Ocupação atual'} · {data.stats.total} vagas · {data.stats.livres} disponíveis · {data.stats.reservadas || 0} reservadas · {data.stats.ocupadas} ocupadas · {data.stats.indisponiveis || 0} indisponíveis</p>
-      {(tab==='visao'||tab==='reservas') && <div className="parking-v2-filters">
+      <div className="parking-v3-section-heading"><h2>{activeSection?.label}</h2><p>{activeSection?.description}</p></div>
+      {["visao","reservas","entradas"].includes(tab) && <div className="parking-v2-context-bar"><label>Atividade<select value={parking.context.eventId} onChange={event=>{parking.setContext({eventId:event.target.value,start:'',end:''});parking.setReservationFilters(f=>({...f,page:1}));}}><option value="">{tab === "reservas" ? "Todas as atividades" : "Agora / todas as atividades"}</option>{parking.eventOptions.map(item=><option key={item.id} value={item.id}>{item.titulo} · {formatTime(item.inicia_em)}</option>)}</select></label><p>{parking.context.eventId ? "Reservas e vagas consultadas para esta atividade. As entradas e saídas mostram os veículos presentes agora." : tab === "reservas" ? "Mostrando reservas de todas as atividades." : "Mostrando a situação atual. Escolha uma atividade para consultar reservas futuras."}</p></div>}
+      {tab==='visao' && <p className="parking-v2-summary">{parking.context.eventId ? 'Atividade selecionada' : 'Ocupação atual'} · {data.stats.total} vagas · {data.stats.livres} disponíveis · {data.stats.reservadas || 0} reservadas · {data.stats.ocupadas} ocupadas · {data.stats.indisponiveis || 0} indisponíveis</p>}
+      {(tab==='visao'||tab==='reservas') && <div className={`parking-v3-filter-panel${filtersOpen ? " is-open" : ""}`}><button type="button" className="parking-v3-filter-toggle" aria-expanded={filtersOpen} onClick={()=>setFiltersOpen(value=>!value)}>{filtersOpen ? "Ocultar filtros" : "Buscar e filtrar"}{[parking.reservationFilters.q,parking.reservationFilters.setorId,parking.reservationFilters.tipo,parking.reservationFilters.status].filter(Boolean).length ? " · filtros ativos" : ""}</button><div className="parking-v2-filters">
         <label>Buscar {tab==='visao' ? 'vaga' : 'pessoa, placa, vaga ou reserva'}<input value={parking.reservationFilters.q} onChange={event=>parking.setReservationFilters(f=>({...f,q:event.target.value,page:1}))} /></label>
         <label>Setor<select value={parking.reservationFilters.setorId} onChange={event=>parking.setReservationFilters(f=>({...f,setorId:event.target.value,page:1}))}><option value="">Todos os setores</option>{sectors.map(sector=><option key={sector.id} value={sector.id.split(':')[0]}>{sector.name}</option>)}</select></label>
         <label>Tipo<select value={parking.reservationFilters.tipo} onChange={event=>parking.setReservationFilters(f=>({...f,tipo:event.target.value,page:1}))}><option value="">Todos os tipos</option><option value="COMUM">Comum</option><option value="PCD">PCD</option><option value="IDOSO">Idoso</option><option value="RESERVADA">Especial</option></select></label>
         <label>Status<select value={parking.reservationFilters.status} onChange={event=>parking.setReservationFilters(f=>({...f,status:event.target.value,page:1}))}><option value="">Todos os status</option>{(tab==='reservas' ? [['PENDENTE','Pendente'],['CONFIRMADA','Confirmada'],['CHECKIN','Entrada registrada'],['RECUSADA','Recusada'],['CANCELADA','Cancelada']] : [['available','Disponível'],['reserved','Reservada'],['occupied','Ocupada'],['blocked','Indisponível']]).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
         <button type="button" onClick={()=>parking.setReservationFilters({q:'',setorId:'',tipo:'',status:'',page:1})}>Limpar filtros</button>
         {canConfigure && <button type="button" onClick={()=>setTab('mapa')}>Editar mapa</button>}
-      </div>}
+      </div></div>}
       {tab==='visao' && <section className="parking-v2-records"><div className="parking-v2-table-scroll"><table className="parking-v2-data-table"><thead><tr><th scope="col">Vaga</th><th scope="col">Setor</th><th scope="col">Tipo</th><th scope="col">Situação</th><th scope="col">Entrada atual</th><th scope="col">Ações</th></tr></thead><tbody>
-        {filteredSpaces.map(space=>{const state=spaceState(space),movement=data.movimentacoes.find(m=>m.status==='NO_LOCAL'&&m.vaga_id===space.id);return <tr key={space.id}><td data-label="Vaga"><strong>{space.codigo}</strong></td><td data-label="Setor">{space.setor_nome}</td><td data-label="Tipo">{space.tipo}</td><td data-label="Situação"><span className={'parking-v2-status '+state.className}>{state.mark} {state.label}</span></td><td data-label="Entrada">{movement ? formatTime(movement.entrada_em) : '—'}</td><td data-label="Ações">{movement&&canExit ? <button type="button" disabled={working} onClick={()=>{if(window.confirm('Registrar saída do veículo '+movement.placa+'?')) void registerExit(movement.id);}}>Registrar saída</button> : <button type="button" onClick={()=>{parking.setReservationFilters(f=>({...f,q:space.codigo,status:'',page:1}));setTab('reservas');}}>Ver reservas</button>}</td></tr>;})}
+        {filteredSpaces.map(space=>{const state=spaceState(space),movement=data.movimentacoes.find(m=>m.status==='NO_LOCAL'&&m.vaga_id===space.id);return <tr key={space.id}><td data-label="Vaga"><strong>{space.codigo}</strong></td><td data-label="Setor">{space.setor_nome}</td><td data-label="Tipo">{parkingLabel(space.tipo)}</td><td data-label="Situação"><span className={'parking-v2-status '+state.className}>{state.mark} {state.label}</span></td><td data-label="Entrada">{movement ? formatTime(movement.entrada_em) : '—'}</td><td data-label="Ações">{movement&&canExit ? <button type="button" disabled={working} onClick={()=>{if(window.confirm('Registrar saída do veículo '+movement.placa+'?')) void registerExit(movement.id);}}>Registrar saída</button> : <button type="button" onClick={()=>{parking.setReservationFilters(f=>({...f,q:space.codigo,status:'',page:1}));setTab('reservas');}}>Ver reservas</button>}</td></tr>;})}
       </tbody></table></div><p className="parking-v2-pagination">{filteredSpaces.length} de {data.vagas.length} vagas</p>{!filteredSpaces.length && <p className="gestao-empty">{data.vagas.length ? "Nenhuma vaga encontrada para estes filtros." : "Nenhuma vaga cadastrada. Configure os setores e as vagas para começar."}</p>}</section>}
       {tab==='historico' && <ParkingMovementHistory />}
       {tab === "entradas" && (
@@ -170,7 +187,7 @@ export default function ParkingManagementConsole({
               }}
             >
               <fieldset>
-                <legend>Registrar entrada</legend>
+                <legend>Entrada sem reserva</legend><p className="gestao-hint">Para uma reserva aprovada, use o QR acima ou a ação Registrar entrada na aba Reservas.</p>
                 <label>Placa<input name="placa" required maxLength={10} placeholder="ABC1D23" /></label>
                 <label>Responsável<input name="responsavel" required maxLength={120} placeholder="Nome de quem estaciona" /></label>
                 <label>Tipo<select name="tipoVeiculo"><option value="CARRO">Carro</option><option value="MOTO">Moto</option><option value="VAN">Van</option><option value="ONIBUS">Ônibus</option><option value="OUTRO">Outro</option></select></label>
@@ -188,14 +205,14 @@ export default function ParkingManagementConsole({
             </form>
           )}
           <div className="gestao-card-inner">
-            <header><h3>Veículos no local</h3><span>{activeMovements.length}</span></header>
+            <header><h3>Veículos no local</h3><span>{activeMovements.length}</span></header><label>Buscar veículo para saída<input placeholder="Placa, pessoa ou vaga" value={exitSearch} onChange={event=>setExitSearch(event.target.value)} /></label>
             <div className="gestao-simple-list">
-              {activeMovements.length ? activeMovements.map((item) => (
+              {visibleMovements.length ? visibleMovements.map((item) => (
                 <article key={item.id}>
                   <div><strong>{item.placa}</strong><small>{item.vaga_codigo || "Sem vaga"} · {item.responsavel}</small></div>
                   {canExit && <button type="button" disabled={working} onClick={() => {if(window.confirm(`Registrar saída de ${item.placa}?`)) void registerExit(item.id);}}>Registrar saída</button>}
                 </article>
-              )) : <p className="gestao-empty">Nenhum veículo no local.</p>}
+              )) : <p className="gestao-empty">{exitSearch ? "Nenhum veículo corresponde à busca. Tente parte da placa ou o nome." : "Nenhum veículo no local."}</p>}
             </div>
           </div>
         </section>
@@ -219,17 +236,17 @@ export default function ParkingManagementConsole({
               <legend>Relatar ocorrência</legend>
               <label>Tipo<select name="tipo"><option value="SEGURANCA">Segurança</option><option value="DANO">Dano</option><option value="BLOQUEIO">Bloqueio</option><option value="ORIENTACAO">Orientação</option><option value="OUTRO">Outro</option></select></label>
               <label>Gravidade<select name="gravidade"><option value="BAIXA">Baixa</option><option value="MEDIA">Média</option><option value="ALTA">Alta</option></select></label>
-              <label className="gestao-wide">Descrição<textarea name="descricao" required minLength={8} rows={3} /></label>
+              <label className="gestao-wide">Descrição<textarea name="descricao" required minLength={8} rows={3} placeholder="Informe o local, o que aconteceu e a providência tomada." /></label>
             </fieldset>
             <button className="gestao-primary" disabled={working}>Registrar ocorrência</button>
           </form>
           <div className="gestao-card-inner">
-            <header><h3>Histórico de problemas</h3></header>
+            <header><h3>Últimas ocorrências</h3></header>
             <div className="gestao-simple-list">
               {data.ocorrencias.length ? data.ocorrencias.map((item) => (
                 <article key={item.id}>
                   <div>
-                    <strong>{item.tipo} · {item.gravidade}</strong>
+                    <strong>{parkingLabel(item.tipo)} · atenção {parkingLabel(item.gravidade).toLocaleLowerCase("pt-BR")}</strong>
                     <small>{item.descricao}</small>
                     <small>{item.criado_por_nome || "Operador"} · {formatTime(item.criado_em)}</small>
                   </div>
@@ -242,12 +259,12 @@ export default function ParkingManagementConsole({
 
       {tab === "relatorios" && (
         <section className="gestao-card">
-          <header><p className="gestao-kicker">FECHAMENTO DE ESCALA</p><h2>Relatórios enviados ao final de cada plantão</h2></header>
+          <header><p className="gestao-kicker">FECHAMENTO DE ESCALA</p><h2>Envio e revisão dos plantões</h2></header>
           <div className="gestao-report-grid">
             {reports.length ? reports.map((report) => (
               <article key={report.id} className="gestao-report-form">
                 <header>
-                  <span className={`gestao-badge status-${report.status.toLowerCase()}`}>{report.status.replaceAll("_", " ")}</span>
+                  <span className={`gestao-badge status-${report.status.toLowerCase()}`}>{parkingLabel(report.status)}</span>
                   <h3>{report.titulo}</h3>
                 </header>
                 <dl>
@@ -265,7 +282,7 @@ export default function ParkingManagementConsole({
                   </div>
                 )}
               </article>
-            )) : <p className="gestao-empty">Nenhum relatório de escala ainda.</p>}
+            )) : <p className="gestao-empty">Nenhum relatório disponível. Os registros são vinculados aos plantões do ministério de estacionamento.</p>}
           </div>
         </section>
       )}
@@ -273,13 +290,13 @@ export default function ParkingManagementConsole({
       {tab === "mapa" && (
         <section className="gestao-card">
           <header>
-            <div><p className="gestao-kicker">MAPA</p><h2>Ocupação por setor</h2></div>
+            <div><p className="gestao-kicker">MAPA</p><h2>Organização dos setores</h2></div>
             <div className="gestao-row-actions">
               <span>{data.stats.livres} livres</span>
               {canConfigure && <button type="button" className="gestao-ghost" onClick={() => setMapEditing((value) => !value)}>{mapEditing ? "Concluir edição" : "Reorganizar vagas"}</button>}
             </div>
           </header>
-          {mapEditing && <p className="gestao-hint">Arraste uma vaga ou use os campos de posição. Cada alteração é salva explicitamente; conflitos são verificados no servidor.</p>}
+          {mapEditing && <p className="gestao-hint">Ao soltar uma vaga, a nova posição é salva. Para usar o teclado, abra Editar posições por campos e pressione Salvar posição.</p>}
           <div className="gestao-map">
             {sectors.map((sector) => {
               const positioned = hasCustomParkingLayout(sector.spaces);
@@ -309,7 +326,7 @@ export default function ParkingManagementConsole({
                         >
                           <label>Nome<input name="nome" defaultValue={sector.name} required maxLength={80} /></label>
                           <label>Cor<input name="cor" type="color" defaultValue={sector.color} /></label>
-                          <label>Posição<input name="ordem" type="number" min="0" max="99" defaultValue={sector.order} /></label>
+                          <label>Ordem do setor<input name="ordem" type="number" min="0" max="99" defaultValue={sector.order} /></label>
                           <button className="gestao-primary" disabled={working}>Salvar setor</button>
                         </form>
                       </details>
@@ -335,7 +352,7 @@ export default function ParkingManagementConsole({
                         onPointerCancel={() => {pointerDragRef.current=null;setDraggedSpace(null);void parking.load(true);}}
                         style={usesCanvas ? { left: space.posicao_x, top: space.posicao_y } : undefined}
                         className={`gestao-slot small status-${space.status.toLowerCase()}${mapEditing ? " is-editing" : ""}`}
-                        title={`${space.codigo} · ${space.tipo} · ${space.status}`}
+                        title={`${space.codigo} · ${parkingLabel(space.tipo)} · ${spaceState({...space,reservada:0}).label}`}
                       >{space.codigo}</button>
                     ))}
                   </div>
@@ -344,7 +361,7 @@ export default function ParkingManagementConsole({
             })}
             {!sectors.length && <p className="gestao-empty">Nenhum setor cadastrado ainda.</p>}
           </div>
-          {canConfigure && <details className="parking-v2-coordinate-editor"><summary>Editar posições por campos</summary><p>Posições em pixels. Use espaçamento de pelo menos 72 × 64 para manter as vagas legíveis.</p>{data.vagas.map(space=><form key={space.id+'-'+space.posicao_x+'-'+space.posicao_y} onSubmit={event=>{event.preventDefault();const values=new FormData(event.currentTarget);void moveSpace(space.id,Number(values.get('x')),Number(values.get('y')));}}><strong>{space.codigo} · {space.setor_nome}</strong><label>X<input name="x" type="number" min="0" max="10000" defaultValue={space.posicao_x} required /></label><label>Y<input name="y" type="number" min="0" max="10000" defaultValue={space.posicao_y} required /></label><button disabled={working}>Salvar posição</button></form>)}</details>}
+          {canConfigure && <details className="parking-v2-coordinate-editor"><summary>Editar posições por campos</summary><p>A posição horizontal cresce para a direita e a vertical, para baixo. Deixe pelo menos 72 pixels entre colunas e 64 entre linhas.</p>{data.vagas.map(space=><form key={space.id+'-'+space.posicao_x+'-'+space.posicao_y} onSubmit={event=>{event.preventDefault();const values=new FormData(event.currentTarget);void moveSpace(space.id,Number(values.get('x')),Number(values.get('y')));}}><strong>{space.codigo} · {space.setor_nome}</strong><label>Horizontal (px)<input name="x" type="number" min="0" max="10000" defaultValue={space.posicao_x} required /></label><label>Vertical (px)<input name="y" type="number" min="0" max="10000" defaultValue={space.posicao_y} required /></label><button disabled={working}>Salvar posição</button></form>)}</details>}
           {canConfigure && (
             <details className="gestao-settings-block">
               <summary>Criar setores e vagas</summary>
@@ -394,6 +411,7 @@ export default function ParkingManagementConsole({
 
       {tab === "equipe" && (
         <section className="gestao-card gestao-two-col">
+          {!data.operator.escala && <p className="parking-v3-empty">Você não está em um plantão confirmado agora. Os convites para auxiliares aparecem durante o plantão; os integrantes são cadastrados no ministério de estacionamento.</p>}
           {canManageHelpers && data.operator.escala && (
             <form
               className="gestao-form"
@@ -438,10 +456,10 @@ export default function ParkingManagementConsole({
                 </label>
                 <label className="gestao-wide">Instruções da equipe<textarea name="instrucoes" rows={3} defaultValue={data.config.instrucoes} /></label>
               </fieldset>
-              <button className="gestao-primary" disabled={working}>Salvar</button>
+              <button className="gestao-primary" disabled={working}>Salvar configuração</button>
             </form>
           )}
-          <div className="gestao-row-actions"><button type="button" onClick={()=>setTab('historico')}>Consultar histórico de movimentações</button>{canEdit && <button type="button" disabled={working} onClick={()=>{if(window.confirm('Excluir as movimentações encerradas?')) void clearMovementHistory();}}>Limpar movimentações encerradas</button>}</div>
+          <details className="parking-v3-history-tools"><summary>Manutenção do histórico</summary><p>A limpeza exclui os registros encerrados. Confira o histórico antes de continuar.</p><div className="gestao-row-actions"><button type="button" onClick={()=>setTab('historico')}>Consultar histórico de movimentações</button>{canEdit && <button type="button" disabled={working} onClick={()=>{if(window.confirm('Excluir as movimentações encerradas?')) void clearMovementHistory();}}>Limpar movimentações encerradas</button>}</div></details>
         </section>
       )}
     </section>

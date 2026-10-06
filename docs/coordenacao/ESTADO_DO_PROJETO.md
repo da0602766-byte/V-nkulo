@@ -1,5 +1,9 @@
 # ESTADO DO PROJETO — REFORMA OFICIAL DO VÍNKULO
 
+## Estacionamento — revisão local aguardando aprovação em 06/10/2026
+
+Após a publicação 358, o usuário solicitou revisão como membro/gestor, melhorias de entendimento e layout, capturas e nova confirmação antes de publicar. Revisão implementada localmente: etapas da reserva, distinção entre solicitação e aprovação, navegação móvel, filtros, busca de saídas e orientações das oito áreas da gestão. Galeria de 26 telas em `outputs/parking-review/avaliacao.html`; dados fictícios. Suíte completa 618/618, TypeScript/build aprovados e lint sem erros (um aviso preexistente). Nenhuma nova publicação nesta revisão; a autorização anterior não dispensa a confirmação solicitada agora. Detalhes no [relatório](../relatorios/ESTACIONAMENTO_REDESIGN_2026-10-06.md).
+
 ## Estacionamento — publicado em 06/10/2026
 
 Publicado Sites 358 em 06/10/2026 às 13h38 (Brasília), confirmado como succeeded pelo serviço. Fonte 61fa3bf212e05bab5dc3b7716fa51d3566600a00; deployment appgdep_6ac523d06018819189b25b97ee588fd0; URL https://adote-gestao.da0602766.chatgpt.site. Pré-publicação: 618/618 testes, TypeScript limpo, lint 0 erros/1 aviso, build válido; 24 cenários visuais e seis interações extras aprovados. Sem nova migração. Câmera/APK físicos permanecem pendentes.

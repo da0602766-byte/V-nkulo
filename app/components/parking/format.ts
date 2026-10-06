@@ -80,3 +80,19 @@ export function formatCountdown(milliseconds: number) {
   const pad = (value: number) => String(value).padStart(2, "0");
   return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${pad(minutes)}:${pad(seconds)}`;
 }
+
+/** Human labels shared by the member, management and shift screens. */
+export function parkingLabel(value: string) {
+  const labels: Record<string, string> = {
+    COMUM: "Comum", PCD: "PCD", IDOSO: "Idoso", RESERVADA: "Especial",
+    CARRO: "Carro", MOTO: "Moto", VAN: "Van", ONIBUS: "Ônibus", OUTRO: "Outro",
+    PENDENTE: "Aguardando aprovação", CONFIRMADA: "Aprovada", CHECKIN: "No local",
+    CANCELADA: "Cancelada", RECUSADA: "Recusada", ENCERRADA: "Encerrada",
+    ADMIN_COMUNIDADE: "Administrador", SUPERADMIN: "Proprietário", LIDER: "Líder",
+    PASTOR: "Pastor", MEMBRO: "Membro", SEGURANCA: "Segurança", DANO: "Dano",
+    BLOQUEIO: "Bloqueio", ORIENTACAO: "Orientação", BAIXA: "Baixa", MEDIA: "Média",
+    ALTA: "Alta", AGUARDANDO_MEMBRO: "Aguardando envio", AGUARDANDO_LIDER: "Em revisão pela liderança",
+    ENVIADO_PASTOR: "Enviado ao pastor", CORRECAO_SOLICITADA: "Correção solicitada",
+  };
+  return labels[value] || value;
+}

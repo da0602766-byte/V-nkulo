@@ -128,3 +128,30 @@ Publicado Sites 358 em 06/10/2026 às 13h38 (Brasília), confirmado como succeed
 Empacotamento no Windows exigiu Git Bash no PATH e TAR_OPTIONS=--force-local. O helper oficial enviou a fonte e validou o arquivo; nenhuma adaptação de código foi necessária. Registro documental posterior ao deploy.
 
 Reversão: o trabalho está em branch isolada baseada em `6aa3458`; não há reversão de banco a executar. Caso os commits sejam integrados posteriormente, revertê-los restaura a implementação anterior, observando que reservas/cancelamentos já realizados são dados de negócio e devem manter seu histórico.
+
+
+## Revisão de usabilidade local — 06/10/2026, após Sites 358
+
+Pedido: percorrer o estacionamento como usuário, identificar dificuldades e falhas de layout, melhorar as telas e apresentar capturas antes de uma nova publicação. A revisão foi feita com os componentes reais, Worker compilado e dados sintéticos no servidor local. Nenhuma alteração desta revisão foi publicada.
+
+| Dificuldade encontrada | Melhoria aplicada |
+|---|---|
+| Mapa aparentemente disponível antes de escolher uma atividade | Orientação inicial e seleção de atividade antes do mapa; sequência Atividade → Vaga → Solicitação. |
+| Botão de confirmação e QR sugeriam que a solicitação já estava aprovada | Botão Solicitar vaga, recibo de solicitação com instrução de aguardar aprovação, sem QR de entrada enquanto pendente. QR das reservas aprovadas preservado. |
+| Dados de conta repetidos e regras de horário pouco claras | CPF vinculado apresentado como informação, e-mail opcional nesse caso e explicação da janela de chegada/saída com validação do intervalo. |
+| Estados técnicos e persistência da garagem pouco claros | Rótulos legíveis para tipos/status e explicação de que os veículos são salvos neste navegador/aparelho. |
+| Oito botões ocupavam grande parte do celular | Seletor Área de trabalho no celular e navegação por abas no computador; título e orientação por área. |
+| Filtro de atividade aparecia em áreas que não utilizavam esse contexto | Contexto restrito às áreas de vagas, reservas e entradas/saídas; explicação da diferença entre reserva da atividade e ocupação física. |
+| Filtros e textos cortados em telas pequenas | Filtros recolhíveis, duas colunas no celular e uma coluna até 360 px; controles e textos maiores. |
+| Dificuldade para localizar veículos na saída | Busca por veículo/pessoa/vaga e mensagem útil quando não há correspondência. |
+| Editor não explicava quando salvava e códigos de vagas quebravam linha | Instrução sobre salvar ao soltar, alternativa por campos e largura fixa para exibir os códigos inteiros. |
+| Ações de manutenção misturadas à configuração comum | Limpeza do histórico agrupada em uma seção própria com explicação; rótulo Salvar configuração. |
+| Limites das listas não apareciam | Ocorrências e relatórios indicam os recortes existentes de 20 e 60 registros. |
+
+Validação: pré-publicação completa aprovada com 618 testes, zero falhas; TypeScript limpo; ESLint zero erros e um aviso preexistente; build/Worker/manifesto aprovados. Após os últimos ajustes exclusivos de CSS, build e verificações visuais repetidos. Script novo de captura aprovado no ESLint. Matriz com 24 cenários (membro/gestão, seis larguras e dois temas) e oito interações adicionais; zero erro JavaScript e zero transbordamento lateral de página nos cenários executados. A galeria percorre as oito áreas da gestão em computador/celular, formulário/mapa/reservas/garagem do membro e filtros de 320 px.
+
+Evidências locais: [galeria com 26 capturas](../../outputs/parking-review/avaliacao.html), [resultado da galeria](../../outputs/parking-review/resultados.json), [matriz visual](../../outputs/parking/visual-results.json), [interações](../../outputs/parking/extra-results.json), [pré-publicação](../../.task-tools/parking-ux-complete.log) e [build final](../../.task-tools/parking-ux-build-final.log). O script reproduzível da galeria é scripts/qa/parking-usability-qa.mjs e deve rodar depois dos outros dois scripts sobre uma prévia local recém-iniciada. Os artefatos são ignorados pelo Git e usam somente dados fictícios.
+
+Limites: inspeção do fluxo de operador em plantão restrita ao código nesta revisão; câmera, leitor de tela, teclado virtual, PWA e APK físicos não foram ensaiados. Navegação e testes automatizados não substituem pesquisa com usuários reais. Banco, APIs, permissões e regras de aprovação/cancelamento permanecem como publicados.
+
+Estado da entrega: **aguardando a confirmação do usuário após avaliar as telas. Não publicar automaticamente. A versão pública permanece Sites 358.**

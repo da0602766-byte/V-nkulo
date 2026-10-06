@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ParkingQrCheckin, type ParkingQrValidationResult } from "../ParkingReservationQr";
-import { formatClock, formatCountdown, formatTime } from "./format";
+import { formatClock, formatCountdown, formatTime, parkingLabel } from "./format";
 import type { ParkingController } from "./useParkingData";
 
 const WARNING_MS = 15 * 60 * 1000;
@@ -138,7 +138,7 @@ export default function ParkingOperatorMobile({
                     <strong>{item.nome_completo}</strong>
                     <small>{item.vaga_codigo} · {item.setor_nome} · {formatTime(item.inicio_em)}</small>
                   </div>
-                  <span className={`gestao-badge status-${item.status.toLowerCase()}`}>{item.status === "PENDENTE" ? "Pendente" : "Confirmada"}</span>
+                  <span className={`gestao-badge status-${item.status.toLowerCase()}`}>{parkingLabel(item.status)}</span>
                 </article>
               )) : <p className="gestao-empty">Nenhuma reserva pendente ou confirmada nesta página.</p>}
             </div>
@@ -170,7 +170,7 @@ export default function ParkingOperatorMobile({
                     <small>{item.responsavel} · saiu {formatTime(item.saida_em as string)}</small>
                   </div>
                 </article>
-              )) : <p className="gestao-empty">Ainda não houve check-out nesta escala.</p>}
+              )) : <p className="gestao-empty">Ainda não há saídas registradas nesta lista.</p>}
             </div>
           </section>
         </>

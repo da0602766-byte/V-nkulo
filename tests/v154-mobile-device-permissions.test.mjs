@@ -54,7 +54,8 @@ test("a reserva mantém comprovante, QR e uma garagem reutilizável do próprio 
   assert.match(garage, /vinkulo:gestao:garagem:/);
   assert.match(memberPortal, /CPF\/CNPJ não será salvo/);
   assert.match(memberPortal, /Código copiado/);
-  assert.match(memberPortal, /ParkingReservationQr code=\{justCreated\.codigo\}/);
+  assert.doesNotMatch(memberPortal, /ParkingReservationQr code=\{justCreated\.codigo\}/);
+  assert.match(memberPortal, /Quando aprovada, o comprovante para entrada/);
   assert.match(memberPortal, /ParkingReservationQr code=\{reservation\.codigo\}/);
   assert.match(memberPortal, /Entrada já liberada/);
 });

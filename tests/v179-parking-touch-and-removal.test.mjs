@@ -24,7 +24,7 @@ test("o mapa do membro preserva posições reais e permite escolher setor e list
   assert.match(memberPortal, /selectedSector\?\.spaces/);
   const map = await readFile(new URL("../app/components/parking/ParkingSpaceMap.tsx", import.meta.url), "utf8");
   assert.match(map, /left:space.posicao_x,top:space.posicao_y/);
-  assert.match(map, /Lista acessível/);
+  assert.match(map, /Lista de vagas/);
   assert.match(memberPortal, /isSpaceAvailable/);
   assert.match(format, /export function hasCustomParkingLayout/);
   assert.match(managementConsole, /space\.posicao_x, top: space\.posicao_y/);
