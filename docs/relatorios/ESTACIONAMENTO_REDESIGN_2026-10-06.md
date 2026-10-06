@@ -155,3 +155,21 @@ Evidências locais: [galeria com 26 capturas](../../outputs/parking-review/avali
 Limites: inspeção do fluxo de operador em plantão restrita ao código nesta revisão; câmera, leitor de tela, teclado virtual, PWA e APK físicos não foram ensaiados. Navegação e testes automatizados não substituem pesquisa com usuários reais. Banco, APIs, permissões e regras de aprovação/cancelamento permanecem como publicados.
 
 Estado da entrega: **aguardando a confirmação do usuário após avaliar as telas. Não publicar automaticamente. A versão pública permanece Sites 358.**
+
+
+## Segunda revisão — entendimento do membro e prioridades da gestão
+
+Pedido posterior do usuário: propor e aplicar melhorias sob as duas perspectivas e apresentar novas screenshots. Implementada localmente sobre 4a9de83, ainda sem publicação.
+
+- Membro: guia recolhível de solicitação, aprovação e entrada; resumo de atividade, vaga, veículo e período antes do envio; próximo passo em cada reserva; comprovante aprovado com ação principal destacada. Cancelamento preservado como ação secundária.
+- Consultas pessoais: a escolha da atividade continua filtrando a disponibilidade, mas não filtra a lista pessoal de reservas. O escopo mine e a paginação permanecem. Na gestão, o filtro de atividade continua aplicado às reservas. Nenhuma ampliação de acesso.
+- Gestão: atalhos para analisar solicitações, consultar aprovadas e controlar entradas/saídas. O atalho de solicitações limpa buscas antigas e abre a fila pendente. Filtros rápidos de etapa consultam o servidor e preservam o contexto da atividade.
+- Listagem: atividade de cada reserva visível, rótulo Período reservado, aprovação destacada e instrução específica de cada fila. Entradas registradas explica que também inclui reservas encerradas.
+
+Validação concluída: 618/618 testes, TypeScript limpo, build/Worker/manifesto válidos, lint zero erros e um aviso preexistente. Scripts novos/alterados aprovados no lint. Matriz visual de 24 combinações de tela/tema e quatro fluxos principais; nove interações adicionais, incluindo verificação da consulta pessoal sem eventoId ao escolher atividade. A galeria valida ainda a limpeza da busca anterior pelo atalho de pendências e as consultas das filas PENDENTE/CONFIRMADA em computador e celular. Zero erro JavaScript e zero transbordamento lateral de página nos cenários executados.
+
+Evidências: [galeria com 34 capturas](../../outputs/parking-review-v2/avaliacao.html), [resultado](../../outputs/parking-review-v2/resultados.json), [resumo antes do envio](../../outputs/parking-review-v2/membro-resumo-desktop.png), [próximos passos no celular](../../outputs/parking-review-v2/membro-reservas-celular.png), [fila de solicitações](../../outputs/parking-review-v2/gestao-pendentes-desktop.png) e [pré-publicação](../../.task-tools/parking-ux2-check.log). Screenshots são da aplicação compilada com dados fictícios. A galeria anterior permanece disponível em outputs/parking-review.
+
+Limites mantidos: esta é uma avaliação de interface e fluxos em navegador; câmera, APK físico, leitor de tela e entrevistas com usuários reais não foram realizados. Regras de aprovação, acesso e cancelamento mantidas.
+
+**Aguardando avaliação e confirmação do usuário. Não houve deploy; versão pública permanece Sites 358.**

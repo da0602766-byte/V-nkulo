@@ -197,3 +197,44 @@
 @media(max-width:360px) {
   .parking-v3-filter-panel .parking-v2-filters { grid-template-columns: minmax(0,1fr); }
 }
+
+/* Member next steps and management queues: a focused second usability pass. */
+.parking-redesign .parking-v4-guide { border-bottom: 1px solid var(--pilot-line); }
+.parking-v4-guide summary { padding: 10px 0; font-size: 14px; font-weight: 600; }
+.parking-v4-guide ol { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 22px; padding-left: 22px; margin: 4px 0 16px; }
+.parking-v4-guide li { padding-left: 3px; }
+.parking-v4-guide li strong, .parking-v4-guide li span { display: block; }
+.parking-v4-guide li span, .parking-v4-guide p { font-size: 14px; color: var(--pilot-muted); }
+.parking-v4-guide p { padding-bottom: 14px; }
+.parking-redesign .parking-v4-review { background: var(--parking-soft); border: 1px solid var(--pilot-line); border-radius: 10px; padding: 16px; }
+.parking-v4-review h3 { margin: 0 0 12px; font-size: 16px; }
+.parking-v4-review dl { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 12px 20px; margin: 0; }
+.parking-v4-review dt { font-size: 13px; color: var(--pilot-muted); }
+.parking-v4-review dd { margin: 2px 0 0; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.parking-v4-review dd span { display: block; }
+.parking-redesign #parking-my-reservations .gestao-reservation-item { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 16px 24px; padding: 20px 0; }
+.parking-v4-reservation-next { display: grid; gap: 6px; align-content: start; border-left: 3px solid #8054dd; padding-left: 14px; }
+.status-pendente .parking-v4-reservation-next { border-left-color: #b98316; }
+.status-confirmada .parking-v4-reservation-next { border-left-color: #208665; }
+.parking-v4-reservation-next p { font-size: 14px; color: var(--pilot-muted); }
+.parking-v4-eyebrow { font-size: 12px; letter-spacing: .04em; color: var(--pilot-muted); text-transform: uppercase; }
+.parking-redesign .parking-v4-reservation-next .gestao-qr-ticket { margin: 4px 0 0; min-width: 0; width: 100%; }
+.parking-redesign .parking-v4-reservation-next .gestao-qr-ticket > summary { display: flex; align-items: center; width: fit-content; min-height: 44px; padding: 8px 14px; border-radius: 7px; background: #5b2fc4; color: #fff; font-size: 14px; font-weight: 600; }
+.parking-redesign .parking-v4-cancel { grid-column: 1/-1; justify-self: start; min-height: 44px; font-size: 14px; background: transparent; }
+.parking-v4-operation-actions { padding: 12px 0; border-block: 1px solid var(--pilot-line); display: grid; gap: 8px; }
+.parking-v4-operation-actions > span { font-size: 14px; font-weight: 600; }
+.parking-v4-operation-actions > div, .parking-v4-queue-options { display: flex; gap: 8px; flex-wrap: wrap; }
+.parking-redesign .parking-v4-operation-actions button, .parking-redesign .parking-v4-queue-options button { font-size: 14px; min-height: 44px; }
+.parking-v4-queue { display: grid; gap: 8px; }
+.parking-v4-queue p { font-size: 14px; color: var(--pilot-muted); }
+.parking-redesign .parking-v4-queue-options button[aria-pressed=true] { background: #5b2fc4; border-color: #5b2fc4; color: #fff; font-weight: 600; }
+.parking-v4-table-event { max-width: 26ch; overflow-wrap: anywhere; }
+.parking-redesign .gestao-tabs button { font-size: 14px; }
+@media(max-width:760px) {
+  .parking-v4-guide ol { grid-template-columns: minmax(0,1fr); gap: 12px; }
+  .parking-redesign #parking-my-reservations .gestao-reservation-item { grid-template-columns: minmax(0,1fr); }
+  .parking-v4-review dl { grid-template-columns: minmax(0,1fr); }
+  .parking-v4-operation-actions > div, .parking-v4-queue-options { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
+  .parking-v4-operation-actions > div > button:last-child:nth-child(odd) { grid-column: 1/-1; }
+  .parking-v4-queue-options button { text-align: center; padding-inline: 8px; }
+}

@@ -1,6 +1,10 @@
 # ESTADO DO PROJETO — REFORMA OFICIAL DO VÍNKULO
 
-## Estacionamento — revisão local aguardando aprovação em 06/10/2026
+## Estacionamento — segunda revisão local aguardando aprovação em 06/10/2026
+
+Implementada a segunda avaliação de membro/gestor: próximo passo por reserva, guia breve, resumo antes de enviar, reservas pessoais de todas as atividades e filas de gestão por etapa. Galeria atual de 34 capturas em `outputs/parking-review-v2/avaliacao.html`; a galeria anterior foi preservada. Validação: 618 testes, TypeScript/build aprovados, lint sem erros (um aviso preexistente), matriz visual e nove interações adicionais aprovadas. Tudo permanece local; publicação depende de confirmação posterior do usuário.
+
+## Estacionamento — primeira revisão local em 06/10/2026
 
 Após a publicação 358, o usuário solicitou revisão como membro/gestor, melhorias de entendimento e layout, capturas e nova confirmação antes de publicar. Revisão implementada localmente: etapas da reserva, distinção entre solicitação e aprovação, navegação móvel, filtros, busca de saídas e orientações das oito áreas da gestão. Galeria de 26 telas em `outputs/parking-review/avaliacao.html`; dados fictícios. Suíte completa 618/618, TypeScript/build aprovados e lint sem erros (um aviso preexistente). Nenhuma nova publicação nesta revisão; a autorização anterior não dispensa a confirmação solicitada agora. Detalhes no [relatório](../relatorios/ESTACIONAMENTO_REDESIGN_2026-10-06.md).
 

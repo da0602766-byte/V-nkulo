@@ -46,7 +46,8 @@ export function useParkingData(memberMode: boolean) {
       if (context.eventId) params.set("eventoId",context.eventId);
       if (context.start && context.end) { params.set("inicioEm",context.start); params.set("fimEm",context.end); }
       const filters = new URLSearchParams({ ...reservationFilters, page: String(reservationFilters.page), pageSize: "40" });
-      if (context.eventId) filters.set("eventoId",context.eventId);
+      // Choosing an activity affects availability, while the personal list keeps every activity visible.
+      if (context.eventId && !memberMode) filters.set("eventoId",context.eventId);
       if (memberMode) filters.set("scope","mine");
       const options = { cache: "no-store" as const, signal: controller.signal };
       const [response,reservationResponse,reportResponse] = await Promise.all([

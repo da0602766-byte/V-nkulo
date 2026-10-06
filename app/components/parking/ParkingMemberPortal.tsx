@@ -161,6 +161,7 @@ export default function ParkingMemberPortal({
     <section className="gestao-member parking-redesign">
       <header className="parking-v2-page-heading"><p>{communityName}</p><h1>Estacionamento</h1><p>Escolha a atividade, selecione a vaga e envie sua solicitação.</p></header>
       <nav className="parking-v3-shortcuts" aria-label="Atalhos do estacionamento"><a href="#parking-new-reservation">Reservar vaga</a><a href="#parking-my-reservations">Minhas reservas</a><a href="#parking-my-garage">Meus veículos</a></nav>
+      <details className="parking-v4-guide"><summary>Como funciona a reserva?</summary><ol><li><strong>Solicite uma vaga</strong><span>Escolha a atividade, a vaga e informe o veículo.</span></li><li><strong>Acompanhe a aprovação</strong><span>A solicitação precisa ser aprovada pela gestão.</span></li><li><strong>Apresente o comprovante</strong><span>Após a aprovação, abra Minhas reservas e mostre o QR na entrada.</span></li></ol><p>Selecionar uma vaga no mapa não garante a reserva. A disponibilidade é conferida no envio.</p></details>
       <ol className="parking-v3-steps" aria-label="Etapas da reserva"><li className={selectedEventId ? "is-done" : "is-current"}>1. Atividade</li><li className={selectedSpace ? "is-done" : selectedEventId ? "is-current" : ""}>2. Vaga</li><li className={selectedSpace ? "is-current" : ""}>3. Solicitação</li></ol>
       <div className="parking-v2-context-bar" id="parking-new-reservation">
         <label>Atividade
@@ -275,7 +276,7 @@ export default function ParkingMemberPortal({
 
               {locked && <p className="gestao-hint">{parking.stale ? "Conecte-se e atualize a disponibilidade antes de enviar." : "O envio será liberado na abertura das reservas. Você já pode preencher os dados."}</p>}
               {invalidWindow && <p className="gestao-hint" role="alert">Informe uma saída posterior à chegada.</p>}
-              <div className="parking-v2-booking-action"><p>{selectedSpace.codigo} · {selectedSector?.name} · {vehicle.placa || "Informe o veículo"}</p><button className="gestao-primary" disabled={working || locked || selectionLost || invalidWindow}>{working ? "Aguarde…" : `Solicitar vaga ${selectedSpace.codigo}`}</button><small>A solicitação será enviada para aprovação da gestão.</small></div>
+              <div className="parking-v2-booking-action"><div className="parking-v4-review"><h3>Confira antes de enviar</h3><dl><div><dt>Atividade</dt><dd>{selectedEvent?.titulo}</dd></div><div><dt>Vaga</dt><dd>{selectedSpace.codigo} · {selectedSector?.name}</dd></div><div><dt>Veículo</dt><dd>{vehicle.placa || "Informe a placa"}{vehicle.modelo ? " · "+vehicle.modelo : ""}</dd></div><div><dt>Período reservado</dt><dd>{window_.start ? formatTime(new Date(window_.start).toISOString()) : "Informe a chegada"}<span>até {window_.end ? formatTime(new Date(window_.end).toISOString()) : "informar a saída"}</span></dd></div></dl></div><button className="gestao-primary" disabled={working || locked || selectionLost || invalidWindow}>{working ? "Aguarde…" : `Solicitar vaga ${selectedSpace.codigo}`}</button><small>A solicitação será enviada para aprovação da gestão.</small></div>
             </form>
           </section>
         </div>
@@ -284,7 +285,7 @@ export default function ParkingMemberPortal({
       <section className="gestao-card" id="parking-my-reservations">
         <header>
           <p className="gestao-kicker">MINHAS RESERVAS</p>
-          <h2>Minhas reservas e comprovantes</h2><p>Acompanhe a aprovação e apresente o comprovante na entrada. Você pode cancelar antes de entrar.</p>
+          <h2>Minhas reservas e comprovantes</h2><p>Suas reservas de todas as atividades. Veja o próximo passo de cada uma; você pode cancelar antes de entrar.</p>
         </header>
         <div className="gestao-reservation-list">
           {myOpenReservations.length ? myOpenReservations.map((reservation) => (
@@ -295,15 +296,10 @@ export default function ParkingMemberPortal({
                 <small>{reservation.placa_veiculo} · {reservation.modelo_veiculo} · {reservation.cor_veiculo}</small>
                 <small>{formatTime(reservation.inicio_em)} até {formatTime(reservation.fim_em)}</small><span className={`gestao-badge status-${reservation.status.toLowerCase()}`}>{reservation.saida_em ? "Encerrada" : parkingLabel(reservation.status)}</span>
               </div>
-              {["PENDENTE", "CONFIRMADA"].includes(reservation.status) && <button type="button" disabled={working} onClick={() => {if(window.confirm(`Cancelar sua reserva da vaga ${reservation.vaga_codigo}?`)) void parking.reservationAction({id:reservation.id,acao:"CANCELAR_PROPRIA"});}}>Cancelar minha reserva</button>}
-              {reservation.status === "CONFIRMADA" && reservation.codigo ? (
-                <details className="gestao-qr-ticket">
-                  <summary>Mostrar comprovante</summary>
-                  <ParkingReservationQr code={reservation.codigo} label={`${reservation.vaga_codigo} · ${reservation.setor_nome}`} expiresAt={reservation.fim_em} />
-                </details>
-              ) : (
-                <p>{reservation.status === "PENDENTE" ? "A gestão ainda precisa aprovar sua solicitação." : "Entrada já liberada."}</p>
-              )}
+              <div className="parking-v4-reservation-next"><span className="parking-v4-eyebrow">Próximo passo</span><strong>{reservation.status === "PENDENTE" ? "Aguarde a aprovação" : reservation.status === "CONFIRMADA" ? "Apresente o comprovante na entrada" : "Avise a equipe quando sair"}</strong><p>{reservation.status === "PENDENTE" ? "A gestão ainda precisa aprovar sua solicitação. Acompanhe a atualização por aqui." : reservation.status === "CONFIRMADA" ? "Sua reserva foi aprovada. A equipe registra sua entrada ao validar o comprovante." : "Entrada já liberada. Seu veículo está no local; procure a equipe para registrar a saída."}</p>
+                {reservation.status === "CONFIRMADA" && reservation.codigo && <details className="gestao-qr-ticket"><summary>Mostrar comprovante</summary><ParkingReservationQr code={reservation.codigo} label={`${reservation.vaga_codigo} · ${reservation.setor_nome}`} expiresAt={reservation.fim_em} /></details>}
+              </div>
+              {["PENDENTE", "CONFIRMADA"].includes(reservation.status) && <button type="button" className="parking-v4-cancel" disabled={working} onClick={() => {if(window.confirm(`Cancelar sua reserva da vaga ${reservation.vaga_codigo}?`)) void parking.reservationAction({id:reservation.id,acao:"CANCELAR_PROPRIA"});}}>Cancelar minha reserva</button>}
             </article>
           )) : <p className="gestao-empty">Nenhuma reserva ativa.</p>}
         </div>

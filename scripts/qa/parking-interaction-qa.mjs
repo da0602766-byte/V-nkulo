@@ -10,7 +10,15 @@ await page.getByText('Manter no celular',{exact:true}).click({timeout:1500}).cat
 for(let n=0;n<2;n++)await page.getByText('Pular introdução',{exact:true}).click({timeout:1500}).catch(()=>{});
 assert.equal(await page.locator('.parking-v2-map').count(),0,'Do not advertise availability before choosing an activity');
 results.push({case:'activity-required-before-map',passed:true});
+const personalBefore=await page.locator('.gestao-reservation-item').count();
+const personalReload=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/pilot/estacionamento/reservas' && r.request().method()==='GET');
+const availabilityReload=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/pilot/estacionamento/disponibilidade' && new URL(r.url()).searchParams.has('eventoId'));
 await page.locator('.parking-v2-context-bar select').selectOption({index:1});
+const personalResponse=await personalReload;await availabilityReload;
+assert.equal(new URL(personalResponse.url()).searchParams.get('scope'),'mine');
+assert.equal(new URL(personalResponse.url()).searchParams.has('eventoId'),false,'Personal history must remain independent from activity selection');
+await page.waitForFunction(expected=>document.querySelectorAll('.gestao-reservation-item').length===expected,personalBefore);
+results.push({case:'personal-reservations-stay-visible-when-activity-changes',passed:true});
 await page.getByRole('button',{name:'Lista de vagas',exact:true}).click();
 const available=page.locator('.parking-v2-space.available').first();await available.focus();await page.keyboard.press('Enter');
 assert.equal(await available.getAttribute('aria-pressed'),'true');
