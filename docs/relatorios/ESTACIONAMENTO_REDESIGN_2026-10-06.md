@@ -113,12 +113,16 @@ Os scripts `scripts/qa/parking-visual-qa.mjs` e `parking-interaction-qa.mjs` usa
 - Ocorrências e relatórios preservam os recortes existentes de 20 e 60 registros. A paginação nova contempla reservas e movimentações. Uma consulta integral/exportação de ocorrências e relatórios permanece como extensão separada.
 - O envio automático de relatório é o mecanismo existente acionado pela tela; não é um agendador garantido com a aplicação fechada. Não há encerramento automático de veículos.
 - Não executados: câmera física/decodificação óptica, PWA instalado, APK/WebView real, teclado virtual real, leitor de tela, carga e concorrência no D1 remoto. Zoom CSS a 200%, viewport reduzido e teclado do navegador não substituem esses ensaios.
-- A suíte geral possui falhas preexistentes do harness de `SafeImage`, reproduzidas na base original. Elas não foram ocultadas nem corrigidas fora do escopo.
+- A primeira entrega local tinha quatro falhas preexistentes de mocks SafeImage. Na preparação autorizada para publicação, os mocks foram corrigidos e a suíte integrada passou integralmente.
 
-Os itens de homologação física e as lacunas acima permanecem explícitos. A entrega local não declara aprovação integral de todos os casos P1 da seção 22 do ZIP nem liberação para publicação.
+Os itens de homologação física e as lacunas acima permanecem explícitos. Não se declara aprovação integral dos ensaios físicos P1 da seção 22 do ZIP. O proprietário autorizou a publicação em mensagem posterior.
 
 ## Publicação
 
-Não publicada. Nenhum merge ou migração em produção autorizado nesta tarefa.
+Publicação autorizada pelo usuário em 06/10/2026 (“Pode publicar”). Candidato integrado sobre a fonte Sites 357 (`c8030f226ed825f784782c5f3323236f4d117758`), preservando as alterações de mural, imagens, arquivos e ficha de pessoas. O CPF vinculado à conta foi mantido nas rotas de disponibilidade/reserva.
+
+Pré-publicação completa aprovada após a integração: 618 testes passaram, zero falhas; TypeScript limpo; lint zero erros e um aviso; build e Worker/manifesto válidos. Repetidos 24 cenários visuais e seis cenários extras de interação com o Worker compilado e dados sintéticos. Corrigidos bloqueios herdados de lint em três componentes, mocks e asserções antigas de imagem/feed e o próximo número livre do README de migrações (0085). Nenhuma migração nova ou alteração direta em dados de produção foi necessária.
+
+Envio/publicação em andamento; versão e URL serão registradas após confirmação nativa.
 
 Reversão: o trabalho está em branch isolada baseada em `6aa3458`; não há reversão de banco a executar. Caso os commits sejam integrados posteriormente, revertê-los restaura a implementação anterior, observando que reservas/cancelamentos já realizados são dados de negócio e devem manter seu histórico.
