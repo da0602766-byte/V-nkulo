@@ -221,6 +221,10 @@ html body :is(.people-person-button,.people-open-record,.person-record button,.w
 @media (prefers-reduced-motion:reduce) { html body .pilot-dashboard[data-ui-version="v2"] :is(.pilot-dashboard-layout,.pilot-sidebar,.pilot-sidebar-label,.worship-post) { transition:none !important; } html body .pilot-dashboard[data-ui-version="v2"] .pilot-navigation-drawer { animation:none !important; } }
 
 /* Desktop mural: keep the familiar sidebar while the reading column stays compact. */
+@media (min-width: 1024px) {
+  html body .pilot-dashboard[data-ui-version="v2"][data-sidebar-collapsed] .pilot-dashboard-layout:has(> .pilot-workspace > .community-feed-redesign) { grid-template-columns: 260px minmax(0, 1fr) !important; }
+}
+
 @media (min-width: 961px) {
   html body .pilot-dashboard[data-ui-version="v2"] .community-feed-redesign .worship-layout { grid-template-columns: minmax(0, 1fr) 260px !important; }
   html body .pilot-dashboard[data-ui-version="v2"] .community-feed-redesign .worship-main { width: min(100%, 680px); justify-self: center; }
