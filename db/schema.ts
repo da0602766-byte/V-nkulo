@@ -9,6 +9,19 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
+// Stable Drive IDs make retries and simultaneous copies idempotent.
+export const userFileCopies = sqliteTable("user_file_copies", {
+  usuarioId: integer("usuario_id").notNull(),
+  googleAccount: text("google_account").notNull(),
+  contentHash: text("content_hash").notNull(),
+  driveId: text("drive_id").notNull(),
+  name: text("name").notNull(),
+  mimeType: text("mime_type").notNull(),
+  size: integer("size").notNull(),
+  status: text("status").notNull().default("PENDING"),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, table => [primaryKey({ columns: [table.usuarioId, table.googleAccount, table.contentHash] })]);
+
 export const usuarios = sqliteTable("usuarios", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   nome: text("nome").notNull(),

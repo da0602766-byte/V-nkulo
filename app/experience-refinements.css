@@ -145,12 +145,7 @@ html[data-theme] .gestao-scan-hub button :is(strong,span,small){color:inherit!im
   .worship-layout{padding-left:max(0px,calc((100% - 858px)/2))}
   .worship-welcome{padding-left:max(0px,calc((100% - 858px)/2))}
 }
-/* Layout stable when the navigation rail opens. */
-@media(min-width:821px){
- .pilot-dashboard[data-ui-version="v2"]:has(.community-feed-redesign) .pilot-dashboard-layout{grid-template-columns:72px minmax(0,1fr)!important}
- .pilot-dashboard[data-ui-version="v2"]:has(.community-feed-redesign) .pilot-sidebar{position:sticky;z-index:30;align-self:start}
- .pilot-dashboard[data-ui-version="v2"]:has(.community-feed-redesign)[data-sidebar-collapsed="false"] .pilot-sidebar{box-shadow:14px 0 30px #0003}
-}
+/* Desktop reflow and mobile drawer behavior are owned by workspace-layout.css. */
 .pilot-dashboard[data-ui-version="v2"] .secretary-members{display:block!important;background:transparent!important}
 .pilot-dashboard[data-ui-version="v2"] .secretary-members>article{display:grid!important;grid-template-columns:32px minmax(130px,1fr) 80px minmax(130px,.8fr) auto!important;gap:12px!important;align-items:center!important;padding:12px 0!important;margin:0!important;border:0!important;border-bottom:1px solid var(--line,#ffffff15)!important;border-radius:0!important;background:transparent!important;min-height:0!important}
 .pilot-dashboard[data-ui-version="v2"] .secretary-members>article>*{min-width:0}
@@ -185,7 +180,6 @@ html[data-theme] .gestao-scan-hub button :is(strong,span,small){color:inherit!im
 .community-composer-inline .composer-wide{grid-column:1/-1;min-width:0}
 .community-composer-inline .composer-share{grid-column:1/-1;display:flex;align-items:center;gap:8px}
 .community-composer-inline .composer-share input{width:auto}
-.worship-composer-prompt{pointer-events:none}
 .public-community-footer{display:flex;justify-content:space-between;align-items:center;gap:24px;border-top:1px solid var(--pilot-line);margin:40px auto 0;padding:28px 0;color:var(--pilot-muted)}
 .public-community-footer strong{color:var(--pilot-text)}
 .public-community-footer p{font-size:13px;margin:8px 0 0}
@@ -256,7 +250,6 @@ html[data-theme] .gestao-scan-hub button :is(strong,span,small){color:inherit!im
 .public-community .public-community-footer{width:min(1120px,calc(100% - 40px));color:var(--community-muted);border-color:var(--community-line)}
 .public-community .public-community-footer strong{color:var(--community-text)}
 @media(max-width:820px){.events-studio-directory{grid-template-columns:minmax(0,1fr) 140px}.events-studio-directory>div{grid-column:1/-1}}
-@media(min-width:821px){html body .pilot-dashboard[data-ui-version="v2"][data-sidebar-collapsed]:has(.community-feed-redesign) .pilot-dashboard-layout{grid-template-columns:72px minmax(0,1fr)!important}}
 .pilot-dashboard[data-ui-version="v2"] .secretary-members>article{grid-template-areas:none!important;grid-template-rows:auto!important;grid-template-columns:32px minmax(130px,1fr) 70px 150px 180px!important}
 .pilot-dashboard[data-ui-version="v2"] .secretary-members>article>*{grid-area:auto!important}
 .pilot-dashboard[data-ui-version="v2"] .secretary-capacity-form{width:180px!important;min-width:180px!important;max-width:none!important;grid-template-columns:none!important}

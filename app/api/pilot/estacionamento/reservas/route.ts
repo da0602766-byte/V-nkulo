@@ -67,10 +67,11 @@ export async function POST(request: Request) {
   const end = new Date(String(payload.fimEm || ""));
   const validEmail = /^\S+@\S+\.\S+$/.test(email);
   const validDocument = validateCpfCnpj(document);
-  if (!vagaId || nome.length < 5 || (!validEmail && !validDocument) || !phone || vehiclePlate.length < 6 || !["CARRO", "MOTO", "VAN", "OUTRO"].includes(vehicleType) || vehicleModel.length < 2 || !vehicleColor || !Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end <= start) {
+  const db = getD1();
+  const linkedCpf = await db.prepare(`SELECT cpf_hash, finais FROM identidades_cpf WHERE usuario_id=? LIMIT 1`).bind(access.user.id).first<{ cpf_hash: string; finais: string }>();
+  if (!vagaId || nome.length < 5 || (!validEmail && !validDocument && !linkedCpf) || !phone || vehiclePlate.length < 6 || !["CARRO", "MOTO", "VAN", "OUTRO"].includes(vehicleType) || vehicleModel.length < 2 || !vehicleColor || !Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end <= start) {
     return Response.json({ error: "Revise os dados do usuário, veículo, contato e período da reserva." }, { status: 400 });
   }
-  const db = getD1();
   let eventTitle = "";
   if (eventId) {
     const linkedEvent = await db.prepare(
@@ -85,7 +86,7 @@ export async function POST(request: Request) {
   }
   const config = await db.prepare("SELECT ativo FROM estacionamento_configuracoes WHERE comunidade_id=?").bind(access.context.comunidadeId).first<{ativo:number}>();
   if (!config?.ativo) return Response.json({ error: "O módulo está desativado nesta comunidade." }, { status: 423 });
-  const identityKey = validDocument ? document : email;
+  const identityKey = validDocument ? document : linkedCpf?.cpf_hash ? `CPF:${linkedCpf.cpf_hash}` : email;
   const hashBuffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${access.context.comunidadeId}:${identityKey}`));
   const documentHash = [...new Uint8Array(hashBuffer)].map((value) => value.toString(16).padStart(2, "0")).join("");
   const requestId = String(payload.requestId || crypto.randomUUID());
@@ -114,7 +115,7 @@ export async function POST(request: Request) {
     AND NOT EXISTS(SELECT 1 FROM estacionamento_movimentacoes WHERE comunidade_id=? AND vaga_id=? AND status='NO_LOCAL')
     AND NOT EXISTS(SELECT 1 FROM estacionamento_reservas WHERE comunidade_id=? AND codigo=?)
     AND EXISTS(SELECT 1 FROM estacionamento_configuracoes WHERE comunidade_id=? AND ativo=1)
-    AND EXISTS(SELECT 1 FROM eventos_comunidade WHERE id=? AND comunidade_id=? AND status='PUBLICADO' AND (reservas_abrem_em IS NULL OR datetime(reservas_abrem_em)<=datetime('now')))`).bind(access.context.comunidadeId,vagaId,access.user.id,eventId,eventTitle,nome,validEmail?email:"",phone,vehiclePlate,vehicleType,vehicleModel,vehicleColor,documentHash,validDocument?maskDocument(document):"Não informado",start.toISOString(),end.toISOString(),code,vagaId,access.context.comunidadeId,access.context.comunidadeId,vagaId,end.toISOString(),start.toISOString(),access.context.comunidadeId,vagaId,access.context.comunidadeId,code,access.context.comunidadeId,eventId,access.context.comunidadeId);
+    AND EXISTS(SELECT 1 FROM eventos_comunidade WHERE id=? AND comunidade_id=? AND status='PUBLICADO' AND (reservas_abrem_em IS NULL OR datetime(reservas_abrem_em)<=datetime('now')))`).bind(access.context.comunidadeId,vagaId,access.user.id,eventId,eventTitle,nome,validEmail?email:"",phone,vehiclePlate,vehicleType,vehicleModel,vehicleColor,documentHash,validDocument?maskDocument(document):linkedCpf?.finais ? `***.***.***-${linkedCpf.finais}` : "Não informado",start.toISOString(),end.toISOString(),code,vagaId,access.context.comunidadeId,access.context.comunidadeId,vagaId,end.toISOString(),start.toISOString(),access.context.comunidadeId,vagaId,access.context.comunidadeId,code,access.context.comunidadeId,eventId,access.context.comunidadeId);
   const [result] = await db.batch([insert,parkingAuditStatement(db,tenantId,requesterId,"ESTACIONAMENTO_RESERVA_CRIADA",{vagaId},"reservaId")]);
   if (!result.meta.changes) return (await recovered()) || Response.json({ error: "Esta vaga acabou de ficar indisponível. Escolha outra vaga." }, { status: 409 });
   const managers = await db.prepare(`SELECT DISTINCT m.responsavel_usuario_id AS id FROM ministerios_comunidade m WHERE m.comunidade_id = ? AND m.status = 'ATIVO' AND m.categoria = 'ESTACIONAMENTO' AND m.responsavel_usuario_id IS NOT NULL`).bind(access.context.comunidadeId).all<{ id: number }>();

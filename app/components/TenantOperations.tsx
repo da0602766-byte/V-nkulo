@@ -94,7 +94,7 @@ type BirthdayVisitor = Pick<Visitor, "id" | "nome_completo" | "data_nascimento" 
 
 type CategoryResponsible = { id: number; nome: string };
 type CategoryMinistry = { id: number; nome: string };
-type VisitorGrowth = { categoria_id: number; mes: string; novos: number };
+type VisitorGrowth = { categoria_id: number | null; mes: string; novos: number };
 
 const VISITOR_CATEGORY_ICONS = ["◎", "◇", "♡", "✦", "♙", "▣", "○", "△"];
 const VISITOR_CATEGORY_COLORS = ["#7357e8", "#2f80ed", "#12a879", "#e09a21", "#df5b72", "#8d5bd2"];
@@ -339,7 +339,7 @@ export function VisitorsWorkspace({
     for (const item of growth) {
       increments.set(item.mes, (increments.get(item.mes) || 0) + Number(item.novos || 0));
     }
-    const currentTotal = categories.reduce((sum, item) => sum + Number(item.total_visitantes || 0), 0);
+    const currentTotal = counts.todos;
     const periodAdds = growthMonths.reduce((sum, month) => sum + (increments.get(month) || 0), 0);
     const initial = Math.max(0, currentTotal - periodAdds);
     const points = growthMonths.reduce<Array<{ month: string; value: number }>>(
@@ -349,8 +349,10 @@ export function VisitorsWorkspace({
       },
       [],
     );
-    return { points, max: Math.max(1, ...points.map((item) => item.value)), currentTotal };
-  }, [categories, growth, growthMonths]);
+    const max = Math.max(2, Math.ceil(Math.max(0, ...points.map((item) => item.value)) / 2) * 2);
+    const coordinates = points.map((point, index) => ({ ...point, x: (index + .5) * 600 / points.length, y: 160 - point.value / max * 160 }));
+    return { points: coordinates, max, currentTotal, line: coordinates.map((point) => `${point.x},${point.y}`).join(" ") };
+  }, [counts.todos, growth, growthMonths]);
 
   const categoryDashboards = useMemo(
     () => categories.filter((category) => Boolean(category.exibir_dashboard)),
@@ -1315,20 +1317,28 @@ export function VisitorsWorkspace({
                 como o cartão do ministério selecionado faz em Ministérios. A
                 versão completa vive na aba Acompanhamento. */}
             <RelacionamentoTools visitantes={visitors} compacto onAbrirVisitante={(visitorId) => void loadFollowups(visitorId)} onVerTodos={() => openTab("acompanhamento")} />
-            <article className="secretary-card visitor-growth-card-v7" aria-labelledby="visitor-growth-title-v7">
+            <article className="secretary-card visitor-growth-card-v7" aria-labelledby="visitor-panorama-growth">
                 <header>
                   <div><p className="pilot-kicker">CRESCIMENTO</p><strong id="visitor-panorama-growth">Pessoas ativas</strong></div>
                   <b>{counts.todos}</b>
                 </header>
-                <div className={`visitor-growth-chart-v6 ${!categoriesLoaded ? "is-loading" : ""}`} aria-busy={!categoriesLoaded}>
+                <div className={`visitor-growth-chart-v6 visitor-growth-chart-polished ${!categoriesLoaded ? "is-loading" : ""}`} aria-busy={!categoriesLoaded}>
                   {!categoriesLoaded && <p>Carregando crescimento…</p>}
-                  {categoriesLoaded && growthDashboard.points.map((point) => (
-                    <span key={point.month}>
-                      <i style={{ height: `${Math.max(6, Math.round((point.value / growthDashboard.max) * 100))}%` }} aria-hidden="true" />
-                      <b>{point.value}</b>
-                      <small>{formatGrowthMonth(point.month)}</small>
-                    </span>
-                  ))}
+                  {categoriesLoaded && growthDashboard.points.length > 0 && <>
+                    <div className="visitor-growth-plot" role="img" aria-label={`Pessoas ativas por mês: ${growthDashboard.points.map((point) => `${formatGrowthMonth(point.month)} ${point.value}`).join(", ")}`}>
+                      <div className="visitor-growth-scale" aria-hidden="true">{[growthDashboard.max, growthDashboard.max / 2, 0].map((value) => <span key={value} style={{ top: `${100 - value / growthDashboard.max * 100}%` }}>{value}</span>)}</div>
+                      <div className="visitor-growth-canvas">
+                      <svg viewBox="0 0 600 160" preserveAspectRatio="none" aria-hidden="true">
+                        <defs><linearGradient id="visitor-growth-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--pilot-primary)" stopOpacity=".28" /><stop offset="100%" stopColor="var(--pilot-primary)" stopOpacity="0" /></linearGradient></defs>
+                        {[0, 80, 160].map((y) => <line key={y} x1="0" y1={y} x2="600" y2={y} className="visitor-growth-gridline" />)}
+                        <polygon points={`${growthDashboard.points[0].x},160 ${growthDashboard.line} ${growthDashboard.points.at(-1)!.x},160`} fill="url(#visitor-growth-fill)" />
+                        <polyline points={growthDashboard.line} className="visitor-growth-line" />
+                      </svg>
+                      {growthDashboard.points.map((point) => <i key={point.month} className="visitor-growth-dot" style={{ left: `${point.x / 6}%`, top: `${point.y / 1.6}%` }} title={`${formatGrowthMonth(point.month)}: ${point.value}`} aria-hidden="true" />)}
+                      </div>
+                    </div>
+                    <div className="visitor-growth-months" aria-hidden="true">{growthDashboard.points.map((point) => <span key={point.month}><b>{point.value}</b><small>{formatGrowthMonth(point.month)}</small></span>)}</div>
+                  </>}
                   {categoriesLoaded && !growthDashboard.points.length && <p>O gráfico aparece depois do primeiro cadastro.</p>}
                 </div>
                 {Boolean(categoryDashboards.length) && (
@@ -2253,7 +2263,7 @@ function formatBirthday(value: string | null) {
 function formatGrowthMonth(value: string) {
   const [year, month] = value.split("-").map(Number);
   if (!year || !month) return value;
-  return new Intl.DateTimeFormat("pt-BR", { month: "short" })
+  return new Intl.DateTimeFormat("pt-BR", { month: "short", timeZone: "UTC" })
     .format(new Date(Date.UTC(year, month - 1, 1)))
     .replace(".", "");
 }

@@ -1,12 +1,29 @@
 "use client";
 import { useEffect, useRef, useState, type ImgHTMLAttributes } from "react";
 import { imagePlaceholder, reportMediaFailure } from "../lib/media-feedback";
+import { readLocalMedia } from "../lib/local-media";
 
 type Props = ImgHTMLAttributes<HTMLImageElement> & { fallbackName?: string; fallbackKind?: "avatar" | "image" };
 
 /** Keeps existing image geometry and retries automatically when the source changes. */
 export default function SafeImage(props: Props) {
+  if (typeof props.src === "string" && props.src.startsWith("/local-media/")) return <LocalImage key={props.src} {...props} />;
   return <ImageWithFallback key={`${props.src}:${props.srcSet}`} {...props} />;
+}
+
+function LocalImage(props: Props) {
+  const [source, setSource] = useState("");
+  useEffect(() => {
+    let active = true;
+    let objectUrl = "";
+    void readLocalMedia(String(props.src)).then(record => {
+      if (!active) return;
+      objectUrl = URL.createObjectURL(record.blob);
+      setSource(objectUrl);
+    }).catch(() => { if (active) setSource(imagePlaceholder(props.fallbackName, props.fallbackKind)); });
+    return () => { active = false; if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [props.src, props.fallbackName, props.fallbackKind]);
+  return <ImageWithFallback key={source} {...props} src={source || imagePlaceholder(props.fallbackName, props.fallbackKind)} srcSet={undefined} />;
 }
 
 function ImageWithFallback({ src, srcSet, alt = "", fallbackName, fallbackKind = "image", onError, onLoad, style, ...props }: Props) {

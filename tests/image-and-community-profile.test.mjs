@@ -24,7 +24,7 @@ test("imagens aceitam originais maiores e são convertidas automaticamente", () 
   assert.match(upload, /8 \* 1024 \* 1024/);
   assert.match(nativeUpload, /saveImageOutsidePlatform\(file, purpose, resourceId\)/);
   assert.match(mediaUpload, /prepareImageForUpload\(file, purpose\)/);
-  assert.match(mediaUpload, /storeLocalMedia\(prepared\)/);
+  assert.match(mediaUpload, /storeLocalMedia\(prepared, preference\.userId\)/);
   assert.match(nativeUpload, /accept="image\/\*"/);
   assert.match(loginConfig, /backgroundFit: "SMART" \| "COVER"/);
   assert.match(loginPortal, /className="login-v2-top-banner"/);

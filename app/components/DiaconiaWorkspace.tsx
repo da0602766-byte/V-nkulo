@@ -1,6 +1,7 @@
 "use client";
 
 import TransientFeedback from "./TransientFeedback";
+import FileSaveActions from "./FileSaveActions";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -391,11 +392,7 @@ export default function DiaconiaWorkspace({
                       notificados na plataforma.
                     </span>
                   </div>
-                  <a
-                    href={`/api/pilot/diaconia/${schedule.id}/pdf?download=1`}
-                  >
-                    Baixar PDF
-                  </a>
+                  <FileSaveActions source={`/api/pilot/diaconia/${schedule.id}/pdf?download=1`} name={`relatorio-${schedule.id}.pdf`} />
                 </div>
               )}
             </article>

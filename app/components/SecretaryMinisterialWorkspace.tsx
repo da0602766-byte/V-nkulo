@@ -1,5 +1,6 @@
 "use client";
 import SafeImage from "./SafeImage";
+import FileSaveActions from "./FileSaveActions";
 
 
 import {
@@ -411,6 +412,21 @@ export default function SecretaryMinisterialWorkspace({
     window.addEventListener("vinkulo:new-schedule", openSchedule);
     return () => window.removeEventListener("vinkulo:new-schedule", openSchedule);
   }, [ministries]);
+
+  useEffect(() => {
+    if (loading) return;
+    const url = new URL(window.location.href);
+    const scheduleId = Number(url.searchParams.get("schedule"));
+    const selected = schedules.find((item) => item.id === scheduleId);
+    if (selected) {
+      setSelectedMinistryId(selected.ministerio_id);
+      setDesktopScheduleId(selected.id);
+      setTab("escalas");
+      const frame = window.requestAnimationFrame(() => document.getElementById(`person-schedule-${selected.id}`)?.scrollIntoView({ block: "start" }));
+      return () => window.cancelAnimationFrame(frame);
+    }
+    if (url.searchParams.get("tab") === "escalas") setTab("escalas");
+  }, [loading, schedules]);
 
   useEffect(() => {
     const acertar = () => setAgora(Date.now());
@@ -1477,7 +1493,7 @@ export default function SecretaryMinisterialWorkspace({
       },
     ].filter((group) => group.team || group.assignments.length > 0);
     const card = (
-      <article className="secretary-schedule-card" key={schedule.id}>
+      <article className="secretary-schedule-card" id={`person-schedule-${schedule.id}`} key={schedule.id}>
         <header>
           <time dateTime={schedule.inicia_em}><strong>{formatDay(schedule.inicia_em)}</strong><span>{formatMonth(schedule.inicia_em)}</span></time>
           <div><span className={`secretary-status ${schedule.status.toLowerCase()}`}>{schedule.status.replaceAll("_", " ")}</span><h2>{schedule.titulo}</h2><p>{formatDate(schedule.inicia_em)} · {schedule.local || "Local não informado"}</p>{schedule.status === "AGENDADA" && schedule.publicar_em && <SchedulePublicationCountdown opensAt={schedule.publicar_em} />}</div>
@@ -2470,7 +2486,7 @@ export default function SecretaryMinisterialWorkspace({
                   {ministrySchedules.map((schedule) => (
                     <article key={schedule.id}>
                       <div><strong>{schedule.titulo}</strong><span>{formatDate(schedule.inicia_em)} · {schedule.status}</span></div>
-                      <button type="button" onClick={() => void downloadSchedulePdf(schedule)} disabled={busy === `pdf-${schedule.id}`}>{busy === `pdf-${schedule.id}` ? "Preparando…" : "Baixar PDF"}</button>
+                      <FileSaveActions source={`/api/pilot/escalas/${schedule.id}/pdf?download=1`} name={`escala-${schedule.titulo}.pdf`} />
                       <button type="button" onClick={() => downloadScheduleImage(schedule)}>Baixar imagem</button>
                       <button type="button" onClick={() => addScheduleToCalendar(schedule)}>Adicionar ao calendário</button>
                     </article>
@@ -3517,7 +3533,7 @@ function ShareDialogV2({
               {directRecipient?.telefone && <button type="button" onClick={() => void shareGeneratedMessage(directRecipient.nome)}>Enviar para contato</button>}
               <a href={`https://t.me/share/url?url=${encodeURIComponent(generatedAccesses[0]?.url || "")}&text=${encodeURIComponent(safeMessage)}`} target="_blank" rel="noreferrer">Telegram</a>
               <a href={`mailto:?subject=${encodeURIComponent(`Acesso temporário — ${schedule.titulo}`)}&body=${encodeURIComponent(safeMessage)}`}>E-mail</a>
-              <button type="button" onClick={() => void downloadFileForDevice(`/api/pilot/escalas/${schedule.id}/pdf?download=1`, `escala-${schedule.titulo}.pdf`).catch((cause) => setShareStatus((cause as Error).message || "Não foi possível abrir o PDF."))}>Baixar PDF</button>
+              <FileSaveActions source={`/api/pilot/escalas/${schedule.id}/pdf?download=1`} name={`escala-${schedule.titulo}.pdf`} />
               <button type="button" onClick={() => downloadScheduleImage(schedule)}>Baixar imagem</button>
             </div>
             {shareStatus && <p className="secretary-share-status" role="status">{shareStatus}</p>}

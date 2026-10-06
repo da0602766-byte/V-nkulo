@@ -1,9 +1,11 @@
 "use client";
 import SafeImage from "./SafeImage";
+import FileSaveActions from "./FileSaveActions";
 
 
 import { useEffect, useState } from "react";
 import FeedImageLightbox from "./feed/FeedImageLightbox";
+import FeedIcon from "./feed/FeedIcon";
 
 export default function ResponsiveFeedImage({
   src,
@@ -43,9 +45,6 @@ export default function ResponsiveFeedImage({
   if (!src) return null;
   const optimizedSource = dataSaver && thumbnail ? thumbnail : src;
   const showImage = requestedLoad || (presentation === "photo" && preferenceReady && !dataSaver);
-  const downloadUrl = src.startsWith("/api/")
-    ? `${src}${src.includes("?") ? "&" : "?"}download=1`
-    : src;
 
   return (
     <figure
@@ -95,8 +94,9 @@ export default function ResponsiveFeedImage({
           </button>
         </>
       )}
-      <div className="feed-image-attachment-actions">
-        {presentation === "photo" && showImage && !failed ? <button type="button" onClick={() => setLightboxOpen(true)}>Ampliar imagem</button> : (
+      <div className="feed-media-toolbar" role="group" aria-label="Ações da imagem">
+        <FileSaveActions source={src} name="imagem-da-publicacao" imageToolbar leadingAction={
+        presentation === "photo" && showImage && !failed ? <button type="button" title="Ampliar imagem" onClick={() => setLightboxOpen(true)}><FeedIcon name="expand" /><span>Ampliar</span></button> : (
         <button
           type="button"
           onClick={() => {
@@ -104,12 +104,10 @@ export default function ResponsiveFeedImage({
             setRequestedLoad((current) => !current);
           }}
         >
-          {requestedLoad ? "Fechar imagem" : "Visualizar imagem"}
+          <FeedIcon name={requestedLoad ? "close" : "image"} />
+          <span>{requestedLoad ? "Fechar" : "Visualizar"}</span>
         </button>
-        )}
-        <a href={downloadUrl} download>
-          Baixar imagem
-        </a>
+        )} />
       </div>
       {lightboxOpen && <FeedImageLightbox src={src} alt={alt} onClose={() => setLightboxOpen(false)} />}
     </figure>

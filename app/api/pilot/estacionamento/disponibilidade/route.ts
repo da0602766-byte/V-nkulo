@@ -6,8 +6,10 @@ export async function GET(request: Request) {
   const access = await requireTenantPermission("parking.reserve");
   if ("error" in access) return access.error;
   const db = getD1();
-  const config = await db.prepare(`SELECT ativo,nome_modulo,cor_destaque,atualizado_em FROM estacionamento_configuracoes WHERE comunidade_id=?`)
-    .bind(access.context.comunidadeId).first<Record<string, unknown>>();
+  const [config, identity] = await Promise.all([db.prepare(`SELECT ativo,nome_modulo,cor_destaque,atualizado_em FROM estacionamento_configuracoes WHERE comunidade_id=?`)
+    .bind(access.context.comunidadeId).first<Record<string, unknown>>(),
+    db.prepare("SELECT finais FROM identidades_cpf WHERE usuario_id=? LIMIT 1").bind(access.user.id).first<{finais:string}>(),
+  ]);
   if (!config?.ativo) return Response.json({ error: "O módulo de estacionamento está desativado nesta comunidade." }, { status: 423 });
   const context = await readParkingContext(db, access.context.comunidadeId, access.user.id, new URL(request.url));
   if ("error" in context) return Response.json({ error: context.error }, { status: context.status });
@@ -15,7 +17,7 @@ export async function GET(request: Request) {
     ...context,
     config: { ...config, responsavel: null, responsavelUsuarioId: null, instrucoes: "", atualizado_por_nome: null },
     movimentacoes: [], ocorrencias: [], availableUsers: [], ministryMembers: [],
-    operator: { id: access.user.id, nome: access.user.nome, email: access.user.email, papel: access.context.papel, origemAcesso: "MEMBRO", escala: null },
+    operator: { id: access.user.id, nome: access.user.nome, email: access.user.email, cpfFinal: identity?.finais || null, papel: access.context.papel, origemAcesso: "MEMBRO", escala: null },
     permissions: access.context.permissions.filter(item => item.startsWith("parking.")),
   }, { headers: { "Cache-Control": "no-store" } });
 }

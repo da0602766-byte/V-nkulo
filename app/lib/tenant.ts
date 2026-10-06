@@ -190,19 +190,23 @@ export async function getActiveTenantContext(
     (permission) => !continuityPermissions.has(permission),
   );
   let temporaryAccess: TenantContext["temporaryAccess"] = null;
+  // Todas estas leituras dependem apenas da comunidade e do usuário atuais.
+  // Aguarde o mesmo lote antes de aplicar permissões, revogação e limites do plano.
+  // Não reutilize o resultado entre requisições: mudanças de acesso são imediatas.
+  const fullAccess = membership.communityAccess !== "FEED_ONLY";
+  const [diaconiaPermissions, networkPermissions, parkingAssignment, parkingLeaderPermissions,
+    subscription, configuredModules] = await Promise.all([
+    fullAccess ? getDiaconiaPermissions(user.id, membership.comunidadeId) : Promise.resolve([]),
+    fullAccess ? getNetworkPermissions(user.id, membership.comunidadeId) : Promise.resolve([]),
+    fullAccess ? getActiveParkingAssignment(user.id, membership.comunidadeId) : Promise.resolve(null),
+    fullAccess ? getParkingLeaderPermissions(user.id, membership.comunidadeId) : Promise.resolve([]),
+    getSubscription(membership.comunidadeId),
+    getCommunityModules(membership.comunidadeId),
+  ]);
   if (membership.communityAccess !== "FEED_ONLY") {
     for (const permission of membership.customPermissions) {
       if (!permissions.includes(permission)) permissions.push(permission);
     }
-    // As quatro consultas são somente leitura e dependem do mesmo par
-    // usuário/comunidade, nunca do resultado umas das outras. Mantemos a
-    // aplicação das permissões na ordem anterior depois da leitura paralela.
-    const [diaconiaPermissions, networkPermissions, parkingAssignment, parkingLeaderPermissions] = await Promise.all([
-      getDiaconiaPermissions(user.id, membership.comunidadeId),
-      getNetworkPermissions(user.id, membership.comunidadeId),
-      getActiveParkingAssignment(user.id, membership.comunidadeId),
-      getParkingLeaderPermissions(user.id, membership.comunidadeId),
-    ]);
     for (const permission of diaconiaPermissions) {
       if (!permissions.includes(permission)) permissions.push(permission);
     }
@@ -227,6 +231,7 @@ export async function getActiveTenantContext(
     for (const permission of parkingLeaderPermissions) {
       if (!permissions.includes(permission)) permissions.push(permission);
     }
+    // Esta consulta também pode persistir expiração/cancelamento; preserve sua ordem.
     const temporaryToken = jar.get(TEMPORARY_ACCESS_COOKIE)?.value;
     const cookieGrant = temporaryToken
       ? await getTemporaryAccessByToken(getD1(), temporaryToken)
@@ -290,12 +295,6 @@ export async function getActiveTenantContext(
     permissions.push("community.lifecycle.review");
   }
 
-  // Both reads use the selected community and neither depends on the other.
-  // Run them together to avoid adding a full D1 round trip to access checks.
-  const [subscription, configuredModules] = await Promise.all([
-    getSubscription(membership.comunidadeId),
-    getCommunityModules(membership.comunidadeId),
-  ]);
   const modules = subscription ? configuredModules.filter(key => subscription.active && subscription.plan.modulos.includes(key)) : configuredModules;
   permissions = filterPermissionsForCommunityModules(permissions, modules);
   permissions = filterPlanPermissions(permissions, subscription?.plan || null, subscription?.active ?? true);

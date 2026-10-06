@@ -121,10 +121,12 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
   const [loadingOperationalRows, setLoadingOperationalRows] = useState(false);
   const [lastOperationalRefresh, setLastOperationalRefresh] = useState<Date | null>(null);
   const [central, setCentral] = useState<CentralData>(EMPTY_CENTRAL);
+  const [centralLoaded, setCentralLoaded] = useState(false);
   const [canManage, setCanManage] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [feedback, setFeedback] = useState("");
+  const [entryNotice, setEntryNotice] = useState(0);
   const [error, setError] = useState("");
   const [mode, setMode] = useState<"member" | "operations">("member");
   const [formOpen, setFormOpen] = useState(false);
@@ -161,6 +163,12 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
   const formRef = useRef<(HTMLFormElement & { open: boolean })>(null);
   const operationalRefreshInFlight = useRef(false);
 
+  useEffect(() => {
+    const showEntryNotice = () => setEntryNotice((count) => count + 1);
+    window.addEventListener("vinkulo:requests-opened", showEntryNotice);
+    return () => window.removeEventListener("vinkulo:requests-opened", showEntryNotice);
+  }, []);
+
   const load = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
     setError("");
@@ -194,6 +202,7 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
           return next;
         });
       } catch (caught) { setError((caught as Error).message); }
+      finally { setCentralLoaded(true); }
     })();
     await Promise.all([requestsTask, centralTask]);
   }, []);
@@ -498,6 +507,11 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
     </header>
 
     {(feedback || error) && <TransientFeedback className={`operations-feedback request-global-feedback ${error ? "error" : ""}`} role="status">{error || feedback}</TransientFeedback>}
+    {entryNotice > 0 && centralLoaded && <TransientFeedback noticeKey={`requests-entry-${entryNotice}`} role="status" durationMs={8000}>
+      {central.canOperate && metrics.open > 0
+        ? <span>Há {metrics.open} {metrics.open === 1 ? "pedido" : "pedidos"} para revisar. <button type="button" onClick={() => setMode("operations")}>Ver atendimento</button></span>
+        : <span>Precisa de oração ou acompanhamento? <button type="button" onClick={() => { setMode("member"); openCreate("ORACAO"); }}>Fazer um pedido</button></span>}
+    </TransientFeedback>}
 
     {mode === "member" ? <div className="request-member-view">
       <section className="request-welcome" data-guide="request-start-guide" aria-labelledby="request-welcome-title">

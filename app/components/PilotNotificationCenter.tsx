@@ -43,6 +43,24 @@ export default function PilotNotificationCenter({
   // servidor e cliente na hidratação.
   const [agora, setAgora] = useState(0);
   const [open, setOpen] = useState(false);
+  const panelRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const trigger = document.activeElement as HTMLElement | null;
+    const panel = panelRef.current;
+    const controls = () => [...(panel?.querySelectorAll<HTMLElement>('button:not([disabled]),a[href],input:not([disabled]),[tabindex="0"]') || [])].filter(item => item.getClientRects().length);
+    panel?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); setOpen(false); }
+      if (event.key !== "Tab") return;
+      const items = controls(), first = items[0], last = items[items.length - 1];
+      if (!first) return;
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === panel)) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    panel?.addEventListener("keydown", onKeyDown);
+    return () => { panel?.removeEventListener("keydown", onKeyDown); trigger?.focus({ preventScroll: true }); };
+  }, [open]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [canConfigure, setCanConfigure] = useState(false);
@@ -302,7 +320,7 @@ export default function PilotNotificationCenter({
             aria-label="Fechar notificações"
             onClick={() => setOpen(false)}
           />
-          <section className="pilot-notification-panel" role="dialog" aria-label="Notificações">
+          <section ref={panelRef} tabIndex={-1} className="pilot-notification-panel" role="dialog" aria-modal="true" aria-label="Notificações">
             <header>
               <div><p className="pilot-kicker">CENTRAL</p><h2>Notificações</h2></div>
               <div className="notification-panel-actions">
@@ -382,13 +400,10 @@ export default function PilotNotificationCenter({
                       <p>{item.message}</p>
                       <time dateTime={item.createdAt}>{formatDate(item.createdAt)}</time>
                     </div>
-                    {item.read ? (
-                      <button type="button" className="notification-clear-one" onClick={() => void clearRead(item.id)}>Limpar</button>
-                    ) : item.destination ? (
-                      <button type="button" onClick={() => void openNotification(item)}>Abrir</button>
-                    ) : !item.read ? (
-                      <button type="button" onClick={() => markRead(item.id)}>Lida</button>
-                    ) : null}
+                    <div className="notification-item-actions">
+                      {isSafeInternalDestination(item.destination) && <button type="button" className="notification-open" aria-label={`Abrir: ${item.title}`} onClick={() => void openNotification(item)}>Abrir</button>}
+                      {item.read ? <button type="button" className="notification-clear-one" onClick={() => void clearRead(item.id)}>Limpar</button> : !isSafeInternalDestination(item.destination) ? <button type="button" onClick={() => markRead(item.id)}>Lida</button> : null}
+                    </div>
                   </article>
                   </Fragment>
                     );
