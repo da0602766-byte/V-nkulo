@@ -1,6 +1,9 @@
 "use client";
 
 import { DragEvent, FormEvent, useRef, useState } from "react";
+import ParkingReservationTable from "./ParkingReservationTable";
+import ParkingMovementHistory from "./ParkingMovementHistory";
+import { spaceState } from "./ParkingSpaceMap";
 import { ParkingQrCheckin, type ParkingQrValidationResult } from "../ParkingReservationQr";
 import {
   formatTime,
@@ -9,9 +12,9 @@ import {
   hasCustomParkingLayout,
 } from "./format";
 import type { ParkingController } from "./useParkingData";
-import type { Movement, Space } from "./types";
+import type { Space } from "./types";
 
-type Tab = "visao" | "entradas" | "reservas" | "ocorrencias" | "relatorios" | "mapa" | "equipe";
+type Tab = "historico" | "visao" | "entradas" | "reservas" | "ocorrencias" | "relatorios" | "mapa" | "equipe";
 
 export default function ParkingManagementConsole({
   communityName,
@@ -23,27 +26,23 @@ export default function ParkingManagementConsole({
   const {
     data,
     sectors,
-    reservations,
     reports,
     working,
     feedback,
     error,
-    canManageReservations,
     canReviewReports,
     registerEntry,
     registerExit,
     registerOccurrence,
     submitJson,
     reservationAction,
-    deleteReservationHistory,
-    clearReservationHistory,
     clearMovementHistory,
     reportAction,
     moveSpace,
   } = parking;
 
-  const [tab, setTab] = useState<Tab>("visao");
-  const [query, setQuery] = useState("");
+  const [tab, updateTab] = useState<Tab>("visao");
+  const setTab = (next: Tab) => { if (next !== tab) parking.setReservationFilters(f => ({...f,status:"",page:1})); updateTab(next); };
   const [mapEditing, setMapEditing] = useState(false);
   const [draggedSpace, setDraggedSpace] = useState<number | null>(null);
   const pointerDragRef = useRef<{ spaceId: number; offsetX: number; offsetY: number } | null>(null);
@@ -51,8 +50,7 @@ export default function ParkingManagementConsole({
   if (!data) {
     return (
       <section className="gestao-console gestao-loading">
-        <span className="gestao-spinner" aria-hidden="true" />
-        <p>Carregando painel de gestão…</p>
+        {parking.loading ? <p role="status">Carregando painel de gestão…</p> : <><p role="alert">{error || "Não foi possível abrir o estacionamento."}</p><button type="button" onClick={()=>void parking.load()}>Tentar novamente</button></>}
       </section>
     );
   }
@@ -64,10 +62,8 @@ export default function ParkingManagementConsole({
   const canManageHelpers = data.permissions.includes("parking.helpers.manage");
 
   const activeMovements = (data.movimentacoes || []).filter((item) => item.status === "NO_LOCAL");
-  const visibleMovements = filterMovements(data.movimentacoes, query);
-  const openOccurrences = data.ocorrencias.filter((item) => item.status !== "RESOLVIDA").length;
-  const pendingReports = reports.filter((item) => item.status === "AGUARDANDO_LIDER").length;
-  const activeReservations = reservations.filter((item) => ["PENDENTE", "CONFIRMADA", "CHECKIN"].includes(item.status)).length;
+
+  const filteredSpaces = data.vagas.filter(space=>{const f=parking.reservationFilters;return (!f.q || space.codigo.toLowerCase().includes(f.q.toLowerCase()))&&(!f.setorId||String(space.setor_id)===f.setorId)&&(!f.tipo||space.tipo===f.tipo)&&(!f.status||spaceState(space).className===f.status);});
 
   async function handleQr(code: string): Promise<ParkingQrValidationResult | boolean> {
     const result = await reservationAction({ codigo: code, acao: "CHECKIN" });
@@ -90,8 +86,8 @@ export default function ParkingManagementConsole({
     if (!mapEditing || !drag || drag.spaceId !== Number(event.currentTarget.dataset.spaceId) || !canvas) return;
     event.preventDefault();
     const rect = canvas.getBoundingClientRect();
-    const x = Math.max(0, Math.round(event.clientX - rect.left + canvas.scrollLeft - drag.offsetX));
-    const y = Math.max(0, Math.round(event.clientY - rect.top + canvas.scrollTop - drag.offsetY));
+    const x = Math.max(0, Math.round((event.clientX - rect.left - drag.offsetX) * canvas.offsetWidth / rect.width + canvas.scrollLeft));
+    const y = Math.max(0, Math.round((event.clientY - rect.top - drag.offsetY) * canvas.offsetHeight / rect.height + canvas.scrollTop));
     event.currentTarget.style.left = `${x}px`;
     event.currentTarget.style.top = `${y}px`;
   }
@@ -111,19 +107,19 @@ export default function ParkingManagementConsole({
     event.preventDefault();
     if (!mapEditing || !draggedSpace) return;
     const rect = event.currentTarget.getBoundingClientRect();
-    const x = Math.max(0, Math.round(event.clientX - rect.left - 26));
-    const y = Math.max(0, Math.round(event.clientY - rect.top - 18));
+    const x = Math.max(0, Math.round((event.clientX - rect.left) * event.currentTarget.offsetWidth / rect.width - 32));
+    const y = Math.max(0, Math.round((event.clientY - rect.top) * event.currentTarget.offsetHeight / rect.height - 28));
     setDraggedSpace(null);
     void moveSpace(draggedSpace, x, y);
   }
 
   return (
-    <section className="gestao-console" style={{ "--gestao-accent": data.config.cor_destaque || "#d99a32" } as React.CSSProperties}>
+    <section className="gestao-console parking-redesign">
       <header className="gestao-console-header">
         <div>
           <p className="gestao-kicker">GESTÃO · {communityName}</p>
           <h1>{data.config.nome_modulo || "Estacionamento"}</h1>
-          <p>Operação isolada desta comunidade. Placas e responsáveis não aparecem em outra comunidade.</p>
+          <p>Gestão de vagas, reservas e movimentações.</p>
         </div>
         <div className="gestao-operator-chip">
           <strong>{data.operator.nome}</strong>
@@ -133,61 +129,35 @@ export default function ParkingManagementConsole({
 
       {(feedback || error) && <p className={`gestao-feedback${error ? " is-error" : ""}`} role="status">{error || feedback}</p>}
 
-      <div className="gestao-kpi-row">
-        <Kpi label="Ocupadas" value={data.stats.ocupadas} tone="amber" />
-        <Kpi label="Disponíveis" value={data.stats.livres} tone="teal" />
-        <Kpi label="Reservas ativas" value={activeReservations} tone="violet" />
-        <Kpi label="Ocorrências" value={openOccurrences} tone="rose" />
-        <Kpi label="Relatórios p/ revisar" value={pendingReports} tone="blue" />
-      </div>
-
+      <div className="parking-v2-context-bar"><label>Atividade<select value={parking.context.eventId} onChange={event=>{parking.setContext({eventId:event.target.value,start:'',end:''});parking.setReservationFilters(f=>({...f,page:1}));}}><option value="">Ocupação atual / todas as atividades</option>{parking.eventOptions.map(item=><option key={item.id} value={item.id}>{item.titulo} · {formatTime(item.inicia_em)}</option>)}</select></label></div>
+      <div className="parking-v2-sync"><span>{parking.stale ? 'Informações desatualizadas' : parking.lastSync ? 'Atualizado às '+new Date(parking.lastSync).toLocaleTimeString('pt-BR') : 'Atualizando…'}</span><button type="button" onClick={()=>void parking.load(true)}>Atualizar</button></div>
       <nav className="gestao-tabs" aria-label="Seções da gestão">
-        <TabButton id="visao" tab={tab} setTab={setTab}>Visão geral</TabButton>
-        {(canEntry || canExit) && <TabButton id="entradas" tab={tab} setTab={setTab}>Entradas / Saídas</TabButton>}
+        <TabButton id="visao" tab={tab} setTab={setTab}>Vagas</TabButton>
+        {(canEntry || canExit) && <TabButton id="entradas" tab={tab} setTab={setTab}>Operação</TabButton>}
         <TabButton id="reservas" tab={tab} setTab={setTab}>Reservas</TabButton>
+        {(canEntry || canExit || canEdit) && <TabButton id="historico" tab={tab} setTab={setTab}>Histórico</TabButton>}
         {canEdit && <TabButton id="ocorrencias" tab={tab} setTab={setTab}>Ocorrências</TabButton>}
         <TabButton id="relatorios" tab={tab} setTab={setTab}>Relatórios</TabButton>
         <TabButton id="mapa" tab={tab} setTab={setTab}>Mapa e vagas</TabButton>
         {(canConfigure || canManageHelpers) && <TabButton id="equipe" tab={tab} setTab={setTab}>Equipe e configuração</TabButton>}
       </nav>
 
-      {tab === "visao" && (
-        <section className="gestao-card gestao-overview">
-          {canEntry && (
-            <div className="gestao-scan-hub">
-              <div>
-                <p className="gestao-kicker">PORTARIA DIGITAL</p>
-                <h2>Ler QR Code da reserva</h2>
-                <p>Aponte a câmera para o código do visitante ou digite manualmente.</p>
-              </div>
-              <ParkingQrCheckin disabled={working} onDetected={handleQr} />
-            </div>
-          )}
-          <div className="gestao-overview-grid">
-            <article>
-              <h3>Movimentações recentes</h3>
-              <ul>
-                {(data.movimentacoes || []).slice(0, 6).map((item) => (
-                  <li key={item.id}><strong>{item.placa}</strong> {item.responsavel} · {item.vaga_codigo || "—"} · {item.status === "NO_LOCAL" ? "no local" : "encerrada"}</li>
-                ))}
-                {!data.movimentacoes.length && <li className="gestao-empty">Sem movimentações ainda.</li>}
-              </ul>
-            </article>
-            <article>
-              <h3>Últimas reservas</h3>
-              <ul>
-                {reservations.slice(0, 6).map((item) => (
-                  <li key={item.id}><strong>{item.vaga_codigo}</strong> {item.nome_completo} · {item.status}</li>
-                ))}
-                {!reservations.length && <li className="gestao-empty">Nenhuma reserva neste período.</li>}
-              </ul>
-            </article>
-          </div>
-        </section>
-      )}
-
+      <p className="parking-v2-summary">{parking.context.eventId ? 'Atividade selecionada' : 'Ocupação atual'} · {data.stats.total} vagas · {data.stats.livres} disponíveis · {data.stats.reservadas || 0} reservadas · {data.stats.ocupadas} ocupadas · {data.stats.indisponiveis || 0} indisponíveis</p>
+      {(tab==='visao'||tab==='reservas') && <div className="parking-v2-filters">
+        <label>Buscar {tab==='visao' ? 'vaga' : 'pessoa, placa, vaga ou reserva'}<input value={parking.reservationFilters.q} onChange={event=>parking.setReservationFilters(f=>({...f,q:event.target.value,page:1}))} /></label>
+        <label>Setor<select value={parking.reservationFilters.setorId} onChange={event=>parking.setReservationFilters(f=>({...f,setorId:event.target.value,page:1}))}><option value="">Todos os setores</option>{sectors.map(sector=><option key={sector.id} value={sector.id.split(':')[0]}>{sector.name}</option>)}</select></label>
+        <label>Tipo<select value={parking.reservationFilters.tipo} onChange={event=>parking.setReservationFilters(f=>({...f,tipo:event.target.value,page:1}))}><option value="">Todos os tipos</option><option value="COMUM">Comum</option><option value="PCD">PCD</option><option value="IDOSO">Idoso</option><option value="RESERVADA">Especial</option></select></label>
+        <label>Status<select value={parking.reservationFilters.status} onChange={event=>parking.setReservationFilters(f=>({...f,status:event.target.value,page:1}))}><option value="">Todos os status</option>{(tab==='reservas' ? [['PENDENTE','Pendente'],['CONFIRMADA','Confirmada'],['CHECKIN','Entrada registrada'],['RECUSADA','Recusada'],['CANCELADA','Cancelada']] : [['available','Disponível'],['reserved','Reservada'],['occupied','Ocupada'],['blocked','Indisponível']]).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
+        <button type="button" onClick={()=>parking.setReservationFilters({q:'',setorId:'',tipo:'',status:'',page:1})}>Limpar filtros</button>
+        {canConfigure && <button type="button" onClick={()=>setTab('mapa')}>Editar mapa</button>}
+      </div>}
+      {tab==='visao' && <section className="parking-v2-records"><div className="parking-v2-table-scroll"><table className="parking-v2-data-table"><thead><tr><th scope="col">Vaga</th><th scope="col">Setor</th><th scope="col">Tipo</th><th scope="col">Situação</th><th scope="col">Entrada atual</th><th scope="col">Ações</th></tr></thead><tbody>
+        {filteredSpaces.map(space=>{const state=spaceState(space),movement=data.movimentacoes.find(m=>m.status==='NO_LOCAL'&&m.vaga_id===space.id);return <tr key={space.id}><td data-label="Vaga"><strong>{space.codigo}</strong></td><td data-label="Setor">{space.setor_nome}</td><td data-label="Tipo">{space.tipo}</td><td data-label="Situação"><span className={'parking-v2-status '+state.className}>{state.mark} {state.label}</span></td><td data-label="Entrada">{movement ? formatTime(movement.entrada_em) : '—'}</td><td data-label="Ações">{movement&&canExit ? <button type="button" disabled={working} onClick={()=>{if(window.confirm('Registrar saída do veículo '+movement.placa+'?')) void registerExit(movement.id);}}>Registrar saída</button> : <button type="button" onClick={()=>{parking.setReservationFilters(f=>({...f,q:space.codigo,status:'',page:1}));setTab('reservas');}}>Ver reservas</button>}</td></tr>;})}
+      </tbody></table></div><p className="parking-v2-pagination">{filteredSpaces.length} de {data.vagas.length} vagas</p>{!filteredSpaces.length && <p className="gestao-empty">{data.vagas.length ? "Nenhuma vaga encontrada para estes filtros." : "Nenhuma vaga cadastrada. Configure os setores e as vagas para começar."}</p>}</section>}
+      {tab==='historico' && <ParkingMovementHistory />}
       {tab === "entradas" && (
         <section className="gestao-card gestao-two-col">
+          {canEntry && <div className="parking-v2-scan-inline"><h2>Ler QR Code da reserva</h2><ParkingQrCheckin disabled={working} onDetected={handleQr} /></div>}
           {canEntry && (
             <form
               className="gestao-form"
@@ -223,7 +193,7 @@ export default function ParkingManagementConsole({
               {activeMovements.length ? activeMovements.map((item) => (
                 <article key={item.id}>
                   <div><strong>{item.placa}</strong><small>{item.vaga_codigo || "Sem vaga"} · {item.responsavel}</small></div>
-                  {canExit && <button type="button" disabled={working} onClick={() => void registerExit(item.id)}>Registrar saída</button>}
+                  {canExit && <button type="button" disabled={working} onClick={() => {if(window.confirm(`Registrar saída de ${item.placa}?`)) void registerExit(item.id);}}>Registrar saída</button>}
                 </article>
               )) : <p className="gestao-empty">Nenhum veículo no local.</p>}
             </div>
@@ -231,48 +201,7 @@ export default function ParkingManagementConsole({
         </section>
       )}
 
-      {tab === "reservas" && (
-        <section className="gestao-card">
-          <header>
-            <div><p className="gestao-kicker">RESERVAS</p><h2>Confirmações, cancelamentos e código de acesso</h2></div>
-            {canManageReservations && <button type="button" className="gestao-ghost" onClick={() => void clearReservationHistory()} disabled={working}>Limpar histórico</button>}
-          </header>
-          <div className="gestao-reservation-table">
-            {reservations.length ? reservations.map((reservation) => (
-              <article key={reservation.id} className={`status-${reservation.status.toLowerCase()}`}>
-                <div>
-                  <strong>{reservation.vaga_codigo} · {reservation.setor_nome}</strong>
-                  <small>{reservation.nome_completo} · {formatTime(reservation.inicio_em)} até {formatTime(reservation.fim_em)}</small>
-                  {reservation.evento_titulo && <em>{reservation.evento_titulo}</em>}
-                </div>
-                <span className={`gestao-badge status-${reservation.status.toLowerCase()}`}>{reservation.status}</span>
-                {canManageReservations && (
-                  <details className="gestao-reservation-details">
-                    <summary>Detalhes</summary>
-                    <dl>
-                      <div><dt>Documento</dt><dd>{reservation.documento_mascarado}</dd></div>
-                      <div><dt>E-mail</dt><dd>{reservation.email || "Não informado"}</dd></div>
-                      <div><dt>Celular</dt><dd>{reservation.telefone}</dd></div>
-                      <div><dt>Veículo</dt><dd>{reservation.placa_veiculo} · {reservation.tipo_veiculo} · {reservation.modelo_veiculo} · {reservation.cor_veiculo}</dd></div>
-                    </dl>
-                  </details>
-                )}
-                {canManageReservations && reservation.status === "PENDENTE" && (
-                  <div className="gestao-row-actions">
-                    <button type="button" className="gestao-primary" disabled={working} onClick={() => void reservationAction({ id: reservation.id, acao: "CONFIRMAR" })}>Confirmar</button>
-                    <button type="button" className="gestao-danger" disabled={working} onClick={() => void reservationAction({ id: reservation.id, acao: "RECUSAR" })}>Recusar / cancelar</button>
-                  </div>
-                )}
-                {["RECUSADA", "CANCELADA", "CHECKIN"].includes(reservation.status) && (
-                  <div className="gestao-row-actions">
-                    <button type="button" className="gestao-ghost" disabled={working} onClick={() => void deleteReservationHistory(reservation.id)}>Excluir do histórico</button>
-                  </div>
-                )}
-              </article>
-            )) : <p className="gestao-empty">Nenhuma reserva neste período.</p>}
-          </div>
-        </section>
-      )}
+      {tab === "reservas" && <ParkingReservationTable parking={parking} />}
 
       {tab === "ocorrencias" && canEdit && (
         <section className="gestao-card gestao-two-col">
@@ -350,7 +279,7 @@ export default function ParkingManagementConsole({
               {canConfigure && <button type="button" className="gestao-ghost" onClick={() => setMapEditing((value) => !value)}>{mapEditing ? "Concluir edição" : "Reorganizar vagas"}</button>}
             </div>
           </header>
-          {mapEditing && <p className="gestao-hint">Clique, segure e arraste cada vaga para reposicioná-la.</p>}
+          {mapEditing && <p className="gestao-hint">Arraste uma vaga ou use os campos de posição. Cada alteração é salva explicitamente; conflitos são verificados no servidor.</p>}
           <div className="gestao-map">
             {sectors.map((sector) => {
               const positioned = hasCustomParkingLayout(sector.spaces);
@@ -370,11 +299,11 @@ export default function ParkingManagementConsole({
                             const values = Object.fromEntries(new FormData(event.currentTarget).entries());
                             void submitJson(
                               "/api/pilot/estacionamento/mapa",
-                              { action: "ATUALIZAR_SETOR", setorId: Number(sector.id.split(":")[0]), ...values },
+                              { action: "ATUALIZAR_SETOR", setorId: Number(sector.id.split(":")[0]), previousNome: sector.name, previousCor: sector.color, previousOrdem: sector.order, ...values },
                               `Setor “${sector.name}” atualizado.`,
                               "PATCH",
-                            ).then(() => {
-                              if (editor) editor.open = false;
+                            ).then((saved) => {
+                              if (saved && editor) editor.open = false;
                             });
                           }}
                         >
@@ -403,7 +332,7 @@ export default function ParkingManagementConsole({
                         onPointerDown={(event) => startPointerMove(event, space.id)}
                         onPointerMove={continuePointerMove}
                         onPointerUp={finishPointerMove}
-                        onPointerCancel={finishPointerMove}
+                        onPointerCancel={() => {pointerDragRef.current=null;setDraggedSpace(null);void parking.load(true);}}
                         style={usesCanvas ? { left: space.posicao_x, top: space.posicao_y } : undefined}
                         className={`gestao-slot small status-${space.status.toLowerCase()}${mapEditing ? " is-editing" : ""}`}
                         title={`${space.codigo} · ${space.tipo} · ${space.status}`}
@@ -415,6 +344,7 @@ export default function ParkingManagementConsole({
             })}
             {!sectors.length && <p className="gestao-empty">Nenhum setor cadastrado ainda.</p>}
           </div>
+          {canConfigure && <details className="parking-v2-coordinate-editor"><summary>Editar posições por campos</summary><p>Posições em pixels. Use espaçamento de pelo menos 72 × 64 para manter as vagas legíveis.</p>{data.vagas.map(space=><form key={space.id+'-'+space.posicao_x+'-'+space.posicao_y} onSubmit={event=>{event.preventDefault();const values=new FormData(event.currentTarget);void moveSpace(space.id,Number(values.get('x')),Number(values.get('y')));}}><strong>{space.codigo} · {space.setor_nome}</strong><label>X<input name="x" type="number" min="0" max="10000" defaultValue={space.posicao_x} required /></label><label>Y<input name="y" type="number" min="0" max="10000" defaultValue={space.posicao_y} required /></label><button disabled={working}>Salvar posição</button></form>)}</details>}
           {canConfigure && (
             <details className="gestao-settings-block">
               <summary>Criar setores e vagas</summary>
@@ -511,58 +441,16 @@ export default function ParkingManagementConsole({
               <button className="gestao-primary" disabled={working}>Salvar</button>
             </form>
           )}
-          <div className="gestao-card-inner gestao-wide">
-            <header><h3>Histórico de movimentações</h3></header>
-            <div className="gestao-toolbar">
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar placa, pessoa ou vaga" />
-              {canEdit && <button type="button" className="gestao-ghost" onClick={() => void clearMovementHistory()} disabled={working}>Limpar encerrados</button>}
-            </div>
-            <div className="gestao-table-wrap">
-              <table>
-                <thead><tr><th>Placa</th><th>Responsável</th><th>Entrada</th><th>Saída</th><th>Vaga</th><th>Status</th></tr></thead>
-                <tbody>
-                  {visibleMovements.map((item) => (
-                    <tr key={item.id}>
-                      <td>{item.placa}</td>
-                      <td>{item.responsavel}</td>
-                      <td>{formatTime(item.entrada_em)}</td>
-                      <td>{item.saida_em ? formatTime(item.saida_em) : "—"}</td>
-                      <td>{item.vaga_codigo || "—"}</td>
-                      <td><span className={`gestao-badge status-${item.status.toLowerCase()}`}>{item.status === "NO_LOCAL" ? "No local" : "Encerrada"}</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {!visibleMovements.length && <p className="gestao-empty">Nenhuma movimentação encontrada.</p>}
-            </div>
-          </div>
+          <div className="gestao-row-actions"><button type="button" onClick={()=>setTab('historico')}>Consultar histórico de movimentações</button>{canEdit && <button type="button" disabled={working} onClick={()=>{if(window.confirm('Excluir as movimentações encerradas?')) void clearMovementHistory();}}>Limpar movimentações encerradas</button>}</div>
         </section>
       )}
     </section>
   );
 }
 
-function filterMovements(movements: Movement[] | undefined, query: string) {
-  const term = query.trim().toLowerCase();
-  const list = movements || [];
-  const filtered = term
-    ? list.filter((item) => [item.placa, item.responsavel, item.vaga_codigo, item.setor_nome].filter(Boolean).some((value) => String(value).toLowerCase().includes(term)))
-    : list;
-  return filtered.slice(0, 40);
-}
-
-function Kpi({ label, value, tone }: { label: string; value: number; tone: string }) {
-  return (
-    <article className={`gestao-kpi tone-${tone}`}>
-      <strong>{value}</strong>
-      <small>{label}</small>
-    </article>
-  );
-}
-
 function TabButton({ id, tab, setTab, children }: { id: Tab; tab: Tab; setTab: (id: Tab) => void; children: React.ReactNode }) {
   return (
-    <button type="button" className={tab === id ? "is-active" : ""} onClick={() => setTab(id)}>
+    <button type="button" aria-pressed={tab === id} className={tab === id ? "is-active" : ""} onClick={() => setTab(id)}>
       {children}
     </button>
   );

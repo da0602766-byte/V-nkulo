@@ -14,7 +14,9 @@ test("ações administrativas sincronizam sem esconder toda a tela", async () =>
   assert.match(owner, /if \(!quiet\) setLoading\(true\)/);
   assert.ok((owner.match(/await load\(true\)/g) || []).length >= 5);
   assert.match(parkingData, /const load = useCallback\(async \(quiet = false\)/);
-  assert.match(parkingData, /if \(!quiet\) setLoading\(false\)/);
+  assert.match(parkingData, /if \(!quiet\) \{ setLoading\(true\)/);
+  assert.match(parkingData, /sequence === sequenceRef.current/);
+  assert.match(await read("app/components/parking/ParkingMemberPortal.tsx"), /loading && !data/);
 });
 
 test("reservas e limpezas evitam recarregar dados que já estão na tela", async () => {

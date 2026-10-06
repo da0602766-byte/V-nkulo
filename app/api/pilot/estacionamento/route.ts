@@ -1,10 +1,13 @@
+import { parkingAuditStatement } from "../../../lib/parking-audit";
+import { readParkingContext } from "../../../lib/parking-context";
+import { readParkingShiftStats } from "../../../lib/parking-shift-stats";
 import { getD1 } from "../../../../db";
 import { parseParkingEntry } from "../../../lib/parking-validation";
 import { recordTenantAudit } from "../../../lib/tenant-audit";
 import { requireTenantPermission } from "../../../lib/tenant";
 import { getActiveParkingAssignment } from "../../../lib/tenant";
 
-export async function GET() {
+export async function GET(request: Request) {
   const access = await requireTenantPermission("parking.view");
   if ("error" in access) return access.error;
   const db = getD1();
@@ -25,34 +28,10 @@ export async function GET() {
     );
   }
   const rules = readRules(config.regras);
-  const [stats, spaces, movements, occurrences, users, ministryMembers, responsible, assignment] = await Promise.all([
+  const [movements, occurrences, users, ministryMembers, responsible, assignment] = await Promise.all([
     db
       .prepare(
-        `SELECT
-          COUNT(*) AS total,
-          SUM(CASE WHEN status = 'OCUPADA' THEN 1 ELSE 0 END) AS ocupadas,
-          SUM(CASE WHEN status = 'LIVRE' THEN 1 ELSE 0 END) AS livres,
-          SUM(CASE WHEN tipo IN ('RESERVADA','IDOSO','PCD') THEN 1 ELSE 0 END) AS especiais
-         FROM estacionamento_vagas
-         WHERE comunidade_id = ? AND ativo = 1`,
-      )
-      .bind(access.context.comunidadeId)
-      .first<Record<string, number>>(),
-    db
-      .prepare(
-        `SELECT v.id, v.codigo, v.tipo, v.status, v.posicao_x, v.posicao_y, s.id AS setor_id,
-          s.nome AS setor_nome, s.cor AS setor_cor, s.ordem
-         FROM estacionamento_vagas v
-         JOIN estacionamento_setores s
-           ON s.id = v.setor_id AND s.comunidade_id = v.comunidade_id
-         WHERE v.comunidade_id = ? AND v.ativo = 1 AND s.ativo = 1
-         ORDER BY s.ordem, s.nome, v.posicao_y, v.posicao_x, v.codigo`,
-      )
-      .bind(access.context.comunidadeId)
-      .all<Record<string, unknown>>(),
-    db
-      .prepare(
-        `SELECT m.id, m.placa, m.tipo_veiculo, m.responsavel, m.vinculo,
+        `SELECT m.id, m.vaga_id, m.placa, m.tipo_veiculo, m.responsavel, m.vinculo,
           m.entrada_em, m.saida_em, m.status, m.observacoes,
           actor.nome AS operador_nome,
           v.codigo AS vaga_codigo, s.nome AS setor_nome
@@ -62,12 +41,11 @@ export async function GET() {
          LEFT JOIN estacionamento_setores s
            ON s.id = v.setor_id AND s.comunidade_id = m.comunidade_id
          LEFT JOIN usuarios actor ON actor.id = m.criado_por
-         WHERE m.comunidade_id = ?
+         WHERE m.comunidade_id = ? AND (m.status='NO_LOCAL' OR m.id IN (SELECT id FROM estacionamento_movimentacoes WHERE comunidade_id=? AND status='ENCERRADA' ORDER BY entrada_em DESC,id DESC LIMIT 20))
          ORDER BY CASE m.status WHEN 'NO_LOCAL' THEN 0 ELSE 1 END,
-           m.entrada_em DESC, m.id DESC
-         LIMIT 80`,
+           m.entrada_em DESC, m.id DESC`,
       )
-      .bind(access.context.comunidadeId)
+      .bind(access.context.comunidadeId,access.context.comunidadeId)
       .all<Record<string, unknown>>(),
     db
       .prepare(
@@ -118,20 +96,17 @@ export async function GET() {
       : Promise.resolve(null),
     getActiveParkingAssignment(access.user.id, access.context.comunidadeId),
   ]);
+  const parkingContext = await readParkingContext(db, access.context.comunidadeId, access.user.id, new URL(request.url));
+  if ("error" in parkingContext) return Response.json({ error: parkingContext.error }, { status: parkingContext.status });
+  const shiftStats = assignment ? await readParkingShiftStats(db,access.context.comunidadeId,assignment.inicia_em,assignment.termina_em) : null;
   return Response.json(
     {
+      ...parkingContext,
       config: {
         ...config,
         ...rules,
         responsavel: responsible,
       },
-      stats: {
-        total: Number(stats?.total || 0),
-        ocupadas: Number(stats?.ocupadas || 0),
-        livres: Number(stats?.livres || 0),
-        especiais: Number(stats?.especiais || 0),
-      },
-      vagas: spaces.results,
       movimentacoes: access.context.permissions.some((item) => ["parking.entry","parking.exit","parking.edit"].includes(item)) ? movements.results : [],
       ocorrencias: access.context.permissions.includes("parking.edit") ? occurrences.results : [],
       availableUsers: access.context.permissions.includes("parking.helpers.manage") ||
@@ -143,6 +118,7 @@ export async function GET() {
         ? ministryMembers.results
         : [],
       operator: {
+        shiftStats,
         id: access.user.id,
         nome: access.user.nome,
         email: access.user.email,
@@ -222,7 +198,12 @@ export async function POST(request: Request) {
       `INSERT INTO estacionamento_movimentacoes
        (comunidade_id, vaga_id, placa, tipo_veiculo, responsavel, vinculo,
         observacoes, criado_por, atualizado_por)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+       WHERE EXISTS(SELECT 1 FROM estacionamento_vagas v JOIN estacionamento_setores s ON s.id=v.setor_id AND s.comunidade_id=v.comunidade_id
+         WHERE v.id=? AND v.comunidade_id=? AND v.ativo=1 AND s.ativo=1 AND v.status='LIVRE')
+       AND NOT EXISTS(SELECT 1 FROM estacionamento_movimentacoes WHERE comunidade_id=? AND status='NO_LOCAL' AND (vaga_id=? OR placa=?))
+       AND NOT EXISTS(SELECT 1 FROM estacionamento_reservas WHERE comunidade_id=? AND vaga_id=? AND status IN ('PENDENTE','CONFIRMADA')
+         AND datetime(inicio_em)<=datetime('now') AND datetime(fim_em)>datetime('now'))`,
     )
     .bind(
       access.context.comunidadeId,
@@ -234,24 +215,18 @@ export async function POST(request: Request) {
       parsed.observacoes,
       access.user.id,
       access.user.id,
+      parsed.vagaId, access.context.comunidadeId, access.context.comunidadeId, parsed.vagaId, parsed.placa, access.context.comunidadeId, parsed.vagaId,
     );
   const occupy = db
     .prepare(
       `UPDATE estacionamento_vagas
        SET status = 'OCUPADA', atualizado_em = CURRENT_TIMESTAMP
-       WHERE id = ? AND comunidade_id = ? AND status = 'LIVRE'`,
+       WHERE id = ? AND comunidade_id = ? AND status = 'LIVRE' AND changes()=1`,
     )
     .bind(parsed.vagaId, access.context.comunidadeId);
-  const [result] = await db.batch([insert, occupy]);
+  const [result] = await db.batch([insert, occupy, parkingAuditStatement(db,access.context.comunidadeId,access.user.id,"ESTACIONAMENTO_ENTRADA_REGISTRADA",{vagaId:parsed.vagaId},"movimentacaoId")]);
+  if (!result.meta.changes) return Response.json({ error: "A vaga ou o veículo já possui uso ativo ou reserva neste horário." }, { status: 409 });
   const movementId = Number(result.meta.last_row_id);
-  await recordTenantAudit(
-    db,
-    access.context,
-    access.user.id,
-    "ESTACIONAMENTO_ENTRADA_REGISTRADA",
-    "SUCESSO",
-    { movimentacaoId: movementId, vagaId: parsed.vagaId },
-  );
   return Response.json({ id: movementId }, { status: 201 });
 }
 

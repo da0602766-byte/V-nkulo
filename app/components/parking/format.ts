@@ -11,7 +11,7 @@ export async function readJson<T>(response: Response) {
 }
 
 export function formatTime(value: string) {
-  const date = new Date(value);
+  const date = new Date(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value) ? value.replace(" ", "T") + "Z" : value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "short",
@@ -21,7 +21,7 @@ export function formatTime(value: string) {
 }
 
 export function formatClock(value: string) {
-  const date = new Date(value);
+  const date = new Date(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value) ? value.replace(" ", "T") + "Z" : value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("pt-BR", {
     timeStyle: "short",
@@ -40,18 +40,24 @@ export function isSpaceAvailable(space: Space) {
 
 export function hasCustomParkingLayout(spaces: Space[]) {
   if (!spaces.length) return false;
+  if (spaces.some(space => !Number.isFinite(space.posicao_x) || !Number.isFinite(space.posicao_y) || space.posicao_x < 0 || space.posicao_y < 0)) return false;
   const positions = new Set(spaces.map((space) => `${space.posicao_x}:${space.posicao_y}`));
-  return positions.size > 1 || spaces.some((space) => space.posicao_x > 0 || space.posicao_y > 0);
+  if (positions.size !== spaces.length || (positions.size === 1 && spaces[0].posicao_x === 0 && spaces[0].posicao_y === 0)) return false;
+  const ordered = [...spaces].sort((a,b)=>a.posicao_x-b.posicao_x);
+  for(let i=0;i<ordered.length;i++) for(let j=i+1;j<ordered.length && ordered[j].posicao_x-ordered[i].posicao_x<64;j++) {
+    if(Math.abs(ordered[j].posicao_y-ordered[i].posicao_y)<56) return false;
+  }
+  return true;
 }
 
 export function getParkingCanvasWidth(spaces: Space[]) {
   const furthest = Math.max(0, ...spaces.map((space) => Number(space.posicao_x) || 0));
-  return Math.max(360, Math.min(1200, furthest + 76));
+  return Math.max(360, furthest + 76);
 }
 
 export function getParkingCanvasHeight(spaces: Space[]) {
   const furthest = Math.max(0, ...spaces.map((space) => Number(space.posicao_y) || 0));
-  return Math.max(220, Math.min(720, furthest + 58));
+  return Math.max(220, furthest + 58);
 }
 
 export function getEventParkingWindow(event: ParkingEventOption) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
+import ParkingSpaceMap from "./ParkingSpaceMap";
 import { ParkingReservationQr } from "../ParkingReservationQr";
 import { formatTime, getEventParkingWindow, isSpaceAvailable, toLocalDateTimeInput } from "./format";
 import type { ParkingController } from "./useParkingData";
@@ -35,28 +36,29 @@ export default function ParkingMemberPortal({
 
   const [selectedSectorId, setSelectedSectorId] = useState("");
   const [selectedSpaceId, setSelectedSpaceId] = useState<number | null>(null);
-  const [selectedEventId, setSelectedEventId] = useState("");
+  const selectedEventId = parking.context.eventId;
   const [contact, setContact] = useState<ContactForm>({ nomeCompleto: "", email: "", documento: "", telefone: "" });
   const [vehicle, setVehicle] = useState<VehicleForm>(EMPTY_VEHICLE);
   const [saveVehicle, setSaveVehicle] = useState(true);
   const [window_, setWindow] = useState({ start: "", end: "" });
-  const [justCreated, setJustCreated] = useState<{ codigo: string; spaceLabel: string } | null>(null);
+  const [justCreated, setJustCreated] = useState<{ codigo: string; spaceLabel: string; status: string } | null>(null);
   const [copyMessage, setCopyMessage] = useState("");
 
   const ownerKey = data ? (data.operator.email || `u${data.operator.id}`) : "";
   const garage = useParkingGarage(ownerKey);
 
-  const selectedSector = sectors.find((sector) => sector.id === selectedSectorId) || null;
+  const selectedSector = sectors.find((sector) => sector.id === selectedSectorId) || sectors[0] || null;
   const selectedSpace = selectedSector?.spaces.find((space) => space.id === selectedSpaceId) || null;
   const selectedEvent = eventOptions.find((item) => String(item.id) === selectedEventId) || null;
   const gate = data?.reservationGate;
-  const locked = Boolean(gate && !gate.unlocked);
+  const locked = Boolean(gate && !gate.unlocked) || parking.stale;
+  const selectionLost = Boolean(selectedSpace && !isSpaceAvailable(selectedSpace));
 
   const myOpenReservations = useMemo(
-    () => reservations.filter((item) => ["PENDENTE", "CONFIRMADA", "CHECKIN"].includes(item.status)),
+    () => reservations.filter((item) => ["PENDENTE", "CONFIRMADA", "CHECKIN"].includes(item.status) && !item.saida_em),
     [reservations],
   );
-  const myHistory = useMemo(() => reservations.filter(canDeleteReservationHistory), [reservations]);
+  const myHistory = useMemo(() => reservations.filter(item => canDeleteReservationHistory(item) && (item.status !== "CHECKIN" || item.saida_em)), [reservations]);
 
   function pickSpace(sectorId: string, spaceId: number) {
     setSelectedSectorId(sectorId);
@@ -99,7 +101,8 @@ export default function ParkingMemberPortal({
   }
 
   function chooseEvent(id: string) {
-    setSelectedEventId(id);
+    setSelectedSpaceId(null);
+    parking.setContext({ eventId: id, start: "", end: "" });
     const event = eventOptions.find((item) => String(item.id) === id);
     if (!event) return;
     const recommended = getEventParkingWindow(event);
@@ -108,7 +111,7 @@ export default function ParkingMemberPortal({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedSpace) return;
+    if (!selectedSpace || !isSpaceAvailable(selectedSpace) || locked || working) return;
     const values = {
       vagaId: String(selectedSpace.id),
       nomeCompleto: contact.nomeCompleto,
@@ -120,15 +123,15 @@ export default function ParkingMemberPortal({
       modeloVeiculo: vehicle.modelo,
       corVeiculo: vehicle.cor,
       eventoId: selectedEventId,
-      inicioEm: window_.start,
-      fimEm: window_.end,
+      inicioEm: new Date(window_.start).toISOString(),
+      fimEm: new Date(window_.end).toISOString(),
     };
     const result = await createReservation(values);
     if (result?.codigo) {
       if (saveVehicle && vehicle.placa) {
         garage.addVehicle({ apelido: vehicle.modelo || vehicle.placa, ...vehicle });
       }
-      setJustCreated({ codigo: result.codigo, spaceLabel: `${selectedSpace.codigo} · ${selectedSector?.name}` });
+      setJustCreated({ codigo: result.codigo, spaceLabel: `${selectedSpace.codigo} · ${selectedSector?.name}`, status: result.status || "PENDENTE" });
       setSelectedSpaceId(null);
       setSelectedSectorId("");
     }
@@ -152,44 +155,31 @@ export default function ParkingMemberPortal({
   }
 
   return (
-    <section className="gestao-member" style={{ "--gestao-accent": data.config.cor_destaque || "#d99a32" } as React.CSSProperties}>
-      <header className="gestao-member-header">
-        <div>
-          <p className="gestao-kicker">GESTÃO · {communityName}</p>
-          <h1>Reserve sua vaga</h1>
-          <p>Escolha um setor, depois toque em uma vaga livre.</p>
-        </div>
-        <div className="gestao-member-count">
-          <strong>{data.stats.livres}</strong>
-          <span>livres</span>
-        </div>
-      </header>
-
-      {(feedback || error) && (
-        <p className={`gestao-feedback${error ? " is-error" : ""}`} role="status">{error || feedback}</p>
-      )}
-
-      {locked && gate && (
-        <section className="gestao-gate-notice" role="status">
-          <span aria-hidden="true">◷</span>
-          <div>
-            <strong>{gate.reason === "WAIT_OPENING" ? "Reserva libera em breve" : "Mapa disponível para consulta"}</strong>
-            <p>
-              {gate.reason === "WAIT_OPENING"
-                ? `Você pode escolher a vaga agora. A confirmação abre no horário programado para “${gate.eventTitle}”.`
-                : "As vagas aparecem aqui, mas a reserva libera quando houver um evento publicado."}
-            </p>
-          </div>
-        </section>
-      )}
-
+    <section className="gestao-member parking-redesign">
+      <header className="parking-v2-page-heading"><p>{communityName}</p><h1>Estacionamento</h1><p>Reserve sua vaga com tranquilidade.</p></header>
+      <div className="parking-v2-context-bar">
+        <label>Atividade
+          <select value={selectedEventId} onChange={event => chooseEvent(event.target.value)}>
+            <option value="">Selecione a atividade</option>
+            {eventOptions.map(item => <option key={item.id} value={item.id}>{item.titulo} · {formatTime(item.inicia_em)}</option>)}
+          </select>
+        </label>
+        {selectedEvent && <p>{formatTime(selectedEvent.inicia_em)} até {formatTime(selectedEvent.termina_em || selectedEvent.inicia_em)}</p>}
+        <p role="status">{!gate?.eventAvailable ? "Não há atividades com estacionamento disponíveis neste momento." : !selectedEventId ? "Escolha uma atividade para consultar a disponibilidade do período." : locked ? gate?.reservationsOpenAt ? 'Reservas abrem em '+formatTime(gate.reservationsOpenAt) : "Atualizando disponibilidade…" : "Reservas abertas · sujeitas à aprovação da gestão"}</p>
+      </div>
+      {(feedback || error) && <p className={error ? "gestao-feedback is-error" : "gestao-feedback"} role="status">{error || feedback}</p>}
+      <div className="parking-v2-sync"><span>{parking.stale ? "Disponibilidade desatualizada" : parking.lastSync ? 'Atualizado às '+new Date(parking.lastSync).toLocaleTimeString('pt-BR') : 'Carregando…'}</span><button type="button" onClick={() => void load(true)}>Atualizar</button></div>
+      <div className="parking-v2-map-heading"><div><h2>Onde você quer parar?</h2><p>Toque em uma vaga disponível para selecionar.</p></div>
+        <label>Setor<select value={selectedSector?.id || ''} onChange={event => {setSelectedSectorId(event.target.value);setSelectedSpaceId(null);}}>{sectors.map(sector => <option key={sector.id} value={sector.id}>{sector.name}</option>)}</select></label>
+      </div>
+      <p className="parking-v2-summary">{selectedSector?.spaces.filter(isSpaceAvailable).length || 0} disponíveis no setor · selecionar não conclui a reserva</p>
       {justCreated && (
         <section className="gestao-receipt">
           <header>
             <span aria-hidden="true">✓</span>
             <div>
-              <strong>Reserva enviada</strong>
-              <p>{justCreated.spaceLabel} · aguardando confirmação</p>
+              <strong>{justCreated.status === "PENDENTE" ? "Reserva enviada" : "Reserva recuperada"}</strong>
+              <p>{justCreated.spaceLabel} · {justCreated.status === "PENDENTE" ? "aguardando confirmação" : justCreated.status.toLocaleLowerCase("pt-BR")}</p>
             </div>
             <button type="button" onClick={() => setJustCreated(null)} aria-label="Fechar">×</button>
           </header>
@@ -198,54 +188,19 @@ export default function ParkingMemberPortal({
         </section>
       )}
 
-      <section className="gestao-lot-map" aria-label="Vagas por setor">
-        {sectors.map((sector) => {
-          const free = sector.spaces.filter(isSpaceAvailable).length;
-          return (
-            <article key={sector.id} className="gestao-lot-sector" style={{ "--sector-color": sector.color } as React.CSSProperties}>
-              <header>
-                <strong>{sector.name}</strong>
-                <span>{free} livres</span>
-              </header>
-              <div className="gestao-lot-grid">
-                {sector.spaces.map((space) => {
-                  const free2 = isSpaceAvailable(space);
-                  const reserved = Boolean(space.reservada);
-                  const selected = selectedSpaceId === space.id;
-                  return (
-                    <button
-                      key={space.id}
-                      type="button"
-                      disabled={!free2}
-                      className={`gestao-slot ${free2 ? "is-free" : reserved ? "is-reserved" : "is-busy"}${selected ? " is-selected" : ""}`}
-                      onClick={() => pickSpace(sector.id, space.id)}
-                      title={`${space.codigo} · ${free2 ? "Livre" : reserved ? "Reservada" : "Ocupada"}`}
-                    >
-                      <span>{space.codigo}</span>
-                      {space.tipo !== "COMUM" && <small>{space.tipo}</small>}
-                    </button>
-                  );
-                })}
-                {!sector.spaces.length && <p className="gestao-empty">Nenhuma vaga cadastrada.</p>}
-              </div>
-            </article>
-          );
-        })}
-        {!sectors.length && <p className="gestao-empty">O responsável ainda não cadastrou vagas.</p>}
-        <div className="gestao-lot-legend">
-          <span><i className="is-free" />Livre</span>
-          <span><i className="is-reserved" />Reservada</span>
-          <span><i className="is-busy" />Ocupada</span>
-        </div>
-      </section>
-
+      <ParkingSpaceMap spaces={selectedSector?.spaces || []} selectedId={selectedSpaceId} busy={working} onSelect={space => {
+        if (space.minha_reserva) { document.getElementById('parking-my-reservations')?.scrollIntoView({behavior:'smooth'}); return; }
+        if(selectedSector) pickSpace(selectedSector.id,space.id);
+      }} />
+      {selectedSpace && <div className="parking-v2-selection-summary" role="status"><div><strong>Vaga {selectedSpace.codigo}</strong><span>{selectedSector?.name} · {selectedSpace.tipo}</span></div><button type="button" onClick={()=>document.getElementById('parking-reservation-review')?.scrollIntoView({block:'start'})}>Revisar reserva</button></div>}
+      {selectionLost && <p role="alert" className="gestao-feedback is-error">Esta vaga acabou de ficar indisponível. Escolha outra vaga.</p>}
       {selectedSpace && (
-        <div className="gestao-drawer-backdrop" role="presentation" onClick={() => setSelectedSpaceId(null)}>
-          <section className="gestao-drawer" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+        <div className="parking-v2-booking">
+          <section id="parking-reservation-review" aria-label="Revisão da reserva">
             <header>
               <div>
                 <p className="gestao-kicker">VAGA SELECIONADA</p>
-                <h2>{selectedSpace.codigo} · {selectedSector?.name}</h2>
+                <h2>{selectedSpace.codigo} · {selectedSector?.name}</h2><p>{selectedSpace.tipo} · confira os dados antes de confirmar.</p>
               </div>
               <button type="button" onClick={() => setSelectedSpaceId(null)} aria-label="Fechar">×</button>
             </header>
@@ -302,32 +257,25 @@ export default function ParkingMemberPortal({
 
               <fieldset>
                 <legend>Evento e período</legend>
-                <label>Evento ou culto
-                  <select value={selectedEventId} onChange={(event) => chooseEvent(event.target.value)}>
-                    <option value="">Reserva sem evento vinculado</option>
-                    {eventOptions.map((item) => (
-                      <option key={item.id} value={item.id}>{item.titulo} · {formatTime(item.inicia_em)}</option>
-                    ))}
-                  </select>
-                </label>
+                <p>{selectedEvent?.titulo || 'Selecione uma atividade acima'}</p>
                 <div className="gestao-time-grid">
                   <label>Chegada
-                    <input type="datetime-local" required value={window_.start} onChange={(event) => setWindow((w) => ({ ...w, start: event.target.value }))} />
+                    <input type="datetime-local" required value={window_.start} onChange={(event) => { const start=event.target.value; setWindow(w => ({...w,start})); if(start && window_.end) parking.setContext(c => ({...c,start:new Date(start).toISOString(),end:new Date(window_.end).toISOString()})); }} />
                   </label>
                   <label>Saída
-                    <input type="datetime-local" required value={window_.end} onChange={(event) => setWindow((w) => ({ ...w, end: event.target.value }))} />
+                    <input type="datetime-local" required value={window_.end} onChange={(event) => { const end=event.target.value; setWindow(w => ({...w,end})); if(end && window_.start) parking.setContext(c => ({...c,start:new Date(window_.start).toISOString(),end:new Date(end).toISOString()})); }} />
                   </label>
                 </div>
               </fieldset>
 
               {locked && <p className="gestao-hint">A confirmação da reserva libera no horário programado do evento. Você já pode preencher os dados.</p>}
-              <button className="gestao-primary" disabled={working || locked}>{working ? "Enviando…" : `Reservar ${selectedSpace.codigo}`}</button>
+              <div className="parking-v2-booking-action"><p>{selectedSpace.codigo} · {selectedSector?.name} · {vehicle.placa || "Informe o veículo"}</p><button className="gestao-primary" disabled={working || locked || selectionLost}>{working ? "Aguarde…" : `Confirmar vaga ${selectedSpace.codigo}`}</button><small>A solicitação será enviada para aprovação da gestão.</small></div>
             </form>
           </section>
         </div>
       )}
 
-      <section className="gestao-card">
+      <section className="gestao-card" id="parking-my-reservations">
         <header>
           <p className="gestao-kicker">MINHAS RESERVAS</p>
           <h2>Histórico e comprovantes</h2>
@@ -337,8 +285,11 @@ export default function ParkingMemberPortal({
             <article key={reservation.id} className={`gestao-reservation-item status-${reservation.status.toLowerCase()}`}>
               <div>
                 <strong>{reservation.vaga_codigo} · {reservation.setor_nome}</strong>
-                <small>{formatTime(reservation.inicio_em)} · {reservation.status}</small>
+                <small>{reservation.evento_titulo || "Atividade vinculada"}</small>
+                <small>{reservation.placa_veiculo} · {reservation.modelo_veiculo} · {reservation.cor_veiculo}</small>
+                <small>{formatTime(reservation.inicio_em)} até {formatTime(reservation.fim_em)} · {reservation.status}</small>
               </div>
+              {["PENDENTE", "CONFIRMADA"].includes(reservation.status) && <button type="button" disabled={working} onClick={() => {if(window.confirm(`Cancelar sua reserva da vaga ${reservation.vaga_codigo}?`)) void parking.reservationAction({id:reservation.id,acao:"CANCELAR_PROPRIA"});}}>Cancelar minha reserva</button>}
               {reservation.status === "CONFIRMADA" && reservation.codigo ? (
                 <details className="gestao-qr-ticket">
                   <summary>Mostrar comprovante</summary>
@@ -358,9 +309,10 @@ export default function ParkingMemberPortal({
                 <article key={reservation.id} className={`gestao-reservation-item status-${reservation.status.toLowerCase()}`}>
                   <div>
                     <strong>{reservation.vaga_codigo} · {reservation.setor_nome}</strong>
-                    <small>{formatTime(reservation.inicio_em)} · {reservation.status}</small>
+                    <small>{reservation.evento_titulo || "Atividade vinculada"} · {reservation.placa_veiculo}</small>
+                    <small>{formatTime(reservation.inicio_em)} até {formatTime(reservation.fim_em)} · {reservation.status}</small>
                   </div>
-                  <button type="button" disabled={working} onClick={() => void deleteReservationHistory(reservation.id)}>Excluir</button>
+                  <button type="button" disabled={working} onClick={() => {if(window.confirm("Excluir este registro do histórico?")) void deleteReservationHistory(reservation.id);}}>Excluir</button>
                 </article>
               ))}
             </div>
@@ -368,11 +320,13 @@ export default function ParkingMemberPortal({
         )}
       </section>
 
+      <div className="parking-v2-pagination"><span>{parking.reservationTotal} reserva(s) · página {parking.reservationFilters.page}</span><div><button type="button" disabled={parking.reservationFilters.page<=1 || loading} onClick={()=>parking.setReservationFilters(f=>({...f,page:f.page-1}))}>Anterior</button><button type="button" disabled={parking.reservationFilters.page*40>=parking.reservationTotal || loading} onClick={()=>parking.setReservationFilters(f=>({...f,page:f.page+1}))}>Próxima</button></div></div>
       <section className="gestao-card">
         <header>
           <p className="gestao-kicker">MEUS VEÍCULOS</p>
           <h2>Garagem salva neste aparelho</h2>
         </header>
+        <details><summary>Adicionar veículo neste aparelho</summary><form className="gestao-form" onSubmit={event=>{event.preventDefault();const form=event.currentTarget;const values=new FormData(form);garage.addVehicle({apelido:String(values.get('modelo')),placa:String(values.get('placa')).toUpperCase().replace(/[^A-Z0-9]/g,''),tipo:String(values.get('tipo')),modelo:String(values.get('modelo')),cor:String(values.get('cor'))});form.reset();}}><fieldset><label>Placa<input name="placa" required minLength={6} maxLength={10}/></label><label>Tipo<select name="tipo"><option value="CARRO">Carro</option><option value="MOTO">Moto</option><option value="VAN">Van</option><option value="OUTRO">Outro</option></select></label><label>Marca e modelo<input name="modelo" required minLength={2}/></label><label>Cor<input name="cor" required/></label></fieldset><button>Salvar neste aparelho</button></form></details>
         {garage.vehicles.length ? (
           <ul className="gestao-garage-list">
             {garage.vehicles.map((item) => (

@@ -68,7 +68,9 @@ test("quem tem acesso permanente à gestão não perde o console ao trocar de ap
   assert.match(orchestrator, /isPermanentLeader/);
   assert.match(orchestrator, /parking\.configure/);
   assert.match(orchestrator, /showOperatorMobile = isMobile && isOnDutyShift && !isPermanentLeader/);
-  assert.match(managementConsole, /gestao-reservation-details/);
+  assert.match(managementConsole, /ParkingReservationTable parking=\{parking\}/);
+  const table = await read("app/components/parking/ParkingReservationTable.tsx");
+  assert.match(table, /<summary>Detalhes<\/summary>/);
   assert.match(reservations, /"parking.entry", "parking.exit", "parking.edit", "parking.configure"/);
 });
 

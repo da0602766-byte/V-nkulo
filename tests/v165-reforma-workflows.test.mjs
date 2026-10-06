@@ -13,7 +13,7 @@ test("event actions use an independent menu and expose both opening times", asyn
 });
 
 test("parking reservations use the published event without requiring personal confirmation", async () => {
-  const availability = await read("app/api/pilot/estacionamento/disponibilidade/route.ts");
+  const availability = (await read("app/api/pilot/estacionamento/disponibilidade/route.ts")) + (await read("app/lib/parking-context.ts"));
   const reservations = await read("app/api/pilot/estacionamento/reservas/route.ts");
   const memberPortal = await read("app/components/parking/ParkingMemberPortal.tsx");
   assert.doesNotMatch(availability, /confirmacoes_evento/);
@@ -21,7 +21,7 @@ test("parking reservations use the published event without requiring personal co
   assert.match(reservations, /status\s*=\s*'PUBLICADO'/);
   assert.match(availability, /reservas_abrem_em/);
   assert.doesNotMatch(memberPortal, /return <ParkingReservationGate/);
-  assert.match(memberPortal, /Mapa disponível para consulta/);
+  assert.match(memberPortal, /Escolha uma atividade para consultar a disponibilidade/);
 });
 
 test("ministry schedules can be collected for timed publication with live status feedback", async () => {

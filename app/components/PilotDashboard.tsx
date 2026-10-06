@@ -1356,7 +1356,7 @@ export default function PilotDashboard({
             />
           )}
           {visibleView === "estacionamento" && (
-            <ParkingWorkspace communityName={active.comunidadeNome} memberMode={!active.permissions.includes("parking.view")} />
+            <ParkingWorkspace key={active.comunidadeId} communityName={active.comunidadeNome} memberMode={!active.permissions.includes("parking.view")} />
           )}
           {visibleView === "redes" && features.networkModuleEnabled && (
             <NetworkWorkspace />

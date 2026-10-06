@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import "./parking/parking.css";
 import ParkingManagementConsole from "./parking/ParkingManagementConsole";
 import ParkingMemberPortal from "./parking/ParkingMemberPortal";
 import ParkingOperatorMobile from "./parking/ParkingOperatorMobile";
