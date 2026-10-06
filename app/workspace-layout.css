@@ -228,6 +228,10 @@ html body :is(.people-person-button,.people-open-record,.person-record button,.w
 }
 
 /* The member feed keeps a single readable column on phones. */
+@container (min-width: 1240px) {
+  html body .pilot-dashboard[data-ui-version="v2"] .community-feed-redesign .worship-layout:not(.feed-only) > .worship-main { position: relative; left: 140px; }
+}
+
 @media (max-width: 960px) {
   html body .pilot-dashboard[data-ui-version="v2"] .community-feed-redesign .worship-posts { grid-template-columns: minmax(0, 1fr); }
 }
