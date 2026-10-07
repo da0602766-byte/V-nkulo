@@ -31,6 +31,22 @@ for(const [sectorName,rows,columns] of [['Setor A',5,6],['Setor B',3,5]]){
     if(n%7===0)db.prepare("INSERT INTO estacionamento_movimentacoes(comunidade_id,vaga_id,placa,responsavel,tipo_veiculo,vinculo,criado_por,atualizado_por) VALUES(1,?,?,'Pessoa de teste','CARRO','MEMBRO',?,?)").run(id,'QAT'+n+'A23',member,member);
   }
 }
+// Optional synthetic cards for visual review of every reservation state.
+if (process.env.PARKING_QA_CARDS === '1') {
+ const slots=db.prepare("SELECT id FROM estacionamento_vagas v WHERE status='LIVRE' AND NOT EXISTS (SELECT 1 FROM estacionamento_reservas r WHERE r.vaga_id=v.id) LIMIT 6").all();
+ const examples=[['CHECKIN',true,'Marina Oliveira'],['PENDENTE',false,'Rafael Santos'],['CONFIRMADA',false,'Camila Almeida'],['CHECKIN',false,'Lucas Ferreira'],['CANCELADA',false,'Beatriz Costa'],['RECUSADA',false,'Antônio de Albuquerque e Silva']];
+ examples.forEach(([status,closed,name],index)=>{
+  const plate='QAC'+String(index+1).padStart(4,'0'),slot=slots[index].id;
+  const entered=status==='CHECKIN'?new Date(Date.now()-60*60_000).toISOString():null;
+  const left=closed?new Date(Date.now()-15*60_000).toISOString():null;
+  const periodStart=entered?new Date(Date.now()-90*60_000).toISOString():start;
+  const id=Number(db.prepare("INSERT INTO estacionamento_reservas(comunidade_id,vaga_id,usuario_id,evento_id,evento_titulo,nome_completo,email,telefone,placa_veiculo,tipo_veiculo,modelo_veiculo,cor_veiculo,documento_hash,documento_mascarado,inicio_em,fim_em,codigo,status,checkin_em) VALUES(1,?,?,?,'Culto de domingo',?,'contato.exemplo@example.invalid','47999998888',?,'CARRO','Honda Civic','Prata','qa-cards','***.***.***-18',?,?,?,?,?)").run(slot,member,event,name,plate,periodStart,end,'QA-CARD-'+index,status,entered).lastInsertRowid);
+  if(entered) {
+   db.prepare("INSERT INTO estacionamento_movimentacoes(comunidade_id,vaga_id,placa,responsavel,tipo_veiculo,vinculo,criado_por,atualizado_por,status,entrada_em,saida_em,observacoes) VALUES(1,?,?,?,'CARRO','MEMBRO',?,?,?,?,?,?)").run(slot,plate,name,member,member,closed?'ENCERRADA':'NO_LOCAL',entered,left,'Entrada liberada por QR da reserva '+id+'.');
+   if(!closed)db.prepare("UPDATE estacionamento_vagas SET status='OCUPADA' WHERE id=?").run(slot);
+  }
+ });
+}
 http.createServer(async(req,res)=>{
  try {
   const url=new URL(req.url,base);

@@ -46,12 +46,12 @@ for(const theme of ['CLARO','ESCURO']){
  await manager.page.evaluate(theme=>{localStorage.setItem('vinkulo-theme',theme);window.dispatchEvent(new StorageEvent('storage',{key:'vinkulo-theme',newValue:theme}));},theme);
  for(const width of [320,390,430,768,1024,1440]){
   await manager.page.setViewportSize({width,height:1000});await manager.page.evaluate(()=>scrollTo(0,0));await manager.page.waitForTimeout(100);
-  const layout=await manager.page.evaluate(()=>{const table=document.querySelector('.parking-v2-data-table'),wrapper=table.parentElement;return {width:innerWidth,scroll:document.documentElement.scrollWidth,theme:document.documentElement.dataset.theme,mobileTableClipped:innerWidth<=760 && table.getBoundingClientRect().width>wrapper.getBoundingClientRect().width+1};});
+  const layout=await manager.page.evaluate(()=>{const table=document.querySelector('.parking-reservation-grid'),wrapper=table.parentElement;return {width:innerWidth,scroll:document.documentElement.scrollWidth,theme:document.documentElement.dataset.theme,mobileTableClipped:innerWidth<=760 && table.getBoundingClientRect().width>wrapper.getBoundingClientRect().width+1};});
   results.push({role:'manager',theme,width,...layout});await manager.page.screenshot({path:`outputs/parking/manager-${width}-${theme.toLowerCase()}.png`});
  }
 }
 await manager.page.locator('.parking-v2-filters input').fill('QAQ9Z99');await manager.page.waitForTimeout(400);
-const row=manager.page.locator('.parking-v2-data-table tbody tr').filter({hasText:'QAQ9Z99'});
+const row=manager.page.locator('.parking-reservation-card').filter({hasText:'QAQ9Z99'});
 await row.getByRole('button',{name:'Aprovar',exact:true}).click();
 await row.getByRole('button',{name:'Registrar entrada',exact:true}).waitFor();
 await row.getByRole('button',{name:'Registrar entrada',exact:true}).click();

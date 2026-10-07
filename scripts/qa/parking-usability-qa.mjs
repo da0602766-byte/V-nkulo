@@ -78,13 +78,13 @@ try {
   await page.getByRole('button',{name:'Analisar solicitações',exact:true}).click();
   const pendingResponse=await pending;
   assert.equal(new URL(pendingResponse.url()).searchParams.get('q'),'');
-  await page.waitForFunction(()=>[...document.querySelectorAll('.parking-v2-data-table tbody tr')].length>0 && [...document.querySelectorAll('.parking-v2-data-table tbody tr')].every(row=>row.textContent.includes('Aguardando aprovação')));
+  await page.waitForFunction(()=>[...document.querySelectorAll('.parking-reservation-card')].length>0 && [...document.querySelectorAll('.parking-reservation-card')].every(row=>row.textContent.includes('Aguardando aprovação')));
   assert.equal(await page.getByRole('group',{name:'Filtrar fila de reservas'}).getByRole('button',{name:'Aguardando aprovação',exact:true}).getAttribute('aria-pressed'),'true');
   await shot('gestao-pendentes-'+(width<760?'celular':'desktop'),'Gestão · fila de solicitações · '+(width<760?'celular':'computador'),width<760?'.parking-v4-queue':undefined);
   const approved=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/pilot/estacionamento/reservas' && new URL(r.url()).searchParams.get('status')==='CONFIRMADA');
   await page.getByRole('group',{name:'Filtrar fila de reservas'}).getByRole('button',{name:'Aprovadas',exact:true}).click();
   await approved;
-  await page.waitForFunction(()=>[...document.querySelectorAll('.parking-v2-data-table tbody tr')].length>0 && [...document.querySelectorAll('.parking-v2-data-table tbody tr')].every(row=>row.textContent.includes('Aprovada')));
+  await page.waitForFunction(()=>[...document.querySelectorAll('.parking-reservation-card')].length>0 && [...document.querySelectorAll('.parking-reservation-card')].every(row=>row.textContent.includes('Aprovada')));
   await shot('gestao-aprovadas-'+(width<760?'celular':'desktop'),'Gestão · reservas aprovadas · '+(width<760?'celular':'computador'),width<760?'.parking-v4-queue':undefined);
  }
  checks.push('Atalho de pendências limpa buscas anteriores; filas de pendentes e aprovadas consultam o servidor corretamente');
