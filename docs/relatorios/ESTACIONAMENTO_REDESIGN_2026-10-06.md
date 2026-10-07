@@ -173,3 +173,10 @@ Evidências: [galeria com 34 capturas](../../outputs/parking-review-v2/avaliacao
 Limites mantidos: esta é uma avaliação de interface e fluxos em navegador; câmera, APK físico, leitor de tela e entrevistas com usuários reais não foram realizados. Regras de aprovação, acesso e cancelamento mantidas.
 
 **Aguardando avaliação e confirmação do usuário. Não houve deploy; versão pública permanece Sites 358.**
+
+
+## Publicação das revisões aprovadas — Sites 359
+
+O usuário confirmou a publicação após avaliar as telas da segunda revisão. Publicado Sites 359 em 06/10/2026 às 21h25 (Brasília), confirmado como succeeded pelo serviço. Fonte 34c878a7de39fa701b1e58d2d53c213b25063e2f; deployment appgdep_6ac59175acc08191948844b552e9fefc; URL https://adote-gestao.da0602766.chatgpt.site. Inclui as duas revisões de usabilidade aprovadas: orientação do membro, resumo de envio, próximo passo por reserva, navegação móvel, filtros e filas de gestão. Validação: 618/618 testes, TypeScript/build aprovados, lint 0 erros/1 aviso preexistente, matriz visual e nove interações adicionais aprovadas. Sem nova migração. Câmera/APK físicos permanecem pendentes.
+
+A abertura pelo helper oficial preservou a fonte aprovada 201a6d6, sem novas mudanças de aplicação ou integração. O único complemento anterior ao empacotamento foi o registro da autorização. Fonte enviada e pacote validados pelo helper oficial; versão salva e deploy confirmados pelo Sites. O envio exigiu renovação da credencial temporária, sem alteração de código. Registro documental posterior ao deploy. Os estados de espera citados nas seções históricas anteriores estão encerrados por esta confirmação.

@@ -1,12 +1,16 @@
 # ESTADO DO PROJETO — REFORMA OFICIAL DO VÍNKULO
 
-## Estacionamento — segunda revisão local aguardando aprovação em 06/10/2026
+## Estacionamento — revisões publicadas em 06/10/2026
 
-Implementada a segunda avaliação de membro/gestor: próximo passo por reserva, guia breve, resumo antes de enviar, reservas pessoais de todas as atividades e filas de gestão por etapa. Galeria atual de 34 capturas em `outputs/parking-review-v2/avaliacao.html`; a galeria anterior foi preservada. Validação: 618 testes, TypeScript/build aprovados, lint sem erros (um aviso preexistente), matriz visual e nove interações adicionais aprovadas. Tudo permanece local; publicação depende de confirmação posterior do usuário.
+Publicado Sites 359 em 06/10/2026 às 21h25 (Brasília), confirmado como succeeded pelo serviço. Fonte 34c878a7de39fa701b1e58d2d53c213b25063e2f; deployment appgdep_6ac59175acc08191948844b552e9fefc; URL https://adote-gestao.da0602766.chatgpt.site. Inclui as duas revisões de usabilidade aprovadas: orientação do membro, resumo de envio, próximo passo por reserva, navegação móvel, filtros e filas de gestão. Validação: 618/618 testes, TypeScript/build aprovados, lint 0 erros/1 aviso preexistente, matriz visual e nove interações adicionais aprovadas. Sem nova migração. Câmera/APK físicos permanecem pendentes.
+
+## Estacionamento — validação da segunda revisão
+
+Implementada a segunda avaliação de membro/gestor: próximo passo por reserva, guia breve, resumo antes de enviar, reservas pessoais de todas as atividades e filas de gestão por etapa. Galeria atual de 34 capturas em `outputs/parking-review-v2/avaliacao.html`; a galeria anterior foi preservada. Validação: 618 testes, TypeScript/build aprovados, lint sem erros (um aviso preexistente), matriz visual e nove interações adicionais aprovadas. O usuário confirmou a publicação posteriormente; entrega concluída no Sites 359.
 
 ## Estacionamento — primeira revisão local em 06/10/2026
 
-Após a publicação 358, o usuário solicitou revisão como membro/gestor, melhorias de entendimento e layout, capturas e nova confirmação antes de publicar. Revisão implementada localmente: etapas da reserva, distinção entre solicitação e aprovação, navegação móvel, filtros, busca de saídas e orientações das oito áreas da gestão. Galeria de 26 telas em `outputs/parking-review/avaliacao.html`; dados fictícios. Suíte completa 618/618, TypeScript/build aprovados e lint sem erros (um aviso preexistente). Nenhuma nova publicação nesta revisão; a autorização anterior não dispensa a confirmação solicitada agora. Detalhes no [relatório](../relatorios/ESTACIONAMENTO_REDESIGN_2026-10-06.md).
+Após a publicação 358, o usuário solicitou revisão como membro/gestor, melhorias de entendimento e layout, capturas e nova confirmação antes de publicar. Revisão implementada localmente: etapas da reserva, distinção entre solicitação e aprovação, navegação móvel, filtros, busca de saídas e orientações das oito áreas da gestão. Galeria de 26 telas em `outputs/parking-review/avaliacao.html`; dados fictícios. Suíte completa 618/618, TypeScript/build aprovados e lint sem erros (um aviso preexistente). A confirmação posterior foi recebida; esta revisão foi publicada junto à segunda no Sites 359. Detalhes no [relatório](../relatorios/ESTACIONAMENTO_REDESIGN_2026-10-06.md).
 
 ## Estacionamento — publicado em 06/10/2026
 
