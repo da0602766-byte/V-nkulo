@@ -25,4 +25,4 @@ A validação usa navegador desktop com larguras móveis. APK/aparelho físico, 
 
 ## Publicação
 
-Preparação da versão sobre Sites 359. Resultado do serviço será registrado após o envio.
+Publicado no Sites 360 em 07/10/2026 às 15h13 (Brasília), confirmado como succeeded. Fonte 5a3e0649079921b38b81a311507df065319e7a6f; deployment appgdep_6ac68bb486ac8191a7835f407e39df75; URL https://adote-gestao.da0602766.chatgpt.site. Sem migração ou alteração de API. Registro documental posterior ao deploy.

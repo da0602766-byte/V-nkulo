@@ -1,5 +1,9 @@
 # ESTADO DO PROJETO — REFORMA OFICIAL DO VÍNKULO
 
+## Reservas — leitura de gestão publicada em 07/10/2026
+
+Publicado no Sites 360 em 07/10/2026 às 15h13 (Brasília), confirmado como succeeded. Fonte 5a3e0649079921b38b81a311507df065319e7a6f; deployment appgdep_6ac68bb486ac8191a7835f407e39df75; URL https://adote-gestao.da0602766.chatgpt.site. Sem migração ou alteração de API. Registro documental posterior ao deploy. Cartões responsivos com vaga/status/placa, período separado da movimentação, detalhes recolhíveis e filtros removíveis. Validação: 618 testes, tipos/build aprovados, lint sem erros; matriz visual, fluxos e 17 verificações dos cartões aprovados. Galeria local em outputs/reservas-redesign/avaliacao.html; relatório em docs/relatorios/RESERVAS_LAYOUT_2026-10-07.md.
+
 ## Estacionamento — revisões publicadas em 06/10/2026
 
 Publicado Sites 359 em 06/10/2026 às 21h25 (Brasília), confirmado como succeeded pelo serviço. Fonte 34c878a7de39fa701b1e58d2d53c213b25063e2f; deployment appgdep_6ac59175acc08191948844b552e9fefc; URL https://adote-gestao.da0602766.chatgpt.site. Inclui as duas revisões de usabilidade aprovadas: orientação do membro, resumo de envio, próximo passo por reserva, navegação móvel, filtros e filas de gestão. Validação: 618/618 testes, TypeScript/build aprovados, lint 0 erros/1 aviso preexistente, matriz visual e nove interações adicionais aprovadas. Sem nova migração. Câmera/APK físicos permanecem pendentes.
