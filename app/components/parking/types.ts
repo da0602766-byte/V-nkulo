@@ -117,6 +117,7 @@ export type ParkingData = {
   };
   stats: { total: number; ocupadas: number; livres: number; especiais: number; reservadas?: number; indisponiveis?: number };
   vagas: Space[];
+  setores?: { id: number; nome: string; cor: string; ordem: number }[];
   movimentacoes: Movement[];
   ocorrencias: Occurrence[];
   availableUsers: AvailableUser[];

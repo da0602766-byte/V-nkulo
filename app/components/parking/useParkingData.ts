@@ -103,19 +103,16 @@ export function useParkingData(memberMode: boolean) {
   },[load]);
 
   const sectors: ParkingSector[] = useMemo(() => {
-    const grouped = new Map<string, ParkingSector["spaces"]>();
-    for (const space of data?.vagas || []) {
-      const key = `${space.setor_id}:${space.setor_nome}`;
-      grouped.set(key, [...(grouped.get(key) || []), space]);
+    const grouped = new Map<number, ParkingSector>();
+    for (const sector of data?.setores || []) {
+      grouped.set(sector.id, { id: `${sector.id}:${sector.nome}`, name: sector.nome, color: sector.cor, order: Number(sector.ordem), spaces: [] });
     }
-    return [...grouped.entries()]
-      .map(([key, spaces]) => ({
-        id: key,
-        name: spaces[0]?.setor_nome || "Setor",
-        color: spaces[0]?.setor_cor || "#3b82f6",
-        order: Number(spaces[0]?.ordem || 0),
-        spaces,
-      }))
+    for (const space of data?.vagas || []) {
+      const sector: ParkingSector = grouped.get(space.setor_id) || { id: `${space.setor_id}:${space.setor_nome}`, name: space.setor_nome, color: space.setor_cor || "#3b82f6", order: Number(space.ordem || 0), spaces: [] };
+      sector.spaces.push(space);
+      grouped.set(space.setor_id, sector);
+    }
+    return [...grouped.values()]
       .sort((a, b) => a.order - b.order);
   }, [data]);
 

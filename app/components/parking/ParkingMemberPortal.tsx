@@ -2,6 +2,8 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import ParkingSpaceMap from "./ParkingSpaceMap";
+import PublicIcon from "../PublicIcon";
+import { ParkingEmpty, ParkingHeading, ParkingReservationIdentity } from "./ParkingUi";
 import { ParkingReservationQr } from "../ParkingReservationQr";
 import { formatTime, parkingLabel, getEventParkingWindow, isSpaceAvailable, toLocalDateTimeInput } from "./format";
 import type { ParkingController } from "./useParkingData";
@@ -158,9 +160,9 @@ export default function ParkingMemberPortal({
   }
 
   return (
-    <section className="gestao-member parking-redesign">
-      <header className="parking-v2-page-heading"><p>{communityName}</p><h1>Estacionamento</h1><p>Escolha a atividade, selecione a vaga e envie sua solicitação.</p></header>
-      <nav className="parking-v3-shortcuts" aria-label="Atalhos do estacionamento"><a href="#parking-new-reservation">Reservar vaga</a><a href="#parking-my-reservations">Minhas reservas</a><a href="#parking-my-garage">Meus veículos</a></nav>
+    <section className="gestao-member parking-redesign parking-member">
+      <header className="parking-v2-page-heading parking-page-hero"><span className="parking-section-icon"><PublicIcon name="pin" size={28}/></span><div><p className="parking-record-eyebrow">{communityName} · ÁREA DO MEMBRO</p><h1>Estacionamento</h1><p>Organize sua chegada: solicite uma vaga e acompanhe a aprovação.</p></div></header>
+      <nav className="parking-v3-shortcuts" aria-label="Atalhos do estacionamento"><a href="#parking-new-reservation"><PublicIcon name="pin" size={19}/>Reservar vaga</a><a href="#parking-my-reservations"><PublicIcon name="calendar" size={19}/>Minhas reservas</a><a href="#parking-my-garage"><PublicIcon name="layers" size={19}/>Meus veículos</a></nav>
       <details className="parking-v4-guide"><summary>Como funciona a reserva?</summary><ol><li><strong>Solicite uma vaga</strong><span>Escolha a atividade, a vaga e informe o veículo.</span></li><li><strong>Acompanhe a aprovação</strong><span>A solicitação precisa ser aprovada pela gestão.</span></li><li><strong>Apresente o comprovante</strong><span>Após a aprovação, abra Minhas reservas e mostre o QR na entrada.</span></li></ol><p>Selecionar uma vaga no mapa não garante a reserva. A disponibilidade é conferida no envio.</p></details>
       <ol className="parking-v3-steps" aria-label="Etapas da reserva"><li className={selectedEventId ? "is-done" : "is-current"}>1. Atividade</li><li className={selectedSpace ? "is-done" : selectedEventId ? "is-current" : ""}>2. Vaga</li><li className={selectedSpace ? "is-current" : ""}>3. Solicitação</li></ol>
       <div className="parking-v2-context-bar" id="parking-new-reservation">
@@ -175,7 +177,7 @@ export default function ParkingMemberPortal({
       </div>
       {(feedback || error) && <p className={error ? "gestao-feedback is-error" : "gestao-feedback"} role="status">{error || feedback}</p>}
       <div className="parking-v2-sync"><span>{parking.stale ? "Disponibilidade desatualizada" : parking.lastSync ? 'Atualizado às '+new Date(parking.lastSync).toLocaleTimeString('pt-BR') : 'Carregando…'}</span><button type="button" onClick={() => void load(true)}>Atualizar</button></div>
-      {selectedEventId && <><div className="parking-v2-map-heading"><div><h2>Onde você quer parar?</h2><p>Toque em uma vaga disponível para selecionar.</p></div>
+      {selectedEventId && <><div className="parking-v2-map-heading"><ParkingHeading icon="pin" title="Onde você quer parar?">Toque em uma vaga disponível para selecionar.</ParkingHeading>
         <label>Setor<select value={selectedSector?.id || ''} onChange={event => {setSelectedSectorId(event.target.value);setSelectedSpaceId(null);}}>{sectors.map(sector => <option key={sector.id} value={sector.id}>{sector.name}</option>)}</select></label>
       </div>
       <p className="parking-v2-summary">{selectedSector?.spaces.filter(isSpaceAvailable).length || 0} disponíveis no setor para o período selecionado</p></>}
@@ -194,7 +196,7 @@ export default function ParkingMemberPortal({
         </section>
       )}
 
-      {!selectedEventId ? <div className="parking-v3-empty"><strong>Comece escolhendo uma atividade</strong><p>As vagas e os horários disponíveis aparecerão depois da seleção. Você também pode consultar suas reservas abaixo.</p></div> : <ParkingSpaceMap key={selectedSector?.id} spaces={selectedSector?.spaces || []} selectedId={selectedSpaceId} busy={working || parking.stale} onSelect={space => {
+      {!selectedEventId ? <ParkingEmpty icon="calendar" title="Comece escolhendo uma atividade">Depois, escolha uma vaga disponível e informe seu veículo. Suas reservas já feitas continuam disponíveis abaixo.</ParkingEmpty> : <ParkingSpaceMap key={selectedSector?.id} spaces={selectedSector?.spaces || []} selectedId={selectedSpaceId} busy={working || parking.stale} onSelect={space => {
         if (space.minha_reserva) { document.getElementById('parking-my-reservations')?.scrollIntoView({behavior:'smooth'}); return; }
         if(selectedSector) pickSpace(selectedSector.id,space.id);
       }} />}
@@ -283,25 +285,17 @@ export default function ParkingMemberPortal({
       )}
 
       <section className="gestao-card" id="parking-my-reservations">
-        <header>
-          <p className="gestao-kicker">MINHAS RESERVAS</p>
-          <h2>Minhas reservas e comprovantes</h2><p>Suas reservas de todas as atividades. Veja o próximo passo de cada uma; você pode cancelar antes de entrar.</p>
-        </header>
+        <ParkingHeading icon="calendar" eyebrow="MINHAS RESERVAS" title="Minhas reservas e comprovantes">Suas reservas de todas as atividades. Veja o próximo passo de cada uma; você pode cancelar antes de entrar.</ParkingHeading>
         <div className="gestao-reservation-list">
           {myOpenReservations.length ? myOpenReservations.map((reservation) => (
             <article key={reservation.id} className={`gestao-reservation-item status-${reservation.status.toLowerCase()}`}>
-              <div>
-                <strong>{reservation.vaga_codigo} · {reservation.setor_nome}</strong>
-                <small>{reservation.evento_titulo || "Atividade vinculada"}</small>
-                <small>{reservation.placa_veiculo} · {reservation.modelo_veiculo} · {reservation.cor_veiculo}</small>
-                <small>{formatTime(reservation.inicio_em)} até {formatTime(reservation.fim_em)}</small><span className={`gestao-badge status-${reservation.status.toLowerCase()}`}>{reservation.saida_em ? "Encerrada" : parkingLabel(reservation.status)}</span>
-              </div>
+              <ParkingReservationIdentity reservation={reservation} />
               <div className="parking-v4-reservation-next"><span className="parking-v4-eyebrow">Próximo passo</span><strong>{reservation.status === "PENDENTE" ? "Aguarde a aprovação" : reservation.status === "CONFIRMADA" ? "Apresente o comprovante na entrada" : "Avise a equipe quando sair"}</strong><p>{reservation.status === "PENDENTE" ? "A gestão ainda precisa aprovar sua solicitação. Acompanhe a atualização por aqui." : reservation.status === "CONFIRMADA" ? "Sua reserva foi aprovada. A equipe registra sua entrada ao validar o comprovante." : "Entrada já liberada. Seu veículo está no local; procure a equipe para registrar a saída."}</p>
                 {reservation.status === "CONFIRMADA" && reservation.codigo && <details className="gestao-qr-ticket"><summary>Mostrar comprovante</summary><ParkingReservationQr code={reservation.codigo} label={`${reservation.vaga_codigo} · ${reservation.setor_nome}`} expiresAt={reservation.fim_em} /></details>}
               </div>
               {["PENDENTE", "CONFIRMADA"].includes(reservation.status) && <button type="button" className="parking-v4-cancel" disabled={working} onClick={() => {if(window.confirm(`Cancelar sua reserva da vaga ${reservation.vaga_codigo}?`)) void parking.reservationAction({id:reservation.id,acao:"CANCELAR_PROPRIA"});}}>Cancelar minha reserva</button>}
             </article>
-          )) : <p className="gestao-empty">Nenhuma reserva ativa.</p>}
+          )) : <ParkingEmpty icon="calendar" title="Nenhuma reserva ativa">Escolha uma atividade acima para solicitar sua próxima vaga.</ParkingEmpty>}
         </div>
         {myHistory.length > 0 && (
           <details className="gestao-history-collapse">
@@ -309,11 +303,7 @@ export default function ParkingMemberPortal({
             <div className="gestao-reservation-list">
               {myHistory.map((reservation) => (
                 <article key={reservation.id} className={`gestao-reservation-item status-${reservation.status.toLowerCase()}`}>
-                  <div>
-                    <strong>{reservation.vaga_codigo} · {reservation.setor_nome}</strong>
-                    <small>{reservation.evento_titulo || "Atividade vinculada"} · {reservation.placa_veiculo}</small>
-                    <small>{formatTime(reservation.inicio_em)} até {formatTime(reservation.fim_em)}</small><span className={`gestao-badge status-${reservation.status.toLowerCase()}`}>{reservation.saida_em ? "Encerrada" : parkingLabel(reservation.status)}</span>
-                  </div>
+                  <ParkingReservationIdentity reservation={reservation} />
                   <button type="button" disabled={working} onClick={() => {if(window.confirm("Excluir este registro do histórico?")) void deleteReservationHistory(reservation.id);}}>Excluir</button>
                 </article>
               ))}
@@ -323,25 +313,20 @@ export default function ParkingMemberPortal({
       </section>
 
       <div className="parking-v2-pagination"><span>{parking.reservationTotal} reserva(s) · página {parking.reservationFilters.page}</span><div><button type="button" disabled={parking.reservationFilters.page<=1 || loading} onClick={()=>parking.setReservationFilters(f=>({...f,page:f.page-1}))}>Anterior</button><button type="button" disabled={parking.reservationFilters.page*40>=parking.reservationTotal || loading} onClick={()=>parking.setReservationFilters(f=>({...f,page:f.page+1}))}>Próxima</button></div></div>
-      <section className="gestao-card">
-        <header>
-          <p className="gestao-kicker" id="parking-my-garage">MEUS VEÍCULOS</p>
-          <h2>Garagem salva neste aparelho</h2>
-        </header>
-        <details><summary>Adicionar veículo neste aparelho</summary><form className="gestao-form" onSubmit={event=>{event.preventDefault();const form=event.currentTarget;const values=new FormData(form);garage.addVehicle({apelido:String(values.get('modelo')),placa:String(values.get('placa')).toUpperCase().replace(/[^A-Z0-9]/g,''),tipo:String(values.get('tipo')),modelo:String(values.get('modelo')),cor:String(values.get('cor'))});form.reset();}}><fieldset><label>Placa<input name="placa" required minLength={6} maxLength={10}/></label><label>Tipo<select name="tipo"><option value="CARRO">Carro</option><option value="MOTO">Moto</option><option value="VAN">Van</option><option value="OUTRO">Outro</option></select></label><label>Marca e modelo<input name="modelo" required minLength={2}/></label><label>Cor<input name="cor" required/></label></fieldset><button>Salvar neste aparelho</button></form></details>
+      <section className="gestao-card parking-garage" id="parking-my-garage"><ParkingHeading icon="layers" eyebrow="MEUS VEÍCULOS" title="Garagem salva neste aparelho">Guarde seus veículos para preencher a próxima solicitação mais rápido. Os dados ficam somente neste navegador.</ParkingHeading>
+        <details className="parking-garage-add"><summary>Adicionar veículo neste aparelho</summary><form className="gestao-form" onSubmit={event=>{event.preventDefault();const form=event.currentTarget;const values=new FormData(form);garage.addVehicle({apelido:String(values.get('modelo')),placa:String(values.get('placa')).toUpperCase().replace(/[^A-Z0-9]/g,''),tipo:String(values.get('tipo')),modelo:String(values.get('modelo')),cor:String(values.get('cor'))});form.reset();}}><fieldset><label>Placa<input name="placa" required minLength={6} maxLength={10}/></label><label>Tipo<select name="tipo"><option value="CARRO">Carro</option><option value="MOTO">Moto</option><option value="VAN">Van</option><option value="OUTRO">Outro</option></select></label><label>Marca e modelo<input name="modelo" required minLength={2}/></label><label>Cor<input name="cor" required/></label></fieldset><button className="gestao-primary">Salvar neste aparelho</button></form></details>
         {garage.vehicles.length ? (
           <ul className="gestao-garage-list">
             {garage.vehicles.map((item) => (
               <li key={item.id}>
                 <div>
-                  <strong>{item.apelido || item.placa}</strong>
-                  <small>{item.placa} · {item.modelo} · {item.cor}</small>
+                  <strong className="parking-plate">{item.placa}</strong><p>{item.modelo || item.apelido}</p><small>{parkingLabel(item.tipo)} · {item.cor}</small>
                 </div>
                 <button type="button" onClick={() => garage.removeVehicle(item.id)}>Remover</button>
               </li>
             ))}
           </ul>
-        ) : <p className="gestao-empty">Salve um veículo aqui ou marque a opção de salvar ao solicitar uma vaga. Ele ficará disponível neste navegador.</p>}
+        ) : <ParkingEmpty icon="layers" title="Sua garagem está vazia">Adicione um veículo ou marque a opção de salvar ao solicitar uma vaga. Ele ficará disponível neste navegador.</ParkingEmpty>}
       </section>
     </section>
   );

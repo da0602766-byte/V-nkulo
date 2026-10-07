@@ -19,7 +19,7 @@ const env={DB:d1,AUTH_SECRET:'local-preview-synthetic-only',ASSETS:{fetch:asset}
 const ctx={waitUntil(p){p.catch(()=>{});},passThroughOnException(){}};
 db.exec("UPDATE comunidades SET nome='Comunidade QA · teste local' WHERE id=1; DELETE FROM estacionamento_reservas; DELETE FROM estacionamento_movimentacoes; DELETE FROM estacionamento_vagas; DELETE FROM estacionamento_setores; DELETE FROM eventos_comunidade;");
 const member=await createPilotUser(db,{nome:'Membro de teste',email:'membro.qa@example.invalid',senha:'TesteLocal123!',memberships:[{comunidadeId:1,papel:'MEMBRO'}]});
-await createPilotUser(db,{nome:'Gestor de teste',email:'gestor.qa@example.invalid',senha:'TesteLocal123!',memberships:[{comunidadeId:1,papel:'ADMIN_COMUNIDADE'}]});
+const manager=await createPilotUser(db,{nome:'Gestor de teste',email:'gestor.qa@example.invalid',senha:'TesteLocal123!',memberships:[{comunidadeId:1,papel:'ADMIN_COMUNIDADE'}]});
 const start=new Date(Date.now()+45*60_000).toISOString(),end=new Date(Date.now()+165*60_000).toISOString();
 const event=Number(db.prepare("INSERT INTO eventos_comunidade(comunidade_id,titulo,inicia_em,termina_em,status,publico) VALUES(1,'Encontro da comunidade · QA',?,?,'PUBLICADO',1)").run(start,end).lastInsertRowid);
 for(const [sectorName,rows,columns] of [['Setor A',5,6],['Setor B',3,5]]){
@@ -47,12 +47,29 @@ if (process.env.PARKING_QA_CARDS === '1') {
   }
  });
 }
+// Full-workspace QA uses only the local in-memory database.
+if (process.env.PARKING_QA_FULL === '1') {
+ const operator=await createPilotUser(db,{nome:'Operador de teste',email:'operador.qa@example.invalid',senha:'TesteLocal123!',memberships:[{comunidadeId:1,papel:'MEMBRO'}]});
+ const helper=await createPilotUser(db,{nome:'Auxiliar de teste',email:'auxiliar.qa@example.invalid',senha:'TesteLocal123!',memberships:[{comunidadeId:1,papel:'MEMBRO'}]});
+ const ministry=Number(db.prepare("INSERT INTO ministerios_comunidade(comunidade_id,nome,categoria,responsavel_usuario_id) VALUES(1,'Equipe do estacionamento QA','ESTACIONAMENTO',?)").run(manager).lastInsertRowid);
+ const shiftStart=new Date(Date.now()-30*60_000).toISOString(),shiftEnd=new Date(Date.now()+90*60_000).toISOString();
+ const shift=Number(db.prepare("INSERT INTO escalas_ministerio(comunidade_id,ministerio_id,titulo,inicia_em,termina_em,status) VALUES(1,?,'Plantão da noite QA',?,?,'PUBLICADA')").run(ministry,shiftStart,shiftEnd).lastInsertRowid);
+ for(const user of [operator,manager,helper]) {
+  const volunteer=Number(db.prepare("INSERT INTO ministerio_voluntarios(comunidade_id,ministerio_id,usuario_id,funcao,papel,ativo) VALUES(1,?,?,'Portaria',?,1)").run(ministry,user,user===manager?'LIDER':'VOLUNTARIO').lastInsertRowid);
+  if(user!==helper) db.prepare("INSERT INTO escala_designacoes(comunidade_id,escala_id,voluntario_id,usuario_id,funcao,status,ativo) VALUES(1,?,?,?,'Portaria','CONFIRMADA',1)").run(shift,volunteer,user);
+ }
+ for(const [n,status] of ['AGUARDANDO_LIDER','AGUARDANDO_LIDER','ENVIADO_PASTOR'].entries()) {
+  const past=Number(db.prepare("INSERT INTO escalas_ministerio(comunidade_id,ministerio_id,titulo,inicia_em,termina_em,status) VALUES(1,?,?,? ,?,'PUBLICADA')").run(ministry,'Plantão concluído QA '+(n+1),new Date(Date.now()-(n+2)*86400_000).toISOString(),new Date(Date.now()-(n+2)*86400_000+7200_000).toISOString()).lastInsertRowid);
+  db.prepare("INSERT INTO estacionamento_relatorios_escala(comunidade_id,escala_id,usuario_id,resumo,entradas,saidas,ocorrencias,status) VALUES(1,?,?,'Fluxo organizado. Equipe orientou as chegadas e conferiu as saídas.',24,24,1,?)").run(past,operator,status);
+ }
+ for(const [severity,description] of [['BAIXA','Orientação de chegada no setor A concluída.'],['MEDIA','Veículo estacionado fora da marcação; responsável orientado.'],['ALTA','Acesso ao setor B bloqueado temporariamente. Equipe no local.']]) db.prepare("INSERT INTO estacionamento_ocorrencias(comunidade_id,tipo,descricao,gravidade,status,criado_por) VALUES(1,'ORIENTACAO',?,?,'ABERTA',?)").run(description,severity,manager);
+}
 http.createServer(async(req,res)=>{
  try {
   const url=new URL(req.url,base);
   let response;
-  if(url.pathname==='/qa-login/member'||url.pathname==='/qa-login/manager'){
-    const email=url.pathname.endsWith('member')?'membro.qa@example.invalid':'gestor.qa@example.invalid';
+  if(['/qa-login/member','/qa-login/manager','/qa-login/operator'].includes(url.pathname)){
+    const email=url.pathname.endsWith('member')?'membro.qa@example.invalid':url.pathname.endsWith('operator')?'operador.qa@example.invalid':'gestor.qa@example.invalid';
     const login=await cpfLoginRequest(env,new Request(base+'/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email,senha:'TesteLocal123!'})}));
     const result=await worker.fetch(login,env,ctx);
     response=new Response(null,{status:302,headers:{location:'/painel?view=estacionamento'}});

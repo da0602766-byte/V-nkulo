@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { hasCustomParkingLayout, isSpaceAvailable, parkingLabel } from "./format";
+import PublicIcon from "../PublicIcon";
 import type { Space } from "./types";
 
 export function spaceState(space: Space) {
@@ -27,8 +28,8 @@ export default function ParkingSpaceMap({ spaces, selectedId, onSelect, busy = f
   return <section className="parking-v2-map" aria-label="Mapa de vagas">
     <div className="parking-v2-map-tools">
       <div role="group" aria-label="Visualização das vagas">
-        <button type="button" aria-pressed={!list} disabled={!positioned} onClick={() => setMode("map")}>Mapa</button>
-        <button type="button" aria-pressed={list} onClick={() => setMode("list")}>Lista de vagas</button>
+        <button type="button" aria-pressed={!list} disabled={!positioned} onClick={() => setMode("map")}><PublicIcon name="pin" size={17}/>Mapa</button>
+        <button type="button" aria-pressed={list} onClick={() => setMode("list")}><PublicIcon name="layers" size={17}/>Lista de vagas</button>
       </div>
       {!list && <div role="group" aria-label="Zoom do mapa">
         <button type="button" aria-label="Reduzir mapa" disabled={zoom <= 1} onClick={() => setZoom(z => Math.max(1,z-.25))}>−</button>

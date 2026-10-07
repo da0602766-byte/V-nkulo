@@ -18,7 +18,7 @@ try {
  await page.locator('.parking-redesign').waitFor();
  await page.getByRole('button',{name:'Manter no celular',exact:true}).click({timeout:1500}).catch(()=>{});
  for(let i=0;i<2;i++)await page.getByRole('button',{name:'Pular introdução',exact:true}).click({timeout:1500}).catch(()=>{});
- await page.locator('.parking-v3-mobile-tabs select').selectOption('reservas');
+ await page.getByRole('navigation',{name:'Seções da gestão'}).getByRole('button',{name:'Reservas',exact:true}).click();
  await page.getByRole('button',{name:'Buscar e filtrar',exact:true}).click();
  await page.locator('.parking-v2-filters input').fill('QAC');
  await page.waitForFunction(()=>document.querySelectorAll('.parking-reservation-card').length===6);

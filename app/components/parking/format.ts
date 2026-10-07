@@ -89,6 +89,7 @@ export function parkingLabel(value: string) {
     PENDENTE: "Aguardando aprovação", CONFIRMADA: "Aprovada", CHECKIN: "No local",
     CANCELADA: "Cancelada", RECUSADA: "Recusada", ENCERRADA: "Encerrada",
     ADMIN_COMUNIDADE: "Administrador", SUPERADMIN: "Proprietário", LIDER: "Líder",
+    VOLUNTARIO: "Voluntário", EQUIPE: "Equipe", EM_ANDAMENTO: "Em andamento", ABERTA: "Aberta", RESOLVIDA: "Resolvida",
     PASTOR: "Pastor", MEMBRO: "Membro", SEGURANCA: "Segurança", DANO: "Dano",
     BLOQUEIO: "Bloqueio", ORIENTACAO: "Orientação", BAIXA: "Baixa", MEDIA: "Média",
     ALTA: "Alta", AGUARDANDO_MEMBRO: "Aguardando envio", AGUARDANDO_LIDER: "Em revisão pela liderança",

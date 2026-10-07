@@ -31,6 +31,23 @@ async function setup(){
   return {db,env,member,second,admin,other,event,sector,space,space2,base,call};
 }
 
+test('Configurador recebe setores vazios ativos da própria comunidade e consegue criar as primeiras vagas',async t=>{
+  const f=await setup();t.after(()=>f.db.close());
+  const created=await f.call(f.admin,'/mapa','POST',{action:'CRIAR_SETOR',nome:'Setor vazio QA',cor:'#6542aa',ordem:3});
+  assert.equal(created.status,201,JSON.stringify(created));
+  const inactive=Number(f.db.prepare("INSERT INTO estacionamento_setores(comunidade_id,nome,ativo) VALUES(1,'Setor inativo QA',0)").run().lastInsertRowid);
+  const outside=Number(f.db.prepare("INSERT INTO estacionamento_setores(comunidade_id,nome) VALUES(2,'Setor de outra comunidade')").run().lastInsertRowid);
+  const data=await f.call(f.admin);
+  assert.equal(data.status,200);
+  assert.ok(data.body.setores.some(s=>s.id===created.body.id && s.nome==='Setor vazio QA'));
+  assert.equal(data.body.vagas.some(v=>v.setor_id===created.body.id),false);
+  assert.equal(data.body.setores.some(s=>s.id===inactive||s.id===outside),false);
+  assert.equal((await f.call(f.member,'/disponibilidade')).body.setores,undefined);
+  const spaces=await f.call(f.admin,'/mapa','POST',{action:'CRIAR_VAGAS',setorId:created.body.id,prefixo:'NOV',quantidade:2,tipo:'COMUM'});
+  assert.equal(spaces.status,201,JSON.stringify(spaces));
+  assert.equal((await f.call(f.admin)).body.vagas.filter(v=>v.setor_id===created.body.id).length,2);
+});
+
 test('P0: reservas concorrentes, retry idempotente, evento obrigatório e abertura no servidor',async t=>{
   const f=await setup();t.after(()=>f.db.close());
   assert.equal((await f.call(f.member,'/reservas','POST',{...f.base,eventoId:''})).status,400);

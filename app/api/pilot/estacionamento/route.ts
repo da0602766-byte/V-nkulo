@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     );
   }
   const rules = readRules(config.regras);
-  const [movements, occurrences, users, ministryMembers, responsible, assignment] = await Promise.all([
+  const [movements, occurrences, users, ministryMembers, responsible, assignment, sectors] = await Promise.all([
     db
       .prepare(
         `SELECT m.id, m.vaga_id, m.placa, m.tipo_veiculo, m.responsavel, m.vinculo,
@@ -95,6 +95,11 @@ export async function GET(request: Request) {
           .first<Record<string, unknown>>()
       : Promise.resolve(null),
     getActiveParkingAssignment(access.user.id, access.context.comunidadeId),
+    access.context.permissions.includes("parking.configure")
+      ? db.prepare(`SELECT id, nome, cor, ordem FROM estacionamento_setores
+          WHERE comunidade_id = ? AND ativo = 1 ORDER BY ordem, nome`)
+          .bind(access.context.comunidadeId).all<{ id: number; nome: string; cor: string; ordem: number }>()
+      : Promise.resolve({ results: [] }),
   ]);
   const parkingContext = await readParkingContext(db, access.context.comunidadeId, access.user.id, new URL(request.url));
   if ("error" in parkingContext) return Response.json({ error: parkingContext.error }, { status: parkingContext.status });
@@ -102,6 +107,7 @@ export async function GET(request: Request) {
   return Response.json(
     {
       ...parkingContext,
+      setores: sectors.results,
       config: {
         ...config,
         ...rules,

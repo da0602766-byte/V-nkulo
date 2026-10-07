@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import PublicIcon from "./PublicIcon";
 import "./parking/parking.css";
 import ParkingManagementConsole from "./parking/ParkingManagementConsole";
 import ParkingMemberPortal from "./parking/ParkingMemberPortal";
@@ -30,8 +31,8 @@ export default function ParkingWorkspace({
   const effectiveMemberMode = memberMode || viewAsMember;
   return <div className="parking-experience">
     {!memberMode && <nav className="parking-experience-switch" aria-label="Visão do estacionamento">
-      <button type="button" aria-pressed={!viewAsMember} onClick={() => setViewAsMember(false)}>Gestão</button>
-      <button type="button" aria-pressed={viewAsMember} onClick={() => setViewAsMember(true)}>Visão do membro · Reservar vaga</button>
+      <button type="button" aria-pressed={!viewAsMember} onClick={() => setViewAsMember(false)}><PublicIcon name="layers" size={18}/>Gestão</button>
+      <button type="button" aria-pressed={viewAsMember} onClick={() => setViewAsMember(true)}><PublicIcon name="user" size={18}/>Visão do membro · Reservar vaga</button>
     </nav>}
     <ParkingExperience key={effectiveMemberMode ? "member" : "management"} communityName={communityName} memberMode={effectiveMemberMode} />
   </div>;
