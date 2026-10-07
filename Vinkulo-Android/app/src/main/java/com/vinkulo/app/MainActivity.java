@@ -438,7 +438,7 @@ public class MainActivity extends Activity {
                             case "push-bind": FirebaseDeviceState.bind(MainActivity.this, data.optString("token"), data.optString("bindingId")); break;
                             case "push-clear": FirebaseDeviceState.clearBinding(MainActivity.this); break;
                             case "notification":
-                                postNativeNotification("Vínkulo", "Você recebeu uma atualização. Abra o Vínkulo para consultar.",
+                                postNativeNotification(NotificationContent.text(data.optString("title"), 120), NotificationContent.text(data.optString("body"), 500),
                                         data.optString("tag"), data.optString("url"));
                                 break;
                             default: break;
@@ -451,7 +451,7 @@ public class MainActivity extends Activity {
                 + "clearPushBinding:function(){VinkuloNative.postMessage(JSON.stringify({action:'push-clear'}));},"
                 + "shareToWhatsApp:function(text){VinkuloNative.postMessage(JSON.stringify({action:'share',text:text}));},"
                 + "openGoogleAuth:function(url){VinkuloNative.postMessage(JSON.stringify({action:'google',url:url}));},"
-                + "showNotification:function(title,body,tag,url){VinkuloNative.postMessage(JSON.stringify({action:'notification',tag:tag,url:url}));}"
+                + "showNotification:function(title,body,tag,url){VinkuloNative.postMessage(JSON.stringify({action:'notification',title:title,body:body,tag:tag,url:url}));}"
                 + "});}";
         WebViewCompat.addDocumentStartJavaScript(webView, script, Collections.singleton(APP_URL));
     }
