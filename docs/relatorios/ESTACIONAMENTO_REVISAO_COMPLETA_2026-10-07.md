@@ -41,4 +41,4 @@ Galeria local: `outputs/estacionamento-completo/avaliacao.html`. Capturas usam d
 
 ## Publicação
 
-Candidato validado sobre a versão 360. Identificação da publicação registrada após a confirmação do serviço.
+Publicado no Sites 361 em 07/10/2026 às 19h33 (Brasília), confirmado como succeeded. Fonte: a17887163f4b69f96fdde3828b906ac97e6727d0. Deployment: appgdep_6ac6c88432848191aa9c107e308ae1bd. URL: https://adote-gestao.da0602766.chatgpt.site. A primeira tentativa retornou Unauthorized; a nova tentativa da mesma versão, após reconfirmar o acesso de proprietário, foi concluída. Registro documental posterior à publicação.
