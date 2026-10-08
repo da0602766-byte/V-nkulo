@@ -2,7 +2,9 @@
 
 import TransientFeedback from "./TransientFeedback";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import "./community-settings.css";
+import { matchesDirectorySearch } from "../lib/directory-search";
 import CommunityThemeEditor from "./CommunityThemeEditor";
 import MemberRegistrationLinkManager from "./MemberRegistrationLinkManager";
 
@@ -49,66 +51,63 @@ export default function CommunityAdminWorkspace({
   const [parkingActive, setParkingActive] = useState(false);
   const [parkingName, setParkingName] = useState("Estacionamento");
   const [parkingColor, setParkingColor] = useState("#d99a32");
-  const [loading, setLoading] = useState(true);
+  const [requestsLoading, setRequestsLoading] = useState(true);
+  const [parkingLoading, setParkingLoading] = useState(true);
+  const [requestsLoadError, setRequestsLoadError] = useState("");
+  const [parkingLoadError, setParkingLoadError] = useState("");
+  const [requestSearch, setRequestSearch] = useState("");
+  const [requestStatus, setRequestStatus] = useState("");
+  const [visitedSections, setVisitedSections] = useState<string[]>(["atalhos"]);
+  const mutationRef = useRef(false);
   const [working, setWorking] = useState<number | "config" | null>(null);
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
 
-  const load = useCallback(async () => {
-    if (!canManageRequests && !canConfigureParking) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError("");
+  const loadRequests = useCallback(async (signal?: AbortSignal) => {
+    if (!canManageRequests) { setRequestsLoading(false); return; }
+    setRequestsLoading(true); setRequestsLoadError("");
     try {
-      const [requestsResponse, parkingResponse] = await Promise.all([
-        canManageRequests
-          ? fetch("/api/pilot/solicitacoes-entrada", { cache: "no-store" })
-          : Promise.resolve(null),
-        canConfigureParking
-          ? fetch("/api/pilot/estacionamento/configuracao", {
-              cache: "no-store",
-            })
-          : Promise.resolve(null),
-      ]);
-      const requestsResult = requestsResponse
-        ? await requestsResponse.json()
-        : null;
-      const parkingResult = parkingResponse
-        ? await parkingResponse.json()
-        : null;
-      if (requestsResponse && !requestsResponse.ok) {
-        throw new Error(
-          requestsResult.error || "Não foi possível carregar solicitações.",
-        );
-      }
-      if (parkingResponse && !parkingResponse.ok) {
-        throw new Error(
-          parkingResult?.error || "Não foi possível carregar o estacionamento.",
-        );
-      }
-      if (requestsResult) {
-        setRequests(requestsResult.solicitacoes || []);
-      }
-      if (parkingResult) {
-        setParkingActive(Boolean(parkingResult.ativo));
-        setParkingName(String(parkingResult.nomeModulo || "Estacionamento"));
-        setParkingColor(String(parkingResult.corDestaque || "#d99a32"));
-      }
-    } catch (loadError) {
-      setError((loadError as Error).message);
+      const response = await fetch("/api/pilot/solicitacoes-entrada", { cache: "no-store", signal });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Não foi possível carregar as solicitações.");
+      if (!Array.isArray(result.solicitacoes)) throw new Error("Não foi possível ler as solicitações.");
+      if (!signal?.aborted) setRequests(result.solicitacoes);
+    } catch (cause) {
+      if (!signal?.aborted) setRequestsLoadError((cause as Error).message);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setRequestsLoading(false);
     }
-  }, [canConfigureParking, canManageRequests]);
+  }, [canManageRequests]);
+
+  const loadParking = useCallback(async (signal?: AbortSignal) => {
+    if (!canConfigureParking) { setParkingLoading(false); return; }
+    setParkingLoading(true); setParkingLoadError("");
+    try {
+      const response = await fetch("/api/pilot/estacionamento/configuracao", { cache: "no-store", signal });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Não foi possível carregar o módulo.");
+      if (typeof result.ativo !== "boolean" && result.ativo !== 0 && result.ativo !== 1) throw new Error("Não foi possível ler a configuração do módulo.");
+      if (!signal?.aborted) {
+        setParkingActive(Boolean(result.ativo));
+        setParkingName(String(result.nomeModulo || "Estacionamento"));
+        setParkingColor(String(result.corDestaque || "#d99a32"));
+      }
+    } catch (cause) {
+      if (!signal?.aborted) setParkingLoadError((cause as Error).message);
+    } finally {
+      if (!signal?.aborted) setParkingLoading(false);
+    }
+  }, [canConfigureParking]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => void load(), 0);
-    return () => window.clearTimeout(timer);
-  }, [load]);
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => { void loadRequests(controller.signal); void loadParking(controller.signal); }, 0);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [loadRequests, loadParking]);
 
   async function updateRequest(id: number, acao: "APROVAR" | "RECUSAR") {
+    if (mutationRef.current || requestsLoading || requestsLoadError) return;
+    mutationRef.current = true;
     setWorking(id);
     setFeedback("");
     setError("");
@@ -127,15 +126,18 @@ export default function CommunityAdminWorkspace({
           ? "Solicitação aprovada e vínculo de membro criado."
           : "Solicitação recusada.",
       );
-      await load();
+      await loadRequests();
     } catch (updateError) {
       setError((updateError as Error).message);
     } finally {
+      mutationRef.current = false;
       setWorking(null);
     }
   }
 
   async function updateParkingConfig(enabled: boolean) {
+    if (mutationRef.current || parkingLoading || parkingLoadError) return;
+    mutationRef.current = true;
     setWorking("config");
     setFeedback("");
     setError("");
@@ -163,6 +165,7 @@ export default function CommunityAdminWorkspace({
     } catch (updateError) {
       setError((updateError as Error).message);
     } finally {
+      mutationRef.current = false;
       setWorking(null);
     }
   }
@@ -182,13 +185,15 @@ export default function CommunityAdminWorkspace({
           id: "solicitacoes" as const,
           label: "Solicitações de entrada",
           visivel: canManageRequests,
-          contador: requests.filter((item) => item.status === "PENDENTE").length,
+          contador: requestsLoading || requestsLoadError ? undefined : requests.filter((item) => item.status === "PENDENTE").length,
         },
       ].filter((secao) => secao.visivel),
-    [accessSlot, canConfigureParking, canManageCommunity, canManageRegistrationLinks, canManageRequests, requests],
+    [accessSlot, canConfigureParking, canManageCommunity, canManageRegistrationLinks, canManageRequests, requests, requestsLoading, requestsLoadError],
   );
   const [secao, setSecao] = useState<string>("atalhos");
   const secaoAtiva = secoes.some((item) => item.id === secao) ? secao : "atalhos";
+
+  const visibleRequests = requests.filter((item) => (!requestStatus || item.status === requestStatus) && matchesDirectorySearch(requestSearch, item.nome, item.email));
 
   return (
     <div className="community-admin-extra">
@@ -198,8 +203,8 @@ export default function CommunityAdminWorkspace({
             key={item.id}
             type="button"
             className={secaoAtiva === item.id ? "active" : ""}
-            aria-current={secaoAtiva === item.id ? "page" : undefined}
-            onClick={() => setSecao(item.id)}
+            aria-pressed={secaoAtiva === item.id}
+            onClick={() => { setSecao(item.id); setVisitedSections((current) => current.includes(item.id) ? current : [...current, item.id]); }}
           >
             {item.label}
             {typeof item.contador === "number" && item.contador > 0 && (
@@ -239,7 +244,7 @@ export default function CommunityAdminWorkspace({
       </section>
       )}
 
-      {secaoAtiva === "aparencia" && canManageCommunity && <CommunityThemeEditor />}
+      {visitedSections.includes("aparencia") && canManageCommunity && <div className="community-settings-section" hidden={secaoAtiva !== "aparencia"}><CommunityThemeEditor active={secaoAtiva === "aparencia"} /></div>}
 
       {secaoAtiva === "privacidade" && canManageCommunity && (
         <>
@@ -258,15 +263,15 @@ export default function CommunityAdminWorkspace({
         </>
       )}
 
-      {secaoAtiva === "acessos" && (
-        <>
+      {visitedSections.includes("acessos") && (
+        <div className="community-settings-section" hidden={secaoAtiva !== "acessos"}>
           {accessSlot}
           {canManageRegistrationLinks && <MemberRegistrationLinkManager />}
-        </>
+        </div>
       )}
 
       {secaoAtiva === "modulos" && canConfigureParking && (
-        <section className="community-privacy-control parking-module-control">
+        <section className="community-privacy-control parking-module-control" aria-busy={parkingLoading}>
           <div>
             <p className="pilot-kicker">MÓDULO OFICIAL</p>
             <h2>{parkingName}</h2>
@@ -275,15 +280,16 @@ export default function CommunityAdminWorkspace({
               dados e a auditoria são preservados.
             </p>
           </div>
-          <label>
+          {parkingLoading ? <p role="status">Carregando configuração do módulo…</p> : parkingLoadError ? <div className="community-settings-error"><p role="alert">{parkingLoadError}</p><button type="button" onClick={() => void loadParking()}>Tentar novamente</button></div> : <label>
             <input
               type="checkbox"
               checked={parkingActive}
-              disabled={working === "config"}
+              disabled={working !== null}
               onChange={(event) => updateParkingConfig(event.target.checked)}
             />
-            <span>{parkingActive ? "Módulo ativo" : "Módulo desativado"}</span>
-          </label>
+            <span>{working === "config" ? "Salvando alteração…" : parkingActive ? "Módulo ativo" : "Módulo desativado"}</span>
+          </label>}
+          {!parkingLoading && !parkingLoadError && <small>A alteração é salva assim que você toca no controle.</small>}
         </section>
       )}
 
@@ -293,7 +299,7 @@ export default function CommunityAdminWorkspace({
         </TransientFeedback>
       )}
 
-      {secaoAtiva === "solicitacoes" && canManageRequests && <section className="join-requests-panel">
+      {secaoAtiva === "solicitacoes" && canManageRequests && <section className="join-requests-panel" aria-busy={requestsLoading}>
         <header>
           <div>
             <p className="pilot-kicker">SOLICITAÇÕES DE ENTRADA</p>
@@ -302,11 +308,18 @@ export default function CommunityAdminWorkspace({
               Pedidos analisados permanecem visíveis por 24 horas antes da limpeza automática.
             </p>
           </div>
-          <span>{loading ? "Carregando…" : `${requests.length} registros`}</span>
+          <span>{requestsLoading ? "Carregando…" : requestsLoadError ? "Consulta indisponível" : `${requests.length} ${requests.length === 1 ? "registro" : "registros"}`}</span>
         </header>
+        <div className="community-request-filters">
+          <label>Buscar pessoa ou e-mail<input type="search" value={requestSearch} onChange={(event) => setRequestSearch(event.target.value)} placeholder="Nome ou e-mail" /></label>
+          <label>Situação<select value={requestStatus} onChange={(event) => setRequestStatus(event.target.value)}><option value="">Todas</option><option value="PENDENTE">Aguardando análise</option><option value="APROVADA">Aprovadas</option><option value="RECUSADA">Recusadas</option></select></label>
+          {(requestSearch || requestStatus) && <button type="button" onClick={() => { setRequestSearch(""); setRequestStatus(""); }}>Limpar filtros</button>}
+        </div>
+        {requestsLoading ? <p role="status">Carregando solicitações…</p> : requestsLoadError ? <div className="community-settings-error"><p role="alert">{requestsLoadError}</p><button type="button" onClick={() => void loadRequests()}>Tentar novamente</button></div> : <>
+        <p className="community-request-count" role="status">{visibleRequests.length} de {requests.length} solicitações</p>
         <div className="join-request-list">
-          {requests.length ? (
-            requests.map((item) => (
+          {visibleRequests.length ? (
+            visibleRequests.map((item) => (
               <article key={item.id}>
                 <span>{item.nome.slice(0, 1)}</span>
                 <div>
@@ -316,19 +329,23 @@ export default function CommunityAdminWorkspace({
                 </div>
                 <div>
                   <span className={`request-status status-${item.status.toLowerCase()}`}>
-                    {item.status}
+                    {{ PENDENTE: "Aguardando análise", APROVADA: "Aprovada", RECUSADA: "Recusada" }[item.status]}
                   </span>
                   {item.status === "PENDENTE" && (
                     <>
                       <button
-                        disabled={working === item.id}
+                        type="button"
+                        aria-label={`Aprovar entrada de ${item.nome}`}
+                        disabled={working !== null}
                         onClick={() => updateRequest(item.id, "APROVAR")}
                       >
                         Aprovar
                       </button>
                       <button
                         className="request-reject"
-                        disabled={working === item.id}
+                        type="button"
+                        aria-label={`Recusar entrada de ${item.nome}`}
+                        disabled={working !== null}
                         onClick={() => updateRequest(item.id, "RECUSAR")}
                       >
                         Recusar
@@ -340,11 +357,12 @@ export default function CommunityAdminWorkspace({
             ))
           ) : (
             <div className="pilot-empty-state">
-              <strong>Nenhuma solicitação recebida</strong>
-              <p>Novos pedidos aparecerão aqui sem misturar comunidades.</p>
+              <strong>{requests.length ? "Nenhuma solicitação para estes filtros" : "Nenhuma solicitação recebida"}</strong>
+              <p>{requests.length ? "Ajuste a busca ou use Limpar filtros para ampliar a consulta." : "Os pedidos de entrada desta comunidade aparecerão aqui."}</p>
             </div>
           )}
         </div>
+        </>}
       </section>}
     </div>
   );

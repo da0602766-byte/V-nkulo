@@ -30,7 +30,7 @@ type CommunityResponse = {
   error?: string;
 };
 
-export default function CommunityThemeEditor() {
+export default function CommunityThemeEditor({ active = true }: { active?: boolean } = {}) {
   const [data, setData] = useState<ThemeResponse>({});
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -80,9 +80,9 @@ export default function CommunityThemeEditor() {
       ".pilot-dashboard[data-community-palette]",
     );
     if (!dashboard) return;
-    applyPalettePreview(dashboard, paletteId);
+    applyPalettePreview(dashboard, active ? paletteId : savedPaletteId);
     return () => applyPalettePreview(dashboard, savedPaletteId);
-  }, [paletteId, savedPaletteId]);
+  }, [active, paletteId, savedPaletteId]);
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

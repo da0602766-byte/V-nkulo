@@ -1399,7 +1399,7 @@ export default function PilotDashboard({
           {visibleView === "conta" && <AccountProfileWorkspace />}
           {visibleView === "comunidade" && (
             <section className="community-central-workspace">
-              <header className="workspace-heading"><div><p className="pilot-kicker">GESTÃO DA COMUNIDADE</p><h1>Central da comunidade</h1><p>Pessoas, liderança, continuidade, solicitações e preferências reunidas no contexto da comunidade ativa.</p></div></header>
+              <header className="workspace-heading"><div><p className="pilot-kicker">GESTÃO DA COMUNIDADE</p><h1>Configurações da comunidade</h1><p>Pessoas, liderança, continuidade, solicitações e preferências reunidas no contexto da comunidade ativa.</p></div></header>
               <CommunityAdminWorkspace
                 accessSlot={
                   active.permissions.includes("invites.manage") ? (
