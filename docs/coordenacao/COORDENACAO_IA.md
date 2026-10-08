@@ -17,6 +17,8 @@ Antes de alterar o código, leia este documento e atualize a seção **Trabalho 
 
 ## Trabalho em andamento
 
+Notificações específicas — estabilizar a observação de `NotificationManager` em `SpecificNotificationTest.java`: aguardar a publicação/cancelamento assíncronos do serviço Android com prazo de cinco segundos, mantendo todas as asserções de conteúdo e revogação. A API35 consultou a bandeja antes de os avisos aparecerem na terceira execução.
+
 Notificações específicas — usar o helper existente `OfflineUiEvidence` na captura de `SpecificNotificationTest.java`, pois escrita direta na raiz de /sdcard foi recusada nas APIs 29/35. Todas as asserções de título/corpo/privacidade passaram antes da captura; manter a asserção de revogação e a evidência obrigatória.
 
 Notificações específicas — complemento de validação: atualizar a versão esperada em `Vinkulo-Android/app/src/androidTest/java/com/vinkulo/app/UpgradeContinuityTest.java` para 1.20.0. A primeira CI compilou e validou assinatura/instalação, mas o teste de preservação ainda exigia 1.19.0. Manter todas as verificações de dados cifrados.
