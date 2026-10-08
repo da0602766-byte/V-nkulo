@@ -191,3 +191,26 @@
 @media (prefers-reduced-motion: reduce) {
   .intro { animation: none; transition: none; }
 }
+
+.workspace .directory { display: grid; gap: 16px; margin: 24px 0 16px; min-width: 0; }
+.directoryHeading h2 { margin: 4px 0 8px; color: var(--pilot-text); font-size: 22px; }
+.directoryHeading small { color: var(--pilot-muted); font-size: 11px; letter-spacing: .06em; }
+.directoryHeading p { margin: 0; color: var(--pilot-muted); font-size: 14px; line-height: 1.5; }
+.directoryFilters { display: grid; grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr)); gap: 12px; }
+.directoryFilters label { display: grid; gap: 6px; min-width: 0; color: var(--pilot-text); font-size: 13px; font-weight: 700; }
+.directoryFilters :is(input, select) { width: 100%; min-width: 0; min-height: 44px; box-sizing: border-box; border: 1px solid var(--pilot-line); border-radius: 10px; padding: 10px 12px; color: var(--pilot-text); background: var(--pilot-surface); font: inherit; font-size: 16px; }
+.directorySummary, .layerNotice { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; color: var(--pilot-muted); font-size: 13px; }
+.directorySummary button, .directoryEmpty button, .layerNotice button { min-height: 44px; border: 1px solid var(--pilot-line); border-radius: 10px; background: var(--pilot-surface); padding: 8px 12px; color: var(--pilot-text); font: inherit; font-size: 13px; cursor: pointer; }
+.directoryEmpty { display: grid; justify-items: start; gap: 10px; padding: 20px; border: 1px dashed var(--pilot-line); border-radius: 12px; color: var(--pilot-text); }
+.directoryEmpty p { margin: 0; color: var(--pilot-muted); font-size: 14px; }
+.workspace .eventSummary { display: grid; gap: 4px; margin: 8px 0 12px; color: var(--pilot-muted); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.eventSummary time { color: var(--pilot-text); }
+.layerNotice { padding: 12px; border: 1px solid var(--pilot-line); border-radius: 10px; background: var(--pilot-surface); }
+.directory :is(input, select, button):focus-visible, .directoryEmpty button:focus-visible, .layerNotice button:focus-visible { outline: 2px solid var(--pilot-primary); outline-offset: 3px; }
+@media (max-width: 760px) {
+  .directoryFilters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .directoryFilters label:first-child { grid-column: 1 / -1; }
+}
+@media (max-width: 460px) {
+  .directoryFilters { grid-template-columns: minmax(0, 1fr); }
+}

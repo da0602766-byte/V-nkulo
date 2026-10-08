@@ -13,6 +13,7 @@ import { createPortal } from "react-dom";
 import AgendaCalendar from "./AgendaCalendar";
 import TransientFeedback from "./TransientFeedback";
 import styles from "./EventsAgenda.module.css";
+import { filterEventDirectory, type EventPeriod } from "../lib/event-directory";
 
 type CommunityEvent = {
   id: number;
@@ -77,20 +78,14 @@ export default function EventsWorkspace({
   communitySlug: string;
 }) {
   const introId = useId();
-  const [introState, setIntroState] = useState<"auto" | "open" | "closed">("auto");
-  const introOpen = introState !== "closed";
-
-  useEffect(() => {
-    if (introState !== "auto") return;
-    const timer = window.setTimeout(() => setIntroState("closed"), 5_200);
-    return () => window.clearTimeout(timer);
-  }, [introState]);
+  const [introOpen, setIntroOpen] = useState(false);
 
   const [eventSearch, setEventSearch] = useState("");
   const [eventStatus, setEventStatus] = useState("TODOS");
+  const [eventPeriod, setEventPeriod] = useState<EventPeriod>("PROXIMOS");
   const [events, setEvents] = useState<CommunityEvent[]>([]);
   const [agendaRevision, setAgendaRevision] = useState(0);
-  const [now] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Date.now());
   const [loading, setLoading] = useState(true);
   const [workingId, setWorkingId] = useState<number | "form" | null>(null);
   const [feedback, setFeedback] = useState("");
@@ -108,7 +103,10 @@ export default function EventsWorkspace({
   const detailsRef = useRef<HTMLDetailsElement>(null);
   const canManage = permissions.includes("events.manage");
   const canRsvp = permissions.includes("events.rsvp");
-  const displayedEvents = useMemo(() => events.filter(item => (eventStatus === "TODOS" || item.status === eventStatus) && `${item.titulo} ${item.local} ${item.descricao}`.toLocaleLowerCase("pt-BR").includes(eventSearch.trim().toLocaleLowerCase("pt-BR"))), [events,eventSearch,eventStatus]);
+  const displayedEvents = useMemo(() => filterEventDirectory(events, eventSearch, eventStatus, eventPeriod, now), [events, eventSearch, eventStatus, eventPeriod, now]);
+  const hasDirectoryFilters = Boolean(eventSearch.trim()) || eventStatus !== "TODOS" || eventPeriod !== "TODOS";
+  const requestedEventRef = useRef<number | null>(null);
+  const scrolledEventRef = useRef<number | null>(null);
   const registrantSearchEvent = useMemo(
     () => events.find((item) => item.id === registrantSearchEventId) || null,
     [events, registrantSearchEventId],
@@ -137,6 +135,7 @@ export default function EventsWorkspace({
         throw new Error(result.error || "Não foi possível carregar os eventos.");
       }
       setEvents(result.eventos || []);
+      setNow(Date.now());
       setLoadError("");
       setAgendaRevision((value) => value + 1);
     } catch (loadError) {
@@ -175,10 +174,21 @@ export default function EventsWorkspace({
   useEffect(() => {
     if (!events.length || typeof window === "undefined") return;
     const requestedId = Number(new URLSearchParams(window.location.search).get("evento"));
-    if (!requestedId) return;
+    if (!requestedId || scrolledEventRef.current === requestedId) return;
+    if (requestedEventRef.current !== requestedId) {
+      requestedEventRef.current = requestedId;
+      setEventPeriod("TODOS");
+      setEventSearch("");
+      setEventStatus("TODOS");
+    }
     const target = document.getElementById(`event-${requestedId}`);
-    if (target) window.setTimeout(() => target.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
-  }, [events]);
+    if (!target) return;
+    const timer = window.setTimeout(() => {
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      scrolledEventRef.current = requestedId;
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [events, eventPeriod]);
 
   useEffect(() => {
     if (!canManage) return;
@@ -415,13 +425,13 @@ export default function EventsWorkspace({
   return (
     <section className={`events-workspace events-studio ${styles.workspace}`}>
       <header className={styles.titlebar}>
-        <h1>Eventos</h1>
+        <h1>Agenda</h1>
         <button
           type="button"
           className={styles.introToggle}
           aria-expanded={introOpen}
           aria-controls={introId}
-          onClick={() => setIntroState(introOpen ? "closed" : "open")}
+          onClick={() => setIntroOpen((value) => !value)}
         >
           {introOpen ? "Recolher apresentação" : "Sobre a agenda"}
           <span aria-hidden="true">{introOpen ? "−" : "+"}</span>
@@ -716,8 +726,16 @@ export default function EventsWorkspace({
           <span />
         </div>
       ) : events.length ? (<>
-        <div className="events-studio-directory"><div><small>PROGRAMAÇÃO DA COMUNIDADE</small><h2>Encontros e eventos</h2></div><label><span className="sr-only">Buscar eventos</span><input type="search" value={eventSearch} onChange={event => setEventSearch(event.target.value)} placeholder="Buscar evento ou local…" /></label><label><span className="sr-only">Estado dos eventos</span><select value={eventStatus} onChange={event=>setEventStatus(event.target.value)}><option value="TODOS">Todos os estados</option><option value="PUBLICADO">Publicados</option>{canManage && <option value="RASCUNHO">Rascunhos</option>}<option value="CANCELADO">Cancelados</option></select></label></div>
-        {!displayedEvents.length && <p className="agenda-vazio">{loadError ? "Não foi possível atualizar os eventos. Tente novamente para confirmar os resultados." : "Nenhum evento corresponde à busca."}</p>}
+        <section className={styles.directory} aria-label="Buscar na programação">
+          <div className={styles.directoryHeading}><small>PROGRAMAÇÃO DA COMUNIDADE</small><h2>Encontros e eventos</h2><p>Consulte os eventos por período. Esta busca não altera o calendário acima.</p></div>
+          <div className={styles.directoryFilters}>
+            <label>Buscar eventos<input type="search" value={eventSearch} onChange={event => setEventSearch(event.target.value)} placeholder="Título, local ou descrição" /></label>
+            <label>Período dos eventos<select value={eventPeriod} onChange={event => setEventPeriod(event.target.value as EventPeriod)}><option value="PROXIMOS">Em andamento e próximos</option><option value="ANTERIORES">Anteriores</option><option value="TODOS">Todos os períodos</option></select></label>
+            <label>Situação<select value={eventStatus} onChange={event=>setEventStatus(event.target.value)}><option value="TODOS">Todas as situações</option><option value="PUBLICADO">Publicados</option>{canManage && <option value="RASCUNHO">Rascunhos</option>}<option value="CANCELADO">Cancelados</option></select></label>
+          </div>
+          <div className={styles.directorySummary}><span role="status">{displayedEvents.length} {displayedEvents.length === 1 ? "evento encontrado" : "eventos encontrados"}</span>{hasDirectoryFilters && <button type="button" onClick={() => { setEventSearch(""); setEventStatus("TODOS"); setEventPeriod("TODOS"); }}>Limpar busca e filtros</button>}</div>
+        </section>
+        {!displayedEvents.length && <div className={styles.directoryEmpty}><strong>{loadError ? "Não foi possível confirmar os resultados." : eventPeriod === "PROXIMOS" && !eventSearch.trim() && eventStatus === "TODOS" ? "Nenhum evento em andamento ou futuro." : "Nenhum evento encontrado com esses filtros."}</strong><p>{loadError ? "Tente atualizar a programação novamente." : "Você pode consultar os eventos anteriores ou ajustar a busca."}</p><button type="button" onClick={() => { if (loadError) void loadEvents(); else { setEventSearch(""); setEventStatus("TODOS"); setEventPeriod("TODOS"); } }}>{loadError ? "Tentar novamente" : "Ver todos os eventos"}</button></div>}
         <div className="event-grid">
           {displayedEvents.map((item) => {
             const isPublished = item.status === "PUBLICADO";
@@ -758,6 +776,7 @@ export default function EventsWorkspace({
                     )}
                   </div>
                   <h2>{item.titulo}</h2>
+                  <div className={styles.eventSummary}><time dateTime={item.inicia_em}>{formatDateTimeRange(item.inicia_em, item.termina_em)}</time><span>{item.local || "Local a definir"}</span></div>
                   <details className="event-card-details">
                     <summary>
                       <span>

@@ -396,6 +396,8 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
         </div>
       </div>
 
+      {!camadasVisiveis.some((camada) => camadasAtivas.includes(camada.id)) && <div className={styles.layerNotice} role="status"><span>Nenhuma categoria selecionada. Os compromissos estão ocultos.</span><button type="button" onClick={() => setCamadasAtivas(camadasVisiveis.map((camada) => camada.id))}>Mostrar todas as categorias</button></div>}
+
       {erro && <TransientFeedback className="agenda-erro" role="alert">{erro}</TransientFeedback>}
       {sucesso && <TransientFeedback className="operations-feedback" role="status" tone="success">{sucesso}</TransientFeedback>}
       {erroCarregamento && <TransientFeedback className="agenda-erro" role="alert">
@@ -530,7 +532,8 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
                 key={chave}
                 className={`agenda-dia${doPeriodo ? "" : " fora"}${chave === hojeChave ? " hoje" : ""}${chave === diaAberto ? " selected" : ""}`}
                 onClick={() => setDiaAberto(chave === diaAberto ? null : chave)}
-                aria-label={`${dia.getDate()} — ${carregando ? "Carregando compromissos" : `${doDia.length} compromisso(s)`}`}
+                aria-label={`${dia.toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" })} — ${carregando ? "Carregando compromissos" : `${doDia.length} compromisso(s)`}`}
+                aria-current={chave === hojeChave ? "date" : undefined}
                 aria-pressed={chave === diaAberto}
               >
                 <span className="agenda-dia-numero">{dia.getDate()}</span>
