@@ -1,4 +1,6 @@
 "use client";
+import "./directory-controls.css";
+import { matchesDirectorySearch } from "../lib/directory-search";
 import SafeImage from "./SafeImage";
 import FileSaveActions from "./FileSaveActions";
 
@@ -253,6 +255,8 @@ export default function SecretaryMinisterialWorkspace({
   const [selectedMinistryId, setSelectedMinistryId] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>("painel");
   const [loading, setLoading] = useState(true);
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const [catalogCategory, setCatalogCategory] = useState("");
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState("");
@@ -1308,6 +1312,9 @@ export default function SecretaryMinisterialWorkspace({
     }
   }
 
+  const catalogCategories = [...new Set(ministries.map((item) => item.categoria))];
+  const visibleMinistries = ministries.filter((item) => (!catalogCategory || item.categoria === catalogCategory) && matchesDirectorySearch(catalogSearch, item.nome, item.descricao, item.responsavel_nome, CATEGORY_LABELS[item.categoria] || item.categoria));
+
   if (loading) {
     return (
       <section className="secretary-workspace ministry-project" aria-busy="true">
@@ -1349,12 +1356,19 @@ export default function SecretaryMinisterialWorkspace({
           )}
         </header>
 
-        {error && <div className="secretary-message error" role="alert">{error}</div>}
+        {error && <div className="secretary-message error" role="alert">{error} <button type="button" onClick={() => void loadData()}>Tentar novamente</button></div>}
         {feedback && <div className="secretary-message success" role="status">{feedback}</div>}
 
+        <section className="secretary-directory-controls" aria-label="Encontrar um ministério">
+          <div className="secretary-directory-fields">
+            <label>Buscar ministério ou liderança<input type="search" value={catalogSearch} onChange={(event) => setCatalogSearch(event.target.value)} placeholder="Nome, categoria ou responsável" /></label>
+            <label>Categoria<select value={catalogCategory} onChange={(event) => setCatalogCategory(event.target.value)}><option value="">Todas as categorias</option>{catalogCategories.map((category) => <option value={category} key={category}>{CATEGORY_LABELS[category] || category}</option>)}</select></label>
+          </div>
+          <div className="secretary-directory-results"><p role="status">{visibleMinistries.length} de {ministries.length} ministérios</p>{(catalogSearch.trim() || catalogCategory) && <button type="button" onClick={() => { setCatalogSearch(""); setCatalogCategory(""); }}>Limpar filtros</button>}</div>
+        </section>
         <div className="secretary-catalog-layout">
           <main className="secretary-ministry-catalog" aria-label="Ministérios disponíveis">
-            {ministries.map((ministry) => (
+            {visibleMinistries.map((ministry) => (
               <article
                 className="secretary-ministry-tile-wrap"
                 data-editor-key={`ministerios-catalogo-item-${ministry.id}`}
@@ -1380,7 +1394,8 @@ export default function SecretaryMinisterialWorkspace({
                 </button>
               </article>
             ))}
-            {!ministries.length && (
+            {!visibleMinistries.length && ministries.length > 0 && <div className="secretary-empty secretary-catalog-empty"><h2>Nenhum ministério encontrado</h2><p>Ajuste sua busca ou use Limpar filtros para ver os ministérios disponíveis.</p></div>}
+            {!ministries.length && !error && (
               <div className="secretary-empty secretary-catalog-empty">
                 <span aria-hidden="true">✣</span>
                 <h2>Nenhum ministério disponível</h2>
@@ -1409,7 +1424,7 @@ export default function SecretaryMinisterialWorkspace({
                     const ministry = ministries.find(
                       (item) => item.id === schedule.ministerio_id,
                     );
-                    if (ministry) openMinistry(ministry);
+                    if (ministry) { openMinistry(ministry); setTab("escalas"); }
                   }}
                   key={schedule.id}
                 >
@@ -1787,7 +1802,7 @@ export default function SecretaryMinisterialWorkspace({
             ] as [Tab, string][])
           : ([["escalas", "Minhas escalas"]] as [Tab, string][]))
           .map(([id, label]) => (
-          <button type="button" className={tab === id ? "active" : ""} onClick={() => setTab(id)} key={id}>{label}</button>
+          <button type="button" aria-pressed={tab === id} className={tab === id ? "active" : ""} onClick={() => setTab(id)} key={id}>{label}</button>
         ))}
       </nav>
 

@@ -1,4 +1,5 @@
 "use client";
+import { matchesDirectorySearch } from "../../lib/directory-search";
 import SafeImage from "../SafeImage";
 
 
@@ -86,15 +87,11 @@ function CellGrid({
   const ready = healthCounts.MULTIPLICAR || 0;
   const noReport = healthCounts.SEM_RELATORIO || 0;
 
-  const term = search.trim().toLocaleLowerCase("pt-BR");
   const visible = list.filter((cell) => {
     if (status === "active" && !cell.ativo) return false;
     if (status === "archived" && cell.ativo) return false;
     if (healthFilter !== "all" && healthById.get(cell.id)!.id !== healthFilter) return false;
-    if (!term) return true;
-    return [cell.nome, cell.descricao_publica, cell.rede, cell.lider_nome, cell.responsavel]
-      .filter(Boolean)
-      .some((value) => String(value).toLocaleLowerCase("pt-BR").includes(term));
+    return matchesDirectorySearch(search, cell.nome, cell.descricao_publica, cell.rede, cell.lider_nome, cell.responsavel, cell.endereco_publico);
   });
 
   const healthPills: { key: "all" | CellHealthId; label: string; count: number }[] = [
@@ -119,9 +116,9 @@ function CellGrid({
               Ver como participante
             </button>
           )}
-          <button type="button" className="cgestao-btn-solid" onClick={() => setCreateOpen(true)}>
+          {cells.canManage && <button type="button" className="cgestao-btn-solid" onClick={() => setCreateOpen(true)}>
             <span aria-hidden="true">＋</span> Criar célula
-          </button>
+          </button>}
         </div>
       </header>
 
@@ -139,7 +136,7 @@ function CellGrid({
       <div className="cgestao-filters">
         <label className="cgestao-search">
           <span aria-hidden="true">⌕</span>
-          <input
+          <input type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Buscar célula, líder ou bairro"
@@ -148,7 +145,7 @@ function CellGrid({
         </label>
         <div className="cgestao-status-toggle" role="group" aria-label="Filtrar por situação">
           {([["all", "Todas"], ["active", "Ativas"], ["archived", "Arquivadas"]] as const).map(([value, label]) => (
-            <button key={value} type="button" className={status === value ? "active" : ""} onClick={() => setStatus(value)}>
+            <button key={value} type="button" aria-pressed={status === value} className={status === value ? "active" : ""} onClick={() => setStatus(value)}>
               {label}
             </button>
           ))}
@@ -158,6 +155,7 @@ function CellGrid({
             <button
               key={pill.key}
               type="button"
+              aria-pressed={healthFilter === pill.key}
               data-saude={pill.key}
               className={healthFilter === pill.key ? "active" : ""}
               onClick={() => setHealthFilter(pill.key)}
@@ -169,8 +167,9 @@ function CellGrid({
         </div>
       </div>
 
+      <div className="cell-directory-results"><p role="status">{visible.length} de {list.length} células</p>{(search.trim() || status !== "all" || healthFilter !== "all") && <button type="button" onClick={() => { setSearch(""); setStatus("all"); setHealthFilter("all"); }}>Limpar filtros</button>}</div>
       {visible.length === 0 ? (
-        <p className="cgestao-empty">Nenhuma célula encontrada com os filtros aplicados.</p>
+        <p className="cgestao-empty">{list.length ? "Nenhuma célula corresponde à busca. Ajuste os filtros ou use Limpar filtros." : cells.canManage ? "Nenhuma célula cadastrada. Use Criar célula para começar." : "Nenhuma célula disponível. Consulte a liderança da comunidade."}</p>
       ) : (
         <div className="cgestao-grid">
           {visible.map((cell) => (

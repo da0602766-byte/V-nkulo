@@ -1,0 +1,15 @@
+.cell-directory-controls,.secretary-directory-controls{margin:20px 0 16px;color:var(--pilot-text,#20313f)}
+.cell-directory-fields,.secretary-directory-fields{display:grid;grid-template-columns:minmax(220px,2fr) repeat(3,minmax(140px,1fr));gap:12px;align-items:end}
+.secretary-directory-fields{grid-template-columns:minmax(220px,2fr) minmax(180px,1fr);max-width:860px}
+.cell-directory-fields label,.secretary-directory-fields label{display:grid;min-width:0;gap:6px;font-size:14px;font-weight:650;line-height:1.4}
+.cell-directory-fields input,.cell-directory-fields select,.secretary-directory-fields input,.secretary-directory-fields select{width:100%;min-width:0;min-height:44px;border:1px solid var(--pilot-line,#dce4e8);border-radius:12px;padding:10px 12px;background:var(--pilot-surface,#fff);color:var(--pilot-text,#20313f);font:inherit;font-size:16px;font-weight:400}
+.cell-directory-results,.secretary-directory-results{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin:8px 0 16px;color:var(--pilot-muted,#6b7c89);font-size:14px}
+.cell-directory-results p,.secretary-directory-results p{margin:0}
+.cell-directory-results button,.secretary-directory-results button,.cells-load-state button{min-height:44px;border:1px solid var(--pilot-line,#dce4e8);border-radius:10px;padding:8px 12px;background:var(--pilot-surface,#fff);color:var(--pilot-text,#20313f);font:inherit;font-weight:650;cursor:pointer}
+.cells-load-state{max-width:1280px;margin:16px auto;padding:20px;border:1px solid var(--pilot-line,#dce4e8);border-radius:16px;background:var(--pilot-surface,#fff);color:var(--pilot-text,#20313f)}
+.cell-directory-controls :is(input,select,button):focus-visible,.secretary-directory-controls :is(input,select,button):focus-visible,.cells-load-state button:focus-visible,.secretary-tabs button:focus-visible{outline:3px solid var(--pilot-purple,#6846d9);outline-offset:3px}
+.cgestao-filters :is(button,input),.secretary-tabs button{min-height:44px}
+.cpart-row-copy,.cpart-mobile-stats strong{overflow-wrap:anywhere;min-width:0}
+@media(max-width:1000px){.cell-directory-fields{grid-template-columns:repeat(3,minmax(0,1fr))}.cell-directory-search{grid-column:1/-1}}
+@media(max-width:680px){.cell-directory-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.cell-directory-fields label:last-child{grid-column:1/-1}.secretary-directory-fields{grid-template-columns:minmax(0,1fr)}.cell-directory-controls,.secretary-directory-controls{margin-top:16px}.cpart-mobile-list>button{flex-wrap:wrap}.cpart-mobile-list .cpart-row-copy{flex:1;min-width:120px}.cpart-mobile-list .cpart-badge{max-width:100%;white-space:normal}}
+@media(max-width:360px){.cell-directory-fields{grid-template-columns:minmax(0,1fr)}}

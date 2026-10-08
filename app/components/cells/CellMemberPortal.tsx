@@ -5,9 +5,10 @@ import TransientFeedback from "../TransientFeedback";
 import { useEffect, useMemo, useState } from "react";
 import { initialsOf } from "./format";
 import type { CellsData } from "./useCellsData";
-import type { Cell } from "./types";
+import { DAY_LABELS, type Cell } from "./types";
+import CellDirectoryFilters, { CellDirectoryEmpty, useCellDirectory, type CellDirectory, type ParticipationStatus } from "./CellDirectoryFilters";
 
-type ParticipationStatus = "participo" | "pendente" | "aberta";
+
 
 const STATUS_BADGE: Record<ParticipationStatus, { label: string; tom: string }> = {
   participo: { label: "Já participo", tom: "acc" },
@@ -50,7 +51,7 @@ export default function CellMemberPortal({
   onBackToGestao?: () => void;
 }) {
   const [pendingIds, setPendingIds] = useState<Set<number>>(() => new Set());
-  const [mobileSelected, setMobileSelected] = useState<Cell | null>(null);
+  const [mobileSelectedId, setMobileSelectedId] = useState<number | null>(null);
   // Abaixo de 680px, mostrar a interface própria do celular.
   const [isRealMobile, setIsRealMobile] = useState(false);
 
@@ -75,6 +76,9 @@ export default function CellMemberPortal({
     return "aberta";
   }
 
+  const directory = useCellDirectory(list, statusOf);
+  const mobileSelected = list.find((cell) => cell.id === mobileSelectedId) || null;
+
   async function requestEntry(cell: Cell, nome: string, contato: string, mensagem: string) {
     const ok = await cells.requestCellEntry(cell.id, cell.nome, { nome, contato, mensagem });
     if (ok) {
@@ -89,9 +93,9 @@ export default function CellMemberPortal({
       <section className="cpart-shell cpart-shell-mobile" aria-busy={cells.loading}>
         <OperationFeedback message={cells.message} error={cells.error} />
         {mobileSelected ? (
-          <MobileDetail cell={mobileSelected} cells={cells} status={statusOf(mobileSelected)} onBack={() => setMobileSelected(null)} onBackToGestao={onBackToGestao} onRequestEntry={requestEntry} />
+          <MobileDetail cell={mobileSelected} cells={cells} status={statusOf(mobileSelected)} onBack={() => setMobileSelectedId(null)} onBackToGestao={onBackToGestao} onRequestEntry={requestEntry} />
         ) : (
-          <MobileList list={list} statusOf={statusOf} onSelect={setMobileSelected} onBackToGestao={onBackToGestao} />
+          <MobileList list={list} directory={directory} statusOf={statusOf} onSelect={(cell) => setMobileSelectedId(cell.id)} onBackToGestao={onBackToGestao} />
         )}
       </section>
     );
@@ -103,6 +107,7 @@ export default function CellMemberPortal({
         communityName={communityName}
         cells={cells}
         list={list}
+        directory={directory}
         statusOf={statusOf}
         onRequestEntry={requestEntry}
         onBackToGestao={onBackToGestao}
@@ -171,6 +176,7 @@ function CellPortalDesktop({
   communityName,
   cells,
   list,
+  directory,
   statusOf,
   onRequestEntry,
   onBackToGestao,
@@ -178,32 +184,14 @@ function CellPortalDesktop({
   communityName: string;
   cells: CellsData;
   list: Cell[];
+  directory: CellDirectory;
   statusOf: (cell: Cell) => ParticipationStatus;
   onRequestEntry: (cell: Cell, nome: string, contato: string, mensagem: string) => Promise<boolean>;
   onBackToGestao?: () => void;
 }) {
-  const [search, setSearch] = useState("");
-  const [redeFilter, setRedeFilter] = useState("todas");
-  const [diaFilter, setDiaFilter] = useState("todos");
-  const [statusFilter, setStatusFilter] = useState<"todas" | ParticipationStatus>("todas");
-  // Sem estado redundante: enquanto nada foi escolhido, `selected` abaixo já
-  // cai na primeira célula da lista filtrada — não precisa de efeito para
-  // "lembrar" disso.
   const [selectedId, setSelectedId] = useState<number | null>(null);
-
-  const redes = useMemo(() => [...new Set(list.map((cell) => cell.rede).filter(Boolean))], [list]);
-  const dias = useMemo(() => [...new Set(list.flatMap((cell) => cell.dias_reuniao))], [list]);
-
-  const term = search.trim().toLocaleLowerCase("pt-BR");
-  const filtered = list.filter((cell) => {
-    if (redeFilter !== "todas" && cell.rede !== redeFilter) return false;
-    if (diaFilter !== "todos" && !cell.dias_reuniao.includes(diaFilter)) return false;
-    if (statusFilter !== "todas" && statusOf(cell) !== statusFilter) return false;
-    if (!term) return true;
-    return [cell.nome, cell.descricao_publica, cell.rede].filter(Boolean).some((value) => String(value).toLocaleLowerCase("pt-BR").includes(term));
-  });
-
-  const selected = list.find((cell) => cell.id === selectedId) || filtered[0] || null;
+  const { filtered } = directory;
+  const selected = filtered.find((cell) => cell.id === selectedId) || filtered[0] || null;
   const myCell = list.find((cell) => cell.minha_participacao);
   const pendingCount = list.filter((cell) => statusOf(cell) === "pendente").length;
   const myMeetings = list.filter((cell) => cell.minha_participacao).reduce((total, cell) => total + cell.agenda.length, 0);
@@ -253,37 +241,18 @@ function CellPortalDesktop({
         </article>
       </div>
 
-      <div className="cpart-filters">
-        <label className="cpart-search">
-          <span aria-hidden="true">⌕</span>
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar célula ou bairro" />
-        </label>
-        <select value={redeFilter} onChange={(event) => setRedeFilter(event.target.value)}>
-          <option value="todas">Todas as redes</option>
-          {redes.map((rede) => <option key={rede} value={rede}>{rede}</option>)}
-        </select>
-        <select value={diaFilter} onChange={(event) => setDiaFilter(event.target.value)}>
-          <option value="todos">Todos os dias</option>
-          {dias.map((dia) => <option key={dia} value={dia}>{dia}</option>)}
-        </select>
-        <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}>
-          <option value="todas">Todas as situações</option>
-          <option value="participo">Já participo</option>
-          <option value="pendente">Solicitação pendente</option>
-          <option value="aberta">Abertas</option>
-        </select>
-      </div>
+      <CellDirectoryFilters directory={directory} total={list.length} />
 
       <div className="cpart-body">
         <div className="cpart-list">
           {filtered.map((cell) => {
             const status = statusOf(cell);
             return (
-              <button key={cell.id} type="button" className={`cpart-row${selected?.id === cell.id ? " active" : ""}`} onClick={() => setSelectedId(cell.id)}>
+              <button key={cell.id} type="button" aria-pressed={selected?.id === cell.id} className={`cpart-row${selected?.id === cell.id ? " active" : ""}`} onClick={() => setSelectedId(cell.id)}>
                 <span className="cpart-avatar" aria-hidden="true">{initialsOf(cell.nome)}</span>
                 <span className="cpart-row-copy">
                   <strong>{cell.nome}</strong>
-                  <small>{[cell.rede, cell.dias_reuniao.join(", "), cell.lider_nome || cell.responsavel].filter(Boolean).join(" · ")}</small>
+                  <small>{[cell.rede, cell.dias_reuniao.map((day) => DAY_LABELS[day] || day).join(", "), cell.lider_nome || cell.responsavel].filter(Boolean).join(" · ")}</small>
                 </span>
                 <span className="cpart-row-end">
                   <span className="cpart-badge" data-tom={STATUS_BADGE[status].tom}>{STATUS_BADGE[status].label}</span>
@@ -292,11 +261,11 @@ function CellPortalDesktop({
               </button>
             );
           })}
-          {!filtered.length && <p className="cpart-empty">Nenhuma célula encontrada.</p>}
+          {!filtered.length && <CellDirectoryEmpty total={list.length} />}
         </div>
         <div className="cpart-profile">
           {selected ? (
-            <CellProfilePanel cell={selected} status={statusOf(selected)} onRequestEntry={onRequestEntry} saving={cells.saving} />
+            <CellProfilePanel key={selected.id} cell={selected} status={statusOf(selected)} onRequestEntry={onRequestEntry} saving={cells.saving} />
           ) : (
             <p className="cpart-empty">Selecione uma célula para ver o perfil.</p>
           )}
@@ -370,7 +339,7 @@ function CellProfilePanel({
       <div className="cpart-panel-body">
         <div className="cpart-panel-grid">
           <div><p>Líder</p><strong>{cell.lider_nome || cell.responsavel}</strong></div>
-          <div><p>Encontro</p><strong>{cell.horario_texto || cell.dias_reuniao.join(", ") || "A definir"}</strong></div>
+          <div><p>Encontro</p><strong>{cell.horario_texto || cell.dias_reuniao.map((day) => DAY_LABELS[day] || day).join(", ") || "A definir"}</strong></div>
           <div><p>Local</p><strong>{cell.endereco_publico || "A definir"}</strong></div>
           <div><p>Pessoas</p><strong>{cell.membros_total + cell.visitantes_ativos}</strong></div>
         </div>
@@ -421,11 +390,13 @@ function CellProfilePanel({
 // ── Frame 4 — prévia e experiência de celular ──────────────────────────────
 function MobileList({
   list,
+  directory,
   statusOf,
   onSelect,
   onBackToGestao,
 }: {
   list: Cell[];
+  directory: CellDirectory;
   statusOf: (cell: Cell) => ParticipationStatus;
   onSelect: (cell: Cell) => void;
   onBackToGestao?: () => void;
@@ -446,13 +417,15 @@ function MobileList({
         <div><p>Encontros</p><strong>{myCell?.agenda.length ?? 0}</strong></div>
         <div><p>Disponíveis</p><strong>{openCount}</strong></div>
       </div>
+      <CellDirectoryFilters directory={directory} total={list.length} />
+      {!directory.filtered.length && <CellDirectoryEmpty total={list.length} />}
       <div className="cpart-mobile-list">
-        {list.map((cell) => {
+        {directory.filtered.map((cell) => {
           const status = statusOf(cell);
           return (
             <button key={cell.id} type="button" onClick={() => onSelect(cell)}>
               <span className="cpart-avatar" aria-hidden="true">{initialsOf(cell.nome)}</span>
-              <span className="cpart-row-copy"><strong>{cell.nome}</strong><small>{[cell.rede, cell.dias_reuniao.join(", ")].filter(Boolean).join(" · ")}</small></span>
+              <span className="cpart-row-copy"><strong>{cell.nome}</strong><small>{[cell.rede, cell.dias_reuniao.map((day) => DAY_LABELS[day] || day).join(", ")].filter(Boolean).join(" · ")}</small></span>
               <span className="cpart-badge" data-tom={STATUS_BADGE[status].tom}>{STATUS_BADGE[status].label}</span>
             </button>
           );
@@ -491,7 +464,7 @@ function MobileDetail({
       <div className="cpart-mobile-content">
         <div className="cpart-panel-grid">
           <div><p>Líder</p><strong>{cell.lider_nome || cell.responsavel}</strong></div>
-          <div><p>Encontro</p><strong>{cell.horario_texto || cell.dias_reuniao.join(", ") || "A definir"}</strong></div>
+          <div><p>Encontro</p><strong>{cell.horario_texto || cell.dias_reuniao.map((day) => DAY_LABELS[day] || day).join(", ") || "A definir"}</strong></div>
           <div><p>Local</p><strong>{cell.endereco_publico || "A definir"}</strong></div>
           <div><p>Pessoas</p><strong>{cell.membros_total + cell.visitantes_ativos}</strong></div>
         </div>
