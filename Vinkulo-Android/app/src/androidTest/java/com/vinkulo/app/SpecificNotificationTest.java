@@ -9,7 +9,6 @@ import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.uiautomator.UiDevice;
-import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 import org.junit.Test;
@@ -39,9 +38,8 @@ public class SpecificNotificationTest {
                 assertEquals(bodies[i], actual.extras.getCharSequence(Notification.EXTRA_BIG_TEXT).toString());
                 assertEquals(Notification.VISIBILITY_PRIVATE, actual.visibility);
             }
-            device.openNotification(); device.waitForIdle();
-            device.takeScreenshot(new File("/sdcard/vinkulo-reader-notifications.png"));
-            device.dumpWindowHierarchy(new File("/sdcard/vinkulo-reader-notifications.xml"));
+            device.openNotification();
+            OfflineUiEvidence.capture(device, "notifications");
             device.pressBack();
             FirebaseDeviceState.clearBinding(context);
             VinkuloFirebaseMessagingService.publish(context, binding, "999", new NotificationContent("Não exibir", "Vínculo revogado", "/painel"));

@@ -17,6 +17,8 @@ Antes de alterar o código, leia este documento e atualize a seção **Trabalho 
 
 ## Trabalho em andamento
 
+Notificações específicas — usar o helper existente `OfflineUiEvidence` na captura de `SpecificNotificationTest.java`, pois escrita direta na raiz de /sdcard foi recusada nas APIs 29/35. Todas as asserções de título/corpo/privacidade passaram antes da captura; manter a asserção de revogação e a evidência obrigatória.
+
 Notificações específicas — complemento de validação: atualizar a versão esperada em `Vinkulo-Android/app/src/androidTest/java/com/vinkulo/app/UpgradeContinuityTest.java` para 1.20.0. A primeira CI compilou e validou assinatura/instalação, mas o teste de preservação ainda exigia 1.19.0. Manter todas as verificações de dados cifrados.
 
 Notificações específicas Android — Codex, 07/10/2026. Checkout isolado sobre f299d2b (1.19.0). Escopo: MainActivity, serviço FCM, resolução autenticada e apresentação de notificações, testes, versão 1.20.0/code23 e workflow. Preservar base offline e assinatura; validar APIs 29/35 e distribuir homologação sem promover a estável.
