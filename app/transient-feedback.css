@@ -38,9 +38,9 @@ html[data-theme="dark"] .app-toast-viewport, html[data-pilot-theme="escuro"] .ap
 body .app-toast-viewport { bottom: var(--app-feedback-bottom, calc(96px + env(safe-area-inset-bottom, 0px))); }
 body:has(.app-toast-viewport) .global-feedback-launcher { bottom: var(--app-feedback-help-bottom, calc(220px + env(safe-area-inset-bottom, 0px))); }
 
-/* Active mobile notices sit in the middle; the collapsed history stays by navigation. */
+/* Keep brief feedback near navigation instead of covering the form's center. */
 @media (max-width: 760px) {
-  body .app-toast-viewport.has-active-notice { top: 50%; bottom: auto; transform: translate(-50%, -50%); max-height: 80dvh; }
-  .app-toast-viewport.has-active-notice .app-toast-stack { max-height: 66dvh; overflow-y: auto; overscroll-behavior: contain; }
-  body:has(.app-toast-viewport.has-active-notice) .global-feedback-launcher { bottom: var(--app-feedback-bottom, 96px); }
+  .app-toast-viewport.has-active-notice .app-toast-content { max-height: 24dvh; }
+  .app-toast-viewport.has-active-notice .app-toast-stack { max-height: 36dvh; overflow-y: auto; overscroll-behavior: contain; }
+  body:has(.app-toast-viewport.has-active-notice) .global-feedback-launcher { visibility: hidden; }
 }

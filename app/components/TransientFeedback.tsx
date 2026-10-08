@@ -79,7 +79,7 @@ export function TransientFeedbackViewport() {
     return () => { document.removeEventListener("pointerdown", outside); document.removeEventListener("keydown", escape); };
   }, [historyOpen]);
   if (!entries.length) return null;
-  const visible = entries.filter(entry => !entry.dismissed).slice(0, 3);
+  const visible = entries.filter(entry => !entry.dismissed).slice(0, 1);
   return createPortal(<aside className={`app-toast-viewport${visible.length || historyOpen ? " has-active-notice" : ""}`} aria-label="Avisos do sistema" ref={region}>
     {historyOpen ? <section id="app-toast-history" className="app-toast-history" aria-label="Avisos desta tela">
       <header><strong>Avisos desta tela</strong><button type="button" aria-label="Fechar avisos recentes" onClick={() => { setHistoryOpen(false); historyButton.current?.focus(); }}>×</button></header>

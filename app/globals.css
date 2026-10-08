@@ -26822,8 +26822,9 @@ textarea { resize:none!important; }
 .global-feedback-dialog>header p { margin:0; color:var(--pilot-muted,#6f7a8d); font-size:.78rem; }
 .global-feedback-dialog>header>button { flex:0 0 36px; width:36px; height:36px; border:1px solid var(--pilot-line,#d8e0ea); border-radius:10px; background:var(--pilot-surface-2,#f3f6fa); color:inherit; font-size:var(--fs-2xl); cursor:pointer; }
 .global-feedback-dialog>form { display:grid; gap:14px; padding:20px 22px 22px; }
-.global-feedback-dialog label,.global-feedback-image-field { display:grid; gap:7px; font-size:.75rem; font-weight:850; }
-.global-feedback-dialog :is(select,textarea) { width:100%; border:1px solid var(--pilot-line,#d8e0ea); border-radius:12px; background:var(--pilot-surface-2,#f6f8fb); color:inherit; padding:11px 12px; font:inherit; }
+.global-feedback-dialog label,.global-feedback-image-field { display:grid; gap:7px; font-size:14px; font-weight:700; }
+.global-feedback-dialog label>small { color:var(--pilot-muted,#6f7a8d); font-size:13px; font-weight:400; }
+.global-feedback-dialog :is(select,textarea) { width:100%; min-width:0; box-sizing:border-box; border:1px solid var(--pilot-line,#d8e0ea); border-radius:12px; background:var(--pilot-surface-2,#f6f8fb); color:inherit; padding:11px 12px; font:inherit; font-size:16px; }
 .global-feedback-dialog textarea { resize:vertical; line-height:1.5; }
 .global-feedback-image-field>input { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
 .global-feedback-image-field>button { min-height:44px; border:1px dashed color-mix(in srgb,#7255ef 52%,var(--pilot-line,#d8e0ea)); border-radius:12px; background:color-mix(in srgb,#7255ef 7%,var(--pilot-surface,#fff)); color:#7255ef; font-weight:850; cursor:pointer; }
@@ -31404,10 +31405,13 @@ html[data-pilot-theme="escuro"] .pilot-dashboard[data-ui-version="v2"] .cell-det
   grid-column: 1 / -1;
 }
 .pilot-mobile-task-summary > .pilot-mobile-device-notifications b {
-  min-width: 34px;
-  background: color-mix(in srgb, #2ba879 82%, var(--pilot-primary));
-  font-size: 9px;
-  letter-spacing: .05em;
+  min-width: 0;
+  padding-inline: 8px;
+  background: var(--pilot-surface);
+  color: var(--pilot-primary);
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 0;
 }
 
 .community-palette-grid > button {

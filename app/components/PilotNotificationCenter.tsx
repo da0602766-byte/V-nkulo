@@ -70,6 +70,13 @@ export default function PilotNotificationCenter({
   const [webPushSubscribed, setWebPushSubscribed] = useState(false);
   const [pushDelivery, setPushDelivery] = useState<PushDeliveryStatus | null>(null);
   const [showDevicePermissionHelp, setShowDevicePermissionHelp] = useState(false);
+  const [deviceChecking, setDeviceChecking] = useState(true);
+  const [deviceCheckFailed, setDeviceCheckFailed] = useState(false);
+  const [deviceCheckRevision, setDeviceCheckRevision] = useState(0);
+  const [deviceMessage, setDeviceMessage] = useState("");
+  const [deviceActivating, setDeviceActivating] = useState(false);
+  const [nativePushAvailable, setNativePushAvailable] = useState(false);
+  const activatingRef = useRef(false);
 
   useEffect(() => {
     const acertar = () => setAgora(Date.now());
@@ -81,7 +88,6 @@ export default function PilotNotificationCenter({
     };
   }, []);
   const requestRef = useRef<AbortController | null>(null);
-  const permissionRef = useRef<"unsupported" | NotificationPermission>("unsupported");
   const unread = items.filter((item) => !item.read).length;
   const unreadSummary = useMemo<NotificationUnreadSummary>(() => {
     const summary: NotificationUnreadSummary = {
@@ -143,25 +149,48 @@ export default function PilotNotificationCenter({
   }, [showUnreadOnDevice]);
 
   useEffect(() => {
-    const initial = window.setTimeout(() => {
-      if (!isWebPushSupported()) {
-        permissionRef.current = "unsupported";
-        setDevicePermission("unsupported");
-        return;
+    let cancelled = false;
+    let revision = 0;
+    const refreshDeviceState = async () => {
+      if (activatingRef.current || document.visibilityState !== "visible") return;
+      const request = ++revision;
+      setDeviceChecking(true);
+      setDeviceCheckFailed(false);
+      setDeviceMessage("");
+      setWebPushSubscribed(false);
+      setPushDelivery(null);
+      const native = typeof window.VinkuloAndroid?.requestPushToken === "function";
+      setNativePushAvailable(native);
+      const permission = isWebPushSupported() ? Notification.permission : "unsupported";
+      setDevicePermission(permission);
+      try {
+        if (permission === "granted" && !native) {
+          const state = await getWebPushSubscriptionState();
+          if (cancelled || request !== revision) return;
+          setWebPushSubscribed(state.subscribed);
+          setPushDelivery(state.delivery || null);
+          if (state.error) { setDeviceMessage(state.error); setDeviceCheckFailed(true); }
+        }
+      } catch {
+        if (!cancelled && request === revision) {
+          setDeviceCheckFailed(true);
+          setDeviceMessage("Não foi possível conferir a ativação. Verifique sua conexão e tente novamente.");
+        }
+      } finally {
+        if (!cancelled && request === revision) setDeviceChecking(false);
       }
-      permissionRef.current = Notification.permission;
-      setDevicePermission(Notification.permission);
-      if (Notification.permission === "granted") {
-        void getWebPushSubscriptionState().then((state) => {
-          if (state.supported) {
-            setWebPushSubscribed(state.subscribed);
-            setPushDelivery(state.delivery || null);
-          }
-        }).catch(() => undefined);
-      }
-    }, 0);
-    return () => window.clearTimeout(initial);
-  }, [open]);
+    };
+    const refresh = () => { void refreshDeviceState(); };
+    const initial = window.setTimeout(refresh, 0);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(initial);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [open, deviceCheckRevision]);
 
   useEffect(() => {
     const initial = window.setTimeout(() => void load(), 0);
@@ -238,21 +267,24 @@ export default function PilotNotificationCenter({
   }
 
   const enableDeviceNotifications = useCallback(async () => {
-    if (window.VinkuloAndroid?.requestPushToken) {
-      window.VinkuloAndroid.requestPushToken();
-      setMessage("O registro Android será atualizado. Permita notificações nas configurações do aplicativo; o envio também depende da configuração Firebase do proprietário.");
-      return;
-    }
-    if (!isWebPushSupported()) {
-      setDevicePermission("unsupported");
-      setMessage(isNativeNotificationBridgeAvailable()
-        ? "Esta versão do APK não oferece push em segundo plano. Instale o Vínkulo pelo navegador para receber avisos mesmo fechado."
-        : "Este navegador não oferece notificações push.");
-      return;
-    }
+    if (activatingRef.current) return;
+    activatingRef.current = true;
+    setDeviceActivating(true);
+    setDeviceMessage("");
     try {
+      if (window.VinkuloAndroid?.requestPushToken) {
+        window.VinkuloAndroid.requestPushToken();
+        setDeviceMessage("Ativação solicitada ao aplicativo Android. Confira a permissão em Configurações › Aplicativos › Vínkulo › Notificações. A solicitação ainda não confirma o recebimento de avisos.");
+        return;
+      }
+      if (!isWebPushSupported()) {
+        setDevicePermission("unsupported");
+        setDeviceMessage(isNativeNotificationBridgeAvailable()
+          ? "Esta versão do APK não oferece push em segundo plano. Instale o Vínkulo pelo navegador para receber avisos mesmo fechado."
+          : "Este navegador não oferece notificações push.");
+        return;
+      }
       const { registration } = await subscribeWebPushNotifications();
-      permissionRef.current = "granted";
       setDevicePermission("granted");
       setWebPushSubscribed(true);
       setPushDelivery(null);
@@ -266,14 +298,17 @@ export default function PilotNotificationCenter({
       await load();
     } catch (error) {
       const permission = "Notification" in window ? Notification.permission : "unsupported";
-      permissionRef.current = permission;
       setDevicePermission(permission);
-      setMessage(error instanceof Error ? error.message : "Não foi possível ativar as notificações push.");
+      setDeviceMessage(error instanceof Error ? error.message : "Não foi possível ativar as notificações push.");
+    } finally {
+      activatingRef.current = false;
+      setDeviceActivating(false);
     }
   }, [load]);
 
   function handleDeviceNotificationPermission() {
-    if (devicePermission === "denied") {
+    if (deviceCheckFailed) { setDeviceCheckRevision(value => value + 1); return; }
+    if (devicePermission === "denied" && !nativePushAvailable) {
       setShowDevicePermissionHelp((value) => !value);
       return;
     }
@@ -328,10 +363,11 @@ export default function PilotNotificationCenter({
                 <button type="button" onClick={() => setOpen(false)} aria-label="Fechar">×</button>
               </div>
             </header>
-            <section className={`notification-device-permission status-${devicePermission}`} aria-label="Notificações neste celular">
-              <div><strong>Avisos neste celular</strong><small>{webPushSubscribed ? "Ativados — você recebe avisos mesmo com o Vínkulo fechado" : devicePermission === "denied" ? "Bloqueados nas configurações do navegador ou aplicativo" : devicePermission === "unsupported" ? "Instale pelo navegador para receber avisos mesmo com o aplicativo fechado" : devicePermission === "granted" ? "Permissão liberada; conclua a ativação para receber avisos em segundo plano" : "Receba escalas, eventos, pedidos e demais avisos"}</small></div>
-              {!webPushSubscribed && devicePermission !== "unsupported" && <button type="button" onClick={handleDeviceNotificationPermission}>{devicePermission === "denied" ? "Como liberar" : "Ativar"}</button>}
+            <section className={`notification-device-permission status-${devicePermission}`} aria-label="Notificações neste aparelho" aria-busy={deviceChecking || deviceActivating}>
+              <div><strong>Avisos neste aparelho</strong><small>{deviceChecking ? "Conferindo a ativação neste aparelho…" : deviceCheckFailed ? "Não foi possível confirmar se os avisos estão ativados neste aparelho." : nativePushAvailable ? "A ativação é feita pelo aplicativo Android e depende da permissão de notificações do aparelho." : webPushSubscribed ? "Ativados para esta sessão, mesmo com o Vínkulo fechado" : devicePermission === "denied" ? "Bloqueados nas configurações do navegador ou aplicativo" : devicePermission === "unsupported" ? "Instale pelo navegador para receber avisos mesmo com o aplicativo fechado" : devicePermission === "granted" ? "Permissão liberada; conclua a ativação para receber avisos em segundo plano" : "Receba escalas, eventos, pedidos e demais avisos"}</small></div>
+              {!webPushSubscribed && (nativePushAvailable || devicePermission !== "unsupported") && <button type="button" disabled={deviceChecking || deviceActivating} onClick={handleDeviceNotificationPermission}>{deviceActivating ? "Ativando…" : deviceCheckFailed ? "Verificar novamente" : nativePushAvailable ? "Solicitar ativação" : devicePermission === "denied" ? "Como liberar" : "Ativar"}</button>}
             </section>
+            {deviceMessage && <p className="notification-device-help" role="status">{deviceMessage}</p>}
             {webPushSubscribed && <section className="notification-device-help" aria-live="polite">
               <strong>{pushDelivery?.consecutiveFailures ? "O último envio encontrou uma dificuldade" : "Privacidade neste aparelho"}</strong>
               <p>{pushDelivery?.consecutiveFailures
@@ -355,12 +391,11 @@ export default function PilotNotificationCenter({
               {unread > 0 && <button className="notification-read-all" type="button" onClick={() => markRead()}>Marcar todas como lidas</button>}
               {items.some((item) => item.read) && <button className="notification-clear-read" type="button" onClick={() => void clearRead()}>Limpar visualizadas</button>}
             </div>
+            {message && <p className="notification-device-help" role="status">{message}</p>}
             {loading ? (
               <p className="notification-empty">Carregando…</p>
-            ) : message ? (
-              <p className="notification-empty">{message}</p>
             ) : items.length === 0 ? (
-              <p className="notification-empty">Nenhuma solicitação nova.</p>
+              <p className="notification-empty">Nenhuma notificação por enquanto.</p>
             ) : (
               <>
               <div className="notification-scope-v5" role="group" aria-label="Filtrar notificações">
