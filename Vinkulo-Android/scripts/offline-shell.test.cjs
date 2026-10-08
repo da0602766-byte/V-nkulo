@@ -23,7 +23,7 @@ function shell(supported = true) {
       return elements.get(id);
     }, addEventListener(name, fn) { events[name] = fn; },
   };
-  const window = {location:{hash:'',assign(){}}, addEventListener(){}, setInterval(){},requestAnimationFrame(fn){fn();return 1;},cancelAnimationFrame(){},
+  const window = {confirm:()=>true,location:{hash:'',assign(){}}, addEventListener(){}, setInterval(){},requestAnimationFrame(fn){fn();return 1;},cancelAnimationFrame(){},
     setTimeout(fn) { timers.set(++nextTimer, fn); return nextTimer; }, clearTimeout(id) { timers.delete(id); },
   };
   if (supported) window.VinkuloOffline = {postMessage(raw) { requests.push(JSON.parse(raw)); }};
@@ -71,6 +71,40 @@ function snapshot() {
     compromissos:section([]),escalas:section([{id:3,titulo:'Minha escala',texto:'Recepção',data:'2026-09-29',resposta:'PENDENTE'}]),
   };
 }
+
+test('date-only calendar values keep their civil day in Brazil; missing agenda sections fail closed', () => {
+  const previousTZ=process.env.TZ;process.env.TZ='America/Sao_Paulo';
+  try {
+    const app=shell(),data=snapshot();delete data.compromissos;
+    app.send({prepared:true,preparedAt:1,validForMs:1000,snapshot:data});
+    app.elements.get('tab-agenda').handlers.click();
+    const content=app.elements.get('items').children.at(-1).children.map(n=>n.textContent).join(' ');
+    assert.match(content,/28\/09\/2026/);assert.doesNotMatch(content,/27\/09\/2026/);
+    assert.match(app.elements.get('window').textContent,/26\/09\/2026 a 27\/10\/2026/);
+    assert.match(app.elements.get('list-status').textContent,/Parte desta consulta não foi autorizada/);
+  } finally {if(previousTZ===undefined)delete process.env.TZ;else process.env.TZ=previousTZ;}
+});
+
+test('cancelling removal preserves readable copies and sends no lock; accepting removes only consultations', () => {
+  const app=shell();app.send({prepared:true,preparedAt:1,validForMs:1000,snapshot:snapshot()});
+  const count=app.requests.length;app.window.confirm=()=>false;app.elements.get('lock').handlers.click();
+  assert.equal(app.requests.length,count);assert.equal(app.elements.get('reader-content').hidden,false);
+  assert.equal(app.elements.get('shortcut-mural').attributes.href,'#read-mural');
+  app.window.confirm=()=>true;app.elements.get('lock').handlers.click();
+  assert.equal(app.requests.length,count+1);assert.equal(app.requests.at(-1).action,'lock');
+  assert.equal(app.elements.get('reader-content').hidden,true);
+});
+
+test('identity alone never claims consultations are ready; preparation reports progress and avoids double submits', () => {
+  const app=shell();app.send({prepared:true,preparedAt:1,validForMs:1000});
+  assert.equal(app.elements.get('context-title').textContent,'Ative suas consultas');
+  assert.equal(app.elements.get('consultation-count').textContent,'0 de 4 disponíveis');
+  const count=app.requests.length;app.elements.get('prepare').handlers.click();app.elements.get('prepare-requests').handlers.click();
+  assert.equal(app.requests.length,count+1);assert.equal(app.elements.get('prepare-requests').disabled,true);
+  assert.match(app.elements.get('context-detail').textContent,/Preparando com internet/);
+  app.send({result:'unavailable'});assert.equal(app.elements.get('prepare').disabled,false);
+  assert.match(app.elements.get('home-notice').textContent,/Não foi possível preparar/);
+});
 test('reader uses literal text, filters local data and clears operational content on lock', () => {
   const app=shell();
   app.send({prepared:true,communityName:'Teste',preparedAt:1000,validForMs:1000,snapshot:snapshot()});

@@ -14,6 +14,11 @@
   const send = action => { if (bridge) bridge.postMessage(JSON.stringify({ action, requestId: ++requestId })); };
   const date = value => {
     if (!value) return '';
+    // Calendar dates have no timezone. Parsing them as UTC shifts them in Brazil.
+    if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
+      const parts = String(value).split('-');
+      return parts[2] + '/' + parts[1] + '/' + parts[0];
+    }
     const parsed = new Date(value);
     return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toLocaleString('pt-BR');
   };
@@ -44,7 +49,7 @@
     const names = selected === 'agenda' ? ['eventos', 'compromissos'] : [selected];
     let rows = [], more = false, denied = false;
     names.forEach(name => {
-      const section = snapshot[name];
+      const section = snapshot[name] || {allowed:false,hasMore:false,items:[]};
       denied = denied || !section.allowed; more = more || section.hasMore;
       if (section.allowed) rows = rows.concat(section.items.map(item => ({item, name})));
     });
@@ -103,10 +108,15 @@
     // validForMs is remaining lifetime, not duration since preparedAt.
     const validUntil = ready ? new Date(Date.now() + Math.max(0, Number(state.validForMs) || 0)) : null;
     setText(byId('home-notice'), waiting ? 'Conferindo seu acesso…' : ready
-      ? 'Cópia salva · acesso até ' + validUntil.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'}) + '.'
+      ? 'Disponíveis até ' + validUntil.toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) + '.'
       : state.result === 'storage-error' ? 'Não foi possível ler as consultas. Seus dados não foram apagados.'
+      : state.result === 'unavailable' ? 'Não foi possível preparar. Confira a conexão e tente novamente.'
+      : state.prepared ? 'Sua identificação está salva. Falta ativar as consultas.'
       : 'Prepare com internet para consultar depois.');
     if (ready && state.result === 'unavailable') setText(byId('home-notice'), 'Atualização indisponível. A cópia anterior continua com prazo limitado.');
+    const total = ['mural','agenda','escalas','pedidos'].filter(available).length;
+    setText(byId('consultation-count'), total + ' de 4 disponíveis');
+    setText(byId('manage-label'), ready ? 'Gerenciar consultas offline' : 'Preparar consultas offline');
     ['mural','agenda','escalas','pedidos'].forEach(name => {
       const allowed = available(name), link = byId('shortcut-' + name);
       link.setAttribute('href', allowed ? '#read-' + name : '#offline-settings');
@@ -120,7 +130,7 @@
     waiting = !!state.refreshing;
     byId('prepare').disabled = waiting;
     byId('prepare-requests').disabled = waiting;
-    setText(byId('context-title'), state.prepared ? 'Aparelho preparado' : 'Preparação necessária');
+    setText(byId('context-title'), state.prepared && state.snapshot ? 'Consultas preparadas' : state.prepared ? 'Ative suas consultas' : state.result === 'storage-error' ? 'Consultas indisponíveis' : 'Prepare antes de ficar offline');
     const message = state.prepared
       ? state.snapshot ? 'Consultas protegidas disponíveis por tempo limitado. Esta é uma cópia da última atualização, não uma confirmação em tempo real.' : 'Identificação preparada na versão anterior. Ative as consultas offline para salvar conteúdo autorizado.'
       : state.result === 'storage-error'
@@ -178,9 +188,18 @@
     setText(byId('home-notice'), 'Atualize o WebView para preparar consultas. O sistema online continua acessível.');
   }
   byId('open').addEventListener('click', () => { if (!window.VinkuloNavigation || window.VinkuloNavigation.allow()) window.location.assign('/painel'); });
-  byId('prepare').addEventListener('click', () => { if (waiting) return; waiting = true; byId('prepare').disabled = true; send('refresh'); });
-  byId('prepare-requests').addEventListener('click', () => { if (waiting) return; waiting = true; byId('prepare-requests').disabled = true; send('refresh-requests'); });
-  byId('lock').addEventListener('click', () => { render({result:'locked'}); send('lock'); });
+  function prepare(action) {
+    if (waiting || !bridge) return;
+    waiting = true; byId('prepare').disabled = true; byId('prepare-requests').disabled = true;
+    setText(byId('context-detail'), 'Preparando com internet… Aguarde a confirmação antes de sair.');
+    send(action);
+  }
+  byId('prepare').addEventListener('click', () => prepare('refresh'));
+  byId('prepare-requests').addEventListener('click', () => prepare('refresh-requests'));
+  byId('lock').addEventListener('click', () => {
+    if (!window.confirm('Apagar as consultas locais de mural, agenda, escalas e pedidos? Será preciso internet para prepará-las novamente. Os rascunhos e as filas de visitantes e outros módulos permanecem.')) return;
+    render({result:'locked'}); send('lock');
+  });
   ['mural', 'agenda', 'escalas', 'pedidos'].forEach(name => byId('tab-' + name).addEventListener('click', () => {
     if (window.VinkuloNavigation) { window.VinkuloNavigation.go('#read-' + name); return; }
     if (name === 'pedidos' && (!snapshot || !snapshot.pedidos || !snapshot.pedidos.allowed)) return;

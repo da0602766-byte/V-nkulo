@@ -33,3 +33,27 @@ test('dropped replies time out, reject late data and allow retry; bridge errors 
 test('background polling never sends and active central only polls local status',()=>{
  const s=shell();s.reply(state([]));s.window.interval();assert.equal(s.requests.length,1);s.window.VinkuloNavigation={current:()=>'#pending-section'};s.window.interval();assert.equal(s.requests.at(-1).action,'status');s.reply(state([]));s.document.hidden=true;s.window.interval();assert.equal(s.requests.length,2);
 });
+
+test('locked counts are unknown rather than zero and previously visible summary is cleared',()=>{
+ const s=shell();s.reply(state([row('CONFLICT'),row('PENDING')]));
+ assert.equal(s.el('count-review').textContent,'1');assert.equal(s.el('home').attrs['data-attention'],'true');
+ assert.match(s.el('scope').textContent,/Resumo parcial/);
+ s.window.VinkuloPendingScreen.refresh();s.reply({sections:[{module:'notes',ready:false,rows:[row('DRAFT','SEGREDO')]}]});
+ assert.equal(s.el('count-review').textContent,'—');assert.equal(s.el('count-drafts').textContent,'—');
+ assert.match(s.el('home-status').textContent,/Acesso não preparado/);assert.doesNotMatch(s.el('home-status').textContent,/0 /);
+ assert.equal(s.el('access-details').open,true);assert.doesNotMatch(s.el('list').textContent,/SEGREDO/);
+ s.window.VinkuloPendingScreen.invalidate();assert.equal(s.el('count-queued').textContent,'—');assert.equal(s.el('scope').hidden,true);
+});
+
+test('empty authorized queues cannot sync even through a programmatic click',()=>{
+ const s=shell();s.reply(state([row('DRAFT')]));s.window.confirm=()=>true;
+ const count=s.requests.length;s.el('sync').events.click();assert.equal(s.requests.length,count);
+});
+
+test('pending search combines the selected filter and authorized titles without exposing locked rows or sending data',()=>{
+ const s=shell();s.reply(state([row('DRAFT','Reunião de domingo'),row('CONFLICT','Reunião de líderes'),row('CONFIRMED','Recibo') ]));
+ s.el('search').value='reunião';s.el('search').events.input();assert.match(s.el('result').textContent,/2 registros encontrados nesta busca/);
+ s.el('filters').children[1].events.click();assert.match(s.el('result').textContent,/1 registro encontrado/);assert.doesNotMatch(s.el('list').textContent,/domingo/);
+ s.el('search').value='SEGREDO';s.el('search').events.input();assert.match(s.el('result').textContent,/0 registros/);assert.doesNotMatch(s.el('list').textContent,/SEGREDO/);
+ assert.equal(s.requests.length,1);s.window.VinkuloPendingScreen.invalidate();assert.equal(s.el('search').value,'');
+});

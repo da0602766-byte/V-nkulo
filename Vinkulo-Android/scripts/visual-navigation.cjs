@@ -14,7 +14,7 @@ const csp="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'se
  try{browser=await chromium.launch({headless:true,...(process.env.VINKULO_BROWSER_CHANNEL?{channel:process.env.VINKULO_BROWSER_CHANNEL}:{})});}catch(e){server.close();throw e;}
  const errors=[];
  try{for(const scheme of ['light','dark'])for(const width of [320,390,600]){
-  const page=await browser.newPage({viewport:{width,height:844},colorScheme:scheme});page.on('pageerror',e=>errors.push(e.message));
+  const page=await browser.newPage({viewport:{width,height:844},colorScheme:scheme,timezoneId:'America/Sao_Paulo'});page.on('pageerror',e=>errors.push(e.message));
   await page.addInitScript(()=>{
    Object.defineProperty(navigator,'onLine',{get:()=>false});window.qaRequests=[];window.qaPrepared=true;window.qaFailSave=false;window.qaSaveDelay=0;
    const section=items=>({allowed:true,hasMore:false,items:items||[]});
@@ -23,7 +23,7 @@ const csp="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'se
    window.qaTheme={version:1,paletteId:'ACOLHEDOR',light,dark};
    window.qaPendingLocked=false;
    window.VinkuloPending={postMessage(raw){const q=JSON.parse(raw);window.qaRequests.push(q);setTimeout(()=>this.onmessage({data:JSON.stringify({requestId:q.requestId,validForMs:3600000,scheduled:q.action==='sync'?1:0,sections:[{module:'notes',ready:!window.qaPendingLocked,communityName:'Comunidade de teste',canSync:true,rows:['DRAFT','PENDING','CONFIRMED','CONFLICT','REJECTED','RETRY','SENDING'].map((state,i)=>({id:String(i),state,title:['Preparar encontro de domingo','Material da reunião','Aviso enviado','Revisar atualização','Conferir autorização','Envio sem resposta','Aguardando recibo'][i],updatedAt:1790592000000,receipt:state==='CONFIRMED'?'teste-123':'',message:state==='CONFLICT'?'O registro mudou. Confira antes de tentar novamente.':''}))},{module:'visitors',ready:false}]})}),0);}};
-   window.VinkuloOffline={postMessage(raw){const q=JSON.parse(raw);window.qaRequests.push(q);setTimeout(()=>this.onmessage({data:JSON.stringify({requestId:q.requestId,...(window.qaPrepared?{prepared:true,communityName:'Comunidade de teste',preparedAt:1,validForMs:3600000,theme:window.qaTheme,snapshot:{from:'2026-09-27',until:'2026-10-27',mural:section([{id:1,titulo:'Aviso de teste local',texto:'Somente validação visual.',data:'2026-09-28'}]),eventos:section(),compromissos:section(),escalas:section()}}:{prepared:false})})}),0);}};
+   window.VinkuloOffline={postMessage(raw){const q=JSON.parse(raw);window.qaRequests.push(q);setTimeout(()=>this.onmessage({data:JSON.stringify({requestId:q.requestId,...(window.qaPrepared?{prepared:true,communityName:'Comunidade de teste',preparedAt:Date.now()-600000,validForMs:3600000,theme:window.qaTheme,snapshot:{from:'2026-09-27',until:'2026-10-27',mural:section([{id:1,titulo:'Aviso de teste local',texto:'Somente validação visual.',data:'2026-09-28'}]),eventos:section(),compromissos:section(),escalas:section()}}:{prepared:false})})}),0);}};
    for(const name of ['Visitors','Modules'])window['Vinkulo'+name]={postMessage(raw){const q=JSON.parse(raw);window.qaRequests.push(q);setTimeout(()=>this.onmessage({data:JSON.stringify({requestId:q.requestId,module:q.module,prepared:window.qaPrepared,communityName:'Comunidade de teste',issuedAt:1,validForMs:3600000,canWrite:true,snapshot:{items:[],options:[{id:1,label:'Registro autorizado',version:1}]},rows:[],...(q.action==='save'?(window.qaFailSave?{error:'Falha de teste ao salvar'}:{savedId:'fixture-id'}):{})})}),q.action==='save'?window.qaSaveDelay:0);}};
   });
   const visible=async id=>assert.equal(await page.locator('#'+id).isVisible(),true,id);
@@ -34,7 +34,9 @@ const csp="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'se
   await page.evaluate(()=>document.fonts.ready);assert.equal(await page.evaluate(()=>document.fonts.check('16px "Instrument Sans"')),true);
   assert.equal(await page.locator('.feature').count(),6);assert.equal(await page.locator('#visitor-section').isVisible(),false);
   assert.equal(await page.locator('html').getAttribute('data-palette'),'ACOLHEDOR');assert.equal(await page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--primary').trim()),scheme==='light'?'#9b4938':'#e88a70');
-  const end=await page.locator('.feature-grid').boundingBox();assert.ok(end.y+end.height<844);await fit();await shot('home');
+  // The pending summary now precedes the grid. At 320px, preserve legible cards
+  // and allow scrolling to operational modules; all four reading shortcuts fit.
+  await shot('home');const end=await page.locator('#shortcut-pedidos').boundingBox();assert.ok(end.y+end.height<844, 'Reading shortcuts bottom: '+(end.y+end.height));await fit();
   await page.locator('#shortcut-agenda').click();await visible('reader');assert.equal(await page.locator('#home-screen').isVisible(),false);assert.equal(await page.locator('#tab-agenda').getAttribute('aria-pressed'),'true');
   await page.locator('#screen-back').click();await page.locator('#manage-offline').click();await visible('offline-settings');assert.equal(await page.evaluate(()=>window.qaRequests.some(q=>q.action!=='status')),false);await shot('settings');
   await go('#module-section');await visible('module-menu');await shot('functions');await page.locator('#module-menu a[href="#module-notes"]').click();await page.locator('#module-input-titulo').waitFor();
@@ -56,7 +58,18 @@ const csp="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'se
   await page.evaluate(()=>{window.qaPendingLocked=true;window.VinkuloPendingScreen.invalidate();window.VinkuloPendingScreen.refresh();});await page.waitForFunction(()=>document.getElementById('pending-result').textContent.startsWith('0 registro'));assert.doesNotMatch(await page.locator('#pending-list').textContent(),/Preparar encontro|Aviso enviado/);await shot('pending-locked');
   await go('#top');await fit();assert.ok((await page.locator('.app-header > div').boundingBox()).width>=256);assert.ok((await page.locator('.feature').first().boundingBox()).width>=256);await shot('large-home');
   await go('#module-notes');await page.waitForFunction(()=>!document.getElementById('module-workspace').hidden);await fit();assert.deepEqual(await page.evaluate(()=>Array.from(document.querySelectorAll('button,a,input,select,textarea,summary')).filter(e=>e.getClientRects().length&&e.getBoundingClientRect().height<48).map(e=>e.id||e.textContent)),[]);await shot('large-notes');
-  await page.evaluate(()=>{window.qaPrepared=false;window.dispatchEvent(new Event('vinkulo:offline-status'));});await page.waitForFunction(()=>!document.documentElement.hasAttribute('data-palette'));assert.equal(await page.locator('#community').textContent(),'');await go('#read-agenda');await visible('reader-locked');await page.close();
+  await page.evaluate(()=>{window.qaPrepared=false;window.dispatchEvent(new Event('vinkulo:offline-status'));});await page.waitForFunction(()=>!document.documentElement.hasAttribute('data-palette'));assert.equal(await page.locator('#community').textContent(),'');await go('#read-agenda');await visible('reader-locked');
+  await page.evaluate(()=>{document.documentElement.style.fontSize='100%';window.dispatchEvent(new CustomEvent('vinkulo:native-network',{detail:'online'}));});
+  await go('#top');await page.waitForFunction(()=>document.getElementById('pending-count-drafts').textContent==='—');await fit();await page.screenshot({path:path.join(output,'home-unprepared-'+scheme+'-'+width+'.png'),fullPage:true});
+  await page.locator('#manage-offline').click();await fit();await page.screenshot({path:path.join(output,'preparation-'+scheme+'-'+width+'.png'),fullPage:true});
+  await page.evaluate(()=>{window.qaPrepared=true;window.qaPendingLocked=false;window.qaTheme=null;window.dispatchEvent(new Event('vinkulo:offline-status'));window.dispatchEvent(new CustomEvent('vinkulo:native-network',{detail:'offline'}));});
+  await page.waitForFunction(()=>document.getElementById('context-title').textContent==='Consultas preparadas');
+  await go('#top');await page.waitForFunction(()=>document.getElementById('pending-count-review').textContent==='2');await page.screenshot({path:path.join(output,'home-ready-'+scheme+'-'+width+'.png'),fullPage:true});
+  await go('#pending-section');await page.locator('#pending-filters button').nth(1).click();await page.screenshot({path:path.join(output,'review-'+scheme+'-'+width+'.png'),fullPage:true});
+  await page.locator('#pending-search').fill('atualização');assert.match(await page.locator('#pending-result').textContent(),/^1 registro encontrado nesta busca/);assert.doesNotMatch(await page.locator('#pending-list').textContent(),/Conferir autorização/);await shot('pending-search');
+  await page.locator('#pending-search').fill('');
+  await go('#offline-settings');await page.locator('summary').filter({hasText:'Privacidade e remoção'}).click();page.once('dialog',d=>d.dismiss());await page.locator('#lock').click();assert.equal(await page.locator('#context-title').textContent(),'Consultas preparadas');assert.equal(await page.evaluate(()=>window.qaRequests.some(q=>q.action==='lock')),false);
+  await page.close();
  }assert.deepEqual(errors,[]);console.log('Visual QA passed: six layouts/themes; dedicated screens; guards; failed/raced saves; theme reset; 200% text; offline navigation. '+output);
  }finally{await browser.close();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);process.exitCode=1;});
