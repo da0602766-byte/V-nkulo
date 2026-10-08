@@ -103,7 +103,10 @@ public class OfflineFoundationTest {
             requireVisible(device,supportsBridge ? "O que você quer fazer?" : "Seu Vínkulo começa aqui.");
             if (android.os.Build.VERSION.SDK_INT >= 35) assertTrue("Modern WebView must exercise the bridge", supportsBridge);
             String expected = supportsBridge ? "Preparação necessária" : "Atualize o Android System WebView";
-            assertTrue("Local JavaScript must render a usable state", device.wait(Until.hasObject(By.text(expected)),15000));
+            // Preparation status lives inside the collapsed consultation drawer.
+            // Verify the initialized DOM while the task heading stays accessible.
+            if (supportsBridge) requireLocalDocument(scenario,expected);
+            else assertTrue("Local JavaScript must render a usable state", device.wait(Until.hasObject(By.text(expected)),15000));
             if (!supportsBridge) assertTrue(device.hasObject(By.clazz("android.widget.Button").text("ATUALIZAR WEBVIEW"))
                     || device.hasObject(By.clazz("android.widget.Button").text("Atualizar WebView")));
             for(int repeat=0;repeat<5;repeat++) {
