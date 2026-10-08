@@ -30,11 +30,14 @@ export default function StoragePrivacyWorkspace() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [googleToast, setGoogleToast] = useState<GoogleToastState>(null);
+  const [loadError, setLoadError] = useState("");
+  const [revision, setRevision] = useState(0);
 
-  async function load() {
-    const response = await fetch("/api/storage/preferences", { cache: "no-store" });
+  async function load(signal?: AbortSignal) {
+    const response = await fetch("/api/storage/preferences", { cache: "no-store", signal });
     const result = await response.json() as StorageData;
     if (!response.ok) throw new Error(result.error || "Não foi possível carregar a privacidade.");
+    if (signal?.aborted) return;
     setData(result);
   }
 
@@ -54,12 +57,17 @@ export default function StoragePrivacyWorkspace() {
       } else if (failure) {
         setGoogleToast({ variant: "error", title: "Não foi possível conectar o Drive", detail: failure });
       }
-      void load().catch((error) =>
-        setGoogleToast({ variant: "error", title: "Não foi possível carregar", detail: (error as Error).message }),
-      );
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void load(controller.signal).catch((error) => {
+      if (!controller.signal.aborted) setLoadError((error as Error).message);
+    });
+    return () => controller.abort();
+  }, [revision]);
 
   async function savePreference(next: Partial<{
     provider: "LOCAL" | "GOOGLE_DRIVE";
@@ -185,7 +193,7 @@ export default function StoragePrivacyWorkspace() {
     }
   }
 
-  if (!data) return <section className="storage-privacy-card" aria-busy="true"><p>Carregando privacidade e armazenamento…</p></section>;
+  if (!data) return <section className="storage-privacy-card storage-load-state" aria-busy={!loadError}>{loadError ? <><p role="alert">{loadError}</p><button type="button" onClick={() => { setLoadError(""); setRevision(value => value + 1); }}>Tentar novamente</button></> : <p role="status">Carregando privacidade e armazenamento…</p>}</section>;
   const driveConnected = Boolean(data.google?.connected);
   return (
     <section className="storage-privacy-card" aria-labelledby="storage-privacy-title">

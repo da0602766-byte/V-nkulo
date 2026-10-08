@@ -2,8 +2,9 @@
 
 import TransientFeedback from "./TransientFeedback";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CareNotesBoard from "./CareNotesBoard";
+import "./day-thread-ux.css";
 
 // O fio reúne o que já aconteceu e o que ainda vai acontecer no dia, numa
 // ordem só. O que o sistema não capta sozinho entra como registro manual.
@@ -84,14 +85,16 @@ export default function DayThreadWorkspace({
 }) {
   const hoje = useMemo(() => diaLocal(new Date()), []);
   const [dia, setDia] = useState(hoje);
-  const [itens, setItens] = useState<ItemFio[]>([]);
-  const [resumo, setResumo] = useState<ResumoFio | null>(null);
+  const [resultadoAtual, setResultadoAtual] = useState<{ key: string; itens: ItemFio[]; resumo: ResumoFio | null } | null>(null);
+  const [falhaConsulta, setFalhaConsulta] = useState<{ key: string; message: string } | null>(null);
   const [camadasAtivas, setCamadasAtivas] = useState<ItemFio["camada"][]>([]);
-  const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
   const [aviso, setAviso] = useState("");
   const [formAberto, setFormAberto] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  const envioEmCurso = useRef(false);
+  const tituloInput = useRef<HTMLInputElement>(null);
+  const registrarButton = useRef<HTMLButtonElement>(null);
   const [novoTitulo, setNovoTitulo] = useState("");
   const [novoDetalhe, setNovoDetalhe] = useState("");
   const [novaCamada, setNovaCamada] = useState<ItemFio["camada"]>("PESSOAS");
@@ -106,36 +109,47 @@ export default function DayThreadWorkspace({
 
   const [recarga, setRecarga] = useState(0);
   const recarregar = useCallback(() => setRecarga((n) => n + 1), []);
+  const consultaKey = JSON.stringify([dia, recarga]);
+  const atual = resultadoAtual?.key === consultaKey ? resultadoAtual : null;
+  const erroConsulta = falhaConsulta?.key === consultaKey ? falhaConsulta.message : "";
+  const carregando = !atual && !erroConsulta;
+  const itens = useMemo(() => atual?.itens || [], [atual]);
+  const resumo = atual?.resumo;
 
-  // Toda escrita de estado acontece depois de um await: escrever de forma
-  // síncrona dentro do efeito dispara renderização em cascata. O sinalizador
-  // de cancelamento evita que a resposta de um dia antigo sobrescreva a de um
-  // dia mais novo quando alguém troca a data rápido.
+  // A chave oculta o dia anterior já na primeira renderização da nova data.
   useEffect(() => {
-    let cancelado = false;
+    const controller = new AbortController();
     (async () => {
       try {
         const resposta = await fetch(`/api/pilot/fio?dia=${dia}`, {
           cache: "no-store",
+          signal: controller.signal,
         });
         const resultado = await resposta.json();
-        if (cancelado) return;
+        if (controller.signal.aborted) return;
         if (!resposta.ok) {
           throw new Error(resultado.error || "Não foi possível abrir o fio do dia.");
         }
-        setItens(resultado.itens || []);
-        setResumo(resultado.resumo || null);
-        setErro("");
+        if (!Array.isArray(resultado.itens)) throw new Error("Não foi possível ler os registros. Tente novamente.");
+        setResultadoAtual({ key: consultaKey, itens: resultado.itens, resumo: resultado.resumo || null });
+        setFalhaConsulta(null);
       } catch (falha) {
-        if (!cancelado) setErro((falha as Error).message);
-      } finally {
-        if (!cancelado) setCarregando(false);
+        if (!controller.signal.aborted) setFalhaConsulta({ key: consultaKey, message: (falha as Error).message });
       }
     })();
     return () => {
-      cancelado = true;
+      controller.abort();
     };
-  }, [dia, recarga]);
+  }, [dia, consultaKey]);
+
+  useEffect(() => {
+    if (formAberto) tituloInput.current?.focus();
+  }, [formAberto]);
+
+  function fecharFormulario() {
+    setFormAberto(false);
+    registrarButton.current?.focus();
+  }
 
   // "Agora" precisa vir de estado, nunca de Date.now() durante a renderização:
   // no servidor e no cliente o valor seria diferente e a hidratação quebraria.
@@ -181,7 +195,8 @@ export default function DayThreadWorkspace({
 
   async function registrar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
-    if (!novoTitulo.trim()) return;
+    if (!novoTitulo.trim() || envioEmCurso.current) return;
+    envioEmCurso.current = true;
     setSalvando(true);
     setErro("");
     setAviso("");
@@ -203,12 +218,13 @@ export default function DayThreadWorkspace({
       }
       setNovoTitulo("");
       setNovoDetalhe("");
-      setFormAberto(false);
+      fecharFormulario();
       setAviso(resultado.message || "Registro adicionado ao fio do dia.");
       recarregar();
     } catch (falha) {
       setErro((falha as Error).message);
     } finally {
+      envioEmCurso.current = false;
       setSalvando(false);
     }
   }
@@ -226,7 +242,8 @@ export default function DayThreadWorkspace({
           <p className="day-thread-count">
             {carregando
               ? "Organizando o dia…"
-              : `${visiveis.length} ${visiveis.length === 1 ? "registro" : "registros"} no fio`}
+              : erroConsulta ? "Consulta indisponível"
+              : `${visiveis.length} ${visiveis.length === 1 ? "registro" : "registros"} ${camadasAtivas.length ? `de ${itens.length} · filtros ativos` : "no fio"}`}
           </p>
         </div>
         <div className="day-thread-actions">
@@ -236,18 +253,22 @@ export default function DayThreadWorkspace({
               type="date"
               value={dia}
               max={hoje}
+              disabled={salvando}
               onChange={(evento) => {
-                setCarregando(true);
                 setDia(evento.target.value || hoje);
               }}
             />
           </label>
+          {dia !== hoje && <button type="button" className="day-thread-secondary" disabled={salvando} onClick={() => setDia(hoje)}>Voltar para hoje</button>}
           {podeRegistrar && (
             <button
               type="button"
               className="day-thread-register"
+              ref={registrarButton}
+              disabled={salvando}
               onClick={() => setFormAberto((aberto) => !aberto)}
               aria-expanded={formAberto}
+              aria-controls="day-thread-register-form"
             >
               Registrar no fio
             </button>
@@ -267,7 +288,7 @@ export default function DayThreadWorkspace({
           <article>
             <small>Registros</small>
             <strong>{resumo.registros}</strong>
-            <em>no fio de hoje</em>
+            <em>{dia === hoje ? "no fio de hoje" : "no dia selecionado"}</em>
           </article>
           {resumo.visitantes !== null && (
             <article>
@@ -288,7 +309,7 @@ export default function DayThreadWorkspace({
           }>
             <small>Escalas</small>
             <strong>{resumo.escalas.confirmadas}<span>/{resumo.escalas.total}</span></strong>
-            <em>{resumo.escalas.total === 0 ? "nenhuma hoje" : "confirmadas"}</em>
+            <em>{resumo.escalas.total === 0 ? "nenhuma neste dia" : "confirmadas"}</em>
           </article>
         </div>
       )}
@@ -317,10 +338,13 @@ export default function DayThreadWorkspace({
       </div>
 
       {podeRegistrar && formAberto && (
-        <form className="day-thread-form" onSubmit={registrar}>
+        <form id="day-thread-register-form" className="day-thread-form" onSubmit={registrar} aria-busy={salvando}>
+          <p className="day-thread-form-context">Registrar em <strong>{formatarDiaLongo(dia)}</strong>. Título obrigatório.</p>
           <label>
             Título
             <input
+              ref={tituloInput}
+              disabled={salvando}
               value={novoTitulo}
               maxLength={160}
               required
@@ -331,6 +355,7 @@ export default function DayThreadWorkspace({
           <label>
             Camada
             <select
+              disabled={salvando}
               value={novaCamada}
               onChange={(evento) =>
                 setNovaCamada(evento.target.value as ItemFio["camada"])
@@ -346,6 +371,7 @@ export default function DayThreadWorkspace({
           <label className="day-thread-form-wide">
             Detalhe <small>opcional</small>
             <textarea
+              disabled={salvando}
               value={novoDetalhe}
               rows={2}
               maxLength={900}
@@ -355,6 +381,8 @@ export default function DayThreadWorkspace({
           <label>
             Quem vê
             <select
+              disabled={salvando}
+              aria-describedby="day-thread-visibility-hint"
               value={novaVisibilidade}
               onChange={(evento) => setNovaVisibilidade(evento.target.value)}
             >
@@ -365,10 +393,11 @@ export default function DayThreadWorkspace({
               ))}
             </select>
           </label>
+          {erro && <p className="day-thread-form-error" role="alert">{erro} Seus dados continuam no formulário.</p>}
           <footer>
-            <small>{visibilidadeEscolhida?.hint}</small>
-            <button type="button" onClick={() => setFormAberto(false)}>
-              Cancelar
+            <small id="day-thread-visibility-hint">{visibilidadeEscolhida?.hint}</small>
+            <button type="button" disabled={salvando} onClick={fecharFormulario}>
+              Fechar
             </button>
             <button type="submit" disabled={salvando || !novoTitulo.trim()}>
               {salvando ? "Registrando…" : "Registrar"}
@@ -377,16 +406,18 @@ export default function DayThreadWorkspace({
         </form>
       )}
 
-      {(erro || aviso) && (
-        <TransientFeedback className={`operations-feedback ${erro ? "error" : ""}`} role="status">
-          {erro || aviso}
+      {aviso && (
+        <TransientFeedback tone="success" role="status">
+          {aviso}
         </TransientFeedback>
       )}
 
       <div className="day-thread-body-v5">
-      <div className="day-thread-main-v5">
-      {carregando && !itens.length ? (
-        <p className="home-thread-empty">Organizando o dia…</p>
+      <div className="day-thread-main-v5" aria-busy={carregando}>
+      {carregando ? (
+        <p className="home-thread-empty" role="status">Organizando o dia…</p>
+      ) : erroConsulta ? (
+        <div className="day-thread-load-error"><p role="alert">{erroConsulta}</p><button type="button" className="day-thread-secondary" onClick={recarregar}>Tentar novamente</button></div>
       ) : visiveis.length ? (
         <ol className="home-timeline day-thread-timeline">
           {visiveis.map((item, indice) => (
@@ -437,7 +468,7 @@ export default function DayThreadWorkspace({
         <div className="home-thread-empty">
           <strong>
             {camadasAtivas.length
-              ? "Nenhum registro nessa camada"
+              ? "Nenhum registro nas camadas selecionadas"
               : "Nada registrado neste dia"}
           </strong>
           <p>
@@ -445,6 +476,7 @@ export default function DayThreadWorkspace({
               ? "Limpe o filtro para ver o dia inteiro."
               : "O fio reúne cultos, escalas, visitantes, pedidos e mural. O que não for captado automaticamente pode ser registrado à mão."}
           </p>
+          {camadasAtivas.length > 0 && <button type="button" className="day-thread-secondary" onClick={() => setCamadasAtivas([])}>Limpar filtros</button>}
         </div>
       )}
       </div>
@@ -467,8 +499,8 @@ export default function DayThreadWorkspace({
             })()}
           </section>
         )}
-        <section>
-          <h3>{dia === hoje ? "Ainda hoje" : "Depois deste ponto"}</h3>
+        {atual && dia === hoje && <section>
+          <h3>Ainda hoje</h3>
           {(() => {
             const futuros = agora
               ? visiveis.filter((item) => Date.parse(item.ocorreEm) > agora)
@@ -483,7 +515,7 @@ export default function DayThreadWorkspace({
               </div>
             ));
           })()}
-        </section>
+        </section>}
         <CareNotesBoard compact />
       </aside>
       </div>

@@ -1,0 +1,25 @@
+.day-thread-workspace :is(.day-thread-date input, .day-thread-register, .day-thread-agenda-link, .day-thread-layers button, .day-thread-form input, .day-thread-form select, .day-thread-form footer button) { min-height: 44px; }
+.day-thread-workspace :is(button, a, input, select, textarea):focus-visible { outline: 3px solid var(--pilot-primary, #6942cf); outline-offset: 3px; }
+.day-thread-workspace .day-thread-form { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.day-thread-form > *, .day-thread-form :is(input, select, textarea), .day-thread-actions > * { min-width: 0; max-width: 100%; }
+.day-thread-form :is(input, select, textarea) { width: 100%; font-size: 16px; }
+.day-thread-form-context { grid-column: 1 / -1; margin: 0; color: var(--pilot-muted); font-size: 14px; line-height: 1.5; }
+.day-thread-form-context strong { color: var(--pilot-text); }
+.day-thread-form-error, .day-thread-load-error { padding: 16px; border: 1px solid var(--pilot-line); border-left: 4px solid var(--rose, #b42338); border-radius: 10px; background: var(--pilot-surface); color: var(--pilot-text); line-height: 1.5; overflow-wrap: anywhere; }
+.day-thread-form-error { grid-column: 1 / -1; margin: 0; }
+.day-thread-secondary { min-height: 44px; padding: 10px 14px; border: 1px solid var(--pilot-line); border-radius: 10px; background: var(--pilot-surface); color: var(--pilot-text); font: inherit; font-size: 14px; cursor: pointer; }
+.day-thread-load-error p { margin: 0 0 12px; }
+.day-thread-workspace button:disabled { cursor: not-allowed; opacity: .6; }
+.day-thread-workspace .home-timeline-content { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  .day-thread-workspace .day-thread-stats-v5 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .day-thread-stats-v5 article { min-width: 0; padding: 12px; overflow-wrap: anywhere; }
+  .day-thread-workspace .day-thread-form { grid-template-columns: minmax(0, 1fr); }
+  .day-thread-form footer small { flex-basis: 100%; min-width: 0; }
+  .day-thread-form footer button { flex: 1; }
+  .day-thread-actions { margin-left: 0; gap: 12px; }
+  .day-thread-date { flex: 1 1 140px; }
+  .day-thread-workspace .day-thread-register { flex: 1 0 160px; white-space: normal; }
+  .day-thread-workspace .day-thread-agenda-link { width: 100%; padding: 0; white-space: normal; }
+  .day-thread-workspace .day-thread-date input { width: 100%; font-size: 16px; }
+}
