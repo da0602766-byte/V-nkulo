@@ -102,7 +102,7 @@ public class OfflineFoundationTest {
             boolean supportsBridge = WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER);
             requireVisible(device,supportsBridge ? "O que você quer fazer?" : "Seu Vínkulo começa aqui.");
             if (android.os.Build.VERSION.SDK_INT >= 35) assertTrue("Modern WebView must exercise the bridge", supportsBridge);
-            String expected = supportsBridge ? "Preparação necessária" : "Atualize o Android System WebView";
+            String expected = supportsBridge ? "Prepare antes de ficar offline" : "Atualize o Android System WebView";
             // Preparation status lives inside the collapsed consultation drawer.
             // Verify the initialized DOM while the task heading stays accessible.
             if (supportsBridge) requireLocalDocument(scenario,expected);
