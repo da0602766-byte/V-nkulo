@@ -15,7 +15,7 @@
     "versionCode": 24,
     "file": "VINKULO_ANDROID_1.21.0_HOMOLOGACAO.apk",
     "bytes": 639993,
-    "sha256": "ac4b047b2ff30075123da2893e575174371d9eae4c7519d54651141ea23dbede",
+    "sha256": "fdfaa435995f3c425da5ba7abfae72519f88f291577aae77e29faabbdf438dc6",
     "sourceCommit": "d744e484eb7176e2414cc13e4b1ebe85bd3d06c1",
     "workflowRun": "https://github.com/da0602766-byte/V-nkulo/actions/runs/37806857178",
     "physicalValidation": "pending"
