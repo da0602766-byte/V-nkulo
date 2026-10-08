@@ -89,7 +89,7 @@ html body .pilot-dashboard[data-ui-version="v2"] .pilot-workspace { min-width: 0
     background:var(--pilot-surface);
   }
   html body .pilot-dashboard[data-ui-version="v2"] .pilot-workspace[data-fullscreen-view="mensagens"] .private-chat-layout.has-thread {
-    display:grid !important; grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr);
+    display:grid !important; grid-template-columns:minmax(0,1fr) !important; grid-template-rows:minmax(0,1fr);
     flex:1 1 0; height:auto !important; min-height:0 !important; max-width:none;
   }
   html body .pilot-dashboard[data-ui-version="v2"] .pilot-workspace[data-fullscreen-view="mensagens"] .private-chat-thread { height:100%; min-height:0; overflow:hidden; }
