@@ -19,6 +19,8 @@
   const states={DRAFT:'Rascunho — não enviado',PENDING:'Na fila',SENDING:'Aguardando confirmação',RETRY:'Aguardando nova tentativa',CONFIRMED:'Confirmado no servidor',CONFLICT:'Revisão necessária',REJECTED:'Recusado'};
   let module=el('kind').value,requestId=0,busy=false,prepared=false,editing='',version=0,snapshot={},canWrite=false,expiry,signature='',lastAction='';
   let baseline='',saving='';
+  let saveToQueue=false,preparationDone=null;
+  const formTitles={requests:'Novo pedido',notes:'Nova anotação',followups:'Novo acompanhamento',checklists:'Atualizar tarefa',cells:'Rascunho de relatório',parking:'Nova ocorrência'};
   const fingerprint=()=>JSON.stringify(definitions[module].map(([key])=>document.getElementById('module-input-'+key)?.value??''));
   const dirty=()=>prepared&&fingerprint()!==baseline;
   const dirtyNotice=()=>{el('dirty').hidden=!dirty();};
@@ -29,6 +31,10 @@
   function replaceList(container,build){const fragment=document.createDocumentFragment();container.setAttribute('aria-busy','true');build(fragment);container.textContent='';container.appendChild(fragment);container.setAttribute('aria-busy','false');}
   function button(parent,label,fn,context){const b=text(parent,'button',label);b.type='button';b.className='secondary';if(context)b.setAttribute('aria-label',label+': '+context);b.addEventListener('click',()=>{if(!busy)fn();});}
   function form(payload){
+    el('title').textContent=formTitles[module];el('form-title').textContent=module==='cells'?'Registre como foi a reunião':'Preencha os dados';
+    el('save').textContent=module==='cells'?'Salvar relatório neste aparelho':'Guardar para terminar depois';
+    el('save').className=module==='cells'?'primary':'secondary';
+    el('save-help').textContent=module==='cells'?'Este relatório fica salvo neste aparelho. O envio de relatórios offline ainda não está disponível: conclua no sistema online quando houver conexão.':'O envio será tentado com internet. Aguarde a confirmação; guardar para depois não envia.';
     el('fields').textContent='';version=payload?.version??0;
     for(const [key,label,kind] of definitions[module]){
       const l=text(el('fields'),'label',label);l.htmlFor='module-input-'+key;
@@ -39,29 +45,32 @@
         if(kind==='options'&&payload&&!options.some(o=>String(o.id)===String(payload[key]))){const o=text(field,'option','Registro salvo — confira autorização online');o.value=String(payload[key]);}
       }else if(kind==='date')field.type='date';else field.maxLength=kind;
       field.enterKeyHint=field.tagName==='TEXTAREA'?'done':'next';
-      if(payload)field.value=String(payload[key]??'');
+      if(payload)field.value=String(payload[key]??'');else if(kind==='date'&&key==='data')field.value=new Date().toLocaleDateString('sv-SE');
       el('fields').appendChild(field);
       field.addEventListener('input',dirtyNotice);field.addEventListener('change',dirtyNotice);
       if(key==='itemId')field.addEventListener('change',()=>{version=(snapshot.options||[]).find(o=>String(o.id)===field.value)?.version??0;});
     }
     clean();
   }
-  function clear(){el('settings').open=true;prepared=false;snapshot={};signature='';editing='';window.clearTimeout(expiry);el('workspace').hidden=true;el('rows').textContent='';el('items').textContent='';el('fields').textContent='';el('community').textContent='';el('updated').textContent='';el('status').textContent='';clean();}
+  function clear(){saveToQueue=false;el('locked').hidden=false;el('settings').open=true;prepared=false;snapshot={};signature='';editing='';window.clearTimeout(expiry);el('workspace').hidden=true;el('rows').textContent='';el('items').textContent='';el('fields').textContent='';el('community').textContent='';el('updated').textContent='';el('status').textContent='';clean();}
   function send(action,extra={}){
-    if(!bridge||(busy&&action!=='lock'))return;busy=true;lastAction=action;el('save').disabled=true;el('prepare').disabled=true;el('kind').disabled=true;
+    if(!bridge||(busy&&action!=='lock'))return;busy=true;lastAction=action;el('save').disabled=true;el('save-send').disabled=true;el('prepare').disabled=true;el('kind').disabled=true;
     bridge.postMessage(JSON.stringify({action,module,requestId:++requestId,...extra}));
   }
   function render(s){
-    busy=false;el('save').disabled=false;el('prepare').disabled=!bridge;el('kind').disabled=false;
-    if(s.error){if(s.prepared!==true)clear();setText(el('status'),s.error);return;}
+    busy=false;el('save').disabled=false;el('save-send').disabled=false;el('prepare').disabled=!bridge;el('kind').disabled=false;
+    if(s.error){saveToQueue=false;if(s.prepared!==true)clear();setText(el('status'),s.error);return;}
     if(!s.prepared){clear();setText(el('status'),'Prepare este módulo com internet e a mesma conta/comunidade para acessar o trabalho salvo.');return;}
-    const first=!prepared;prepared=true;canWrite=s.canWrite;snapshot=s.snapshot||{};el('workspace').hidden=false;el('community').textContent=s.communityName;
+    const first=!prepared;prepared=true;canWrite=s.canWrite;snapshot=s.snapshot||{};el('locked').hidden=true;el('workspace').hidden=false;el('community').textContent=s.communityName;
     el('updated').textContent='Última consulta: '+new Date(s.issuedAt).toLocaleString('pt-BR')+'. Não representa mudanças posteriores.';
-    if(first){form();el('settings').open=false;setText(el('status'),'Consulta preparada. Salvar não envia.');}
+    if(first){form();el('settings').open=false;setText(el('status'),'Função pronta. Preencha abaixo; você pode guardar sem internet.');}
     if(s.savedId){editing=s.savedId;baseline=saving;dirtyNotice();setText(el('status'),'Rascunho salvo no aparelho. Ainda não enviado.');}else if(lastAction!=='status')setText(el('status'),'Estado atualizado. Confira cada registro abaixo.');
     el('sync').hidden=!canWrite||module==='cells';
+    el('save-send').hidden=!canWrite||module==='cells';
     window.clearTimeout(expiry);expiry=window.setTimeout(()=>{clear();el('status').textContent='Autorização vencida; trabalho salvo preservado. Prepare novamente.';send('status');},Math.max(0,Number(s.validForMs)||0));
-    const next=JSON.stringify([s.rows,snapshot]);if(next===signature)return;signature=next;
+    let enqueueId='';
+    if(s.savedId&&saveToQueue){saveToQueue=false;if(fingerprint()===saving){enqueueId=s.savedId;editing='';form();}else setText(el('status'),'Rascunho salvo. Há novas alterações: salve novamente antes de enviar.');}
+    const next=JSON.stringify([s.rows,snapshot]);if(next===signature){if(enqueueId)send('enqueue',{id:enqueueId});return;}signature=next;
     const savedItems=[...(snapshot.memberships||[]),...(snapshot.items||[])];
     replaceList(el('items'),fragment=>{for(const [index,item] of savedItems.entries()){const a=text(fragment,'article','');a.className='entry';a.setAttribute('role','listitem');const h=text(a,'h3',item.label);h.id='module-saved-'+index;a.setAttribute('aria-labelledby',h.id);text(a,'p',item.text);if(item.status)text(a,'p',item.status);if(item.date)text(a,'p',item.date);}if(!savedItems.length)text(fragment,'p','Nenhum registro nesta cópia limitada. Consulte o sistema online para outros registros.');});
     replaceList(el('rows'),fragment=>{for(const [index,row] of (s.rows||[]).entries()){const title=row.payload.titulo||row.payload.resultado||row.payload.tipo||'Rascunho salvo';const a=text(fragment,'article','');a.className='entry';a.setAttribute('role','listitem');const h=text(a,'h3',title);h.id='module-row-'+index;a.setAttribute('aria-labelledby',h.id);text(a,'p',states[row.state]||'Estado desconhecido');if(row.message)text(a,'p',row.message);if(row.resultId)text(a,'p','Recibo: '+row.resultId);
@@ -73,18 +82,20 @@
       }
       if(['DRAFT','CONFIRMED','CONFLICT','REJECTED'].includes(row.state))button(a,'Remover cópia do aparelho',()=>{if(editing===row.id&&!allow())return;if(window.confirm('Apagar somente esta cópia local?')){if(editing===row.id){editing='';form();}send('discard',{id:row.id});}},title);
     }});
+    if(enqueueId)send('enqueue',{id:enqueueId});
   }
-  if(bridge)bridge.onmessage=e=>{if(document.hidden)return;try{const s=JSON.parse(e.data);if(s.requestId===requestId&&(!s.module||s.module===module))render(s);}catch{busy=false;clear();el('status').textContent='Resposta local indisponível.';}};
+  if(bridge)bridge.onmessage=e=>{if(document.hidden)return;try{const s=JSON.parse(e.data);if(s.requestId===requestId&&(!s.module||s.module===module)){render(s);if(preparationDone){const done=preparationDone;preparationDone=null;done(s);}}}catch{busy=false;clear();el('status').textContent='Resposta local indisponível.';if(preparationDone){const done=preparationDone;preparationDone=null;done({error:'Resposta indisponível.'});}}};
   else{el('prepare').disabled=true;el('status').textContent='Atualize o Android System WebView para usar os módulos protegidos.';}
   function openModule(next){if(!definitions[next]||next===module)return;clear();busy=false;module=next;el('kind').value=next;requestId++;el('help').textContent=help[module];send('status');}
-  window.VinkuloModuleScreen={open:openModule};
+  window.VinkuloModuleScreen={open:openModule,prepareOffline(next,done){if(!bridge||!definitions[next]||(busy&&lastAction!=='status'))return false;clear();busy=false;module=next;el('kind').value=next;el('help').textContent=help[module];preparationDone=done;send('prepare');return true;}};
   el('kind').addEventListener('change',()=>{const next=el('kind').value;el('kind').value=module;if(window.VinkuloNavigation)window.VinkuloNavigation.go('#module-'+next);else if(allow())openModule(next);});
   el('prepare').addEventListener('click',()=>{if(allow()&&window.confirm('Salvar a consulta autorizada e permitir rascunhos protegidos somente deste módulo por até 8 horas?')){clear();send('prepare');}});
-  el('save').addEventListener('click',()=>{if(!prepared||busy)return;const payload={};for(const [key,,kind] of definitions[module]){const v=document.getElementById('module-input-'+key).value;payload[key]=kind==='options'?Number(v):v;}if(module==='checklists')payload.version=version;saving=fingerprint();send('save',{id:editing,payload});});
+  function save(queue){if(!prepared||busy||(queue&&(!canWrite||module==='cells')))return;if(queue&&!window.confirm('Salvar este registro e enviar quando houver internet? '+(module==='requests'?help.requests:'Depois de enviado para processamento, ele não poderá ser editado.')))return;const payload={};for(const [key,,kind] of definitions[module]){const v=document.getElementById('module-input-'+key).value;payload[key]=kind==='options'?Number(v):v;}if(module==='checklists')payload.version=version;saveToQueue=queue;saving=fingerprint();send('save',{id:editing,payload});}
+  el('save').addEventListener('click',()=>save(false));el('save-send').addEventListener('click',()=>save(true));
   el('new').addEventListener('click',()=>{if(!busy&&window.confirm('Limpar campos não salvos? Rascunhos salvos permanecem.')){editing='';form();}});
   el('sync').addEventListener('click',()=>send('sync'));el('lock').addEventListener('click',()=>{if(allow()){clear();send('lock');}});
   if(window.VinkuloNavigation)window.VinkuloNavigation.register('module-section',{dirty,discard:()=>{editing='';form();},busy:()=>busy&&lastAction!=='status'});
-  document.addEventListener('visibilitychange',()=>{clear();busy=false;requestId++;if(!document.hidden)send('status');});
+  document.addEventListener('visibilitychange',()=>{preparationDone=null;clear();busy=false;requestId++;if(!document.hidden)send('status');});
   window.setInterval(()=>{if(!document.hidden&&!busy)send('status');},15000);
   el('help').textContent=help[module];send('status');
 })();

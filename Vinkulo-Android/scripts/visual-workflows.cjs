@@ -1,0 +1,41 @@
+// Real shell, stateful in-memory native fixtures; no production account or API.
+const {chromium}=require(process.env.VINKULO_PLAYWRIGHT||'playwright');
+const assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path'),http=require('node:http');
+const assets=path.resolve(__dirname,'../app/src/main/assets/mobile-app'),output=path.resolve(process.env.VINKULO_QA_DIR||'app/build/reports/workflows');
+(async()=>{await fs.mkdir(output,{recursive:true});const server=http.createServer(async(req,res)=>{try{const name=new URL(req.url,'http://localhost').pathname.replace('/mobile-app/','');assert.match(name,/^(index\.html|app\.(css|js)|theme\.js|navigation\.js|pending\.js|workflows\.js|visitors\.js|modules\.js|instrument-sans\.woff2)$/);res.writeHead(200,{'Content-Type':name.endsWith('.html')?'text/html; charset=utf-8':name.endsWith('.css')?'text/css':name.endsWith('.woff2')?'font/woff2':'application/javascript','Content-Security-Policy':"default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'"});res.end(await fs.readFile(path.join(assets,name)));}catch{res.writeHead(404);res.end();}});await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await chromium.launch({headless:true,channel:process.env.VINKULO_BROWSER_CHANNEL||'msedge'});const errors=[];
+try{for(const scheme of ['light','dark'])for(const width of [320,390,600]){
+ const page=await browser.newPage({viewport:{width,height:844},colorScheme:scheme,timezoneId:'America/Sao_Paulo'});page.on('pageerror',e=>errors.push(e.message));
+ await page.addInitScript(()=>{
+  window.qaOnline=true;window.qaRequests=[];window.qaGrants={};window.qaRows={};window.qaFailSave=false;let id=0;
+  Object.defineProperty(navigator,'onLine',{get:()=>window.qaOnline});
+  const names=['visitors','requests','notes','followups','checklists','cells','parking'];
+  function reply(bridge,data){setTimeout(()=>bridge.onmessage({data:JSON.stringify(data)}),20);}
+  window.VinkuloOffline={postMessage(raw){const q=JSON.parse(raw);window.qaRequests.push(q);reply(this,{requestId:q.requestId,prepared:false});}};
+  window.VinkuloPending={postMessage(raw){const q=JSON.parse(raw);window.qaRequests.push(q);reply(this,{requestId:q.requestId,validForMs:3600000,sections:names.map(module=>({module,ready:!!window.qaGrants[module],communityName:'Comunidade de teste',canSync:(window.qaRows[module]||[]).some(r=>r.state==='PENDING'),rows:(window.qaRows[module]||[]).map(row=>({...row,title:module==='visitors'?row.visitor.nomeCompleto:row.payload.titulo||'Relatório de célula'}))}))});}};
+  for(const type of ['Visitors','Modules'])window['Vinkulo'+type]={postMessage(raw){const q=JSON.parse(raw),module=type==='Visitors'?'visitors':q.module;window.qaRequests.push({...q,module});let error,savedId;
+   if(q.action==='prepare'){if(window.qaOnline&&module!=='parking')window.qaGrants[module]=true;else error='Confira sua conexão e permissão para esta função.';}
+   const ready=!!window.qaGrants[module];window.qaRows[module]||=[];
+   if(q.action==='save'&&ready){if(window.qaFailSave)error='Não foi possível salvar. Tente novamente.';else{savedId=q.id||'fixture-'+(++id);const row={id:savedId,state:'DRAFT',updatedAt:Date.now(),...(type==='Visitors'?{visitor:q.visitor}:{payload:q.payload})};window.qaRows[module]=window.qaRows[module].filter(r=>r.id!==savedId).concat(row);}}
+   if(q.action==='enqueue'&&ready){const row=window.qaRows[module].find(r=>r.id===q.id);if(row)row.state='PENDING';}
+   reply(this,{requestId:q.requestId,module,prepared:ready,communityName:'Comunidade de teste',issuedAt:Date.now(),validForMs:3600000,canWrite:module!=='cells',snapshot:{items:[],options:[{id:1,label:'Célula Esperança',version:1}]},rows:window.qaRows[module],savedId,error});
+  }};
+ });
+ const go=hash=>page.evaluate(h=>window.VinkuloNavigation.go(h),hash);
+ const shot=async name=>{assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await page.screenshot({path:path.join(output,name+'-'+scheme+'-'+width+'.png'),fullPage:true});};
+ await page.goto('http://127.0.0.1:'+server.address().port+'/mobile-app/index.html');await page.waitForFunction(()=>document.getElementById('work-visitors-status').textContent.includes('Precisa ativar'));await shot('inicio-sem-ativacao');
+ await page.locator('#work-visitors').click();assert.equal(await page.locator('#visitor-locked').isVisible(),true);assert.equal(await page.locator('#visitor-workspace').isVisible(),false);
+ await page.locator('#visitor-locked a').click();for(const module of ['visitors','cells','notes','parking'])await page.locator('#work-choices input[value="'+module+'"]').check();await page.locator('#work-activate').click();
+ await page.waitForFunction(()=>document.getElementById('work-setup-status').textContent.startsWith('3 de 4'));assert.match(await page.locator('#setup-parking').textContent(),/permissão/);await shot('ativacao-conjunta');
+ assert.deepEqual(await page.evaluate(()=>window.qaRequests.filter(q=>q.action==='prepare').map(q=>q.module)),['visitors','cells','notes','parking']);
+ await page.evaluate(()=>{window.qaOnline=false;window.dispatchEvent(new CustomEvent('vinkulo:native-network',{detail:'offline'}));});await go('#top');await page.waitForFunction(()=>document.getElementById('work-visitors-status').textContent==='Disponível sem internet');await shot('inicio-pronto');
+ await page.locator('#work-visitors').click();await page.locator('#visitor-name').fill('Marina de Oliveira');await page.locator('#visitor-phone').fill('(11) 99999-0000');await shot('cadastro-offline');
+ page.once('dialog',d=>d.accept());await page.locator('#visitor-save-send').click();await page.waitForFunction(()=>document.getElementById('visitor-rows').textContent.includes('Na fila de envio'));
+ assert.deepEqual(await page.evaluate(()=>window.qaRequests.filter(q=>q.module==='visitors'&&['save','enqueue'].includes(q.action)).map(q=>q.action)),['save','enqueue']);await shot('cadastro-salvo');
+ await go('#module-cells');await page.locator('#module-input-celulaId').selectOption('1');await page.locator('#module-input-data').fill('2026-10-08');await page.locator('#module-input-observacoes').fill('Reunião realizada na casa da Ana. Participaram 12 pessoas, incluindo 2 visitantes. Próximo encontro: quinta-feira.');await shot('relatorio-offline');
+ assert.equal(await page.locator('#module-save-send').isVisible(),false);await page.locator('#module-save').click();await page.waitForFunction(()=>document.getElementById('module-status').textContent.includes('Rascunho salvo'));await shot('relatorio-salvo');
+ await go('#module-notes');await page.locator('#module-input-titulo').fill('Organizar recepção');await page.locator('#module-input-texto').fill('Separar fichas e confirmar os responsáveis.');await page.evaluate(()=>window.qaFailSave=true);page.once('dialog',d=>d.accept());await page.locator('#module-save-send').click();await page.waitForFunction(()=>document.getElementById('module-status').textContent.includes('Não foi possível salvar'));
+ assert.equal(await page.locator('#module-input-titulo').inputValue(),'Organizar recepção');assert.equal(await page.evaluate(()=>window.qaRequests.some(q=>q.module==='notes'&&q.action==='enqueue')),false);
+ await page.evaluate(()=>window.qaFailSave=false);page.once('dialog',d=>d.accept());await page.locator('#module-save-send').click();await page.waitForFunction(()=>document.getElementById('module-rows').textContent.includes('Na fila'));await go('#pending-section');await page.waitForFunction(()=>document.getElementById('pending-count-queued').textContent==='2');await shot('registros-salvos');
+ await go('#work-setup');assert.equal(await page.locator('#work-activate').isDisabled(),true);await page.evaluate(()=>document.documentElement.style.fontSize='200%');await shot('ativacao-fonte-ampliada');await go('#top');await shot('inicio-fonte-ampliada');await page.close();
+}assert.deepEqual(errors,[]);console.log('Workflows passed in six layouts: explicit activation, partial denial, offline visitor save/enqueue, cell draft, failed save preservation, notes enqueue and pending summary. '+output);
+}finally{await browser.close();await new Promise(r=>server.close(r));}})().catch(e=>{console.error(e);process.exitCode=1;});

@@ -175,7 +175,7 @@ public class OfflineReadTest {
     }
     private void requireReader(ActivityScenario<MainActivity> scenario,boolean prepared) throws Exception {
         String script="(function(){var r=document.getElementById('reader-content'),i=document.getElementById('items'),s=document.getElementById('context-title');return location.href.split('#')[0]==='"+OfflinePolicy.HOME+"'&&document.readyState==='complete'&&!document.hidden&&!!r&&!!i&&!!s&&"+
-            (prepared?"!r.hidden&&s.textContent==='Aparelho preparado'&&i.textContent.indexOf('Aviso offline de teste')>=0":"r.hidden&&s.textContent==='Preparação necessária'&&i.textContent===''" )+";})()";
+            (prepared?"!r.hidden&&s.textContent==='Consultas preparadas'&&i.textContent.indexOf('Aviso offline de teste')>=0":"r.hidden&&s.textContent==='Prepare antes de ficar offline'&&i.textContent===''" )+";})()";
         requireDom(scenario,script);
         if(prepared)evaluate(scenario,"window.VinkuloNavigation.go('#read-mural');document.getElementById('items').scrollIntoView({block:'center'})");
         awaitDraw(scenario);

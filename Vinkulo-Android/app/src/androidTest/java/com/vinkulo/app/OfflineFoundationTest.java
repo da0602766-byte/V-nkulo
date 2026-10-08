@@ -100,7 +100,7 @@ public class OfflineFoundationTest {
         UiDevice device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
         try (ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
             boolean supportsBridge = WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER);
-            requireVisible(device,supportsBridge ? "Seu espaço salvo" : "Seu Vínkulo começa aqui.");
+            requireVisible(device,supportsBridge ? "O que você quer fazer?" : "Seu Vínkulo começa aqui.");
             if (android.os.Build.VERSION.SDK_INT >= 35) assertTrue("Modern WebView must exercise the bridge", supportsBridge);
             String expected = supportsBridge ? "Preparação necessária" : "Atualize o Android System WebView";
             assertTrue("Local JavaScript must render a usable state", device.wait(Until.hasObject(By.text(expected)),15000));
@@ -138,7 +138,7 @@ public class OfflineFoundationTest {
             });
             queried.await(2,java.util.concurrent.TimeUnit.SECONDS);last=result.get();
             if(last!=null && (OfflinePolicy.HOME+"#top").equals(last.optString("url")) && "complete".equals(last.optString("ready"))
-                    && "Seu espaço salvo".equals(last.optString("title")) && expected.equals(last.optString("status"))
+                    && "O que você quer fazer?".equals(last.optString("title")) && expected.equals(last.optString("status"))
                     && last.optBoolean("visible") && last.optBoolean("button")) {
                 java.util.concurrent.CountDownLatch drawn=new java.util.concurrent.CountDownLatch(1);
                 scenario.onActivity(activity->((android.webkit.WebView)activity.findViewById(R.id.webview)).postVisualStateCallback(1,

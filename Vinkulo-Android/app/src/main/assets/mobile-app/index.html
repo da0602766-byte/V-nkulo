@@ -8,6 +8,7 @@
   <script src="/mobile-app/visitors.js" defer></script>
   <script src="/mobile-app/modules.js" defer></script>
   <script src="/mobile-app/pending.js" defer></script>
+  <script src="/mobile-app/workflows.js" defer></script>
 </head>
 <body id="top">
 <svg class="icon-library" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
@@ -26,31 +27,57 @@
   </header>
   <div id="screen-nav" class="screen-nav" hidden><button id="screen-back" class="back-button" type="button" aria-label="Voltar à tela anterior">← Voltar</button><h1 id="screen-title" tabindex="-1"></h1></div>
   <div id="home-screen">
-  <div class="home-heading"><div><p class="eyebrow">MODO OFFLINE</p><h1 id="home-title" tabindex="-1">Seu espaço salvo</h1></div></div>
+  <div class="home-heading"><div><p class="eyebrow">TRABALHAR SEM INTERNET</p><h1 id="home-title" tabindex="-1">O que você quer fazer?</h1></div></div>
   <section id="offline-notice" class="offline-notice" role="status" aria-live="polite" aria-atomic="true" hidden>
     <span class="offline-notice-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M2 8.8a15.8 15.8 0 0 1 17.4-2.5M5.4 12.2a10.5 10.5 0 0 1 8.5-2.3M8.9 15.7a5.3 5.3 0 0 1 3.1-1.1M3 3l18 18M12 19h.01"/></svg></span>
-    <span><strong>Sem acesso à internet</strong><span>Consulte as cópias preparadas.</span></span>
+    <span><strong>Sem acesso à internet</strong><span>As funções ativadas continuam disponíveis.</span></span>
   </section>
+  <section class="work-start" aria-labelledby="work-title"><h2 id="work-title">Cadastros e registros</h2><p>Escolha uma ação. O que você salvar fica neste aparelho.</p>
+  <nav class="work-grid" aria-label="Trabalhar offline">
+    <a id="work-visitors" class="work-action" href="#visitor-section"><svg aria-hidden="true"><use href="#i-visitantes"/></svg><strong>Cadastrar visitante</strong><span id="work-visitors-status">Conferindo acesso…</span></a>
+    <a id="work-cells" class="work-action" href="#module-cells"><svg aria-hidden="true"><use href="#i-escalas"/></svg><strong>Relatório de célula</strong><span id="work-cells-status">Conferindo acesso…</span></a>
+    <a id="work-requests" class="work-action" href="#module-requests"><strong>Fazer um pedido</strong><span id="work-requests-status">Conferindo acesso…</span></a>
+    <a id="work-notes" class="work-action" href="#module-notes"><strong>Criar anotação</strong><span id="work-notes-status">Conferindo acesso…</span></a>
+    <a id="work-followups" class="work-action" href="#module-followups"><strong>Registrar acompanhamento</strong><span id="work-followups-status">Conferindo acesso…</span></a>
+    <a id="work-checklists" class="work-action" href="#module-checklists"><strong>Atualizar minha tarefa</strong><span id="work-checklists-status">Conferindo acesso…</span></a>
+    <a id="work-parking" class="work-action" href="#module-parking"><strong>Registrar ocorrência</strong><span id="work-parking-status">Conferindo acesso…</span></a>
+  </nav><a class="text-action" href="#work-setup">Ativar funções para usar sem internet <span aria-hidden="true">→</span></a></section>
+  <a id="pending-home" class="pending-shortcut" href="#pending-section"><strong><span id="pending-home-title">Meus registros salvos</span><span aria-hidden="true">→</span></strong><span id="pending-home-status">Conferindo rascunhos, envios e confirmações…</span></a>
+  <details class="consultation-drawer"><summary>Consultar mural, agenda e escalas</summary>
   <section class="card preparation-card" aria-labelledby="context-title">
     <div class="status-heading"><span id="context-dot" class="dot" aria-hidden="true"></span><h2 id="context-title">Verificando este aparelho</h2></div>
     <p id="prepared-at" class="muted" hidden></p>
     <p id="home-notice" class="muted" role="status" aria-live="polite" aria-atomic="true">Conferindo suas consultas salvas.</p>
     <a id="manage-offline" class="text-action" href="#offline-settings"><span id="manage-label">Preparar consultas offline</span><span aria-hidden="true">→</span></a>
   </section>
-  <a id="pending-home" class="pending-shortcut" href="#pending-section"><strong><span id="pending-home-title">Central de pendências</span><span aria-hidden="true">→</span></strong><span id="pending-home-status">Conferindo rascunhos, envios e confirmações…</span></a>
   <div class="section-heading"><h2>Suas consultas</h2><span id="consultation-count">Conferindo acesso</span></div>
   <nav class="feature-grid" aria-label="Atalhos desta tela">
     <a id="shortcut-mural" class="feature" href="#offline-settings"><svg aria-hidden="true" focusable="false"><use href="#i-mural"/></svg><strong>Mural</strong><span id="shortcut-mural-status">Conferindo acesso</span></a>
     <a id="shortcut-agenda" class="feature" href="#offline-settings"><svg aria-hidden="true" focusable="false"><use href="#i-agenda"/></svg><strong>Agenda</strong><span id="shortcut-agenda-status">Conferindo acesso</span></a>
     <a id="shortcut-escalas" class="feature" href="#offline-settings"><svg aria-hidden="true" focusable="false"><use href="#i-escalas"/></svg><strong>Minhas escalas</strong><span id="shortcut-escalas-status">Conferindo acesso</span></a>
     <a id="shortcut-pedidos" class="feature" href="#offline-settings"><svg aria-hidden="true" focusable="false"><use href="#i-pedidos"/></svg><strong>Meus pedidos</strong><span id="shortcut-pedidos-status">Conferindo acesso</span></a>
-    <div class="section-heading feature-divider"><h2>Registrar no aparelho</h2><span>Preparação por função</span></div>
-    <a class="feature" href="#visitor-section"><svg aria-hidden="true" focusable="false"><use href="#i-visitantes"/></svg><strong>Visitantes</strong><span>Cadastros e rascunhos</span></a>
-    <a class="feature" href="#module-section"><svg aria-hidden="true" focusable="false"><use href="#i-modulos"/></svg><strong>Mais funções</strong><span>Anotações, células e mais</span></a>
   </nav>
+  </details>
   <div class="online-action"><button id="open" class="secondary" type="button">Ir para o sistema online <span aria-hidden="true">↗</span></button><p id="connection" class="muted" role="status" aria-live="polite" aria-atomic="true"></p></div>
   <a id="quick-reader" class="back-top" href="#reader" hidden>Ver consultas salvas</a>
   </div>
+  <section id="work-setup" class="next" hidden aria-labelledby="work-setup-title">
+    <h2 id="work-setup-title">O que você vai precisar?</h2><p>Com internet, escolha as funções e toque em Ativar. Depois, abra a ação no início e preencha normalmente, mesmo sem conexão.</p>
+    <p class="footnote">Usa a conta e a comunidade conectadas. O acesso atual dura até 8 horas; reiniciar o celular exige ativar novamente com internet. Somente as funções permitidas para você serão liberadas.</p>
+    <fieldset id="work-choices"><legend>Funções para ativar neste aparelho</legend>
+      <label><input type="checkbox" value="visitors"> Cadastrar visitantes <span id="setup-visitors"></span></label>
+      <label><input type="checkbox" value="cells"> Rascunhar relatório de célula <span id="setup-cells"></span></label>
+      <label><input type="checkbox" value="requests"> Fazer pedidos <span id="setup-requests"></span></label>
+      <label><input type="checkbox" value="notes"> Criar anotações <span id="setup-notes"></span></label>
+      <label><input type="checkbox" value="followups"> Registrar acompanhamentos <span id="setup-followups"></span></label>
+      <label><input type="checkbox" value="checklists"> Atualizar minhas tarefas <span id="setup-checklists"></span></label>
+      <label><input type="checkbox" value="parking"> Registrar ocorrências <span id="setup-parking"></span></label>
+    </fieldset>
+    <p class="footnote">Ao ativar, você autoriza guardar os dados dessas funções de forma protegida neste aparelho. Isso não envia rascunhos; envios já autorizados podem ser retomados. Relatórios de células ainda precisam ser concluídos no sistema online.</p>
+    <button id="work-activate" class="primary" disabled>Ativar funções selecionadas</button>
+    <p id="work-setup-status" role="status" aria-live="polite">Selecione o que deseja usar.</p>
+    <a class="back-top" href="#top">Voltar e começar a trabalhar</a>
+  </section>
   <details id="offline-settings" class="settings" tabindex="-1" hidden>
     <summary>Preparar neste aparelho <span class="summary-hint">Consultas, cadastros e privacidade</span></summary>
     <div class="settings-content">
@@ -93,7 +120,8 @@
     </div><a class="back-top" href="#top">Voltar ao início</a>
   </section>
   <section id="visitor-section" class="next" aria-labelledby="visitor-title" tabindex="-1" hidden>
-    <h2 id="visitor-title">Receber um visitante</h2>
+    <h2 id="visitor-title">Preencha os dados do visitante</h2>
+    <div id="visitor-locked" class="draft-notice"><strong>Este cadastro ainda não está liberado neste aparelho.</strong><p>Para usar sem internet, ative Visitantes com sua conta conectada. Se você já ativou, o acesso pode ter vencido.</p><a class="text-action" href="#work-setup">Ativar cadastros para usar offline →</a></div>
     <details id="visitor-settings" class="help-details" open><summary>Acesso e preparação</summary>
     <p>Salve um rascunho protegido no aparelho e escolha quando colocá-lo na fila. Envio pendente não é cadastro confirmado.</p>
     <button id="visitor-prepare" class="secondary" type="button">Ativar cadastros offline</button>
@@ -101,14 +129,16 @@
     <p id="visitor-status" role="status" aria-live="polite" aria-atomic="true" class="muted">Entre com internet e permissão de cadastrar visitantes para preparar.</p>
     <div id="visitor-workspace" role="group" aria-labelledby="visitor-form-title" hidden>
       <p id="visitor-community"></p>
-      <h3 id="visitor-form-title">Rascunho de visitante</h3>
+      <h3 id="visitor-form-title">Novo cadastro</h3>
       <label for="visitor-name">Nome completo</label><input id="visitor-name" maxlength="120" autocomplete="off" enterkeyhint="next">
       <label for="visitor-phone">Telefone (opcional)</label><input id="visitor-phone" type="tel" inputmode="tel" maxlength="30" autocomplete="off" enterkeyhint="next">
       <label for="visitor-email">E-mail (opcional)</label><input id="visitor-email" type="email" inputmode="email" maxlength="180" autocomplete="off" enterkeyhint="next">
       <label for="visitor-date">Data de entrada</label><input id="visitor-date" type="date">
       <p id="visitor-form-help" class="footnote">Salve antes de minimizar ou fechar o aplicativo: campos não salvos são limpos por privacidade. Campos adicionais ficam online.</p>
       <p id="visitor-dirty" class="draft-notice" role="status" aria-live="polite" hidden>Alterações não salvas neste formulário.</p>
-      <button id="visitor-save" type="button" class="primary">Salvar rascunho no aparelho</button>
+      <button id="visitor-save-send" type="button" class="primary">Salvar e enviar quando conectar</button>
+      <button id="visitor-save" type="button" class="secondary">Guardar para terminar depois</button>
+      <p class="footnote">O envio será tentado quando houver internet. O cadastro só estará confirmado quando aparecer o recibo.</p>
       <button id="visitor-new" type="button" class="quiet">Limpar formulário / novo rascunho</button>
       <button id="visitor-sync" type="button" class="secondary">Tentar enviar pendências</button>
       <div id="visitor-rows" role="list" aria-label="Rascunhos e envios de visitantes"></div>
@@ -144,6 +174,7 @@
   </section>
   <section id="module-section" class="next" aria-labelledby="module-title" tabindex="-1" hidden>
     <h2 id="module-title">Trabalhar por módulo</h2>
+    <div id="module-locked" class="draft-notice"><strong>Ative esta função antes de usar sem internet.</strong><p>Conecte-se com sua conta e escolha esta função em Ativar. Um acesso vencido também precisa ser renovado.</p><a class="text-action" href="#work-setup">Escolher funções para usar offline →</a></div>
     <div hidden><label for="module-kind">Escolha o módulo</label><select id="module-kind"><option value="requests">Pedidos</option><option value="notes">Minhas anotações</option><option value="followups">Meus acompanhamentos</option><option value="checklists">Ministérios, equipes e checklists</option><option value="cells">Minhas células</option><option value="parking">Estacionamento</option></select></div>
     <details id="module-settings" class="help-details" open><summary>Acesso e preparação</summary>
     <p id="module-help" class="footnote"></p>
@@ -152,11 +183,13 @@
     </details>
     <p id="module-status" role="status" aria-live="polite" aria-atomic="true"></p>
     <div id="module-workspace" hidden>
-      <p id="module-community"></p><p id="module-updated" class="muted"></p>
-      <details><summary>Consultar última cópia salva</summary><div id="module-items" role="list" aria-label="Registros autorizados do módulo"></div></details>
-      <h3>Rascunho</h3><div id="module-fields"></div>
+      <p id="module-community"></p>
+      <details><summary>Consultar última cópia salva</summary><p id="module-updated" class="muted"></p><div id="module-items" role="list" aria-label="Registros autorizados do módulo"></div></details>
+      <h3 id="module-form-title">Novo registro</h3><div id="module-fields"></div>
       <p id="module-dirty" class="draft-notice" role="status" aria-live="polite" hidden>Alterações não salvas neste formulário.</p>
-      <button id="module-save" class="primary" type="button">Salvar rascunho no aparelho</button>
+      <button id="module-save-send" class="primary" type="button">Salvar e enviar quando conectar</button>
+      <button id="module-save" class="secondary" type="button">Guardar para terminar depois</button>
+      <p id="module-save-help" class="footnote"></p>
       <button id="module-new" class="quiet" type="button">Limpar formulário / novo rascunho</button>
       <button id="module-sync" class="secondary" type="button">Tentar enviar pendências deste módulo</button>
       <p class="footnote">Salve antes de minimizar ou fechar: campos não salvos são limpos por privacidade. Em caso de conflito, confira online antes de refazer; não há sobrescrita automática. Textos limitados a 3.500 bytes por rascunho.</p>

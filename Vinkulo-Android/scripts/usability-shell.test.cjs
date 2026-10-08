@@ -29,8 +29,9 @@ test('Android back delegates local focus and anchors before leaving the activity
   assert.match(activity,/VinkuloLocalBack&&window\.VinkuloLocalBack/);assert.match(activity,/finishWebBack\(\)/);
 });
 
-test('home places six shortcuts ahead of optional consent and includes a local licensed font',()=>{
-  assert.equal((html.match(/class="feature"/g)||[]).length,6);
+test('home prioritizes writing actions, retains reading shortcuts and includes a local licensed font',()=>{
+  assert.equal((html.match(/class="feature"/g)||[]).length,4);
+  for(const action of ['visitors','cells','requests','notes','followups','checklists','parking'])assert.match(html,new RegExp('id="work-'+action+'"'));
   assert.ok(html.indexOf('class="feature-grid"')<html.indexOf('id="prepare"'));
   assert.match(html,/<details id="offline-settings"/);
   assert.doesNotMatch(html,/<details id="offline-settings"[^>]*\sopen/);

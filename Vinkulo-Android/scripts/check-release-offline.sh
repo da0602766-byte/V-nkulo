@@ -8,7 +8,7 @@ offline_surface_ready() {
   { grep -Fq 'Seu Vínkulo começa aqui.' app/build/reports/vinkulo-release-offline.xml &&
     grep -Fq 'Atualize o Android System WebView' app/build/reports/vinkulo-release-offline.xml &&
     grep -Fq 'ATUALIZAR WEBVIEW' app/build/reports/vinkulo-release-offline.xml; } ||
-  { grep -Fq 'Seu espaço salvo' app/build/reports/vinkulo-release-offline.xml &&
+  { grep -Fq 'O que você quer fazer?' app/build/reports/vinkulo-release-offline.xml &&
     grep -Fq 'Sem acesso à internet' app/build/reports/vinkulo-release-offline.xml; }
 }
 # Cold WebView initialization on shared CI runners has variable latency.

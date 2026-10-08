@@ -8,7 +8,7 @@ function shell(supported=true){
   const window={confirm:()=>true,setInterval(){},setTimeout(f){timers.set(++tick,f);return tick;},clearTimeout(i){timers.delete(i);}};
   if(supported)window.VinkuloVisitors={postMessage:s=>requests.push(JSON.parse(s))};
   vm.runInNewContext(source,{document,window});
-  return {requests,document,events,timers,el:k=>document.getElementById('visitor-'+k),send(state){window.VinkuloVisitors.onmessage({data:JSON.stringify({requestId:requests.at(-1).requestId,...state})});}};
+  return {window,requests,document,events,timers,el:k=>document.getElementById('visitor-'+k),send(state){window.VinkuloVisitors.onmessage({data:JSON.stringify({requestId:requests.at(-1).requestId,...state})});}};
 }
 const state={prepared:true,communityName:'Test',validForMs:5000,rows:[]};
 test('visitor form requires native access and explicit acknowledgement before saying saved',()=>{
@@ -38,4 +38,14 @@ test('visitor lock preempts an in-flight save and rejected save keeps the expiry
   assert.equal(s.requests.at(-1).action,'lock');assert.equal(s.el('workspace').hidden,true);
   const other=shell();other.send(state);other.el('save').handlers.click();other.send({prepared:true,error:'Cannot save'});
   assert.equal(other.timers.size,1);[...other.timers.values()][0]();assert.equal(other.el('workspace').hidden,true);
+});
+
+test('single save-and-send requires persistence acknowledgement and never queues failed or newly edited content',()=>{
+ const s=shell();s.send(state);s.el('name').value='Marina';s.el('save-send').handlers.click();
+ assert.equal(s.requests.at(-1).action,'save');s.send({...state,savedId:'saved-1'});
+ assert.equal(s.requests.at(-1).action,'enqueue');assert.equal(s.requests.at(-1).id,'saved-1');
+ const fail=shell();fail.send(state);fail.el('save-send').handlers.click();fail.send({...state,error:'Sem espaço'});assert.equal(fail.requests.at(-1).action,'save');
+ const race=shell();race.send(state);race.el('name').value='Antes';race.el('save-send').handlers.click();race.el('name').value='Depois';race.send({...state,savedId:'saved-2'});
+ assert.equal(race.requests.at(-1).action,'save');assert.equal(race.el('name').value,'Depois');assert.match(race.el('status').textContent,/novas alterações/);
+ const cancel=shell();cancel.send(state);cancel.window.confirm=()=>false;cancel.el('save-send').handlers.click();assert.equal(cancel.requests.length,1);
 });

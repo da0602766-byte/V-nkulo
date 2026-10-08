@@ -7,7 +7,7 @@
   const href=module=>module==='visitors'?'#visitor-section':'#module-'+module;
   let requestId=0,busy=false,sections=[],filter='all',expiry,timeout,signature='',lastAction='status';
   const text=(parent,tag,value,className)=>{const n=document.createElement(tag);n.textContent=String(value||'');if(className)n.className=className;parent.appendChild(n);return n;};
-  function clear(message){window.clearTimeout(expiry);sections=[];signature='';el('list').textContent='';el('access').textContent='';el('filters').textContent='';el('result').textContent='';el('checked').textContent='';el('search').value='';el('sync').disabled=true;el('status').textContent=message;el('home-title').textContent='Conferir pendências';el('home-status').textContent='Consulta indisponível. Isso não significa que não há trabalho salvo.';el('home').setAttribute('data-attention','false');el('scope').hidden=true;['review','queued','drafts'].forEach(key=>el('count-'+key).textContent='—');}
+  function clear(message){if(window.VinkuloWorkStatus)window.VinkuloWorkStatus([]);window.clearTimeout(expiry);sections=[];signature='';el('list').textContent='';el('access').textContent='';el('filters').textContent='';el('result').textContent='';el('checked').textContent='';el('search').value='';el('sync').disabled=true;el('status').textContent=message;el('home-title').textContent='Conferir pendências';el('home-status').textContent='Consulta indisponível. Isso não significa que não há trabalho salvo.';el('home').setAttribute('data-attention','false');el('scope').hidden=true;['review','queued','drafts'].forEach(key=>el('count-'+key).textContent='—');}
   function invalidate(message){window.clearTimeout(timeout);busy=false;requestId++;clear(message);el('refresh').disabled=!bridge;}
   function send(action){if(!bridge||busy||document.hidden)return;busy=true;lastAction=action;el('refresh').disabled=true;el('sync').disabled=true;timeout=window.setTimeout(()=>invalidate('Consulta interrompida. Atualize a lista; uma tentativa de envio pode continuar em segundo plano.'),12000);try{bridge.postMessage(JSON.stringify({action,requestId:++requestId}));}catch{invalidate('Consulta local indisponível. O trabalho salvo não foi apagado.');}}
   function renderList(){
@@ -15,7 +15,8 @@
     sections.forEach(section=>{if(!section.ready){locked++;return;}eligible=eligible||!!section.canSync;(section.rows||[]).forEach(row=>{all.push({...row,module:section.module});count.all++;count[group(row.state)]++;});});
     el('sync').disabled=busy||!eligible;
     const accessible=sections.some(section=>section.ready);
-    el('home-title').textContent=count.review ? 'Há registros para revisar' : 'Central de pendências';
+    if(window.VinkuloWorkStatus)window.VinkuloWorkStatus(sections);
+    el('home-title').textContent=count.review ? 'Há registros para revisar' : 'Meus registros salvos';
     el('home').setAttribute('data-attention',String(count.review>0));
     el('home-status').textContent=!accessible ? 'Acesso não preparado. Confira os módulos para ver seu trabalho.' : count.review+ ' em revisão · '+count.queued+' na fila · '+count.drafts+(count.drafts===1?' rascunho':' rascunhos')+(locked?' · acesso parcial':'');
     ['review','queued','drafts'].forEach(key=>el('count-'+key).textContent=accessible?String(count[key]):'—');

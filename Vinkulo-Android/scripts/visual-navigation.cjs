@@ -7,7 +7,7 @@ const csp="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'se
  await fs.mkdir(output,{recursive:true});
  const server=http.createServer(async(req,res)=>{try{
   const name=new URL(req.url,'http://localhost').pathname.replace('/mobile-app/','');
-  assert.match(name,/^(index\.html|app\.(css|js)|theme\.js|navigation\.js|pending\.js|visitors\.js|modules\.js|instrument-sans\.woff2)$/);
+  assert.match(name,/^(index\.html|app\.(css|js)|theme\.js|navigation\.js|pending\.js|workflows\.js|visitors\.js|modules\.js|instrument-sans\.woff2)$/);
   res.writeHead(200,{'Content-Type':name.endsWith('.html')?'text/html; charset=utf-8':name.endsWith('.css')?'text/css':name.endsWith('.woff2')?'font/woff2':'application/javascript','Content-Security-Policy':csp});res.end(await fs.readFile(path.join(assets,name)));
  }catch{res.writeHead(404);res.end();}});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser;
@@ -32,12 +32,12 @@ const csp="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'se
   const go=async hash=>page.evaluate(h=>window.VinkuloNavigation.go(h),hash);
   await page.goto('http://127.0.0.1:'+server.address().port+'/mobile-app/index.html');await page.waitForFunction(()=>document.getElementById('shortcut-mural-status').textContent==='Consulta salva');
   await page.evaluate(()=>document.fonts.ready);assert.equal(await page.evaluate(()=>document.fonts.check('16px "Instrument Sans"')),true);
-  assert.equal(await page.locator('.feature').count(),6);assert.equal(await page.locator('#visitor-section').isVisible(),false);
+  assert.equal(await page.locator('.feature').count(),4);assert.equal(await page.locator('#visitor-section').isVisible(),false);
   assert.equal(await page.locator('html').getAttribute('data-palette'),'ACOLHEDOR');assert.equal(await page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--primary').trim()),scheme==='light'?'#9b4938':'#e88a70');
   // The pending summary now precedes the grid. At 320px, preserve legible cards
   // and allow scrolling to operational modules; all four reading shortcuts fit.
-  await shot('home');const end=await page.locator('#shortcut-pedidos').boundingBox();assert.ok(end.y+end.height<844, 'Reading shortcuts bottom: '+(end.y+end.height));await fit();
-  await page.locator('#shortcut-agenda').click();await visible('reader');assert.equal(await page.locator('#home-screen').isVisible(),false);assert.equal(await page.locator('#tab-agenda').getAttribute('aria-pressed'),'true');
+  await shot('home');const end=await page.locator('#work-cells').boundingBox();assert.ok(end.y+end.height<844, 'Reading shortcuts bottom: '+(end.y+end.height));await fit();
+  await page.locator('.consultation-drawer > summary').click();await page.locator('#shortcut-agenda').click();await visible('reader');assert.equal(await page.locator('#home-screen').isVisible(),false);assert.equal(await page.locator('#tab-agenda').getAttribute('aria-pressed'),'true');
   await page.locator('#screen-back').click();await page.locator('#manage-offline').click();await visible('offline-settings');assert.equal(await page.evaluate(()=>window.qaRequests.some(q=>q.action!=='status')),false);await shot('settings');
   await go('#module-section');await visible('module-menu');await shot('functions');await page.locator('#module-menu a[href="#module-notes"]').click();await page.locator('#module-input-titulo').waitFor();
   await page.locator('#module-input-titulo').fill('Não perder este texto');await visible('module-dirty');page.once('dialog',d=>d.dismiss());await page.locator('a[href="#module-section"]').last().click();assert.equal(await page.locator('#module-input-titulo').inputValue(),'Não perder este texto');

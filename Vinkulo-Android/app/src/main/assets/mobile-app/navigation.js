@@ -1,14 +1,15 @@
 (() => {
   const el = id => document.getElementById(id);
-  const moduleNames = {requests:'Pedidos',notes:'Minhas anotações',followups:'Meus acompanhamentos',checklists:'Ministérios e checklists',cells:'Minhas células',parking:'Estacionamento'};
+  const moduleNames = {requests:'Fazer um pedido',notes:'Criar anotação',followups:'Registrar acompanhamento',checklists:'Atualizar minha tarefa',cells:'Relatório de célula',parking:'Registrar ocorrência'};
   const readerNames = {mural:'Mural',agenda:'Agenda',escalas:'Minhas escalas',pedidos:'Meus pedidos'};
-  const screens = ['home-screen','offline-settings','reader','visitor-section','module-menu','module-section','pending-section'];
+  const screens = ['home-screen','offline-settings','reader','visitor-section','module-menu','module-section','pending-section','work-setup'];
   const guards = {};
   let current = '#top', stack = [];
   function route(hash) {
     if (hash === '#pending-section') return {id:'pending-section',title:'Central de pendências'};
+    if (hash === '#work-setup') return {id:'work-setup',title:'Ativar modo offline'};
     if (hash === '#offline-settings') return {id:'offline-settings',title:'Gerenciar offline'};
-    if (hash === '#visitor-section') return {id:'visitor-section',title:'Visitantes'};
+    if (hash === '#visitor-section') return {id:'visitor-section',title:'Cadastrar visitante'};
     if (hash === '#module-section') return {id:'module-menu',title:'Mais funções'};
     if (hash.startsWith('#module-') && moduleNames[hash.slice(8)]) return {id:'module-section',title:moduleNames[hash.slice(8)],module:hash.slice(8)};
     if (hash.startsWith('#read-') && readerNames[hash.slice(6)]) return {id:'reader',title:readerNames[hash.slice(6)],reader:hash.slice(6)};
