@@ -44,6 +44,7 @@ async function fixture(t) {
       sendWebPush: async (subscription, payload, _config, options) => { sends.push({ endpoint: subscription.endpoint, payload: JSON.parse(payload), options }); return new Response(null, { status: 201 }); } },
   });
   const resolve = await moduleAt("app/api/push-subscriptions/notification/route.ts", {
+    "../../../lib/device-notification-content": await moduleAt("app/lib/device-notification-content.ts"),
     "../../../../db": { getD1: () => d1 }, "../../../lib/chat-push": authorize,
     "../../../lib/local-auth": { getSessionUser: async () => currentUser ? { id: currentUser, ativo: true } : null, getCurrentSessionTokenHash: async () => `session-${sessionUser}` },
     "../../../lib/web-push": { safeDestination: value => value.startsWith("/painel?") ? value : "/painel" },
@@ -56,7 +57,7 @@ async function fixture(t) {
     as: (user, session = user) => { currentUser = user; sessionUser = session; }, feedOnly: () => { access.context.communityAccess = "FEED_ONLY"; } };
 }
 
-test("chat: grava mensagem, aviso genérico e fila somente do destinatário; Web e APK recebem", async t => {
+test("chat: prévia específica só após autorização; Web/FCM recebem apenas metadados", async t => {
   const f = await fixture(t);
   f.database.prepare("INSERT INTO notificacoes_push_dispositivos(usuario_id,endpoint,p256dh,auth,sessao_token_hash,vinculo_id) VALUES (?,'fcm:native-recipient','key','auth',?,?)")
     .run(f.recipient, `session-${f.recipient}`, crypto.randomUUID());
@@ -67,8 +68,8 @@ test("chat: grava mensagem, aviso genérico e fila somente do destinatário; Web
   assert.ok(f.rows().every(row => row.usuario_id === f.recipient)); assert.equal(f.wakeups.length, 1);
   assert.doesNotMatch(JSON.stringify(f.notification()), /Conteúdo privado/);
   const display = await f.request(); assert.equal(display.status, 200);
-  const notice = await display.json(); assert.match(notice.body, /nova mensagem/); assert.equal(notice.url, "/painel?view=mensagens");
-  assert.doesNotMatch(JSON.stringify(notice), /Conteúdo privado|sender|recipient/);
+  const notice = await display.json(); assert.equal(notice.title, "Mensagem de sender"); assert.equal(notice.body, "Conteúdo privado de teste"); assert.equal(notice.url, "/painel?view=mensagens");
+  assert.equal(display.headers.get("cache-control"), "no-store");
   await f.queue.drainPushQueue(f.d1);
   assert.equal(f.sends.length, 2); assert.ok(f.rows().every(row => row.estado === "ACEITO"));
   assert.equal(f.sends.find(item => !item.native).options.urgent, true);

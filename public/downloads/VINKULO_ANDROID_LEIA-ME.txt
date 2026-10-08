@@ -6,6 +6,13 @@ em testes acompanhados. A versão estável continua disponível separadamente.
 Instale a atualização por cima do aplicativo existente. NÃO desinstale,
 limpe os dados ou faça downgrade se houver rascunhos/envios pendentes.
 
+Na versão 1.20.0, cada notificação mostra seu título e sua mensagem:
+reservas, escalas, pedidos de entrada e outros avisos deixam de usar o
+mesmo texto genérico. Mensagens de conversa mostram remetente e prévia
+quando o acesso está válido. Toque no aviso para abrir o destino.
+Para receber a correção no Android, atualize o APK e abra o aplicativo.
+Notificações antigas que já estão na bandeja mantêm o texto anterior.
+
 Antes de usar sem internet: entre na conta, escolha a comunidade e prepare
 as consultas/módulos desejados. A preparação tem prazo e exige conexão
 novamente após reiniciar o celular.

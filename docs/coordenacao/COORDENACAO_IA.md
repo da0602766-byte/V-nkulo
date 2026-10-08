@@ -17,6 +17,12 @@ Antes de alterar o código, leia este documento e atualize a seção **Trabalho 
 
 ## Trabalho em andamento
 
+Notificações específicas — validação final aprovada. Site: 622 testes, TypeScript/build sem erros. Android 1.20.0/code23, fonte dd921245f44fb3a7b528dd54f194a46d6982e14f, CI 37706298961 aprovada em API29/35, incluindo conteúdos distintos e revogação. APK 634565 bytes/SHA256 545048ed3e986f7146407fb5ccf46e6695db54bc948281c3a311bdb34a0fb520. Publicação em preparação; registros anteriores abaixo descrevem as etapas intermediárias.
+
+Complemento das notificações específicas — distribuição Android 1.20.0: reservar `public/downloads/android-release.json`, `public/downloads/VINKULO_ANDROID_LEIA-ME.txt`, novo APK de homologação e `docs/relatorios/NOTIFICACOES_ESPECIFICAS_2026-10-07.md`. A fonte Android está isolada em `.task-tools/android-notifications`, commit `cf313213a69c231dadc5b44befb87cdc4a3a4020`, CI 37703583269 em execução. Preservar canal estável e assinatura; publicar somente após validação do artefato.
+
+Notificações específicas — Codex, 07/10/2026, sobre Sites 361. Escopo: app/lib/device-notification-sync.ts, novo formatador de texto, app/api/push-subscriptions/notification/route.ts, app/lib/chat-push.ts, testes de conteúdo/autorização e documentação. Preservar o título e mensagem de cada aviso na ponte Android e na resolução autenticada usada por Web Push/FCM; chat com remetente e prévia após validar acesso. Provedores continuam recebendo somente metadados de entrega. Validar sessão, destinatário, leitura, deduplicação e publicar.
+
 Extensão da revisão integral, 07/10/2026: teste de ponta a ponta identificou que setores vazios não retornam ao editor, impedindo criar suas primeiras vagas. Reservado também app/api/pilot/estacionamento/route.ts e teste de regressão do estacionamento para incluir os setores ativos na leitura autorizada do configurador, sem migração ou alteração de permissões.
 
 Revisão integral do estacionamento — Codex, 07/10/2026, após Sites 360. Escopo reservado: app/components/parking/*, ParkingWorkspace.tsx, scripts/qa/parking-*.mjs e documentação. Análise no navegador das oito áreas da gestão e das funções do membro concluída; aplicar linguagem de cartões, ícones, estados claros, formulários agrupados, navegação e ações hierarquizadas, incluindo operação de plantão. Preservar dados, APIs, permissões e fluxos. Implementação e validação concluídas: 619 testes, TypeScript/build aprovados e lint sem erros (um aviso preexistente); 89 verificações da revisão integral, 28 casos de regressão visual/fluxos, nove interações e 17 verificações dos cartões. Galeria com 39 capturas em outputs/estacionamento-completo/avaliacao.html. Publicado no Sites 361 em 07/10/2026 às 19h33 (Brasília), succeeded. Fonte a17887163f4b69f96fdde3828b906ac97e6727d0; deployment appgdep_6ac6c88432848191aa9c107e308ae1bd; URL https://adote-gestao.da0602766.chatgpt.site. Inclui a correção dos setores vazios. Relatório ESTACIONAMENTO_REVISAO_COMPLETA_2026-10-07.md; registro documental posterior ao deploy.
@@ -189,3 +195,4 @@ Registre na linha da tarefa:
 - Nomeie componentes pela função, evitando sufixos genéricos como `Novo`, `Final` ou `V2` quando substituírem um componente existente.
 - Para mudanças estruturais, descreva a decisão no commit ou em `docs/coordenacao/ESTADO_DO_PROJETO.md`.
 - Em caso de dúvida sobre autoria ou escopo, pare antes de editar o mesmo arquivo.
+

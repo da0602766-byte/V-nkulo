@@ -105,7 +105,9 @@ test("push: aviso atrasado exige destinatário, vínculo e sessão atuais", asyn
     assert.equal(response.status, 200);
     const body = await response.json();
     assert.equal(body.url, "/painel?view=eventos");
-    assert.doesNotMatch(JSON.stringify(body), /Título reservado|Conteúdo reservado/);
+    assert.equal(body.title, "Título reservado");
+    assert.equal(body.body, "Conteúdo reservado");
+    assert.equal(response.headers.get("cache-control"), "no-store");
     assert.equal((await f.request(path, b)).status, 404);
     assert.equal((await f.request(path)).status, 401);
     await f.save(b, sub);

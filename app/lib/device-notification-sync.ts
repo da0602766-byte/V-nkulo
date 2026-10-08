@@ -3,6 +3,7 @@ import {
   showDeviceNotification,
 } from "./androidNativeBridge";
 import { isWebPushSupported } from "./web-push-client";
+import { deviceNotificationContent } from "./device-notification-content";
 
 const DEVICE_NOTIFICATION_STORAGE_KEY = "vinkulo-device-notifications-v1";
 
@@ -39,15 +40,15 @@ export async function showUnreadDeviceNotifications(items: DeviceNotificationRec
       ? item.destination
       : "/painel";
     const tag = `vinkulo-notification-${item.id}`;
+    const content = deviceNotificationContent(item.title, item.message);
     const shownNatively = nativeBridge && showDeviceNotification({
-      title: "Vínkulo",
-      body: "Você recebeu uma atualização. Abra o Vínkulo para consultar.",
+      ...content,
       tag,
       url: destination,
     });
     if (!shownNatively && registration) {
-      await registration.showNotification("Vínkulo", {
-        body: "Você recebeu uma atualização. Abra o Vínkulo para consultar.",
+      await registration.showNotification(content.title, {
+        body: content.body,
         icon: "/vinkulo-app-icon-192.png",
         badge: "/vinkulo-app-icon-192.png",
         tag,
