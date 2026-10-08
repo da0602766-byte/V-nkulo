@@ -56,6 +56,7 @@ html body .pilot-dashboard[data-ui-version="v2"] .pilot-workspace { min-width: 0
   html body .pilot-dashboard[data-ui-version="v2"] .pilot-mobile-nav svg { width:24px; height:24px; fill:none; stroke:currentColor; stroke-width:1.8; }
   html body .pilot-dashboard[data-ui-version="v2"] .pilot-mobile-nav-icon { width:28px; height:28px; display:grid; place-items:center; }
   html body .pilot-dashboard[data-ui-version="v2"] .pilot-mobile-nav-label { font-size:12px; line-height:1.1; }
+  html body .pilot-dashboard[data-ui-version="v2"] .pilot-mobile-label { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
   html body .pilot-dashboard[data-ui-version="v2"] .pilot-mobile-list-icon { width:24px; height:24px; display:flex; flex-direction:column; justify-content:center; gap:5px; }
   html body .pilot-dashboard[data-ui-version="v2"] .pilot-mobile-list-icon i { width:20px; height:2px; background:currentColor; border-radius:2px; }
   html body .pilot-dashboard[data-ui-version="v2"] .pilot-mobile-create-icon { width:32px; height:32px; display:grid; place-items:center; font-size:26px; line-height:1; border-radius:10px; background:var(--community-primary); color:var(--community-on-primary); }
@@ -73,6 +74,32 @@ html body .pilot-dashboard[data-ui-version="v2"] .pilot-workspace { min-width: 0
   html body .pilot-navigation-drawer .pilot-mobile-task-summary>button { grid-column:auto !important; }
 }
 @keyframes navigation-drawer-in { from { transform:translateX(-100%); } to { transform:translateX(0); } }
+
+/* A conversation owns the mobile viewport; only its message list scrolls.
+   Keep these rules next to the navigation rules so their specificity agrees. */
+@media (max-width:760px) {
+  html body:has(.pilot-workspace[data-fullscreen-view="mensagens"] .private-chat-shell.has-thread) { overflow:hidden; }
+  html body .pilot-dashboard[data-ui-version="v2"] .pilot-workspace[data-fullscreen-view="mensagens"] { padding:0 !important; }
+  html body .pilot-dashboard[data-ui-version="v2"]:has(.pilot-workspace[data-fullscreen-view="mensagens"] .private-chat-shell.has-thread) :is(.pilot-topbar,nav.pilot-mobile-nav) { display:none !important; }
+  html body .pilot-dashboard[data-ui-version="v2"] .pilot-workspace[data-fullscreen-view="mensagens"] .private-chat-shell.has-thread {
+    position:fixed; z-index:80; left:0; right:0;
+    top:calc(var(--chat-visible-top,0px) * var(--vinkulo-ui-scale-inverse,1));
+    height:calc(var(--chat-visible-height,100dvh) * var(--vinkulo-ui-scale-inverse,1));
+    width:100%; max-width:none; min-height:0; margin:0; gap:0; overflow:hidden;
+    background:var(--pilot-surface);
+  }
+  html body .pilot-dashboard[data-ui-version="v2"] .pilot-workspace[data-fullscreen-view="mensagens"] .private-chat-layout.has-thread {
+    display:grid !important; grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr);
+    flex:1 1 0; height:auto !important; min-height:0 !important; max-width:none;
+  }
+  html body .pilot-dashboard[data-ui-version="v2"] .pilot-workspace[data-fullscreen-view="mensagens"] .private-chat-thread { height:100%; min-height:0; overflow:hidden; }
+  html body .pilot-dashboard[data-ui-version="v2"] .pilot-workspace[data-fullscreen-view="mensagens"] .private-chat-messages { min-height:0; overscroll-behavior:contain; }
+  html body .pilot-dashboard[data-ui-version="v2"] .pilot-workspace[data-fullscreen-view="mensagens"] .private-chat-thread>form {
+    position:static; flex:none; grid-template-columns:minmax(0,1fr) auto; padding:10px 12px max(10px,env(safe-area-inset-bottom));
+  }
+  .private-chat-shell.has-thread .private-chat-thread textarea { min-width:0; font-size:16px; }
+  .private-chat-shell.has-thread .private-chat-thread>header>button { min-width:44px; min-height:44px; }
+}
 
 /* Feed layout follows its available container width, including sidebar reflow. */
 html body .pilot-dashboard[data-ui-version="v2"] .community-feed-redesign { container-type:inline-size; }
@@ -117,8 +144,9 @@ html body .people-directory .people-metrics article { min-height:78px; padding:1
 .people-directory .owner-access-banner p { font-size:14px; }
 html body .people-directory .people-tabs button.active { background:var(--community-primary); color:var(--community-on-primary); }
 .people-directory .people-tabs button { font-size:14px; }
-.people-directory .people-toolbar { flex-wrap:wrap; }
-.people-directory .people-toolbar>label { flex:1 1 240px; }
+html body .people-directory .people-toolbar { display:flex; flex-wrap:wrap; min-width:0; }
+html body .people-directory .people-toolbar>label { flex:1 1 240px; min-width:0; max-width:100%; }
+html body .people-directory .people-toolbar input[type="search"] { min-width:0; width:100%; box-sizing:border-box; }
 html body .people-directory .people-directory-list { display:block; border:1px solid var(--pilot-line); border-radius:14px; background:var(--pilot-surface); }
 html body .people-directory :is(.people-directory-columns,.people-directory-row) { display:grid !important; grid-template-columns:minmax(210px,1.5fr) minmax(120px,1fr) minmax(170px,1.1fr) 100px 126px !important; gap:16px; align-items:center; }
 .people-directory-columns { padding:14px 18px; background:var(--pilot-surface-2); border-radius:14px 14px 0 0; color:var(--pilot-muted); font-size:12px; font-weight:650; }
@@ -156,7 +184,9 @@ html body .people-directory .people-open-record { min-height:40px; padding:8px 1
   html body .people-directory-row .people-card-contact { grid-column:1/-1; display:flex; gap:12px; flex-wrap:wrap; }
   .people-mobile-label { display:block; }
   .people-directory .people-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }
-  .people-directory .people-toolbar>label { max-width:none; flex-basis:100%; }
+  html body .people-directory .people-toolbar { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; }
+  html body .people-directory .people-toolbar>label { width:100%; max-width:none; }
+  html body .people-directory .people-tabs { display:flex; flex-wrap:wrap; min-width:0; }
   .people-directory .scope-badge { display:none; }
 }
 

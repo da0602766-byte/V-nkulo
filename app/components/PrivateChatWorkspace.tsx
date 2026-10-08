@@ -98,6 +98,35 @@ export default function PrivateChatWorkspace({
   const [confirmed, setConfirmed] = useState<Message[]>([]);
   const [pending, setPending] = useState<PendingMessage[]>([]);
   const [activeId, setActiveId] = useState(initialConversation);
+  const shellRef = useRef<HTMLElement>(null);
+
+  // The keyboard changes the visible viewport without resizing the layout
+  // viewport on mobile Safari and Android. Keep the composer inside that area.
+  useEffect(() => {
+    const shell = shellRef.current;
+    const viewport = window.visualViewport;
+    if (!shell || !viewport || !activeId) return;
+    let frame = 0;
+    const update = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        // Preserve browser pinch zoom; only follow viewport changes at 1x.
+        if (viewport.scale !== 1) return;
+        shell.style.setProperty("--chat-visible-height", `${viewport.height}px`);
+        shell.style.setProperty("--chat-visible-top", `${viewport.offsetTop}px`);
+      });
+    };
+    update();
+    viewport.addEventListener("resize", update);
+    viewport.addEventListener("scroll", update);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      viewport.removeEventListener("resize", update);
+      viewport.removeEventListener("scroll", update);
+      shell.style.removeProperty("--chat-visible-height");
+      shell.style.removeProperty("--chat-visible-top");
+    };
+  }, [activeId]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(false);
@@ -426,7 +455,7 @@ export default function PrivateChatWorkspace({
   const purgeShort = useMemo(() => formatPurgeShort(workspace?.nextPurgeAt || null), [workspace?.nextPurgeAt]);
 
   return (
-    <section className={`private-chat-shell ${activeId ? "has-thread" : ""}`}>
+    <section ref={shellRef} className={`private-chat-shell ${activeId ? "has-thread" : ""}`}>
       <header className="workspace-heading private-chat-heading">
         <div>
           <p className="pilot-kicker">MENSAGENS</p>
@@ -562,6 +591,7 @@ export default function PrivateChatWorkspace({
                 <textarea
                   ref={textareaRef}
                   name="message"
+                  aria-label="Mensagem"
                   rows={1}
                   maxLength={2000}
                   required

@@ -89,7 +89,7 @@ const MENU: { id: View; label: string; permission: string }[] = [
   { id: "solicitacoes", label: "Pedidos", permission: "dashboard.view" },
   { id: "visitantes", label: "Visitantes", permission: "visitors.view" },
   { id: "celulas", label: "Células", permission: "cells.view" },
-  { id: "estacionamento", label: "Gestão", permission: "parking.view" },
+  { id: "estacionamento", label: "Estacionamento", permission: "parking.view" },
   { id: "redes", label: "Redes e unidades", permission: "networks.view" },
   { id: "membro", label: "Painel do membro", permission: "dashboard.view" },
   { id: "lider", label: "Painel de liderança", permission: "leadership.panel.view" },
@@ -381,7 +381,7 @@ export default function PilotDashboard({
     () =>
       allowedMenu.filter(
         (item) =>
-          !COMMUNITY_MANAGEMENT_VIEWS.includes(
+          item.id === "pessoas" || !COMMUNITY_MANAGEMENT_VIEWS.includes(
             item.id as CommunityManagementView,
           ),
       ),
@@ -442,7 +442,6 @@ export default function PilotDashboard({
         items: [
           makeItem("fio", "Fio do dia"),
           makeItem("inicio", "Início"),
-          makeItem("inicio", "Mural", "mural", { anchor: "mural" }),
           makeItem("eventos", "Agenda"),
         ].filter(Boolean),
       },
@@ -451,12 +450,9 @@ export default function PilotDashboard({
         items: [
           makeItem("pessoas", "Pessoas"),
           makeItem("ministerios", "Ministérios"),
-          makeItem("ministerios", "Escalas", "escalas", {
-            event: "vinkulo:open-schedules",
-          }),
           makeItem("visitantes", "Visitantes"),
           makeItem("solicitacoes", "Pedidos"),
-          makeItem("estacionamento", "Gestão do estacionamento"),
+          makeItem("estacionamento"),
           makeItem("celulas"),
           makeItem("redes"),
         ].filter(Boolean),
@@ -471,7 +467,10 @@ export default function PilotDashboard({
     const term = navigationSearch.trim().toLocaleLowerCase("pt-BR");
     return sidebarGroups
       .flatMap((group) => group.items)
-      .filter((item) => !term || item!.label.toLocaleLowerCase("pt-BR").includes(term))
+      .filter((item) => {
+        const aliases = item?.id === "ministerios" ? " escalas equipes" : item?.id === "inicio" ? " mural publicações" : "";
+        return !term || `${item!.label}${aliases}`.toLocaleLowerCase("pt-BR").includes(term);
+      })
       .slice(0, 7);
   }, [navigationSearch, sidebarGroups]);
   const communityManagementItems = useMemo(
@@ -514,7 +513,7 @@ export default function PilotDashboard({
               : null,
             active.permissions.includes("parking.view")
               ? {
-                  label: "Gestão",
+                  label: "Estacionamento",
                   description: "Entrada, saída ou ocorrência",
                   icon: "estacionamento" as MenuIconId,
                   view: "estacionamento" as View,
@@ -806,10 +805,7 @@ export default function PilotDashboard({
       window.dispatchEvent(new CustomEvent("vinkulo:open-visual-editor"));
       return;
     }
-    // "Mural" e "Escalas" apontam para a mesma view que "Início" e
-    // "Ministérios". Sem um destino próprio os quatro itens levavam ao mesmo
-    // lugar, e dois deles mentiam sobre onde iam parar. O foco resolve isso
-    // sem duplicar view: leva à seção certa depois que a tela monta.
+    // Ações contextuais podem focar uma seção depois que a área monta.
     if (focus) {
       window.setTimeout(() => {
         if (focus.event) {
@@ -1113,7 +1109,7 @@ export default function PilotDashboard({
           <section className="pilot-command-search" role="dialog" aria-modal="true" aria-label="Buscar uma área" onMouseDown={(event) => event.stopPropagation()}>
             <label>
               <span aria-hidden="true">⌕</span>
-              <input autoFocus type="search" value={navigationSearch} onChange={(event) => setNavigationSearch(event.target.value)} placeholder="Buscar pessoas, agenda, pedidos…" />
+              <input autoFocus type="search" aria-label="Buscar uma área da comunidade" value={navigationSearch} onChange={(event) => setNavigationSearch(event.target.value)} placeholder="Buscar pessoas, agenda, pedidos…" />
               <kbd>ESC</kbd>
             </label>
             <nav aria-label="Resultados da busca">
@@ -1269,7 +1265,8 @@ export default function PilotDashboard({
                   <button
                     key={item.key}
                     data-editor-key={`menu-principal-${item.key}`}
-                    className={visibleView === item.id && (visibleView !== "inicio" || item.key === "mural") ? "active" : ""}
+                    className={visibleView === item.id ? "active" : ""}
+                    aria-current={visibleView === item.id ? "page" : undefined}
                     onClick={() => openView(item.id, item.focus)}
                     aria-label={item.label}
                     title={item.label}
@@ -1458,7 +1455,7 @@ export default function PilotDashboard({
             title="Toque para abrir · segure para trocar"
           >
             <span className="pilot-mobile-nav-icon" aria-hidden="true"><MenuIcon id={item.id} /></span>
-            <small className="pilot-mobile-label">{item.label}</small>
+            <small className="pilot-mobile-label">{item.id === "estacionamento" ? "Vagas" : item.label}</small>
             {item.id === "eventos" && agendaAlerts > 0 && <b className="pilot-mobile-badge">{Math.min(agendaAlerts, 99)}</b>}
             {item.id === "solicitacoes" && unreadNotifications.pedidos > 0 && <b className="pilot-mobile-badge">{Math.min(unreadNotifications.pedidos, 99)}</b>}
           </button>
@@ -1495,7 +1492,7 @@ export default function PilotDashboard({
               title="Toque para abrir · segure para trocar"
             >
               <span className="pilot-mobile-nav-icon" aria-hidden="true"><MenuIcon id={item.id} /></span>
-              <small className="pilot-mobile-label">{item.label}</small>
+              <small className="pilot-mobile-label">{item.id === "estacionamento" ? "Vagas" : item.label}</small>
               {item.id === "eventos" && agendaAlerts > 0 && <b className="pilot-mobile-badge">{Math.min(agendaAlerts, 99)}</b>}
               {item.id === "solicitacoes" && unreadNotifications.pedidos > 0 && <b className="pilot-mobile-badge">{Math.min(unreadNotifications.pedidos, 99)}</b>}
             </button>

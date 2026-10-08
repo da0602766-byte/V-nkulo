@@ -293,7 +293,22 @@
   .visitor-dashboard-v7 > .relationship-compact-v7 { grid-row: auto; }
 }
 @media (max-width: 760px) {
+  html body .pilot-dashboard[data-ui-version="v2"] .visitor-workspace-v7 .visitor-hero-v7 {
+    display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 20px 16px;
+  }
+  html body .pilot-dashboard[data-ui-version="v2"] .visitor-hero-v7 h1 {
+    font-size: 26px; line-height: 1.2; overflow-wrap: normal; word-break: normal; letter-spacing: -.025em;
+  }
+  .visitor-hero-v7 .secretary-community { width: 100%; min-width: 0; box-sizing: border-box; }
   .visitor-flow-v7 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .visitor-workspace-v7 .visitor-flow-v7 > div {
+    display: grid; grid-template-columns: 27px minmax(0, 1fr); gap: 8px; padding: 12px 10px 16px;
+  }
+  .visitor-workspace-v7 .visitor-flow-v7 strong {
+    grid-column: 1 / -1; grid-row: 2; font-size: 13px; line-height: 1.4; overflow-wrap: normal; word-break: normal;
+  }
+  .visitor-workspace-v7 .visitor-flow-v7 b { grid-column: 2; grid-row: 1; margin-left: 0; justify-self: end; font-size: 22px; }
+  .visitor-workspace-v7 .visitor-flow-v7 em { grid-column: 1 / -1; font-size: 12px; }
   .visitor-hero-v7 .secretary-community strong { font-size: 25px; }
   .visitor-toolbar-v7 { grid-template-columns: minmax(0, 1fr); }
   .visitor-toolbar-v7 .secretary-toolbar-actions { justify-content: stretch; }

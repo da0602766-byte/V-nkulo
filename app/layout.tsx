@@ -55,9 +55,6 @@ export const metadata: Metadata = {
     index: false,
     follow: false,
   },
-  other: {
-    "codex-preview": "development",
-  },
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
