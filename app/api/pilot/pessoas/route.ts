@@ -162,7 +162,7 @@ export async function GET(request: Request) {
          JOIN usuarios u ON u.id = uc.usuario_id
          LEFT JOIN oficiais_comunidade oc
            ON oc.usuario_comunidade_id = uc.id
-         WHERE uc.comunidade_id = ? AND u.ativo = 1
+         WHERE uc.comunidade_id = ? AND u.ativo = 1 AND uc.status = 'ATIVO'
            AND (? <> 'sem-ministerio' OR NOT EXISTS (SELECT 1 FROM ministerio_voluntarios mv JOIN ministerios_comunidade m ON m.id=mv.ministerio_id AND m.comunidade_id=mv.comunidade_id WHERE mv.usuario_id=u.id AND mv.comunidade_id=uc.comunidade_id AND mv.ativo=1 AND m.status='ATIVO'))
            AND (? <> 'com-escala' OR EXISTS (SELECT 1 FROM escala_designacoes d JOIN escalas_ministerio s ON s.id=d.escala_id AND s.comunidade_id=d.comunidade_id WHERE d.usuario_id=u.id AND d.comunidade_id=uc.comunidade_id AND d.ativo=1 AND d.status IN ('CONFIRMADA','PENDENTE') AND s.status IN ('PUBLICADA','AGUARDANDO_CHECKLIST') AND datetime(s.termina_em)>=datetime('now')))
            AND (? <> 'sem-titulo' OR (oc.id IS NOT NULL AND COALESCE(oc.titulo,'')=''))
@@ -211,7 +211,7 @@ export async function GET(request: Request) {
          JOIN usuarios u ON u.id = uc.usuario_id
          LEFT JOIN oficiais_comunidade oc
            ON oc.usuario_comunidade_id = uc.id
-         WHERE uc.comunidade_id = ? AND u.ativo = 1`,
+         WHERE uc.comunidade_id = ? AND u.ativo = 1 AND uc.status = 'ATIVO'`,
       )
       .bind(access.context.comunidadeId)
       .first<{ membros: number; oficiais: number; oficiais_sem_titulo: number }>(),

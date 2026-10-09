@@ -36,5 +36,9 @@ test('Rotas reais da Central e Pessoas respeitam autenticação, escopo e filtro
     const self=await (await get('/api/pilot/pessoas?aba=todos',member)).json();assert.equal(self.canViewPeople,false);assert.equal(self.people.length,0);
     f.db.prepare("UPDATE usuario_comunidades SET status='REMOVIDO' WHERE usuario_id=?").run(f.member);
     assert.equal((await get('/api/pilot/central',member)).status,403);
+    const activePeople=await (await get('/api/pilot/pessoas?aba=todos',pastor)).json();
+    assert.ok(!activePeople.people.some(person=>person.usuario_id===f.member));
+    const activeCentral=await (await get('/api/pilot/central',pastor)).json();
+    assert.equal(activePeople.counts.membros+activePeople.counts.oficiais,activeCentral.metrics.find(metric=>metric.label==='Pessoas vinculadas').value);
   } finally {f.db.close();}
 });
