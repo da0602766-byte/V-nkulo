@@ -4,7 +4,10 @@ import SafeImage from "./SafeImage";
 
 import TransientFeedback from "./TransientFeedback";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { matchesDirectorySearch } from "../lib/directory-search";
+import "./leadership-member-ux.css";
 
 type Leader = {
   membership_id: number;
@@ -87,63 +90,97 @@ export default function LeadershipWorkspace({
   const [message, setMessage] = useState("");
   const [dashboard, setDashboard] = useState<PastoralDashboard | null>(null);
 
-  const load = useCallback(async (quiet = false) => {
-    if (!quiet) setLoading(true);
-    setMessage("");
+  const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [candidateLoading, setCandidateLoading] = useState(false);
+  const [candidateError, setCandidateError] = useState("");
+  const [candidateReady, setCandidateReady] = useState(false);
+  const [candidateSearch, setCandidateSearch] = useState("");
+  const [dashboardLoading, setDashboardLoading] = useState(mode === "pastoral");
+  const [dashboardError, setDashboardError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const leadershipRequest = useRef<AbortController | null>(null);
+  const candidateRequest = useRef<AbortController | null>(null);
+  const dashboardRequest = useRef<AbortController | null>(null);
+  const mutationRef = useRef(false);
+
+  const loadCandidates = useCallback(async () => {
+    candidateRequest.current?.abort();
+    const controller = new AbortController();
+    candidateRequest.current = controller;
+    setCandidateLoading(true); setCandidateError(""); setCandidateReady(false);
     try {
-      const [leadershipResponse, peopleResponse, dashboardResponse] = await Promise.all([
-        fetch("/api/pilot/leadership", { cache: "no-store" }),
-        // A lista aqui é o conjunto de quem pode ser promovido a líder, então
-        // precisa estar completa: um membro fora dela simplesmente não pode ser
-        // escolhido. Como /api/pilot/pessoas passou a responder por lotes, o
-        // primeiro lote vem aqui e os seguintes logo abaixo, pelo cursor.
-        fetch("/api/pilot/pessoas?aba=membros&limite=50", { cache: "no-store" }),
-        mode === "pastoral"
-          ? fetch("/api/pilot/pastoral-dashboard", { cache: "no-store" })
-          : Promise.resolve(null),
-      ]);
-      const leadership = await responseJson(leadershipResponse) as { error?: string; leaders?: Leader[]; history?: HistoryItem[]; canManage?: boolean };
-      const peopleData = await responseJson(peopleResponse) as { error?: string; people?: Person[]; canManage?: boolean };
-      if (!leadershipResponse.ok) {
-        throw new Error(leadership.error || "Falha ao carregar liderança.");
-      }
-      setLeaders(leadership.leaders || []);
-      setHistory(leadership.history || []);
-      setCanManage(Boolean(leadership.canManage && peopleData.canManage));
-      if (peopleResponse.ok) {
-        const todos = [...(peopleData.people || [])];
-        // Percorre o restante dos lotes. O teto de voltas evita laço infinito
-        // caso um cursor pare de avançar.
-        let cursor = (peopleData as { nextCursor?: string | null }).nextCursor;
-        for (let volta = 0; cursor && volta < 60; volta += 1) {
-          const address = new URL("/api/pilot/pessoas", window.location.origin);
-          address.searchParams.set("aba", "membros");
-          address.searchParams.set("limite", "50");
-          address.searchParams.set("cursor", cursor);
-          const seguinte = await fetch(address, { cache: "no-store" });
-          if (!seguinte.ok) break;
-          const lote = await responseJson(seguinte) as { people?: Person[]; nextCursor?: string | null };
-          todos.push(...(lote.people || []));
-          cursor = lote.nextCursor;
-        }
-        setPeople(todos);
-      }
-      if (dashboardResponse) {
-        const dashboardData = await responseJson(dashboardResponse) as PastoralDashboard & { error?: string };
-        if (!dashboardResponse.ok) throw new Error(dashboardData.error || "Falha ao carregar indicadores pastorais.");
-        setDashboard(dashboardData as PastoralDashboard);
-      }
-    } catch (error) {
-      setMessage((error as Error).message);
+      const all: Person[] = [];
+      const seen = new Set<string>();
+      let cursor: string | null = null;
+      do {
+        const address = new URL("/api/pilot/pessoas", window.location.origin);
+        address.searchParams.set("aba", "membros"); address.searchParams.set("limite", "50");
+        if (cursor) address.searchParams.set("cursor", cursor);
+        const response = await fetch(address, { cache: "no-store", signal: controller.signal });
+        const data = await responseJson(response) as { error?: string; people?: Person[]; canManage?: boolean; nextCursor?: string | null };
+        if (!response.ok) throw new Error(data.error || "Não foi possível carregar os membros disponíveis.");
+        if (!data.canManage) { if (!controller.signal.aborted) setPeople([]); return; }
+        if (!Array.isArray(data.people)) throw new Error("A lista de membros chegou incompleta. Tente novamente.");
+        all.push(...data.people);
+        cursor = data.nextCursor || null;
+        if (cursor && (typeof cursor !== "string" || seen.has(cursor) || seen.size >= 60)) throw new Error("Não foi possível completar a lista de membros. Tente novamente.");
+        if (cursor) seen.add(cursor);
+      } while (cursor && !controller.signal.aborted);
+      if (controller.signal.aborted) return;
+      setPeople([...new Map(all.map(person => [person.membership_id, person])).values()]);
+      setCandidateReady(true);
+      setSelectedMembership(current => all.some(person => String(person.membership_id) === current) ? current : "");
+    } catch (cause) {
+      if (!controller.signal.aborted) setCandidateError((cause as Error).message);
     } finally {
-      if (!quiet) setLoading(false);
+      if (candidateRequest.current === controller) { candidateRequest.current = null; setCandidateLoading(false); }
     }
-  }, [mode]);
+  }, []);
+
+  const load = useCallback(async () => {
+    leadershipRequest.current?.abort();
+    const controller = new AbortController(); leadershipRequest.current = controller;
+    setLoading(true); setLoadError("");
+    try {
+      const response = await fetch("/api/pilot/leadership", { cache: "no-store", signal: controller.signal });
+      const data = await responseJson(response) as { error?: string; leaders?: Leader[]; history?: HistoryItem[]; canManage?: boolean };
+      if (!response.ok) throw new Error(data.error || "Não foi possível carregar a liderança.");
+      if (!Array.isArray(data.leaders) || !Array.isArray(data.history)) throw new Error("O painel chegou incompleto. Tente novamente.");
+      if (controller.signal.aborted) return;
+      setLeaders(data.leaders); setHistory(data.history); setCanManage(Boolean(data.canManage)); setLoaded(true);
+      if (data.canManage) void loadCandidates();
+      else { candidateRequest.current?.abort(); setCandidateReady(false); setCandidateError(""); setPeople([]); }
+    } catch (cause) {
+      if (!controller.signal.aborted) setLoadError((cause as Error).message);
+    } finally {
+      if (leadershipRequest.current === controller) { leadershipRequest.current = null; setLoading(false); }
+    }
+  }, [loadCandidates]);
+
+  const loadDashboard = useCallback(async () => {
+    dashboardRequest.current?.abort();
+    const controller = new AbortController(); dashboardRequest.current = controller;
+    setDashboardLoading(true); setDashboardError("");
+    try {
+      const response = await fetch("/api/pilot/pastoral-dashboard", { cache: "no-store", signal: controller.signal });
+      const data = await responseJson(response) as PastoralDashboard & { error?: string };
+      if (!response.ok) throw new Error(data.error || "Não foi possível carregar os indicadores.");
+      if ([data.series, data.cellReports, data.pastors].some(value => value !== undefined && !Array.isArray(value))) throw new Error("Os indicadores chegaram incompletos. Tente novamente.");
+      if (typeof data.canViewCharts !== "boolean" || (data.canViewCharts && (!data.metrics || ![data.metrics.members, data.metrics.visitors, data.metrics.posts30d, data.metrics.upcomingEvents, data.metrics.ministries, data.metrics.cells].every(value => typeof value === "number" && Number.isFinite(value))))) throw new Error("Os indicadores chegaram incompletos. Tente novamente.");
+      if (controller.signal.aborted) return;
+      setDashboard(data);
+    } catch (cause) {
+      if (!controller.signal.aborted) setDashboardError((cause as Error).message);
+    } finally {
+      if (dashboardRequest.current === controller) { dashboardRequest.current = null; setDashboardLoading(false); }
+    }
+  }, []);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => void load(), 0);
-    return () => window.clearTimeout(timer);
-  }, [load]);
+    const timer = window.setTimeout(() => { void load(); if (mode === "pastoral") void loadDashboard(); else setDashboard(null); }, 0);
+    return () => { window.clearTimeout(timer); leadershipRequest.current?.abort(); candidateRequest.current?.abort(); dashboardRequest.current?.abort(); };
+  }, [load, loadDashboard, mode]);
 
   const candidates = useMemo(
     () =>
@@ -156,13 +193,17 @@ export default function LeadershipWorkspace({
     [people],
   );
 
+  const visibleCandidates = candidates.filter(person => matchesDirectorySearch(candidateSearch, person.nome, person.email));
+
   async function addLeader() {
+    if (mutationRef.current || !canManage || !candidateReady || candidateLoading || candidateError || loading || loadError) return;
     const person = people.find(
       (item) => item.membership_id === Number(selectedMembership),
     );
-    if (!person) return;
+    if (!person || !candidates.some(candidate => candidate.membership_id === person.membership_id)) return;
+    mutationRef.current = true;
     setWorking(true);
-    setMessage("");
+    setMessage(""); setActionError("");
     try {
       const response = await fetch("/api/pilot/pessoas", {
         method: "PATCH",
@@ -181,17 +222,19 @@ export default function LeadershipWorkspace({
       }
       setSelectedMembership("");
       setMessage("Líder adicionado com registro no histórico.");
-      await load(true);
+      await load();
     } catch (error) {
-      setMessage((error as Error).message);
+      setActionError((error as Error).message);
     } finally {
-      setWorking(false);
+      mutationRef.current = false; setWorking(false);
     }
   }
 
   async function updatePastoralAccess(userId: number, enabled: boolean) {
+    if (mutationRef.current || !dashboard?.canManageAccess || dashboardLoading || dashboardError) return;
+    mutationRef.current = true;
     setWorking(true);
-    setMessage("");
+    setMessage(""); setActionError("");
     try {
       const response = await fetch("/api/pilot/pastoral-dashboard", {
         method: "PATCH",
@@ -201,16 +244,12 @@ export default function LeadershipWorkspace({
       const result = await responseJson(response) as { error?: string };
       if (!response.ok) throw new Error(result.error || "Não foi possível alterar o acesso.");
       setMessage(enabled ? "Acesso aos gráficos concedido." : "Acesso aos gráficos removido.");
-      await load(true);
+      await loadDashboard();
     } catch (error) {
-      setMessage((error as Error).message);
+      setActionError((error as Error).message);
     } finally {
-      setWorking(false);
+      mutationRef.current = false; setWorking(false);
     }
-  }
-
-  if (loading) {
-    return <div className="people-loading">Carregando painel de liderança…</div>;
   }
 
   const pastoral = leaders.filter((item) => item.papel === "PASTOR");
@@ -227,23 +266,26 @@ export default function LeadershipWorkspace({
               : "Liderança e organização"}
           </h1>
           <p>
-            {communityName}: funções e alterações validadas no servidor, sem
-            conceder acesso além da comunidade ativa.
+            {communityName}: acompanhe a equipe, os indicadores disponíveis e as alterações recentes.
           </p>
         </div>
-        <span>{mode === "pastoral" ? pastoral.length : leaders.length}</span>
+        <button type="button" className="leadership-refresh" disabled={loading || working} onClick={() => { void load(); if (mode === "pastoral") void loadDashboard(); }}>Atualizar painel</button>
       </header>
 
-      <div className="leadership-metrics">
+      {loading && <p className="leadership-query-status" role="status">{loaded ? "Atualizando equipe e histórico…" : "Carregando equipe e histórico…"}</p>}
+      {loadError && <LoadError message={loadError} retained={loaded} onRetry={() => void load()} />}
+      {loaded && <div className="leadership-metrics">
         <article><small>Lideranças ativas</small><strong>{leaders.length}</strong></article>
         <article><small>Pastoral</small><strong>{pastoral.length}</strong></article>
         <article><small>Alterações recentes</small><strong>{history.length}</strong></article>
-      </div>
+      </div>}
 
+      {mode === "pastoral" && dashboardLoading && <p className="leadership-query-status" role="status">Carregando indicadores…</p>}
+      {mode === "pastoral" && dashboardError && <LoadError message={dashboardError} retained={Boolean(dashboard)} onRetry={() => void loadDashboard()} />}
       {mode === "pastoral" && dashboard && (
         <PastoralCommunityDashboard
           data={dashboard}
-          working={working}
+          working={working || dashboardLoading || Boolean(dashboardError)}
           onAccessChange={updatePastoralAccess}
         />
       )}
@@ -255,14 +297,19 @@ export default function LeadershipWorkspace({
             <h2>Adicionar líder</h2>
             <p>Somente membros ativos desta comunidade podem ser selecionados.</p>
           </div>
+          {candidateLoading && <p role="status">Carregando todos os membros disponíveis…</p>}
+          {candidateError && <LoadError message={candidateError} onRetry={() => void loadCandidates()} />}
+          {!candidateLoading && !candidateError && !candidateReady && <p>A gestão de membros não está disponível para o seu perfil.</p>}
+          {candidateReady && !candidateError && <><label>Buscar membro<input type="search" value={candidateSearch} onChange={event => { setCandidateSearch(event.target.value); setSelectedMembership(""); }} placeholder="Nome ou e-mail" /></label>
           <label>
             Pessoa
             <select
+              disabled={working || candidateLoading || loading || Boolean(loadError)}
               value={selectedMembership}
               onChange={(event) => setSelectedMembership(event.target.value)}
             >
               <option value="">Selecione um membro</option>
-              {candidates.map((person) => (
+              {visibleCandidates.map((person) => (
                 <option key={person.membership_id} value={person.membership_id}>
                   {person.nome} · {person.email}
                 </option>
@@ -271,17 +318,20 @@ export default function LeadershipWorkspace({
           </label>
           <button
             type="button"
-            disabled={!selectedMembership || working}
+            disabled={!selectedMembership || working || candidateLoading || loading || Boolean(loadError)}
             onClick={() => void addLeader()}
           >
             {working ? "Salvando…" : "Adicionar líder"}
           </button>
+          {!visibleCandidates.length && <p>{candidateSearch ? "Nenhum membro corresponde à busca." : "Nenhum membro disponível para adicionar à liderança."}</p>}
+          </>}
         </section>
       )}
 
+      {actionError && <p className="leadership-query-error" role="alert">{actionError}</p>}
       {message && <TransientFeedback className="operations-feedback" role="status">{message}</TransientFeedback>}
 
-      <div className="leadership-content-grid">
+      {loaded && <div className="leadership-content-grid">
         <section className="leadership-list-card">
           <header>
             <div>
@@ -306,6 +356,7 @@ export default function LeadershipWorkspace({
                 <em>{roleLabel(leader.papel)}</em>
               </article>
             ))}
+            {!leaders.length && <p className="platform-post-empty">Nenhuma liderança disponível para consulta.</p>}
           </div>
         </section>
 
@@ -334,9 +385,13 @@ export default function LeadershipWorkspace({
             )}
           </div>
         </section>
-      </div>
+      </div>}
     </section>
   );
+}
+
+function LoadError({message, retained = false, onRetry}: {message: string; retained?: boolean; onRetry: () => void}) {
+  return <div className="leadership-query-error" role="alert"><p>{retained ? "Os dados anteriores continuam visíveis. " : ""}{message}</p><button type="button" onClick={onRetry}>Tentar novamente</button></div>;
 }
 
 function PastoralCommunityDashboard({
@@ -361,7 +416,7 @@ function PastoralCommunityDashboard({
   const maxActivity = Math.max(1, ...series.flatMap((item) => [item.posts, item.events]));
   return (
     <section className="pastoral-community-dashboard">
-      <header><div><p className="pilot-kicker">SAÚDE DA COMUNIDADE</p><h2>Indicadores pastorais</h2><p>Dados isolados da comunidade ativa. Nenhuma informação de outra comunidade entra nestes totais.</p></div><span>Últimos 6 meses</span></header>
+      <header><div><p className="pilot-kicker">SAÚDE DA COMUNIDADE</p><h2>Indicadores pastorais</h2><p>Acompanhe a participação e as atividades desta comunidade.</p></div></header>
       <div className="pastoral-kpi-grid">
         {[
           ["Membros ativos", metrics.members], ["Visitantes", metrics.visitors],
@@ -370,19 +425,20 @@ function PastoralCommunityDashboard({
         ].map(([label, value]) => <article key={String(label)}><small>{label}</small><strong>{value}</strong></article>)}
       </div>
       <div className="pastoral-activity-chart" role="img" aria-label="Atividade mensal no feed e nos eventos">
-        <div><p className="pilot-kicker">ATIVIDADE</p><h3>Feed e eventos</h3></div>
+        <div><p className="pilot-kicker">ATIVIDADE · ÚLTIMOS 6 MESES</p><h3>Feed e eventos</h3></div>
         <div className="pastoral-chart-bars">
           {series.map((item) => (
             <div key={item.month}>
-              <span style={{ "--bar-posts": `${Math.max(4, (item.posts / maxActivity) * 100)}%`, "--bar-events": `${Math.max(4, (item.events / maxActivity) * 100)}%` } as React.CSSProperties}><i title={`${item.posts} publicações`} /><b title={`${item.events} eventos`} /></span>
+              <span style={{ "--bar-posts": `${Math.max(0, (item.posts / maxActivity) * 100)}%`, "--bar-events": `${Math.max(0, (item.events / maxActivity) * 100)}%` } as React.CSSProperties}><i title={`${item.posts} publicações`} /><b title={`${item.events} eventos`} /></span>
               <small>{item.label}</small>
             </div>
           ))}
         </div>
         <footer><span><i /> Publicações</span><span><i /> Eventos</span></footer>
       </div>
+      <details className="pastoral-chart-data"><summary>Ver valores por mês</summary><table><caption>Publicações e eventos nos últimos seis meses</caption><thead><tr><th scope="col">Mês</th><th scope="col">Publicações</th><th scope="col">Eventos</th></tr></thead><tbody>{series.map(item => <tr key={item.month}><th scope="row">{item.label}</th><td>{item.posts}</td><td>{item.events}</td></tr>)}</tbody></table>{!series.length && <p>Não há dados mensais disponíveis.</p>}</details>
       <section className="pastoral-cell-reports-v2">
-        <header><div><p className="pilot-kicker">RELATÓRIOS DAS CÉLULAS</p><h3>Acompanhamento semanal</h3></div><span>{(data.cellReports || []).length} recentes</span></header>
+        <header><div><p className="pilot-kicker">RELATÓRIOS DAS CÉLULAS</p><h3>Acompanhamento semanal</h3></div><span>{Math.min((data.cellReports || []).length, 10)} {(data.cellReports || []).length === 1 ? "recente" : "recentes"}</span></header>
         <div>{(data.cellReports || []).slice(0, 10).map((report) => <article key={report.id}><time>{new Date(`${report.data_reuniao}T12:00:00`).toLocaleDateString("pt-BR")}</time><div><strong>{report.celula_nome}</strong><small>{report.aconteceu ? `${report.presentes} presentes · ${report.visitantes} visitantes` : "Encontro não realizado"}</small></div><p>{report.observacoes || `Enviado por ${report.enviado_por_nome}`}</p></article>)}{!(data.cellReports || []).length && <p>Nenhum relatório semanal recebido.</p>}</div>
       </section>
       {data.canManageAccess && (

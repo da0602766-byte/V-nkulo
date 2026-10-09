@@ -7,6 +7,7 @@ import VerifiedOwnerName from "./VerifiedOwnerName";
 import PersonRecord from "./PersonRecord";
 import SafeImage from "./SafeImage";
 import "./people-directory-ux.css";
+import "./leadership-member-ux.css";
 
 type Person = {
   membership_id: number;
@@ -163,9 +164,11 @@ const PERMISSION_GROUPS = [
 export default function PeopleWorkspace({
   communityName,
   mode = "manage",
+  selfLinks = [],
 }: {
   communityName: string;
   mode?: "self" | "manage";
+  selfLinks?: Array<{ label: string; href: string }>;
 }) {
   const [data, setData] = useState<PeopleResponse>({
     me: null,
@@ -179,6 +182,7 @@ export default function PeopleWorkspace({
   const requestRef = useRef<AbortController | null>(null);
   const loadedQueryRef = useRef<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const profileSavingRef = useRef(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [tab, setTab] = useState<"todos" | "membros" | "oficiais">("todos");
@@ -264,6 +268,8 @@ export default function PeopleWorkspace({
 
   async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (profileSavingRef.current) return;
+    profileSavingRef.current = true;
     setSaving(true);
     setError("");
     setMessage("");
@@ -283,6 +289,7 @@ export default function PeopleWorkspace({
     } catch (saveError) {
       setError((saveError as Error).message);
     } finally {
+      profileSavingRef.current = false;
       setSaving(false);
     }
   }
@@ -360,18 +367,18 @@ export default function PeopleWorkspace({
     }
   }
 
-  if (loading && mode === "self") {
+  if (loading && mode === "self" && !data.me) {
     return (
       <section className="people-workspace">
         <div className="people-loading" role="status">
-          Carregando pessoas da comunidade…
+          Carregando seu perfil…
         </div>
       </section>
     );
   }
 
   if (mode === "self") {
-    if (listError) return <section className="directory-load-error"><p role="alert">{listError}</p><button type="button" onClick={() => void load()}>Tentar novamente</button></section>;
+    if (listError && !data.me) return <section className="directory-load-error"><p role="alert">{listError}</p><button type="button" onClick={() => void load()}>Tentar novamente</button></section>;
     return (
       <SelfProfile
         me={data.me}
@@ -379,6 +386,10 @@ export default function PeopleWorkspace({
         error={error}
         message={message}
         onSubmit={saveProfile}
+        refreshError={listError}
+        onRetry={() => void load({ quiet: true })}
+        refreshing={pending}
+        links={selfLinks}
       />
     );
   }
@@ -723,12 +734,20 @@ function SelfProfile({
   error,
   message,
   onSubmit,
+  refreshError,
+  onRetry,
+  refreshing,
+  links,
 }: {
   me: Me | null;
   saving: boolean;
   error: string;
   message: string;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  refreshError: string;
+  onRetry: () => void;
+  refreshing: boolean;
+  links: Array<{ label: string; href: string }>;
 }) {
   if (!me) {
     return <div className="pilot-empty-state">Perfil indisponível.</div>;
@@ -746,6 +765,8 @@ function SelfProfile({
         </div>
         <span className="scope-badge">{roleLabel(me.papel)}</span>
       </header>
+      {links.length > 0 && <nav className="self-profile-links" aria-label="Minha participação"><strong>Minha participação</strong>{links.map(link => <a key={link.href} href={link.href}>{link.label}<span aria-hidden="true"> →</span></a>)}</nav>}
+      {refreshError && <div className="directory-load-error" role="alert"><p>Não foi possível atualizar a consulta do perfil. Seu preenchimento continua abaixo. {refreshError}</p><button type="button" disabled={refreshing} onClick={onRetry}>Tentar novamente</button></div>}
       <div className="self-profile-card">
         <aside>
           <span className="self-profile-avatar" aria-hidden="true">{getInitials(me.nome)}</span>
@@ -754,11 +775,13 @@ function SelfProfile({
           <em>{me.oficial ? me.titulo_oficial || "Oficial" : "Membro"}</em>
         </aside>
         <form className="pilot-form" onSubmit={onSubmit}>
+          <h2 className="self-profile-section-title">Meus dados de contato</h2>
           <label>
             Telefone
             <input
               name="telefone"
               type="tel"
+              autoComplete="tel"
               maxLength={30}
               defaultValue={me.telefone || ""}
             />
@@ -768,6 +791,8 @@ function SelfProfile({
             <input
               name="dataNascimento"
               type="date"
+              autoComplete="bday"
+              max={new Date().toISOString().slice(0, 10)}
               defaultValue={me.data_nascimento || ""}
             />
           </label>
@@ -775,33 +800,18 @@ function SelfProfile({
             Endereço
             <input
               name="endereco"
+              autoComplete="street-address"
               maxLength={180}
               defaultValue={me.endereco || ""}
             />
           </label>
-          <label>
-            Célula
-            <span className="self-profile-readonly">
-              {me.celula_vinculada || "Você ainda não está em uma célula."}
-            </span>
-            <small>O vínculo é definido pelos responsáveis da célula.</small>
-          </label>
-          <label>
-            Ministério
-            <span className="self-profile-readonly">
-              {me.ministerio || "Você ainda não está vinculado a um ministério."}
-            </span>
-            <input type="hidden" name="ministerio" value={me.ministerio || ""} />
-            <small>Preenchido automaticamente conforme seus vínculos ativos.</small>
-          </label>
+          <input type="hidden" name="ministerio" value={me.ministerio || ""} />
           <button disabled={saving}>
             {saving ? "Salvando…" : "Salvar meus dados"}
           </button>
-          {(message || error) && (
-            <TransientFeedback className={`operations-feedback ${error ? "error" : ""}`} role="status">
-              {error || message}
-            </TransientFeedback>
-          )}
+          {error && <p className="self-profile-save-error" role="alert">{error} Seus dados preenchidos foram mantidos para tentar novamente.</p>}
+          {message && <p className="self-profile-save-success" role="status">{message}</p>}
+          <section className="self-profile-memberships" aria-labelledby="self-memberships-title"><h2 id="self-memberships-title">Meus vínculos na comunidade</h2><p>Estas informações são atualizadas pelos responsáveis de cada área.</p><dl><div><dt>Célula</dt><dd>{me.celula_vinculada || "Você ainda não está em uma célula."}</dd></div><div><dt>Ministérios</dt><dd>{me.ministerio || "Você ainda não está vinculado a um ministério."}</dd></div></dl></section>
         </form>
       </div>
     </section>

@@ -1385,6 +1385,7 @@ export default function PilotDashboard({
             <PeopleWorkspace
               communityName={active.comunidadeNome}
               mode="self"
+              selfLinks={allowedMenu.filter(item => ["eventos", "ministerios", "celulas"].includes(item.id)).map(item => ({ label: item.label, href: `/painel?view=${item.id}` }))}
             />
           )}
           {visibleView === "lider" && (
