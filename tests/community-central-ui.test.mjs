@@ -46,3 +46,20 @@ test('Busca de avisos e filtro não lidos operam nos avisos recebidos',async()=>
 const lifecycleData={community:{id:7,name:'Teste',status:'ATIVA'},requests:[],protection:{communityStatus:'ATIVA',recentRecords:10,activeLegalHolds:0},canRequest:true,canReview:false,mfa:{required:true,available:false}};
 test('Continuidade começa pelo acompanhamento, sem cancelamento pré-selecionado',async()=>{const h=harness('CommunityLifecycleWorkspace.tsx',{currentCommunityId:7});h.render();h.flush();await reply(h.requests[0],lifecycleData);assert.equal(find(h.render(),'form'),undefined);button(h.render(),'Nova solicitação').props.onClick();const radios=nodes(h.render()).filter(n=>n.type==='input'&&n.props.type==='radio');assert.equal(radios.length,3);assert.ok(radios.every(r=>!r.props.checked));assert.equal(button(h.render(),'Enviar solicitação ao suporte').props.disabled,true)});
 test('Continuidade bloqueia envio duplicado e mantém formulário quando falha',async()=>{const h=harness('CommunityLifecycleWorkspace.tsx',{currentCommunityId:7});h.render();h.flush();await reply(h.requests[0],lifecycleData);button(h.render(),'Nova solicitação').props.onClick();find(h.render(),'input',n=>n.props.value==='DESATIVACAO').props.onChange();const onSubmit=find(h.render(),'form').props.onSubmit;const event={preventDefault(){},currentTarget:{reason:'Teste',description:'Solicitação de demonstração',confirmation:'SOLICITAR',password:'ficticia',reset(){}}};onSubmit(event);onSubmit(event);assert.equal(h.requests.filter(r=>r.options?.method==='POST').length,1);await reply(h.requests.at(-1),{error:'Falha simulada'},503);assert.ok(find(h.render(),'form'));assert.match(text(h.render()),/preenchimento foi mantido/)});
+
+
+test('Título de oficial não acrescenta acesso e mantém navegação direta',()=>{
+ const visited=[];
+ const h=harness('CommunityCentral.tsx',{communityName:'Teste',roleLabel:'Oficial · Diácono',current:'relatorios',allowed:['comunidade','membro','relatorios','avisos','conta'],onNavigate:id=>visited.push(id)},'CentralNavigation');
+ const tree=h.render();assert.equal(find(tree,'select'),undefined);
+ assert.doesNotMatch(text(tree),/Liderança|Pessoas|Continuidade|Configurações/);
+ const selected=nodes(tree).find(n=>n.type==='button'&&n.props['aria-current']==='page');assert.match(text(selected),/Relatórios/);
+ nodes(tree).find(n=>n.type==='button'&&text(n).startsWith('Avisos')).props.onClick();assert.deepEqual(visited,['avisos']);
+});
+test('Consulta pessoal agrupa filtros e omite total de integrantes da equipe',async()=>{
+ const h=harness('CommunityCentral.tsx',{communityId:7,mode:'reports'});h.render();h.flush();
+ await reply(h.requests[0],{...centralData,scope:'personal',scopeLabel:'Sua participação',ministries:centralData.ministries.map(m=>({...m,volunteers:null}))});
+ const tree=h.render();assert.doesNotMatch(text(tree),/Integrantes/);assert.match(text(tree),/somente a você/);
+ const section=nodes(tree).find(n=>n.type==='section'&&n.props.className?.includes('central-report-section')&&text(n).includes('Meus ministérios'));
+ assert.ok(section);assert.ok(find(section,'select'));assert.ok(button(section,'Baixar CSV'));assert.match(text(section),/Louvor/);
+});
