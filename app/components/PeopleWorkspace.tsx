@@ -188,6 +188,7 @@ export default function PeopleWorkspace({
   const [tab, setTab] = useState<"todos" | "membros" | "oficiais">("todos");
   const [record, setRecord] = useState<Person | null>(null);
   const [search, setSearch] = useState("");
+  const [participation, setParticipation] = useState("");
   const [loadingMore, setLoadingMore] = useState(false);
   const [editing, setEditing] = useState<Person | null>(null);
   const [permissionDraft, setPermissionDraft] = useState<string[]>([]);
@@ -197,7 +198,7 @@ export default function PeopleWorkspace({
   const [removing, setRemoving] = useState<Person | null>(null);
   const [removeConfirmation, setRemoveConfirmation] = useState("");
   const [removalIssue, setRemovalIssue] = useState<{ message: string; blockers: RemovalBlocker[] } | null>(null);
-  const queryKey = JSON.stringify([tab, search.trim()]);
+  const queryKey = JSON.stringify([tab, search.trim(), participation]);
   const currentFailure = loadFailure?.key === queryKey ? loadFailure : null;
   const loading = pending || (loadedKey !== queryKey && !currentFailure);
   const listError = currentFailure && !currentFailure.cursor ? currentFailure.message : "";
@@ -217,6 +218,7 @@ export default function PeopleWorkspace({
       try {
         const address = new URL("/api/pilot/pessoas", window.location.origin);
         address.searchParams.set("aba", tab);
+        if (participation) address.searchParams.set("vinculo", participation);
         const term = search.trim();
         if (term) address.searchParams.set("busca", term);
         if (cursor) address.searchParams.set("cursor", cursor);
@@ -244,7 +246,7 @@ export default function PeopleWorkspace({
         }
       }
     },
-    [search, tab, queryKey],
+    [search, tab, participation, queryKey],
   );
 
   // A busca agora roda no banco, então cada tecla viraria uma consulta; o
@@ -404,12 +406,12 @@ export default function PeopleWorkspace({
       <header className="workspace-heading people-heading">
         <div>
           <p className="pilot-kicker">COMUNIDADE · {communityName}</p>
-          <h1>Pessoas</h1>
+          <h1>Encontre e acompanhe pessoas</h1>
           <p>
-            Consulte os vínculos, a disponibilidade e a participação de cada pessoa.
+            Busque uma pessoa, consulte sua participação e abra a ficha para acompanhar os detalhes.
           </p>
         </div>
-        <span className="scope-badge">Escopo: comunidade ativa</span>
+        <a className="people-report-link" href="/painel?view=relatorios">Consultar relatórios →</a>
       </header>
 
       {data.canEditSelfHierarchy && (
@@ -483,7 +485,8 @@ export default function PeopleWorkspace({
             placeholder="Buscar por nome, e-mail ou telefone"
           />
         </label>
-        {(search || tab !== "todos") && <button type="button" className="people-clear-filters" onClick={() => { setSearch(""); setTab("todos"); }}>Limpar filtros</button>}
+        <label><span>Acompanhamento</span><select value={participation} onChange={event => setParticipation(event.target.value)}><option value="">Todos os vínculos</option><option value="sem-ministerio">Sem ministério ativo</option><option value="com-escala">Com próximas escalas</option><option value="sem-titulo">Oficiais sem título</option></select></label>
+        {(search || participation || tab !== "todos") && <button type="button" className="people-clear-filters" onClick={() => { setSearch(""); setTab("todos"); setParticipation(""); }}>Limpar filtros</button>}
       </div>
 
       {loading && <p className="people-loading" role="status">Buscando pessoas…</p>}
@@ -528,7 +531,7 @@ export default function PeopleWorkspace({
         {!filtered.length && (
           <div className="pilot-empty-state">
             <strong>Nenhuma pessoa encontrada</strong>
-            <p>{search || tab !== "todos" ? "Ajuste a busca ou limpe os filtros para ampliar os resultados." : "Os vínculos desta comunidade aparecerão aqui."}</p>
+            <p>{search || participation || tab !== "todos" ? "Ajuste a busca ou limpe os filtros para ampliar os resultados." : "Os vínculos desta comunidade aparecerão aqui."}</p>
           </div>
         )}
       </div>}
@@ -538,7 +541,7 @@ export default function PeopleWorkspace({
           <span>
             {filtered.length} {filtered.length === 1 ? "pessoa carregada" : "pessoas carregadas"}
             {" · "}
-            {search.trim() ? `na busca por “${search.trim()}”` : `${tab === "todos" ? members + totals.oficiais : tab === "oficiais" ? totals.oficiais : totals.membros} nesta aba`}
+            {participation ? "no filtro de acompanhamento" : search.trim() ? `na busca por “${search.trim()}”` : `${tab === "todos" ? members + totals.oficiais : tab === "oficiais" ? totals.oficiais : totals.membros} nesta aba`}
           </span>
           {currentFailure?.cursor && <p className="people-more-error" role="alert">{currentFailure.message} As pessoas já carregadas continuam disponíveis.</p>}
           {data.nextCursor && (
@@ -759,8 +762,7 @@ function SelfProfile({
           <p className="pilot-kicker">MEU PERFIL</p>
           <h1>Olá, <VerifiedOwnerName name={me.nome} verified={Boolean(me.owner_verified)} /></h1>
           <p>
-            Você pode atualizar apenas seus próprios dados. Funções e
-            permissões são administradas pela comunidade.
+            Mantenha seus contatos atualizados e consulte seus vínculos nesta comunidade.
           </p>
         </div>
         <span className="scope-badge">{roleLabel(me.papel)}</span>

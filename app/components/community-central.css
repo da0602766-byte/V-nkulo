@@ -1,0 +1,148 @@
+.central-surface { --central-accent: var(--pilot-accent); }
+.central-masthead { padding: 8px 0 0; border-bottom: 1px solid var(--pilot-line); margin-bottom: 28px; }
+.central-context { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; font-size: 13px; color: var(--pilot-muted); }
+.central-masthead h1 { font-size: clamp(26px, 3vw, 36px); line-height: 1.2; letter-spacing: -.03em; margin: 12px 0 8px; color: var(--pilot-text); }
+.central-masthead > p { color: var(--pilot-muted); margin: 0 0 22px; line-height: 1.5; }
+.central-nav { display: flex; gap: 4px 20px; flex-wrap: wrap; }
+.central-nav button { min-height: 48px; padding: 10px 0; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--pilot-muted); font: inherit; font-size: 14px; cursor: pointer; }
+.central-nav button[aria-current="page"] { border-bottom-color: var(--pilot-primary); color: var(--pilot-text); font-weight: 800; }
+.central-mobile-nav { display: none; }
+.central-dashboard { min-width: 0; color: var(--pilot-text); }
+.central-page-heading, .central-section-heading { display: flex; justify-content: space-between; align-items: start; gap: 18px; }
+.central-page-heading h2 { font-size: clamp(23px, 2vw, 29px); line-height: 1.25; margin: 0 0 8px; letter-spacing: -.02em; }
+.central-page-heading p, .central-section-heading p { margin: 0; color: var(--pilot-muted); font-size: 14px; line-height: 1.6; }
+.central-dashboard :is(button, input, select), .central-mobile-nav select { min-height: 44px; border: 1px solid var(--pilot-line); border-radius: 8px; padding: 10px 12px; background: var(--pilot-surface); color: var(--pilot-text); font: inherit; font-size: 14px; }
+.central-dashboard button { cursor: pointer; font-weight: 700; }
+.central-dashboard button:disabled { opacity: .5; cursor: wait; }
+.central-dashboard a { color: var(--pilot-text); text-underline-offset: 4px; }
+.central-dashboard :is(button, input, select, a, summary):focus-visible, .central-masthead :is(button,select):focus-visible { outline: 3px solid var(--pilot-primary); outline-offset: 3px; }
+.central-metric-line { display: grid; grid-template-columns: repeat(auto-fit,minmax(150px,1fr)); border-block: 1px solid var(--pilot-line); margin: 24px 0 0; padding: 20px 0; gap: 20px; }
+.central-metric-line > div { min-width: 0; border-right: 1px solid var(--pilot-line); padding-right: 16px; }
+.central-metric-line > div:last-child { border: 0; }
+.central-metric-line dt { font-size: 13px; color: var(--pilot-muted); }
+.central-metric-line dd { margin: 5px 0; font-size: 30px; font-weight: 750; line-height: 1.2; }
+.central-metric-line a { text-decoration: none; }
+.central-metric-line small { color: var(--pilot-muted); font-size: 12px; line-height: 1.4; display: block; }
+.central-columns { display: grid; grid-template-columns: minmax(0,1.15fr) minmax(0,1fr); gap: 36px; }
+.central-section { padding: 28px 0; border-bottom: 1px solid var(--pilot-line); min-width: 0; }
+.central-section-heading { margin-bottom: 16px; align-items: baseline; }
+.central-section-heading h3 { font-size: 18px; margin: 0 0 5px; }
+.central-section-heading a { font-size: 13px; flex-shrink: 0; padding: 10px 0; }
+.central-action-row { display: grid; gap: 10px; padding: 16px 0; border-top: 1px solid var(--pilot-line); text-decoration: none; }
+.central-action-row strong, .central-schedule-row strong { font-size: 15px; line-height: 1.4; }
+.central-action-row small, .central-schedule-row small { display: block; color: var(--pilot-muted); font-size: 13px; margin-top: 5px; line-height: 1.4; }
+.central-attention { font-size: 13px; color: var(--pilot-text); font-weight: 650; border-left: 3px solid var(--central-accent); padding-left: 10px; }
+.central-schedule-row { display: grid; grid-template-columns: 44px minmax(0,1fr) 20px; align-items: center; gap: 12px; padding: 16px 0; border-top: 1px solid var(--pilot-line); text-decoration: none; }
+.central-schedule-row time { text-align: center; }
+.central-schedule-row time strong { font-size: 24px; }
+.central-schedule-row time small { margin: 0; }
+.central-empty { padding: 18px 0; margin: 0; color: var(--pilot-muted); line-height: 1.6; font-size: 14px; }
+.central-toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 20px; margin: 20px 0 12px; }
+.central-toolbar label { display: grid; gap: 7px; min-width: 160px; flex: 1; font-size: 13px; font-weight: 650; color: var(--pilot-text); }
+.central-toolbar label > :is(input,select) { min-width: 0; width: 100%; }
+.central-toolbar .central-check { display: flex; align-items: center; min-height: 44px; font-weight: 500; }
+.central-toolbar .central-check input { width: 18px; height: 18px; min-height: 0; }
+.central-export-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.central-note { color: var(--pilot-muted); font-size: 13px; line-height: 1.6; }
+.central-area-index { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 28px; }
+.central-area-index a { display:grid; grid-template-columns:minmax(0,1fr) 24px; padding:18px 0; border-top:1px solid var(--pilot-line); text-decoration:none; gap:6px 12px; }
+.central-area-index small { grid-column:1; color:var(--pilot-muted); font-size:13px; line-height:1.5; }
+.central-area-index span { grid-column:2; grid-row:1 / 3; align-self:center; }
+.central-error { margin: 18px 0; padding: 16px; border-left: 3px solid var(--pilot-danger,#b42338); background: var(--pilot-surface); line-height: 1.5; }
+.central-error p { margin: 0 0 10px; }
+.central-ministry-columns, .central-ministry-row { display: grid; grid-template-columns: minmax(180px,2.5fr) repeat(5,minmax(70px,1fr)); gap: 14px; align-items: center; }
+.central-ministry-columns { padding: 12px 0; font-size: 12px; color: var(--pilot-muted); border-bottom: 1px solid var(--pilot-line); }
+.central-ministry-row { padding: 17px 0; border-bottom: 1px solid var(--pilot-line); font-size: 14px; }
+.central-ministry-row > div { min-width: 0; }
+.central-ministry-row a { font-weight: 750; text-decoration: none; }
+.central-ministry-row small { display: block; font-size: 12px; line-height: 1.5; color: var(--pilot-muted); margin-top: 4px; }
+.central-ministry-row .central-mobile-label { display: none; }
+.central-cell-report { border-top: 1px solid var(--pilot-line); padding: 4px 0; }
+.central-cell-report summary { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; padding: 14px 0; min-height: 48px; cursor: pointer; font-size: 14px; }
+.central-cell-report summary small { display: block; color: var(--pilot-muted); margin-top: 4px; }
+.central-cell-report p { font-size: 14px; line-height: 1.6; }
+.central-notice-list article { display: flex; align-items: start; gap: 16px; justify-content: space-between; border-bottom: 1px solid var(--pilot-line); padding: 20px 0; }
+.central-notice-list h3 { font-size: 16px; margin: 7px 0; }
+.central-notice-list small { font-size: 12px; color: var(--pilot-muted); }
+.central-notice-list p { margin: 6px 0 0; font-size: 14px; line-height: 1.6; white-space: pre-line; }
+.central-notice-list a { padding: 12px 0; font-size: 13px; white-space: nowrap; }
+.central-notice-list .is-read h3 { font-weight: 500; }
+.central-disclosure { border-top: 1px solid var(--pilot-line); margin-top: 24px; padding: 16px 0; }
+.central-disclosure > summary { min-height: 48px; cursor: pointer; font-size: 18px; font-weight: 700; padding: 10px 0; }
+.central-disclosure > p { color: var(--pilot-muted); font-size: 14px; line-height: 1.6; }
+.central-surface :is(.people-workspace,.leadership-workspace) :is(.workspace-heading,.leadership-hero) { background: none; border: 0; padding: 20px 0; box-shadow: none; min-height: 0; border-radius: 0; }
+.central-surface :is(.people-heading,.leadership-hero) h1 { font-size: 26px; }
+.central-surface :is(.people-metrics,.leadership-metrics) { display: flex; flex-wrap: wrap; gap: 0 28px; padding: 16px 0; border-block: 1px solid var(--pilot-line); }
+.central-surface :is(.people-metrics,.leadership-metrics) article { border: 0; background: none; box-shadow: none; padding: 8px 0; min-height: 0; border-radius: 0; }
+.central-surface .people-metrics article > span { display: none; }
+.central-surface .people-metrics strong { font-size: 22px; }
+.central-surface .people-toolbar { background: none; box-shadow: none; border: 0; padding: 20px 0; border-radius: 0; }
+.central-surface .people-toolbar { display: grid; grid-template-columns: minmax(0,2fr) minmax(180px,1fr) auto; gap: 16px; }
+.central-surface .people-tabs { grid-column: 1 / -1; }
+.central-surface .people-toolbar :is(input,select) { width:100%; min-width:0; min-height:46px; padding:10px 12px; background:var(--pilot-surface); color:var(--pilot-text); border:1px solid var(--pilot-line); border-radius:8px; font:inherit; }
+.central-surface .people-report-link { color:var(--pilot-text); font-size:14px; padding:12px 0; text-underline-offset:4px; }
+.central-surface .people-directory-list { border: 0; border-radius: 0; background: none; box-shadow: none; }
+.central-surface .people-directory-row { background: none; box-shadow: none; border-radius: 0; }
+.central-surface .self-profile-card { display: grid; grid-template-columns: minmax(0,1fr); border: 0; background: none; box-shadow: none; padding: 0; }
+.central-surface .self-profile-card > aside { display: grid; grid-template-columns: 48px minmax(0,1fr); gap: 4px 14px; align-items: center; text-align: left; padding: 16px 0; background: none; border-radius: 0; }
+.central-surface .self-profile-avatar { width: 48px; height: 48px; font-size: 18px; grid-row: span 3; margin: 0; }
+.central-surface .self-profile-card form { padding: 20px 0; }
+.central-surface :is(.leadership-add-card,.leadership-list-card,.leadership-history-card,.pastoral-community-dashboard,.pastoral-activity-chart,.pastoral-kpi-grid article) { box-shadow: none; border-radius: 0; background: none; border: 0; border-bottom: 1px solid var(--pilot-line); }
+.central-surface .leadership-add-card { padding: 24px 0; }
+.central-surface .leadership-content-grid { gap: 28px; }
+.central-surface :is(.leadership-list-card,.leadership-history-card) > header { padding: 20px 0; }
+.central-surface .account-profile-workspace { margin-top: 20px; }
+.central-text-value { font-size: 22px!important; }
+.central-status { padding: 14px 0; border-left: 3px solid var(--pilot-primary); padding-left: 14px; }
+.central-lifecycle-form { padding: 24px 0; border-bottom: 1px solid var(--pilot-line); }
+.central-lifecycle-form h3 { margin: 0; font-size: 20px; }
+.central-lifecycle-form > p { color: var(--pilot-muted); line-height: 1.6; }
+.central-lifecycle-form fieldset { padding: 0; margin: 24px 0 0; border: 0; min-width: 0; }
+.central-lifecycle-form legend { font-weight: 700; margin-bottom: 12px; }
+.central-lifecycle-options { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; }
+.central-lifecycle-options label { display: flex; align-items: start; gap: 10px; padding: 14px 0; border-top: 1px solid var(--pilot-line); cursor: pointer; }
+.central-lifecycle-options input { min-height: 20px; width: 20px; height: 20px; margin: 0; flex-shrink: 0; }
+.central-lifecycle-options small { display: block; margin-top: 6px; color: var(--pilot-muted); line-height: 1.5; }
+.central-lifecycle-fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; margin-top: 24px; }
+.central-lifecycle-fields label { display: grid; gap: 8px; font-size: 14px; font-weight: 650; }
+.central-lifecycle-fields .wide { grid-column: 1 / -1; }
+.central-lifecycle-fields textarea { border: 1px solid var(--pilot-line); background: var(--pilot-surface); color: var(--pilot-text); border-radius: 8px; font: inherit; padding: 12px; width: 100%; resize: vertical; }
+@media(max-width:1000px) {
+  .central-ministry-columns { display: none; }
+  .central-ministry-row { grid-template-columns: repeat(5,minmax(0,1fr)); gap: 14px 8px; }
+  .central-ministry-row > div:first-child { grid-column: 1 / -1; }
+  .central-ministry-row .central-mobile-label { display: block; margin: 0 0 5px; font-size: 11px; }
+}
+@media(max-width:640px) {
+  .central-masthead { margin-bottom: 24px; }
+  .central-context { display: grid; gap: 4px; }
+  .central-nav { display: none; }
+  .central-mobile-nav { display: grid; gap: 8px; margin: 16px 0; font-size: 13px; color: var(--pilot-muted); }
+  .central-mobile-nav select { width: 100%; font-size: 16px; }
+  .central-page-heading { display: grid; gap: 12px; }
+  .central-page-heading > button { justify-self: start; }
+  .central-columns { grid-template-columns: minmax(0,1fr); gap: 0; }
+  .central-area-index { grid-template-columns:minmax(0,1fr); }
+  .central-metric-line { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px 14px; }
+  .central-metric-line > div { border: 0; padding: 0; }
+  .central-metric-line dd { font-size: 28px; }
+  .central-section-heading { flex-wrap: wrap; gap: 4px; }
+  .central-toolbar label { flex-basis: 100%; }
+  .central-dashboard :is(input,select) { font-size: 16px; }
+  .central-ministry-row { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .central-notice-list article { display: grid; gap: 2px; }
+  .central-notice-list a { justify-self: start; }
+  .central-surface .people-directory-row { border-inline: 0; padding: 18px 0; }
+  .central-surface .people-directory-columns { display: none; }
+  .central-surface .people-metrics { gap: 10px 24px; }
+  .central-surface .people-toolbar { grid-template-columns:minmax(0,1fr); }
+  .central-surface .people-toolbar :is(input,select) { font-size:16px; }
+  .central-lifecycle-options,.central-lifecycle-fields { grid-template-columns: minmax(0,1fr); }
+}
+@media print {
+  .pilot-header,.pilot-sidebar,.pilot-mobile-nav,.pilot-mobile-sheet,.central-masthead,.central-toolbar,.central-page-heading>button,[aria-label="Ajuda e feedback"],.central-disclosure { display:none!important; }
+  .pilot-shell,.pilot-workspace { display:block!important; margin:0!important; padding:0!important; width:100%!important; max-width:none!important; }
+  .central-dashboard { color:#111!important; background:white!important; }
+  .central-dashboard :is(a,p,small,strong,h2,h3,span) { color:#111!important; }
+  .central-section,.central-ministry-row,.central-cell-report { break-inside:avoid; }
+}

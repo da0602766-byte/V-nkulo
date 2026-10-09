@@ -65,7 +65,7 @@ export async function notifyCommunityManagers(
         message: `${input.applicantName} solicitou entrada em ${input.communityName}.`,
         entityId: input.requestId,
         area: "SOLICITACOES",
-        destination: "/painel?view=comunidade",
+        destination: "/painel?view=configuracoes",
         createdBy: input.createdBy,
       }),
     ),

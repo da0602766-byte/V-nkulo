@@ -26,6 +26,7 @@ import WorkspaceErrorBoundary from "./WorkspaceErrorBoundary";
 import VerifiedOwnerName from "./VerifiedOwnerName";
 import TemporaryAccessWatcher from "./TemporaryAccessWatcher";
 import CloseDetailsOnOutside from "./CloseDetailsOnOutside";
+import CommunityCentral, { CentralNavigation, CENTRAL_VIEWS } from "./CommunityCentral";
 
 const moduleLoading = () => <section className="workspace-module-loading" aria-busy="true" role="status"><span className="pilot-loading-spinner" aria-hidden="true" /><strong>Carregando esta área…</strong><small>Somente o necessário para esta tela está sendo preparado.</small></section>;
 const AccountProfileWorkspace = dynamic(() => import("./AccountProfileWorkspace"), { loading: moduleLoading });
@@ -79,7 +80,10 @@ type View =
   | "pessoas"
   | "solicitacoes"
   | "mensagens"
-  | "conta";
+  | "conta"
+  | "relatorios"
+  | "avisos"
+  | "configuracoes";
 type NavigationFocus = { anchor?: string; event?: string };
 const MENU: { id: View; label: string; permission: string }[] = [
   { id: "inicio", label: "Início", permission: "dashboard.view" },
@@ -94,7 +98,10 @@ const MENU: { id: View; label: string; permission: string }[] = [
   { id: "membro", label: "Painel do membro", permission: "dashboard.view" },
   { id: "lider", label: "Painel de liderança", permission: "leadership.panel.view" },
   { id: "pessoas", label: "Pessoas", permission: "people.view" },
-  { id: "comunidade", label: "Configurações", permission: "dashboard.view" },
+  { id: "comunidade", label: "Central da Comunidade", permission: "dashboard.view" },
+  { id: "relatorios", label: "Relatórios", permission: "dashboard.view" },
+  { id: "avisos", label: "Avisos", permission: "dashboard.view" },
+  { id: "configuracoes", label: "Configurações", permission: "dashboard.view" },
   { id: "continuidade", label: "Continuidade", permission: "community.lifecycle.request" },
 ];
 const COMMUNITY_MANAGEMENT_VIEWS: CommunityManagementView[] = [
@@ -110,7 +117,7 @@ const COMMUNITY_MANAGEMENT_DESCRIPTIONS: Record<
   membro: "Seus dados, vínculos e participação na comunidade.",
   lider: "Acompanhamento e decisões permitidas à liderança.",
   pessoas: "Diretório, funções e oficiais da comunidade.",
-  continuidade: "Sucessão e continuidade da comunidade.",
+  continuidade: "Situação, solicitações administrativas e preservação do histórico.",
 };
 const VIEW_MODULE: Partial<Record<View, TenantContext["modules"][number]>> = {
   eventos: "events",
@@ -360,6 +367,7 @@ export default function PilotDashboard({
             ["inicio", "pessoas"].includes(
               item.id,
             )) &&
+          (item.id !== "configuracoes" || active.isCommunityOwner || active.permissions.some(permission => ["community.theme.manage", "invites.manage", "parking.configure", "membership.requests.manage"].includes(permission))) &&
           (item.id !== "estacionamento" || parkingEnabled) &&
           (item.id !== "redes" || features.networkModuleEnabled) &&
           (item.id !== "lider" ||
@@ -370,6 +378,7 @@ export default function PilotDashboard({
     [
       active.communityAccess,
       active.isOwner,
+      active.isCommunityOwner,
       active.modules,
       active.papel,
       active.permissions,
@@ -381,9 +390,9 @@ export default function PilotDashboard({
     () =>
       allowedMenu.filter(
         (item) =>
-          item.id === "pessoas" || !COMMUNITY_MANAGEMENT_VIEWS.includes(
+          !["relatorios", "avisos", "configuracoes"].includes(item.id) && (item.id === "pessoas" || !COMMUNITY_MANAGEMENT_VIEWS.includes(
             item.id as CommunityManagementView,
-          ),
+          )),
       ),
     [allowedMenu],
   );
@@ -459,7 +468,7 @@ export default function PilotDashboard({
       },
       {
         label: "Gestão",
-        items: [makeItem("comunidade", "Configurações")].filter(Boolean),
+        items: [makeItem("comunidade", "Central da Comunidade")].filter(Boolean),
       },
     ];
   }, [allowedMenu]);
@@ -468,7 +477,7 @@ export default function PilotDashboard({
     return sidebarGroups
       .flatMap((group) => group.items)
       .filter((item) => {
-        const aliases = item?.id === "ministerios" ? " escalas equipes" : item?.id === "inicio" ? " mural publicações" : "";
+        const aliases = item?.id === "comunidade" ? " relatórios avisos conta perfil liderança configurações" : item?.id === "ministerios" ? " escalas equipes" : item?.id === "inicio" ? " mural publicações" : "";
         return !term || `${item!.label}${aliases}`.toLocaleLowerCase("pt-BR").includes(term);
       })
       .slice(0, 7);
@@ -1218,7 +1227,7 @@ export default function PilotDashboard({
                   type="button"
                   onClick={() => {
                     setCommunityInfoOpen(false);
-                    openView("comunidade");
+                    openView("configuracoes");
                   }}
                 >
                   Editar comunidade
@@ -1294,7 +1303,7 @@ export default function PilotDashboard({
           {visibleView === "inicio" && <div className="worship-sidebar-art"><small>MAIS QUE UM APP.</small><p>Pessoas reais.<br />Propósito<br /><em>eterno.</em></p><span aria-hidden="true" /><small>Onde a fé encontra<br />uma família.</small></div>}
         </aside>
         <section
-          className={`pilot-workspace${viewLoading ? " is-view-loading" : ""}${
+          className={`pilot-workspace${CENTRAL_VIEWS.includes(visibleView) ? " central-surface" : ""}${viewLoading ? " is-view-loading" : ""}${
             visibleView === "inicio" && communityTheme.wallpaperUrl
               ? " has-community-wallpaper"
               : ""
@@ -1315,18 +1324,14 @@ export default function PilotDashboard({
               </div>
             </section>
           )}
-          {COMMUNITY_MANAGEMENT_VIEWS.includes(
-            visibleView as CommunityManagementView,
-          ) && (
-            <button
-              type="button"
-              className="community-management-back"
-              onClick={() => openView("comunidade")}
-            >
-              <span aria-hidden="true">←</span>
-              Gestão da comunidade
-            </button>
-          )}
+          {CENTRAL_VIEWS.includes(visibleView) && !accessDeniedView && <CentralNavigation
+            communityName={active.comunidadeNome} roleLabel={ROLE_LABELS[active.papel] || active.papel}
+            current={visibleView} allowed={[...allowedMenu.map(item => item.id), "conta"]}
+            onNavigate={next => openView(next as View)} />}
+          {["comunidade", "relatorios", "avisos"].includes(visibleView) && !accessDeniedView && <CommunityCentral
+            key={`${active.comunidadeId}:${visibleView}`} communityId={active.comunidadeId}
+            mode={visibleView === "relatorios" ? "reports" : visibleView === "avisos" ? "notices" : "overview"}
+            onNotifications={() => window.dispatchEvent(new CustomEvent("vinkulo:open-notifications"))} />}
           {visibleView === "inicio" && !accessDeniedView && (
             <CommunityHome
               key={active.comunidadeId}
@@ -1381,27 +1386,29 @@ export default function PilotDashboard({
           {visibleView === "redes" && features.networkModuleEnabled && (
             <NetworkWorkspace />
           )}
-          {visibleView === "membro" && (
-            <PeopleWorkspace
-              communityName={active.comunidadeNome}
-              mode="self"
-              selfLinks={allowedMenu.filter(item => ["eventos", "ministerios", "celulas"].includes(item.id)).map(item => ({ label: item.label, href: `/painel?view=${item.id}` }))}
-            />
-          )}
-          {visibleView === "lider" && (
-            <LeadershipWorkspace
-              mode={active.permissions.includes("pastoral.panel.view") ? "pastoral" : "leader"}
-              communityName={active.comunidadeNome}
-            />
-          )}
+          {visibleView === "membro" && <>
+            <CommunityCentral key={`member:${active.comunidadeId}`} communityId={active.comunidadeId} mode="member" />
+            <details className="central-disclosure"><summary>Meus dados e vínculos</summary><p>Consulte seus vínculos e mantenha seus contatos atualizados.</p>
+              <PeopleWorkspace communityName={active.comunidadeNome} mode="self"
+                selfLinks={allowedMenu.filter(item => ["eventos", "ministerios", "celulas"].includes(item.id)).map(item => ({ label: item.label, href: `/painel?view=${item.id}` }))} />
+            </details>
+            <p className="central-note"><a href="/painel?view=conta">Editar perfil, foto, conta e privacidade →</a></p>
+          </>}
+          {visibleView === "lider" && <>
+            <CommunityCentral key={`leadership:${active.comunidadeId}`} communityId={active.comunidadeId} mode="leadership" />
+            <details className="central-disclosure"><summary>Equipe, funções e acesso pastoral</summary><p>Consulte os responsáveis, o histórico e as opções de gestão disponíveis para você.</p>
+              <LeadershipWorkspace mode={active.permissions.includes("pastoral.panel.view") ? "pastoral" : "leader"} communityName={active.comunidadeNome} />
+            </details>
+          </>}
           {visibleView === "pessoas" && (
             <PeopleWorkspace communityName={active.comunidadeNome} />
           )}
           {visibleView === "conta" && <AccountProfileWorkspace />}
-          {visibleView === "comunidade" && (
+          {visibleView === "configuracoes" && (
             <section className="community-central-workspace">
               <header className="workspace-heading"><div><p className="pilot-kicker">GESTÃO DA COMUNIDADE</p><h1>Configurações da comunidade</h1><p>Pessoas, liderança, continuidade, solicitações e preferências reunidas no contexto da comunidade ativa.</p></div></header>
               <CommunityAdminWorkspace
+                hideManagementHub
                 accessSlot={
                   active.permissions.includes("invites.manage") ? (
                     <>
@@ -1434,6 +1441,7 @@ export default function PilotDashboard({
           )}
           {visibleView === "continuidade" && (
             <CommunityLifecycleWorkspace
+              key={active.comunidadeId}
               currentCommunityId={active.comunidadeId}
             />
           )}

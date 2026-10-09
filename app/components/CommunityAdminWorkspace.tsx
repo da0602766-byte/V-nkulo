@@ -32,6 +32,7 @@ type ManagementItem = {
 
 export default function CommunityAdminWorkspace({
   managementItems,
+  hideManagementHub = false,
   onOpenManagementView,
   canManageCommunity = false,
   canManageRequests = false,
@@ -40,6 +41,7 @@ export default function CommunityAdminWorkspace({
   accessSlot = null,
 }: {
   managementItems: ManagementItem[];
+  hideManagementHub?: boolean;
   onOpenManagementView: (view: CommunityManagementView) => void;
   canManageCommunity?: boolean;
   canManageRequests?: boolean;
@@ -57,7 +59,7 @@ export default function CommunityAdminWorkspace({
   const [parkingLoadError, setParkingLoadError] = useState("");
   const [requestSearch, setRequestSearch] = useState("");
   const [requestStatus, setRequestStatus] = useState("");
-  const [visitedSections, setVisitedSections] = useState<string[]>(["atalhos"]);
+  const [visitedSections, setVisitedSections] = useState<string[]>(["atalhos", ...(hideManagementHub && canManageCommunity ? ["aparencia"] : [])]);
   const mutationRef = useRef(false);
   const [working, setWorking] = useState<number | "config" | null>(null);
   const [feedback, setFeedback] = useState("");
@@ -176,7 +178,7 @@ export default function CommunityAdminWorkspace({
   const secoes = useMemo(
     () =>
       [
-        { id: "atalhos" as const, label: "Áreas da comunidade", visivel: true },
+        { id: "atalhos" as const, label: "Áreas da comunidade", visivel: !hideManagementHub },
         { id: "aparencia" as const, label: "Aparência", visivel: canManageCommunity },
         { id: "acessos" as const, label: "Acessos", visivel: canManageRegistrationLinks || Boolean(accessSlot) },
         { id: "modulos" as const, label: "Módulos", visivel: canConfigureParking },
@@ -188,15 +190,16 @@ export default function CommunityAdminWorkspace({
           contador: requestsLoading || requestsLoadError ? undefined : requests.filter((item) => item.status === "PENDENTE").length,
         },
       ].filter((secao) => secao.visivel),
-    [accessSlot, canConfigureParking, canManageCommunity, canManageRegistrationLinks, canManageRequests, requests, requestsLoading, requestsLoadError],
+    [hideManagementHub, accessSlot, canConfigureParking, canManageCommunity, canManageRegistrationLinks, canManageRequests, requests, requestsLoading, requestsLoadError],
   );
-  const [secao, setSecao] = useState<string>("atalhos");
-  const secaoAtiva = secoes.some((item) => item.id === secao) ? secao : "atalhos";
+  const [secao, setSecao] = useState<string>(hideManagementHub ? canManageCommunity ? "aparencia" : canManageRegistrationLinks || accessSlot ? "acessos" : canConfigureParking ? "modulos" : "solicitacoes" : "atalhos");
+  const secaoAtiva = secoes.some((item) => item.id === secao) ? secao : secoes[0]?.id || "";
 
   const visibleRequests = requests.filter((item) => (!requestStatus || item.status === requestStatus) && matchesDirectorySearch(requestSearch, item.nome, item.email));
 
   return (
     <div className="community-admin-extra">
+      {!secoes.length && <p className="central-empty">Seu perfil não possui configurações administrativas. Seus dados pessoais estão em Perfil e conta.</p>}
       <nav className="community-settings-nav-v5" aria-label="Assuntos das configurações">
         {secoes.map((item) => (
           <button

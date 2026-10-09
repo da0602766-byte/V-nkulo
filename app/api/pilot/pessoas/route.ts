@@ -126,6 +126,8 @@ export async function GET(request: Request) {
   const address = new URL(request.url);
   const search = (address.searchParams.get("busca") || "").trim().slice(0, 80);
   const requestedTab = address.searchParams.get("aba");
+  const participation = address.searchParams.get("vinculo") || "";
+  if (!["", "sem-ministerio", "com-escala", "sem-titulo"].includes(participation)) return Response.json({ error: "Filtro de acompanhamento inválido." }, { status: 400 });
   const officialsOnly = requestedTab === "todos" ? -1 : requestedTab === "oficiais" ? 1 : 0;
   const cursor = decodePeopleCursor(address.searchParams.get("cursor"));
   const requestedSize = Number(address.searchParams.get("limite") || 0);
@@ -161,6 +163,9 @@ export async function GET(request: Request) {
          LEFT JOIN oficiais_comunidade oc
            ON oc.usuario_comunidade_id = uc.id
          WHERE uc.comunidade_id = ? AND u.ativo = 1
+           AND (? <> 'sem-ministerio' OR NOT EXISTS (SELECT 1 FROM ministerio_voluntarios mv JOIN ministerios_comunidade m ON m.id=mv.ministerio_id AND m.comunidade_id=mv.comunidade_id WHERE mv.usuario_id=u.id AND mv.comunidade_id=uc.comunidade_id AND mv.ativo=1 AND m.status='ATIVO'))
+           AND (? <> 'com-escala' OR EXISTS (SELECT 1 FROM escala_designacoes d JOIN escalas_ministerio s ON s.id=d.escala_id AND s.comunidade_id=d.comunidade_id WHERE d.usuario_id=u.id AND d.comunidade_id=uc.comunidade_id AND d.ativo=1 AND d.status IN ('CONFIRMADA','PENDENTE') AND s.status IN ('PUBLICADA','AGUARDANDO_CHECKLIST') AND datetime(s.termina_em)>=datetime('now')))
+           AND (? <> 'sem-titulo' OR (oc.id IS NOT NULL AND COALESCE(oc.titulo,'')=''))
            AND (? = -1 OR (CASE WHEN oc.id IS NULL THEN 0 ELSE 1 END) = ?)
            AND (
              ? = ''
@@ -178,6 +183,7 @@ export async function GET(request: Request) {
       )
       .bind(
         access.context.comunidadeId,
+        participation, participation, participation,
         officialsOnly,
         officialsOnly,
         search,
