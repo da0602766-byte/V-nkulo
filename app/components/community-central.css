@@ -151,3 +151,11 @@
   .pilot-workspace.central-surface .people-directory-row .people-card-main { grid-column:1 / -1; }
   .pilot-workspace.central-surface .people-directory-row .people-card-actions { grid-column:1 / -1; grid-row:auto; justify-content:flex-start; }
 }
+
+@media(max-width:640px) {
+  body:has(.pilot-workspace.central-surface) > .global-feedback-launcher {
+    position:relative; inset:auto; z-index:auto; margin:0 16px;
+    padding:0 0 calc(96px + env(safe-area-inset-bottom));
+  }
+  body:has(.pilot-workspace.central-surface) > .global-feedback-launcher .global-feedback-trigger { box-shadow:none; }
+}
