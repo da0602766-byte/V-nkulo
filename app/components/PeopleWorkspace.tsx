@@ -2,10 +2,11 @@
 
 import TransientFeedback from "./TransientFeedback";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import VerifiedOwnerName from "./VerifiedOwnerName";
 import PersonRecord from "./PersonRecord";
 import SafeImage from "./SafeImage";
+import "./people-directory-ux.css";
 
 type Person = {
   membership_id: number;
@@ -172,7 +173,11 @@ export default function PeopleWorkspace({
     canViewPeople: false,
     canManage: false,
   });
-  const [loading, setLoading] = useState(true);
+  const [pending, setPending] = useState(false);
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const [loadFailure, setLoadFailure] = useState<{key: string; cursor: string | null; message: string} | null>(null);
+  const requestRef = useRef<AbortController | null>(null);
+  const loadedQueryRef = useRef<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -188,51 +193,66 @@ export default function PeopleWorkspace({
   const [removing, setRemoving] = useState<Person | null>(null);
   const [removeConfirmation, setRemoveConfirmation] = useState("");
   const [removalIssue, setRemovalIssue] = useState<{ message: string; blockers: RemovalBlocker[] } | null>(null);
+  const queryKey = JSON.stringify([tab, search.trim()]);
+  const currentFailure = loadFailure?.key === queryKey ? loadFailure : null;
+  const loading = pending || (loadedKey !== queryKey && !currentFailure);
+  const listError = currentFailure && !currentFailure.cursor ? currentFailure.message : "";
 
   // `cursor` vazio recomeça a lista (troca de aba, nova busca, recarga depois de
   // uma alteração); com cursor, o lote novo é anexado ao que já está na tela.
   const load = useCallback(
     async (options: { quiet?: boolean; cursor?: string | null } = {}) => {
       const { quiet = false, cursor = null } = options;
+      if (cursor && (requestRef.current || loadedQueryRef.current !== queryKey)) return;
+      requestRef.current?.abort();
+      const controller = new AbortController();
+      requestRef.current = controller;
       if (cursor) setLoadingMore(true);
-      else if (!quiet) setLoading(true);
-      setError("");
+      else if (!quiet) setPending(true);
+      setLoadFailure(null);
       try {
         const address = new URL("/api/pilot/pessoas", window.location.origin);
         address.searchParams.set("aba", tab);
         const term = search.trim();
         if (term) address.searchParams.set("busca", term);
         if (cursor) address.searchParams.set("cursor", cursor);
-        const response = await fetch(address, { cache: "no-store" });
+        const response = await fetch(address, { cache: "no-store", signal: controller.signal });
         const result = (await response.json()) as PeopleResponse;
         if (!response.ok) {
           throw new Error(result.error || "Não foi possível carregar as pessoas.");
         }
+        if (controller.signal.aborted) return;
+        if (!Array.isArray(result.people)) throw new Error("Não foi possível ler a lista de pessoas.");
         setData((current) =>
           cursor
-            ? { ...result, people: [...current.people, ...result.people] }
+            ? { ...result, people: [...new Map([...current.people, ...result.people].map(person => [person.membership_id, person])).values()] }
             : result,
         );
+        setLoadedKey(queryKey);
+        loadedQueryRef.current = queryKey;
       } catch (loadError) {
-        setError((loadError as Error).message);
+        if (!controller.signal.aborted) setLoadFailure({key: queryKey, cursor, message: (loadError as Error).message});
       } finally {
-        setLoadingMore(false);
-        if (!quiet) setLoading(false);
+        if (requestRef.current === controller) {
+          requestRef.current = null;
+          setLoadingMore(false);
+          setPending(false);
+        }
       }
     },
-    [search, tab],
+    [search, tab, queryKey],
   );
 
   // A busca agora roda no banco, então cada tecla viraria uma consulta; o
   // intervalo abaixo espera a digitação parar antes de recomeçar a lista.
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), search ? 300 : 0);
-    return () => window.clearTimeout(timer);
+    return () => { window.clearTimeout(timer); requestRef.current?.abort(); requestRef.current = null; };
   }, [load, search]);
 
   // A aba e a busca são resolvidas no servidor, então o que chega já é o
   // resultado filtrado: filtrar de novo aqui esconderia gente do lote seguinte.
-  const filtered = data.people;
+  const filtered = loadedKey === queryKey && !listError ? data.people : [];
   const pagedPeople = filtered;
 
   function applyHierarchyModel(title: string) {
@@ -340,7 +360,7 @@ export default function PeopleWorkspace({
     }
   }
 
-  if (loading) {
+  if (loading && mode === "self") {
     return (
       <section className="people-workspace">
         <div className="people-loading" role="status">
@@ -351,6 +371,7 @@ export default function PeopleWorkspace({
   }
 
   if (mode === "self") {
+    if (listError) return <section className="directory-load-error"><p role="alert">{listError}</p><button type="button" onClick={() => void load()}>Tentar novamente</button></section>;
     return (
       <SelfProfile
         me={data.me}
@@ -394,7 +415,7 @@ export default function PeopleWorkspace({
         </div>
       )}
 
-      <div className="people-metrics">
+      {data.counts && <div className="people-metrics">
         <article>
           <span>◎</span>
           <div><small>Pessoas vinculadas</small><strong>{members + totals.oficiais}</strong></div>
@@ -414,7 +435,7 @@ export default function PeopleWorkspace({
             <strong>{totals.oficiaisSemTitulo}</strong>
           </div>
         </article>
-      </div>
+      </div>}
 
       {(message || error) && (
         <TransientFeedback className={`operations-feedback ${error ? "error" : ""}`} role="status">
@@ -424,14 +445,14 @@ export default function PeopleWorkspace({
 
       <div className="people-toolbar">
         <div className="people-tabs" aria-label="Tipo de pessoa">
-          <button type="button" className={tab === "todos" ? "active" : ""} aria-pressed={tab === "todos"} onClick={() => setTab("todos")}>Todas <span>{members + totals.oficiais}</span></button>
+          <button type="button" className={tab === "todos" ? "active" : ""} aria-pressed={tab === "todos"} onClick={() => setTab("todos")}>Todas {data.counts && <span>{members + totals.oficiais}</span>}</button>
           <button
             type="button"
             className={tab === "membros" ? "active" : ""}
             aria-pressed={tab === "membros"}
             onClick={() => setTab("membros")}
           >
-            Membros <span>{members}</span>
+            Membros {data.counts && <span>{members}</span>}
           </button>
           <button
             type="button"
@@ -439,11 +460,11 @@ export default function PeopleWorkspace({
             aria-pressed={tab === "oficiais"}
             onClick={() => setTab("oficiais")}
           >
-            Oficiais <span>{totals.oficiais}</span>
+            Oficiais {data.counts && <span>{totals.oficiais}</span>}
           </button>
         </div>
         <label>
-          <span className="sr-only">Buscar pessoa</span>
+          <span>Buscar pessoa</span>
           <input
             type="search"
             value={search}
@@ -451,9 +472,12 @@ export default function PeopleWorkspace({
             placeholder="Buscar por nome, e-mail ou telefone"
           />
         </label>
+        {(search || tab !== "todos") && <button type="button" className="people-clear-filters" onClick={() => { setSearch(""); setTab("todos"); }}>Limpar filtros</button>}
       </div>
 
-      <div className="people-list people-directory-list">
+      {loading && <p className="people-loading" role="status">Buscando pessoas…</p>}
+      {listError && <div className="directory-load-error"><p role="alert">{listError}</p><button type="button" onClick={() => void load()}>Tentar novamente</button></div>}
+      {!loading && !listError && <div className="people-list people-directory-list">
         <div className="people-directory-columns" aria-hidden="true"><span>Pessoa / função</span><span>Ministérios</span><span>Contato</span><span>Próximas escalas</span><span>Ficha</span></div>
         {pagedPeople.map((person) => (
           <article key={person.membership_id} className="people-card people-directory-row">
@@ -493,25 +517,26 @@ export default function PeopleWorkspace({
         {!filtered.length && (
           <div className="pilot-empty-state">
             <strong>Nenhuma pessoa encontrada</strong>
-            <p>A busca considera somente a comunidade ativa.</p>
+            <p>{search || tab !== "todos" ? "Ajuste a busca ou limpe os filtros para ampliar os resultados." : "Os vínculos desta comunidade aparecerão aqui."}</p>
           </div>
         )}
-      </div>
+      </div>}
 
-      {(data.nextCursor || filtered.length > 0) && (
+      {!loading && !listError && (data.nextCursor || filtered.length > 0) && (
         <nav className="people-pagination" aria-label="Paginação de pessoas">
           <span>
             {filtered.length} {filtered.length === 1 ? "pessoa carregada" : "pessoas carregadas"}
             {" · "}
-            {tab === "todos" ? members + totals.oficiais : tab === "oficiais" ? totals.oficiais : totals.membros} nesta aba
+            {search.trim() ? `na busca por “${search.trim()}”` : `${tab === "todos" ? members + totals.oficiais : tab === "oficiais" ? totals.oficiais : totals.membros} nesta aba`}
           </span>
+          {currentFailure?.cursor && <p className="people-more-error" role="alert">{currentFailure.message} As pessoas já carregadas continuam disponíveis.</p>}
           {data.nextCursor && (
             <button
               type="button"
               disabled={loadingMore}
               onClick={() => void load({ cursor: data.nextCursor, quiet: true })}
             >
-              {loadingMore ? "Carregando…" : "Carregar mais"}
+              {loadingMore ? "Carregando…" : currentFailure?.cursor ? "Tentar carregar mais" : "Carregar mais"}
             </button>
           )}
         </nav>

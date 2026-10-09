@@ -16,6 +16,7 @@ import {
 import { createPortal } from "react-dom";
 import { RelacionamentoTools } from "./RelacionamentoTools";
 import CareNotesBoard from "./CareNotesBoard";
+import "./visitor-directory-ux.css";
 
 type Visitor = {
   id: number;
@@ -197,7 +198,17 @@ export function VisitorsWorkspace({
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [duplicateMatches, setDuplicateMatches] = useState<Visitor[]>([]);
   const [duplicateChecking, setDuplicateChecking] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [pending, setLoading] = useState(false);
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const [listFailure, setListFailure] = useState<{key: string; append: boolean; message: string} | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const listRequest = useRef<AbortController | null>(null);
+  const loadedQuery = useRef<string | null>(null);
+  const followupRequest = useRef<AbortController | null>(null);
+  const [followupsLoading, setFollowupsLoading] = useState(false);
+  const [followupsError, setFollowupsError] = useState("");
+  const visitorDialog = useRef<HTMLDialogElement | null>(null);
+  const visitorClose = useRef<HTMLButtonElement | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -243,6 +254,14 @@ export function VisitorsWorkspace({
   const canEdit = permissions.includes("visitors.edit");
   const canDeactivate = permissions.includes("visitors.deactivate");
   const canFollowup = permissions.includes("followups.manage");
+  // Filtros do diretório não limitam silenciosamente a visão geral e o cuidado.
+  const querySearch = tab === "pessoas" ? search.trim() : "";
+  const queryCategory = tab === "pessoas" ? categoryFilter : "all";
+  const queryVision = tab === "pessoas" ? activeVision : "todos";
+  const queryKey = JSON.stringify([querySearch, queryCategory, queryVision]);
+  const currentFailure = listFailure?.key === queryKey ? listFailure : null;
+  const directoryError = currentFailure && !currentFailure.append ? currentFailure.message : "";
+  const loading = pending || (loadedKey !== queryKey && !currentFailure);
   const visibleCategories = useMemo(() => {
     const term = categorySearch.trim().toLocaleLowerCase("pt-BR");
     if (!term) return categories;
@@ -268,33 +287,47 @@ export function VisitorsWorkspace({
 
   const loadVisitors = useCallback(
     async (cursor: number | null = null, append = false) => {
-      setLoading(true);
-      setError("");
+      if (append && (listRequest.current || loadedQuery.current !== queryKey)) return;
+      listRequest.current?.abort();
+      const controller = new AbortController();
+      listRequest.current = controller;
+      setLoading(!append);
+      setLoadingMore(append);
+      setListFailure(null);
+      if (!append) setSelectedRows([]);
       try {
         const params = new URLSearchParams();
-        if (search.trim()) params.set("busca", search.trim());
-        if (categoryFilter !== "all") params.set("categoria", categoryFilter);
-        params.set("visao", activeVision);
+        if (querySearch) params.set("busca", querySearch);
+        if (queryCategory !== "all") params.set("categoria", queryCategory);
+        params.set("visao", queryVision);
         if (cursor) params.set("cursor", String(cursor));
         const result = await apiJson<{
           visitantes: Visitor[];
           nextCursor: number | null;
           aniversariantes: BirthdayVisitor[];
           contagens: VisitorCounts;
-        }>(`/api/pilot/visitantes?${params}`);
+        }>(`/api/pilot/visitantes?${params}`, { signal: controller.signal });
+        if (controller.signal.aborted) return;
+        if (!Array.isArray(result.visitantes)) throw new Error("Não foi possível ler os visitantes.");
         setVisitors((current) =>
           append ? uniqueById([...current, ...result.visitantes]) : result.visitantes,
         );
         setNextCursor(result.nextCursor);
         setCounts((current) => result.contagens || current);
         if (!append) setBirthdays(result.aniversariantes || []);
+        setLoadedKey(queryKey);
+        loadedQuery.current = queryKey;
       } catch (caught) {
-        setError((caught as Error).message);
+        if (!controller.signal.aborted) setListFailure({key: queryKey, append, message: (caught as Error).message});
       } finally {
-        setLoading(false);
+        if (listRequest.current === controller) {
+          listRequest.current = null;
+          setLoading(false);
+          setLoadingMore(false);
+        }
       }
     },
-    [activeVision, categoryFilter, search],
+    [querySearch, queryCategory, queryVision, queryKey],
   );
 
   const loadCells = useCallback(async () => {
@@ -377,9 +410,9 @@ export function VisitorsWorkspace({
   useEffect(() => {
     const timer = window.setTimeout(() => {
       void loadVisitors();
-    }, search ? 220 : 0);
-    return () => window.clearTimeout(timer);
-  }, [loadVisitors, search]);
+    }, querySearch ? 220 : 0);
+    return () => { window.clearTimeout(timer); listRequest.current?.abort(); listRequest.current = null; };
+  }, [loadVisitors, querySearch]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -599,15 +632,24 @@ export function VisitorsWorkspace({
   }, [canCreate]);
 
   async function loadFollowups(visitorId: number) {
+    followupRequest.current?.abort();
+    const controller = new AbortController();
+    followupRequest.current = controller;
     setSelectedId(visitorId);
     setFollowups([]);
+    setFollowupsLoading(true);
+    setFollowupsError("");
     try {
       const result = await apiJson<{ acompanhamentos: Followup[] }>(
         `/api/pilot/acompanhamentos?visitanteId=${visitorId}`,
+        { signal: controller.signal },
       );
+      if (controller.signal.aborted) return;
       setFollowups(result.acompanhamentos);
     } catch (caught) {
-      setError((caught as Error).message);
+      if (!controller.signal.aborted) setFollowupsError((caught as Error).message);
+    } finally {
+      if (!controller.signal.aborted) setFollowupsLoading(false);
     }
   }
 
@@ -637,10 +679,13 @@ export function VisitorsWorkspace({
   }
 
   function openExistingVisitor(visitor: Visitor) {
+    setTab("pessoas");
+    setActiveVision(visitor.ativo ? "todos" : "arquivados");
     setSearch(visitor.nome_completo);
     setCategoryFilter("all");
     setDuplicateMatches([]);
     setRegistrationOpen(false);
+    void loadFollowups(visitor.id);
   }
 
   async function createVisitor(event: FormEvent<HTMLFormElement>) {
@@ -1010,6 +1055,18 @@ export function VisitorsWorkspace({
   }
 
   const selectedVisitor = visitors.find((visitor) => visitor.id === selectedId) || null;
+  const selectedVisitorId = selectedVisitor?.id;
+  useEffect(() => {
+    if (!selectedVisitorId) return;
+    const element = visitorDialog.current;
+    const trigger = document.activeElement as HTMLElement | null;
+    const overflow = document.body.style.overflow;
+    element?.showModal();
+    visitorClose.current?.focus();
+    document.body.style.overflow = "hidden";
+    return () => { element?.close(); document.body.style.overflow = overflow; trigger?.focus(); };
+  }, [selectedVisitorId]);
+  useEffect(() => () => followupRequest.current?.abort(), []);
   // Só uma superfície mostra o aviso por vez: a que está por cima. Repetir o
   // mesmo texto no fundo e no modal faria o leitor de tela anunciar duas vezes.
   const overlayOpen =
@@ -1019,7 +1076,7 @@ export function VisitorsWorkspace({
     setError("");
     setWarning("");
   };
-  const visibleVisitors = [...visitors].sort((left, right) => {
+  const visibleVisitors = (loadedKey === queryKey && !loading && !directoryError ? [...visitors] : []).sort((left, right) => {
     const comparison = left.nome_completo.localeCompare(right.nome_completo, "pt-BR");
     return sortDirection === "asc" ? comparison : -comparison;
   });
@@ -1034,6 +1091,12 @@ export function VisitorsWorkspace({
     setSelectedRows([]);
     setSelectedId(null);
     setFollowups([]);
+  }
+
+  function clearVisitorFilters() {
+    setSearch("");
+    setCategoryFilter("all");
+    changeVision("todos");
   }
 
   // O funil é o assunto da página: quantos chegaram e quantos avançaram. A
@@ -1062,18 +1125,18 @@ export function VisitorsWorkspace({
           <h1>Relacionamento</h1>
           <p>Acompanhe pessoas, contatos e próximos cuidados em uma única ficha.</p>
         </div>
-        <div className="secretary-community">
+        {loadedKey && tab === "painel" && <div className="secretary-community">
           <span>Pessoas ativas</span>
           <strong>{counts.todos}</strong>
           <small>{counts.pendencias} com contato vencido</small>
           <small>{birthdays.length} aniversariantes neste mês</small>
-        </div>
+        </div>}
       </header>
 
       {/* O funil ocupa o lugar do fluxo numerado de Ministérios: ali as etapas
           são do processo do ministério, aqui são as do acolhimento. Mesmo
           dispositivo, e nos dois casos a ordem carrega informação. */}
-      <div className="secretary-flow visitor-flow-v7" aria-label="Funil de acolhimento">
+      {loadedKey && tab === "painel" && <div className="secretary-flow visitor-flow-v7" aria-label="Funil de acolhimento">
         {funnelStages.map((etapa, indice) => {
           const proporcao = funnelTotal ? Math.round((etapa.total / funnelTotal) * 100) : 0;
           return (
@@ -1086,13 +1149,13 @@ export function VisitorsWorkspace({
             </div>
           );
         })}
-      </div>
+      </div>}
 
       <div className="secretary-toolbar visitor-toolbar-v7">
-        <p className="visitor-toolbar-note-v7">
+        {loadedKey && tab === "painel" && <p className="visitor-toolbar-note-v7">
           <strong>{counts.novos} pessoa{counts.novos === 1 ? "" : "s"} aguardando primeiro contato</strong>
           <small>{counts.sem_contato} sem contato há mais de 15 dias · {counts.arquivados} arquivada(s)</small>
-        </p>
+        </p>}
         <div className="secretary-toolbar-actions">
           {canCreate && <button type="button" onClick={() => setRegistrationOpen(true)}>＋ Novo visitante</button>}
             {canManageCategories && (
@@ -1233,7 +1296,7 @@ export function VisitorsWorkspace({
             aria-current={tab === id ? "page" : undefined}
             onClick={() => openTab(id)}
           >
-            {label}{total !== null && <b>{total}</b>}
+            {label}{loadedKey && total !== null && <b>{total}</b>}
           </button>
         ))}
         <button type="button" className={`visitor-notebook-tab ${tab === "anotacoes" ? "active" : ""}`} aria-label="Minhas anotações de cuidado" title="Minhas anotações" aria-current={tab === "anotacoes" ? "page" : undefined} onClick={() => openTab("anotacoes")}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="5" y="3" width="15" height="18" rx="2"/><path d="M8 3v18M3 7h4M3 12h4M3 17h4M11 8h6M11 12h6"/></svg></button>
@@ -1304,7 +1367,9 @@ export function VisitorsWorkspace({
         </section>
         </div>, document.body)}
 
-      {tab === "painel" && (
+      {loading && <p className="visitor-query-status" role="status">Carregando visitantes…</p>}
+      {directoryError && <div className="visitor-query-error"><p role="alert">{directoryError}</p><button type="button" onClick={() => void loadVisitors()}>Tentar novamente</button></div>}
+      {tab === "painel" && !loading && !directoryError && (
         <div className="secretary-panel">
           <div className="secretary-summary-grid">
             <VisitorSummary label="Pessoas ativas" value={counts.todos} detail="Cadastro da comunidade" icon="◫" tone="purple" />
@@ -1428,30 +1493,30 @@ export function VisitorsWorkspace({
             </section>}
 
             <form className="visitor-commandbar-v2" onSubmit={(event) => { event.preventDefault(); void loadVisitors(); }}>
-              <label className="visitor-search-v2"><span aria-hidden="true">⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nome, telefone ou e-mail" /></label>
-              <button type="button" className={filtersOpen ? "active" : ""} onClick={() => setFiltersOpen((current) => !current)}>☷ Filtros</button>
+              <label className="visitor-search-v2"><span aria-hidden="true">⌕</span><input type="search" aria-label="Buscar visitante" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nome, telefone ou e-mail" /></label>
+              <button type="button" className={filtersOpen ? "active" : ""} aria-expanded={filtersOpen} aria-controls="visitor-filter-panel" onClick={() => setFiltersOpen((current) => !current)}>☷ Filtros</button>
               <button type="button" className={columnsOpen ? "active" : ""} onClick={() => setColumnsOpen((current) => !current)}>▦ Colunas</button>
               <button type="button" onClick={() => setSortDirection((current) => current === "asc" ? "desc" : "asc")}>↕ Nome {sortDirection === "asc" ? "A–Z" : "Z–A"}</button>
               <button type="submit" disabled={loading}>{loading ? "Atualizando…" : "Atualizar"}</button>
             </form>
 
             {filtersOpen && (
-              <div className="visitor-filter-panel-v2">
+              <div id="visitor-filter-panel" className="visitor-filter-panel-v2">
                 <label>Categoria<select aria-label="Filtrar visitantes por categoria" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option value="all">Todas</option><option value="sem-categoria">Sem categoria</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.nome}</option>)}</select></label>
-                <button type="button" onClick={() => { setSearch(""); setCategoryFilter("all"); }}>Limpar filtros</button>
+                <button type="button" onClick={clearVisitorFilters}>Limpar filtros</button>
                 <button type="button" onClick={() => changeVision("arquivados")}>Ver arquivados ({counts.arquivados})</button>
               </div>
             )}
             {(search.trim() || categoryFilter !== "all" || activeVision === "arquivados") && (
               <div className="visitor-active-filters-v2" aria-label="Filtros ativos">
                 {search.trim() && <button type="button" onClick={() => setSearch("")}>Busca: {search.trim()} <span aria-hidden="true">×</span></button>}
-                {categoryFilter !== "all" && <button type="button" onClick={() => setCategoryFilter("all")}>Categoria ativa <span aria-hidden="true">×</span></button>}
+                {categoryFilter !== "all" && <button type="button" onClick={() => setCategoryFilter("all")}>Categoria: {categoryFilter === "sem-categoria" ? "Sem categoria" : categories.find(item => String(item.id) === categoryFilter)?.nome || "Selecionada"} <span aria-hidden="true">×</span></button>}
                 {activeVision === "arquivados" && <button type="button" onClick={() => changeVision("todos")}>Arquivados <span aria-hidden="true">×</span></button>}
               </div>
             )}
             {columnsOpen && <div className="visitor-column-panel-v2"><span>Colunas sempre visíveis nesta tabela</span><b>Nome</b><b>Contato</b><b>Categoria</b><b>Ministério</b><b>Responsável</b><b>Status</b><b>Último contato</b><b>Próximo passo</b></div>}
 
-            {Boolean(selectedRows.length) && (
+            {Boolean(selectedRows.length) && !loading && !directoryError && (
               <div className="visitor-bulkbar-v2"><strong>{selectedRows.length} selecionado(s)</strong><button type="button" onClick={() => setSelectedRows([])}>Limpar seleção</button>{canDeactivate && activeVision !== "arquivados" && <button type="button" className="danger" onClick={() => void archiveSelectedVisitors()}>Arquivar</button>}{canDeactivate && <button type="button" className="danger permanent" onClick={() => void permanentlyDeleteSelectedVisitors()}>Excluir</button>}</div>
             )}
 
@@ -1477,14 +1542,15 @@ export function VisitorsWorkspace({
                   ))}
                 </tbody>
               </table>
-              {!loading && !visibleVisitors.length && <div className="visitor-empty-v2"><span aria-hidden="true">◎</span><strong>Nenhuma pessoa nesta visão</strong><p>Ajuste os filtros ou cadastre um novo visitante.</p></div>}
+              {!loading && !directoryError && !visibleVisitors.length && <div className="visitor-empty-v2"><span aria-hidden="true">◎</span><strong>Nenhuma pessoa nesta visão</strong><p>Ajuste os filtros para ampliar os resultados.</p>{(search || categoryFilter !== "all" || activeVision !== "todos") && <button type="button" onClick={clearVisitorFilters}>Limpar busca e filtros</button>}</div>}
             </div>
-            {nextCursor && <button type="button" className="visitor-load-more-v2" disabled={loading} onClick={() => void loadVisitors(nextCursor, true)}>Carregar mais pessoas</button>}
+            {currentFailure?.append && <p className="visitor-query-error" role="alert">{currentFailure.message} Os registros já carregados continuam disponíveis.</p>}
+            {!loading && !directoryError && nextCursor && <button type="button" className="visitor-load-more-v2" disabled={loadingMore} onClick={() => void loadVisitors(nextCursor, true)}>{loadingMore ? "Carregando mais pessoas…" : currentFailure?.append ? "Tentar carregar mais" : "Carregar mais pessoas"}</button>}
           </section>
         </div>
       )}
 
-      {tab === "acompanhamento" && (
+      {tab === "acompanhamento" && !loading && !directoryError && (
         <div className="secretary-panel">
           {/* A central usa os mesmos dados do funil, mas organiza as decisões por
               prioridade, pessoa e próximo cuidado. */}
@@ -1492,7 +1558,7 @@ export function VisitorsWorkspace({
         </div>
       )}
 
-      {tab === "aniversarios" && (
+      {tab === "aniversarios" && !loading && !directoryError && (
         <div className="secretary-panel">
           <article className="secretary-card visitor-birthday-card-v7" aria-labelledby="visitor-birthday-title-v7">
             <header>
@@ -1534,17 +1600,17 @@ export function VisitorsWorkspace({
         </div>, document.body)}
 
       {selectedVisitor && createPortal(
-        <div className="visitor-person-drawer-backdrop-v2" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedId(null); }}>
-          <aside className="visitor-person-drawer-v2" role="dialog" aria-modal="true" aria-labelledby="visitor-person-title">
+        <dialog ref={visitorDialog} className="visitor-person-dialog" aria-labelledby="visitor-person-title" onCancel={(event) => { event.preventDefault(); setSelectedId(null); }} onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedId(null); }}>
+          <aside className="visitor-person-drawer-v2">
             <header>
               <div className="visitor-person-avatar-v2" style={{ "--category-color": selectedVisitor.categoria_cor || "var(--pilot-blue)" } as CSSProperties}>{selectedVisitor.nome_completo.slice(0, 1).toLocaleUpperCase("pt-BR")}</div>
               <div><p className="pilot-kicker">FICHA CENTRAL</p><h2 id="visitor-person-title">{selectedVisitor.nome_completo}</h2><span>{selectedVisitor.categoria_nome || "Sem categoria"} · {statusLabel(selectedVisitor.status)}</span></div>
-              <button type="button" aria-label="Fechar ficha" onClick={() => setSelectedId(null)}>×</button>
+              <button ref={visitorClose} type="button" aria-label="Fechar ficha" onClick={() => setSelectedId(null)}>×</button>
             </header>
             <div className="visitor-person-actions-v2">
               {selectedVisitor.telefone && whatsappHref(selectedVisitor.telefone) && <a href={whatsappHref(selectedVisitor.telefone) || undefined} target="_blank" rel="noreferrer">WhatsApp</a>}
-              {canEdit && selectedVisitor.status !== "INTEGRADO" && <button type="button" onClick={() => void markIntegrated(selectedVisitor)}>Marcar integrado</button>}
-              {canDeactivate && activeVision !== "arquivados" && <button type="button" className="danger" onClick={() => void deactivateVisitor(selectedVisitor)}>Arquivar</button>}
+              {canEdit && Boolean(selectedVisitor.ativo) && selectedVisitor.status !== "INTEGRADO" && <button type="button" onClick={() => void markIntegrated(selectedVisitor)}>Marcar integrado</button>}
+              {canDeactivate && Boolean(selectedVisitor.ativo) && <button type="button" className="danger" onClick={() => void deactivateVisitor(selectedVisitor)}>Arquivar</button>}
               {canDeactivate && <button type="button" className="danger" onClick={() => void permanentlyDeleteVisitor(selectedVisitor)}>Excluir</button>}
             </div>
             <VisitorNotice message={message} error={error} warning={warning} onDismiss={dismissNotice} inline />
@@ -1556,11 +1622,11 @@ export function VisitorsWorkspace({
               <div><dt>Responsável</dt><dd>{selectedVisitor.responsavel_email || selectedVisitor.acompanhante || "A definir"}</dd></div>
               <div><dt>Próxima ação</dt><dd>{selectedVisitor.proximo_contato ? formatDate(selectedVisitor.proximo_contato) : "Não definida"}</dd></div>
             </dl>
-            {canEdit && activeVision !== "arquivados" && <details className="visitor-edit-compact-v2"><summary>Editar dados completos</summary><form className="pilot-form visitor-edit-form" onSubmit={(event) => updateVisitor(event, selectedVisitor)}><label>Nome completo*<input name="nomeCompleto" required maxLength={120} defaultValue={selectedVisitor.nome_completo} /></label><label>Data de nascimento<input name="dataNascimento" type="date" defaultValue={selectedVisitor.data_nascimento || ""} /></label><label>Telefone<input name="telefone" maxLength={30} defaultValue={selectedVisitor.telefone || ""} /></label><label>E-mail<input name="email" type="email" maxLength={180} defaultValue={selectedVisitor.email || ""} /></label><label>Endereço<input name="endereco" maxLength={250} defaultValue={selectedVisitor.endereco || ""} /></label><label>Quem recebeu<input name="acompanhante" maxLength={120} defaultValue={selectedVisitor.acompanhante || ""} /></label><label>Parente<input name="parente" maxLength={120} defaultValue={selectedVisitor.parente || ""} /></label><label>Ministério<input name="ministerio" maxLength={120} defaultValue={selectedVisitor.ministerio || ""} /></label><label>Célula<select name="celulaId" defaultValue={selectedVisitor.celula_id || ""}><option value="">Sem célula</option>{cells.map((cell) => <option key={cell.id} value={cell.id}>{cell.nome}</option>)}</select></label><label>Categoria<select name="categoriaId" defaultValue={selectedVisitor.categoria_id || ""}><option value="">Sem categoria</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.nome}</option>)}</select></label><label>Batismo<select name="batizado" defaultValue={selectedVisitor.batizado}><option value="NAO_INFORMADO">Não informado</option><option value="SIM">Sim</option><option value="NAO">Não</option></select></label><label>Status<select name="status" defaultValue={selectedVisitor.status}><option value="NOVO">Novo</option><option value="EM_CONTATO">Em contato</option><option value="EM_ACOMPANHAMENTO">Em acompanhamento</option><option value="INTEGRADO">Integrado</option></select></label><label>Entrada<input name="dataEntrada" type="date" required defaultValue={selectedVisitor.data_entrada} /></label><label className="visitor-check"><input name="encontroComDeus" type="checkbox" defaultChecked={Boolean(selectedVisitor.encontro_com_deus)} />Encontro com Deus</label><label className="visitor-check"><input name="cursoMembros" type="checkbox" defaultChecked={Boolean(selectedVisitor.curso_membros)} />Curso de membros</label><label className="visitor-wide-field">Observações<textarea name="observacoes" rows={3} maxLength={1000} defaultValue={selectedVisitor.observacoes || ""} /></label><button disabled={saving}>Salvar alterações</button></form></details>}
-            {canFollowup && activeVision !== "arquivados" && <details className="visitor-followup-details-v2"><summary><span><strong>Novo acompanhamento</strong><small>Registre o cuidado sem sair da ficha.</small></span><i aria-hidden="true">⌄</i></summary><form className="visitor-followup-quick-v2" onSubmit={createFollowup}><label>Canal<select name="tipo" defaultValue="WHATSAPP"><option value="WHATSAPP">WhatsApp</option><option value="TELEFONE">Telefone</option><option value="PRESENCIAL">Presencial</option><option value="EMAIL">E-mail</option><option value="OUTRO">Outro</option></select></label><label>Resultado<input name="resultado" required maxLength={160} placeholder="Resumo do contato" /></label><label>Próximo contato<input name="proximoContato" type="date" /></label><label className="wide">Observações<textarea name="descricao" rows={3} maxLength={1500} /></label><button disabled={saving}>{saving ? "Salvando…" : "Registrar acompanhamento"}</button></form></details>}
-            <section className="visitor-timeline-v2"><header><strong>Histórico</strong><b>{followups.length}</b></header>{followups.map((item) => <article key={item.id}><span aria-hidden="true" /><div><header><b>{item.tipo}</b><time>{formatDateTime(item.criado_em)}</time></header><strong>{item.resultado}</strong>{item.descricao && <p>{item.descricao}</p>}{item.proximo_contato && <small>Próximo contato: {formatDate(item.proximo_contato)}</small>}</div></article>)}{!followups.length && <p className="operations-muted">Nenhum acompanhamento registrado.</p>}</section>
+            {canEdit && Boolean(selectedVisitor.ativo) && <details className="visitor-edit-compact-v2"><summary>Editar dados completos</summary><form className="pilot-form visitor-edit-form" onSubmit={(event) => updateVisitor(event, selectedVisitor)}><label>Nome completo*<input name="nomeCompleto" required maxLength={120} defaultValue={selectedVisitor.nome_completo} /></label><label>Data de nascimento<input name="dataNascimento" type="date" defaultValue={selectedVisitor.data_nascimento || ""} /></label><label>Telefone<input name="telefone" maxLength={30} defaultValue={selectedVisitor.telefone || ""} /></label><label>E-mail<input name="email" type="email" maxLength={180} defaultValue={selectedVisitor.email || ""} /></label><label>Endereço<input name="endereco" maxLength={250} defaultValue={selectedVisitor.endereco || ""} /></label><label>Quem recebeu<input name="acompanhante" maxLength={120} defaultValue={selectedVisitor.acompanhante || ""} /></label><label>Parente<input name="parente" maxLength={120} defaultValue={selectedVisitor.parente || ""} /></label><label>Ministério<input name="ministerio" maxLength={120} defaultValue={selectedVisitor.ministerio || ""} /></label><label>Célula<select name="celulaId" defaultValue={selectedVisitor.celula_id || ""}><option value="">Sem célula</option>{cells.map((cell) => <option key={cell.id} value={cell.id}>{cell.nome}</option>)}</select></label><label>Categoria<select name="categoriaId" defaultValue={selectedVisitor.categoria_id || ""}><option value="">Sem categoria</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.nome}</option>)}</select></label><label>Batismo<select name="batizado" defaultValue={selectedVisitor.batizado}><option value="NAO_INFORMADO">Não informado</option><option value="SIM">Sim</option><option value="NAO">Não</option></select></label><label>Status<select name="status" defaultValue={selectedVisitor.status}><option value="NOVO">Novo</option><option value="EM_CONTATO">Em contato</option><option value="EM_ACOMPANHAMENTO">Em acompanhamento</option><option value="INTEGRADO">Integrado</option></select></label><label>Entrada<input name="dataEntrada" type="date" required defaultValue={selectedVisitor.data_entrada} /></label><label className="visitor-check"><input name="encontroComDeus" type="checkbox" defaultChecked={Boolean(selectedVisitor.encontro_com_deus)} />Encontro com Deus</label><label className="visitor-check"><input name="cursoMembros" type="checkbox" defaultChecked={Boolean(selectedVisitor.curso_membros)} />Curso de membros</label><label className="visitor-wide-field">Observações<textarea name="observacoes" rows={3} maxLength={1000} defaultValue={selectedVisitor.observacoes || ""} /></label><button disabled={saving}>Salvar alterações</button></form></details>}
+            {canFollowup && Boolean(selectedVisitor.ativo) && <details className="visitor-followup-details-v2"><summary><span><strong>Novo acompanhamento</strong><small>Registre o cuidado sem sair da ficha.</small></span><i aria-hidden="true">⌄</i></summary><form className="visitor-followup-quick-v2" onSubmit={createFollowup}><label>Canal<select name="tipo" defaultValue="WHATSAPP"><option value="WHATSAPP">WhatsApp</option><option value="TELEFONE">Telefone</option><option value="PRESENCIAL">Presencial</option><option value="EMAIL">E-mail</option><option value="OUTRO">Outro</option></select></label><label>Resultado<input name="resultado" required maxLength={160} placeholder="Resumo do contato" /></label><label>Próximo contato<input name="proximoContato" type="date" /></label><label className="wide">Observações<textarea name="descricao" rows={3} maxLength={1500} /></label><button disabled={saving}>{saving ? "Salvando…" : "Registrar acompanhamento"}</button></form></details>}
+            <section className="visitor-timeline-v2" aria-busy={followupsLoading}><header><strong>Histórico</strong>{!followupsLoading && !followupsError && <b>{followups.length}</b>}</header>{followupsLoading ? <p role="status">Carregando histórico…</p> : followupsError ? <div className="visitor-query-error"><p role="alert">{followupsError}</p><button type="button" onClick={() => void loadFollowups(selectedVisitor.id)}>Tentar novamente</button></div> : <>{followups.map((item) => <article key={item.id}><span aria-hidden="true" /><div><header><b>{item.tipo}</b><time>{formatDateTime(item.criado_em)}</time></header><strong>{item.resultado}</strong>{item.descricao && <p>{item.descricao}</p>}{item.proximo_contato && <small>Próximo contato: {formatDate(item.proximo_contato)}</small>}</div></article>)}{!followups.length && <p className="operations-muted">Nenhum acompanhamento registrado.</p>}</>}</section>
           </aside>
-        </div>, document.body)}
+        </dialog>, document.body)}
 
     </section>
   );

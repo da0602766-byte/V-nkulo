@@ -1,0 +1,40 @@
+.visitor-person-dialog { position: fixed; inset: 0; margin: 0; width: 100vw; max-width: none; height: 100dvh; max-height: none; padding: 0; border: 0; background: transparent; overflow: hidden; color: var(--pilot-text); }
+.visitor-person-dialog[open] { display: flex; justify-content: flex-end; }
+.visitor-person-dialog::backdrop { background: #020711a8; backdrop-filter: blur(6px); }
+.visitor-person-dialog .visitor-person-drawer-v2 { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.visitor-person-dialog .visitor-person-drawer-v2 > header { grid-template-columns: 44px minmax(0, 1fr) 44px; }
+.visitor-person-dialog .visitor-person-drawer-v2 > header > button { width: 44px; height: 44px; }
+.visitor-person-dialog .visitor-person-avatar-v2 { width: 44px; height: 44px; }
+.visitor-person-dialog .visitor-person-actions-v2 { flex-wrap: wrap; gap: 8px; }
+.visitor-person-dialog :is(button, a, summary), .visitor-workspace-v7 :is(.visitor-view-tabs-v2 button, .visitor-category-strip-v2 button, .visitor-commandbar-v2 button, .visitor-load-more-v2, .visitor-filter-panel-v2 button, .visitor-empty-v2 button) { min-height: 44px; }
+.visitor-query-error { margin: 12px 0; padding: 16px; border: 1px solid var(--pilot-line); border-left: 4px solid var(--rose, #b42338); border-radius: 12px; background: var(--pilot-surface); color: var(--pilot-text); line-height: 1.5; }
+.visitor-query-error p { margin: 0 0 12px; }
+.visitor-query-error button, .visitor-empty-v2 button { min-height: 44px; padding: 10px 14px; border: 1px solid var(--pilot-line); border-radius: 10px; background: var(--pilot-surface-2); color: var(--pilot-text); font: inherit; cursor: pointer; }
+.visitor-query-status { margin: 0; padding: 16px; color: var(--pilot-muted); }
+.visitor-workspace-v7 :is(button, input, select):focus-visible, .visitor-person-dialog :is(button, a, input, select, textarea, summary):focus-visible { outline: 3px solid var(--pilot-primary); outline-offset: 3px; }
+@media (max-width: 640px) {
+  .visitor-workspace-v7 .visitor-commandbar-v2 { display: flex; flex-wrap: wrap; gap: 10px; }
+  .visitor-workspace-v7 .visitor-search-v2 { flex: 1 1 100%; min-width: 0; }
+  .visitor-workspace-v7 .visitor-search-v2 input { width: 100%; min-width: 0; min-height: 44px; font-size: 16px; }
+  .visitor-workspace-v7 .visitor-table-v2, .visitor-workspace-v7 .visitor-table-v2 tbody { display: block; width: 100%; }
+  .visitor-workspace-v7 .visitor-table-v2 thead, .visitor-workspace-v7 .visitor-table-v2 thead tr { display: block; }
+  .visitor-workspace-v7 .visitor-table-v2 thead th:first-child { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 12px; }
+  .visitor-workspace-v7 .visitor-table-v2 thead th:first-child::after { content: "Selecionar página"; font-size: 12px; }
+  .visitor-workspace-v7 .visitor-table-v2 thead th:not(:first-child) { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); }
+  .visitor-workspace-v7 .visitor-table-v2 tbody tr { display: grid; grid-template-columns: 24px minmax(0, 1fr) 90px; gap: 8px; padding: 12px 8px; border-bottom: 1px solid var(--pilot-line); }
+  .visitor-workspace-v7 .visitor-table-v2 tbody :is(th, td) { width: auto; min-width: 0; height: auto; padding: 0; border: 0; }
+  .visitor-workspace-v7 .visitor-table-v2 tbody td:first-child { grid-column: 1; grid-row: 1 / 3; padding-top: 12px; }
+  .visitor-workspace-v7 .visitor-table-v2 tbody th { grid-column: 2 / 4; }
+  .visitor-workspace-v7 .visitor-table-v2 tbody td:nth-child(7) { grid-column: 2; }
+  .visitor-workspace-v7 .visitor-table-v2 tbody td:last-child { grid-column: 3; }
+  .visitor-workspace-v7 .visitor-table-v2 tbody :is(td:nth-child(7), td:last-child)::before { display: block; margin-bottom: 6px; color: var(--pilot-muted); font-size: 12px; font-weight: 600; }
+  .visitor-workspace-v7 .visitor-table-v2 tbody td:nth-child(7)::before { content: "Status"; }
+  .visitor-workspace-v7 .visitor-table-v2 tbody td:last-child::before { content: "Próximo passo"; }
+  .visitor-workspace-v7 .visitor-person-cell-v2 { grid-template-columns: minmax(0, 1fr); min-height: 44px; padding-block: 6px; }
+  .visitor-workspace-v7 .visitor-person-cell-v2 > span:first-child { display: none; }
+  .visitor-workspace-v7 .visitor-person-cell-v2 strong { white-space: normal; overflow-wrap: anywhere; font-size: 14px; line-height: 1.4; }
+  .visitor-workspace-v7 .visitor-person-cell-v2 small { white-space: normal; font-size: 12px; line-height: 1.4; }
+  .visitor-person-dialog .visitor-followup-quick-v2 { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .visitor-person-dialog :is(input, select, textarea) { font-size: 16px; }
+  .visitor-person-dialog .visitor-person-summary-v2 { grid-template-columns: minmax(0, 1fr); }
+}
