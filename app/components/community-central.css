@@ -1,4 +1,4 @@
-.central-surface { --central-accent: var(--pilot-accent); }
+.pilot-workspace.central-surface { --central-accent: var(--pilot-accent); }
 .central-masthead { padding: 8px 0 0; border-bottom: 1px solid var(--pilot-line); margin-bottom: 28px; }
 .central-context { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; font-size: 13px; color: var(--pilot-muted); }
 .central-masthead h1 { font-size: clamp(26px, 3vw, 36px); line-height: 1.2; letter-spacing: -.03em; margin: 12px 0 8px; color: var(--pilot-text); }
@@ -70,28 +70,28 @@
 .central-disclosure { border-top: 1px solid var(--pilot-line); margin-top: 24px; padding: 16px 0; }
 .central-disclosure > summary { min-height: 48px; cursor: pointer; font-size: 18px; font-weight: 700; padding: 10px 0; }
 .central-disclosure > p { color: var(--pilot-muted); font-size: 14px; line-height: 1.6; }
-.central-surface :is(.people-workspace,.leadership-workspace) :is(.workspace-heading,.leadership-hero) { background: none; border: 0; padding: 20px 0; box-shadow: none; min-height: 0; border-radius: 0; }
-.central-surface :is(.people-heading,.leadership-hero) h1 { font-size: 26px; }
-.central-surface :is(.people-metrics,.leadership-metrics) { display: flex; flex-wrap: wrap; gap: 0 28px; padding: 16px 0; border-block: 1px solid var(--pilot-line); }
-.central-surface :is(.people-metrics,.leadership-metrics) article { border: 0; background: none; box-shadow: none; padding: 8px 0; min-height: 0; border-radius: 0; }
-.central-surface .people-metrics article > span { display: none; }
-.central-surface .people-metrics strong { font-size: 22px; }
-.central-surface .people-toolbar { background: none; box-shadow: none; border: 0; padding: 20px 0; border-radius: 0; }
-.central-surface .people-toolbar { display: grid; grid-template-columns: minmax(0,2fr) minmax(180px,1fr) auto; gap: 16px; }
-.central-surface .people-tabs { grid-column: 1 / -1; }
-.central-surface .people-toolbar :is(input,select) { width:100%; min-width:0; min-height:46px; padding:10px 12px; background:var(--pilot-surface); color:var(--pilot-text); border:1px solid var(--pilot-line); border-radius:8px; font:inherit; }
-.central-surface .people-report-link { color:var(--pilot-text); font-size:14px; padding:12px 0; text-underline-offset:4px; }
-.central-surface .people-directory-list { border: 0; border-radius: 0; background: none; box-shadow: none; }
-.central-surface .people-directory-row { background: none; box-shadow: none; border-radius: 0; }
-.central-surface .self-profile-card { display: grid; grid-template-columns: minmax(0,1fr); border: 0; background: none; box-shadow: none; padding: 0; }
-.central-surface .self-profile-card > aside { display: grid; grid-template-columns: 48px minmax(0,1fr); gap: 4px 14px; align-items: center; text-align: left; padding: 16px 0; background: none; border-radius: 0; }
-.central-surface .self-profile-avatar { width: 48px; height: 48px; font-size: 18px; grid-row: span 3; margin: 0; }
-.central-surface .self-profile-card form { padding: 20px 0; }
-.central-surface :is(.leadership-add-card,.leadership-list-card,.leadership-history-card,.pastoral-community-dashboard,.pastoral-activity-chart,.pastoral-kpi-grid article) { box-shadow: none; border-radius: 0; background: none; border: 0; border-bottom: 1px solid var(--pilot-line); }
-.central-surface .leadership-add-card { padding: 24px 0; }
-.central-surface .leadership-content-grid { gap: 28px; }
-.central-surface :is(.leadership-list-card,.leadership-history-card) > header { padding: 20px 0; }
-.central-surface .account-profile-workspace { margin-top: 20px; }
+.pilot-workspace.central-surface :is(.people-workspace,.leadership-workspace) :is(.workspace-heading,.leadership-hero) { background: none; border: 0; padding: 20px 0; box-shadow: none; min-height: 0; border-radius: 0; }
+.pilot-workspace.central-surface :is(.people-heading,.leadership-hero) h1 { font-size: 26px; }
+.pilot-workspace.central-surface :is(.people-metrics,.leadership-metrics) { display: flex; flex-wrap: wrap; gap: 0 28px; padding: 16px 0; border-block: 1px solid var(--pilot-line); }
+.pilot-workspace.central-surface :is(.people-metrics,.leadership-metrics) article { border: 0; background: none; box-shadow: none; padding: 8px 0; min-height: 0; border-radius: 0; }
+.pilot-workspace.central-surface .people-metrics article > span { display: none; }
+.pilot-workspace.central-surface .people-metrics strong { font-size: 22px; }
+.pilot-workspace.central-surface .people-toolbar { background: none; box-shadow: none; border: 0; padding: 20px 0; border-radius: 0; }
+.pilot-workspace.central-surface .people-toolbar { display: grid; grid-template-columns: minmax(0,2fr) minmax(180px,1fr) auto; gap: 16px; }
+.pilot-workspace.central-surface .people-tabs { grid-column: 1 / -1; }
+.pilot-workspace.central-surface .people-toolbar :is(input,select) { width:100%; min-width:0; min-height:46px; padding:10px 12px; background:var(--pilot-surface); color:var(--pilot-text); border:1px solid var(--pilot-line); border-radius:8px; font:inherit; }
+.pilot-workspace.central-surface .people-report-link { color:var(--pilot-text); font-size:14px; padding:12px 0; text-underline-offset:4px; }
+.pilot-workspace.central-surface .people-directory-list { border: 0; border-radius: 0; background: none; box-shadow: none; }
+.pilot-workspace.central-surface .people-directory-row { background: none; box-shadow: none; border-radius: 0; }
+.pilot-workspace.central-surface .self-profile-card { display: grid; grid-template-columns: minmax(0,1fr); border: 0; background: none; box-shadow: none; padding: 0; }
+.pilot-workspace.central-surface .self-profile-card > aside { display: grid; grid-template-columns: 48px minmax(0,1fr); gap: 4px 14px; align-items: center; text-align: left; padding: 16px 0; background: none; border-radius: 0; }
+.pilot-workspace.central-surface .self-profile-avatar { width: 48px; height: 48px; font-size: 18px; grid-row: span 3; margin: 0; }
+.pilot-workspace.central-surface .self-profile-card form { padding: 20px 0; }
+.pilot-workspace.central-surface :is(.leadership-add-card,.leadership-list-card,.leadership-history-card,.pastoral-community-dashboard,.pastoral-activity-chart,.pastoral-kpi-grid article) { box-shadow: none; border-radius: 0; background: none; border: 0; border-bottom: 1px solid var(--pilot-line); }
+.pilot-workspace.central-surface .leadership-add-card { padding: 24px 0; }
+.pilot-workspace.central-surface .leadership-content-grid { gap: 28px; }
+.pilot-workspace.central-surface :is(.leadership-list-card,.leadership-history-card) > header { padding: 20px 0; }
+.pilot-workspace.central-surface .account-profile-workspace { margin-top: 20px; }
 .central-text-value { font-size: 22px!important; }
 .central-status { padding: 14px 0; border-left: 3px solid var(--pilot-primary); padding-left: 14px; }
 .central-lifecycle-form { padding: 24px 0; border-bottom: 1px solid var(--pilot-line); }
@@ -132,11 +132,11 @@
   .central-ministry-row { grid-template-columns: repeat(3,minmax(0,1fr)); }
   .central-notice-list article { display: grid; gap: 2px; }
   .central-notice-list a { justify-self: start; }
-  .central-surface .people-directory-row { border-inline: 0; padding: 18px 0; }
-  .central-surface .people-directory-columns { display: none; }
-  .central-surface .people-metrics { gap: 10px 24px; }
-  .central-surface .people-toolbar { grid-template-columns:minmax(0,1fr); }
-  .central-surface .people-toolbar :is(input,select) { font-size:16px; }
+  .pilot-workspace.central-surface .people-directory-row { border-inline: 0; padding: 18px 0; }
+  .pilot-workspace.central-surface .people-directory-columns { display: none; }
+  .pilot-workspace.central-surface .people-metrics { gap: 10px 24px; }
+  .pilot-workspace.central-surface .people-toolbar { grid-template-columns:minmax(0,1fr); }
+  .pilot-workspace.central-surface .people-toolbar :is(input,select) { font-size:16px; }
   .central-lifecycle-options,.central-lifecycle-fields { grid-template-columns: minmax(0,1fr); }
 }
 @media print {
@@ -145,4 +145,9 @@
   .central-dashboard { color:#111!important; background:white!important; }
   .central-dashboard :is(a,p,small,strong,h2,h3,span) { color:#111!important; }
   .central-section,.central-ministry-row,.central-cell-report { break-inside:avoid; }
+}
+
+@media(max-width:420px) {
+  .pilot-workspace.central-surface .people-directory-row .people-card-main { grid-column:1 / -1; }
+  .pilot-workspace.central-surface .people-directory-row .people-card-actions { grid-column:1 / -1; grid-row:auto; justify-content:flex-start; }
 }
