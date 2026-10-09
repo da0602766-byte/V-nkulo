@@ -1,0 +1,39 @@
+.member-link-toolbar { display: flex; flex-wrap: wrap; gap: 8px; }
+.member-link-toolbar button:first-child { background: var(--pilot-primary); color: var(--pilot-on-primary, #fff); }
+.member-link-manager #member-link-create[hidden] { display: none; }
+.member-link-manager :is(button, input:not([type="checkbox"]), select) { min-height: 44px; }
+.member-link-help { grid-column: 1 / -1; margin: 0; color: var(--pilot-muted); font-size: 14px; line-height: 1.5; }
+.member-link-error { border: 1px solid var(--pilot-line); border-left: 4px solid var(--pilot-danger, #b42338); padding: 16px; border-radius: 12px; background: var(--pilot-surface); color: var(--pilot-text); line-height: 1.5; }
+.member-link-error p { margin: 0 0 12px; }
+.member-link-manager .member-link-list { align-items: start; }
+.member-link-card { min-width: 0; border: 1px solid var(--pilot-line); border-radius: 14px; background: var(--pilot-surface-subtle); }
+.member-link-card > summary { display: grid; grid-template-columns: minmax(0, 1fr) auto 20px; align-items: center; gap: 8px; padding: 16px; min-height: 64px; cursor: pointer; list-style: none; }
+.member-link-card > summary::-webkit-details-marker { display: none; }
+.member-link-card > summary strong { font-size: 16px; line-height: 1.4; overflow-wrap: anywhere; }
+.member-link-card > summary small { grid-column: 1 / 3; color: var(--pilot-muted); line-height: 1.5; }
+.member-link-card .member-link-disclosure { grid-column: 3; grid-row: 1 / 3; }
+.member-link-card[open] .member-link-disclosure { transform: rotate(180deg); }
+.member-link-card > form { display: grid; gap: 12px; padding: 16px; border-top: 1px solid var(--pilot-line); }
+.member-link-card > form > :is(header, footer) { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; justify-content: space-between; }
+.member-link-card > form > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.member-link-card > form > p { margin: 0; color: var(--pilot-muted); font-size: 14px; line-height: 1.5; }
+.member-link-manager .member-submission-panel > div { max-height: none; overflow: visible; }
+.member-link-manager :is(button, input, select, summary):focus-visible, .member-registration-public :is(button, a, input, select):focus-visible { outline: 3px solid var(--pilot-primary, #7652df); outline-offset: 3px; }
+.member-registration-public .member-registration-required { margin: 0; color: var(--pilot-muted, #9aa9be); font-size: 14px; line-height: 1.5; }
+.member-registration-public .member-registration-consent { display: flex; align-items: flex-start; gap: 12px; line-height: 1.6; }
+.member-registration-public .member-registration-consent input { flex: 0 0 20px; width: 20px; height: 20px; min-height: 20px; margin-top: 3px; }
+.member-registration-consent a { color: var(--pilot-text, #eef4ff); text-decoration: underline; text-underline-offset: 3px; }
+.member-registration-public .member-registration-days label, .member-registration-review footer button { min-height: 44px; }
+.member-registration-public .member-registration-feedback { color: var(--pilot-text, #eef4ff); line-height: 1.5; }
+.member-registration-public button:disabled { opacity: .55; cursor: not-allowed; }
+@media (max-width: 640px) {
+  .member-link-card > summary { grid-template-columns: minmax(0, 1fr) 20px; padding: 14px; }
+  .member-link-card > summary > :is(small, .member-link-status) { grid-column: 1; justify-self: start; }
+  .member-link-card .member-link-disclosure { grid-column: 2; grid-row: 1 / 4; }
+  .member-link-card > form > div { grid-template-columns: minmax(0, 1fr); }
+  .member-link-card > form > footer { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .member-link-card > form > footer button { width: 100%; margin: 0; }
+  .member-link-manager :is(input:not([type="checkbox"]), select), .member-registration-public :is(input:not([type="checkbox"]), select) { min-width: 0; width: 100%; font-size: 16px; }
+  .member-link-toolbar > button { flex: 1; }
+  .member-registration-public .member-registration-review dl { grid-template-columns: minmax(0, 1fr); }
+}
