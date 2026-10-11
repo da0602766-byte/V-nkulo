@@ -1,5 +1,7 @@
 import { getD1 } from "../../../../../db";
 import { attachSessionCookie, createSession, getSessionUser, normalizeEmail } from "../../../../lib/local-auth";
+import { auditAccess } from "../../../../lib/access-security";
+import { AuthLinkError, linkAuthAfterVerifiedGoogleLogin } from "../../../../lib/supabase-auth-link";
 import {
   exchangeGoogleCode,
   readGoogleState,
@@ -89,6 +91,15 @@ export async function GET(request: Request) {
       const target = new URL(state.returnTo || "/painel?view=conta", url.origin);
       target.searchParams.set("google", "connected");
       return clearStateCookie(mutableRedirect(target));
+    }
+    // Both browser and Android logins reach this point only after Google identity
+    // validation and the existing-account check. Drive-only consent returns above.
+    try {
+      const outcome = await linkAuthAfterVerifiedGoogleLogin(userId, identity);
+      if (outcome !== "SKIPPED") await auditAccess("SUPABASE_AUTH_LINK", userId, { outcome, source: "GOOGLE" });
+    } catch (error) {
+      await auditAccess("SUPABASE_AUTH_LINK", userId,
+        { reason: error instanceof AuthLinkError ? error.code : "UNAVAILABLE", source: "GOOGLE" }, null, "ERRO").catch(() => {});
     }
     if (nativeHandoff) {
       await finishGoogleNativeHandoff(state.pairingHash!, userId);

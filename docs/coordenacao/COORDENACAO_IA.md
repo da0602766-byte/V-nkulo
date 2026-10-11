@@ -17,6 +17,8 @@ Antes de alterar o código, leia este documento e atualize a seção **Trabalho 
 
 ## Trabalho em andamento
 
+Supabase — Codex, 11/10/2026, sobre fonte Sites 378 (`6405e05`). Reserva: nova migração Supabase para funções de claims sem privilégios elevados; `app/lib/supabase-auth-link.ts`, callback Google, `app/components/SupabaseAuthLink.tsx`, testes de vínculo Auth/Google e relatório desta etapa. Retirar SECURITY DEFINER dos dois leitores de claims, validar papéis/claims no banco real e estender o vínculo progressivo ao login Google validado, sem senha artificial, sem trocar sessões/permissões D1. Plano Free confirmado; proteção nativa de senhas vazadas exige Pro e não será contratada. Publicar após testes de conflitos, retomada, isolamento e preservação do login.
+
 Notificações específicas — validação final aprovada. Site: 622 testes, TypeScript/build sem erros. Android 1.20.0/code23, fonte dd921245f44fb3a7b528dd54f194a46d6982e14f, CI 37706298961 aprovada em API29/35, incluindo conteúdos distintos e revogação. APK 634565 bytes/SHA256 545048ed3e986f7146407fb5ccf46e6695db54bc948281c3a311bdb34a0fb520. Publicação em preparação; registros anteriores abaixo descrevem as etapas intermediárias.
 
 Complemento das notificações específicas — distribuição Android 1.20.0: reservar `public/downloads/android-release.json`, `public/downloads/VINKULO_ANDROID_LEIA-ME.txt`, novo APK de homologação e `docs/relatorios/NOTIFICACOES_ESPECIFICAS_2026-10-07.md`. A fonte Android está isolada em `.task-tools/android-notifications`, commit `cf313213a69c231dadc5b44befb87cdc4a3a4020`, CI 37703583269 em execução. Preservar canal estável e assinatura; publicar somente após validação do artefato.
