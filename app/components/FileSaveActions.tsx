@@ -7,8 +7,8 @@ import { storeLocalMedia } from "../lib/local-media";
 import { MAX_COPY_BYTES } from "../lib/file-copy";
 import "../file-saving.css";
 
-export default function FileSaveActions({ source, name = "arquivo", file, ownerId, onSaved, downloadOnly = false, leadingAction, imageToolbar = false }: {
-  source?: string; name?: string; file?: File; ownerId?: number; onSaved?: () => void; downloadOnly?: boolean; leadingAction?: ReactNode; imageToolbar?: boolean;
+export default function FileSaveActions({ source, name = "arquivo", file, ownerId, onSaved, downloadOnly = false, leadingAction, imageToolbar = false, inlineFeedback = false }: {
+  source?: string; name?: string; file?: File; ownerId?: number; onSaved?: () => void; downloadOnly?: boolean; leadingAction?: ReactNode; imageToolbar?: boolean; inlineFeedback?: boolean;
 }) {
   const lock = useRef(false);
   const [busy, setBusy] = useState("");
@@ -63,7 +63,13 @@ export default function FileSaveActions({ source, name = "arquivo", file, ownerI
       if ((error as Error).name !== "AbortError") setNotice({ text: "O celular não abriu a opção de salvar. Toque em Salvar arquivo para tentar novamente.", error: true });
     } finally { lock.current = false; }
   }
-  return <span className={`file-save-actions${imageToolbar ? " file-save-actions--image" : ""}`} aria-busy={Boolean(busy)}>
+  const feedback = notice && <>
+    <strong>{ready ? "Download pronto" : notice.error ? "Não foi possível concluir" : "Fotos e arquivos"}</strong><p>{notice.text}</p>
+    {ready && !inlineFeedback && <button type="button" onClick={() => void save()}>Salvar arquivo</button>}
+    {notice.reconnect && <a href="/painel?view=conta#storage-privacy-title">Conectar Drive</a>}
+  </>;
+  const Container = inlineFeedback ? "div" : "span";
+  return <Container className={`file-save-actions${imageToolbar ? " file-save-actions--image" : ""}`} aria-busy={Boolean(busy)}>
     {leadingAction}
     <button type="button" className={imageToolbar && ready ? "file-save-ready" : undefined} disabled={Boolean(busy)} title={ready ? "Salvar arquivo no aparelho" : "Baixar no aparelho"} onClick={() => void (imageToolbar && ready ? save() : run("download"))}>{imageToolbar && <FeedIcon name="download" />}<span>{busy === "download" ? "Preparando…" : imageToolbar ? (ready ? "Salvar arquivo" : "Baixar") : "Baixar no aparelho"}</span></button>
     {!downloadOnly && <>
@@ -71,10 +77,7 @@ export default function FileSaveActions({ source, name = "arquivo", file, ownerI
       {!source?.startsWith("/local-media/") && <button type="button" disabled={Boolean(busy)} title="Guardar uma cópia neste navegador" onClick={() => void run("local")}>{imageToolbar && <FeedIcon name="browser" />}<span>{busy === "local" ? "Guardando…" : imageToolbar ? "No navegador" : "Guardar no navegador"}</span></button>}
     </>}
     {ready && !imageToolbar && <button type="button" className="file-save-ready" onClick={() => void save()}>Salvar arquivo</button>}
-    {notice && <TransientFeedback tone={notice.error ? "error" : ready || notice.reconnect ? "info" : "success"} noticeKey={`${source || file?.name}:${revision}`} durationMs={ready ? 12000 : undefined} onDismiss={() => setNotice(null)}>
-      <strong>{ready ? "Download pronto" : notice.error ? "Não foi possível concluir" : "Fotos e arquivos"}</strong><p>{notice.text}</p>
-      {ready && <button type="button" onClick={() => void save()}>Salvar arquivo</button>}
-      {notice.reconnect && <a href="/painel?view=conta#storage-privacy-title">Conectar Drive</a>}
-    </TransientFeedback>}
-  </span>;
+    {notice && (inlineFeedback ? <div className="file-save-inline-feedback" role={notice.error ? "alert" : "status"}>{feedback}</div> :
+      <TransientFeedback tone={notice.error ? "error" : ready || notice.reconnect ? "info" : "success"} noticeKey={`${source || file?.name}:${revision}`} durationMs={ready ? 12000 : undefined} onDismiss={() => setNotice(null)}>{feedback}</TransientFeedback>)}
+  </Container>;
 }

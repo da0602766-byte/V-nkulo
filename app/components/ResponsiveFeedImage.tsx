@@ -1,11 +1,10 @@
 "use client";
 import SafeImage from "./SafeImage";
-import FileSaveActions from "./FileSaveActions";
 
 
 import { useEffect, useState } from "react";
 import FeedImageLightbox from "./feed/FeedImageLightbox";
-import FeedIcon from "./feed/FeedIcon";
+import FeedImageActions from "./feed/FeedImageActions";
 
 export default function ResponsiveFeedImage({
   src,
@@ -68,7 +67,7 @@ export default function ResponsiveFeedImage({
         </div>
       ) : failed ? (
         <p className="feed-image-attachment-error" role="alert">
-          A prévia não abriu. O arquivo ainda pode ser baixado.
+          A prévia não abriu. Use as opções da imagem para tentar novamente ou baixar.
         </p>
       ) : (
         <>
@@ -94,21 +93,12 @@ export default function ResponsiveFeedImage({
           </button>
         </>
       )}
-      <div className="feed-media-toolbar" role="group" aria-label="Ações da imagem">
-        <FileSaveActions source={src} name="imagem-da-publicacao" imageToolbar leadingAction={
-        presentation === "photo" && showImage && !failed ? <button type="button" title="Ampliar imagem" onClick={() => setLightboxOpen(true)}><FeedIcon name="expand" /><span>Ampliar</span></button> : (
-        <button
-          type="button"
-          onClick={() => {
-            setFailed(false);
-            setRequestedLoad((current) => !current);
-          }}
-        >
-          <FeedIcon name={requestedLoad ? "close" : "image"} />
-          <span>{requestedLoad ? "Fechar" : "Visualizar"}</span>
-        </button>
-        )} />
-      </div>
+      <FeedImageActions source={src} overlay={showImage && !failed}
+        canEnlarge={showImage && !failed}
+        onView={() => {
+          if (showImage && !failed) setLightboxOpen(true);
+          else { setFailed(false); setLoaded(false); setRequestedLoad(true); }
+        }} />
       {lightboxOpen && <FeedImageLightbox src={src} alt={alt} onClose={() => setLightboxOpen(false)} />}
     </figure>
   );
