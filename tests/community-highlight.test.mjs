@@ -1,0 +1,20 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {runInNewContext} from 'node:vm';
+import ts from 'typescript';
+const transpile=path=>ts.transpileModule(readFileSync(new URL(path,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+const model={};runInNewContext(transpile('../app/lib/community-highlight.ts'),{exports:model,URL});
+const {DEFAULT_COMMUNITY_HIGHLIGHT:defaults,parseCommunityHighlight:parse}=model;
+test('Destaque permite texto, versículo e imagem; exige descrição e rejeita fontes inseguras',()=>{
+ assert.equal(parse({...defaults,verse:'Texto do versículo',reference:'Salmos 133:1'}).reference,'Salmos 133:1');
+ assert.equal(parse({...defaults,imageUrl:'https://example.test/photo.jpg',imageAlt:'Paisagem'}).imageAlt,'Paisagem');
+ for(const imageUrl of ['javascript:alert(1)','data:image/svg+xml,test','//example.test/a','/local-media/1','https://user:pass@example.test/a'])assert.throws(()=>parse({...defaults,imageUrl,imageAlt:'Teste'}));
+ assert.throws(()=>parse({...defaults,imageUrl:'https://example.test/a',imageAlt:''}));
+ assert.throws(()=>parse({...defaults,title:'x'.repeat(121)}));
+ assert.equal(parse({...defaults,enabled:false,title:'',content:''}).enabled,false);
+});
+function fixture(){let allowed=true,cid=7;const rows=new Map(),audit=[];const db={prepare(){let args;return{bind(...values){args=values;return this},async first(){return rows.has(args[0])?{valor:rows.get(args[0])}:null},async run(){rows.set(args[0],args[1])}}}};const route={};runInNewContext(transpile('../app/api/pilot/community-highlight/route.ts'),{exports:route,Response,URL,require:name=>name.endsWith('/db')?{getD1:()=>db}:name.endsWith('/tenant')?{requireTenantPermission:async permission=>!allowed&&permission==='community.theme.manage'?{error:Response.json({error:'Sem acesso'},{status:403})}:{context:{comunidadeId:cid,permissions:allowed?['community.theme.manage']:[],papel:allowed?'ADMIN_COMUNIDADE':'MEMBRO'},user:{id:3}}}:name.endsWith('/tenant-audit')?{recordTenantAudit:async(...args)=>audit.push(args)}:model});return{route,rows,audit,setAllowed:value=>allowed=value,setCommunity:value=>cid=value};}
+const patch=(communityId,highlight)=>new Request('http://localhost/api/pilot/community-highlight',{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({communityId,highlight})});
+test('Conteúdo persiste por comunidade e membro somente consulta',async()=>{const f=fixture();assert.equal((await (await f.route.GET()).json()).highlight.title,defaults.title);assert.equal((await f.route.PATCH(patch(7,{...defaults,title:'Comunidade A'}))).status,200);assert.equal((await(await f.route.GET()).json()).highlight.title,'Comunidade A');f.setCommunity(8);assert.equal((await(await f.route.GET()).json()).highlight.title,defaults.title);assert.equal((await f.route.PATCH(patch(7,defaults))).status,409);f.setAllowed(false);assert.equal((await f.route.PATCH(patch(8,defaults))).status,403);assert.equal((await(await f.route.GET()).json()).canEdit,false);assert.equal(f.rows.size,1);assert.equal(f.audit.length,1);});
+test('Conteúdo inválido não sobrescreve dados salvos',async()=>{const f=fixture();await f.route.PATCH(patch(7,defaults));assert.equal((await f.route.PATCH(patch(7,{...defaults,imageUrl:'javascript:alert(1)'}))).status,400);assert.equal((await(await f.route.GET()).json()).highlight.imageUrl,'');});

@@ -1,4 +1,5 @@
 "use client";
+import { createPortal } from "react-dom";
 import SafeImage from "../SafeImage";
 
 
@@ -21,14 +22,15 @@ export default function FeedImageLightbox({ src, alt, onClose }: { src: string; 
     };
   }, []);
 
-  return (
+  if (typeof document === "undefined") return null;
+  return createPortal(
     <dialog ref={dialogRef} className="feed-image-lightbox" aria-label="Imagem ampliada" onCancel={onClose} onClose={onClose}
       onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <header><span>Imagem da publicação</span><button type="button" autoFocus onClick={onClose} aria-label="Fechar imagem ampliada">× <span>Fechar</span></button></header>
       {failed ? <p role="alert">Não foi possível abrir a imagem. Feche e tente novamente.</p> : (
         // Full resolution is requested only after the user chooses to enlarge.
-        <SafeImage src={src} alt={alt || "Imagem da publicação"} onError={() => setFailed(true)} />
+        <div className="feed-image-lightbox-stage"><SafeImage src={src} alt={alt || "Imagem da publicação"} onError={() => setFailed(true)} /></div>
       )}
-    </dialog>
+    </dialog>, document.body
   );
 }

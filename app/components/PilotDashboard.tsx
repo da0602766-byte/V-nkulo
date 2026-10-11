@@ -1,5 +1,6 @@
 "use client";
 import SafeImage from "./SafeImage";
+import CommunityHighlight from "./CommunityHighlight";
 
 import InviteRevocationList from './InviteRevocationList';
 
@@ -1300,7 +1301,7 @@ export default function PilotDashboard({
             <EditorialSidebarSchedule onOpen={() => window.location.assign("/proprietario?tab=editorial")} />
           )}
           <div className="pilot-sidebar-note"><strong>{allowedMenu.length} áreas disponíveis</strong><p>As demais dependem das permissões do seu perfil.</p></div>
-          {visibleView === "inicio" && <div className="worship-sidebar-art"><small>MAIS QUE UM APP.</small><p>Pessoas reais.<br />Propósito<br /><em>eterno.</em></p><span aria-hidden="true" /><small>Onde a fé encontra<br />uma família.</small></div>}
+          {visibleView === "inicio" && <CommunityHighlight key={active.comunidadeId} communityId={active.comunidadeId} />}
         </aside>
         <section
           className={`pilot-workspace${CENTRAL_VIEWS.includes(visibleView) ? " central-surface" : ""}${viewLoading ? " is-view-loading" : ""}${
@@ -1407,6 +1408,7 @@ export default function PilotDashboard({
           {visibleView === "configuracoes" && (
             <section className="community-central-workspace">
               <header className="workspace-heading"><div><p className="pilot-kicker">GESTÃO DA COMUNIDADE</p><h1>Configurações da comunidade</h1><p>Pessoas, liderança, continuidade, solicitações e preferências reunidas no contexto da comunidade ativa.</p></div></header>
+              {active.permissions.includes("community.theme.manage") && <CommunityHighlight key={`highlight:${active.comunidadeId}`} communityId={active.comunidadeId} editor />}
               <CommunityAdminWorkspace
                 hideManagementHub
                 accessSlot={
