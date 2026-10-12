@@ -1,4 +1,6 @@
 "use client";
+import CommunitySignature from "./CommunitySignature";
+import FeedPrayer from "./FeedPrayer";
 import SafeImage from "./SafeImage";
 
 
@@ -108,6 +110,7 @@ type ReplacementCandidate = {
 };
 
 export default function CommunityHome({
+  communityId,
   communityName,
   communitySlug,
   permissions,
@@ -119,6 +122,7 @@ export default function CommunityHome({
   onNavigate,
   readOnlyFeed = false,
 }: {
+  communityId: number;
   communityName: string;
   communitySlug: string;
   permissions: string[];
@@ -651,7 +655,7 @@ export default function CommunityHome({
           <h2>Fé que conecta pessoas.<br />Comunidade que <em>transforma.</em></h2>
           <p className="worship-community-name">{communityName}</p>
         </div>
-        <Link className="worship-signature" href={`/comunidades/${communitySlug}`} aria-label={`Página pública de ${communityName}`}>Juntos, por<br />algo maior.<FeedIcon name="heart" /></Link>
+        <CommunitySignature communityId={communityId} communityName={communityName} communitySlug={communitySlug}/>
       </header>
       </div></div>
       {!readOnlyFeed && <nav className="worship-context-nav" aria-label="Acontece na comunidade">
@@ -1259,7 +1263,7 @@ export default function CommunityHome({
             )}
           </section>}
 
-          <section className="worship-prayer"><FeedIcon name="heart" /><h2>Cuidar também é estar presente.</h2><p>Compartilhe seu pedido com quem pode caminhar com você.</p><button type="button" onClick={() => onNavigate?.("solicitacoes", true)}><FeedIcon name="plus" />Fazer um pedido</button></section>
+          <FeedPrayer communityId={communityId} currentUserId={currentUserId}/>
           <CommunityPresencePanel />
         </aside>}
       </div>

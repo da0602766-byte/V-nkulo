@@ -76,11 +76,20 @@ test("Pedidos V213 protege notas, permissões e comunidades durante todo o atend
   const southCookie = await login(worker, env, "sul.v213@example.test");
 
   const created = await call(worker, env, memberCookie, "/api/pilot/solicitacoes", {
+    feedPrayer: true, communityId: 1,
     tipo: "ORACAO", titulo: "Oração pela família V213", descricao: "Pedido privado para acompanhamento da família.",
     visibilidade: "PRIVADA", preferenciaContato: "WHATSAPP", disponibilidade: "No período da noite", contatoAutorizado: true,
   }, "POST");
   assert.equal(created.response.status, 201);
   const requestId = Number(created.data.id);
+  assert.equal(created.data.prayer.id, requestId);
+  assert.equal((await call(worker, env, memberCookie, "/api/pilot/solicitacoes", {feedPrayer:true,communityId:2,tipo:"ORACAO",titulo:"Comunidade errada",descricao:"Não deve criar na comunidade errada."}, "POST")).response.status,409);
+  const ownFeed = await call(worker, env, memberCookie, "/api/pilot/solicitacoes?feedPrayer=1");
+  assert.equal(ownFeed.data.items[0].id,requestId);
+  for (const cookie of [otherCookie,southCookie,pastorCookie]) {
+    const otherFeed = await call(worker,env,cookie,"/api/pilot/solicitacoes?feedPrayer=1");
+    assert.equal(otherFeed.data.items.some(item=>item.id===requestId),false);
+  }
 
   const own = await call(worker, env, memberCookie, "/api/pilot/solicitacoes");
   assert.equal(own.response.status, 200);
@@ -120,6 +129,9 @@ test("Pedidos V213 protege notas, permissões e comunidades durante todo o atend
     proximoRetornoEm: "2027-01-10T19:00:00.000Z", mensagemAtendimento: "Seguimos em oração com você.",
   });
   assert.equal(update.response.status, 200);
+  const updatedFeed = await call(worker,env,memberCookie,"/api/pilot/solicitacoes?feedPrayer=1");
+  assert.equal(updatedFeed.data.items[0].status,"EM_ORACAO");
+  assert.doesNotMatch(JSON.stringify(updatedFeed.data),/Conteúdo interno protegido/);
   const answered = await call(worker, env, memberCookie, "/api/pilot/solicitacoes", {
     action: "CONFIRMAR_ORACAO_ATENDIDA", id: requestId, testemunho: "Resposta recebida.", testemunhoPermissao: "NAO_PERMITIR",
   });

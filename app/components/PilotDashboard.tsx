@@ -1335,6 +1335,7 @@ export default function PilotDashboard({
             onNotifications={() => window.dispatchEvent(new CustomEvent("vinkulo:open-notifications"))} />}
           {visibleView === "inicio" && !accessDeniedView && (
             <CommunityHome
+              communityId={active.comunidadeId}
               key={active.comunidadeId}
               communityName={active.comunidadeNome}
               communitySlug={active.comunidadeSlug}

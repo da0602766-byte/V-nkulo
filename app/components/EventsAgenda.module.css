@@ -275,3 +275,24 @@
   .dayDialog :global(.agenda-form) { grid-template-columns: minmax(0, 1fr); }
 }
 
+
+.dayDialog .eventDialogForm > :global(.event-form){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 24px;box-shadow:none!important}
+.dayDialog .eventDialogForm :global(.event-form)>label{padding:0!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important;display:grid;align-content:start;gap:7px;font-size:13px;font-weight:600;min-width:0}
+.dayDialog .eventDialogForm :global(.event-form) :is(input:not([type="checkbox"]),select,textarea){box-sizing:border-box;width:100%;min-width:0;min-height:44px;height:auto;padding:10px 2px!important;border:0!important;border-bottom:1px solid var(--pilot-line)!important;border-radius:0!important;box-shadow:none!important;background:transparent!important;color:var(--pilot-text)!important;font:inherit;font-size:16px}
+.dayDialog .eventDialogForm :global(.event-form) textarea{resize:vertical;min-height:100px}
+.dayDialog .eventDialogForm :global(.event-form) label>small{font-size:11px;line-height:1.5;font-weight:400;color:var(--pilot-muted)}
+.dayDialog .eventDialogForm :global(.event-form) :global(.event-wide-field){grid-column:1/-1}
+.dayDialog .eventDialogForm :global(.event-form)>:global(.event-checkbox){display:flex;align-items:center;gap:10px;min-height:44px;padding-top:20px!important}
+.dayDialog .eventDialogForm :global(.event-checkbox) input{width:18px;height:18px;margin:0;accent-color:var(--pilot-primary)}
+.dayDialog .eventDialogForm :global(.event-poll-field){margin:0;padding:16px 0!important;border:0!important;border-top:1px solid var(--pilot-line)!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}
+.dayDialog .eventDialogForm :global(.event-poll-field) legend{font-size:13px;font-weight:650;padding:0 8px 0 0}
+.dayDialog .eventDialogForm :global(.event-poll-toggle){display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;min-height:44px;padding:4px 0!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important;text-align:left}
+.dayDialog .eventDialogForm :global(.event-poll-toggle) :is(strong,small,em){color:var(--pilot-text)!important;background:none!important}
+.dayDialog .eventDialogForm :global(.event-poll-toggle-copy) small{display:block;color:var(--pilot-muted)!important;font-size:12px;font-weight:400!important;margin-top:4px}
+.dayDialog .eventDialogForm :global(.event-poll-toggle-icon){display:none}.dayDialog .eventDialogForm :global(.event-poll-toggle-action){background:none!important;padding:0!important;box-shadow:none!important}.dayDialog .eventDialogForm :global(.event-poll-toggle-action) b{background:none!important;color:var(--pilot-primary)!important}
+.dayDialog .eventDialogForm :global(.event-poll-builder),.dayDialog .eventDialogForm :global(.event-poll-option-list){padding:12px 0!important;border:0!important;box-shadow:none!important;background:none!important}
+.dayDialog .eventDialogForm :global(.event-form-actions){grid-column:1/-1;padding-top:16px;border-top:1px solid var(--pilot-line);display:flex;justify-content:flex-end;gap:10px}
+@media(max-width:600px){.dayDialog .eventDialogForm > :global(.event-form){grid-template-columns:1fr;gap:18px}.dayDialog .eventDialogForm :global(.event-form)>:global(.event-checkbox){padding-top:0!important}}
+.dayDialog .eventDialogForm :global(.event-form)>label:has(input[name="titulo"]){grid-column:auto}
+:global(.pilot-dashboard[data-ui-version="v2"]) .dayDialog .eventDialogForm button:global(.event-poll-toggle){background:transparent!important;color:var(--pilot-text)!important}
+:global(.pilot-dashboard[data-ui-version="v2"]) .dayDialog .eventDialogForm :global(.event-poll-toggle) :is(strong,small,em,b){color:var(--pilot-text)!important;background:transparent!important;border:0!important}
