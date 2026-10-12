@@ -44,3 +44,5 @@ body:has(.app-toast-viewport) .global-feedback-launcher { bottom: var(--app-feed
   .app-toast-viewport.has-active-notice .app-toast-stack { max-height: 36dvh; overflow-y: auto; overscroll-behavior: contain; }
   body:has(.app-toast-viewport.has-active-notice) .global-feedback-launcher { visibility: hidden; }
 }
+
+.app-toast-card .app-toast-close{flex:0 0 auto;width:auto;min-width:72px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:6px 10px;border:1px solid var(--toast-line);font-size:12px;font-weight:700;white-space:nowrap}.app-toast-close span{font-size:20px}

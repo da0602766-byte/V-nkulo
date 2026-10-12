@@ -24,6 +24,7 @@ export function CentralNavigation({ communityName, roleLabel, current, allowed, 
   const items = CENTRAL_VIEWS.filter(id => allowed.includes(id));
   const primary = items.filter(id => !["conta","continuidade","configuracoes"].includes(id));
   const secondary = items.filter(id => ["conta","continuidade","configuracoes"].includes(id));
+  if(current === "configuracoes") return <div className="settings-context"><a href="/painel?view=comunidade">← Central da Comunidade</a><span>{communityName}</span><small>{roleLabel}</small></div>;
   return <div className="central-masthead">
     <div className="central-context"><span>{communityName}</span><span className="central-role-badge">{roleLabel}</span></div>
     <h1>Central da Comunidade</h1>

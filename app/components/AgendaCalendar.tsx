@@ -89,7 +89,9 @@ export default function AgendaCalendar({
   podeAprovar,
   aoCriarEvento,
   atualizacao = 0,
+  headingContent,
 }: {
+  headingContent?: React.ReactNode;
   podeVerEventos: boolean;
   podeAprovar: boolean;
   // Quem hospeda o calendário decide o que "criar evento" faz; aqui só existe
@@ -326,6 +328,7 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
   return (
     <section className={`agenda-calendario agenda-studio ${styles.calendar}`} aria-label="Calendário da agenda">
       <header className="agenda-calendario-topo">
+        {headingContent}
         <div className="agenda-calendario-periodo">
           <button type="button" onClick={() => mover(-1)} aria-label="Período anterior">‹</button>
           <button type="button" onClick={() => mover(1)} aria-label="Próximo período">›</button>

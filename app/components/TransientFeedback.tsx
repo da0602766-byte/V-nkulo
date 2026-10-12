@@ -60,7 +60,7 @@ function ToastCard({ entry, history = false }: { entry: FeedbackEntry<ReactNode>
     onFocusCapture={() => setFocused(true)} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false); }}>
     <span className="app-toast-symbol" aria-hidden="true">{entry.tone === "error" ? "!" : entry.tone === "success" ? "✓" : "i"}</span>
     <div className="app-toast-content">{entry.content}</div>
-    {!history && <button type="button" className="app-toast-close" aria-label="Dispensar aviso" onClick={() => store.dismiss(entry.fingerprint)}>×</button>}
+    {!history && <button type="button" className="app-toast-close" aria-label="Fechar aviso" title="Fechar este aviso" onClick={() => store.dismiss(entry.fingerprint)}><span aria-hidden="true">×</span> Fechar</button>}
   </div>;
 }
 

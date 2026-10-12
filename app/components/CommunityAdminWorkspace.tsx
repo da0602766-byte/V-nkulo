@@ -39,6 +39,7 @@ export default function CommunityAdminWorkspace({
   canConfigureParking = false,
   canManageRegistrationLinks = false,
   accessSlot = null,
+  contentSlot = null,
 }: {
   managementItems: ManagementItem[];
   hideManagementHub?: boolean;
@@ -48,6 +49,7 @@ export default function CommunityAdminWorkspace({
   canConfigureParking?: boolean;
   canManageRegistrationLinks?: boolean;
   accessSlot?: React.ReactNode;
+  contentSlot?: React.ReactNode;
 }) {
   const [requests, setRequests] = useState<JoinRequest[]>([]);
   const [parkingActive, setParkingActive] = useState(false);
@@ -59,7 +61,7 @@ export default function CommunityAdminWorkspace({
   const [parkingLoadError, setParkingLoadError] = useState("");
   const [requestSearch, setRequestSearch] = useState("");
   const [requestStatus, setRequestStatus] = useState("");
-  const [visitedSections, setVisitedSections] = useState<string[]>(["atalhos", ...(hideManagementHub && canManageCommunity ? ["aparencia"] : [])]);
+  const [visitedSections, setVisitedSections] = useState<string[]>(["atalhos", ...(contentSlot ? ["conteudo"] : []), ...(hideManagementHub && canManageCommunity ? ["aparencia"] : [])]);
   const mutationRef = useRef(false);
   const [working, setWorking] = useState<number | "config" | null>(null);
   const [feedback, setFeedback] = useState("");
@@ -179,6 +181,7 @@ export default function CommunityAdminWorkspace({
     () =>
       [
         { id: "atalhos" as const, label: "Áreas da comunidade", visivel: !hideManagementHub },
+        { id: "conteudo" as const, label: "Mensagens e imagens", visivel: Boolean(contentSlot) },
         { id: "aparencia" as const, label: "Aparência", visivel: canManageCommunity },
         { id: "acessos" as const, label: "Acessos", visivel: canManageRegistrationLinks || Boolean(accessSlot) },
         { id: "modulos" as const, label: "Módulos", visivel: canConfigureParking },
@@ -190,9 +193,9 @@ export default function CommunityAdminWorkspace({
           contador: requestsLoading || requestsLoadError ? undefined : requests.filter((item) => item.status === "PENDENTE").length,
         },
       ].filter((secao) => secao.visivel),
-    [hideManagementHub, accessSlot, canConfigureParking, canManageCommunity, canManageRegistrationLinks, canManageRequests, requests, requestsLoading, requestsLoadError],
+    [contentSlot, hideManagementHub, accessSlot, canConfigureParking, canManageCommunity, canManageRegistrationLinks, canManageRequests, requests, requestsLoading, requestsLoadError],
   );
-  const [secao, setSecao] = useState<string>(hideManagementHub ? canManageCommunity ? "aparencia" : canManageRegistrationLinks || accessSlot ? "acessos" : canConfigureParking ? "modulos" : "solicitacoes" : "atalhos");
+  const [secao, setSecao] = useState<string>(contentSlot ? "conteudo" : hideManagementHub ? canManageCommunity ? "aparencia" : canManageRegistrationLinks || accessSlot ? "acessos" : canConfigureParking ? "modulos" : "solicitacoes" : "atalhos");
   const secaoAtiva = secoes.some((item) => item.id === secao) ? secao : secoes[0]?.id || "";
 
   const visibleRequests = requests.filter((item) => (!requestStatus || item.status === requestStatus) && matchesDirectorySearch(requestSearch, item.nome, item.email));
@@ -200,6 +203,7 @@ export default function CommunityAdminWorkspace({
   return (
     <div className="community-admin-extra">
       {!secoes.length && <p className="central-empty">Seu perfil não possui configurações administrativas. Seus dados pessoais estão em Perfil e conta.</p>}
+      {secoes.length>0&&<label className="settings-mobile-subject">Assunto<select value={secaoAtiva} onChange={event=>{const id=event.target.value;setSecao(id);setVisitedSections(current=>current.includes(id)?current:[...current,id]);}}>{secoes.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</select></label>}
       <nav className="community-settings-nav-v5" aria-label="Assuntos das configurações">
         {secoes.map((item) => (
           <button
@@ -247,6 +251,7 @@ export default function CommunityAdminWorkspace({
       </section>
       )}
 
+      {contentSlot && <div className="community-settings-section" hidden={secaoAtiva !== "conteudo"}>{contentSlot}</div>}
       {visitedSections.includes("aparencia") && canManageCommunity && <div className="community-settings-section" hidden={secaoAtiva !== "aparencia"}><CommunityThemeEditor active={secaoAtiva === "aparencia"} /></div>}
 
       {secaoAtiva === "privacidade" && canManageCommunity && (
@@ -315,7 +320,7 @@ export default function CommunityAdminWorkspace({
         </header>
         <div className="community-request-filters">
           <label>Buscar pessoa ou e-mail<input type="search" value={requestSearch} onChange={(event) => setRequestSearch(event.target.value)} placeholder="Nome ou e-mail" /></label>
-          <label>Situação<select value={requestStatus} onChange={(event) => setRequestStatus(event.target.value)}><option value="">Todas</option><option value="PENDENTE">Aguardando análise</option><option value="APROVADA">Aprovadas</option><option value="RECUSADA">Recusadas</option></select></label>
+          <label>Situação<select name="situacao" value={requestStatus} onChange={(event) => setRequestStatus(event.target.value)}><option value="">Todas</option><option value="PENDENTE">Aguardando análise</option><option value="APROVADA">Aprovadas</option><option value="RECUSADA">Recusadas</option></select></label>
           {(requestSearch || requestStatus) && <button type="button" onClick={() => { setRequestSearch(""); setRequestStatus(""); }}>Limpar filtros</button>}
         </div>
         {requestsLoading ? <p role="status">Carregando solicitações…</p> : requestsLoadError ? <div className="community-settings-error"><p role="alert">{requestsLoadError}</p><button type="button" onClick={() => void loadRequests()}>Tentar novamente</button></div> : <>

@@ -58,7 +58,7 @@ test('Solicitações não apresenta vazio antes da resposta e permite filtrar po
  const f=settings();button(f.render(),'Solicitações de entrada').props.onClick();assert.doesNotMatch(text(f.render()),/Nenhuma solicitação/);
  await reply(f.requests[0],{solicitacoes:[{id:1,nome:'João',email:'j@example.invalid',status:'PENDENTE',solicitado_em:'2026-10-08'},{id:2,nome:'Maria',email:'m@example.invalid',status:'APROVADA',solicitado_em:'2026-10-08'}]});
  change(find(f.render(),'input',n=>n.props.type==='search'),'joao');assert.match(text(f.render()),/João/);assert.doesNotMatch(text(f.render()),/Maria/);
- change(find(f.render(),'select'),'APROVADA');assert.match(text(f.render()),/Nenhuma solicitação para estes filtros/);
+ change(find(f.render(),'select',n=>n.props.name==='situacao'),'APROVADA');assert.match(text(f.render()),/Nenhuma solicitação para estes filtros/);
  button(f.render(),'Limpar filtros').props.onClick();assert.match(text(f.render()),/Maria/);
 });
 test('Aprovação em andamento bloqueia envio duplicado',async()=>{

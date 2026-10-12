@@ -1372,7 +1372,7 @@ export default function PilotDashboard({
             />
           )}
           {visibleView === "solicitacoes" && (
-            <RequestsWorkspace communityName={active.comunidadeNome} />
+            <RequestsWorkspace key={active.comunidadeId} communityId={active.comunidadeId} communityName={active.comunidadeNome} />
           )}
           {visibleView === "mensagens" && <PrivateChatWorkspace initialTargetUserId={chatTargetUserId} />}
           {visibleView === "celulas" && (
@@ -1407,10 +1407,10 @@ export default function PilotDashboard({
           )}
           {visibleView === "conta" && <AccountProfileWorkspace />}
           {visibleView === "configuracoes" && (
-            <section className="community-central-workspace">
-              <header className="workspace-heading"><div><p className="pilot-kicker">GESTÃO DA COMUNIDADE</p><h1>Configurações da comunidade</h1><p>Pessoas, liderança, continuidade, solicitações e preferências reunidas no contexto da comunidade ativa.</p></div></header>
-              {active.permissions.includes("community.theme.manage") && <CommunityHighlight key={`highlight:${active.comunidadeId}`} communityId={active.comunidadeId} editor />}
+            <section className="community-central-workspace settings-redesign">
+              <header className="settings-heading"><div><h1>Configurações</h1><p>Escolha um assunto. As alterações valem para {active.comunidadeNome}.</p></div><a href="/painel?view=conta">Meu perfil e conta →</a></header>
               <CommunityAdminWorkspace
+                contentSlot={active.permissions.includes("community.theme.manage") ? <CommunityHighlight key={`highlight:${active.comunidadeId}`} communityId={active.comunidadeId} editor /> : null}
                 hideManagementHub
                 accessSlot={
                   active.permissions.includes("invites.manage") ? (

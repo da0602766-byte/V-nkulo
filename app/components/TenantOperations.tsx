@@ -173,6 +173,7 @@ export function VisitorsWorkspace({
   permissions: string[];
   communityName: string;
 }) {
+  const [introOpen, setIntroOpen] = useState(false);
   const [visitors, setVisitors] = useState<Visitor[]>([]);
   const [cells, setCells] = useState<Cell[]>([]);
   const [followups, setFollowups] = useState<Followup[]>([]);
@@ -1119,7 +1120,8 @@ export function VisitorsWorkspace({
       {/* O invólucro é o mesmo de Ministérios: compor `secretary-workspace` dá o
           herói, o fluxo, as abas em pílula, a grade de resumo e os cartões sem
           recriar nada. `visitors.css` só acrescenta o que é próprio desta aba. */}
-      <header className="secretary-hero visitor-hero-v7">
+      <header className="visitor-compact-heading"><h1>Visitantes</h1><button type="button" aria-expanded={introOpen} aria-controls="visitor-introduction" onClick={()=>setIntroOpen(v=>!v)}>{introOpen?"Recolher apresentação −":"Sobre o relacionamento +"}</button></header>
+      <header id="visitor-introduction" hidden={!introOpen} className="secretary-hero visitor-hero-v7">
         <div className="secretary-hero-copy">
           <p className="pilot-kicker">VISITANTES · {communityName}</p>
           <h1>Relacionamento</h1>

@@ -1,4 +1,5 @@
 "use client";
+import PrayerWelcomeArt from "./PrayerWelcomeArt";
 import SafeImage from "./SafeImage";
 
 
@@ -94,7 +95,7 @@ function buildOperationalAddress(path: string, filters: Record<string, string>, 
   return address;
 }
 
-export default function RequestsWorkspace({ communityName }: { communityName: string }) {
+export default function RequestsWorkspace({ communityName, communityId }: { communityName: string; communityId?:number }) {
   const [items, setItems] = useState<CommunityRequest[]>([]);
   // Alimenta só "Meus pedidos" (todos os tipos, sem filtro) — o painel de
   // Atendimento usa a fila à parte abaixo (opsGeneralItems), já filtrada
@@ -554,7 +555,7 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
     {mode === "member" ? <div className="request-member-view">
       <section className="request-welcome" data-guide="request-start-guide" aria-labelledby="request-welcome-title">
         <div><span className="request-welcome-mark" aria-hidden="true"><RequestIcon type="heart" /></span><p className="pilot-kicker">Comece por aqui · UM ESPAÇO SEGURO</p><h2 id="request-welcome-title">Estamos com você</h2><p>Sua vida importa. Aqui você encontra uma comunidade que ora, acolhe e caminha junto com você.</p></div>
-        <div className="request-welcome-art" aria-hidden="true"><span /><i>Juntos em oração</i></div>
+        <PrayerWelcomeArt communityId={communityId}/>
       </section>
       <section className="request-primary-actions" aria-label="Criar um pedido">
         <button type="button" onClick={() => openCreate("ORACAO")}><span><RequestIcon type="prayer" /></span><div><strong>Pedido de oração</strong><small>Compartilhe sua intenção. Vamos orar por você.</small></div><b aria-hidden="true">›</b></button>

@@ -426,19 +426,6 @@ export default function EventsWorkspace({
 
   return (
     <section className={`events-workspace events-studio ${styles.workspace}`}>
-      <header className={styles.titlebar}>
-        <h1>Agenda</h1>
-        <button
-          type="button"
-          className={styles.introToggle}
-          aria-expanded={introOpen}
-          aria-controls={introId}
-          onClick={() => setIntroOpen((value) => !value)}
-        >
-          {introOpen ? "Fechar resumo" : "Sobre"}
-          <span aria-hidden="true">{introOpen ? "−" : "+"}</span>
-        </button>
-      </header>
       <div id={introId} className={styles.intro} data-open={introOpen} aria-hidden={!introOpen} inert={!introOpen}>
         <div className={styles.introClip}>
           <div className={styles.introContent}>
@@ -458,6 +445,19 @@ export default function EventsWorkspace({
           comunidade, as escalas desta pessoa e os compromissos que ela mesma
           marcou. A lista de gestão de eventos continua abaixo. */}
       <AgendaCalendar
+        headingContent={<div className={styles.titlebar}>
+        <h1>Agenda</h1>
+        <button
+          type="button"
+          className={styles.introToggle}
+          aria-expanded={introOpen}
+          aria-controls={introId}
+          onClick={() => setIntroOpen((value) => !value)}
+        >
+          {introOpen ? "Fechar resumo" : "Sobre"}
+          <span aria-hidden="true">{introOpen ? "−" : "+"}</span>
+        </button>
+      </div>}
         atualizacao={agendaRevision}
         podeVerEventos={permissions.includes("events.view")}
         podeAprovar={canManage}
@@ -482,11 +482,13 @@ export default function EventsWorkspace({
       {canManage && eventFormOpen && (
         <AgendaDialog title={editing ? `Editar: ${editing.titulo}` : "Novo evento"} wide busy={workingId === "form"} onClose={() => setEventFormOpen(false)} key={editing?.id || `new-${newEventDraft}`}>
         <div className={styles.eventDialogForm}>
-          <form className="pilot-form event-form" onSubmit={saveEvent}>
+          <form className="pilot-form event-form" onSubmit={saveEvent} onInvalidCapture={event=>{const parent=(event.target as HTMLElement).closest("details");if(parent)parent.open=true;}}>
+            <div className="event-form-section-title"><span>01</span><div><h3>Sobre o encontro</h3><p>Nome e categoria do evento.</p></div></div>
             <label className="event-wide-field">
               Título*
               <input
                 name="titulo"
+                placeholder="Ex.: Culto de celebração"
                 required
                 maxLength={140}
                 defaultValue={editing?.titulo || ""}
@@ -505,6 +507,7 @@ export default function EventsWorkspace({
                 ))}
               </select>
             </label>
+            <div className="event-form-section-title"><span>02</span><div><h3>Quando e onde</h3><p>Defina os horários e a capacidade.</p></div></div>
             <label>
               Início*
               <input
@@ -526,6 +529,7 @@ export default function EventsWorkspace({
               Local
               <input
                 name="local"
+                placeholder="Ex.: Templo principal"
                 maxLength={180}
                 defaultValue={editing?.local || ""}
               />
@@ -534,12 +538,14 @@ export default function EventsWorkspace({
               Capacidade
               <input
                 name="capacidade"
+                placeholder="Sem limite definido"
                 type="number"
                 min={1}
                 max={100000}
                 defaultValue={editing?.capacidade || ""}
               />
             </label>
+            <details className="event-advanced event-wide-field" open={Boolean(editing?.escalas_abrem_em || editing?.reservas_abrem_em)}><summary>Liberação de escalas e estacionamento <small>Opcional</small></summary><div>
             <label>
               Escalas disponíveis em
               <input
@@ -558,6 +564,8 @@ export default function EventsWorkspace({
               />
               <small>Somente pessoas confirmadas poderão reservar após este horário.</small>
             </label>
+            </div></details>
+            <div className="event-form-section-title"><span>03</span><div><h3>Publicação</h3><p>Escolha como o evento será apresentado.</p></div></div>
             <label>
               Status
               <select name="status" defaultValue={editing?.status || "RASCUNHO"}>
@@ -573,7 +581,7 @@ export default function EventsWorkspace({
               />
               Exibir na página pública
             </label>
-            <fieldset className={`event-poll-field event-wide-field ${pollEnabled ? "is-enabled" : ""}`}>
+            <details className="event-advanced event-wide-field" open={pollEnabled}><summary>Votação do evento <small>Opcional</small></summary><fieldset className={`event-poll-field event-wide-field ${pollEnabled ? "is-enabled" : ""}`}>
               <legend>Votação</legend>
               <button
                 type="button"
@@ -637,11 +645,12 @@ export default function EventsWorkspace({
                   </div>
                 </div>
               )}
-            </fieldset>
+            </fieldset></details>
             <label className="event-wide-field">
               Descrição
               <textarea
                 name="descricao"
+                placeholder="O que os participantes precisam saber?"
                 rows={4}
                 maxLength={2000}
                 defaultValue={editing?.descricao || ""}

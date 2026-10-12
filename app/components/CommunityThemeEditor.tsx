@@ -147,10 +147,10 @@ export default function CommunityThemeEditor({ active = true }: { active?: boole
           style={{ background: `linear-gradient(135deg, ${palette.dark.primary}, ${palette.dark.accent})` }}
         />
       </header>
-      <form onSubmit={save}>
+      <form onSubmit={save} onInvalidCapture={event=>{const parent=(event.target as HTMLElement).closest("details");if(parent)parent.open=true;}}>
         {canEditProfile && (
-          <div className="community-theme-block community-theme-identity">
-            <header><span aria-hidden="true">⌂</span><div><strong>Identidade</strong><small>Informações exibidas no perfil público.</small></div></header>
+          <details open className="community-theme-block community-theme-identity">
+            <summary><span aria-hidden="true">⌂</span><div><strong>Identidade</strong><small>Informações exibidas no perfil público.</small></div></summary>
             <div className="community-profile-fields">
               <label>
                 Nome da comunidade
@@ -165,10 +165,10 @@ export default function CommunityThemeEditor({ active = true }: { active?: boole
                 <textarea name="descricao" required minLength={20} maxLength={600} rows={3} defaultValue={community.descricao} />
               </label>
             </div>
-          </div>
+          </details>
         )}
-        <div className="community-theme-block community-theme-palette">
-          <header><span aria-hidden="true">◐</span><div><strong>Paleta</strong><small>Cores testadas nos modos claro, escuro e automático.</small></div></header>
+        <details className="community-theme-block community-theme-palette">
+          <summary><span aria-hidden="true">◐</span><div><strong>Paleta</strong><small>Cores testadas nos modos claro, escuro e automático.</small></div></summary>
           <div className="community-palette-grid">
             {COMMUNITY_PALETTES.map((item) => (
               <button type="button" aria-pressed={paletteId === item.id} title={item.description} className={paletteId === item.id ? "active" : ""} key={item.id} onClick={() => setPaletteId(item.id)}>
@@ -178,9 +178,9 @@ export default function CommunityThemeEditor({ active = true }: { active?: boole
             ))}
           </div>
           <p className="community-palette-description">{palette.name}: {palette.description}</p>
-        </div>
-        <div className="community-theme-block community-theme-media">
-          <header><span aria-hidden="true">▧</span><div><strong>Imagens</strong><small>Avatar, banner e papel de parede otimizados para computador e celular.</small></div></header>
+        </details>
+        <details className="community-theme-block community-theme-media">
+          <summary><span aria-hidden="true">▧</span><div><strong>Imagens</strong><small>Avatar, banner e papel de parede otimizados para computador e celular.</small></div></summary>
           <NativeImageUpload label="Foto ou avatar da comunidade" value={logoUrl} purpose="community-logo" onChange={setLogoUrl} />
           <NativeImageUpload label="Imagem de fundo ou banner (opcional)" value={bannerUrl} purpose="community-banner" onChange={setBannerUrl} />
           {data.canEditWallpaper && (
@@ -193,13 +193,13 @@ export default function CommunityThemeEditor({ active = true }: { active?: boole
               onChange={setWallpaperUrl}
             />
           )}
-        </div>
+        </details>
         <footer className="community-theme-footer">
           {message && <TransientFeedback className="operations-feedback" role="status">{message}</TransientFeedback>}
           <button type="submit" disabled={saving}>{saving ? "Salvando…" : "Salvar configurações"}</button>
         </footer>
       </form>
-      <CommunityStoryEditor />
+      <details className="settings-story"><summary>História e apresentação pública</summary><CommunityStoryEditor /></details>
     </section>
   );
 }
