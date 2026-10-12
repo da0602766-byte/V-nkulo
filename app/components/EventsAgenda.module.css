@@ -262,8 +262,8 @@
   .calendar:global(.agenda-studio) .layers :global(.agenda-camada) > .layerLabel { display: none; }
   .calendar:global(.agenda-studio) .layers :global(.agenda-camada) > .layerShort { display: inline; }
   .calendar:global(.agenda-studio) :global(.agenda-calendario-acoes) { width: auto; }
-  .calendar:global(.agenda-studio) :global(.agenda-calendario-visoes) { width: 100%; }
-  .calendar:global(.agenda-studio) :global(.agenda-calendario-visoes) button { flex: 1; }
+  .calendar:global(.agenda-studio) :global(.agenda-calendario-visoes) { width: max-content; }
+  .calendar:global(.agenda-studio) :global(.agenda-calendario-visoes) button { flex: 0 0 auto; }
   html body .workspace :global(.agenda-dia) { min-height: clamp(64px, 9dvh, 84px) !important; }
   .dayChoices { grid-template-columns: 1fr; }
   .dayChoices button { min-height: 68px; }
