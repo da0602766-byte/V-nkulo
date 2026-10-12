@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import styles from "./EventsAgenda.module.css";
 import TransientFeedback from "./TransientFeedback";
+import AgendaDialog from "./AgendaDialog";
+import { readAgendaJson, AgendaRequestError, agendaErrorMessage } from "../lib/agenda-request";
 
 type Camada = "EVENTO" | "ESCALA" | "PESSOAL";
 
@@ -53,7 +55,8 @@ function gradeDoMes(referencia: Date) {
   const primeiro = new Date(referencia.getFullYear(), referencia.getMonth(), 1);
   const inicio = new Date(primeiro);
   inicio.setDate(1 - primeiro.getDay());
-  return Array.from({ length: 42 }, (_, i) => {
+  const total = Math.ceil((primeiro.getDay() + new Date(referencia.getFullYear(), referencia.getMonth() + 1, 0).getDate()) / 7) * 7;
+  return Array.from({ length: total }, (_, i) => {
     const dia = new Date(inicio);
     dia.setDate(inicio.getDate() + i);
     return dia;
@@ -138,16 +141,9 @@ export default function AgendaCalendar({
       const de = inicioDoDia(dias[0]);
       const ate = new Date(dias[dias.length - 1]);
       ate.setHours(23, 59, 59, 999);
-      const resposta = await fetch(
-        `/api/pilot/agenda?de=${encodeURIComponent(de.toISOString())}&ate=${encodeURIComponent(ate.toISOString())}`,
-        { cache: "no-store", signal: request.signal },
+      const dados = await readAgendaJson<{ itens?: ItemAgenda[] }>(
+        `/api/pilot/agenda?de=${encodeURIComponent(de.toISOString())}&ate=${encodeURIComponent(ate.toISOString())}`, request.signal,
       );
-      if (!resposta.ok && resposta.status < 500) preserveData = false;
-      const dados = (await resposta.json()) as { itens?: ItemAgenda[]; error?: string };
-      if (!resposta.ok) {
-        // Never retain private content after authentication/access is revoked.
-        throw new Error(dados.error || "Não foi possível carregar a agenda.");
-      }
       if (!request.signal.aborted) {
         loadedRangeRef.current = rangeKey;
         setLoadedRange(rangeKey);
@@ -156,7 +152,8 @@ export default function AgendaCalendar({
       }
     } catch (motivo) {
       if (request.signal.aborted) return;
-      setErroCarregamento(motivo instanceof Error ? motivo.message : "Não foi possível carregar a agenda.");
+      if (motivo instanceof AgendaRequestError && motivo.status >= 400 && motivo.status < 500) preserveData = false;
+      setErroCarregamento(agendaErrorMessage(motivo));
       if (!preserveData) {
         loadedRangeRef.current = "";
         setLoadedRange("");
@@ -175,6 +172,11 @@ export default function AgendaCalendar({
     return () => window.clearTimeout(timer);
   }, [carregar, atualizacao]);
 
+  useEffect(() => {
+    const resume = () => { if (document.visibilityState === "visible") void carregar(); };
+    window.addEventListener("online", resume); document.addEventListener("visibilitychange", resume);
+    return () => { window.removeEventListener("online", resume); document.removeEventListener("visibilitychange", resume); };
+  }, [carregar]);
   const visiveis = useMemo(
     () => itens.filter((item) => camadasAtivas.includes(item.camada)),
     [itens, camadasAtivas],
@@ -212,11 +214,11 @@ export default function AgendaCalendar({
   }
 
   function abrirCompromisso(dia = chaveDia(referencia)) {
+    setErro(""); setSucesso(""); setDiaAberto(dia);
     setFormDia(dia);
     setFormAberto(true);
     window.setTimeout(() => {
       const form = document.querySelector<HTMLFormElement>(".agenda-form");
-      form?.scrollIntoView({ behavior: "smooth", block: "center" });
       form?.querySelector<HTMLInputElement>('[name="titulo"]')?.focus({ preventScroll: true });
     }, 0);
   }
@@ -246,8 +248,8 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
           titulo: form.get("titulo"),
           descricao: form.get("descricao"),
           categoria: form.get("categoria"),
-          iniciaEm: form.get("iniciaEm"),
-          terminaEm: form.get("terminaEm"),
+          iniciaEm: new Date(String(form.get("iniciaEm"))).toISOString(),
+          terminaEm: form.get("terminaEm") ? new Date(String(form.get("terminaEm"))).toISOString() : null,
           local: form.get("local"),
           visibilidade: form.get("visibilidade"),
         }),
@@ -258,7 +260,7 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
       setFormAberto(false);
       await carregar();
     } catch (motivo) {
-      setErro(motivo instanceof Error ? motivo.message : "Não foi possível salvar.");
+      setErro(agendaErrorMessage(motivo, true));
     } finally {
       setSalvando(false);
     }
@@ -312,7 +314,7 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
     };
   }, []);
   const itensDoDiaAberto = diaAberto ? porDia.get(diaAberto) || [] : [];
-  const diaSelecionado = visao === "dia" ? chaveDia(referencia) : diaAberto;
+  const diaSelecionado = diaAberto;
 
   const rotuloPeriodo =
     visao === "dia"
@@ -327,7 +329,7 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
         <div className="agenda-calendario-periodo">
           <button type="button" onClick={() => mover(-1)} aria-label="Período anterior">‹</button>
           <button type="button" onClick={() => mover(1)} aria-label="Próximo período">›</button>
-          <strong aria-live="polite" aria-atomic="true">{rotuloPeriodo}</strong>
+          <button type="button" className={styles.periodTitle} aria-label={`Planejar ${rotuloPeriodo}`} aria-haspopup="dialog" onClick={() => setDiaAberto(chaveDia(referencia))}>{rotuloPeriodo}</button>
           <button
             type="button"
             className="agenda-hoje"
@@ -350,13 +352,6 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
             </button>
           ))}
         </div>
-        <a
-          className="agenda-fio-link"
-          href="/painel?view=fio"
-          title="Ver o registro cronológico do dia, com pedidos e visitantes"
-        >
-          Ver Fio do dia →
-        </a>
         </div>
       </header>
 
@@ -370,52 +365,39 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
               camadasAtivas.includes(camada.id) ? " active" : ""
             }`}
             aria-pressed={camadasAtivas.includes(camada.id)}
+            aria-label={camada.rotulo}
             title={camada.ajuda}
             onClick={() => alternarCamada(camada.id)}
           >
             <span aria-hidden="true" />
-            {camada.rotulo}
+            <span className={styles.layerLabel}>{camada.rotulo}</span><span className={styles.layerShort}>{camada.id === "EVENTO" ? "Eventos" : camada.id === "ESCALA" ? "Escalas" : "Pessoais"}</span>
           </button>
         ))}
         </div>
-        <div className={styles.createActions} role="group" aria-label="Criar na agenda">
-        {aoCriarEvento && (
-          <button type="button" className="agenda-novo-evento" onClick={() => aoCriarEvento(diaSelecionado || undefined)}>
-            + Novo evento
-          </button>
-        )}
-        <button
-          type="button"
-          className="agenda-novo"
-          aria-expanded={formAberto}
-          aria-controls={formAberto ? formId : undefined}
-          onClick={() => formAberto ? setFormAberto(false) : abrirCompromisso(diaSelecionado || chaveDia(referencia))}
-        >
-          {formAberto ? "Cancelar" : "Novo compromisso"}
-        </button>
-        </div>
+
       </div>
 
       {!camadasVisiveis.some((camada) => camadasAtivas.includes(camada.id)) && <div className={styles.layerNotice} role="status"><span>Nenhuma categoria selecionada. Os compromissos estão ocultos.</span><button type="button" onClick={() => setCamadasAtivas(camadasVisiveis.map((camada) => camada.id))}>Mostrar todas as categorias</button></div>}
 
       {erro && <TransientFeedback className="agenda-erro" role="alert">{erro}</TransientFeedback>}
       {sucesso && <TransientFeedback className="operations-feedback" role="status" tone="success">{sucesso}</TransientFeedback>}
-      {erroCarregamento && <TransientFeedback className="agenda-erro" role="alert">
+      {erroCarregamento && <div className={styles.syncNotice} role="status">
         <span>{erroCarregamento}</span>
-        <button type="button" onClick={() => void carregar()}>Tentar novamente</button>
-      </TransientFeedback>}
+        <button type="button" onClick={() => void carregar()}>Atualizar</button>
+      </div>}
 
       <div className="agenda-studio-layout"><div className="agenda-studio-planner">
-      {diaSelecionado && <section className="agenda-day-actions" aria-label="Planejar dia selecionado">
-        <div><small>DIA SELECIONADO</small><strong>{new Date(`${diaSelecionado}T12:00:00`).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}</strong><span>{carregando ? "Carregando compromissos…" : erroCarregamento ? (hasCurrentData ? "Última consulta exibida; não foi possível atualizar." : "Compromissos indisponíveis no momento.") : (porDia.get(diaSelecionado) || []).length ? `${(porDia.get(diaSelecionado) || []).length} compromisso(s) neste dia` : "Que tal planejar um novo encontro?"}</span></div>
-        <div className="agenda-day-buttons">
-          {aoCriarEvento && <button type="button" onClick={() => aoCriarEvento(diaSelecionado)}>Criar evento</button>}
-          <button type="button" onClick={() => abrirCompromisso(diaSelecionado)}>Novo compromisso</button>
-          {visao === "mes" && <button type="button" className="agenda-day-close" aria-label="Fechar dia selecionado" onClick={() => setDiaAberto(null)}>×</button>}
-        </div>
-      </section>}
-      {/* Criar exige confirmação explícita no formulário, com a data escolhida preservada. */}
-      <div className={`agenda-corpo${formAberto ? " com-form" : ""}`}>
+      {diaSelecionado && <AgendaDialog title={new Date(`${diaSelecionado}T12:00:00`).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })} busy={salvando} onClose={() => { setDiaAberto(null); setFormAberto(false); setErro(""); }}>
+        <section className={styles.dayPlan} aria-label="Planejar dia selecionado">
+          <strong>{new Date(`${diaSelecionado}T12:00:00`).toLocaleDateString("pt-BR", { day: "numeric", month: "long" })}</strong>
+          <p>{carregando ? "Carregando compromissos…" : erroCarregamento ? (hasCurrentData ? "Última consulta exibida; não foi possível atualizar." : "Compromissos indisponíveis no momento.") : itensDoDiaAberto.length ? `${itensDoDiaAberto.length} compromisso(s) neste dia` : "O que você quer marcar neste dia?"}</p>
+          {!formAberto && <div className={styles.dayChoices}>
+            {aoCriarEvento && <button type="button" onClick={() => { const day = diaSelecionado; setDiaAberto(null); aoCriarEvento(day); }}><b>＋ Criar evento</b><small>Programação da comunidade</small></button>}
+            <button type="button" onClick={() => abrirCompromisso(diaSelecionado)}><b>＋ Novo compromisso</b><small>Pessoal, visita ou reunião</small></button>
+          </div>}
+          {sucesso && <p role="status">{sucesso}</p>}
+          {erro && !formAberto && <p role="alert">{erro}</p>}
+        </section>
       {formAberto && (
         <form id={formId} className="agenda-form" key={formDia} onSubmit={criarCompromisso}>
           <header className="agenda-form-larga"><strong>Novo compromisso</strong><button type="button" onClick={() => setFormAberto(false)} aria-label="Fechar formulário de compromisso">×</button></header>
@@ -454,11 +436,19 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
             Observações
             <textarea name="descricao" rows={2} maxLength={1000} />
           </label>
+          {erro && <p className={styles.formError} role="alert">{erro}</p>}
           <button type="submit" disabled={salvando}>
             {salvando ? "Salvando…" : "Salvar compromisso"}
           </button>
         </form>
       )}
+        {!formAberto && itensDoDiaAberto.length > 0 && <ul className={styles.dayItems}>{itensDoDiaAberto.map(item => <li key={item.id}>
+          <span className={styles.itemTime}>{item.diaInteiro ? "Dia inteiro" : hora(item.iniciaEm)}</span><div><strong>{item.titulo}</strong><small>{item.local || CAMADAS.find(layer => layer.id === item.camada)?.rotulo}</small>{item.descricao && <p>{item.descricao}</p>}</div>
+          {item.camada === "PESSOAL" && item.meu !== false && <button type="button" onClick={() => void removerCompromisso(item.origemId)}>Remover</button>}
+          {item.camada === "PESSOAL" && item.aprovacaoStatus === "PENDENTE" && podeAprovar && <button type="button" onClick={() => void aprovarCompromisso(item.origemId)}>Aprovar publicação</button>}
+        </li>)}</ul>}
+      </AgendaDialog>}
+      <div className="agenda-corpo">
 
       {/* DIA — linha do tempo vertical: a hora à esquerda, um marcador por
           camada e o cartão com os detalhes à direita. */}
@@ -510,8 +500,8 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
       {!blockingLoadError && visao === "semana" && (
         <div className="agenda-week-list" aria-busy={carregando}>
           {dias.map((dia) => { const items = porDia.get(chaveDia(dia)) || []; return <section key={chaveDia(dia)} className={chaveDia(dia) === hojeChave ? "today" : ""}>
-            <button type="button" className="agenda-week-date" onClick={() => { setReferencia(inicioDoDia(dia)); setVisao("dia"); }}><small>{DIAS_CURTOS[dia.getDay()]}</small><strong>{dia.getDate()}</strong></button>
-            <div>{items.length ? items.map((item) => <button type="button" key={item.id} className={"agenda-week-entry camada-" + item.camada.toLowerCase()} onClick={() => { setReferencia(inicioDoDia(dia)); setVisao("dia"); }}><time>{item.diaInteiro ? "Dia inteiro" : hora(item.iniciaEm)}</time><strong>{item.titulo}</strong><span>{item.local || CAMADAS.find(layer => layer.id === item.camada)?.rotulo}</span></button>) : <p>{carregando ? "Carregando…" : "Dia livre"}</p>}</div>
+            <button type="button" className="agenda-week-date" aria-haspopup="dialog" onClick={() => setDiaAberto(chaveDia(dia))}><small>{DIAS_CURTOS[dia.getDay()]}</small><strong>{dia.getDate()}</strong></button>
+            <div>{items.length ? items.map((item) => <button type="button" key={item.id} className={"agenda-week-entry camada-" + item.camada.toLowerCase()} aria-haspopup="dialog" onClick={() => setDiaAberto(chaveDia(dia))}><time>{item.diaInteiro ? "Dia inteiro" : hora(item.iniciaEm)}</time><strong>{item.titulo}</strong><span>{item.local || CAMADAS.find(layer => layer.id === item.camada)?.rotulo}</span></button>) : <p>{carregando ? "Carregando…" : "Dia livre"}</p>}</div>
           </section>; })}
         </div>
       )}
@@ -531,7 +521,8 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
                 type="button"
                 key={chave}
                 className={`agenda-dia${doPeriodo ? "" : " fora"}${chave === hojeChave ? " hoje" : ""}${chave === diaAberto ? " selected" : ""}`}
-                onClick={() => setDiaAberto(chave === diaAberto ? null : chave)}
+                onClick={() => { setErro(""); setSucesso(""); setDiaAberto(chave); }}
+                aria-haspopup="dialog"
                 aria-label={`${dia.toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" })} — ${carregando ? "Carregando compromissos" : `${doDia.length} compromisso(s)`}`}
                 aria-current={chave === hojeChave ? "date" : undefined}
                 aria-pressed={chave === diaAberto}
@@ -553,46 +544,6 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
         </div>
       )}
 
-      {visao === "mes" && diaAberto && itensDoDiaAberto.length > 0 && (
-        <div className="agenda-detalhe">
-          <header>
-            <strong>
-              {new Date(`${diaAberto}T12:00:00`).toLocaleDateString("pt-BR", {
-                weekday: "long", day: "numeric", month: "long",
-              })}
-            </strong>
-            <button type="button" onClick={() => setDiaAberto(null)} aria-label="Fechar dia">×</button>
-          </header>
-          {itensDoDiaAberto.length === 0 ? (
-            <p className="agenda-vazio">Nada marcado neste dia.</p>
-          ) : (
-            <ul>
-              {itensDoDiaAberto.map((item) => (
-                <li key={item.id} className={`camada-${item.camada.toLowerCase()}`}>
-                  <span className="agenda-detalhe-hora">{hora(item.iniciaEm)}</span>
-                  <span className="agenda-detalhe-corpo">
-                    <strong>{item.titulo}</strong>
-                    {item.descricao && <small>{item.descricao}</small>}
-                    {item.local && <small>{item.local}</small>}
-                  </span>
-                  {item.camada === "PESSOAL" && item.meu !== false && (
-                    <button
-                      type="button"
-                      className="agenda-remover"
-                      onClick={() => void removerCompromisso(item.origemId)}
-                    >
-                      Remover
-                    </button>
-                  )}
-                  {item.camada === "PESSOAL" && item.aprovacaoStatus === "PENDENTE" && podeAprovar && (
-                    <button type="button" className="agenda-aprovar" onClick={() => void aprovarCompromisso(item.origemId)}>Aprovar publicação</button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
       </div>
       </div><details className="agenda-studio-upcoming"><summary><span>Compromissos deste período</span><small>{carregando ? "Carregando…" : erroCarregamento ? "Indisponível" : `${visiveis.length} compromisso(s)`}</small><span aria-hidden="true">⌄</span></summary>
       {carregando ? <p role="status">Carregando compromissos…</p> : erroCarregamento ? <p>Não foi possível consultar os compromissos deste período.</p> : !visiveis.length ? <div className="agenda-studio-empty"><span aria-hidden="true">♡</span><strong>Tempo para novos encontros</strong><p>Não há compromissos nas categorias selecionadas. Adicione um ou navegue para outro período.</p></div> : <ol>{[...visiveis].sort((a,b) => Date.parse(a.iniciaEm)-Date.parse(b.iniciaEm)).map(item => <li key={item.id}><button type="button" onClick={() => { setReferencia(inicioDoDia(new Date(item.iniciaEm))); setVisao("dia"); }}><time dateTime={item.iniciaEm}><b>{new Date(item.iniciaEm).getDate()}</b><span>{new Date(item.iniciaEm).toLocaleDateString("pt-BR",{month:"short"})}</span></time><div><small>{CAMADAS.find(layer => layer.id === item.camada)?.rotulo}</small><strong>{item.titulo}</strong><span>{item.diaInteiro ? "Dia inteiro" : hora(item.iniciaEm)}{item.local ? ` · ${item.local}` : ""}</span></div><span aria-hidden="true">→</span></button></li>)}</ol>}

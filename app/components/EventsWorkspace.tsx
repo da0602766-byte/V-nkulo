@@ -11,6 +11,8 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import AgendaCalendar from "./AgendaCalendar";
+import AgendaDialog from "./AgendaDialog";
+import { readAgendaJson, AgendaRequestError, agendaErrorMessage } from "../lib/agenda-request";
 import TransientFeedback from "./TransientFeedback";
 import styles from "./EventsAgenda.module.css";
 import { filterEventDirectory, type EventPeriod } from "../lib/event-directory";
@@ -100,7 +102,9 @@ export default function EventsWorkspace({
   const [registrantSearchEventId, setRegistrantSearchEventId] = useState<number | null>(null);
   const [registrantSearch, setRegistrantSearch] = useState("");
   const [actionMenuId, setActionMenuId] = useState<number | null>(null);
-  const detailsRef = useRef<HTMLDetailsElement>(null);
+  const [eventFormOpen, setEventFormOpen] = useState(false);
+  const eventsRequestRef = useRef<AbortController | null>(null);
+  const eventsSignatureRef = useRef("");
   const canManage = permissions.includes("events.manage");
   const canRsvp = permissions.includes("events.rsvp");
   const displayedEvents = useMemo(() => filterEventDirectory(events, eventSearch, eventStatus, eventPeriod, now), [events, eventSearch, eventStatus, eventPeriod, now]);
@@ -125,25 +129,31 @@ export default function EventsWorkspace({
   }, [registrantSearch, registrantSearchEvent]);
 
   const loadEvents = useCallback(async (quiet = false) => {
+    if (quiet && eventsRequestRef.current) return;
+    eventsRequestRef.current?.abort();
+    const request = new AbortController(); eventsRequestRef.current = request;
     if (!quiet) setLoading(true);
     try {
-      const response = await fetch("/api/pilot/eventos", {
-        cache: "no-store",
-      });
-      const result = (await response.json()) as ApiResult;
-      if (!response.ok) {
-        throw new Error(result.error || "Não foi possível carregar os eventos.");
-      }
-      setEvents(result.eventos || []);
-      setNow(Date.now());
-      setLoadError("");
-      setAgendaRevision((value) => value + 1);
-    } catch (loadError) {
-      setLoadError(loadError instanceof Error ? loadError.message : "Não foi possível carregar os eventos.");
+      const result = await readAgendaJson<ApiResult>("/api/pilot/eventos", request.signal);
+      if (request.signal.aborted) return;
+      const signature = JSON.stringify(result.eventos || []);
+      setEvents(result.eventos || []); setNow(Date.now()); setLoadError("");
+      if (!quiet || signature !== eventsSignatureRef.current) setAgendaRevision(value => value + 1);
+      eventsSignatureRef.current = signature;
+    } catch (error) {
+      if (request.signal.aborted) return;
+      if (error instanceof AgendaRequestError && [401, 403].includes(error.status)) setEvents([]);
+      setLoadError(agendaErrorMessage(error));
     } finally {
-      if (!quiet) setLoading(false);
+      if (eventsRequestRef.current === request) { eventsRequestRef.current = null; setLoading(false); }
     }
   }, []);
+  useEffect(() => () => eventsRequestRef.current?.abort(), []);
+  useEffect(() => {
+    const resume = () => { if (document.visibilityState === "visible") void loadEvents(true); };
+    window.addEventListener("online", resume); document.addEventListener("visibilitychange", resume);
+    return () => { window.removeEventListener("online", resume); document.removeEventListener("visibilitychange", resume); };
+  }, [loadEvents]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadEvents(), 0);
@@ -198,11 +208,7 @@ export default function EventsWorkspace({
       setNewEventDraft((value) => value + 1);
       setPollEnabled(false);
       setPollOptions(["", ""]);
-      window.requestAnimationFrame(() => {
-        if (!detailsRef.current) return;
-        detailsRef.current.open = true;
-        detailsRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
+      setEventFormOpen(true);
     };
     window.addEventListener("vinkulo:new-event", open);
     return () => window.removeEventListener("vinkulo:new-event", open);
@@ -262,10 +268,10 @@ export default function EventsWorkspace({
       formElement.reset();
       setPollEnabled(false);
       setPollOptions(["", ""]);
-      if (detailsRef.current) detailsRef.current.open = false;
+      setEventFormOpen(false);
       await loadEvents();
     } catch (saveError) {
-      setError((saveError as Error).message);
+      setError(agendaErrorMessage(saveError, true));
     } finally {
       setWorkingId(null);
     }
@@ -415,11 +421,7 @@ export default function EventsWorkspace({
     setPollOptions(item.enquete?.opcoes.map((option) => option.label) || ["", ""]);
     setError("");
     setFeedback("");
-    window.requestAnimationFrame(() => {
-      if (!detailsRef.current) return;
-      detailsRef.current.open = true;
-      detailsRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
+      setEventFormOpen(true);
   }
 
   return (
@@ -433,7 +435,7 @@ export default function EventsWorkspace({
           aria-controls={introId}
           onClick={() => setIntroOpen((value) => !value)}
         >
-          {introOpen ? "Recolher apresentação" : "Sobre a agenda"}
+          {introOpen ? "Fechar resumo" : "Sobre"}
           <span aria-hidden="true">{introOpen ? "−" : "+"}</span>
         </button>
       </header>
@@ -469,13 +471,7 @@ export default function EventsWorkspace({
                 setPollOptions(["", ""]);
                 setError("");
                 setFeedback("");
-                window.requestAnimationFrame(() => {
-                  const alvo = detailsRef.current;
-                  if (!alvo) return;
-                  alvo.open = true;
-                  alvo.scrollIntoView({ behavior: "smooth", block: "start" });
-                  alvo.querySelector<HTMLInputElement>('[name="titulo"]')?.focus({ preventScroll: true });
-                });
+                setEventFormOpen(true);
               }
             : undefined
         }
@@ -483,15 +479,9 @@ export default function EventsWorkspace({
 
 
 
-      {canManage && (
-        <details
-          className="operations-form-card event-form-card"
-          ref={detailsRef}
-          key={editing?.id || `new-${newEventDraft}`}
-        >
-          <summary className="event-form-summary">
-            <span aria-hidden="true">＋</span><div><strong>{editing ? `Editar: ${editing.titulo}` : "Novo evento"}</strong><small>Organize os detalhes, a participação e a divulgação.</small></div><i aria-hidden="true">⌄</i>
-          </summary>
+      {canManage && eventFormOpen && (
+        <AgendaDialog title={editing ? `Editar: ${editing.titulo}` : "Novo evento"} wide busy={workingId === "form"} onClose={() => setEventFormOpen(false)} key={editing?.id || `new-${newEventDraft}`}>
+        <div className={`event-form-card ${styles.eventDialogForm}`}>
           <form className="pilot-form event-form" onSubmit={saveEvent}>
             <label className="event-wide-field">
               Título*
@@ -657,6 +647,7 @@ export default function EventsWorkspace({
                 defaultValue={editing?.descricao || ""}
               />
             </label>
+            {error && <p className={styles.formError} role="alert">{error}</p>}
             <div className="event-form-actions">
               {!editing && (
                 <button
@@ -665,7 +656,7 @@ export default function EventsWorkspace({
                   onClick={() => {
                     setPollEnabled(false);
                     setPollOptions(["", ""]);
-                    if (detailsRef.current) detailsRef.current.open = false;
+                    setEventFormOpen(false);
                   }}
                 >
                   Fechar
@@ -679,7 +670,7 @@ export default function EventsWorkspace({
                     setEditing(null);
                     setPollEnabled(false);
                     setPollOptions(["", ""]);
-                    if (detailsRef.current) detailsRef.current.open = false;
+                    setEventFormOpen(false);
                   }}
                 >
                   Sair da edição
@@ -694,7 +685,7 @@ export default function EventsWorkspace({
               </button>
             </div>
           </form>
-        </details>
+        </div></AgendaDialog>
       )}
 
       {feedback && (
@@ -711,12 +702,12 @@ export default function EventsWorkspace({
         </TransientFeedback>
       )}
       {loadError && (
-        <TransientFeedback className="operations-feedback error" role="alert">
+        <div className={styles.syncNotice} role="status">
           <span>{loadError}</span>
           <button type="button" className="event-inline-action" onClick={() => void loadEvents()}>
             Tentar novamente
           </button>
-        </TransientFeedback>
+        </div>
       )}
 
       {loading ? (

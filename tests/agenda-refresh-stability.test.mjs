@@ -20,13 +20,17 @@ function harness() {
     useMemo: memo, useCallback: (fn, deps) => memo(() => fn, deps), useId: () => 'agenda-test',
     useEffect(fn, deps) { const i = cursor++; if (!slots[i] || !same(slots[i].deps, deps)) { slots[i]?.cleanup?.(); slots[i] = { deps }; effects.push(() => { slots[i].cleanup = fn(); }); } },
   };
+  const requestFetch = (url, options) => new Promise((resolve, reject) => requests.push({ url, options, resolve, reject }));
+  const requestModule = {};
+  runInNewContext(ts.transpileModule(readFileSync(new URL('../app/lib/agenda-request.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, { exports: requestModule, AbortController, Error, TypeError, setTimeout, clearTimeout, fetch: requestFetch });
   const exports = {};
   const source = readFileSync(new URL('../app/components/AgendaCalendar.tsx', import.meta.url), 'utf8');
   runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
     exports, Date, Map, AbortController, Error,
-    window: { setTimeout(fn) { timers.push(fn); return timers.length; }, clearTimeout() {}, setInterval() { return 1; }, clearInterval() {} },
+    document: { visibilityState: "visible", addEventListener() {}, removeEventListener() {} },
+    window: { addEventListener() {}, removeEventListener() {}, setTimeout(fn) { timers.push(fn); return timers.length; }, clearTimeout() {}, setInterval() { return 1; }, clearInterval() {} },
     fetch: (url, options) => new Promise((resolve, reject) => requests.push({ url, options, resolve, reject })),
-    require(name) { if (name === 'react') return hooks; if (name === 'react/jsx-runtime') return jsx; if (name.endsWith('.css')) return { default: {} }; if (name === './TransientFeedback') return { default: () => null }; throw new Error(name); },
+    require(name) { if (name === '../lib/agenda-request') return requestModule; if (name === './AgendaDialog') return {default: function AgendaDialog() {}}; if (name === 'react') return hooks; if (name === 'react/jsx-runtime') return jsx; if (name.endsWith('.css')) return { default: {} }; if (name === './TransientFeedback') return { default: () => null }; throw new Error(name); },
   });
   return { requests, render(revision = 0) { cursor = 0; return exports.default({ podeVerEventos: true, podeAprovar: false, atualizacao: revision }); }, flush() { for (const fn of effects.splice(0)) fn(); for (const fn of timers.splice(0)) fn(); } };
 }
@@ -60,7 +64,7 @@ test('agenda: repeated background refreshes keep the selected-day panel mounted 
     await respond(f.requests.at(-1));
     assert.ok(panel(f.render(revision)));
   }
-  nodes(tree).find(n => n.props?.['aria-label'] === 'Fechar dia selecionado').props.onClick();
+  nodes(tree).find(n => n.type?.name === 'AgendaDialog').props.onClose();
   assert.equal(panel(f.render(4)), undefined, 'explicit close still works');
 });
 
@@ -69,7 +73,7 @@ test('agenda: transient refresh failure preserves the calendar; revoked access c
   f.render(); f.flush(); await respond(f.requests.at(-1));
   let tree = f.render();
   nodes(tree).find(n => n.type === 'button' && n.props?.className?.startsWith('agenda-dia')).props.onClick();
-  f.render(1); f.flush(); await respond(f.requests.at(-1), 503);
+  f.render(1); f.flush(); await respond(f.requests.at(-1), 503); await respond(f.requests.at(-1), 503);
   tree = f.render(1);
   assert.ok(panel(tree)); assert.ok(grid(tree));
   assert.ok(nodes(panel(tree)).some(n => n.props?.children === 'Última consulta exibida; não foi possível atualizar.'));
@@ -87,4 +91,16 @@ test('agenda: changing period still loads fresh data and ignores an aborted resp
   assert.equal(grid(tree).props['aria-busy'], true);
   await respond(previous); assert.equal(grid(f.render(1)).props['aria-busy'], true);
   await respond(f.requests.at(-1)); assert.equal(grid(f.render(1)).props['aria-busy'], false);
+});
+
+ test('agenda: selecting a date opens the card and prefills the appointment without top create buttons', async () => {
+  const f=harness(); f.render(); f.flush(); await respond(f.requests.at(-1)); let tree=f.render();
+  assert.equal(nodes(tree).some(n=>n.props?.className==='agenda-novo'),false);
+  const day=nodes(tree).find(n=>n.type==='button'&&n.props?.className?.startsWith('agenda-dia'));
+  day.props.onClick(); tree=f.render(); assert.ok(nodes(tree).some(n=>n.type?.name==='AgendaDialog'));
+  const action=nodes(tree).find(n=>n.type==='button'&&nodes(n).some(c=>c.type==='b'&&c.props.children==='＋ Novo compromisso'));
+  action.props.onClick(); tree=f.render(); const input=nodes(tree).find(n=>n.props?.name==='iniciaEm');
+  assert.ok(input.props.defaultValue.endsWith('T09:00'));
+  assert.equal(input.props.defaultValue.slice(0,10),day.key);
+  assert.equal(nodes(tree).some(n=>n.props?.children==='＋ Criar evento'),false,'members cannot create community events');
 });
