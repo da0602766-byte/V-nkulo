@@ -481,7 +481,7 @@ export default function EventsWorkspace({
 
       {canManage && eventFormOpen && (
         <AgendaDialog title={editing ? `Editar: ${editing.titulo}` : "Novo evento"} wide busy={workingId === "form"} onClose={() => setEventFormOpen(false)} key={editing?.id || `new-${newEventDraft}`}>
-        <div className={`event-form-card ${styles.eventDialogForm}`}>
+        <div className={styles.eventDialogForm}>
           <form className="pilot-form event-form" onSubmit={saveEvent}>
             <label className="event-wide-field">
               Título*
