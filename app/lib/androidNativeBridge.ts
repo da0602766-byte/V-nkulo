@@ -2,6 +2,7 @@ declare global {
   interface Window {
     VinkuloFcmActive?: boolean;
     VinkuloAndroid?: {
+      offlineModeVersion?: number;
       requestPushToken?: () => void;
       setPushBinding?: (token: string, bindingId: string) => void;
       clearPushBinding?: () => void;

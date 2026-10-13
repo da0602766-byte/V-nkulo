@@ -6,6 +6,15 @@ em testes acompanhados. A versão estável continua disponível separadamente.
 Instale a atualização por cima do aplicativo existente. NÃO desinstale,
 limpe os dados ou faça downgrade se houver rascunhos/envios pendentes.
 
+Na versão 1.22.0, o painel online mostra "Abrir modo offline".
+Esse modo permanece aberto mesmo com internet e permite ativar as funções,
+cadastrar visitantes e registrar rascunhos no aparelho. Para voltar ao painel,
+toque em "Abrir sistema online". A ativação agora mostra progresso e permite
+tentar novamente se a resposta do aparelho não chegar.
+
+Se o painel mostrar "Atualizar para usar offline", instale o APK 1.22.0 por
+cima do atual, sem desinstalar. Depois entre na comunidade e abra o modo.
+
 Na versão 1.21.0, a tela offline começa pelas tarefas: cadastrar visitante,
 criar relatório de célula, fazer pedido, anotar, acompanhar, atualizar tarefa
 ou registrar ocorrência. Use "Ativar funções para usar sem internet" com

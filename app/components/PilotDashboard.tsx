@@ -23,6 +23,7 @@ import PilotNotificationCenter, {
 } from "./PilotNotificationCenter";
 import IncomingMessageToast, { type IncomingMessage } from "./IncomingMessageToast";
 import ThemeControl from "./ThemeControl";
+import OfflineModeEntry from "./OfflineModeEntry";
 import WorkspaceErrorBoundary from "./WorkspaceErrorBoundary";
 import VerifiedOwnerName from "./VerifiedOwnerName";
 import TemporaryAccessWatcher from "./TemporaryAccessWatcher";
@@ -1093,6 +1094,7 @@ export default function PilotDashboard({
           </details>
         </div>
       </header>
+      <OfflineModeEntry />
       {incomingMessage && (
         <IncomingMessageToast
           key={incomingMessage.key}
