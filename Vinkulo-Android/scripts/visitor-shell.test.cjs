@@ -49,3 +49,13 @@ test('single save-and-send requires persistence acknowledgement and never queues
  assert.equal(race.requests.at(-1).action,'save');assert.equal(race.el('name').value,'Depois');assert.match(race.el('status').textContent,/novas alterações/);
  const cancel=shell();cancel.send(state);cancel.window.confirm=()=>false;cancel.el('save-send').handlers.click();assert.equal(cancel.requests.length,1);
 });
+
+ test('activation timeout unlocks retry and ignores a late response; acknowledged activation reveals form',()=>{
+ const s=shell();s.send({prepared:false});s.el('prepare').handlers.click();
+ assert.equal(s.requests.at(-1).action,'prepare');assert.equal(s.el('prepare').disabled,true);
+ assert.match(s.el('status').textContent,/Ativando/);
+ const stale=s.requests.at(-1).requestId;[...s.timers.values()].at(-1)();
+ assert.equal(s.el('prepare').disabled,false);assert.match(s.el('status').textContent,/Sem confirmação/);
+ s.send({...state,requestId:stale});assert.equal(s.el('workspace').hidden,true);
+ s.el('prepare').handlers.click();s.send(state);assert.equal(s.el('workspace').hidden,false);assert.equal(s.el('locked').hidden,true);
+ });

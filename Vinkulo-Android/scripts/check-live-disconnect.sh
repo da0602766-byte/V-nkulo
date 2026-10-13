@@ -16,6 +16,8 @@ adb pull /sdcard/vinkulo-reader-reconnected.png app/build/reports/vinkulo-reader
 adb pull /sdcard/vinkulo-reader-reconnected.xml app/build/reports/vinkulo-reader/reconnected.xml >/dev/null 2>&1 || true
 adb pull /sdcard/vinkulo-reader-reconnect-failure.png app/build/reports/vinkulo-reader/reconnect-failure.png >/dev/null 2>&1 || true
 adb pull /sdcard/vinkulo-reader-reconnect-failure.xml app/build/reports/vinkulo-reader/reconnect-failure.xml >/dev/null 2>&1 || true
+adb pull /sdcard/vinkulo-reader-manual-offline-online.png app/build/reports/vinkulo-reader/manual-offline-online.png >/dev/null 2>&1 || true
+adb pull /sdcard/vinkulo-reader-manual-offline-online.xml app/build/reports/vinkulo-reader/manual-offline-online.xml >/dev/null 2>&1 || true
 grep -q 'OK (1 test)' app/build/reports/vinkulo-reader/live-disconnect-test.txt || result=1
 test -s app/build/reports/vinkulo-reader/live-disconnect.png || result=1
 test -s app/build/reports/vinkulo-reader/live-disconnect.xml || result=1

@@ -24,3 +24,13 @@ test('combined save/send queues only the native saved ID and never submits cells
  const denied=shell();denied.send({...state,canWrite:false});denied.el('save-send').handlers.click();assert.equal(denied.requests.length,1);
  const fail=shell();fail.send(state);fail.el('save-send').handlers.click();fail.send({...state,error:'Falha'});assert.equal(fail.requests.at(-1).action,'save');
 });
+
+ test('activation timeout unlocks retry and ignores a late response; acknowledged activation reveals form',()=>{
+ const s=shell();s.send({prepared:false});s.el('prepare').handlers.click();
+ assert.equal(s.requests.at(-1).action,'prepare');assert.equal(s.el('prepare').disabled,true);
+ assert.match(s.el('status').textContent,/Ativando/);
+ const stale=s.requests.at(-1).requestId;[...s.timers.values()].at(-1)();
+ assert.equal(s.el('prepare').disabled,false);assert.match(s.el('status').textContent,/Sem confirmação/);
+ s.send({...state,requestId:stale});assert.equal(s.el('workspace').hidden,true);
+ s.el('prepare').handlers.click();s.send(state);assert.equal(s.el('workspace').hidden,false);assert.equal(s.el('locked').hidden,true);
+ });

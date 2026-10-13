@@ -124,6 +124,22 @@ public class NetworkTransitionTest {
             assertFalse("The WebView error must not reappear after reconnection",
                     device.hasObject(By.textContains("Página da Web não disponível")));
             OfflineUiEvidence.capture(device, "reconnected");
+            if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+                scenario.onActivity(activity -> ((WebView) activity.findViewById(R.id.webview)).loadUrl(OfflinePolicy.HOME + "?mode=manual#visitor-section"));
+                assertTrue("Manual offline must open with validated internet", waitForScreen(scenario, true));
+                scenario.onActivity(activity -> {
+                    try {
+                        java.lang.reflect.Method reconcile = MainActivity.class.getDeclaredMethod("reconcileInternetAccess");
+                        reconcile.setAccessible(true); reconcile.invoke(activity);
+                    } catch (Exception error) { throw new AssertionError(error); }
+                });
+                InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+                SystemClock.sleep(1500);
+                assertTrue("Internet updates must not close manual offline: " + screenState(scenario), waitForScreen(scenario, true));
+                OfflineUiEvidence.capture(device, "manual-offline-online");
+                scenario.onActivity(activity -> ((WebView) activity.findViewById(R.id.webview)).loadUrl(NativePolicy.ORIGIN + "/painel"));
+                assertTrue("Explicit return must reopen online", waitForRecoveredScreen(scenario));
+            }
         } finally {
             device.executeShellCommand("svc wifi disable");
             device.executeShellCommand("svc data disable");
