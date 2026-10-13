@@ -16,6 +16,14 @@ final class OfflinePolicy {
         return NativePolicy.trusted(url) && "/mobile-app/index.html".equals(URI.create(url).getRawPath());
     }
 
+    static boolean manualMode(String url) {
+        if (!localPage(url)) return false;
+        String query = URI.create(url).getRawQuery();
+        if (query == null) return false;
+        for (String part : query.split("&")) if ("mode=manual".equals(part)) return true;
+        return false;
+    }
+
     static boolean errorPage(String url) {
         return NativePolicy.trusted(url) && "/mobile-app/connection-error.html".equals(URI.create(url).getRawPath());
     }

@@ -13,8 +13,8 @@ android {
         applicationId = "com.vinkulo.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 24
-        versionName = "1.21.0"
+        versionCode = 25
+        versionName = "1.22.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         javaCompileOptions {
             annotationProcessorOptions {

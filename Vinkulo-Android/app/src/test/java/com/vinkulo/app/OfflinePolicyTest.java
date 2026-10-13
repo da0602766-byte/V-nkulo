@@ -20,6 +20,14 @@ public class OfflinePolicyTest {
         assertFalse(OfflinePolicy.fresh(999999, 1100, 2, 1000, 100, 2, 5000));
         assertFalse(OfflinePolicy.fresh(2000, 1100, -1, 1000, 100, -1, 5000));
     }
+    @Test public void manualOfflineStaysLocalOnlyOnTrustedPackagedPage() {
+        assertTrue(OfflinePolicy.manualMode(OfflinePolicy.HOME + "?mode=manual#visitor-section"));
+        assertTrue(OfflinePolicy.manualMode(OfflinePolicy.HOME + "?a=1&mode=manual#module-notes"));
+        assertFalse(OfflinePolicy.manualMode(OfflinePolicy.HOME));
+        assertFalse(OfflinePolicy.manualMode(OfflinePolicy.HOME + "?mode=automatic"));
+        assertFalse(OfflinePolicy.manualMode(NativePolicy.ORIGIN + "/painel?mode=manual"));
+        assertFalse(OfflinePolicy.manualMode("https://evil.test/mobile-app/index.html?mode=manual"));
+    }
     @Test public void localBridgeIsOnlyForTheExactPackagedPage() {
         assertTrue(OfflinePolicy.localPage(OfflinePolicy.HOME));
         assertTrue(OfflinePolicy.errorPage(OfflinePolicy.CONNECTION_ERROR));

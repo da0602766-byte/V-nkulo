@@ -39,12 +39,14 @@
       target.focus({preventScroll:true}); window.scrollTo(0,0);
     }
   }
+  function nextManual(hash) { return hash === '#work-setup' || hash === '#visitor-section' || hash.startsWith('#module-'); }
   function go(hash, back = false) {
     if (hash === '#main-content') { el('main-content').focus(); return true; }
     if (hash === current) return true;
     if (!allow()) return false;
     if (!back) stack.push(current);
     current = hash;
+    if (nextManual(hash)) window.history.replaceState(null,'','?mode=manual' + current);
     // Local history belongs to this document, including after restored links.
     window.history.replaceState(null,'',current);
     show(); return true;

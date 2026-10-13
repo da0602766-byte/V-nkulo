@@ -328,7 +328,7 @@ public class MainActivity extends Activity {
     }
 
     private void returnToOnlinePlatform() {
-        if (!hasValidatedInternet() || webView == null) return;
+        if (!hasValidatedInternet() || webView == null || OfflinePolicy.manualMode(webView.getUrl())) return;
         String path = deferredNotificationPath == null ? "/painel" : deferredNotificationPath;
         if (legacyOfflineView != null) {
             deferredNotificationPath = null;
@@ -342,7 +342,7 @@ public class MainActivity extends Activity {
         String permission = "(!window.VinkuloNavigation || window.VinkuloNavigation.allow())";
         webView.evaluateJavascript(permission, allowed -> {
             if ("true".equals(allowed) && hasValidatedInternet() && webView != null
-                    && OfflinePolicy.localPage(webView.getUrl())
+                    && OfflinePolicy.localPage(webView.getUrl()) && !OfflinePolicy.manualMode(webView.getUrl())
                     && (deferredNotificationPath == null || deferredNotificationPath.equals(path))) {
                 deferredNotificationPath = null;
                 hideLegacyOfflineEntry(); loadOnlineAfterReconnect(path);
@@ -447,7 +447,7 @@ public class MainActivity extends Activity {
                 });
         String script = "if(window===window.top){VinkuloNative.onmessage=function(e){try{window.dispatchEvent(new CustomEvent('vinkulo:fcm-token',{detail:JSON.parse(e.data)}));}catch(ignore){}};window.VinkuloAndroid=Object.freeze({version:'" + BuildConfig.VERSION_NAME + "',"
                 + "requestPushToken:function(){VinkuloNative.postMessage(JSON.stringify({action:'push-token'}));},"
-                + "setPushBinding:function(token,bindingId){VinkuloNative.postMessage(JSON.stringify({action:'push-bind',token:token,bindingId:bindingId}));},"
+                + "offlineModeVersion:1,setPushBinding:function(token,bindingId){VinkuloNative.postMessage(JSON.stringify({action:'push-bind',token:token,bindingId:bindingId}));},"
                 + "clearPushBinding:function(){VinkuloNative.postMessage(JSON.stringify({action:'push-clear'}));},"
                 + "shareToWhatsApp:function(text){VinkuloNative.postMessage(JSON.stringify({action:'share',text:text}));},"
                 + "openGoogleAuth:function(url){VinkuloNative.postMessage(JSON.stringify({action:'google',url:url}));},"

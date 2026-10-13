@@ -19,7 +19,7 @@
   const states={DRAFT:'Rascunho — não enviado',PENDING:'Na fila',SENDING:'Aguardando confirmação',RETRY:'Aguardando nova tentativa',CONFIRMED:'Confirmado no servidor',CONFLICT:'Revisão necessária',REJECTED:'Recusado'};
   let module=el('kind').value,requestId=0,busy=false,prepared=false,editing='',version=0,snapshot={},canWrite=false,expiry,signature='',lastAction='';
   let baseline='',saving='';
-  let saveToQueue=false,preparationDone=null;
+  let saveToQueue=false,preparationDone=null,responseTimer;
   const formTitles={requests:'Novo pedido',notes:'Nova anotação',followups:'Novo acompanhamento',checklists:'Atualizar tarefa',cells:'Rascunho de relatório',parking:'Nova ocorrência'};
   const fingerprint=()=>JSON.stringify(definitions[module].map(([key])=>document.getElementById('module-input-'+key)?.value??''));
   const dirty=()=>prepared&&fingerprint()!==baseline;
@@ -55,9 +55,18 @@
   function clear(){saveToQueue=false;el('locked').hidden=false;el('settings').open=true;prepared=false;snapshot={};signature='';editing='';window.clearTimeout(expiry);el('workspace').hidden=true;el('rows').textContent='';el('items').textContent='';el('fields').textContent='';el('community').textContent='';el('updated').textContent='';el('status').textContent='';clean();}
   function send(action,extra={}){
     if(!bridge||(busy&&action!=='lock'))return;busy=true;lastAction=action;el('save').disabled=true;el('save-send').disabled=true;el('prepare').disabled=true;el('kind').disabled=true;
+    window.clearTimeout(responseTimer);
+    responseTimer=window.setTimeout(()=>{
+      busy=false;saveToQueue=false;requestId++;el('prepare').disabled=false;el('save').disabled=!prepared;el('save-send').disabled=!prepared;el('kind').disabled=false;
+      const error='Sem confirmação do aparelho. Confira os registros salvos antes de repetir o envio; você pode tentar ativar novamente.';
+      el('status').textContent=error;
+      if(preparationDone){const done=preparationDone;preparationDone=null;done({error});}
+    },25000);
+    if(action==='prepare')el('status').textContent='Ativando com sua conta conectada… Aguarde a liberação do formulário.';
     bridge.postMessage(JSON.stringify({action,module,requestId:++requestId,...extra}));
   }
   function render(s){
+    window.clearTimeout(responseTimer);
     busy=false;el('save').disabled=false;el('save-send').disabled=false;el('prepare').disabled=!bridge;el('kind').disabled=false;
     if(s.error){saveToQueue=false;if(s.prepared!==true)clear();setText(el('status'),s.error);return;}
     if(!s.prepared){clear();setText(el('status'),'Prepare este módulo com internet e a mesma conta/comunidade para acessar o trabalho salvo.');return;}
@@ -95,7 +104,7 @@
   el('new').addEventListener('click',()=>{if(!busy&&window.confirm('Limpar campos não salvos? Rascunhos salvos permanecem.')){editing='';form();}});
   el('sync').addEventListener('click',()=>send('sync'));el('lock').addEventListener('click',()=>{if(allow()){clear();send('lock');}});
   if(window.VinkuloNavigation)window.VinkuloNavigation.register('module-section',{dirty,discard:()=>{editing='';form();},busy:()=>busy&&lastAction!=='status'});
-  document.addEventListener('visibilitychange',()=>{preparationDone=null;clear();busy=false;requestId++;if(!document.hidden)send('status');});
+  document.addEventListener('visibilitychange',()=>{window.clearTimeout(responseTimer);preparationDone=null;clear();busy=false;requestId++;if(!document.hidden)send('status');});
   window.setInterval(()=>{if(!document.hidden&&!busy)send('status');},15000);
   el('help').textContent=help[module];send('status');
 })();

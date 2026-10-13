@@ -3,7 +3,7 @@
   let requestId=0,busy=false,prepared=false,editing='',expiry,lastAction='',rowsSignature='';
   const fields=['name','phone','email','date'];
   let baseline='',saving='';
-  let saveToQueue=false,preparationDone=null;
+  let saveToQueue=false,preparationDone=null,responseTimer;
   const fingerprint=()=>JSON.stringify(fields.map(k=>el(k).value));
   const dirty=()=>prepared&&fingerprint()!==baseline;
   const dirtyNotice=()=>{el('dirty').hidden=!dirty();};
@@ -14,6 +14,14 @@
   function clear(){saveToQueue=false;el('locked').hidden=false;el('settings').open=true;prepared=false;rowsSignature='';window.clearTimeout(expiry);el('workspace').hidden=true;el('rows').textContent='';el('community').textContent='';reset();}
   function send(action,extra={}) {
     if(!bridge||(busy&&action!=='lock'))return;busy=true;lastAction=action;el('save').disabled=true;el('save-send').disabled=true;el('prepare').disabled=true;
+    window.clearTimeout(responseTimer);
+    responseTimer=window.setTimeout(()=>{
+      busy=false;saveToQueue=false;requestId++;el('prepare').disabled=false;el('save').disabled=!prepared;el('save-send').disabled=!prepared;
+      const error='Sem confirmação do aparelho. Confira os registros salvos antes de repetir o envio; você pode tentar ativar novamente.';
+      el('status').textContent=error;
+      if(preparationDone){const done=preparationDone;preparationDone=null;done({error});}
+    },25000);
+    if(action==='prepare')el('status').textContent='Ativando com sua conta conectada… Aguarde a liberação do formulário.';
     bridge.postMessage(JSON.stringify({action,requestId:++requestId,...extra}));
   }
   function text(parent,tag,value){const node=document.createElement(tag);node.textContent=value;parent.appendChild(node);return node;}
@@ -21,6 +29,7 @@
   function button(parent,label,fn,context){const node=text(parent,'button',label);node.type='button';node.className='secondary';if(context)node.setAttribute('aria-label',label+': '+context);node.addEventListener('click',()=>{if(!busy)fn();});}
   function replaceList(container,build){const fragment=document.createDocumentFragment();container.setAttribute('aria-busy','true');build(fragment);container.textContent='';container.appendChild(fragment);container.setAttribute('aria-busy','false');}
   function render(state) {
+    window.clearTimeout(responseTimer);
     busy=false;el('save').disabled=false;el('save-send').disabled=false;el('prepare').disabled=!bridge;
     if(state.error){saveToQueue=false;if(state.prepared!==true)clear();setText(el('status'),state.error);return;}
     window.clearTimeout(expiry);
@@ -61,7 +70,7 @@
   el('lock').addEventListener('click',()=>{if(allow()){clear();send('lock');}});
   fields.forEach(k=>{el(k).addEventListener('input',dirtyNotice);el(k).addEventListener('change',dirtyNotice);});
   if(window.VinkuloNavigation)window.VinkuloNavigation.register('visitor-section',{dirty,discard:reset,busy:()=>busy&&lastAction!=='status'});
-  document.addEventListener('visibilitychange',()=>{preparationDone=null;clear();busy=false;requestId++;if(!document.hidden)send('status');});
+  document.addEventListener('visibilitychange',()=>{window.clearTimeout(responseTimer);preparationDone=null;clear();busy=false;requestId++;if(!document.hidden)send('status');});
   window.setInterval(()=>{if(!document.hidden&&!busy)send('status');},15000);
   reset();send('status');
 })();

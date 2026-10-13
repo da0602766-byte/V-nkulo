@@ -3,7 +3,7 @@ name: Validar APK do Vínkulo
 on:
   workflow_dispatch:
   push:
-    branches: [review/offline-ux-20261008]
+    branches: [fix/manual-offline-20261013]
   pull_request:
     branches: [main]
     paths:
@@ -74,13 +74,13 @@ jobs:
           sha256sum app/build/outputs/apk/release/app-release.apk
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: Vinkulo-Android-1.21.0-homologacao-api${{ matrix.api }}
+          name: Vinkulo-Android-1.22.0-homologacao-api${{ matrix.api }}
           path: Vinkulo-Android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: Vinkulo-Android-1.21.0-validacao-api${{ matrix.api }}
+          name: Vinkulo-Android-1.22.0-validacao-api${{ matrix.api }}
           path: |
             Vinkulo-Android/build/reports/dependency-verification/
             Vinkulo-Android/app/build/reports/
@@ -152,7 +152,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: Vinkulo-Android-1.21.0-emulador-api${{ matrix.api }}
+          name: Vinkulo-Android-1.22.0-emulador-api${{ matrix.api }}
           path: |
             Vinkulo-Android/app/build/reports/androidTests/
             Vinkulo-Android/app/build/outputs/androidTest-results/
