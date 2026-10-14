@@ -1,3 +1,5 @@
+import { CARE_FIELDS, parseVisitorCare, isVisitorDate, visitorBoolean } from "../../../lib/visitor-care";
+import { visitorToday } from "../../../lib/visitor-attention";
 import { getD1 } from "../../../../db";
 import { recordTenantAudit } from "../../../lib/tenant-audit";
 import { requireTenantPermission } from "../../../lib/tenant";
@@ -22,6 +24,7 @@ const VISIONS = new Set([
   "pendencias",
   "sem_contato",
   "arquivados",
+  "sem_celula", "sem_discipulado", "sem_ministerio", "certificado", "apoio_social",
 ]);
 
 export async function GET(request: Request) {
@@ -36,6 +39,7 @@ export async function GET(request: Request) {
   const categoryMode = categoryParam === "sem-categoria"
     ? -1
     : Math.max(0, Number(categoryParam) || 0);
+  const personId = Math.max(0, Number(params.get("id")) || 0);
   const like = `%${search}%`;
   const db = getD1();
   const migratedVisitors = await migrateVisitorAgeCategories(db, access.context.comunidadeId);
@@ -64,7 +68,7 @@ export async function GET(request: Request) {
   const result = await db
     .prepare(
       `SELECT v.id, v.nome_completo, v.data_nascimento, v.telefone, v.email,
-        v.batizado, v.status, v.endereco, v.acompanhante, v.parente,
+        v.batizado, v.status, v.tipo_pessoa, v.certificado_batismo, v.discipulado, v.discipulador, v.doa_a_doa, v.doa_receber, v.doacoes_realizadas, v.oficial, v.funcao_oficial, v.responsavel_acompanhamento, v.proxima_acao, v.data_proxima_acao, v.endereco, v.acompanhante, v.parente,
         v.encontro_com_deus, v.curso_membros, v.ministerio,
         v.data_entrada, v.observacoes, v.celula_id, v.categoria_id, v.criado_por,
         v.ativo, v.criado_em, v.atualizado_em,
@@ -100,11 +104,16 @@ export async function GET(request: Request) {
           OR (? <> 'arquivados' AND v.ativo = 1)
         )
         AND (
-          ? = 'todos'
+          (? = 'todos')
+          OR (? = 'sem_celula' AND v.celula_id IS NULL)
+          OR (? = 'sem_discipulado' AND v.discipulado <> 'SIM')
+          OR (? = 'sem_ministerio' AND trim(COALESCE(v.ministerio, '')) = '')
+          OR (? = 'certificado' AND v.batizado = 'SIM' AND v.certificado_batismo <> 'SIM')
+          OR (? = 'apoio_social' AND v.doa_receber = 'SIM')
           OR ? = 'arquivados'
           OR (? = 'novos' AND v.status = 'NOVO')
           OR (? = 'acompanhamento' AND v.status = 'EM_ACOMPANHAMENTO')
-          OR (? = 'pendencias' AND EXISTS (
+          OR (? = 'pendencias' AND (v.data_proxima_acao <= date('now', '-3 hours') OR EXISTS (
             SELECT 1 FROM acompanhamentos ax
             WHERE ax.visitante_id = v.id AND ax.comunidade_id = v.comunidade_id
               AND ax.escopo_confirmado = 1 AND ax.proximo_contato IS NOT NULL
@@ -112,7 +121,7 @@ export async function GET(request: Request) {
                 WHERE latest.visitante_id = v.id AND latest.comunidade_id = v.comunidade_id
                   AND latest.escopo_confirmado = 1)
               AND ax.proximo_contato <= date('now', '-3 hours')
-          ))
+          )))
           OR (? = 'sem_contato'
             AND date(v.data_entrada) <= date('now', '-3 hours', '-15 days')
             AND NOT EXISTS (
@@ -122,6 +131,7 @@ export async function GET(request: Request) {
                 AND date(ax.criado_em, '-3 hours') > date('now', '-3 hours', '-15 days')
             ))
         )
+        AND (? = 0 OR v.id = ?)
         AND (? = 0 OR v.id < ?)
         AND (? = 0 OR (? = -1 AND v.categoria_id IS NULL) OR v.categoria_id = ?)
         AND (? = '' OR v.nome_completo LIKE ? OR COALESCE(v.telefone, '') LIKE ? OR COALESCE(v.email, '') LIKE ?)
@@ -138,6 +148,8 @@ export async function GET(request: Request) {
       vision,
       vision,
       vision,
+      vision, vision, vision, vision, vision,
+      personId, personId,
       cursor,
       cursor,
       categoryMode,
@@ -152,7 +164,7 @@ export async function GET(request: Request) {
     .all<Record<string, unknown>>();
   const hasMore = result.results.length > PAGE_SIZE;
   const visitors = result.results.slice(0, PAGE_SIZE);
-  const month = new Date().toISOString().slice(5, 7);
+  const month = visitorToday().slice(5, 7);
   const birthdays = await db
     .prepare(
       `SELECT id, nome_completo, data_nascimento, telefone
@@ -160,8 +172,7 @@ export async function GET(request: Request) {
        WHERE comunidade_id = ? AND ativo = 1 AND escopo_confirmado = 1
          AND data_nascimento IS NOT NULL
          AND substr(data_nascimento, 6, 2) = ?
-       ORDER BY substr(data_nascimento, 9, 2) ASC, nome_completo ASC
-       LIMIT 5`,
+       ORDER BY substr(data_nascimento, 9, 2) ASC, nome_completo ASC`,
     )
     .bind(access.context.comunidadeId, month)
     .all<Record<string, unknown>>();
@@ -174,7 +185,7 @@ export async function GET(request: Request) {
         SUM(CASE WHEN v.ativo = 1 AND v.status = 'EM_CONTATO' THEN 1 ELSE 0 END) AS em_contato,
         SUM(CASE WHEN v.ativo = 1 AND v.status = 'EM_ACOMPANHAMENTO' THEN 1 ELSE 0 END) AS acompanhamento,
         SUM(CASE WHEN v.ativo = 1 AND v.status = 'INTEGRADO' THEN 1 ELSE 0 END) AS integrado,
-        SUM(CASE WHEN v.ativo = 1 AND EXISTS (
+        SUM(CASE WHEN v.ativo = 1 AND (v.data_proxima_acao <= date('now', '-3 hours') OR EXISTS (
           SELECT 1 FROM acompanhamentos a
           WHERE a.visitante_id = v.id AND a.comunidade_id = v.comunidade_id
             AND a.escopo_confirmado = 1 AND a.proximo_contato IS NOT NULL
@@ -182,7 +193,7 @@ export async function GET(request: Request) {
               WHERE latest.visitante_id = v.id AND latest.comunidade_id = v.comunidade_id
                 AND latest.escopo_confirmado = 1)
             AND a.proximo_contato <= date('now', '-3 hours')
-        ) THEN 1 ELSE 0 END) AS pendencias,
+        )) THEN 1 ELSE 0 END) AS pendencias,
         SUM(CASE WHEN v.ativo = 1
           AND date(v.data_entrada) <= date('now', '-3 hours', '-15 days')
           AND NOT EXISTS (
@@ -191,6 +202,11 @@ export async function GET(request: Request) {
               AND a.escopo_confirmado = 1
               AND date(a.criado_em, '-3 hours') > date('now', '-3 hours', '-15 days')
           ) THEN 1 ELSE 0 END) AS sem_contato
+        ,SUM(CASE WHEN v.ativo = 1 AND v.celula_id IS NULL THEN 1 ELSE 0 END) AS sem_celula
+        ,SUM(CASE WHEN v.ativo = 1 AND v.discipulado <> 'SIM' THEN 1 ELSE 0 END) AS sem_discipulado
+        ,SUM(CASE WHEN v.ativo = 1 AND trim(COALESCE(v.ministerio, '')) = '' THEN 1 ELSE 0 END) AS sem_ministerio
+        ,SUM(CASE WHEN v.ativo = 1 AND v.batizado = 'SIM' AND v.certificado_batismo <> 'SIM' THEN 1 ELSE 0 END) AS certificado
+        ,SUM(CASE WHEN v.ativo = 1 AND v.doa_receber = 'SIM' THEN 1 ELSE 0 END) AS apoio_social
       FROM visitantes v
       WHERE v.comunidade_id = ? AND v.escopo_confirmado = 1`,
     )
@@ -202,6 +218,7 @@ export async function GET(request: Request) {
       nextCursor: hasMore ? Number(visitors.at(-1)?.id || 0) : null,
       aniversariantes: birthdays.results,
       contagens: {
+        ...Object.fromEntries(["sem_celula", "sem_discipulado", "sem_ministerio", "certificado", "apoio_social"].map(key => [key, Number(counts?.[key] || 0)])),
         todos: Number(counts?.todos || 0),
         novos: Number(counts?.novos || 0),
         em_contato: Number(counts?.em_contato || 0),
@@ -231,12 +248,12 @@ export async function POST(request: Request) {
   const acompanhante = cleanText(payload.acompanhante, 120);
   const parente = cleanText(payload.parente, 120);
   const ministerio = cleanText(payload.ministerio, 120);
-  const encontroComDeus = Boolean(payload.encontroComDeus);
-  const cursoMembros = Boolean(payload.cursoMembros);
+  const encontroComDeus = visitorBoolean(payload.encontroComDeus);
+  const cursoMembros = visitorBoolean(payload.cursoMembros);
   const batizado = cleanText(payload.batizado, 30).toUpperCase() || "NAO_INFORMADO";
   const status = cleanText(payload.status, 40).toUpperCase() || "NOVO";
   const dataEntrada =
-    cleanText(payload.dataEntrada, 10) || new Date().toISOString().slice(0, 10);
+    cleanText(payload.dataEntrada, 10) || visitorToday();
   const observacoes = cleanText(payload.observacoes, 1000);
   const celulaId = Number(payload.celulaId || 0) || null;
   const categoriaId = Number(payload.categoriaId || 0) || null;
@@ -245,6 +262,10 @@ export async function POST(request: Request) {
     ? ""
     : rawCategoriaNome;
 
+  const care = parseVisitorCare(payload);
+  if ("error" in care) return Response.json({ error: care.error }, { status: 400 });
+  if (dataNascimento > visitorToday() || dataEntrada > visitorToday()) return Response.json({ error: "Nascimento e chegada não podem estar no futuro." }, { status: 400 });
+  if (batizado !== "SIM" && care.values.certificado_batismo === "SIM") return Response.json({ error: "Confirme o batismo antes de registrar o certificado." }, { status: 400 });
   if (!nome) {
     return Response.json(
       { error: "Nome completo é obrigatório." },
@@ -254,13 +275,13 @@ export async function POST(request: Request) {
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return Response.json({ error: "E-mail inválido." }, { status: 400 });
   }
-  if (dataNascimento && !isIsoDate(dataNascimento)) {
+  if (dataNascimento && !isVisitorDate(dataNascimento)) {
     return Response.json(
       { error: "Data de nascimento inválida." },
       { status: 400 },
     );
   }
-  if (!BAPTISM.has(batizado) || !STATUS.has(status) || !isIsoDate(dataEntrada)) {
+  if (!BAPTISM.has(batizado) || !STATUS.has(status) || !isVisitorDate(dataEntrada)) {
     return Response.json(
       { error: "Revise batismo, status e data de entrada." },
       { status: 400 },
@@ -274,7 +295,7 @@ export async function POST(request: Request) {
     email,
     parente,
   });
-  if (duplicates.length) {
+  if (duplicates.length && !visitorBoolean(payload.confirmarDuplicidade)) {
     return Response.json(
       {
         error: "Já existe uma ficha semelhante. Abra o cadastro existente antes de continuar.",
@@ -308,6 +329,9 @@ export async function POST(request: Request) {
         .first<{ id: number }>()
     : null;
   if (!category && categoriaNome) {
+    if (!access.context.isOwner && !access.context.permissions.includes("visitor.categories.manage")) {
+      return Response.json({ error: "Escolha uma categoria existente. Criar ou reativar categorias exige permissão de gestão." }, { status: 403 });
+    }
     category = await db
       .prepare(
         `SELECT id FROM visitante_categorias
@@ -371,8 +395,8 @@ export async function POST(request: Request) {
         comunidade_id, nome_completo, data_nascimento, telefone, email,
         batizado, status, endereco, acompanhante, parente, celula, celula_id, categoria_id,
         encontro_com_deus, curso_membros, ministerio, data_entrada,
-        observacoes, criado_por, ativo, escopo_confirmado
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)`,
+        observacoes, criado_por, ${Object.values(CARE_FIELDS).join(", ")}, ativo, escopo_confirmado
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${Object.keys(CARE_FIELDS).map(() => "?").join(", ")}, 1, 1)`,
     )
     .bind(
       access.context.comunidadeId,
@@ -394,6 +418,7 @@ export async function POST(request: Request) {
       dataEntrada,
       observacoes || null,
       access.user.email,
+      ...Object.values(care.values),
     )
     .run();
   const visitorId = Number(result.meta.last_row_id);
@@ -415,10 +440,6 @@ export async function POST(request: Request) {
 
 function cleanText(value: unknown, maxLength: number) {
   return String(value ?? "").trim().slice(0, maxLength);
-}
-
-function isIsoDate(value: string) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value));
 }
 
 type DuplicateInput = {
@@ -448,7 +469,6 @@ async function findPotentialDuplicates(
            (? <> '' AND lower(trim(nome_completo)) = ?)
            OR (? <> '' AND lower(trim(COALESCE(email, ''))) = ?)
            OR (? <> '' AND REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(telefone, ''), '(', ''), ')', ''), '-', ''), ' ', ''), '+', ''), '.', '') = ?)
-           OR (? <> '' AND lower(trim(COALESCE(parente, ''))) = ?)
          )
        ORDER BY ativo DESC, atualizado_em DESC
        LIMIT 5`,
@@ -461,8 +481,7 @@ async function findPotentialDuplicates(
       email,
       telefone,
       telefone,
-      parente,
-      parente,
+
     )
     .all<Record<string, unknown>>();
   return result.results;

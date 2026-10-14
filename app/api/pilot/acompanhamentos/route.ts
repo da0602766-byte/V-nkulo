@@ -1,8 +1,9 @@
+import { isVisitorDate } from "../../../lib/visitor-care";
 import { getD1 } from "../../../../db";
 import { recordTenantAudit } from "../../../lib/tenant-audit";
 import { requireTenantPermission } from "../../../lib/tenant";
 
-const TYPES = new Set(["WHATSAPP", "TELEFONE", "PRESENCIAL", "EMAIL", "OUTRO"]);
+const TYPES = new Set(["WHATSAPP", "TELEFONE", "PRESENCIAL", "VISITA", "EMAIL", "OUTRO"]);
 
 export async function GET(request: Request) {
   const access = await requireTenantPermission("followups.view");
@@ -25,13 +26,12 @@ export async function GET(request: Request) {
   const result = await getD1()
     .prepare(
       `SELECT a.id, a.visitante_id, a.tipo, a.resultado, a.descricao,
-        a.proximo_contato, a.criado_em, v.nome_completo AS visitante_nome
+        a.proximo_contato, a.criado_em, a.responsavel_email, v.nome_completo AS visitante_nome
       FROM acompanhamentos a
       JOIN visitantes v
         ON v.id = a.visitante_id
        AND v.comunidade_id = a.comunidade_id
-       AND v.ativo = 1
-       AND v.escopo_confirmado = 1
+              AND v.escopo_confirmado = 1
       WHERE a.visitante_id = ?
         AND a.comunidade_id = ?
         AND a.escopo_confirmado = 1
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
     visitorId <= 0 ||
     !TYPES.has(tipo) ||
     !resultado ||
-    (proximoContato && !/^\d{4}-\d{2}-\d{2}$/.test(proximoContato))
+    (proximoContato && !isVisitorDate(proximoContato))
   ) {
     return Response.json({ error: "Dados do acompanhamento inválidos." }, { status: 400 });
   }
@@ -109,7 +109,7 @@ export async function POST(request: Request) {
     .run();
   await db
     .prepare(
-      `UPDATE visitantes SET status = 'EM_ACOMPANHAMENTO',
+      `UPDATE visitantes SET status = CASE WHEN status = 'INTEGRADO' THEN status ELSE 'EM_ACOMPANHAMENTO' END,
         atualizado_em = CURRENT_TIMESTAMP
       WHERE id = ? AND comunidade_id = ? AND ativo = 1 AND escopo_confirmado = 1`,
     )

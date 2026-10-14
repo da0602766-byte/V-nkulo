@@ -8,6 +8,7 @@ import { purgeExpiredPrivateMessagesIfDue } from "../app/lib/chat-retention";
 import { runAutoSyncIfDue } from "../app/lib/supabase-auto-sync";
 import { scheduleWebPushDelivery } from "../app/lib/push-delivery-queue";
 import { purgeAccessRequests } from "../app/lib/access-retention";
+import { syncPendingVisitorSheets } from "../app/lib/visitor-sheets";
 
 interface Env {
   ASSETS: Fetcher;
@@ -41,6 +42,7 @@ let nextOptimizerCheckAt = 0;
 let nextAutoSyncCheckAt = 0;
 let nextPushQueueCheckAt = 0;
 let nextAccessCleanupAt = 0;
+let nextVisitorSheetCheckAt = 0;
 const AUTO_SYNC_CHECK_MS = 60_000;
 const AUTO_SYNC_MUTATION_PATHS = [
   "/api/auth/cadastro", "/api/conta/perfil", "/api/pilot/pessoas",
@@ -105,6 +107,11 @@ const worker = {
       );
       if (resetRequest) return withSecurityHeaders(response, url.pathname);
       const now = Date.now();
+      const visitorMutation = UNSAFE_METHODS.has(request.method) && /^\/api\/(pilot\/(visitantes|acompanhamentos|celulas|visitante-categorias)|mobile\/visitors)(\/|$)/.test(url.pathname);
+      if (response.status < 400 && (visitorMutation || now >= nextVisitorSheetCheckAt) && url.pathname.startsWith("/api/") && !url.pathname.includes("/planilha")) {
+        nextVisitorSheetCheckAt = now + 60000;
+        ctx.waitUntil(runWithRuntimeEnv({ ...env, executionContext: ctx }, () => syncPendingVisitorSheets(env.DB).catch(() => undefined)));
+      }
       if (now >= nextAccessCleanupAt && env.DB) {
         nextAccessCleanupAt = now + 10 * 60_000;
         ctx.waitUntil(purgeAccessRequests(env.DB).catch(() => undefined));

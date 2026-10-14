@@ -19,6 +19,7 @@ type GoogleIdentity = {
 
 type OAuthState = {
   purpose: "login" | "drive";
+  visitorSheets?: boolean;
   userId: number;
   returnTo: string;
   nonce: string;
@@ -48,7 +49,7 @@ export async function createGoogleAuthorization(
   url.searchParams.set("client_id", env.clientId);
   url.searchParams.set("redirect_uri", `${origin}/api/auth/google/callback`);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", [...BASE_SCOPES, ...(state.purpose === "drive" ? [DRIVE_SCOPE] : [])].join(" "));
+  url.searchParams.set("scope", [...BASE_SCOPES, ...(state.purpose === "drive" ? [DRIVE_SCOPE] : []), ...(state.visitorSheets ? ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive.metadata.readonly"] : [])].join(" "));
   url.searchParams.set("state", signedState);
   url.searchParams.set("include_granted_scopes", "true");
   if (state.purpose === "drive") {

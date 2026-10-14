@@ -1,0 +1,50 @@
+.visitor-care-fields { display: grid; gap: 20px; min-width: 0; }
+.visitor-care-fields fieldset { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 0; padding: 20px; border: 1px solid var(--pilot-line); border-radius: 16px; min-width: 0; }
+.visitor-care-fields legend { padding-inline: 8px; font-size: 15px; font-weight: 700; color: var(--pilot-text); }
+.visitor-care-fields fieldset > p { grid-column: 1 / -1; margin: 0; font-size: 13px; color: var(--pilot-muted); line-height: 1.6; }
+.visitor-care-fields label { display: grid; align-content: start; gap: 8px; min-width: 0; font-size: 13px; color: var(--pilot-text); }
+.visitor-care-fields :is(input, select, textarea) { width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid var(--pilot-line); border-radius: 10px; background: var(--pilot-surface); color: var(--pilot-text); font: inherit; }
+.visitor-care-fields small { line-height: 1.5; color: var(--pilot-muted); }
+.visitor-care-summary { padding: 20px; border: 1px solid var(--pilot-line); border-radius: 16px; background: var(--pilot-surface-2); }
+.visitor-person-drawer-v2 > .visitor-care-summary { margin: 16px 20px; }
+.visitor-registration-modal { position: fixed; inset: 0; width: 100vw; max-width: none; height: 100dvh; max-height: none; margin: 0; padding: 0; border: 0; overflow: hidden; background: transparent; color: var(--pilot-text); }
+.visitor-person-dialog, .visitor-registration-modal { width: calc(100vw * var(--vinkulo-ui-scale-inverse, 1)); height: calc(100dvh * var(--vinkulo-ui-scale-inverse, 1)); }
+.visitor-person-dialog .visitor-person-drawer-v2 { height: 100%; max-height: 100%; }
+.visitor-registration-modal::backdrop { background: #020711b8; backdrop-filter: blur(6px); }
+.visitor-registration-modal .visitor-registration-backdrop { position: absolute; overflow: hidden; background: transparent; backdrop-filter: none; }
+@media (max-width: 680px) {
+  .visitor-registration-modal .visitor-registration-dialog { height: 100% !important; max-height: 100% !important; }
+  .visitor-registration-modal .visitor-registration-dialog .visitor-registration { padding-bottom: calc(24px + env(safe-area-inset-bottom)) !important; }
+}
+@media (max-width: 600px) {
+  .visitor-person-dialog .visitor-person-drawer-v2 { width: 100%; max-width: none; }
+  .visitor-person-dialog .visitor-person-summary-v2 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .visitor-person-dialog .visitor-person-summary-v2 > div { min-width: 0; }
+  .visitor-person-dialog .visitor-person-summary-v2 dd { overflow-wrap: anywhere; }
+  .visitor-person-drawer-v2 > .visitor-care-summary { margin: 16px 12px; }
+}
+.visitor-care-summary header > span, .visitor-integration-board header > span { font-size: 10px; letter-spacing: .12em; font-weight: 700; color: var(--pilot-muted); }
+.visitor-care-summary h3, .visitor-integration-board h3 { margin: 6px 0 16px; color: var(--pilot-text); font-size: 18px; }
+.visitor-care-next { display: grid; gap: 8px; padding: 16px; border-left: 3px solid var(--pilot-primary); background: var(--pilot-surface); border-radius: 8px; overflow-wrap: anywhere; }
+.visitor-care-summary ul { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; list-style: none; margin: 16px 0; }
+.visitor-care-summary li { padding: 7px 10px; font-size: 12px; border: 1px solid var(--pilot-line); border-radius: 8px; background: var(--pilot-surface); }
+.visitor-care-summary dl { display: grid; gap: 14px; margin: 18px 0 0; }
+.visitor-care-summary dt { font-size: 12px; color: var(--pilot-muted); margin-bottom: 4px; }
+.visitor-care-summary dd { margin: 0; font-size: 14px; overflow-wrap: anywhere; }
+.visitor-preserve-lines { white-space: pre-wrap; overflow-wrap: anywhere; }
+.visitor-integration-board { margin-bottom: 20px; padding: 22px; border: 1px solid var(--pilot-line); border-radius: 16px; background: var(--pilot-surface); }
+.visitor-integration-board > div { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.visitor-integration-board button { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 16px; min-height: 92px; text-align: left; border: 1px solid var(--pilot-line); border-radius: 12px; background: var(--pilot-surface-2); color: var(--pilot-text); cursor: pointer; font: inherit; }
+.visitor-integration-board button:hover { border-color: var(--pilot-primary); }
+.visitor-integration-board b { font-size: 26px; line-height: 1; }
+.visitor-integration-board span { font-size: 12px; line-height: 1.5; }
+.visitor-sheets-panel { margin: 20px 0; padding: 22px; border: 1px solid var(--pilot-line); border-radius: 16px; background: var(--pilot-surface); color: var(--pilot-text); }
+.visitor-sheets-panel h3 { margin: 0 0 8px; }
+.visitor-sheets-panel p { font-size: 13px; line-height: 1.6; color: var(--pilot-muted); }
+.visitor-sheets-panel form, .visitor-sheets-panel label { display: grid; gap: 10px; }
+.visitor-sheets-panel input { width: 100%; padding: 12px; min-height: 44px; border: 1px solid var(--pilot-line); border-radius: 8px; background: var(--pilot-surface-2); color: var(--pilot-text); font: inherit; }
+.visitor-sheets-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.visitor-sheets-panel button, .visitor-sheets-panel a { padding: 10px 14px; min-height: 44px; border: 1px solid var(--pilot-line); border-radius: 8px; font: inherit; color: var(--pilot-text); background: var(--pilot-surface-2); cursor: pointer; text-decoration: none; }
+.visitor-care-fields :is(input, select, textarea):focus-visible, .visitor-sheets-panel :focus-visible { outline: 3px solid var(--pilot-primary); outline-offset: 2px; }
+@media (max-width: 900px) { .visitor-integration-board > div { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .visitor-care-fields fieldset { grid-template-columns: minmax(0, 1fr); padding: 16px; } .visitor-care-fields :is(input, select, textarea), .visitor-sheets-panel input { font-size: 16px; } .visitor-integration-board > div { grid-template-columns: repeat(2, minmax(0, 1fr)); } .visitor-integration-board { padding: 16px; } }

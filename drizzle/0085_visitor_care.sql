@@ -1,0 +1,13 @@
+ALTER TABLE visitantes ADD COLUMN tipo_pessoa TEXT NOT NULL DEFAULT 'VISITANTE' CHECK(tipo_pessoa IN ('VISITANTE','MEMBRO'));
+ALTER TABLE visitantes ADD COLUMN certificado_batismo TEXT NOT NULL DEFAULT 'NAO_INFORMADO';
+ALTER TABLE visitantes ADD COLUMN discipulado TEXT NOT NULL DEFAULT 'NAO_INFORMADO';
+ALTER TABLE visitantes ADD COLUMN discipulador TEXT;
+ALTER TABLE visitantes ADD COLUMN doa_a_doa TEXT NOT NULL DEFAULT 'NAO_INFORMADO';
+ALTER TABLE visitantes ADD COLUMN doa_receber TEXT NOT NULL DEFAULT 'NAO_INFORMADO';
+ALTER TABLE visitantes ADD COLUMN doacoes_realizadas TEXT;
+ALTER TABLE visitantes ADD COLUMN oficial TEXT NOT NULL DEFAULT 'NAO_INFORMADO';
+ALTER TABLE visitantes ADD COLUMN funcao_oficial TEXT;
+ALTER TABLE visitantes ADD COLUMN responsavel_acompanhamento TEXT;
+ALTER TABLE visitantes ADD COLUMN proxima_acao TEXT;
+ALTER TABLE visitantes ADD COLUMN data_proxima_acao TEXT;
+CREATE INDEX visitantes_proxima_acao_idx ON visitantes(comunidade_id, ativo, data_proxima_acao);

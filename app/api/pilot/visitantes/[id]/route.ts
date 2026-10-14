@@ -1,3 +1,5 @@
+import { parseVisitorCare, isVisitorDate, visitorBoolean } from "../../../../lib/visitor-care";
+import { visitorToday } from "../../../../lib/visitor-attention";
 import { getD1 } from "../../../../../db";
 import { recordTenantAudit } from "../../../../lib/tenant-audit";
 import { requireTenantPermission } from "../../../../lib/tenant";
@@ -19,10 +21,24 @@ export async function PATCH(request: Request, context: Context) {
   if (!Number.isInteger(id) || id <= 0) {
     return Response.json({ error: "Visitante inválido." }, { status: 400 });
   }
-  const payload = (await request.json()) as Record<
+  const submitted = (await request.json()) as Record<
     string,
     string | number | boolean | null
   >;
+  const db = getD1();
+  const existing = await db.prepare("SELECT * FROM visitantes WHERE id = ? AND comunidade_id = ? AND escopo_confirmado = 1").bind(id, access.context.comunidadeId).first<Record<string, unknown>>();
+  if (!existing) return Response.json({ error: "Visitante não encontrado." }, { status: 404 });
+  if (submitted.reativar === true) {
+    if (!access.context.permissions.includes("visitors.deactivate")) return Response.json({ error: "Sem permissão para reativar." }, { status: 403 });
+    await db.prepare("UPDATE visitantes SET ativo = 1, status = 'EM_ACOMPANHAMENTO', atualizado_em = CURRENT_TIMESTAMP WHERE id = ? AND comunidade_id = ?").bind(id, access.context.comunidadeId).run();
+    await recordTenantAudit(db, access.context, access.user.id, "VISITANTE_REATIVADO", "SUCESSO", { visitanteId: id });
+    return Response.json({ ok: true });
+  }
+  if (!existing.ativo) return Response.json({ error: "Reative a ficha antes de editar." }, { status: 409 });
+  const legacy = { nomeCompleto: "nome_completo", telefone: "telefone", email: "email", dataNascimento: "data_nascimento", endereco: "endereco", acompanhante: "acompanhante", parente: "parente", ministerio: "ministerio", encontroComDeus: "encontro_com_deus", cursoMembros: "curso_membros", batizado: "batizado", status: "status", dataEntrada: "data_entrada", observacoes: "observacoes", celulaId: "celula_id", categoriaId: "categoria_id" };
+  const payload = { ...Object.fromEntries(Object.entries(legacy).map(([key, col]) => [key, existing[col]])), ...submitted };
+  const care = parseVisitorCare(submitted, existing);
+  if ("error" in care) return Response.json({ error: care.error }, { status: 400 });
   const nome = cleanText(payload.nomeCompleto, 120);
   const telefone = cleanText(payload.telefone, 30);
   const email = cleanText(payload.email, 180).toLowerCase();
@@ -31,8 +47,8 @@ export async function PATCH(request: Request, context: Context) {
   const acompanhante = cleanText(payload.acompanhante, 120);
   const parente = cleanText(payload.parente, 120);
   const ministerio = cleanText(payload.ministerio, 120);
-  const encontroComDeus = Boolean(payload.encontroComDeus);
-  const cursoMembros = Boolean(payload.cursoMembros);
+  const encontroComDeus = visitorBoolean(payload.encontroComDeus);
+  const cursoMembros = visitorBoolean(payload.cursoMembros);
   const batizado = cleanText(payload.batizado, 30).toUpperCase();
   const status = cleanText(payload.status, 40).toUpperCase();
   const dataEntrada = cleanText(payload.dataEntrada, 10);
@@ -42,23 +58,12 @@ export async function PATCH(request: Request, context: Context) {
   if (
     !nome ||
     (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) ||
-    (dataNascimento && !/^\d{4}-\d{2}-\d{2}$/.test(dataNascimento)) ||
+    (dataNascimento && (!isVisitorDate(dataNascimento) || dataNascimento > visitorToday())) ||
     !BAPTISM.has(batizado) ||
     !STATUS.has(status) ||
-    !/^\d{4}-\d{2}-\d{2}$/.test(dataEntrada)
+    !isVisitorDate(dataEntrada) || dataEntrada > visitorToday() || (batizado !== "SIM" && care.values.certificado_batismo === "SIM")
   ) {
     return Response.json({ error: "Dados inválidos." }, { status: 400 });
-  }
-  const db = getD1();
-  const existing = await db
-    .prepare(
-      `SELECT id FROM visitantes
-      WHERE id = ? AND comunidade_id = ? AND ativo = 1 AND escopo_confirmado = 1`,
-    )
-    .bind(id, access.context.comunidadeId)
-    .first<{ id: number }>();
-  if (!existing) {
-    return Response.json({ error: "Visitante não encontrado." }, { status: 404 });
   }
   const cell = celulaId
     ? await db
@@ -95,7 +100,7 @@ export async function PATCH(request: Request, context: Context) {
     access.context.comunidadeId,
     dataNascimento || null,
   );
-  const effectiveCategoryId = automaticCategory?.id || category?.id || null;
+  const effectiveCategoryId = category?.id || automaticCategory?.id || null;
   await db
     .prepare(
       `UPDATE visitantes SET
@@ -103,6 +108,7 @@ export async function PATCH(request: Request, context: Context) {
         batizado = ?, status = ?, endereco = ?, acompanhante = ?, parente = ?,
         celula = ?, celula_id = ?, categoria_id = ?, encontro_com_deus = ?,
         curso_membros = ?, ministerio = ?, data_entrada = ?, observacoes = ?,
+        ${Object.keys(care.values).map(column => `${column} = ?`).join(", ")},
         atualizado_em = CURRENT_TIMESTAMP
       WHERE id = ? AND comunidade_id = ? AND ativo = 1 AND escopo_confirmado = 1`,
     )
@@ -124,6 +130,7 @@ export async function PATCH(request: Request, context: Context) {
       ministerio || null,
       dataEntrada,
       observacoes || null,
+      ...Object.values(care.values),
       id,
       access.context.comunidadeId,
     )
@@ -136,6 +143,8 @@ export async function PATCH(request: Request, context: Context) {
     "SUCESSO",
     {
       visitanteId: id,
+      camposAlterados: Object.keys(submitted).filter(key => key !== "observacoes"),
+      proximaAcaoConcluida: Boolean(existing.proxima_acao && Object.hasOwn(submitted, "proximaAcao") && !care.values.proxima_acao),
       celulaId: cell?.id || null,
       categoriaId: effectiveCategoryId,
       categoriaAutomatica: Boolean(automaticCategory),

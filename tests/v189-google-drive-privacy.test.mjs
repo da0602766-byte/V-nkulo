@@ -85,9 +85,12 @@ test("interface explica destino e deixa anexos de publicação sob demanda", asy
   assert.match(storage, /O conteúdo compartilhado segue disponível na comunidade/);
   assert.match(storage, /Carregar os mais recentes automaticamente/);
   assert.match(storage, /O download manual está sempre disponível/);
-  assert.match(image, /"Visualizar"/);
+  // As opções foram extraídas para o componente compartilhado do feed.
+  assert.match(image, /<FeedImageActions source=\{src\}/);
   assert.match(image, /setRequestedLoad/);
-  assert.match(image, /<FileSaveActions source=\{src\}/);
+  const imageActions = await read("app/components/feed/FeedImageActions.tsx");
+  assert.match(imageActions, /"Visualizar imagem"/);
+  assert.match(imageActions, /<FileSaveActions source=\{source\}/);
   const actions = await read("app/components/FileSaveActions.tsx");
   assert.match(actions, /run\("download"\)/);
   assert.match(actions, /Baixar no aparelho/);

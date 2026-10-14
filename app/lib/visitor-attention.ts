@@ -7,6 +7,8 @@ type AttentionVisitor = {
   data_entrada: string;
   ultimo_contato: string | null;
   proximo_contato: string | null;
+  responsavel_acompanhamento?: string | null;
+  data_proxima_acao?: string | null;
 };
 
 export function visitorToday(now = new Date()) {
@@ -30,15 +32,17 @@ export function getVisitorAttention(visitor: AttentionVisitor, today = visitorTo
   const reasons: string[] = [];
   if (!visitor.ativo) return { tone: "none", reasons } as const;
   const nextContact = visitor.proximo_contato?.slice(0, 10);
-  const overdue = Boolean(nextContact && nextContact < today);
-  if (overdue) reasons.push("Retorno atrasado");
+  const overdue = Boolean((nextContact && nextContact < today) || (visitor.data_proxima_acao && visitor.data_proxima_acao < today));
+  if (nextContact && nextContact < today) reasons.push("Retorno atrasado");
   else if (nextContact === today) reasons.push("Contato hoje");
+  if (visitor.data_proxima_acao && visitor.data_proxima_acao < today) reasons.push("Ação atrasada");
+  else if (visitor.data_proxima_acao === today) reasons.push("Ação para hoje");
   const daysSinceEntry = (Date.parse(today) - Date.parse(visitor.data_entrada.slice(0, 10))) / 86_400_000;
   if (daysSinceEntry >= 15 && visitorDaysWithoutContact(visitor, today) >= 15) {
     reasons.push("Sem contato há 15 dias ou mais");
   }
   if (!visitor.categoria_nome?.trim()) reasons.push("Sem categoria");
   if (!visitor.telefone?.trim()) reasons.push("Sem telefone");
-  if (!visitor.responsavel_email?.trim() && !visitor.acompanhante?.trim()) reasons.push("Sem responsável");
+  if (!visitor.responsavel_acompanhamento?.trim() && !visitor.responsavel_email?.trim() && !visitor.acompanhante?.trim()) reasons.push("Sem responsável");
   return { tone: overdue ? "overdue" : reasons.length ? "attention" : "none", reasons } as const;
 }

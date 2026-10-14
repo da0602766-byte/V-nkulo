@@ -77,6 +77,11 @@ export async function GET(request: Request) {
       ).bind(identity.picture, userId).run();
     }
     if (state.purpose === "drive") {
+      if (state.visitorSheets) {
+        const target = new URL(state.returnTo || "/painel?view=visitantes", url.origin);
+        target.searchParams.set("google", "connected");
+        return clearStateCookie(mutableRedirect(target));
+      }
       await getD1().prepare(
         `INSERT INTO storage_preferences
           (usuario_id, provider, auto_load_recent, auto_download_files, consented_at, updated_at)
