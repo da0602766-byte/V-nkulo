@@ -153,3 +153,13 @@
   .vd-pagination { font-size: 10px; }
   .vd-pagination > div { gap: 7px; }
 }
+
+.vd-export-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0; }
+.vd-export-tools button { min-height: 36px; font-size: 12px; }
+.vd-export-tools [role=status] { font-size: 12px; }
+.vd-directory .vd-selection { width: 16px; height: 16px; margin-right: 6px; vertical-align: middle; }
+.vd-deadline { display: block; font-size: 10px; white-space: nowrap; }
+.vd-directory .vd-mobile-row[aria-pressed=true] { box-shadow: inset 4px 0 var(--pilot-blue); background: var(--vd-soft); }
+.vd-ministry-link { margin-block: 12px; padding: 12px; border: 1px solid var(--pilot-line); border-radius: 12px; }
+.vd-ministry-link p { font-size: 12px; line-height: 1.5; }
+.vd-ministry-link select { width: 100%; }

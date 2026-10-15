@@ -46,7 +46,7 @@ export async function PATCH(request: Request, context: Context) {
   const endereco = cleanText(payload.endereco, 250);
   const acompanhante = cleanText(payload.acompanhante, 120);
   const parente = cleanText(payload.parente, 120);
-  const ministerio = cleanText(payload.ministerio, 120);
+  const ministerio = submitted.vincularMinisterio === true ? "" : cleanText(payload.ministerio, 120);
   const encontroComDeus = visitorBoolean(payload.encontroComDeus);
   const cursoMembros = visitorBoolean(payload.cursoMembros);
   const batizado = cleanText(payload.batizado, 30).toUpperCase();
@@ -100,6 +100,14 @@ export async function PATCH(request: Request, context: Context) {
     access.context.comunidadeId,
     dataNascimento || null,
   );
+  if (submitted.vincularMinisterio === true) {
+    const link = categoriaId ? await db.prepare(`SELECT vc.migracao_automatica FROM visitante_categorias vc
+      JOIN ministerios_comunidade m ON m.id = vc.ministerio_id AND m.comunidade_id = vc.comunidade_id AND m.status = 'ATIVO'
+      WHERE vc.id = ? AND vc.comunidade_id = ? AND vc.ativa = 1`).bind(categoriaId, access.context.comunidadeId).first<{ migracao_automatica: number }>() : null;
+    if (!link || (link.migracao_automatica && automaticCategory?.id !== categoriaId)) {
+      return Response.json({ error: "Escolha uma categoria vinculada a um ministério ativo e compatível com a idade." }, { status: 400 });
+    }
+  }
   const effectiveCategoryId = category?.id || automaticCategory?.id || null;
   await db
     .prepare(

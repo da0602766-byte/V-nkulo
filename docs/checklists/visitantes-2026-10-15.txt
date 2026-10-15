@@ -1,0 +1,62 @@
+CHECKLIST DE IMPLEMENTAÇÃO — VISITANTES
+Data: 15/10/2026
+Base de comparação: versão publicada 389, commit dabbde61b276ad120c5e81bc08fcf3655f2bcb54.
+Escopo: oito lacunas da auditoria, mantendo a lista compacta solicitada.
+
+CORREÇÕES IMPLEMENTADAS E VERIFICADAS
+[x] 1. Vincular ministério: ação na ficha reutiliza o vínculo categoria–ministério. A categoria escolhida substitui a atual; isso é explicado antes de salvar. O backend valida comunidade, ministério ativo, permissão e compatibilidade de idade. Verificado que o total muda no módulo Ministérios.
+[x] 2. Responsável correto: prioridade ao responsável individual, depois ao da categoria. O autor do contato permanece somente no histórico. Lista, ficha e exportação usam essa regra.
+[x] 3. Busca normalizada: nomes portugueses com/sem acentos, maiúsculas e telefone com/sem pontuação. Filtros continuam combináveis; caracteres de busca não viram curingas SQL.
+[x] 4. Link direto: ficha aberta pelo ID sem depender da primeira página. Fichas arquivadas podem ser consultadas. IDs de outra comunidade não retornam dados.
+[x] 5. Prazos claros: ação e contato aparecem separadamente. Concluir a ação remove seu texto/prazo; o contato pendente continua visível até registrar outro acompanhamento. Histórico preservado.
+[x] 6. Contagem consistente: Em acompanhamento contabiliza somente EM_ACOMPANHAMENTO, alinhado ao contador anterior e à aba correspondente. EM_CONTATO continua disponível no filtro de status.
+[x] 7. Ficha de leitura: endereço visível para quem pode consultar visitantes; telefone válido oferece ligação; WhatsApp preservado. Sem permissão de edição, comandos de alteração ficam ausentes.
+[x] 8. CSV: exporta todas as fichas ativas dos filtros, além da página atual, ou selecionadas entre páginas. Seleção limpa ao mudar filtros/visão/dados. Limite de 50 selecionadas ou 10.000 filtradas, sem exportação parcial acima do limite. UTF-8, aspas/quebras de linha e proteção contra fórmulas. XLSX completo com arquivados permanece em Mais ferramentas.
+
+REGRESSÕES E FUNÇÕES PRESERVADAS
+[x] Cadastro e edição de ficha completa; validação de datas e dados de cuidado.
+[x] Arquivamento, reativação, exclusão e abertura de cadastro duplicado arquivado — testes existentes aprovados.
+[x] Categorias, responsáveis, regras por idade e reordenação — testes existentes aprovados.
+[x] Histórico, paginação, recuperação de erro, cancelamento de consulta e isolamento entre pessoas — testes aprovados.
+[x] Aniversários, painel anterior e anotações/post-its — controles preservados em Mais ferramentas e verificações existentes aprovadas.
+[x] Importação de planilhas — fluxo existente preservado por revisão de código; não foi feito novo ensaio manual de upload.
+[x] Google Sheets — testes de autorização, cancelamento, retomada, sincronização e revogação aprovados; nenhuma sincronização real foi disparada no QA.
+[x] Permissões de membro e gestor e isolamento por comunidade — operações com dados sintéticos verificadas no Worker real em banco local.
+[x] Base única — sem novas tabelas, migrações ou dados fictícios em produção.
+[x] Celular mantém somente nome e status; modo de seleção usa a própria linha, sem acrescentar dados pessoais.
+[x] Navegador: larguras 360, 390, 768, 1024 e 1440 px conferidas por DOM e medidas; largura da página não excedeu a viewport. Lista móvel até 899 px e tabela nas maiores larguras.
+[x] Navegador: exportação filtrada confirmou 18 fichas sintéticas e ficha contextual abriu com endereço e ação de vínculo.
+
+RESULTADOS TÉCNICOS
+[x] TypeScript sem erros.
+[x] ESLint nos arquivos alterados: zero erros e zero avisos.
+[x] Build de produção concluído; Worker ESM e manifesto do artefato validados.
+[x] Suíte específica final: 42 testes, 42 aprovados, zero falhas.
+[!] Suíte geral: 771 testes, 757 aprovados e 14 falhas já existentes na execução anterior. Nenhuma falha nova identificada. Uma expectativa antiga de título foi atualizada de Cadastrar visitante para Cadastrar pessoa, conforme o formulário já existente.
+
+LIMITES DA VERIFICAÇÃO
+[ ] Capturas novas de tela e inspeção visual por imagem: indisponíveis por falha da ferramenta de captura já constatada nesta sessão. Medidas de DOM não substituem a avaliação visual completa.
+[ ] Revisão manual completa de contraste, tema escuro, ampliação de fonte e todos os percursos de teclado em cada tamanho: não concluída nesta rodada.
+[ ] Corrigir as 14 falhas gerais preexistentes abaixo: fora do escopo desta correção de Visitantes.
+
+FALHAS GERAIS PREEXISTENTES
+- Pedidos troca filtro sem esperar resposta anterior e ignora a resposta cancelada
+- Pedidos diferencia erro de lista vazia e permite repetir a consulta
+- Pedidos não anexa uma página antiga depois de trocar filtros
+- Pedidos remove resultados anteriores quando a sessão perde acesso
+- gestão, visitantes, notificações e mensagens seguem o novo layout
+- Mural e Escalas levam a destinos próprios em vez de repetir a view
+- o fio não lê o relógio durante a renderização nem escreve estado direto no efeito
+- configurações têm navegação por assunto em vez de uma página só
+- o convite mora na seção Acessos, não flutuando acima das abas
+- o fio devolve o resumo do dia e a página o exibe
+- os diálogos dizem a consequência no rodapé
+- Agenda mantém ações juntas e editor sem faixa duplicada
+- menu móvel permite ativar notificações do aparelho
+- imagem de publicação usa bucket próprio e oferece visualizar ou baixar
+
+EVIDÊNCIAS REPRODUZÍVEIS
+Testes novos: tests/visitor-completeness.test.mjs e cenários adicionados em tests/people-visitor-navigation.test.mjs.
+Logs locais: .task-tools/visitors-completeness-final-tests.log, visitors-completeness-all-tests.log, visitors-completeness-build.log e visitors-completeness-lint.log.
+Comparação anterior: .task-tools/visitors-redesign-all-tests.log (766 testes, 15 falhas).
+Publicação: a versão e o resultado do deploy serão informados na resposta final, após confirmação do servidor.

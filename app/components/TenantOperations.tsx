@@ -447,14 +447,6 @@ export function VisitorsWorkspace({
   }, [loadCategories, loadCells]);
 
   useEffect(() => {
-    if (linkedVisitorOpenedRef.current || !visitors.length) return;
-    const requestedId = Number(new URLSearchParams(window.location.search).get("visitante"));
-    if (!requestedId || !visitors.some((visitor) => visitor.id === requestedId)) return;
-    linkedVisitorOpenedRef.current = true;
-    void loadFollowups(requestedId);
-  }, [visitors]);
-
-  useEffect(() => {
     if (!settingsOpen) return;
     const previousOverflow = document.body.style.overflow;
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -656,7 +648,7 @@ export function VisitorsWorkspace({
       window.removeEventListener("vinkulo:new-visitor", openRegistration);
   }, [canCreate]);
 
-  async function loadFollowups(visitorId: number, cursor: number | null = null) {
+  const loadFollowups = useCallback(async (visitorId: number, cursor: number | null = null) => {
     followupRequest.current?.abort();
     const controller = new AbortController();
     followupRequest.current = controller;
@@ -690,7 +682,18 @@ export function VisitorsWorkspace({
     } finally {
       if (!controller.signal.aborted) setFollowupsLoading(false);
     }
-  }
+  }, [visitors, permissions]);
+
+  useEffect(() => {
+    if (linkedVisitorOpenedRef.current) return;
+    const requestedId = Number(new URLSearchParams(window.location.search).get("visitante"));
+    if (!Number.isSafeInteger(requestedId) || requestedId <= 0) return;
+    const timer = window.setTimeout(() => {
+      linkedVisitorOpenedRef.current = true;
+      void loadFollowups(requestedId);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadFollowups]);
 
   function scheduleDuplicateCheck(form: HTMLFormElement) {
     if (duplicateTimerRef.current !== null) window.clearTimeout(duplicateTimerRef.current);
@@ -1512,7 +1515,7 @@ export function VisitorsWorkspace({
               <dl>
                 <div><dt>Sem categoria</dt><dd>{visitors.filter((item) => !item.categoria_id).length}</dd></div>
                 <div><dt>Sem telefone</dt><dd>{visitors.filter((item) => !item.telefone).length}</dd></div>
-                <div><dt>Sem responsável</dt><dd>{visitors.filter((item) => !item.responsavel_email && !item.acompanhante).length}</dd></div>
+                <div><dt>Sem responsável</dt><dd>{visitors.filter((item) => !item.responsavel_acompanhamento?.trim() && !categories.find(c => c.id === item.categoria_id)?.responsavel_nome).length}</dd></div>
               </dl>
               <div className="visitor-export-suggestions-v2"><strong>Categorias sugeridas</strong><span>Novo visitante</span><span>Primeiro contato</span><span>Em acompanhamento</span><span>Integrado</span><span>Sem contato há 15 dias</span></div>
               <footer><button type="button" onClick={() => setExportReviewOpen(false)}>Continuar editando</button><button type="button" className="primary" onClick={() => { setExportReviewOpen(false); void exportVisitors(); }}>Exportar todas as fichas</button></footer>
@@ -1559,7 +1562,7 @@ export function VisitorsWorkspace({
                       <td><strong>{visitor.telefone || "Sem telefone"}</strong><small>{visitor.email || "Sem e-mail"}</small></td>
                       <td><span className="visitor-category-tag-v2" style={{ "--category-color": visitor.categoria_cor || "var(--pilot-blue)" } as CSSProperties} title={visitor.categoria_nome || "Sem categoria"}>{visitor.categoria_nome || "Sem categoria"}</span></td>
                       <td>{visitor.ministerio || "—"}</td>
-                      <td><strong>{visitor.responsavel_acompanhamento || visitor.responsavel_email?.split("@")[0] || visitor.acompanhante || "A definir"}</strong></td>
+                      <td><strong>{visitor.responsavel_acompanhamento?.trim() || categories.find(c => c.id === visitor.categoria_id)?.responsavel_nome || "A definir"}</strong></td>
                       <td>{canEdit && activeVision !== "arquivados" ? <select aria-label={`Status de ${visitor.nome_completo}`} value={visitor.status} onChange={(event) => void updateVisitorField(visitor, { status: event.target.value })}><option value="NOVO">Novo</option><option value="EM_CONTATO">Em contato</option><option value="EM_ACOMPANHAMENTO">Em acompanhamento</option><option value="INTEGRADO">Integrado</option></select> : <span className={`status-pill status-${visitor.status.toLowerCase()}`}>{activeVision === "arquivados" ? "Arquivado" : statusLabel(visitor.status)}</span>}</td>
                       <td>{visitor.ultimo_contato ? <><strong>{splitStamp(visitor.ultimo_contato).date}</strong><small>{splitStamp(visitor.ultimo_contato).time}</small></> : <small>Sem contato</small>}</td>
                       <td className={visitor.proximo_contato && visitor.proximo_contato <= hojeLocal() ? "overdue" : ""}>{visitor.proxima_acao && <small>{visitor.proxima_acao}</small>}{visitor.data_proxima_acao && <strong>{formatDate(visitor.data_proxima_acao)}</strong>}{visitor.proximo_contato ? <strong>{formatDate(visitor.proximo_contato)}</strong> : <small>Sem data</small>}<button type="button" className="visitor-next-step-v2" onClick={() => void loadFollowups(visitor.id)}>{canFollowup ? "Registrar" : "Abrir ficha"}</button></td>
@@ -1637,21 +1640,29 @@ export function VisitorsWorkspace({
               {canEdit && Boolean(selectedVisitor.ativo) && <button type="button" onClick={() => { const target = visitorDialog.current?.querySelector<HTMLDetailsElement>(".visitor-edit-compact-v2"); if (target) { target.open = true; target.scrollIntoView({ block: "nearest" }); target.querySelector<HTMLInputElement>("input")?.focus(); } }}>Editar visitante</button>}
               {selectedVisitor.telefone && whatsappHref(selectedVisitor.telefone) && <a href={whatsappHref(selectedVisitor.telefone) || undefined} target="_blank" rel="noreferrer">WhatsApp</a>}
               <details className="vd-more-actions"><summary>Mais ações</summary>{canEdit && Boolean(selectedVisitor.ativo) && selectedVisitor.status !== "INTEGRADO" && <button type="button" onClick={() => void markIntegrated(selectedVisitor)}>Marcar integrado</button>}
-              {canEdit && Boolean(selectedVisitor.ativo) && selectedVisitor.proxima_acao && <button type="button" disabled={saving} onClick={() => void updateVisitorField(selectedVisitor, { proximaAcao: "", dataProximaAcao: "" })}>Concluir próxima ação</button>}
+              {canEdit && Boolean(selectedVisitor.ativo) && (selectedVisitor.proxima_acao || selectedVisitor.data_proxima_acao) && <button type="button" disabled={saving} onClick={() => void updateVisitorField(selectedVisitor, { proximaAcao: "", dataProximaAcao: "" })}>Concluir próxima ação</button>}
               {canDeactivate && Boolean(selectedVisitor.ativo) && <button type="button" className="danger" onClick={() => void deactivateVisitor(selectedVisitor)}>Arquivar</button>}
               {canEdit && canDeactivate && !selectedVisitor.ativo && <button type="button" disabled={saving} onClick={async () => { setSaving(true); try { await apiJson(`/api/pilot/visitantes/${selectedVisitor.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reativar: true }) }); setSelectedId(null); setMessage("Ficha reativada com o histórico preservado."); await loadVisitors(); } catch (caught) { setError((caught as Error).message); } finally { setSaving(false); } }}>Reativar ficha</button>}
               {canDeactivate && <button type="button" className="danger" onClick={() => void permanentlyDeleteVisitor(selectedVisitor)}>Excluir</button>}</details>
             </div>
             <VisitorNotice message={message} error={error} warning={warning} onDismiss={dismissNotice} inline />
             <dl className="visitor-person-summary-v2">
-              <div><dt>Idade e faixa etária</dt><dd>{selectedVisitor.data_nascimento ? `${visitorAge(selectedVisitor.data_nascimento, hojeLocal()) ?? "—"} anos · ${visitorAgeGroup(selectedVisitor.data_nascimento, hojeLocal())}` : "Não informada"}</dd></div><div><dt>Telefone</dt><dd>{selectedVisitor.telefone || "Não informado"}</dd></div>
-              <div><dt>E-mail</dt><dd>{selectedVisitor.email || "Não informado"}</dd></div>
+              <div><dt>Idade e faixa etária</dt><dd>{selectedVisitor.data_nascimento ? `${visitorAge(selectedVisitor.data_nascimento, hojeLocal()) ?? "—"} anos · ${visitorAgeGroup(selectedVisitor.data_nascimento, hojeLocal())}` : "Não informada"}</dd></div><div><dt>Telefone</dt><dd>{selectedVisitor.telefone && whatsappHref(selectedVisitor.telefone) ? <a href={`tel:+${whatsappHref(selectedVisitor.telefone)!.split("/").pop()}`}>{selectedVisitor.telefone}</a> : selectedVisitor.telefone || "Não informado"}</dd></div>
+              <div><dt>E-mail</dt><dd>{selectedVisitor.email || "Não informado"}</dd></div><div><dt>Endereço</dt><dd>{selectedVisitor.endereco || "Não informado"}</dd></div>
               <div><dt>Célula</dt><dd>{selectedVisitor.celula_nome || "Sem célula"}</dd></div>
-              <div><dt>Ministério</dt><dd>{selectedVisitor.ministerio || categories.find(c => c.id === selectedVisitor.categoria_id)?.ministerio_nome || "Não vinculado"}</dd></div>
-              <div><dt>Responsável</dt><dd>{selectedVisitor.responsavel_acompanhamento || selectedVisitor.responsavel_email || categories.find(c => c.id === selectedVisitor.categoria_id)?.responsavel_nome || "Não definido"}</dd></div>
+              <div><dt>Ministério</dt><dd>{categories.find(c => c.id === selectedVisitor.categoria_id)?.ministerio_nome || (selectedVisitor.ministerio ? `${selectedVisitor.ministerio} (informado, sem vínculo)` : "Não vinculado")}</dd></div>
+              <div><dt>Responsável</dt><dd>{selectedVisitor.responsavel_acompanhamento?.trim() || categories.find(c => c.id === selectedVisitor.categoria_id)?.responsavel_nome || "Não definido"}</dd></div>
               <div><dt>Próximo contato</dt><dd>{selectedVisitor.proximo_contato ? formatDate(selectedVisitor.proximo_contato) : "Não definida"}</dd></div>
             </dl>
-            <section className="vd-next-action"><strong>Próxima ação{selectedVisitor.data_proxima_acao ? ` · ${formatDate(selectedVisitor.data_proxima_acao)}` : ""}</strong><p>{selectedVisitor.proxima_acao || "Nenhuma ação agendada."}</p></section>
+            <section className="vd-next-action"><strong>Próxima ação{selectedVisitor.data_proxima_acao ? ` · ${formatDate(selectedVisitor.data_proxima_acao)}` : ""}</strong><p>{selectedVisitor.proxima_acao || "Nenhuma tarefa agendada."}</p>{selectedVisitor.proximo_contato && <p>Contato agendado: {formatDate(selectedVisitor.proximo_contato)}. Registre o contato para atualizar este prazo.</p>}</section>
+            {canEdit && Boolean(selectedVisitor.ativo) && <details className="vd-ministry-link"><summary>Vincular ministério</summary>
+              <p>O vínculo é feito pela categoria e aparece no módulo Ministérios. Ao salvar, a categoria atual será substituída pela escolhida. Categorias automáticas seguem a idade da pessoa.</p>
+              <form key={`ministry-${selectedVisitor.id}-${selectedVisitor.categoria_id}`} onSubmit={event => { event.preventDefault(); const data = new FormData(event.currentTarget); void updateVisitorField(selectedVisitor, { categoriaId: Number(data.get("categoriaId")), ministerio: "", vincularMinisterio: true }); }}>
+                <label>Ministério e categoria<select name="categoriaId" required defaultValue=""><option value="">Escolha um vínculo</option>{categories.filter(c => c.ministerio_id && c.ministerio_nome && (!c.migracao_automatica || (() => { const age = visitorAge(selectedVisitor.data_nascimento, hojeLocal()); return age !== null && age >= (c.idade_minima ?? 0) && age <= (c.idade_maxima ?? 130); })())).map(c => <option key={c.id} value={c.id}>{c.ministerio_nome} · {c.nome}</option>)}</select></label>
+                <button disabled={saving}>Salvar vínculo</button>
+              </form>
+              <p>Se o ministério não aparecer, a gestão precisa associá-lo a uma categoria compatível em Configurar categorias.</p>
+            </details>}
             <details className="vd-integration-details"><summary>Integração, discipulado e apoio</summary><VisitorCareSummary person={selectedVisitor} /></details>
             {selectedVisitor.observacoes && <section className="visitor-care-summary"><h3>Observações do cuidado</h3><p className="visitor-preserve-lines">{selectedVisitor.observacoes}</p></section>}
             {canEdit && Boolean(selectedVisitor.ativo) && <details className="visitor-edit-compact-v2"><summary>Editar dados completos</summary><form key={`${selectedVisitor.id}-${selectedVisitor.atualizado_em}`} className="pilot-form visitor-edit-form" onSubmit={(event) => updateVisitor(event, selectedVisitor)}><label>Nome completo*<input name="nomeCompleto" required maxLength={120} defaultValue={selectedVisitor.nome_completo} /></label><label>Data de nascimento<input name="dataNascimento" type="date" defaultValue={selectedVisitor.data_nascimento || ""} /></label><label>Telefone<input name="telefone" maxLength={30} defaultValue={selectedVisitor.telefone || ""} /></label><label>E-mail<input name="email" type="email" maxLength={180} defaultValue={selectedVisitor.email || ""} /></label><label>Endereço<input name="endereco" maxLength={250} defaultValue={selectedVisitor.endereco || ""} /></label><label>Quem recebeu<input name="acompanhante" maxLength={120} defaultValue={selectedVisitor.acompanhante || ""} /></label><label>Parente<input name="parente" maxLength={120} defaultValue={selectedVisitor.parente || ""} /></label><label>Ministério<input name="ministerio" maxLength={120} defaultValue={selectedVisitor.ministerio || ""} /></label><label>Célula<select name="celulaId" defaultValue={selectedVisitor.celula_id || ""}><option value="">Sem célula</option>{cells.map((cell) => <option key={cell.id} value={cell.id}>{cell.nome}</option>)}</select></label><label>Categoria<select name="categoriaId" defaultValue={selectedVisitor.categoria_id || ""}><option value="">Sem categoria</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.nome}</option>)}</select></label><label>Batismo<select name="batizado" defaultValue={selectedVisitor.batizado}><option value="NAO_INFORMADO">Não informado</option><option value="SIM">Sim</option><option value="NAO">Não</option></select></label><label>Status<select name="status" defaultValue={selectedVisitor.status}><option value="NOVO">Novo</option><option value="EM_CONTATO">Em contato</option><option value="EM_ACOMPANHAMENTO">Em acompanhamento</option><option value="INTEGRADO">Integrado</option></select></label><label>Entrada<input name="dataEntrada" type="date" required defaultValue={selectedVisitor.data_entrada} /></label><label className="visitor-check"><input name="encontroComDeus" type="checkbox" defaultChecked={Boolean(selectedVisitor.encontro_com_deus)} />Encontro com Deus</label><label className="visitor-check"><input name="cursoMembros" type="checkbox" defaultChecked={Boolean(selectedVisitor.curso_membros)} />Curso de membros</label><label className="visitor-wide-field">Observações<textarea name="observacoes" rows={3} maxLength={1000} defaultValue={selectedVisitor.observacoes || ""} /></label><VisitorCareFields person={selectedVisitor} key={`${selectedVisitor.id}-${selectedVisitor.atualizado_em}`} /><button disabled={saving}>Salvar alterações</button></form></details>}

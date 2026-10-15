@@ -102,7 +102,7 @@ export async function GET(request: Request) {
       WHERE v.comunidade_id = ?
         AND v.escopo_confirmado = 1
         AND (
-          (? = 'arquivados' AND v.ativo = 0)
+          ? > 0 OR (? = 'arquivados' AND v.ativo = 0)
           OR (? <> 'arquivados' AND v.ativo = 1)
         )
         AND (
@@ -142,6 +142,7 @@ export async function GET(request: Request) {
     )
     .bind(
       access.context.comunidadeId,
+      personId,
       vision,
       vision,
       vision,

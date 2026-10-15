@@ -35,6 +35,6 @@ test("interface de produção não exibe linguagem fictícia", async () => {
   ]);
 
   assert.doesNotMatch(`${workspace}\n${communityPage}`, /fict[ií]ci[oa]/i);
-  assert.match(workspace, /Cadastrar visitante<\/h2>/);
+  assert.match(workspace, /Cadastrar pessoa<\/h2>/);
   assert.match(workspace, /Desativar o cadastro de \$\{visitor\.nome_completo\}/);
 });

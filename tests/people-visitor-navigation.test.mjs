@@ -6,14 +6,14 @@ import ts from 'typescript';
 import * as jsx from 'react/jsx-runtime';
 import * as visitorCare from '../app/lib/visitor-care.ts';
 
-function harness(path, props={}, exportName="default") {
+function harness(path, props={}, exportName="default", search="") {
  const slots=[],effects=[],timers=new Map(),requests=[];let cursor=0,timerId=0;
  const same=(a,b)=>a&&b&&a.length===b.length&&a.every((v,i)=>Object.is(v,b[i]));
  const memo=(fn,deps)=>{const i=cursor++;if(!slots[i]||!same(slots[i].deps,deps))slots[i]={value:fn(),deps};return slots[i].value;};
  const hooks={useState(initial){const i=cursor++;if(!(i in slots))slots[i]=typeof initial==='function'?initial():initial;return[slots[i],value=>{slots[i]=typeof value==='function'?value(slots[i]):value}]},useRef(initial){const i=cursor++;return slots[i]??={current:initial}},useMemo:memo,useCallback:(fn,deps)=>memo(()=>fn,deps),useEffect(fn,deps){const i=cursor++;if(!slots[i]||!same(slots[i].deps,deps)){slots[i]?.cleanup?.();slots[i]={deps};effects.push(()=>{slots[i].cleanup=fn()})}}};
  const clock={setTimeout(fn){timers.set(++timerId,fn);return timerId},clearTimeout(id){timers.delete(id)},setInterval(){return ++timerId},clearInterval(){}};
  const exports={};
- runInNewContext(ts.transpileModule(readFileSync(new URL('../app/components/'+path,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,{exports,require:name=>name==='react'?hooks:name==='react/jsx-runtime'?jsx:name==='react-dom'?{createPortal:node=>node}:name.endsWith('/visitor-care')?visitorCare:{default:'stub',RelacionamentoTools:'relationships'},Date,Error,AbortController,URL,URLSearchParams,HTMLElement:class{},document:{body:{style:{overflow:""}},activeElement:null,getElementById(){return null}},FormData:class{constructor(form){this.form=form}get(key){return this.form[key]??null}},window:{...clock,addEventListener(){},removeEventListener(){},requestAnimationFrame:fn=>fn(),location:{origin:'https://example.invalid',href:'https://example.invalid/painel',search:''}},fetch:(url,options)=>new Promise(resolve=>requests.push({url,options,resolve}))});
+ runInNewContext(ts.transpileModule(readFileSync(new URL('../app/components/'+path,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,{exports,require:name=>name==='react'?hooks:name==='react/jsx-runtime'?jsx:name==='react-dom'?{createPortal:node=>node}:name.endsWith('/visitor-care')?visitorCare:{default:'stub',RelacionamentoTools:'relationships'},Date,Error,AbortController,URL,URLSearchParams,clearTimeout:clock.clearTimeout,HTMLElement:class{},document:{body:{style:{overflow:""}},activeElement:null,getElementById(){return null}},FormData:class{constructor(form){this.form=form}get(key){return this.form[key]??null}},window:{...clock,addEventListener(){},removeEventListener(){},requestAnimationFrame:fn=>fn(),location:{origin:'https://example.invalid',href:'https://example.invalid/painel',search}},fetch:(url,options)=>new Promise(resolve=>requests.push({url,options,resolve}))});
  return {requests,render(){cursor=0;return exports[exportName](props)},flush(){for(const effect of effects.splice(0))effect();const batch=[...timers.values()];timers.clear();for(const fn of batch)fn()}};
 }
 function nodes(node){if(Array.isArray(node))return node.flatMap(nodes);if(!node||typeof node!=='object')return[];return[node,...nodes(node.props?.children)]}
@@ -74,3 +74,43 @@ test('Abrir cadastro duplicado direciona para arquivados e abre a ficha correspo
  const f=harness('TenantOperations.tsx',{permissions:['visitors.create'],communityName:'Demonstração'},'VisitorsWorkspace');f.render();f.flush();await reply(requestFor(f,'visitantes?'),visitorResponse([]));button(f.render(),'＋ Novo visitante').props.onClick();find(f.render(),'form',n=>n.props.className==='pilot-form visitor-registration').props.onInput({currentTarget:{nomeCompleto:'Pessoa arquivada'}});f.render();f.flush();const existing={...visitor(7,'Pessoa arquivada'),ativo:0};await reply(requestFor(f,'duplicidade=1'),{duplicados:[existing]});find(f.render(),'button',n=>text(n).includes('Abrir ficha')).props.onClick();f.render();f.flush();const req=requestFor(f,'visao=arquivados');assert.ok(req);assert.match(String(req.url),/busca=Pessoa/);await reply(req,visitorResponse([existing]));assert.ok(find(f.render(),'dialog'));assert.match(text(find(f.render(),'dialog')),/Pessoa arquivada/);
 });
 
+
+test('Link direto abre ficha fora da primeira página e oferece dados de leitura e prazos distintos', async () => {
+ const f=harness('TenantOperations.tsx',{permissions:['visitors.view','followups.view'],communityName:'Teste'},'VisitorsWorkspace','?view=visitantes&visitante=999');
+ f.render();f.flush();
+ assert.ok(requestFor(f,'visitantes?id=999'));
+ await reply(requestFor(f,'visitantes?id=999'),visitorResponse([{...visitor(999,'José da ficha'),endereco:'Rua de teste, 100',telefone:'(11) 91234-5678',categoria_id:7,responsavel_email:'autor@example.test',proximo_contato:'2026-10-20'}]));
+ await reply(requestFor(f,'visitante-categorias'),{categorias:[{id:7,nome:'Equipe',responsavel_nome:'Responsável da categoria'}],crescimento:[],meses:[]});
+ await reply(requestFor(f,'acompanhamentos'),{acompanhamentos:[{id:1,tipo:'TELEFONE',resultado:'Contato anterior',criado_em:'2026-10-01',responsavel_email:'autor@example.test'}]});
+ const dialog=find(f.render(),'dialog');
+ assert.match(text(dialog),/José da ficha/);assert.match(text(dialog),/Rua de teste, 100/);
+ assert.equal(find(dialog,'a',n=>n.props.href?.startsWith('tel:')).props.href,'tel:+5511912345678');
+ assert.ok(find(dialog,'a',n=>n.props.href?.startsWith('https:\/\/wa.me/')));
+ const summary=find(dialog,'dl');assert.match(text(summary),/Responsável da categoria/);assert.doesNotMatch(text(summary),/autor@example.test/);
+ assert.match(text(dialog),/Contato agendado: 20\/10\/2026/);assert.match(text(dialog),/Por autor@example.test/);
+ assert.equal(find(dialog,'details',n=>n.props.className==='vd-ministry-link'),undefined);
+});
+
+test('Vínculo ministerial da ficha envia a categoria escolhida com autorização de edição', async () => {
+ const f=harness('TenantOperations.tsx',{permissions:['visitors.view','visitors.edit'],communityName:'Teste'},'VisitorsWorkspace','?visitante=5');
+ f.render();f.flush();await reply(requestFor(f,'visitantes?id=5'),visitorResponse([visitor(5,'Pessoa')]));
+ await reply(requestFor(f,'visitante-categorias'),{categorias:[{id:7,nome:'Equipe',ministerio_id:2,ministerio_nome:'Acolhimento',migracao_automatica:0}],crescimento:[],meses:[]});
+ const section=find(f.render(),'details',n=>n.props.className==='vd-ministry-link');assert.match(text(section),/Acolhimento · Equipe/);
+ find(section,'form').props.onSubmit({preventDefault(){},currentTarget:{categoriaId:'7'}});
+ assert.deepEqual(JSON.parse(requestFor(f,'/visitantes/5').options.body),{categoriaId:7,ministerio:'',vincularMinisterio:true});
+});
+
+test('Seleção para CSV atravessa páginas e é limpa ao mudar filtros; celular mantém nome e status', async () => {
+ const f=harness('VisitorDirectory.tsx',{view:'pendencias',categories:[],canCreate:false,onOpen(){},selectedId:null,revision:'1'});
+ const result=(id,page)=>({visitantes:[{...visitor(id,'Pessoa '+id),telefone:'Telefone oculto',categoria_nome:'Categoria oculta'}],total:16,pagina:page,paginas:2,limite:15,hoje:'2026-10-15',indicadores:{total:16},ministerios:[],responsaveis:[],grupos:[]});
+ f.render();f.flush();await reply(f.requests.at(-1),result(1,1));
+ const mobile=find(f.render(),'div',n=>n.props.className==='vd-mobile-list');assert.equal(text(mobile),'Pessoa 1Novo');
+ button(f.render(),'Selecionar para exportar').props.onClick();
+ find(f.render(),'button',n=>n.props.className==='vd-mobile-row').props.onClick();
+ button(f.render(),'Próxima página').props.onClick();f.render();f.flush();await reply(f.requests.at(-1),result(16,2));
+ find(f.render(),'button',n=>n.props.className==='vd-mobile-row').props.onClick();
+ button(f.render(),'Exportar selecionados (2)').props.onClick();
+ const exportRequest=f.requests.at(-1);assert.match(exportRequest.url,/exportar/);assert.equal(new URL('http://test'+exportRequest.url).searchParams.get('selecionados'),'1,16');
+ await reply(exportRequest,{error:'Falha temporária'},503);assert.match(text(f.render()),/Falha temporária/);
+ change(searchInput(f.render()),'outra');assert.ok(button(f.render(),'Exportar selecionados (0)').props.disabled);
+});
