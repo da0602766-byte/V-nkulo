@@ -6,13 +6,34 @@ export const VISITOR_SHEET_SCOPES = ["https://www.googleapis.com/auth/spreadshee
 export type VisitorSheetConfig = { comunidade_id: number; usuario_id: number; spreadsheet_id: string; sheet_id: number; habilitada: number; versao: number; versao_sincronizada: number; linhas: number; sincronizado_em: string | null; ultimo_erro: string | null; lock_ate: number };
 const TITLE = "Vínkulo — Pessoas";
 
+export class VisitorSheetError extends Error {
+  constructor(message: string, public code: string, public helpUrl?: string) { super(message); }
+}
+
+export async function hasVisitorSheetAuthorization(userId: number) {
+  const connection = await getGoogleConnection(userId);
+  return { authorized: Boolean(connection?.refresh_token_ciphertext && !connection.revoked_at && VISITOR_SHEET_SCOPES.every(scope => connection.scopes.split(" ").includes(scope))), email: connection?.google_email || null };
+}
+
 export function spreadsheetIdFromUrl(value: string) {
   try { const url = new URL(value); return url.protocol === "https:" && url.hostname === "docs.google.com" ? url.pathname.match(/^\/spreadsheets\/d\/([\w-]{20,120})(?:\/|$)/)?.[1] || null : null; } catch { return null; }
 }
 
 export async function sheetGoogle(token: string, url: string, body?: unknown) {
   const response = await fetch(url, { method: body ? "POST" : "GET", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, ...(body ? { body: JSON.stringify(body) } : {}), signal: AbortSignal.timeout(20000) });
-  if (!response.ok) throw new Error(response.status === 403 ? "Autorize Planilhas Google, habilite a API no projeto Google e confirme sua permissão de edição." : response.status === 404 ? "Planilha não encontrada ou sem acesso pela conta conectada." : "O Google não concluiu a sincronização. Tente novamente.");
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({})) as { error?: { details?: { reason?: string; metadata?: { consumer?: string } }[]; errors?: { reason?: string }[] } };
+    const reasons = [...(body.error?.details || []), ...(body.error?.errors || [])].map(item => item.reason);
+    if (reasons.some(reason => ["SERVICE_DISABLED", "accessNotConfigured"].includes(reason || ""))) {
+      const service = url.includes("sheets.googleapis.com") ? "sheets.googleapis.com" : "drive.googleapis.com";
+      const project = body.error?.details?.map(item => item.metadata?.consumer?.match(/^projects\/(\d+)$/)?.[1]).find(Boolean);
+      throw new VisitorSheetError(`A API ${service === "sheets.googleapis.com" ? "Google Sheets" : "Google Drive"} está desativada no projeto Google do Vínkulo. O administrador da integração precisa ativá-la; depois, tente conectar novamente.`, "GOOGLE_API_DISABLED", `https://console.cloud.google.com/apis/library/${service}${project ? `?project=${project}` : ""}`);
+    }
+    if (response.status === 401 || reasons.some(reason => ["ACCESS_TOKEN_SCOPE_INSUFFICIENT", "insufficientPermissions"].includes(reason || ""))) throw new VisitorSheetError("A autorização do Google expirou ou não inclui Planilhas. Autorize novamente e permita os acessos solicitados.", "GOOGLE_AUTH_REQUIRED");
+    if (response.status === 403) throw new VisitorSheetError("A conta Google conectada não pode editar esta planilha. No Google, compartilhe o arquivo com essa conta como Editor e verifique se a aba está protegida.", "GOOGLE_PERMISSION_DENIED");
+    if (response.status === 404) throw new VisitorSheetError("Planilha não encontrada. Confira o link e compartilhe o arquivo com a conta Google conectada.", "SHEET_NOT_FOUND");
+    throw new VisitorSheetError(response.status === 429 ? "O Google limitou as atualizações temporariamente. Aguarde um minuto e tente novamente." : "O Google está indisponível no momento. Seus cadastros continuam salvos; tente novamente.", "GOOGLE_UNAVAILABLE");
+  }
   return response.json() as Promise<Record<string, any>>;
 }
 

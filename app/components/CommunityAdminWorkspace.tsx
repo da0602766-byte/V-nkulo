@@ -40,6 +40,7 @@ export default function CommunityAdminWorkspace({
   canManageRegistrationLinks = false,
   accessSlot = null,
   contentSlot = null,
+  deviceSlot = null,
 }: {
   managementItems: ManagementItem[];
   hideManagementHub?: boolean;
@@ -50,6 +51,7 @@ export default function CommunityAdminWorkspace({
   canManageRegistrationLinks?: boolean;
   accessSlot?: React.ReactNode;
   contentSlot?: React.ReactNode;
+  deviceSlot?: React.ReactNode;
 }) {
   const [requests, setRequests] = useState<JoinRequest[]>([]);
   const [parkingActive, setParkingActive] = useState(false);
@@ -186,6 +188,7 @@ export default function CommunityAdminWorkspace({
         { id: "acessos" as const, label: "Acessos", visivel: canManageRegistrationLinks || Boolean(accessSlot) },
         { id: "modulos" as const, label: "Módulos", visivel: canConfigureParking },
         { id: "privacidade" as const, label: "Privacidade", visivel: canManageCommunity },
+        { id: "aparelho" as const, label: "Modo offline", visivel: Boolean(deviceSlot) },
         {
           id: "solicitacoes" as const,
           label: "Solicitações de entrada",
@@ -193,7 +196,7 @@ export default function CommunityAdminWorkspace({
           contador: requestsLoading || requestsLoadError ? undefined : requests.filter((item) => item.status === "PENDENTE").length,
         },
       ].filter((secao) => secao.visivel),
-    [contentSlot, hideManagementHub, accessSlot, canConfigureParking, canManageCommunity, canManageRegistrationLinks, canManageRequests, requests, requestsLoading, requestsLoadError],
+    [contentSlot, deviceSlot, hideManagementHub, accessSlot, canConfigureParking, canManageCommunity, canManageRegistrationLinks, canManageRequests, requests, requestsLoading, requestsLoadError],
   );
   const [secao, setSecao] = useState<string>(contentSlot ? "conteudo" : hideManagementHub ? canManageCommunity ? "aparencia" : canManageRegistrationLinks || accessSlot ? "acessos" : canConfigureParking ? "modulos" : "solicitacoes" : "atalhos");
   const secaoAtiva = secoes.some((item) => item.id === secao) ? secao : secoes[0]?.id || "";
@@ -251,6 +254,7 @@ export default function CommunityAdminWorkspace({
       </section>
       )}
 
+      {deviceSlot && secaoAtiva === "aparelho" && <div className="community-settings-section">{deviceSlot}</div>}
       {contentSlot && <div className="community-settings-section" hidden={secaoAtiva !== "conteudo"}>{contentSlot}</div>}
       {visitedSections.includes("aparencia") && canManageCommunity && <div className="community-settings-section" hidden={secaoAtiva !== "aparencia"}><CommunityThemeEditor active={secaoAtiva === "aparencia"} /></div>}
 

@@ -191,6 +191,10 @@ export function VisitorsWorkspace({
   const [canManageCategories, setCanManageCategories] = useState(false);
   const [categoriesLoaded, setCategoriesLoaded] = useState(false);
   const [tab, setTab] = useState<VisitorTab>("painel");
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("sheetSetup")) setTab("pessoas");
+  }, []);
   const [birthdayMessage, setBirthdayMessage] = useState<string>(BIRTHDAY_MESSAGES[0].text);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState("");

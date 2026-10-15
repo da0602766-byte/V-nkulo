@@ -36,7 +36,7 @@ export async function GET(request: Request) {
     }
     return redirectWithError(
       url.origin,
-      state.purpose === "drive" ? "/painel?view=conta" : "/login",
+      state.visitorSheets ? "/painel?view=visitantes&sheetSetup=error" : state.purpose === "drive" ? "/painel?view=conta" : "/login",
       message,
     );
   }
@@ -119,7 +119,7 @@ export async function GET(request: Request) {
     }
     return redirectWithError(
       url.origin,
-      state.purpose === "drive" ? "/painel?view=conta" : "/login",
+      state.visitorSheets ? "/painel?view=visitantes&sheetSetup=error" : state.purpose === "drive" ? "/painel?view=conta" : "/login",
       (error as Error).message,
     );
   }

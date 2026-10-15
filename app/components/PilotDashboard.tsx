@@ -1094,7 +1094,6 @@ export default function PilotDashboard({
           </details>
         </div>
       </header>
-      <OfflineModeEntry />
       {incomingMessage && (
         <IncomingMessageToast
           key={incomingMessage.key}
@@ -1412,6 +1411,7 @@ export default function PilotDashboard({
             <section className="community-central-workspace settings-redesign">
               <header className="settings-heading"><div><h1>Configurações</h1><p>Escolha um assunto. As alterações valem para {active.comunidadeNome}.</p></div><a href="/painel?view=conta">Meu perfil e conta →</a></header>
               <CommunityAdminWorkspace
+                deviceSlot={<OfflineModeEntry />}
                 contentSlot={active.permissions.includes("community.theme.manage") ? <CommunityHighlight key={`highlight:${active.comunidadeId}`} communityId={active.comunidadeId} editor /> : null}
                 hideManagementHub
                 accessSlot={

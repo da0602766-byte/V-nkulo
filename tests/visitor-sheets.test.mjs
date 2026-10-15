@@ -17,16 +17,19 @@ test('planilha privada: sincronização atômica, retomada, texto seguro e acess
     const authorize=await call('authorize'); assert.equal(authorize.status,200);
     const consentUrl=new URL((await authorize.json()).url);
     assert.ok(consentUrl.searchParams.get('scope').includes('/auth/spreadsheets'));
+    const beforeConnection=await call('connect',{url:'https://docs.google.com/spreadsheets/d/test_private_spreadsheet_123456789/edit?usp=sharing'});
+    assert.equal((await beforeConnection.json()).authorizationRequired,true);
     const key=await crypto.subtle.importKey('raw',await crypto.subtle.digest('SHA-256',new TextEncoder().encode('vinkulo-google:'+env.AUTH_SECRET)),'AES-GCM',false,['encrypt']);
     const iv=crypto.getRandomValues(new Uint8Array(12));
     const ciphertext=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode('test-refresh'));
     database.prepare("INSERT INTO google_connections (usuario_id,google_sub,google_email,refresh_token_ciphertext,refresh_token_iv,scopes,drive_enabled) VALUES (?,?,?,?,?,?,1)").run(uid,'test-sub','sheet@example.test',Buffer.from(ciphertext).toString('base64url'),Buffer.from(iv).toString('base64url'),'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.metadata.readonly');
-    let publicAccess=false, failWrite=false;
+    let publicAccess=false, failWrite=false, disabledApi=true;
     const writes=[]; const sheets=[{properties:{sheetId:42,title:'Aba existente',gridProperties:{rowCount:1000,columnCount:40}}}];
     globalThis.fetch=async (input,options={})=>{
       const url=String(input); const json=body=>Response.json(body);
       if(url==='https://oauth2.googleapis.com/token')return json({access_token:'mock-access'});
       if(url.includes('/permissions?'))return json({permissions:[{type:publicAccess?'anyone':'user'}]});
+      if(url.startsWith('https://sheets.googleapis.com/') && disabledApi)return Response.json({error:{details:[{reason:'SERVICE_DISABLED',metadata:{consumer:'projects/123456'}}]}},{status:403});
       if(url.startsWith('https://sheets.googleapis.com/') && !options.body)return json({sheets});
       if(url.startsWith('https://sheets.googleapis.com/') && options.body){
         const body=JSON.parse(options.body);
@@ -38,6 +41,10 @@ test('planilha privada: sincronização atômica, retomada, texto seguro e acess
     };
     const personId=Number(database.prepare("INSERT INTO visitantes (comunidade_id,nome_completo,data_entrada,criado_por,escopo_confirmado) VALUES (1,?,'2026-01-01','test',1)").run('=IMPORTXML("private")').lastInsertRowid);
     const url='https://docs.google.com/spreadsheets/d/test_private_spreadsheet_123456789/edit';
+    const disabled=await call('connect',{url}); assert.equal(disabled.status,400);
+    const diagnosis=await disabled.json(); assert.equal(diagnosis.code,'GOOGLE_API_DISABLED'); assert.match(diagnosis.helpUrl,/sheets.googleapis.com\?project=123456/);
+    const failedConfig=database.prepare('SELECT * FROM visitante_planilha WHERE comunidade_id=1').get(); assert.equal(failedConfig.habilitada,0); assert.equal(failedConfig.sincronizado_em,null); assert.match(failedConfig.ultimo_erro,/está desativada/); assert.equal(writes.length,0);
+    disabledApi=false;
     let response=await call('connect',{url}); assert.equal(response.status,200,await response.clone().text());
     let config=(await response.json()).config; assert.equal(config.ultimo_erro,null); assert.equal(config.versao,config.versao_sincronizada);
     const write=writes.at(-1).requests.find(r=>r.updateCells).updateCells;

@@ -1,8 +1,8 @@
 import { getD1 } from "../../../../../db";
 import { requireTenantPermission } from "../../../../lib/tenant";
 import { recordTenantAudit } from "../../../../lib/tenant-audit";
-import { createGoogleAuthorization } from "../../../../lib/google-integration";
-import { assertSheetPrivate, ensureVisitorSheet, spreadsheetIdFromUrl, syncVisitorSheet, visitorSheetToken, type VisitorSheetConfig } from "../../../../lib/visitor-sheets";
+import { createGoogleAuthorization, googleIntegrationAvailable } from "../../../../lib/google-integration";
+import { assertSheetPrivate, ensureVisitorSheet, hasVisitorSheetAuthorization, spreadsheetIdFromUrl, syncVisitorSheet, visitorSheetToken, VisitorSheetError, type VisitorSheetConfig } from "../../../../lib/visitor-sheets";
 
 async function accessForSheets() {
   const access = await requireTenantPermission("visitor.categories.manage");
@@ -14,8 +14,9 @@ async function accessForSheets() {
 export async function GET() {
   const access = await accessForSheets();
   if ("error" in access) return access.error;
-  const config = await getD1().prepare("SELECT spreadsheet_id, habilitada, versao, versao_sincronizada, sincronizado_em, ultimo_erro FROM visitante_planilha WHERE comunidade_id = ?").bind(access.context.comunidadeId).first();
-  return Response.json({ config }, { headers: { "Cache-Control": "no-store" } });
+  const config = await getD1().prepare("SELECT spreadsheet_id, sheet_id, habilitada, versao, versao_sincronizada, linhas, sincronizado_em, ultimo_erro FROM visitante_planilha WHERE comunidade_id = ?").bind(access.context.comunidadeId).first();
+  const google = await hasVisitorSheetAuthorization(access.user.id);
+  return Response.json({ config, google: { ...google, available: googleIntegrationAvailable() }, communityId: access.context.comunidadeId, userId: access.user.id }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
   if (current && current.lock_ate > Date.now()) return Response.json({ error: "Uma sincronização está em andamento. Aguarde alguns segundos." }, { status: 409 });
   try {
     if (body.action === "authorize") {
-      const authorization = await createGoogleAuthorization(new URL(request.url).origin, { purpose: "drive", visitorSheets: true, userId: access.user.id, returnTo: "/painel?view=visitantes" });
+      const authorization = await createGoogleAuthorization(new URL(request.url).origin, { purpose: "drive", visitorSheets: true, userId: access.user.id, returnTo: "/painel?view=visitantes&sheetSetup=authorized" });
       return Response.json({ url: authorization.url }, { headers: { "Set-Cookie": `__Host-vinkulo_google_state=${authorization.nonce}; Path=/; Max-Age=600; HttpOnly; Secure; SameSite=Lax`, "Cache-Control": "no-store" } });
     }
     if (body.action === "pause") {
@@ -44,6 +45,7 @@ export async function POST(request: Request) {
     if (body.action !== "connect") return Response.json({ error: "Ação inválida." }, { status: 400 });
     const id = spreadsheetIdFromUrl(String(body.url || ""));
     if (!id) return Response.json({ error: "Informe um link HTTPS válido de uma Planilha Google." }, { status: 400 });
+    if (!(await hasVisitorSheetAuthorization(access.user.id)).authorized) return Response.json({ authorizationRequired: true });
     const replacing = Boolean(current && current.spreadsheet_id !== id);
     if (replacing && current?.habilitada) return Response.json({ error: "Pause a sincronização antes de conectar outra planilha. A cópia anterior continuará no Google Drive." }, { status: 409 });
     const token = await visitorSheetToken(access.user.id);
@@ -67,6 +69,9 @@ export async function POST(request: Request) {
     await syncVisitorSheet(db, communityId);
     return GET();
   } catch (error) {
-    return Response.json({ error: error instanceof Error && !/UNIQUE|token|secret/i.test(error.message) ? error.message : "Não foi possível conectar. Verifique se esta planilha já pertence a outra comunidade." }, { status: 400 });
+    const message = error instanceof Error && !/UNIQUE|token|secret/i.test(error.message) ? error.message : "Não foi possível conectar. Verifique se esta planilha já pertence a outra comunidade.";
+    const id = spreadsheetIdFromUrl(String(body.url || ""));
+    if (body.action === "connect" && id) await db.prepare("UPDATE visitante_planilha SET ultimo_erro = ? WHERE comunidade_id = ? AND spreadsheet_id = ? AND lock_ate < ?").bind(message, communityId, id, Date.now()).run();
+    return Response.json({ error: message, code: error instanceof VisitorSheetError ? error.code : "CONNECTION_FAILED", helpUrl: error instanceof VisitorSheetError ? error.helpUrl : undefined }, { status: 400 });
   }
 }
