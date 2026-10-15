@@ -21,6 +21,7 @@ import "./visitor-directory-ux.css";
 import { type VisitorCare, visitorAge, visitorAgeGroup } from "../lib/visitor-care";
 import { VisitorCareFields, VisitorCareSummary } from "./VisitorCareFields";
 import { VisitorSheetSettings } from "./VisitorSheetSettings";
+import VisitorDirectory, { type DirectoryView } from "./VisitorDirectory";
 
 type Visitor = VisitorCare & {
   id: number;
@@ -57,7 +58,7 @@ type Visitor = VisitorCare & {
 // As abas de seção seguem o padrão de Ministérios: a navegação divide a área em
 // partes e cada uma carrega só o que precisa. As "visões" continuam existindo,
 // mas como filtro da lista dentro da aba Pessoas — são coisas diferentes.
-type VisitorTab = "painel" | "pessoas" | "acompanhamento" | "aniversarios" | "anotacoes";
+type VisitorTab = DirectoryView | "painel" | "pessoas" | "acompanhamento" | "aniversarios" | "anotacoes";
 
 type VisitorVision =
   | "todos"
@@ -157,6 +158,7 @@ type Followup = {
   descricao: string | null;
   proximo_contato: string | null;
   criado_em: string;
+  responsavel_email?: string;
 };
 
 type VisitorImportRow = Record<string, string | boolean> & {
@@ -190,10 +192,12 @@ export function VisitorsWorkspace({
   const [birthdays, setBirthdays] = useState<BirthdayVisitor[]>([]);
   const [canManageCategories, setCanManageCategories] = useState(false);
   const [categoriesLoaded, setCategoriesLoaded] = useState(false);
-  const [tab, setTab] = useState<VisitorTab>("painel");
+  const [tab, setTab] = useState<VisitorTab>("pendencias");
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.has("sheetSetup")) setTab("pessoas");
+    if (!params.has("sheetSetup")) return;
+    const timer = window.setTimeout(() => setTab("pessoas"), 0);
+    return () => window.clearTimeout(timer);
   }, []);
   const [birthdayMessage, setBirthdayMessage] = useState<string>(BIRTHDAY_MESSAGES[0].text);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -668,7 +672,10 @@ export function VisitorsWorkspace({
       if (!cursor) {
         const local = visitors.find(v => v.id === visitorId);
         const detail = await apiJson<{ visitantes: Visitor[] }>(`/api/pilot/visitantes?id=${visitorId}&visao=${local?.ativo === 0 ? "arquivados" : "todos"}`, { signal: controller.signal });
-        if (!controller.signal.aborted) setSelectedRecord(detail.visitantes[0] || null);
+        if (!controller.signal.aborted) {
+          if (!detail.visitantes[0]) throw new Error("Esta ficha não está disponível na comunidade atual.");
+          setSelectedRecord(detail.visitantes[0]);
+        }
       }
       if (controller.signal.aborted || !permissions.includes("followups.view")) return;
       const result = await apiJson<{ acompanhamentos: Followup[]; nextCursor: number | null }>(
@@ -1054,10 +1061,19 @@ export function VisitorsWorkspace({
     const element = visitorDialog.current;
     const trigger = document.activeElement as HTMLElement | null;
     const overflow = document.body.style.overflow;
-    element?.showModal();
-    visitorClose.current?.focus();
-    document.body.style.overflow = "hidden";
-    return () => { element?.close(); document.body.style.overflow = overflow; trigger?.focus(); };
+    const media = window.matchMedia("(min-width: 1280px)");
+    const sync = () => {
+      const scrollY = window.scrollY;
+      element?.close();
+      if (media.matches) { element?.show(); document.body.style.overflow = overflow; }
+      else { element?.showModal(); document.body.style.overflow = "hidden"; }
+      window.scrollTo({ top: scrollY, behavior: "instant" });
+    };
+    sync(); visitorClose.current?.focus({ preventScroll: true });
+    media.addEventListener("change", sync);
+    const escape = (event: KeyboardEvent) => { if (event.key === "Escape" && media.matches) setSelectedId(null); };
+    element?.addEventListener("keydown", escape);
+    return () => { media.removeEventListener("change", sync); element?.removeEventListener("keydown", escape); element?.close(); document.body.style.overflow = overflow; if (trigger?.isConnected) trigger.focus({ preventScroll: true }); };
   }, [selectedVisitorId]);
   useEffect(() => () => followupRequest.current?.abort(), []);
   // Só uma superfície mostra o aviso por vez: a que está por cima. Repetir o
@@ -1108,11 +1124,11 @@ export function VisitorsWorkspace({
   const funnelTotal = funnelStages.reduce((soma, etapa) => soma + etapa.total, 0);
 
   return (
-    <section className="secretary-workspace visitor-workspace-v7">
+    <section className={`secretary-workspace visitor-workspace-v7 visitor-operational ${selectedVisitor ? "has-visitor-detail" : ""}`}>
       {/* O invólucro é o mesmo de Ministérios: compor `secretary-workspace` dá o
           herói, o fluxo, as abas em pílula, a grade de resumo e os cartões sem
           recriar nada. `visitors.css` só acrescenta o que é próprio desta aba. */}
-      <header className="visitor-compact-heading"><h1>Visitantes</h1><button type="button" aria-expanded={introOpen} aria-controls="visitor-introduction" onClick={()=>setIntroOpen(v=>!v)}>{introOpen?"Recolher apresentação −":"Sobre o relacionamento +"}</button></header>
+      <header className="visitor-compact-heading"><div><h1>Visitantes</h1><p>Acolha, acompanhe e conecte cada visitante à vida da igreja.</p></div><button type="button" aria-expanded={introOpen} aria-controls="visitor-introduction" onClick={()=>setIntroOpen(v=>!v)}>{introOpen?"Recolher apresentação −":"Sobre o relacionamento +"}</button></header>
       <header id="visitor-introduction" hidden={!introOpen} className="secretary-hero visitor-hero-v7">
         <div className="secretary-hero-copy">
           <p className="pilot-kicker">VISITANTES · {communityName}</p>
@@ -1276,6 +1292,11 @@ export function VisitorsWorkspace({
         </div>
       </div>
 
+      <nav className="vd-tabs" aria-label="Visões da central de visitantes">
+        {([["pendencias", "Pendências", "◷"], ["acompanhamentos", "Acompanhamentos", "♧"], ["categorias", "Categorias", "◇"], ["ministerios", "Ministérios", "▦"]] as const).map(([id, label, icon]) => <button type="button" key={id} aria-current={tab === id ? "page" : undefined} onClick={() => openTab(id)}><span aria-hidden="true">{icon}</span>{label}</button>)}
+      </nav>
+      <details className="vd-tools"><summary>Mais ferramentas · planilhas, anotações e aniversários</summary>
+      {canManageCategories && <button type="button" className="vd-mobile-settings" aria-expanded={settingsOpen} aria-controls="visitor-settings-panel" onClick={() => setSettingsOpen(true)}>Configurar categorias e responsáveis</button>}
       <nav className="secretary-tabs visitor-tabs-v7" aria-label="Seções de visitantes">
         {([
           ["painel", "Visão geral", null],
@@ -1295,9 +1316,12 @@ export function VisitorsWorkspace({
         ))}
         <button type="button" className={`visitor-notebook-tab ${tab === "anotacoes" ? "active" : ""}`} aria-label="Minhas anotações de cuidado" title="Minhas anotações" aria-current={tab === "anotacoes" ? "page" : undefined} onClick={() => openTab("anotacoes")}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="5" y="3" width="15" height="18" rx="2"/><path d="M8 3v18M3 7h4M3 12h4M3 17h4M11 8h6M11 12h6"/></svg></button>
       </nav>
+      </details>
+      {(["pendencias", "acompanhamentos", "categorias", "ministerios"] as string[]).includes(tab) && <VisitorDirectory view={tab as DirectoryView} categories={categories} canCreate={canCreate} onCreate={() => { dismissNotice(); setDuplicateMatches([]); setRegistrationOpen(true); }} onOpen={id => void loadFollowups(id)} selectedId={selectedId} revision={message + String(saving)} />}
       {tab === "anotacoes" && <div className="visitor-notes-panel"><CareNotesBoard /></div>}
 
       {!overlayOpen && <VisitorNotice message={message} error={error} warning={warning} onDismiss={dismissNotice} />}
+      {selectedId && !selectedVisitor && <div className="visitor-query-error" role="status">{followupsError || "Carregando ficha…"}{followupsError && <button type="button" onClick={() => void loadFollowups(selectedId)}>Tentar abrir novamente</button>}<button type="button" onClick={() => { followupRequest.current?.abort(); setSelectedId(null); }}>Fechar</button></div>}
 
       {canCreate && registrationOpen && createPortal(
         <dialog ref={registrationDialog} className="visitor-registration-modal" aria-labelledby="visitor-registration-title" onCancel={event => { event.preventDefault(); if (!saving) setRegistrationOpen(false); }}>
@@ -1601,7 +1625,7 @@ export function VisitorsWorkspace({
         </div>, document.body)}
 
       {selectedVisitor && createPortal(
-        <dialog ref={visitorDialog} className="visitor-person-dialog" aria-labelledby="visitor-person-title" onCancel={(event) => { event.preventDefault(); setSelectedId(null); }} onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedId(null); }}>
+        <dialog ref={visitorDialog} className="visitor-person-dialog vd-person-dialog" aria-labelledby="visitor-person-title" onCancel={(event) => { event.preventDefault(); setSelectedId(null); }} onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedId(null); }}>
           <aside className="visitor-person-drawer-v2">
             <header>
               <div className="visitor-person-avatar-v2" style={{ "--category-color": selectedVisitor.categoria_cor || "var(--pilot-blue)" } as CSSProperties}>{selectedVisitor.nome_completo.slice(0, 1).toLocaleUpperCase("pt-BR")}</div>
@@ -1609,27 +1633,30 @@ export function VisitorsWorkspace({
               <button ref={visitorClose} type="button" aria-label="Fechar ficha" onClick={() => setSelectedId(null)}>×</button>
             </header>
             <div className="visitor-person-actions-v2">
+              {canFollowup && Boolean(selectedVisitor.ativo) && <button type="button" className="vd-primary" onClick={() => { const target = visitorDialog.current?.querySelector<HTMLDetailsElement>(".visitor-followup-details-v2"); if (target) { target.open = true; target.scrollIntoView({ block: "nearest", behavior: "smooth" }); target.querySelector<HTMLSelectElement>("select")?.focus(); } }}>Registrar contato</button>}
+              {canEdit && Boolean(selectedVisitor.ativo) && <button type="button" onClick={() => { const target = visitorDialog.current?.querySelector<HTMLDetailsElement>(".visitor-edit-compact-v2"); if (target) { target.open = true; target.scrollIntoView({ block: "nearest" }); target.querySelector<HTMLInputElement>("input")?.focus(); } }}>Editar visitante</button>}
               {selectedVisitor.telefone && whatsappHref(selectedVisitor.telefone) && <a href={whatsappHref(selectedVisitor.telefone) || undefined} target="_blank" rel="noreferrer">WhatsApp</a>}
-              {canEdit && Boolean(selectedVisitor.ativo) && selectedVisitor.status !== "INTEGRADO" && <button type="button" onClick={() => void markIntegrated(selectedVisitor)}>Marcar integrado</button>}
+              <details className="vd-more-actions"><summary>Mais ações</summary>{canEdit && Boolean(selectedVisitor.ativo) && selectedVisitor.status !== "INTEGRADO" && <button type="button" onClick={() => void markIntegrated(selectedVisitor)}>Marcar integrado</button>}
               {canEdit && Boolean(selectedVisitor.ativo) && selectedVisitor.proxima_acao && <button type="button" disabled={saving} onClick={() => void updateVisitorField(selectedVisitor, { proximaAcao: "", dataProximaAcao: "" })}>Concluir próxima ação</button>}
               {canDeactivate && Boolean(selectedVisitor.ativo) && <button type="button" className="danger" onClick={() => void deactivateVisitor(selectedVisitor)}>Arquivar</button>}
               {canEdit && canDeactivate && !selectedVisitor.ativo && <button type="button" disabled={saving} onClick={async () => { setSaving(true); try { await apiJson(`/api/pilot/visitantes/${selectedVisitor.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reativar: true }) }); setSelectedId(null); setMessage("Ficha reativada com o histórico preservado."); await loadVisitors(); } catch (caught) { setError((caught as Error).message); } finally { setSaving(false); } }}>Reativar ficha</button>}
-              {canDeactivate && <button type="button" className="danger" onClick={() => void permanentlyDeleteVisitor(selectedVisitor)}>Excluir</button>}
+              {canDeactivate && <button type="button" className="danger" onClick={() => void permanentlyDeleteVisitor(selectedVisitor)}>Excluir</button>}</details>
             </div>
             <VisitorNotice message={message} error={error} warning={warning} onDismiss={dismissNotice} inline />
             <dl className="visitor-person-summary-v2">
-              <div><dt>Idade e faixa etária</dt><dd>{visitorAge(selectedVisitor.data_nascimento, hojeLocal()) ?? "—"} anos · {visitorAgeGroup(selectedVisitor.data_nascimento, hojeLocal())}</dd></div><div><dt>Telefone</dt><dd>{selectedVisitor.telefone || "Não informado"}</dd></div>
+              <div><dt>Idade e faixa etária</dt><dd>{selectedVisitor.data_nascimento ? `${visitorAge(selectedVisitor.data_nascimento, hojeLocal()) ?? "—"} anos · ${visitorAgeGroup(selectedVisitor.data_nascimento, hojeLocal())}` : "Não informada"}</dd></div><div><dt>Telefone</dt><dd>{selectedVisitor.telefone || "Não informado"}</dd></div>
               <div><dt>E-mail</dt><dd>{selectedVisitor.email || "Não informado"}</dd></div>
               <div><dt>Célula</dt><dd>{selectedVisitor.celula_nome || "Sem célula"}</dd></div>
-              <div><dt>Ministério</dt><dd>{selectedVisitor.ministerio || "Não definido"}</dd></div>
-              <div><dt>Responsável</dt><dd>{selectedVisitor.responsavel_acompanhamento || selectedVisitor.responsavel_email || selectedVisitor.acompanhante || "A definir"}</dd></div>
+              <div><dt>Ministério</dt><dd>{selectedVisitor.ministerio || categories.find(c => c.id === selectedVisitor.categoria_id)?.ministerio_nome || "Não vinculado"}</dd></div>
+              <div><dt>Responsável</dt><dd>{selectedVisitor.responsavel_acompanhamento || selectedVisitor.responsavel_email || categories.find(c => c.id === selectedVisitor.categoria_id)?.responsavel_nome || "Não definido"}</dd></div>
               <div><dt>Próximo contato</dt><dd>{selectedVisitor.proximo_contato ? formatDate(selectedVisitor.proximo_contato) : "Não definida"}</dd></div>
             </dl>
-            <VisitorCareSummary person={selectedVisitor} />
+            <section className="vd-next-action"><strong>Próxima ação{selectedVisitor.data_proxima_acao ? ` · ${formatDate(selectedVisitor.data_proxima_acao)}` : ""}</strong><p>{selectedVisitor.proxima_acao || "Nenhuma ação agendada."}</p></section>
+            <details className="vd-integration-details"><summary>Integração, discipulado e apoio</summary><VisitorCareSummary person={selectedVisitor} /></details>
             {selectedVisitor.observacoes && <section className="visitor-care-summary"><h3>Observações do cuidado</h3><p className="visitor-preserve-lines">{selectedVisitor.observacoes}</p></section>}
-            {canEdit && Boolean(selectedVisitor.ativo) && <details className="visitor-edit-compact-v2"><summary>Editar dados completos</summary><form className="pilot-form visitor-edit-form" onSubmit={(event) => updateVisitor(event, selectedVisitor)}><label>Nome completo*<input name="nomeCompleto" required maxLength={120} defaultValue={selectedVisitor.nome_completo} /></label><label>Data de nascimento<input name="dataNascimento" type="date" defaultValue={selectedVisitor.data_nascimento || ""} /></label><label>Telefone<input name="telefone" maxLength={30} defaultValue={selectedVisitor.telefone || ""} /></label><label>E-mail<input name="email" type="email" maxLength={180} defaultValue={selectedVisitor.email || ""} /></label><label>Endereço<input name="endereco" maxLength={250} defaultValue={selectedVisitor.endereco || ""} /></label><label>Quem recebeu<input name="acompanhante" maxLength={120} defaultValue={selectedVisitor.acompanhante || ""} /></label><label>Parente<input name="parente" maxLength={120} defaultValue={selectedVisitor.parente || ""} /></label><label>Ministério<input name="ministerio" maxLength={120} defaultValue={selectedVisitor.ministerio || ""} /></label><label>Célula<select name="celulaId" defaultValue={selectedVisitor.celula_id || ""}><option value="">Sem célula</option>{cells.map((cell) => <option key={cell.id} value={cell.id}>{cell.nome}</option>)}</select></label><label>Categoria<select name="categoriaId" defaultValue={selectedVisitor.categoria_id || ""}><option value="">Sem categoria</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.nome}</option>)}</select></label><label>Batismo<select name="batizado" defaultValue={selectedVisitor.batizado}><option value="NAO_INFORMADO">Não informado</option><option value="SIM">Sim</option><option value="NAO">Não</option></select></label><label>Status<select name="status" defaultValue={selectedVisitor.status}><option value="NOVO">Novo</option><option value="EM_CONTATO">Em contato</option><option value="EM_ACOMPANHAMENTO">Em acompanhamento</option><option value="INTEGRADO">Integrado</option></select></label><label>Entrada<input name="dataEntrada" type="date" required defaultValue={selectedVisitor.data_entrada} /></label><label className="visitor-check"><input name="encontroComDeus" type="checkbox" defaultChecked={Boolean(selectedVisitor.encontro_com_deus)} />Encontro com Deus</label><label className="visitor-check"><input name="cursoMembros" type="checkbox" defaultChecked={Boolean(selectedVisitor.curso_membros)} />Curso de membros</label><label className="visitor-wide-field">Observações<textarea name="observacoes" rows={3} maxLength={1000} defaultValue={selectedVisitor.observacoes || ""} /></label><VisitorCareFields person={selectedVisitor} key={selectedVisitor.id} /><button disabled={saving}>Salvar alterações</button></form></details>}
+            {canEdit && Boolean(selectedVisitor.ativo) && <details className="visitor-edit-compact-v2"><summary>Editar dados completos</summary><form key={`${selectedVisitor.id}-${selectedVisitor.atualizado_em}`} className="pilot-form visitor-edit-form" onSubmit={(event) => updateVisitor(event, selectedVisitor)}><label>Nome completo*<input name="nomeCompleto" required maxLength={120} defaultValue={selectedVisitor.nome_completo} /></label><label>Data de nascimento<input name="dataNascimento" type="date" defaultValue={selectedVisitor.data_nascimento || ""} /></label><label>Telefone<input name="telefone" maxLength={30} defaultValue={selectedVisitor.telefone || ""} /></label><label>E-mail<input name="email" type="email" maxLength={180} defaultValue={selectedVisitor.email || ""} /></label><label>Endereço<input name="endereco" maxLength={250} defaultValue={selectedVisitor.endereco || ""} /></label><label>Quem recebeu<input name="acompanhante" maxLength={120} defaultValue={selectedVisitor.acompanhante || ""} /></label><label>Parente<input name="parente" maxLength={120} defaultValue={selectedVisitor.parente || ""} /></label><label>Ministério<input name="ministerio" maxLength={120} defaultValue={selectedVisitor.ministerio || ""} /></label><label>Célula<select name="celulaId" defaultValue={selectedVisitor.celula_id || ""}><option value="">Sem célula</option>{cells.map((cell) => <option key={cell.id} value={cell.id}>{cell.nome}</option>)}</select></label><label>Categoria<select name="categoriaId" defaultValue={selectedVisitor.categoria_id || ""}><option value="">Sem categoria</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.nome}</option>)}</select></label><label>Batismo<select name="batizado" defaultValue={selectedVisitor.batizado}><option value="NAO_INFORMADO">Não informado</option><option value="SIM">Sim</option><option value="NAO">Não</option></select></label><label>Status<select name="status" defaultValue={selectedVisitor.status}><option value="NOVO">Novo</option><option value="EM_CONTATO">Em contato</option><option value="EM_ACOMPANHAMENTO">Em acompanhamento</option><option value="INTEGRADO">Integrado</option></select></label><label>Entrada<input name="dataEntrada" type="date" required defaultValue={selectedVisitor.data_entrada} /></label><label className="visitor-check"><input name="encontroComDeus" type="checkbox" defaultChecked={Boolean(selectedVisitor.encontro_com_deus)} />Encontro com Deus</label><label className="visitor-check"><input name="cursoMembros" type="checkbox" defaultChecked={Boolean(selectedVisitor.curso_membros)} />Curso de membros</label><label className="visitor-wide-field">Observações<textarea name="observacoes" rows={3} maxLength={1000} defaultValue={selectedVisitor.observacoes || ""} /></label><VisitorCareFields person={selectedVisitor} key={`${selectedVisitor.id}-${selectedVisitor.atualizado_em}`} /><button disabled={saving}>Salvar alterações</button></form></details>}
             {canFollowup && Boolean(selectedVisitor.ativo) && <details className="visitor-followup-details-v2"><summary><span><strong>Novo acompanhamento</strong><small>Registre o cuidado sem sair da ficha.</small></span><i aria-hidden="true">⌄</i></summary><form className="visitor-followup-quick-v2" onSubmit={createFollowup}><label>Canal<select name="tipo" defaultValue="WHATSAPP"><option value="WHATSAPP">WhatsApp</option><option value="TELEFONE">Telefone</option><option value="PRESENCIAL">Presencial</option><option value="VISITA">Visita</option><option value="EMAIL">E-mail</option><option value="OUTRO">Outro</option></select></label><label>Resultado<input name="resultado" required maxLength={160} placeholder="Resumo do contato" /></label><label>Próximo contato<input name="proximoContato" type="date" /></label><label className="wide">Observações<textarea name="descricao" rows={3} maxLength={1500} /></label><button disabled={saving}>{saving ? "Salvando…" : "Registrar acompanhamento"}</button></form></details>}
-            <section className="visitor-timeline-v2" aria-busy={followupsLoading}><header><strong>Histórico</strong>{!followupsLoading && !followupsError && <b>{followups.length}</b>}</header>{followupsLoading ? <p role="status">Carregando histórico…</p> : followupsError ? <div className="visitor-query-error"><p role="alert">{followupsError}</p><button type="button" onClick={() => void loadFollowups(selectedVisitor.id)}>Tentar novamente</button></div> : <>{followups.map((item) => <article key={item.id}><span aria-hidden="true" /><div><header><b>{item.tipo}</b><time>{formatDateTime(item.criado_em)}</time></header><strong>{item.resultado}</strong>{item.descricao && <p>{item.descricao}</p>}{item.proximo_contato && <small>Próximo contato: {formatDate(item.proximo_contato)}</small>}</div></article>)}{!followups.length && <p className="operations-muted">Nenhum acompanhamento registrado.</p>}{followupCursor && <button type="button" disabled={followupsLoading} onClick={() => void loadFollowups(selectedVisitor.id, followupCursor)}>Carregar histórico anterior</button>}</>}</section>
+            <section className="visitor-timeline-v2" aria-busy={followupsLoading}><header><strong>Histórico</strong>{!followupsLoading && !followupsError && <b>{followups.length}</b>}</header>{followupsLoading ? <p role="status">Carregando histórico…</p> : followupsError ? <div className="visitor-query-error"><p role="alert">{followupsError}</p><button type="button" onClick={() => void loadFollowups(selectedVisitor.id)}>Tentar novamente</button></div> : <>{followups.map((item) => <article key={item.id}><span aria-hidden="true" /><div><header><b>{item.tipo}</b><time>{formatDateTime(item.criado_em)}</time></header><strong>{item.resultado}</strong>{item.responsavel_email && <small>Por {item.responsavel_email}</small>}{item.descricao && <p>{item.descricao}</p>}{item.proximo_contato && <small>Próximo contato: {formatDate(item.proximo_contato)}</small>}</div></article>)}{!followups.length && <p className="operations-muted">{permissions.includes("followups.view") ? "Nenhum acompanhamento registrado." : "Seu perfil não tem permissão para consultar o histórico."}</p>}{followupCursor && <button type="button" disabled={followupsLoading} onClick={() => void loadFollowups(selectedVisitor.id, followupCursor)}>Carregar histórico anterior</button>}</>}</section>
           </aside>
         </dialog>, document.body)}
 
@@ -2306,7 +2333,9 @@ function formatDateTime(value: string) {
 function whatsappHref(phone: string | null) {
   if (!phone) return null;
   let digits = phone.replace(/\D/g, "");
+  if (digits.startsWith("0") || /^([0-9])\1+$/.test(digits)) return null;
   if (digits.length === 10 || digits.length === 11) digits = `55${digits}`;
+  if (digits.startsWith("55") && !/^55[1-9][0-9][2-9]/.test(digits)) return null;
   return digits.length >= 10 && digits.length <= 15
     ? `https://wa.me/${digits}`
     : null;

@@ -1355,6 +1355,7 @@ export default function PilotDashboard({
           )}
           {visibleView === "visitantes" && (
             <VisitorsWorkspace
+              key={active.comunidadeId}
               permissions={active.permissions}
               communityName={active.comunidadeNome}
             />

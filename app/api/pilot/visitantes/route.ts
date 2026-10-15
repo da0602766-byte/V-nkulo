@@ -1,5 +1,6 @@
 import { CARE_FIELDS, parseVisitorCare, isVisitorDate, visitorBoolean } from "../../../lib/visitor-care";
 import { visitorToday } from "../../../lib/visitor-attention";
+import { readVisitorDirectory } from "../../../lib/visitor-directory";
 import { getD1 } from "../../../../db";
 import { recordTenantAudit } from "../../../lib/tenant-audit";
 import { requireTenantPermission } from "../../../lib/tenant";
@@ -65,6 +66,7 @@ export async function GET(request: Request) {
       { headers: { "Cache-Control": "no-store" } },
     );
   }
+  if (params.get("diretorio") === "1") return readVisitorDirectory(db, access.context.comunidadeId, params);
   const result = await db
     .prepare(
       `SELECT v.id, v.nome_completo, v.data_nascimento, v.telefone, v.email,
