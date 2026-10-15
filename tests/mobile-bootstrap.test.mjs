@@ -66,13 +66,14 @@ test('mobile bootstrap: sessão removida, expirada ou de outra pessoa não prepa
 test('service worker: não captura a entrada empacotada e continua tratando navegação web offline', async () => {
   const source = await readFile(new URL('../public/sw.js', import.meta.url), 'utf8');
   const events = {};
-  runInNewContext(source, { self: { location: { hostname: 'vinkulo.test', origin: 'https://vinkulo.test' }, addEventListener: (name, fn) => {events[name]=fn;} }, URL,
-    fetch: async () => {throw new Error('offline');}, caches: { match: async () => 'offline-page' } });
+  runInNewContext(source, { self: { location: { hostname: 'vinkulo.test', origin: 'https://vinkulo.test' }, addEventListener: (name, fn) => {events[name]=fn;} }, URL, Response, AbortController, setTimeout, clearTimeout,
+    fetch: async () => {throw new Error('offline');}, caches: { open: async () => ({ match: async () => new Response('offline-page', {headers:{'Content-Type':'text/html'}}) }) } });
   for (const path of ['/mobile-app/index.html','/mobile-app/app.js','/api/mobile/bootstrap']) {
     let handled = false;
     events.fetch({request:{url:`https://vinkulo.test${path}`,method:'GET',mode:'navigate'},respondWith:()=>{handled=true;}});
     assert.equal(handled,false,path);
   }
   let result; events.fetch({request:{url:'https://vinkulo.test/painel',method:'GET',mode:'navigate'},respondWith:value=>{result=value;}});
-  assert.equal(await result,'offline-page');
+  assert.equal((await result).status,503);
+  assert.equal(await (await result).text(),'offline-page');
 });

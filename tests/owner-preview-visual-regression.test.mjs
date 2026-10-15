@@ -41,14 +41,14 @@ test('deployed scripts and styles prefer fresh network responses', async () => {
   for (const destination of ['script', 'style']) {
     const { handlers, network } = worker('example.test');
     let response;
-    handlers.fetch({ request: { url: 'http://example.test/app.css', method: 'GET', destination }, respondWith(promise) { response = promise; } });
+    handlers.fetch({ request: { url: 'http://example.test/app.css', method: 'GET', destination }, respondWith(promise) { response = promise; }, waitUntil() {} });
     assert.equal(await response, network);
   }
 });
 test('deployed code keeps an offline fallback', async () => {
   const { handlers, cached } = worker('example.test', true);
   let response;
-  handlers.fetch({ request: { url: 'http://example.test/app.js', method: 'GET', destination: 'script' }, respondWith(promise) { response = promise; } });
+  handlers.fetch({ request: { url: 'http://example.test/app.js', method: 'GET', destination: 'script' }, respondWith(promise) { response = promise; }, waitUntil() {} });
   assert.equal(await response, cached);
 });
 test('activation deletes only obsolete application caches', async () => {
