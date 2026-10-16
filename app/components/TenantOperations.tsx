@@ -1299,7 +1299,7 @@ export function VisitorsWorkspace({
       <nav className="vd-tabs" aria-label="Visões da central de visitantes">
         {([["pendencias", "Pendências", "◷"], ["acompanhamentos", "Acompanhamentos", "♧"], ["categorias", "Categorias", "◇"], ["ministerios", "Ministérios", "▦"]] as const).map(([id, label, icon]) => <button type="button" key={id} aria-current={tab === id ? "page" : undefined} onClick={() => openTab(id)}><span aria-hidden="true">{icon}</span>{label}</button>)}
       </nav>
-      <details className="vd-tools"><summary>Mais ferramentas · planilhas, anotações e aniversários</summary>
+      <details className="vd-tools" data-keep-open-on-outside><summary>Mais ferramentas · planilhas, anotações e aniversários</summary>
       {canManageCategories && <button type="button" className="vd-mobile-settings" aria-expanded={settingsOpen} aria-controls="visitor-settings-panel" onClick={() => setSettingsOpen(true)}>Configurar categorias e responsáveis</button>}
       <nav className="secretary-tabs visitor-tabs-v7" aria-label="Seções de visitantes">
         {([

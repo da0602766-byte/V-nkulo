@@ -130,7 +130,7 @@ export default function CareNotesBoard({
         <label>Título<input name="titulo" defaultValue={editing?.titulo || ""} maxLength={100} required placeholder="Ex.: Ligar para a família Oliveira" /></label>
         <label>Cor<select name="cor" defaultValue={editing?.cor || "amarelo"}><option value="amarelo">Amarelo</option><option value="rosa">Rosa</option><option value="azul">Azul</option><option value="verde">Verde</option></select></label>
         <label className="wide">Anotação<textarea name="texto" defaultValue={editing?.texto || ""} rows={3} maxLength={1200} placeholder="Contexto que você quer lembrar…" /></label>
-        <details className="care-note-options"><summary>Vínculos e checklist <small>opcional</small></summary><div>
+          <details className="care-note-options" data-keep-open-on-outside><summary>Vínculos e checklist <small>opcional</small></summary><div>
         <label>Vincular visitante <small>opcional</small><select name="visitanteId" defaultValue={editing?.visitanteId || ""}><option value="">Sem vínculo</option>{visitors.map((item) => <option value={item.id} key={item.id}>{item.nome_completo}</option>)}</select></label>
         <label>Vincular evento <small>opcional</small><select name="eventoId" defaultValue={editing?.eventoId || ""}><option value="">Sem vínculo</option>{events.map((item) => <option value={item.id} key={item.id}>{item.titulo}</option>)}</select></label>
         <label className="wide">Checklist <small>uma tarefa por linha</small><textarea name="checklist" defaultValue={editing?.checklist.map(item => item.texto).join("\n") || ""} rows={2} maxLength={1800} placeholder={"Enviar mensagem\nConfirmar presença\nRegistrar retorno"} /></label>
