@@ -14,7 +14,6 @@ import {
   useRef,
   useState,
 } from "react";
-import MinistriesWorkspace from "./MinistriesWorkspace";
 import MinistryScheduleWizard from "./MinistryScheduleWizard";
 import NativeImageUpload from "./NativeImageUpload";
 import VerifiedOwnerName from "./VerifiedOwnerName";
@@ -1376,7 +1375,7 @@ export default function SecretaryMinisterialWorkspace({
               >
                 <button
                   type="button"
-                  className={`secretary-ministry-tile ${ministry.banner_url ? "has-banner" : ""}`}
+                  className={`secretary-ministry-tile ministry-directory-card ${ministry.banner_url ? "has-banner" : ""}`}
                   onClick={() => openMinistry(ministry)}
                 >
                   <span className={`secretary-ministry-tile-media ${ministry.banner_url ? "" : "is-placeholder"}`} aria-hidden="true">
@@ -1389,7 +1388,7 @@ export default function SecretaryMinisterialWorkspace({
                   </span>
                   <span className="secretary-ministry-meta">
                     {ministry.responsavel_nome && <strong title={`Liderança: ${ministry.responsavel_nome}`}>{ministry.responsavel_nome}</strong>}
-                    <span>{ministry.can_manage ? "Gerenciar →" : "Minhas escalas →"}</span>
+                    <span className="ministry-card-action">{ministry.can_manage ? "Gerenciar" : "Minhas escalas"}<b aria-hidden="true">→</b></span>
                   </span>
                 </button>
               </article>
@@ -2540,10 +2539,7 @@ export default function SecretaryMinisterialWorkspace({
                   </div>
                 </section>
               )}
-              <section className="secretary-advanced">
-                <header><div><p className="pilot-kicker">CONFIGURAÇÕES AVANÇADAS</p><h2>Recursos preservados</h2><p>Funções personalizadas, modelos, histórico e controles anteriores continuam disponíveis.</p></div></header>
-                <MinistriesWorkspace permissions={permissions} communityName={communityName} />
-              </section>
+
             </div>
           )}
         </>

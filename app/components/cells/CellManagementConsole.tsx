@@ -26,6 +26,7 @@ export default function CellManagementConsole({
   onPreviewParticipacao?: () => void;
 }) {
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  useEffect(() => { const id = Number(new URLSearchParams(window.location.search).get("celula")); if (id) setSelectedId(id); }, []);
   const selected = cells.cells.find((cell) => cell.id === selectedId) || null;
 
   if (selected) {
@@ -264,6 +265,7 @@ type DetailTab = "visao" | "integrantes" | "agenda" | "relatorio" | "solicitacoe
 
 function CellDetailPage({ cell, cells, onBack }: { cell: Cell; cells: CellsData; onBack: () => void }) {
   const [tab, setTab] = useState<DetailTab>("visao");
+  useEffect(() => { if (new URLSearchParams(window.location.search).get("aba") === "solicitacoes") setTab("solicitacoes"); }, []);
   const [memberProfile, setMemberProfile] = useState<CellMember | null>(null);
   const health = cellHealth(cell, cells.agora);
 
@@ -281,7 +283,7 @@ function CellDetailPage({ cell, cells, onBack }: { cell: Cell; cells: CellsData;
     ["integrantes", "Integrantes"],
     ["agenda", "Agenda"],
     ["relatorio", "Relatório semanal"],
-    ["solicitacoes", `Solicitações ${cell.solicitacoes.length || ""}`.trim()],
+    ["solicitacoes", "Solicitações"],
     ["config", "Configurações"],
   ];
   const visitorTabs: [DetailTab, string][] = [
@@ -330,7 +332,7 @@ function CellDetailPage({ cell, cells, onBack }: { cell: Cell; cells: CellsData;
         <nav className="cgestao-tabs" aria-label="Seções da célula">
           {tabs.map(([id, label], index) => (
             <button key={id} type="button" className={tab === id ? "active" : ""} onClick={() => setTab(id)}>
-              <span>{String(index + 1).padStart(2, "0")}</span>{label}
+              <span aria-hidden="true">{id === "solicitacoes" ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg> : String(index + 1).padStart(2, "0")}</span>{label}{id === "solicitacoes" && cell.solicitacoes.length > 0 && <b className="cell-request-count" aria-label={`${cell.solicitacoes.length} pendentes`}>{cell.solicitacoes.length}</b>}
             </button>
           ))}
         </nav>
@@ -444,7 +446,7 @@ function IntegrantesTab({
         {!cell.membros.length && <p className="cgestao-empty">Nenhum integrante cadastrado ainda.</p>}
       </div>
       <div className="cgestao-add-members">
-        <form
+        <form className="cgestao-form"
           onSubmit={(event) => {
             event.preventDefault();
             const form = event.currentTarget;
@@ -460,7 +462,7 @@ function IntegrantesTab({
           </label>
           <button disabled={cells.saving}>Adicionar</button>
         </form>
-        <form
+        <form className="cgestao-form"
           onSubmit={(event) => {
             event.preventDefault();
             const form = event.currentTarget;

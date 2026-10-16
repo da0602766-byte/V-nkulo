@@ -1,3 +1,4 @@
+import { deliverCareNoteReminders } from "../../../lib/care-note-reminders";
 import { getD1 } from "../../../../db";
 import { getSessionUser } from "../../../lib/local-auth";
 
@@ -49,6 +50,7 @@ export async function GET(request: Request) {
     return Response.json({ error: "Faça login para continuar." }, { status: 401 });
   }
   const db = getD1();
+  await deliverCareNoteReminders(db, user.id).catch(() => undefined);
   const address = new URL(request.url);
   const cursor = decodeNotificationCursor(address.searchParams.get("cursor"));
   const requestedSize = Number(address.searchParams.get("limite") || 0);

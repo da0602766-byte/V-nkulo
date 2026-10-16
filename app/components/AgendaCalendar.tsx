@@ -356,8 +356,6 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
           ))}
         </div>
         </div>
-      </header>
-
       <div className="agenda-camadas">
         <div className={styles.layers} role="group" aria-label="Camadas do calendário">
         {camadasVisiveis.map((camada) => (
@@ -379,6 +377,8 @@ Todos os membros vão ver o título, o horário e o local. As observações cont
         </div>
 
       </div>
+
+      </header>
 
       {!camadasVisiveis.some((camada) => camadasAtivas.includes(camada.id)) && <div className={styles.layerNotice} role="status"><span>Nenhuma categoria selecionada. Os compromissos estão ocultos.</span><button type="button" onClick={() => setCamadasAtivas(camadasVisiveis.map((camada) => camada.id))}>Mostrar todas as categorias</button></div>}
 

@@ -195,6 +195,7 @@ export function VisitorsWorkspace({
   const [tab, setTab] = useState<VisitorTab>("pendencias");
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    if (params.has("anotacao")) { setTab("anotacoes"); return; }
     if (!params.has("sheetSetup")) return;
     const timer = window.setTimeout(() => setTab("pessoas"), 0);
     return () => window.clearTimeout(timer);

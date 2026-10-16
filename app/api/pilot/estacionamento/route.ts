@@ -104,9 +104,27 @@ export async function GET(request: Request) {
   const parkingContext = await readParkingContext(db, access.context.comunidadeId, access.user.id, new URL(request.url));
   if ("error" in parkingContext) return Response.json({ error: parkingContext.error }, { status: parkingContext.status });
   const shiftStats = assignment ? await readParkingShiftStats(db,access.context.comunidadeId,assignment.inicia_em,assignment.termina_em) : null;
+  // A separate, tenant-scoped projection is independent of the paginated queue.
+  // Members must never receive other drivers' identities.
+  const canSeeVehicles = access.context.permissions.some(item => ["parking.entry","parking.exit","parking.edit","parking.configure"].includes(item));
+  const spaceReservations = canSeeVehicles ? await db.prepare(`SELECT * FROM (
+      SELECT r.id,r.vaga_id,r.evento_titulo,r.nome_completo,r.placa_veiculo,r.tipo_veiculo,
+        r.modelo_veiculo,r.cor_veiculo,r.inicio_em,r.fim_em,r.status,
+        ROW_NUMBER() OVER (PARTITION BY r.vaga_id ORDER BY r.inicio_em,r.id) AS position,
+        COUNT(*) OVER (PARTITION BY r.vaga_id) AS total
+      FROM estacionamento_reservas r
+      WHERE r.comunidade_id=? AND r.status IN ('PENDENTE','CONFIRMADA','CHECKIN')
+        AND (datetime(r.fim_em)>=datetime('now') OR EXISTS(SELECT 1 FROM estacionamento_movimentacoes m
+          WHERE m.comunidade_id=r.comunidade_id AND m.status='NO_LOCAL' AND m.vaga_id=r.vaga_id
+            AND m.observacoes='Entrada liberada por QR da reserva '||r.id||'.'))
+        AND (? IS NULL OR r.evento_id=?)
+    ) WHERE position<=3 ORDER BY vaga_id,position`)
+    .bind(access.context.comunidadeId, parkingContext.context.eventoId, parkingContext.context.eventoId)
+    .all<Record<string,unknown>>() : {results:[]};
   return Response.json(
     {
       ...parkingContext,
+      reservasVagas: spaceReservations.results,
       setores: sectors.results,
       config: {
         ...config,

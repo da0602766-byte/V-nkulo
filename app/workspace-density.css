@@ -1,0 +1,111 @@
+/* Content-sized objects inside spacious work areas. Scoped to the affected modules. */
+.pilot-dashboard .care-notes-board:not(.is-compact):not(.is-side) { min-height:360px; align-content:start; }
+.pilot-dashboard .care-notes-board .care-notes-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),280px)); align-items:start; align-content:start; justify-content:start; gap:16px; }
+.pilot-dashboard .care-note { width:100%; min-width:0; min-height:230px; max-height:340px; overflow:auto; align-content:start; padding:16px; border-radius:4px 4px 22px 4px; box-sizing:border-box; }
+.pilot-dashboard .care-note { overflow-x:hidden; overflow-y:auto; }
+.pilot-dashboard .care-note::after { right:0; bottom:0; width:22px; height:22px; border-radius:22px 0 0 0; }
+.pilot-dashboard .care-note header { grid-template-columns:8px minmax(0,1fr) auto auto; gap:6px; }
+.pilot-dashboard .care-note header small { margin-right:auto; }
+.pilot-dashboard .care-note header button { margin:0; width:auto; min-width:32px; min-height:32px; font-size:12px; }
+.pilot-dashboard .care-note h3,.pilot-dashboard .care-note p { overflow-wrap:anywhere; }
+.pilot-dashboard .care-note-reminder { display:block; font-size:12px; font-weight:650; margin:0 0 8px; }
+.pilot-dashboard .care-note:focus { outline:2px solid var(--pilot-primary); outline-offset:4px; }
+.pilot-dashboard .care-note-composer { width:min(100%,380px); grid-template-columns:minmax(0,1fr) 100px; padding:16px; border:1px solid var(--pilot-line); border-radius:12px; background:var(--pilot-surface); box-sizing:border-box; }
+.pilot-dashboard .care-note-composer label:has(select[name="visitanteId"]),.pilot-dashboard .care-note-composer label:has(select[name="eventoId"]) { grid-column:1/-1; }
+.pilot-dashboard .care-note-composer :is(input,select,textarea) { box-sizing:border-box; min-width:0; }
+.pilot-dashboard .care-note-composer footer { flex-wrap:wrap; gap:8px; }
+.pilot-dashboard .care-note-composer footer button { margin-left:auto; }
+.care-note-options { grid-column:1/-1; min-width:0; border-top:1px solid var(--pilot-line); }
+.care-note-options summary { padding:10px 0; cursor:pointer; font-size:13px; }
+.care-note-options>div { display:grid; gap:10px; }
+@media(min-width:1100px) {
+  .pilot-dashboard .care-notes-board:not(.is-side):not(.is-compact):has(.care-note-composer) { grid-template-columns:minmax(0,380px) minmax(0,1fr); align-items:start; }
+  .pilot-dashboard .care-notes-board:has(.care-note-composer)>header,.pilot-dashboard .care-notes-board:has(.care-note-composer)>.care-note-feedback { grid-column:1/-1; }
+}
+.pilot-dashboard .care-notes-empty { grid-column:1/-1; max-width:480px; padding:28px 16px; }
+.pilot-dashboard .request-care-heading { margin:0; align-items:center; }
+.pilot-dashboard .request-care-heading h1 { font-size:26px; }
+.pilot-dashboard .request-care-heading p { margin:4px 0 0; }
+.pilot-dashboard[data-ui-version="v2"] .request-care-v213 .request-dashboard { padding:0!important; border:0!important; background:transparent!important; box-shadow:none!important; border-radius:0!important; }
+.pilot-dashboard .request-operations-table td:first-child { display:table-cell; }
+.pilot-dashboard .request-operations-table th { text-transform:none; font-size:12px; letter-spacing:0; }
+.pilot-dashboard .request-operations-table td { font-size:13px; padding:12px; }
+.pilot-dashboard .request-person-cell { display:grid; grid-template-columns:36px minmax(0,1fr); align-items:center; gap:10px; border:0; background:transparent; padding:0; color:inherit; font:inherit; text-align:left; cursor:pointer; width:100%; }
+.request-person-cell>span { display:grid; gap:4px; }
+.request-person-cell strong { overflow-wrap:anywhere; }
+.pilot-dashboard .request-person-cell:focus-visible { outline:2px solid var(--pilot-primary); outline-offset:3px; }
+.pilot-dashboard .request-member-form { max-width:780px; width:100%; justify-self:center; box-sizing:border-box; }
+.request-location small { font-weight:400; color:var(--pilot-muted); line-height:1.5; }
+.pilot-dashboard .request-contact-panel { display:grid; grid-template-columns:minmax(180px,260px) minmax(0,1fr); align-items:center; gap:20px; padding:20px; border:1px solid var(--pilot-line); border-radius:14px; background:var(--pilot-surface); }
+.pilot-dashboard .request-contact-panel h2 { font-size:18px; margin:0 0 6px; }
+.pilot-dashboard .request-contact-strip { display:flex; flex-wrap:wrap; gap:10px; }
+.pilot-dashboard .request-contact-strip button { display:flex; align-items:center; gap:12px; width:auto; max-width:320px; padding:12px 14px; border:1px solid var(--pilot-line); border-radius:10px; background:var(--pilot-surface-2); color:var(--pilot-text); }
+.pilot-dashboard .request-contact-strip button>span { display:grid; gap:4px; text-align:left; }
+.pilot-dashboard .request-contact-strip button small { color:var(--pilot-muted); }
+.pilot-dashboard .request-contact-strip button>b { margin-left:12px; color:var(--pilot-primary); }
+.pilot-dashboard .request-whatsapp-toggle { grid-column:1/-1; }
+.pilot-dashboard .parking-v2-context-bar#parking-new-reservation { width:min(100%,800px); margin-inline:auto; align-items:center; text-align:center; box-sizing:border-box; }
+.pilot-dashboard .parking-v2-context-bar#parking-new-reservation label { text-align:left; }
+.pilot-dashboard .parking-member .gestao-garage-list { grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),360px)); justify-content:start; align-items:start; }
+.pilot-dashboard .parking-redesign.parking-member .gestao-garage-list li { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; padding:14px; gap:10px; border-top:1px solid var(--pilot-line); }
+.pilot-dashboard .parking-member .gestao-garage-list li>div { gap:3px; }
+.pilot-dashboard .gestao-garage-list p { margin:3px 0; }
+.pilot-dashboard .gestao-garage-list .garage-actions { display:flex; flex-direction:column; gap:4px; }
+.pilot-dashboard .garage-actions button { min-height:36px; font-size:12px; }
+.pilot-dashboard .garage-actions button:first-child { color:var(--pilot-primary); }
+.pilot-dashboard .garage-edit { grid-column:1/-1; display:grid; grid-template-columns:1fr 1fr; gap:10px; padding-top:10px; border-top:1px solid var(--pilot-line); }
+.garage-edit label { display:grid; gap:5px; min-width:0; font-size:12px; }
+.garage-edit :is(input,select) { width:100%; min-width:0; box-sizing:border-box; min-height:40px; padding:8px; border:1px solid var(--pilot-line); border-radius:8px; background:var(--pilot-surface); color:var(--pilot-text); }
+.garage-edit footer,.garage-edit>small { grid-column:1/-1; }
+.garage-edit footer { display:flex; justify-content:flex-end; gap:12px; }
+.pilot-dashboard .parking-space-cards { grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),300px)); align-items:start; }
+.parking-space-reservations { display:grid; gap:8px; border-top:1px solid var(--pilot-line); padding-top:8px; }
+.parking-space-reservations>div { display:grid; gap:3px; font-size:12px; }
+.parking-space-reservations small { color:var(--pilot-muted); }
+.pilot-dashboard[data-ui-version="v2"] .events-workspace .event-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),520px)); align-items:start; justify-content:start; gap:16px; }
+.pilot-dashboard[data-ui-version="v2"] .events-workspace .event-card { min-height:0; width:100%; max-width:520px; height:auto; box-sizing:border-box; }
+.pilot-dashboard .event-card-expanded dl { display:grid; grid-template-columns:1fr; gap:8px; }
+.pilot-dashboard .event-card-expanded dl>div { display:grid; grid-template-columns:120px minmax(0,1fr); gap:12px; }
+.pilot-dashboard .cgestao-add-members { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; gap:16px; margin-top:20px; }
+.pilot-dashboard .cgestao-add-members .cgestao-form { display:grid; grid-template-columns:1fr; gap:12px; padding:16px; margin:0; border:1px solid var(--pilot-line); border-radius:12px; background:var(--pilot-surface); }
+.pilot-dashboard .cgestao-add-members label { display:grid; gap:7px; min-width:0; font-size:13px; }
+.pilot-dashboard .cgestao-add-members :is(input,select) { width:100%; min-width:0; min-height:42px; padding:10px; box-sizing:border-box; border:1px solid var(--pilot-line); border-radius:8px; background:var(--pilot-surface-2); color:var(--pilot-text); font:inherit; }
+.pilot-dashboard .cgestao-add-members button { justify-self:start; min-height:40px; padding:8px 16px; border:1px solid var(--pilot-line); border-radius:8px; background:var(--pilot-primary); color:white; font-weight:650; }
+.pilot-dashboard .cgestao-member-list article>div:not(.cgestao-member-actions) { display:grid; gap:5px; }
+.pilot-dashboard .cgestao-member-list .cgestao-link { justify-self:start; padding:0; }
+.cell-request-count { margin-left:auto; min-width:22px; padding:3px 6px; border-radius:20px; background:var(--pilot-primary); color:white; text-align:center; font-size:12px; }
+.pilot-dashboard .member-account-action { display:flex; align-items:center; gap:14px; width:fit-content; max-width:100%; padding:14px 18px; border:1px solid var(--pilot-line); border-radius:12px; background:var(--pilot-surface); color:var(--pilot-text); text-decoration:none; }
+.member-account-action>span:nth-child(2) { display:grid; gap:4px; }
+.member-account-action small { color:var(--pilot-muted); }
+.member-account-action>b { margin-left:20px; color:var(--pilot-primary); }
+.pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-dashboard-grid,.pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-panel:has(>.secretary-dashboard-grid) { padding:0!important; border:0!important; background:transparent!important; box-shadow:none!important; align-items:start; }
+.pilot-dashboard[data-ui-version="v2"] .secretary-workspace.secretary-catalog.ministry-project .secretary-ministry-catalog { grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),360px))!important; align-items:start; justify-content:start; gap:16px; }
+.pilot-dashboard[data-ui-version="v2"] .secretary-workspace.secretary-catalog.ministry-project .secretary-ministry-tile-wrap { border:0; }
+.pilot-dashboard[data-ui-version="v2"] .secretary-workspace.secretary-catalog.ministry-project .secretary-ministry-tile.ministry-directory-card { display:flex!important; flex-direction:column!important; position:relative; isolation:isolate; min-height:0!important; height:auto!important; padding:0!important; gap:0!important; width:100%; text-align:left; border:1px solid var(--pilot-line)!important; border-radius:14px!important; overflow:hidden; background:var(--pilot-surface)!important; color:var(--pilot-text)!important; }
+.pilot-dashboard[data-ui-version="v2"] .secretary-workspace.secretary-catalog.ministry-project .secretary-ministry-tile.ministry-directory-card .secretary-ministry-tile-media { position:relative!important; inset:auto!important; width:100%!important; height:112px!important; min-height:0!important; margin:0!important; padding:0!important; opacity:1!important; mask-image:none!important; z-index:auto!important; display:grid!important; place-items:center; background:var(--pilot-surface-2)!important; }
+.pilot-dashboard[data-ui-version="v2"] .secretary-workspace.secretary-catalog.ministry-project .secretary-ministry-tile.ministry-directory-card .secretary-ministry-tile-media img { width:100%!important; height:100%!important; object-fit:cover!important; opacity:1!important; mask-image:none!important; filter:none!important; }
+.pilot-dashboard[data-ui-version="v2"] .secretary-workspace.secretary-catalog.ministry-project .ministry-directory-card .secretary-ministry-tile-media>span { font-size:48px; opacity:.35; color:var(--pilot-primary); }
+.pilot-dashboard[data-ui-version="v2"] .secretary-workspace.secretary-catalog.ministry-project .ministry-directory-card .secretary-ministry-copy { padding:14px 16px 10px!important; display:grid; gap:6px; }
+.pilot-dashboard[data-ui-version="v2"] .secretary-workspace.secretary-catalog.ministry-project .ministry-directory-card .secretary-ministry-copy>strong { font-size:18px; }
+.pilot-dashboard[data-ui-version="v2"] .secretary-workspace.secretary-catalog.ministry-project .ministry-directory-card .secretary-ministry-copy>span { font-size:13px; line-height:1.5; min-height:0; }
+.pilot-dashboard[data-ui-version="v2"] .secretary-workspace.secretary-catalog.ministry-project .ministry-directory-card .secretary-ministry-meta { display:flex!important; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin:0 16px; padding:12px 0!important; width:auto!important; border-top:1px solid var(--pilot-line); }
+.pilot-dashboard[data-ui-version="v2"] .secretary-workspace.secretary-catalog.ministry-project .ministry-directory-card .secretary-ministry-meta>strong { font-size:12px; color:var(--pilot-muted); }
+.pilot-dashboard[data-ui-version="v2"] .secretary-workspace.secretary-catalog.ministry-project .ministry-directory-card .ministry-card-action { display:inline-flex; gap:12px; align-items:center; padding:8px 10px; border-radius:8px; border:1px solid var(--pilot-line); background:var(--pilot-surface-2); color:var(--pilot-primary); font-size:12px; }
+@media(max-width:760px) {
+  .pilot-dashboard .care-note-composer { grid-template-columns:minmax(0,1fr); }
+  .pilot-dashboard .care-notes-board .care-notes-grid { grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),280px)); }
+  .pilot-dashboard .care-note header button { min-height:44px; min-width:44px; }
+  .pilot-dashboard .care-note-composer :is(input,select,textarea),.pilot-dashboard .garage-edit :is(input,select),.pilot-dashboard .cgestao-add-members :is(input,select) { font-size:16px; }
+  .pilot-dashboard .request-contact-panel,.pilot-dashboard .cgestao-add-members { grid-template-columns:1fr; }
+  .pilot-dashboard .request-care-heading { flex-wrap:wrap; gap:10px; }
+  .pilot-dashboard .request-contact-strip button { min-height:48px; }
+  .pilot-dashboard .event-card-expanded dl>div { grid-template-columns:100px minmax(0,1fr); }
+  .pilot-dashboard .member-account-action { box-sizing:border-box; width:100%; padding:14px; }
+}
+
+.pilot-dashboard[data-ui-version="v2"] .secretary-catalog.ministry-project .ministry-directory-card .secretary-ministry-copy { max-width:none!important; }
+.pilot-dashboard[data-ui-version="v2"] .secretary-catalog.ministry-project .ministry-directory-card .secretary-ministry-meta>strong { max-width:none!important; }
+
+.pilot-dashboard[data-ui-version="v2"] .secretary-workspace.secretary-catalog.ministry-project .ministry-directory-card .secretary-ministry-meta { margin:0 16px!important; align-self:stretch; }
+.pilot-dashboard .parking-space-card:has(.parking-space-reservations) .parking-space-current { min-height:0; }
+@media(max-width:760px) { .pilot-dashboard .garage-actions button { min-height:44px; } }

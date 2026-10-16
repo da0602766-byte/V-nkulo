@@ -834,6 +834,8 @@ export default function PilotDashboard({
     const address = new URL(window.location.href);
     address.searchParams.set("view", nextView);
     if (new URL(window.location.href).searchParams.get("view") !== nextView) {
+      address.hash = "";
+      for (const key of ["anotacao", "celula", "aba", "ministry"]) address.searchParams.delete(key);
       window.history.pushState(
         { ...window.history.state, view: nextView },
         "",
@@ -1396,7 +1398,7 @@ export default function PilotDashboard({
               <PeopleWorkspace communityName={active.comunidadeNome} mode="self"
                 selfLinks={allowedMenu.filter(item => ["eventos", "ministerios", "celulas"].includes(item.id)).map(item => ({ label: item.label, href: `/painel?view=${item.id}` }))} />
             </details>
-            <p className="central-note"><a href="/painel?view=conta">Editar perfil, foto, conta e privacidade →</a></p>
+            <a className="member-account-action" href="/painel?view=conta"><span aria-hidden="true">⚙</span><span><strong>Meu perfil e conta</strong><small>Foto, dados pessoais e privacidade</small></span><b aria-hidden="true">→</b></a>
           </>}
           {visibleView === "lider" && <>
             <CommunityCentral key={`leadership:${active.comunidadeId}`} communityId={active.comunidadeId} mode="leadership" />

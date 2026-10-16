@@ -92,6 +92,7 @@ export type AvailableUser = { id: number; nome: string; papel: string };
 export type MinistryMember = { id: number; nome: string; papel: string };
 
 export type ParkingData = {
+  reservasVagas?: Array<Pick<Reservation,"id"|"vaga_id"|"evento_titulo"|"nome_completo"|"placa_veiculo"|"tipo_veiculo"|"modelo_veiculo"|"cor_veiculo"|"inicio_em"|"fim_em"|"status"> & {total:number}>;
   eventos?: ParkingEventOption[];
   serverTime?: string;
   context?: { eventoId: number | null; inicioEm: string; fimEm: string };

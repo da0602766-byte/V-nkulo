@@ -21,6 +21,7 @@ import "./commerce.css";
 import "./owner-reset.css";
 import "./experience-refinements.css";
 import "./workspace-layout.css";
+import "./workspace-density.css";
 import SmartScrollHeader from "./components/SmartScrollHeader";
 import MobileAppInstall from "./components/MobileAppInstall";
 import GlobalFeedbackLauncher from "./components/GlobalFeedbackLauncher";

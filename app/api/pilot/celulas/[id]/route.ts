@@ -1,4 +1,5 @@
 import { getD1 } from "../../../../../db";
+import { createSystemNotification } from "../../../../lib/system-notifications";
 import { recordTenantAudit } from "../../../../lib/tenant-audit";
 import { requireTenantPermission } from "../../../../lib/tenant";
 
@@ -48,6 +49,11 @@ export async function PATCH(request: Request, context: Context) {
       `INSERT INTO celula_solicitacoes (comunidade_id, celula_id, usuario_id, nome, contato, mensagem)
        VALUES (?, ?, ?, ?, ?, ?)`,
     ).bind(access.context.comunidadeId, id, access.user.id, access.user.nome, contact, message).run();
+    const leaders = await db.prepare(`SELECT DISTINCT u.id FROM usuarios u JOIN usuario_comunidades uc ON uc.usuario_id=u.id
+      WHERE u.ativo=1 AND uc.comunidade_id=? AND uc.status='ATIVO'
+      AND (u.id IN (?,?) OR lower(u.email)=lower(?) OR uc.papel IN ('PASTOR','ADMIN_COMUNIDADE'))`)
+      .bind(access.context.comunidadeId, existing.lider_usuario_id, existing.vice_lider_usuario_id, existing.criado_por).all<{id:number}>();
+    for (const leader of leaders.results) await createSystemNotification(db, { titulo:"Nova solicitação na célula", mensagem:`Uma pessoa quer participar de ${existing.nome}.`, area:"SOLICITACOES", entidadeId:Number(created.meta.last_row_id), usuarioId:leader.id, comunidadeId:access.context.comunidadeId, destinoRota:`/painel?view=celulas&celula=${id}&aba=solicitacoes`, criadoPor:access.user.email });
     await recordTenantAudit(db, access.context, access.user.id, "CELULA_SOLICITACAO_CRIADA", "SUCESSO", { celulaId: id, solicitacaoId: created.meta.last_row_id });
     return Response.json({ ok: true, id: created.meta.last_row_id }, { status: 201 });
   }
@@ -136,8 +142,11 @@ export async function PATCH(request: Request, context: Context) {
   if (action === "SOLICITACAO_DECIDIR") {
     const requestId = Number(payload.solicitacaoId);
     const status = payload.status === "APROVADA" ? "APROVADA" : "RECUSADA";
-    await db.prepare(`UPDATE celula_solicitacoes SET status = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ? AND celula_id = ? AND comunidade_id = ? AND status = 'PENDENTE'`)
+    const decision = await db.prepare(`UPDATE celula_solicitacoes SET status = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ? AND celula_id = ? AND comunidade_id = ? AND status = 'PENDENTE'`)
       .bind(status, requestId, id, access.context.comunidadeId).run();
+    if (!decision.meta.changes) return Response.json({ error:"Essa solicitação não está mais pendente." }, {status:409});
+    const applicant = await db.prepare("SELECT usuario_id FROM celula_solicitacoes WHERE id=? AND comunidade_id=? AND celula_id=?").bind(requestId,access.context.comunidadeId,id).first<{usuario_id:number}>();
+    if (applicant?.usuario_id) await createSystemNotification(db, { titulo:"Resposta à solicitação de célula", mensagem:`Sua solicitação para ${existing.nome} foi ${status === "APROVADA" ? "aprovada" : "recusada"}.`, area:"SOLICITACOES", entidadeId:requestId, usuarioId:applicant.usuario_id, comunidadeId:access.context.comunidadeId, destinoRota:`/painel?view=celulas&celula=${id}`, criadoPor:access.user.email });
     return audited(db, access.context, access.user.id, id, `SOLICITACAO_${status}`);
   }
 

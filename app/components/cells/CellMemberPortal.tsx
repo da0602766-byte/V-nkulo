@@ -57,6 +57,8 @@ export default function CellMemberPortal({
 
   useEffect(() => {
     const timer = window.setTimeout(() => setPendingIds(readPendingIds()), 0);
+    const cellId = Number(new URLSearchParams(window.location.search).get("celula"));
+    if (cellId > 0) setMobileSelectedId(cellId);
     return () => window.clearTimeout(timer);
   }, []);
 
@@ -190,6 +192,10 @@ function CellPortalDesktop({
   onBackToGestao?: () => void;
 }) {
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  useEffect(() => {
+    const cellId = Number(new URLSearchParams(window.location.search).get("celula"));
+    if (cellId > 0) setSelectedId(cellId);
+  }, []);
   const { filtered } = directory;
   const selected = filtered.find((cell) => cell.id === selectedId) || filtered[0] || null;
   const myCell = list.find((cell) => cell.minha_participacao);

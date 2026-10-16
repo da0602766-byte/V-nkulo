@@ -405,7 +405,9 @@ export async function POST(request: Request) {
   if(body.feedPrayer===true && (body.communityId!==access.context.comunidadeId || body.tipo!=="ORACAO")) return Response.json({error:"A comunidade ativa mudou. Reabra o pedido."},{status:409});
   const tipo = clean(body.tipo, 30).toUpperCase();
   const titulo = clean(body.titulo, 120);
-  const descricao = clean(body.descricao, 2000);
+  const descricaoOriginal = clean(body.descricao, 2000);
+  const localizacao = clean(body.localizacao, 400);
+  const descricao = descricaoOriginal + (localizacao ? `\n\nLocalização informada: ${localizacao}` : "");
   const visibilidade = clean(body.visibilidade, 30).toUpperCase() || "PRIVADA";
   const contactPreference = clean(body.preferenciaContato, 30).toUpperCase();
   const availability = clean(body.disponibilidade, 240);
@@ -421,7 +423,7 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  if (titulo.length < 3 || descricao.length < 10) {
+  if (titulo.length < 3 || descricaoOriginal.length < 10) {
     return Response.json(
       { error: "Informe um título e uma descrição clara." },
       { status: 400 },

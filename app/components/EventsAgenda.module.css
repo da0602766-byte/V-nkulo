@@ -302,3 +302,23 @@
 @media(max-width:600px){.dayDialog .eventDialogForm > :global(.event-form),.dayDialog .eventDialogForm :global(.event-advanced)>div{grid-template-columns:1fr}.dayDialog .eventDialogForm :global(.event-form) :is(input,select,textarea){font-size:16px}.dayDialog .eventDialogForm :global(.event-form-actions){bottom:-16px}.calendar:global(.agenda-studio) .titlebar{width:100%;justify-content:space-between}.calendar:global(.agenda-studio) :global(.agenda-camada){min-height:36px}.calendar:global(.agenda-studio) .introToggle{min-height:36px}}
 
 :global(.pilot-dashboard[data-ui-version="v2"]) .dayDialog .eventDialogForm :global(.event-form-actions) :global(.secondary-action){background:transparent!important;color:var(--pilot-muted)!important;border:1px solid var(--pilot-line)!important}
+
+/* One integrated toolbar on monitors; wrap controls naturally on phones. */
+.calendar:global(.agenda-studio) :global(.agenda-calendario-topo) { padding:12px; border:1px solid var(--pilot-line); border-bottom:0; border-radius:12px 12px 0 0; background:var(--pilot-surface); gap:10px; }
+.calendar:global(.agenda-studio) :global(.agenda-camadas) { order:2; padding:0!important; border:0; }
+.calendar:global(.agenda-studio) :global(.agenda-calendario-acoes) { order:3; margin-left:auto; }
+.calendar:global(.agenda-studio) :global(.agenda-calendario-periodo) { flex:0 1 auto; grid-template-columns:32px 32px minmax(100px,auto) auto; }
+.calendar:global(.agenda-studio) { gap:0; }
+@media(min-width:1200px) {
+  .calendar:global(.agenda-studio) :global(.agenda-calendario-topo) { flex-wrap:nowrap; }
+  .calendar:global(.agenda-studio) .layers { flex-wrap:nowrap; }
+  .calendar:global(.agenda-studio) :global(.agenda-camada) { white-space:nowrap; }
+}
+@media(max-width:1199px) {
+  .calendar:global(.agenda-studio) :global(.agenda-camadas) { order:4; flex-basis:100%; }
+}
+@media(max-width:600px) {
+  .calendar:global(.agenda-studio) :global(.agenda-calendario-periodo) { flex:1 1 100%; }
+  .calendar:global(.agenda-studio) :global(.agenda-calendario-acoes) { margin-left:0; }
+  .calendar:global(.agenda-studio) :global(.agenda-camadas) { flex-basis:auto; }
+}

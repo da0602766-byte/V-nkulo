@@ -44,6 +44,7 @@ export default function ParkingMemberPortal({
   const [saveVehicle, setSaveVehicle] = useState(true);
   const [window_, setWindow] = useState({ start: "", end: "" });
   const [justCreated, setJustCreated] = useState<{ codigo: string; spaceLabel: string; status: string } | null>(null);
+  const [editingVehicle, setEditingVehicle] = useState<string | null>(null);
   const [copyMessage, setCopyMessage] = useState("");
 
   const ownerKey = data ? (data.operator.email || `u${data.operator.id}`) : "";
@@ -322,7 +323,13 @@ export default function ParkingMemberPortal({
                 <div>
                   <strong className="parking-plate">{item.placa}</strong><p>{item.modelo || item.apelido}</p><small>{parkingLabel(item.tipo)} · {item.cor}</small>
                 </div>
-                <button type="button" onClick={() => garage.removeVehicle(item.id)}>Remover</button>
+                <div className="garage-actions"><button type="button" onClick={() => setEditingVehicle(editingVehicle === item.id ? null : item.id)} aria-expanded={editingVehicle === item.id}>Editar</button><button type="button" onClick={() => garage.removeVehicle(item.id)}>Remover</button></div>
+                {editingVehicle === item.id && <form className="garage-edit" onSubmit={event => { event.preventDefault(); const values = new FormData(event.currentTarget); garage.updateVehicle(item.id, { apelido:String(values.get("modelo")), placa:String(values.get("placa")).toUpperCase().replace(/[^A-Z0-9]/g,""), tipo:String(values.get("tipo")), modelo:String(values.get("modelo")).trim(), cor:String(values.get("cor")).trim() }); setEditingVehicle(null); }}>
+                  <label>Placa<input name="placa" defaultValue={item.placa} required minLength={6} maxLength={10} pattern="[A-Za-z0-9-]{6,10}" /></label>
+                  <label>Tipo<select name="tipo" defaultValue={item.tipo}><option value="CARRO">Carro</option><option value="MOTO">Moto</option><option value="VAN">Van</option><option value="OUTRO">Outro</option></select></label>
+                  <label>Marca e modelo<input name="modelo" defaultValue={item.modelo} required minLength={2} maxLength={100} /></label><label>Cor<input name="cor" defaultValue={item.cor} required maxLength={40} /></label>
+                  <small>As reservas já enviadas mantêm os dados originais.</small><footer><button type="button" onClick={() => setEditingVehicle(null)}>Cancelar</button><button type="submit">Salvar veículo</button></footer>
+                </form>}
               </li>
             ))}
           </ul>
