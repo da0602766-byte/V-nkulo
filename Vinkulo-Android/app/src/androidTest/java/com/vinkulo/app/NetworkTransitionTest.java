@@ -23,6 +23,12 @@ import static org.junit.Assert.*;
 /** Exercises the real network transition that previously left WebView's ERR_FAILED page visible. */
 @RunWith(AndroidJUnit4.class)
 public class NetworkTransitionTest {
+    @org.junit.Before public void allowOfflineFixture() {
+        android.content.Context context = androidx.test.core.app.ApplicationProvider.getApplicationContext();
+        context.getSharedPreferences("android-global-policy", android.content.Context.MODE_PRIVATE).edit()
+            .putBoolean("enabled", true).putLong("confirmed", System.currentTimeMillis()).commit();
+    }
+
     private final UiDevice device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
     private final ConnectivityManager connectivity = (ConnectivityManager)
             ApplicationProvider.getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);

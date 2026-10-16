@@ -19,6 +19,12 @@ import static org.junit.Assume.assumeTrue;
 
 @RunWith(AndroidJUnit4.class)
 public class VisitorOutboxTest {
+    @org.junit.Before public void allowOfflineFixture() {
+        android.content.Context context = androidx.test.core.app.ApplicationProvider.getApplicationContext();
+        context.getSharedPreferences("android-global-policy", android.content.Context.MODE_PRIVATE).edit()
+            .putBoolean("enabled", true).putLong("confirmed", System.currentTimeMillis()).commit();
+    }
+
     private final Context context=ApplicationProvider.getApplicationContext();
     private final class TestDatabase implements AutoCloseable {
         final OfflineDatabase db;TestDatabase(String name){db=OfflineDatabase.open(context,name);}

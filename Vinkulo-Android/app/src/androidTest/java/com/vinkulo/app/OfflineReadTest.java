@@ -23,6 +23,12 @@ import static org.junit.Assume.assumeTrue;
 
 @RunWith(AndroidJUnit4.class)
 public class OfflineReadTest {
+    @org.junit.Before public void allowOfflineFixture() {
+        android.content.Context context = androidx.test.core.app.ApplicationProvider.getApplicationContext();
+        context.getSharedPreferences("android-global-policy", android.content.Context.MODE_PRIVATE).edit()
+            .putBoolean("enabled", true).putLong("confirmed", System.currentTimeMillis()).commit();
+    }
+
     private final Context context = ApplicationProvider.getApplicationContext();
     private OfflineCipher cipher() { return new OfflineCipher("test-vinkulo-offline-read"); }
     private JSONObject section(JSONArray rows) throws Exception {

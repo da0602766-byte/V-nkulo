@@ -46,7 +46,7 @@ public class UpgradeContinuityTest {
     }
 
     @Test public void verifyUpdatedVersionAndRecovery() throws Exception {
-        assertEquals("1.22.0", context.getPackageManager().getPackageInfo(context.getPackageName(),0).versionName);
+        assertEquals("1.23.0", context.getPackageManager().getPackageInfo(context.getPackageName(),0).versionName);
         JSONArray expected = new JSONArray(context.getSharedPreferences(PREFS,0).getString("expected","[]"));
         assertEquals(7,expected.length());
         try (VisitorAccess access = new VisitorAccess(context)) {

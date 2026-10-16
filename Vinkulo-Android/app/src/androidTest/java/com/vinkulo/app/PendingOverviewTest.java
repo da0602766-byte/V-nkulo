@@ -19,6 +19,12 @@ import static org.junit.Assume.assumeTrue;
 
 @RunWith(AndroidJUnit4.class)
 public class PendingOverviewTest {
+    @org.junit.Before public void allowOfflineFixture() {
+        android.content.Context context = androidx.test.core.app.ApplicationProvider.getApplicationContext();
+        context.getSharedPreferences("android-global-policy", android.content.Context.MODE_PRIVATE).edit()
+            .putBoolean("enabled", true).putLong("confirmed", System.currentTimeMillis()).commit();
+    }
+
     private final Context context=ApplicationProvider.getApplicationContext();
     private static final long USER=8981;
     private void cookies(String value)throws Exception{CountDownLatch done=new CountDownLatch(1);InstrumentationRegistry.getInstrumentation().runOnMainSync(()->CookieManager.getInstance().setCookie(NativePolicy.ORIGIN,"__Host-adote_session="+value+"; Path=/; Secure; HttpOnly",ok->done.countDown()));assertTrue(done.await(5,TimeUnit.SECONDS));}

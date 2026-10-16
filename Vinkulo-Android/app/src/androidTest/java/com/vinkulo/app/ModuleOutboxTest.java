@@ -18,6 +18,12 @@ import static org.junit.Assume.assumeTrue;
 
 @RunWith(AndroidJUnit4.class)
 public class ModuleOutboxTest {
+    @org.junit.Before public void allowOfflineFixture() {
+        android.content.Context context = androidx.test.core.app.ApplicationProvider.getApplicationContext();
+        context.getSharedPreferences("android-global-policy", android.content.Context.MODE_PRIVATE).edit()
+            .putBoolean("enabled", true).putLong("confirmed", System.currentTimeMillis()).commit();
+    }
+
     private final Context context=ApplicationProvider.getApplicationContext();
     private void cookies(String value)throws Exception{CountDownLatch done=new CountDownLatch(1);InstrumentationRegistry.getInstrumentation().runOnMainSync(()->CookieManager.getInstance().setCookie(NativePolicy.ORIGIN,"__Host-adote_session="+value+"; Path=/; Secure; HttpOnly",ok->done.countDown()));assertTrue(done.await(5,TimeUnit.SECONDS));}
     private JSONObject grant(ModuleAccess a,long user)throws Exception{long now=System.currentTimeMillis();JSONArray items=new JSONArray().put(new JSONObject().put("id",1).put("label","Registro fictício autorizado").put("text","Consulta de teste; não é produção").put("version",0));return new JSONObject().put("protocol",1).put("module",a.module).put("deviceId",a.device()).put("accountId",user).put("communityId",33).put("communityName","Comunidade de teste").put("issuedAt",now).put("expiresAt",now+600000).put("token",new String(new char[64]).replace('\0','b')).put("canWrite",!a.module.equals("cells")).put("snapshot",new JSONObject().put("items",items).put("options",items));}

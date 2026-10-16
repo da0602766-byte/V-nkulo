@@ -3,13 +3,9 @@ set -euo pipefail
 mkdir -p app/build/reports
 ready=0
 offline_surface_ready() {
-  { grep -Fq 'O que vamos fazer?' app/build/reports/vinkulo-release-offline.xml &&
-    grep -Fq 'Preparação necessária' app/build/reports/vinkulo-release-offline.xml; } ||
-  { grep -Fq 'Seu Vínkulo começa aqui.' app/build/reports/vinkulo-release-offline.xml &&
-    grep -Fq 'Atualize o Android System WebView' app/build/reports/vinkulo-release-offline.xml &&
-    grep -Fq 'ATUALIZAR WEBVIEW' app/build/reports/vinkulo-release-offline.xml; } ||
-  { grep -Fq 'O que você quer fazer?' app/build/reports/vinkulo-release-offline.xml &&
-    grep -Fq 'Sem acesso à internet' app/build/reports/vinkulo-release-offline.xml; }
+  grep -Fq 'Você está sem internet' app/build/reports/vinkulo-release-offline.xml &&
+  grep -Fq 'Tentar novamente' app/build/reports/vinkulo-release-offline.xml &&
+  ! grep -Fq 'O que você quer fazer?' app/build/reports/vinkulo-release-offline.xml
 }
 # Cold WebView initialization on shared CI runners has variable latency.
 # Wait for usable content, not an arbitrary 3-second screenshot. This is a

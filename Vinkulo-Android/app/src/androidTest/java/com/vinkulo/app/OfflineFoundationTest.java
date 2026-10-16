@@ -22,6 +22,12 @@ import static org.junit.Assert.*;
 
 @RunWith(AndroidJUnit4.class)
 public class OfflineFoundationTest {
+    @org.junit.Before public void allowOfflineFixture() {
+        android.content.Context context = androidx.test.core.app.ApplicationProvider.getApplicationContext();
+        context.getSharedPreferences("android-global-policy", android.content.Context.MODE_PRIVATE).edit()
+            .putBoolean("enabled", true).putLong("confirmed", System.currentTimeMillis()).commit();
+    }
+
     private final Context context = ApplicationProvider.getApplicationContext();
     private String name() { return "test-offline-" + UUID.randomUUID() + ".db"; }
     private OfflineCipher cipher() { return new OfflineCipher("test-vinkulo-offline"); }
