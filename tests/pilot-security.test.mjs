@@ -101,7 +101,7 @@ test("governança V4.7.2 mantém exclusões protegidas, conta neutra e temas iso
     readFile(new URL("../app/components/GlobalVisualEditor.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(peopleRoute, /access\.user\.system_owner/);
-  assert.match(peopleRoute, /EXCLUSAO_DEFINITIVA_DE_CONTA_BLOQUEADA/);
+  assert.match(peopleRoute, /deleteUserAccount\(db, access.user.id, target.usuario_id\)/);
   assert.match(peopleRoute, /UPDATE usuarios SET ativo = 0/);
   assert.match(scheduleRoute, /status = 'ARQUIVADA'/);
   assert.match(ministryRoute, /ARQUIVAR_DIACONIA/);

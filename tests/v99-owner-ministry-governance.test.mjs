@@ -67,10 +67,11 @@ test("proprietário oferece desativação e exclusão definitiva protegida no ba
   assert.match(api, /action === "ALTERAR_STATUS_USUARIO"/);
   assert.match(api, /DELETE FROM sessoes WHERE usuario_id = \?/);
   assert.match(api, /action === "EXCLUIR_USUARIO_DEFINITIVO"/);
-  assert.match(api, /findUserDependencies/);
-  assert.match(api, /PRAGMA foreign_key_list/);
+  assert.match(api, /deleteUserAccount/);
+  const deletion = await read("app/lib/delete-user-account.ts");
+  assert.match(deletion, /PRAGMA foreign_key_list/);
   assert.match(api, /isSystemOwnerAccount/);
-  assert.match(api, /motivo: "conta_sem_vinculos_funcionais"/);
+  assert.match(deletion, /CONTA_EXCLUIDA_DEFINITIVAMENTE/);
   assert.doesNotMatch(api, /CONTA_DE_TESTE_EXCLUIDA_DEFINITIVAMENTE[\s\S]{0,500}target\.email/);
   assert.match(workspace, /Desativar conta/);
   assert.match(workspace, /Excluir definitivamente/);

@@ -247,7 +247,7 @@ export default function OwnerWorkspace({
 
   async function deleteUserPermanently(id: number, name: string) {
     const confirmation = window.prompt(
-      `Exclusão definitiva de ${name}. Esta ação só funciona para contas sem vínculos. Digite EXCLUIR para confirmar.`,
+      `Exclusão definitiva de ${name}. A conta, seus vínculos e registros pessoais serão removidos. Os líderes serão avisados. Esta ação não pode ser desfeita. Digite EXCLUIR para confirmar.`,
     );
     if (confirmation !== "EXCLUIR") return;
     setWorking(id);
@@ -261,9 +261,9 @@ export default function OwnerWorkspace({
           userId: id,
         }),
       });
-      const result = (await response.json()) as { error?: string };
+      const result = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) throw new Error(result.error || "Não foi possível excluir a conta.");
-      setMessage("Conta de teste excluída definitivamente.");
+      setMessage("Conta excluída definitivamente. Avisos registrados para os líderes vinculados.");
       await load(true);
     } catch (error) {
       setMessage((error as Error).message);
@@ -453,7 +453,7 @@ export default function OwnerWorkspace({
                         const id = Number(item.id);
                         const active = Number(item.ativo) === 1;
                         const name = String(item.nome);
-                        return <details key={id}><summary><OwnerAvatar image={String(item.foto_perfil || "")} name={name} /><div><h2>{name}</h2><small>{String(item.telefone || item.email || "Contato não informado")}</small></div><b className={active ? "active" : "inactive"}>{active ? "ATIVO" : "INATIVO"}</b><i aria-hidden="true">⌄</i></summary><div className="owner-user-details"><span><small>E-mail</small><strong>{String(item.email || "Não informado")}</strong></span><span><small>Telefone</small><strong>{String(item.telefone || "Não informado")}</strong></span><span><small>Comunidades</small><strong>{String(item.comunidades_nomes || "Sem vínculo")}</strong></span><span><small>Perfil global</small><strong>{String(item.perfil || "MEMBRO")}</strong></span><div className="owner-user-actions"><button type="button" disabled={working === id || id === data.owner.id || Number(item.system_owner) === 1} onClick={() => void changeUserStatus(id, name, !active)}>{active ? "Desativar conta" : "Reativar conta"}</button><button type="button" className="danger" disabled={working === id || id === data.owner.id || Number(item.system_owner) === 1} onClick={() => void deleteUserPermanently(id, name)}>Excluir definitivamente</button></div><p>{id === data.owner.id || Number(item.system_owner) === 1 ? "Conta do proprietário protegida: desativação e exclusão não são permitidas." : "A exclusão definitiva é aceita somente para contas sem vínculos. Contas com histórico devem ser desativadas."}</p></div></details>;
+                        return <details key={id}><summary><OwnerAvatar image={String(item.foto_perfil || "")} name={name} /><div><h2>{name}</h2><small>{String(item.telefone || item.email || "Contato não informado")}</small></div><b className={active ? "active" : "inactive"}>{active ? "ATIVO" : "INATIVO"}</b><i aria-hidden="true">⌄</i></summary><div className="owner-user-details"><span><small>E-mail</small><strong>{String(item.email || "Não informado")}</strong></span><span><small>Telefone</small><strong>{String(item.telefone || "Não informado")}</strong></span><span><small>Comunidades</small><strong>{String(item.comunidades_nomes || "Sem vínculo")}</strong></span><span><small>Perfil global</small><strong>{String(item.perfil || "MEMBRO")}</strong></span><div className="owner-user-actions"><button type="button" disabled={working === id || id === data.owner.id || Number(item.system_owner) === 1} onClick={() => void changeUserStatus(id, name, !active)}>{active ? "Desativar conta" : "Reativar conta"}</button><button type="button" className="danger" disabled={working === id || id === data.owner.id || Number(item.system_owner) === 1} onClick={() => void deleteUserPermanently(id, name)}>Excluir definitivamente</button></div><p>{id === data.owner.id || Number(item.system_owner) === 1 ? "Conta do proprietário protegida: desativação e exclusão não são permitidas." : "O proprietário pode excluir contas com vínculos. Os líderes são avisados; a conta, os vínculos e registros pessoais são removidos. Dados compartilhados da comunidade permanecem."}</p></div></details>;
                       })}
                       {!visibleDirectoryRows.length && <Empty title="Nenhuma pessoa encontrada" text="Ajuste a pesquisa para ver outros resultados." />}
                     </div>

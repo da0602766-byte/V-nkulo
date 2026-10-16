@@ -28,6 +28,21 @@ const person=(id,nome)=>({membership_id:id,usuario_id:id,nome,email:'teste@examp
 const peopleResponse=(people,nextCursor=null)=>({me:null,people,nextCursor,counts:{membros:40,oficiais:2,oficiaisSemTitulo:0},canViewPeople:true,canManage:false});
 const people=()=>{const f=harness('PeopleWorkspace.tsx',{communityName:'Demonstração'});f.render();f.flush();return f};
 const searchInput=tree=>find(tree,'input',n=>n.props.type==='search');
+
+test('modelo de atuação só preenche permissões autorizadas e preserva título e papel', async () => {
+ const f=people();await reply(f.requests[0],{...peopleResponse([{...person(1,'Pessoa'),oficial:1,titulo_oficial:'DIACONISA'}]),canManage:true,permissionCatalog:['visitors.view','events.view']});
+ button(f.render(),'Editar função').props.onClick();
+ const editor=()=>find(f.render(),'section',n=>n.props['aria-label']==='Editar função de Pessoa');
+ assert.match(editor().props.className,/people-role-editor/);
+ const model=nodes(editor()).find(n=>n.type==='button'&&text(n).startsWith('Cuidado de pessoas'));
+ model.props.onClick({currentTarget:{closest(){return null}}});
+ button(editor(),'Aplicar modelo').props.onClick();
+ assert.equal(find(editor(),'select',n=>n.props.name==='titulo').props.value,'DIACONISA');
+ assert.equal(find(editor(),'select',n=>n.props.name==='papel').props.defaultValue,'MEMBRO');
+ assert.deepEqual(nodes(editor()).filter(n=>n.type==='input'&&n.props.name==='permissions'&&n.props.checked).map(n=>n.props.value),['visitors.view']);
+ assert.match(text(editor()),/Revise as permissões e salve/);
+ assert.equal(f.requests.length,1,'escolher e aplicar não salva antes da confirmação do formulário');
+});
 test('Pessoas mantém a busca montada e ignora respostas de consultas anteriores',async()=>{
  const f=people();await reply(f.requests[0],peopleResponse([person(1,'Anterior')]));
  change(searchInput(f.render()),'lento');assert.ok(searchInput(f.render()));assert.equal(find(f.render(),'article',n=>n.props.className?.includes('people-card')),undefined);f.render();f.flush();const slow=f.requests.at(-1);

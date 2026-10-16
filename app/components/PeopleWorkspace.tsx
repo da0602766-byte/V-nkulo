@@ -8,6 +8,7 @@ import PersonRecord from "./PersonRecord";
 import SafeImage from "./SafeImage";
 import "./people-directory-ux.css";
 import "./leadership-member-ux.css";
+import "./people-role-editor.css";
 
 type Person = {
   membership_id: number;
@@ -154,6 +155,17 @@ const HIERARCHY_MODEL_COPY: Record<string, string> = {
   "GESTORA DE CUIDADO": "Centraliza visitantes, acompanhamentos e pedidos de cuidado.",
 };
 
+const ACTIVITY_MODELS = [
+  { title: "LÍDER", label: "Liderança local" },
+  { title: "SUPERVISOR DE CÉLULAS", label: "Supervisão de células" },
+  { title: "GESTOR DE CUIDADO", label: "Cuidado de pessoas" },
+  { title: "DIÁCONO", label: "Diaconia e apoio" },
+  { title: "COORDENADOR DE MINISTÉRIO", label: "Coordenação de ministério" },
+  { title: "PRESBÍTERO", label: "Presbitério" },
+  { title: "PASTOR", label: "Cuidado pastoral" },
+  { title: "SECRETÁRIO", label: "Apoio administrativo" },
+];
+
 const PERMISSION_GROUPS = [
   { title: "Pessoas e cuidado", detail: "Visitantes, acompanhamentos e células.", permissions: ["visitors.view", "visitors.create", "visitors.edit", "visitor.categories.manage", "followups.view", "followups.manage", "cells.view", "requests.manage"] },
   { title: "Agenda e equipes", detail: "Eventos, ministérios e escalas.", permissions: ["events.view", "events.manage", "ministries.view", "schedules.view", "schedules.manage"] },
@@ -193,6 +205,7 @@ export default function PeopleWorkspace({
   const [editing, setEditing] = useState<Person | null>(null);
   const [permissionDraft, setPermissionDraft] = useState<string[]>([]);
   const [presetTitle, setPresetTitle] = useState("LÍDER");
+  const [modelApplied, setModelApplied] = useState(false);
   const [officialTitle, setOfficialTitle] = useState("LÍDER");
   const [isOfficial, setIsOfficial] = useState(false);
   const [removing, setRemoving] = useState<Person | null>(null);
@@ -202,6 +215,27 @@ export default function PeopleWorkspace({
   const currentFailure = loadFailure?.key === queryKey ? loadFailure : null;
   const loading = pending || (loadedKey !== queryKey && !currentFailure);
   const listError = currentFailure && !currentFailure.cursor ? currentFailure.message : "";
+
+  useEffect(() => {
+    if (!editing) return;
+    const dialog = document.querySelector<HTMLElement>('[data-role-editor="true"]');
+    if (!dialog) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    dialog.querySelector<HTMLButtonElement>('button[aria-label="Fechar"]')?.focus();
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); setEditing(null); }
+      if (event.key !== "Tab") return;
+      const focusable = [...dialog.querySelectorAll<HTMLElement>('button, input, select, summary, [tabindex="0"]')]
+        .filter(element => !element.hasAttribute("disabled") && element.getClientRects().length > 0);
+      const first = focusable[0], last = focusable.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    dialog.addEventListener("keydown", handleKey);
+    return () => { document.body.style.overflow = previousOverflow; dialog.removeEventListener("keydown", handleKey); previousFocus?.focus(); };
+  }, [editing]);
 
   // `cursor` vazio recomeça a lista (troca de aba, nova busca, recarga depois de
   // uma alteração); com cursor, o lote novo é anexado ao que já está na tela.
@@ -263,7 +297,7 @@ export default function PeopleWorkspace({
 
   function applyHierarchyModel(title: string) {
     setPresetTitle(title);
-    setOfficialTitle(title);
+    setModelApplied(true);
     setPermissionDraft((HIERARCHY_PERMISSION_PRESETS[title] || ["events.view", "ministries.view", "schedules.view"])
       .filter((permission) => (data.permissionCatalog || []).includes(permission)));
   }
@@ -511,7 +545,7 @@ export default function PeopleWorkspace({
               <button type="button" className="people-open-record" onClick={() => setRecord(person)} aria-label={`Ver ficha de ${person.nome}`}>Ver ficha</button>
               {(data.canManage || data.canRemoveCommunity) && <details className="people-row-menu"><summary aria-label={`Mais ações para ${person.nome}`}>⋯</summary><div>
               {data.canManage && (
-                <button type="button" onClick={() => { const title = person.titulo_oficial || "LÍDER"; setEditing(person); setPermissionDraft(person.permissoes.split(",").filter(Boolean)); setPresetTitle(title); setOfficialTitle(title); setIsOfficial(Boolean(person.oficial)); }}>
+                <button type="button" onClick={() => { const title = person.titulo_oficial || "LÍDER"; setEditing(person); setModelApplied(false); setPermissionDraft(person.permissoes.split(",").filter(Boolean)); setPresetTitle(title); setOfficialTitle(title); setIsOfficial(Boolean(person.oficial)); }}>
                   Editar função
                 </button>
               )}
@@ -560,10 +594,11 @@ export default function PeopleWorkspace({
       {editing && (
         <div className="people-modal-backdrop" onMouseDown={() => setEditing(null)}>
           <section
-            className="people-modal"
+            className="people-modal people-role-editor"
             role="dialog"
             aria-modal="true"
             aria-label={`Editar função de ${editing.nome}`}
+            data-role-editor="true"
             onMouseDown={(event) => event.stopPropagation()}
           >
             <header>
@@ -609,7 +644,7 @@ export default function PeopleWorkspace({
                   <select
                     name="titulo"
                     value={officialTitle}
-                    onChange={(event) => { setOfficialTitle(event.target.value); setPresetTitle(event.target.value); }}
+                    onChange={(event) => setOfficialTitle(event.target.value)}
                   >
                     {TITLE_CATEGORIES.map((category) => (
                       <optgroup key={category.label} label={category.label}>
@@ -619,13 +654,17 @@ export default function PeopleWorkspace({
                   </select>
                 </label>
               </div>
-              <section className="people-hierarchy-builder" aria-label="Modelo de permissões por hierarquia">
-                <div><strong>Modelo de atuação</strong><small>Escolha uma hierarquia pronta; ela só preenche permissões que você já pode conceder.</small></div>
-                <select value={presetTitle} onChange={(event) => setPresetTitle(event.target.value)} aria-label="Hierarquia usada como modelo">
-                  {TITLE_CATEGORIES.map((category) => <optgroup key={category.label} label={category.label}>{category.titles.map((title) => <option key={title} value={title}>{title}</option>)}</optgroup>)}
-                </select>
-                <button type="button" onClick={() => applyHierarchyModel(presetTitle)}>Aplicar modelo</button>
-                <p>{HIERARCHY_MODEL_COPY[presetTitle] || "Base inicial para organizar a atuação desta pessoa."}</p>
+              <section className="people-activity-model" aria-labelledby="activity-model-title">
+                <header><h3 id="activity-model-title">Modelo de atuação</h3><p>Comece com um conjunto de permissões e ajuste abaixo.</p></header>
+                <details>
+                  <summary><span><small>Modelo selecionado</small><strong>{ACTIVITY_MODELS.find(model => model.title === presetTitle)?.label || presetTitle}</strong></span><span className="people-model-change">Trocar <span aria-hidden="true">⌄</span></span></summary>
+                  <div className="people-model-options" role="group" aria-label="Modelos de atuação">
+                    {ACTIVITY_MODELS.map(model => <button type="button" key={model.title} aria-pressed={presetTitle === model.title} onClick={(event) => { setPresetTitle(model.title); setModelApplied(false); const chooser = event.currentTarget.closest("details"); if (chooser) { chooser.open = false; chooser.querySelector("summary")?.focus(); } }}><strong>{model.label}</strong><small>{HIERARCHY_MODEL_COPY[model.title] || "Consulta agenda, ministérios e escalas."}</small></button>)}
+                  </div>
+                </details>
+                <p>{HIERARCHY_MODEL_COPY[presetTitle] || "Consulta agenda, ministérios e escalas."}</p>
+                <footer><small>Altera apenas as permissões abaixo. O título e o papel são mantidos.</small><button type="button" onClick={() => applyHierarchyModel(presetTitle)}>Aplicar modelo</button></footer>
+                {modelApplied && <p className="people-model-feedback" role="status">Modelo aplicado ao formulário. Revise as permissões e salve para confirmar.</p>}
               </section>
               <fieldset>
                 <legend>Permissões concedidas</legend>
@@ -682,7 +721,7 @@ export default function PeopleWorkspace({
                 <select name="action" defaultValue="REMOVE_COMMUNITY">
                   <option value="REMOVE_COMMUNITY">Remover desta comunidade e liberar funções e escalas</option>
                   {data.canDeleteGlobal && <option value="DEACTIVATE_ACCOUNT">Desativar a conta inteira</option>}
-                  {data.canDeleteGlobal && <option value="DELETE_ACCOUNT">Excluir definitivamente se não houver histórico</option>}
+                  {data.canDeleteGlobal && <option value="DELETE_ACCOUNT">Excluir conta e vínculos definitivamente</option>}
                 </select>
                 {data.canDeleteGlobal && <small>O proprietário pode encerrar o vínculo mesmo com funções ou escalas ativas. O VÍNKULO libera os compromissos, preserva o histórico e avisa os responsáveis.</small>}
               </label>

@@ -1,0 +1,36 @@
+REVISÃO — EXCLUSÃO DE CONTAS, MODELOS DE ATUAÇÃO E VISITANTES
+Data: 16/10/2026
+
+RESULTADO PARA VISITANTES
+Apto para iniciar a rotina de cadastro e acompanhamento com uma pessoa autorizada na comunidade correta. Não equivale à aprovação de todos os módulos da plataforma.
+Permissões sugeridas para o operador: consultar, cadastrar e editar visitantes; consultar e gerenciar acompanhamentos. Organizar categorias somente se fizer parte da função.
+
+VERIFICAÇÕES
+- 42 testes focados aprovados: exclusão de contas, formulário de modelos, navegação de Pessoas/Visitantes, cadastro/edição, validações, duplicidade, filtros, histórico, categorias, responsáveis, exportação CSV/XLSX, planilhas e isolamento por comunidade.
+- Teste do Worker com banco local e chaves estrangeiras ativas: exclusão com ministério, escala, célula, convite, sessão, notificação privada e configuração de Drive vinculados; comunidade, ministério, escala e auditoria anterior permanecem.
+- Conta proprietária protegida; membro comum sem autorização; sessão da conta removida revogada; falha injetada no banco reverte exclusão, vínculos, avisos e auditoria.
+- Avisos internos registrados na mesma transação da exclusão. Um aviso por líder/comunidade, sem destinatários de outra comunidade. Entrega no aparelho segue a fila e as configurações de push existentes.
+- Navegador: cadastro real de uma ficha sintética apenas com nome, confirmando o retorno da lista e a contagem de 18 para 19. Todos os dados dessa verificação ficaram no banco local em memória.
+- Modelo de atuação aplicado na prévia: permissões mudam no formulário, título e papel permanecem; gravar depende do botão Salvar. Escape fecha o editor.
+- Inspeção visual do editor em 390, 768 e 1864 px, incluindo opções abertas e permissões; sem rolagem horizontal da página. Visitantes conferido nas mesmas larguras. Tema escuro e escala de interface de 85% existentes na prévia.
+- TypeScript e build de produção aprovados. Artefato Worker ESM validado.
+- A suíte geral executou 790 testes: 774 passaram e 16 falharam. Uma falha era o mock de importação da listagem de Pessoas, atualizado após a extração da rotina de exclusão; os 3 testes desse arquivo passaram na reexecução. As outras 15 falhas estão fora da alteração: 14 já relacionadas em visitantes-2026-10-15.txt, mais uma expectativa antiga de texto dos cartões de ministério, em código não alterado nesta tarefa. A suíte geral não está integralmente aprovada.
+
+COMPORTAMENTO DA EXCLUSÃO
+A exclusão é global e definitiva: remove a conta, sessões, vínculos e registros dependentes pessoais (por exemplo, convites criados, solicitações próprias e preferências). Referências opcionais nos registros comunitários são desvinculadas, sem atribuir falsamente a autoria ao proprietário. Integrações dependentes da conta removida precisam ser reconectadas por outra conta. Não foram excluídos usuários nem enviados avisos de teste em produção.
+
+MODELO DE ATUAÇÃO
+Substituído o seletor extenso por opções com descrição dentro do formulário. Botão de aplicação destacado, grupos de permissões separados, foco visível, fechamento por Escape e navegação por teclado limitada ao editor. Somente permissões disponíveis para o gestor podem ser preenchidas.
+
+LIMITES
+- Google Sheets foi verificado com testes de autorização, cancelamento, retomada e sincronização simulada. Não houve envio real a uma planilha externa.
+- Nenhum ensaio novo de importação por upload no navegador; testes de leitura/importação de planilhas passaram.
+- Não foi repetida a inspeção visual completa no tema claro nem em um aparelho Android físico.
+- A aprovação operacional aqui se restringe a Visitantes e aos fluxos testados. Falhas de outros módulos constam acima.
+
+EVIDÊNCIAS LOCAIS
+.task-tools/owner-visitors-focused.log
+.task-tools/owner-person-regression.log
+.task-tools/owner-visitors-all-tests.log
+.task-tools/owner-role-types.log
+.task-tools/owner-role-build.log

@@ -68,6 +68,7 @@ test('listagem Todas inclui oficiais e membros, com totais e próximos compromis
     '../../../lib/tenant-policy.mjs':{OFFICIAL_PERMISSION_CATALOG:[]}, '../../../lib/people-validation':{},
     '../../../lib/local-auth':{isSystemOwnerAccount:()=>false}, '../../../lib/pilot-notifications':{},
     '../../../lib/recepcao':{}, '../../../lib/tenant-audit':{},
+    '../../../lib/delete-user-account':{},
   });
   const data = await (await list.GET(new Request('https://qa.test/api/pilot/pessoas?aba=todos&busca=Pessoa%20QA'))).json();
   assert.equal(data.people.length,1); assert.equal(data.people[0].oficial,1);

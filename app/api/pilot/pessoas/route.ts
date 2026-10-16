@@ -1,3 +1,4 @@
+import { deleteUserAccount } from "../../../lib/delete-user-account";
 import { getD1 } from "../../../../db";
 import { OFFICIAL_PERMISSION_CATALOG } from "../../../lib/tenant-policy.mjs";
 import { parseOfficialUpdate } from "../../../lib/people-validation";
@@ -439,81 +440,7 @@ export async function DELETE(request: Request) {
     return Response.json({ ok: true, action });
   }
 
-  const protectedRecords = await db
-    .prepare(
-      `SELECT
-        (SELECT COUNT(*) FROM comunidades WHERE proprietario_usuario_id = ?) AS comunidades,
-        (SELECT COUNT(*) FROM auditoria_piloto WHERE usuario_id = ?) AS auditoria,
-        (SELECT COUNT(*) FROM publicacoes_piloto WHERE criado_por = ?) AS publicacoes,
-        (SELECT COUNT(*) FROM comentarios_publicacao WHERE usuario_id = ?) AS comentarios,
-        (SELECT COUNT(*) FROM escalas_ministerio WHERE criado_por = ? OR atualizado_por = ?) AS escalas,
-        (SELECT COUNT(*) FROM ministerios_comunidade WHERE criado_por = ? OR atualizado_por = ?) AS ministerios,
-        (SELECT COUNT(*) FROM estacionamento_movimentacoes WHERE criado_por = ? OR atualizado_por = ?) AS estacionamento_movimentacoes,
-        (SELECT COUNT(*) FROM estacionamento_ocorrencias WHERE criado_por = ?) AS estacionamento_ocorrencias`,
-    )
-    .bind(
-      target.usuario_id,
-      target.usuario_id,
-      target.usuario_id,
-      target.usuario_id,
-      target.usuario_id,
-      target.usuario_id,
-      target.usuario_id,
-      target.usuario_id,
-      target.usuario_id,
-      target.usuario_id,
-      target.usuario_id,
-    )
-    .first<Record<string, number>>();
-  const blockers = buildRemovalBlockers(protectedRecords || {});
-  const protectedTotal = Object.values(protectedRecords || {}).reduce((total, value) => total + Number(value || 0), 0);
-  if (protectedTotal > 0) {
-    await recordTenantAudit(
-      db,
-      access.context,
-      access.user.id,
-      "EXCLUSAO_DEFINITIVA_DE_CONTA_BLOQUEADA",
-      "NEGADO",
-      { usuarioId: target.usuario_id, registrosProtegidos: protectedTotal },
-    );
-    return Response.json(
-      {
-        error:
-          "Existem vínculos ou históricos que precisam permanecer auditáveis. Abra um dos locais abaixo ou escolha remover da comunidade para o VÍNKULO liberar automaticamente funções e escalas.",
-        blockers,
-      },
-      { status: 409 },
-    );
-  }
-  await recordTenantAudit(
-    db,
-    access.context,
-    access.user.id,
-    "PROPRIETARIO_EXCLUIU_CONTA_SEM_HISTORICO",
-    "SUCESSO",
-    { usuarioId: target.usuario_id, membershipId },
-  );
-  await db.batch([
-    db.prepare("DELETE FROM usuario_comunidades WHERE usuario_id = ?").bind(target.usuario_id),
-    db.prepare("DELETE FROM sessoes WHERE usuario_id = ?").bind(target.usuario_id),
-    db.prepare("DELETE FROM redefinicoes_senha WHERE usuario_id = ?").bind(target.usuario_id),
-    db.prepare("DELETE FROM usuarios WHERE id = ?").bind(target.usuario_id),
-  ]);
-  return Response.json({ ok: true, action });
-}
-
-function buildRemovalBlockers(counts: Record<string, number>) {
-  const blockers: Array<{ label: string; detail: string; href: string }> = [];
-  const add = (count: number, label: string, href: string) => {
-    if (count > 0) blockers.push({ label, detail: `${count} registro${count === 1 ? "" : "s"} relacionado${count === 1 ? "" : "s"}`, href });
-  };
-  add(Number(counts.comunidades || 0), "Comunidades sob responsabilidade", "/proprietario");
-  add(Number(counts.auditoria || 0), "Histórico de auditoria", "/proprietario?view=auditoria");
-  add(Number(counts.publicacoes || 0) + Number(counts.comentarios || 0), "Publicações e comentários", "/painel?view=inicio#mural");
-  add(Number(counts.escalas || 0), "Escalas", "/painel?view=escalas");
-  add(Number(counts.ministerios || 0), "Ministérios", "/painel?view=ministerios");
-  add(Number(counts.estacionamento_movimentacoes || 0) + Number(counts.estacionamento_ocorrencias || 0), "Estacionamento", "/painel?view=estacionamento");
-  return blockers;
+  return deleteUserAccount(db, access.user.id, target.usuario_id);
 }
 
 export async function PATCH(request: Request) {
