@@ -1,5 +1,26 @@
 VÍNKULO — ATUALIZAÇÃO ANDROID
 
+1.23.0: controle global do modo offline
+No Console do proprietário, abra Controles & módulos > Aplicativo Android.
+Use "Desativar para todos" para bloquear o modo offline em todas as comunidades.
+O APK atualizado consulta a configuração ao abrir, ao reconectar e a cada
+30 segundos enquanto está em primeiro plano. Aparelhos desconectados só
+recebem alterações quando reconectam. Uma autorização offline expira após
+24 horas sem confirmação; instalação nova começa sem autorização offline.
+
+Com o modo desativado, a perda de conexão mostra um aviso nativo animado
+com "Tentar novamente". A tela online é preservada quando possível e volta
+automaticamente ao reconectar. Rascunhos já salvos não são apagados;
+operações que já estavam na fila podem concluir a sincronização online.
+O aplicativo verifica o próprio servidor para evitar depender somente da
+validação de internet do Android. Com conexão confirmada, erros do servidor
+mostram uma tela própria de nova tentativa, sem ativar o modo offline.
+
+Todos precisam instalar o APK 1.23.0 para receber o controle nativo.
+Versões anteriores não consultam esta configuração; atualizar somente o site
+não pode substituir o código que já está instalado no aparelho.
+Validação em aparelho físico permanece pendente.
+
 Use somente o APK oficial do canal escolhido. HOMOLOGACAO indica uma versão
 em testes acompanhados. A versão estável continua disponível separadamente.
 

@@ -1,0 +1,5 @@
+.android-update-notice{position:fixed;z-index:1100;bottom:calc(140px + env(safe-area-inset-bottom));left:12px;right:12px;margin-inline:auto;max-width:520px;display:grid;grid-template-columns:minmax(0,1fr) 44px;gap:10px;padding:16px;border:1px solid var(--line,#d5ddda);border-radius:16px;background:var(--surface,#fff);color:var(--ink,#213d3b);box-shadow:0 8px 24px #0002}
+.android-update-notice p{margin:6px 0 0;font-size:14px;line-height:1.45;color:var(--muted,#546965)}
+.android-update-notice a{grid-row:2;grid-column:1/-1;min-height:44px;display:flex;align-items:center;justify-content:center;border-radius:10px;padding:8px 12px;background:#11766e;color:#fff;font-size:16px;text-align:center}
+.android-update-notice button{grid-row:1;grid-column:2;min-height:44px;align-self:start;border:0;border-radius:10px;font-size:24px;background:transparent;color:inherit}
+.android-update-notice :is(a,button):focus-visible{outline:3px solid #966e31;outline-offset:3px}

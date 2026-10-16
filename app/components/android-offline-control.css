@@ -1,0 +1,13 @@
+.android-offline-control{width:min(100%,640px);display:grid;gap:16px;padding:20px;border:1px solid var(--owner-line,var(--line,#d5ddda));border-radius:18px;background:var(--owner-surface,var(--surface,#fff));color:var(--owner-ink,var(--ink,#213d3b));box-sizing:border-box}
+.android-offline-control header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.android-offline-control h2{font-size:1.2rem;line-height:1.35;margin:4px 0 0}
+.android-offline-control p{margin:0;line-height:1.55;color:inherit}
+.android-offline-control header>span{font-size:.8rem;border-radius:20px;padding:6px 10px;background:#edf2f1;color:#425957}
+.android-offline-control header>span.enabled{background:#e4f4eb;color:#17613c}
+.android-offline-control button,.android-offline-control>a{min-height:44px;justify-self:start;display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;max-width:100%;white-space:normal;border-radius:10px;font-size:16px}
+.android-offline-control button.primary{background:var(--community-primary,#11766e);color:#fff;border:0}
+.android-offline-control button:disabled{opacity:.6;cursor:wait}
+.android-offline-control :is(button,a):focus-visible{outline:3px solid #966e31;outline-offset:3px}
+.android-offline-control small{font-size:.85rem;line-height:1.5;color:var(--owner-muted,var(--muted,#546965))}
+.android-offline-control [role=alert]{color:#a02f42}
+@media(max-width:480px){.android-offline-control{padding:16px;gap:14px}.android-offline-control button.primary{width:100%}}

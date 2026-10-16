@@ -14,6 +14,7 @@ async function fixture(t) {
   const source = await readFile(new URL('../app/api/mobile/bootstrap/route.ts', import.meta.url), 'utf8');
   const exports = {};
   const deps = {
+    "../../../lib/android-offline-policy": { rejectDisabledOffline: async () => null },
     '../../../../db': { getD1: () => d1 },
     '../../../lib/local-auth': { getCurrentSessionTokenHash: async () => hash },
     '../../../lib/tenant': { requireTenantPermission: async p => { assert.equal(p, 'dashboard.view'); return access; } },

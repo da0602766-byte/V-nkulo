@@ -3,6 +3,7 @@ declare global {
     VinkuloFcmActive?: boolean;
     VinkuloAndroid?: {
       offlineModeVersion?: number;
+      version?: string;
       requestPushToken?: () => void;
       setPushBinding?: (token: string, bindingId: string) => void;
       clearPushBinding?: () => void;

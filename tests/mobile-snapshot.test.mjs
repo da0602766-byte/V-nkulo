@@ -22,6 +22,7 @@ async function fixture(t) {
   const themeSource=await readFile(new URL('../app/lib/community-theme.ts',import.meta.url),'utf8');
   runInNewContext(ts.transpileModule(themeSource,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:themeExports});
   const deps={
+    "../../../lib/android-offline-policy": { rejectDisabledOffline: async () => null },
     '../../../lib/community-theme':themeExports,
     '../../../../db':{getD1:()=>d1},
     '../../../lib/local-auth':{getCurrentSessionTokenHash:async()=>hash},
