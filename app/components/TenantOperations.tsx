@@ -21,6 +21,8 @@ import "./visitor-directory-ux.css";
 import { type VisitorCare, visitorAge, visitorAgeGroup } from "../lib/visitor-care";
 import { VisitorCareFields, VisitorCareSummary } from "./VisitorCareFields";
 import { VisitorSheetSettings } from "./VisitorSheetSettings";
+import VisitorSpreadsheetImport from "./VisitorSpreadsheetImport";
+import { visitorExportWorksheet } from "../lib/visitor-spreadsheet";
 import VisitorDirectory, { type DirectoryView } from "./VisitorDirectory";
 
 type Visitor = VisitorCare & {
@@ -161,17 +163,6 @@ type Followup = {
   responsavel_email?: string;
 };
 
-type VisitorImportRow = Record<string, string | boolean> & {
-  nomeCompleto: string;
-  telefone: string;
-  email: string;
-  parente: string;
-  categoriaId: string;
-  categoriaNome: string;
-  ministerio: string;
-  status: string;
-  dataEntrada: string;
-};
 
 export function VisitorsWorkspace({
   permissions,
@@ -233,9 +224,6 @@ export function VisitorsWorkspace({
   const [warning, setWarning] = useState("");
   const [registrationOpen, setRegistrationOpen] = useState(false);
   const registrationDialog = useRef<HTMLDialogElement | null>(null);
-  const [importing, setImporting] = useState(false);
-  const [importFileName, setImportFileName] = useState("");
-  const [importRows, setImportRows] = useState<VisitorImportRow[]>([]);
   const [activeVision, setActiveVision] = useState<VisitorVision>("todos");
   const [counts, setCounts] = useState<VisitorCounts>({
     todos: 0,
@@ -257,7 +245,6 @@ export function VisitorsWorkspace({
   const categoriesRef = useRef<VisitorCategory[]>([]);
   const categoryDragTimerRef = useRef<number | null>(null);
   const duplicateTimerRef = useRef<number | null>(null);
-  const importInputRef = useRef<HTMLInputElement | null>(null);
   const linkedVisitorOpenedRef = useRef(false);
   const categoryDragRef = useRef<{
     active: boolean;
@@ -878,103 +865,13 @@ export function VisitorsWorkspace({
     try {
       const result = await apiJson<{ rows: Record<string, string | number>[] }>("/api/pilot/visitantes/exportar");
       const XLSX = await import("xlsx");
-      const worksheet = XLSX.utils.json_to_sheet(result.rows);
-      worksheet["!cols"] = Object.keys(result.rows[0] || {}).map(() => ({ wch: 24 }));
+      const worksheet = visitorExportWorksheet(XLSX, result.rows);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Pessoas");
       XLSX.writeFile(workbook, "pessoas-completo-" + hojeLocal() + ".xlsx", { compression: true });
       setMessage(result.rows.length + " fichas exportadas, incluindo arquivadas. Guarde a planilha em local restrito à equipe.");
     } catch (caught) { setError("Não foi possível gerar a planilha: " + (caught as Error).message); }
     finally { setExporting(false); }
-  }
-
-  async function prepareVisitorImport(file: File) {
-    setImporting(true);
-    setError("");
-    setMessage("");
-    setWarning("");
-    try {
-      const XLSX = await import("xlsx");
-      const workbook = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: "", raw: false });
-      const normalizedCategories = new Map(categories.map((category) => [normalizeSpreadsheetKey(category.nome), category]));
-      const normalizedRows = rawRows.map((raw) => {
-        const values = new Map(Object.entries(raw).map(([key, value]) => [normalizeSpreadsheetKey(key), String(value ?? "").trim()]));
-        const read = (...keys: string[]) => keys.map((key) => values.get(normalizeSpreadsheetKey(key)) || "").find(Boolean) || "";
-        const categoriaNome = read("Categoria", "Categoria de acompanhamento");
-        const categoria = normalizedCategories.get(normalizeSpreadsheetKey(categoriaNome));
-        return {
-          nomeCompleto: read("Nome", "Nome completo"),
-          telefone: read("Telefone", "Telefone/WhatsApp", "WhatsApp"),
-          email: read("E-mail", "Email"),
-          parente: read("Parente", "Parente ou responsável", "Responsável"),
-          categoriaId: categoria ? String(categoria.id) : "",
-          categoriaNome,
-          ministerio: read("Ministério", "Ministerio"),
-          status: importStatus(read("Status")),
-          dataEntrada: spreadsheetDate(read("Data de entrada", "Entrada")),
-          dataNascimento: spreadsheetDate(read("Data de nascimento", "Nascimento")),
-          batizado: importAnswer(read("Batizado", "Batismo")),
-          certificadoBatismo: importAnswer(read("Certificado de batismo")),
-          tipoPessoa: normalizeSpreadsheetKey(read("Vínculo")) === "membro" ? "MEMBRO" : "VISITANTE",
-          discipulado: importAnswer(read("Discipulado")), discipulador: read("Discipulador"),
-          doaADoa: importAnswer(read("Doa a Doa")), doaReceber: importAnswer(read("Deve receber apoio")),
-          doacoesRealizadas: read("Doações realizadas"), oficial: importAnswer(read("Oficial")), funcaoOficial: read("Função do oficial"),
-          responsavelAcompanhamento: read("Responsável pelo acompanhamento"), proximaAcao: read("Próxima ação"), dataProximaAcao: spreadsheetDate(read("Prazo da ação")),
-          encontroComDeus: importAnswer(read("Encontro com Deus")) === "SIM", cursoMembros: importAnswer(read("Curso de membros")) === "SIM",
-          observacoes: read("Observações"), endereco: read("Endereço"), acompanhante: read("Quem recebeu"),
-        } satisfies VisitorImportRow;
-      }).filter((row) => row.nomeCompleto);
-      if (!normalizedRows.length) throw new Error("A primeira planilha não contém uma coluna Nome com cadastros válidos.");
-      setImportRows(normalizedRows);
-      setImportFileName(file.name);
-    } catch (caught) {
-      setImportRows([]);
-      setImportFileName("");
-      setError(`Não foi possível ler a planilha: ${(caught as Error).message}`);
-    } finally {
-      setImporting(false);
-      if (importInputRef.current) importInputRef.current.value = "";
-    }
-  }
-
-  async function confirmVisitorImport() {
-    if (!importRows.length || importing) return;
-    setImporting(true);
-    setError("");
-    setWarning("");
-    let imported = 0;
-    let ignored = 0;
-    const failedRows: VisitorImportRow[] = [];
-    try {
-      for (const row of importRows) {
-        try {
-          await apiJson("/api/pilot/visitantes", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              ...row,
-              batizado: row.batizado || "NAO_INFORMADO",
-              dataEntrada: row.dataEntrada || hojeLocal(),
-            }),
-          });
-          imported += 1;
-        } catch (caught) {
-          failedRows.push({ ...row, erro: (caught as Error).message });
-          ignored += 1;
-        }
-      }
-      setImportRows(failedRows);
-      if (!failedRows.length) setImportFileName("");
-      setMessage(`${imported} cadastro(s) importado(s). Categorias encontradas na planilha foram vinculadas ou criadas na comunidade.`);
-      if (ignored) {
-        setWarning(`${ignored} linha(s) não foram importadas e permanecem para revisão. ${failedRows.slice(0, 3).map(row => row.nomeCompleto + ": " + row.erro).join(" · ")}`);
-      }
-      await Promise.all([loadVisitors(), loadCategories()]);
-    } finally {
-      setImporting(false);
-    }
   }
 
   async function updateVisitor(
@@ -1083,7 +980,7 @@ export function VisitorsWorkspace({
   // Só uma superfície mostra o aviso por vez: a que está por cima. Repetir o
   // mesmo texto no fundo e no modal faria o leitor de tela anunciar duas vezes.
   const overlayOpen =
-    registrationOpen || settingsOpen || Boolean(selectedVisitor) || Boolean(importRows.length);
+    registrationOpen || settingsOpen || Boolean(selectedVisitor);
   const dismissNotice = () => {
     setMessage("");
     setError("");
@@ -1506,7 +1403,7 @@ export function VisitorsWorkspace({
             <header className="visitor-sheet-head-v2">
               <div><p className="pilot-kicker">DIRETÓRIO CENTRAL</p><h2 id="visitor-sheet-title">Pessoas e próximos cuidados</h2><span>Uma ficha por pessoa, em todas as visões.</span></div>
               <div>
-                {canCreate && <><input ref={importInputRef} className="visitor-import-input-v2" type="file" accept=".xlsx,.xls,.csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) void prepareVisitorImport(file); }} /><button type="button" disabled={importing} onClick={() => importInputRef.current?.click()}>⇧ Importar Excel</button></>}
+                {canCreate && <VisitorSpreadsheetImport categories={categories} cells={cells} canManageCategories={canManageCategories} onImported={async (text) => { setMessage(text); await Promise.all([loadVisitors(), loadCategories()]); }} />}
                 <button type="button" disabled={exporting} onClick={() => setExportReviewOpen(true)}>{exporting ? "Exportando…" : "⇩ Exportar todas as fichas"}</button>
               </div>
             </header>
@@ -1618,15 +1515,6 @@ export function VisitorsWorkspace({
         </div>
       )}
 
-      {Boolean(importRows.length) && createPortal(
-        <div className="visitor-import-backdrop-v2" role="presentation">
-          <section className="visitor-import-dialog-v2" role="dialog" aria-modal="true" aria-labelledby="visitor-import-title">
-            <header><div><p className="pilot-kicker">MIGRAÇÃO DE DADOS</p><h2 id="visitor-import-title">Revisar planilha</h2><p>{importFileName} · {importRows.length} cadastro(s) reconhecido(s)</p></div><button type="button" aria-label="Fechar importação" onClick={() => setImportRows([])}>×</button></header>
-            <div className="visitor-import-table-v2"><table><thead><tr><th>Nome</th><th>Contato</th><th>Categoria</th><th>Ministério</th><th>Status</th></tr></thead><tbody>{importRows.slice(0, 10).map((row, index) => <tr key={`${row.nomeCompleto}-${index}`}><th>{row.nomeCompleto}</th><td>{row.telefone || row.email || "—"}</td><td>{row.categoriaNome || "Sem categoria"}</td><td>{row.ministerio || "—"}</td><td>{statusLabel(row.status)}</td></tr>)}</tbody></table>{importRows.length > 10 && <p>Mais {importRows.length - 10} linha(s) serão processadas.</p>}</div>
-            <VisitorNotice message={message} error={error} warning={warning} onDismiss={dismissNotice} inline />
-            <footer><button type="button" onClick={() => setImportRows([])} disabled={importing}>Cancelar</button><button type="button" className="primary" onClick={() => void confirmVisitorImport()} disabled={importing}>{importing ? "Importando…" : `Importar ${importRows.length} cadastro(s)`}</button></footer>
-          </section>
-        </div>, document.body)}
 
       {selectedVisitor && createPortal(
         <dialog ref={visitorDialog} className="visitor-person-dialog vd-person-dialog" aria-labelledby="visitor-person-title" onCancel={(event) => { event.preventDefault(); setSelectedId(null); }} onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedId(null); }}>
@@ -2275,32 +2163,6 @@ function statusLabel(status: string) {
       INTEGRADO: "Integrado",
     }[status] || status
   );
-}
-
-function normalizeSpreadsheetKey(value: string) {
-  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLocaleLowerCase("pt-BR");
-}
-
-function importAnswer(value: string) {
-  const normalized = normalizeSpreadsheetKey(value);
-  return ["sim", "true", "1"].includes(normalized) ? "SIM" : ["nao", "false", "0"].includes(normalized) ? "NAO" : "NAO_INFORMADO";
-}
-
-function importStatus(value: string) {
-  const normalized = normalizeSpreadsheetKey(value).replaceAll(" ", "_");
-  if (normalized === "integrado") return "INTEGRADO";
-  if (normalized === "em_acompanhamento") return "EM_ACOMPANHAMENTO";
-  if (normalized === "em_contato") return "EM_CONTATO";
-  return "NOVO";
-}
-
-function spreadsheetDate(value: string) {
-  if (!value) return "";
-  const iso = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
-  const brazilian = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if (brazilian) return `${brazilian[3]}-${brazilian[2].padStart(2, "0")}-${brazilian[1].padStart(2, "0")}`;
-  return "";
 }
 
 function formatDate(value: string) {

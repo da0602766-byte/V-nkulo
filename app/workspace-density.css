@@ -58,7 +58,7 @@
 .garage-edit :is(input,select) { width:100%; min-width:0; box-sizing:border-box; min-height:40px; padding:8px; border:1px solid var(--pilot-line); border-radius:8px; background:var(--pilot-surface); color:var(--pilot-text); }
 .garage-edit footer,.garage-edit>small { grid-column:1/-1; }
 .garage-edit footer { display:flex; justify-content:flex-end; gap:12px; }
-.pilot-dashboard .parking-space-cards { grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),300px)); align-items:start; }
+.pilot-dashboard .parking-space-cards { grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),300px)); align-items:start; justify-content:center; }
 .parking-space-reservations { display:grid; gap:8px; border-top:1px solid var(--pilot-line); padding-top:8px; }
 .parking-space-reservations>div { display:grid; gap:3px; font-size:12px; }
 .parking-space-reservations small { color:var(--pilot-muted); }
