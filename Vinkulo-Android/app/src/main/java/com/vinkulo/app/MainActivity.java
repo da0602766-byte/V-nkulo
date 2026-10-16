@@ -143,7 +143,11 @@ public class MainActivity extends Activity {
                 int generation = ++mainFrameLoadGeneration;
                 localDocumentLoading = OfflinePolicy.localPage(url) || OfflinePolicy.errorPage(url);
                 if (OfflinePolicy.localPage(url) && !remotePolicy.enabled()) {
-                    view.post(() -> showConnectionNotice(!hasValidatedInternet()));
+                    view.post(() -> {
+                        if (webView == null) return;
+                        if (hasNetwork()) { hideConnectionNotice(); loadOnlineAfterReconnect("/painel"); }
+                        else showConnectionNotice(true);
+                    });
                     return;
                 }
                 if (NativePolicy.trusted(url) && !localDocumentLoading) {
@@ -364,7 +368,9 @@ public class MainActivity extends Activity {
         hadValidatedInternet = connected;
         if (connected) {
             if (!remotePolicy.enabled() && OfflinePolicy.localPage(webView.getUrl())) {
-                showConnectionNotice(false); return;
+                hideConnectionNotice(); hideLegacyOfflineEntry();
+                loadOnlineAfterReconnect(deferredNotificationPath == null ? "/painel" : deferredNotificationPath);
+                deferredNotificationPath = null; return;
             }
             boolean hadNotice = connectionNotice != null;
             hideConnectionNotice();
@@ -760,7 +766,9 @@ public class MainActivity extends Activity {
                 if ("/api/auth/logout".equals(uri.getPath()) || "/login".equals(uri.getPath())) FirebaseDeviceState.clearBinding(this);
                 String path = uri.getPath();
                 if (OfflinePolicy.localPage(uri.toString()) && !remotePolicy.enabled()) {
-                    showConnectionNotice(!hasValidatedInternet()); return true;
+                    if (hasNetwork()) { hideConnectionNotice(); loadOnlineAfterReconnect("/painel"); }
+                    else showConnectionNotice(true);
+                    return true;
                 }
                 if ((path == null || !path.startsWith("/mobile-app/")) && !hasNetwork()) {
                     if ("/api/auth/logout".equals(uri.getPath()) || "/login".equals(uri.getPath())) {
