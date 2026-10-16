@@ -146,6 +146,29 @@ public class NetworkTransitionTest {
                 scenario.onActivity(activity -> ((WebView) activity.findViewById(R.id.webview)).loadUrl(NativePolicy.ORIGIN + "/painel"));
                 assertTrue("Explicit return must reopen online", waitForRecoveredScreen(scenario));
             }
+            // Global-offline disabled: lose the connection on the online page,
+            // keep the page underneath the native notice, and recover without a tap.
+            device.executeShellCommand("svc wifi disable");
+            device.executeShellCommand("svc data disable");
+            assertTrue("Disconnect before installing the owner policy fixture", waitForNetwork(false));
+            Context context = ApplicationProvider.getApplicationContext();
+            context.getSharedPreferences("android-global-policy", Context.MODE_PRIVATE).edit()
+                    .putBoolean("enabled", false).putLong("confirmed", System.currentTimeMillis()).commit();
+            scenario.onActivity(activity -> {
+                try {
+                    java.lang.reflect.Method method = MainActivity.class.getDeclaredMethod("reconcileInternetAccess");
+                    method.setAccessible(true); method.invoke(activity);
+                } catch (Exception failure) { throw new AssertionError(failure); }
+            });
+            assertTrue("Disabled offline must show the native no-internet notice",
+                    device.wait(androidx.test.uiautomator.Until.hasObject(By.text("Você está sem internet")), 15000));
+            OfflineUiEvidence.capture(device, "disabled-live-disconnect");
+            device.executeShellCommand("svc wifi enable"); device.executeShellCommand("svc data enable");
+            assertTrue("The emulator must reconnect again", waitForNetwork(true));
+            assertTrue("Reconnection must remove the notice without user input",
+                    device.wait(androidx.test.uiautomator.Until.gone(By.text("Você está sem internet")), 30000));
+            assertTrue("Online system must recover after disabled-offline disconnection", waitForRecoveredScreen(scenario));
+            OfflineUiEvidence.capture(device, "disabled-reconnected");
         } finally {
             device.executeShellCommand("svc wifi disable");
             device.executeShellCommand("svc data disable");

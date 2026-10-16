@@ -244,7 +244,7 @@ public class MainActivity extends Activity {
             // The local reader has no navigation/form state to restore. Loading
             // after restoreState races the renderer's own history restoration.
             // Recreate it directly and ask native storage for authorized data.
-            if (hasValidatedInternet()) webView.loadUrl(APP_URL + "/painel"); else showOfflineEntry();
+            if (hasNetwork()) webView.loadUrl(APP_URL + "/painel"); else showOfflineEntry();
             handleNotificationTap(getIntent());
         } else {
             android.webkit.WebBackForwardList restored = webView.restoreState(state);
@@ -254,7 +254,7 @@ public class MainActivity extends Activity {
             if (state.getBoolean("vinkulo.legacyOffline", false) || restored == null || restored.getCurrentItem() == null
                     || OfflinePolicy.localPage(restored.getCurrentItem().getUrl())
                     || OfflinePolicy.errorPage(restored.getCurrentItem().getUrl())) {
-                if (hasValidatedInternet()) webView.loadUrl(APP_URL + "/painel"); else showOfflineEntry();
+                if (hasNetwork()) webView.loadUrl(APP_URL + "/painel"); else showOfflineEntry();
             }
             handleNotificationTap(getIntent());
         }
