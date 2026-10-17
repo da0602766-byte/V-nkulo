@@ -1,3 +1,4 @@
+import { validateVisitorCustomValues } from "../../../../lib/visitor-custom-fields";
 import { parseVisitorCare, isVisitorDate, visitorBoolean } from "../../../../lib/visitor-care";
 import { visitorToday } from "../../../../lib/visitor-attention";
 import { getD1 } from "../../../../../db";
@@ -37,6 +38,8 @@ export async function PATCH(request: Request, context: Context) {
   if (!existing.ativo) return Response.json({ error: "Reative a ficha antes de editar." }, { status: 409 });
   const legacy = { nomeCompleto: "nome_completo", telefone: "telefone", email: "email", dataNascimento: "data_nascimento", endereco: "endereco", acompanhante: "acompanhante", parente: "parente", ministerio: "ministerio", encontroComDeus: "encontro_com_deus", cursoMembros: "curso_membros", batizado: "batizado", status: "status", dataEntrada: "data_entrada", observacoes: "observacoes", celulaId: "celula_id", categoriaId: "categoria_id" };
   const payload = { ...Object.fromEntries(Object.entries(legacy).map(([key, col]) => [key, existing[col]])), ...submitted };
+  const custom = await validateVisitorCustomValues(db, access.context.comunidadeId, submitted.camposPersonalizados, existing.campos_personalizados);
+  if (custom.error) return Response.json({ error:custom.error }, { status:400 });
   const care = parseVisitorCare(submitted, existing);
   if ("error" in care) return Response.json({ error: care.error }, { status: 400 });
   const nome = cleanText(payload.nomeCompleto, 120);
@@ -115,7 +118,7 @@ export async function PATCH(request: Request, context: Context) {
         nome_completo = ?, data_nascimento = ?, telefone = ?, email = ?,
         batizado = ?, status = ?, endereco = ?, acompanhante = ?, parente = ?,
         celula = ?, celula_id = ?, categoria_id = ?, encontro_com_deus = ?,
-        curso_membros = ?, ministerio = ?, data_entrada = ?, observacoes = ?,
+        curso_membros = ?, ministerio = ?, data_entrada = ?, observacoes = ?, campos_personalizados = ?,
         ${Object.keys(care.values).map(column => `${column} = ?`).join(", ")},
         atualizado_em = CURRENT_TIMESTAMP
       WHERE id = ? AND comunidade_id = ? AND ativo = 1 AND escopo_confirmado = 1`,
@@ -138,6 +141,7 @@ export async function PATCH(request: Request, context: Context) {
       ministerio || null,
       dataEntrada,
       observacoes || null,
+      custom.json!,
       ...Object.values(care.values),
       id,
       access.context.comunidadeId,

@@ -1,6 +1,7 @@
 import { getD1 } from "../../db";
 import { getDriveAccessToken, getGoogleConnection } from "./google-integration";
-import { visitorExportRows } from "./visitor-export";
+import { visitorExportRows, mapVisitorExportRows } from "./visitor-export";
+import { visitorCustomFields } from "./visitor-custom-fields";
 
 export const VISITOR_SHEET_SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive.metadata.readonly"];
 export type VisitorSheetConfig = { comunidade_id: number; usuario_id: number; spreadsheet_id: string; sheet_id: number; habilitada: number; versao: number; versao_sincronizada: number; linhas: number; sincronizado_em: string | null; ultimo_erro: string | null; lock_ate: number };
@@ -80,13 +81,14 @@ export async function syncVisitorSheet(db: ReturnType<typeof getD1>, communityId
     await assertSheetPrivate(token, config.spreadsheet_id);
     const properties = await ensureVisitorSheet(token, config);
     const rows = await visitorExportRows(db, communityId);
-    const headers = Object.keys(rows[0] || { ID: "", Nome: "", "Data de nascimento": "", Idade: "" });
+    const headers = Object.keys(rows[0] || mapVisitorExportRows([{}], await visitorCustomFields(db, communityId))[0]);
     const values = [headers, ...rows.map(row => Object.values(row))];
     const endRowIndex = Math.max(values.length, config.linhas, 1);
+    const endColumnIndex = Math.max(headers.length, properties.gridProperties.columnCount, 40);
     const requests: unknown[] = [];
     if (endRowIndex > properties.gridProperties.rowCount) requests.push({ appendDimension: { sheetId: config.sheet_id, dimension: "ROWS", length: endRowIndex - properties.gridProperties.rowCount } });
-    if (40 > properties.gridProperties.columnCount) requests.push({ appendDimension: { sheetId: config.sheet_id, dimension: "COLUMNS", length: 40 - properties.gridProperties.columnCount } });
-    requests.push({ updateCells: { range: { sheetId: config.sheet_id, startRowIndex: 0, startColumnIndex: 0, endRowIndex, endColumnIndex: 40 }, rows: values.map(row => ({ values: row.map(value => ({ userEnteredValue: { stringValue: String(value ?? "") } })) })), fields: "userEnteredValue" } });
+    if (endColumnIndex > properties.gridProperties.columnCount) requests.push({ appendDimension: { sheetId: config.sheet_id, dimension: "COLUMNS", length: endColumnIndex - properties.gridProperties.columnCount } });
+    requests.push({ updateCells: { range: { sheetId: config.sheet_id, startRowIndex: 0, startColumnIndex: 0, endRowIndex, endColumnIndex }, rows: values.map(row => ({ values: row.map(value => ({ userEnteredValue: { stringValue: String(value ?? "") } })) })), fields: "userEnteredValue" } });
     // One atomic update replaces the dedicated tab and clears rows removed from the source.
     await sheetGoogle(token, `https://sheets.googleapis.com/v4/spreadsheets/${config.spreadsheet_id}:batchUpdate`, { requests });
     await db.prepare("UPDATE visitante_planilha SET versao_sincronizada = ?, linhas = ?, sincronizado_em = CURRENT_TIMESTAMP, ultimo_erro = NULL, tentar_apos = 0 WHERE comunidade_id = ? AND lock_token = ?").bind(config.versao, values.length, communityId, tokenId).run();

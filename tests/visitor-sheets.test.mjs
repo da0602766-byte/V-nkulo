@@ -44,11 +44,18 @@ test('planilha privada: sincronização atômica, retomada, texto seguro e acess
     const disabled=await call('connect',{url}); assert.equal(disabled.status,400);
     const diagnosis=await disabled.json(); assert.equal(diagnosis.code,'GOOGLE_API_DISABLED'); assert.match(diagnosis.helpUrl,/sheets.googleapis.com\?project=123456/);
     const failedConfig=database.prepare('SELECT * FROM visitante_planilha WHERE comunidade_id=1').get(); assert.equal(failedConfig.habilitada,0); assert.equal(failedConfig.sincronizado_em,null); assert.match(failedConfig.ultimo_erro,/está desativada/); assert.equal(writes.length,0);
+    for(let i=0;i<8;i++) database.prepare("INSERT INTO visitante_campos(comunidade_id,nome,chave,tipo,criado_por) VALUES(1,?,?,'TEXTO',?)").run('Extra '+i,'extra '+i,uid);
+    const field=database.prepare("SELECT id FROM visitante_campos WHERE chave='extra 0'").get();
+    database.prepare("UPDATE visitantes SET campos_personalizados=? WHERE id=?").run(JSON.stringify({[field.id]:'=HYPERLINK("private")'}),personId);
     disabledApi=false;
     let response=await call('connect',{url}); assert.equal(response.status,200,await response.clone().text());
     let config=(await response.json()).config; assert.equal(config.ultimo_erro,null); assert.equal(config.versao,config.versao_sincronizada);
     const write=writes.at(-1).requests.find(r=>r.updateCells).updateCells;
     assert.notEqual(write.range.sheetId,42);
+    assert.ok(write.range.endColumnIndex>40);
+    assert.ok(writes.at(-1).requests.some(r=>r.appendDimension?.dimension==='COLUMNS'));
+    assert.ok(write.rows[0].values.some(v=>v.userEnteredValue.stringValue==='Extra 0'));
+    assert.ok(write.rows.some(r=>r.values.some(v=>v.userEnteredValue.stringValue==='=HYPERLINK("private")')));
     assert.ok(write.rows.some(r=>r.values.some(v=>v.userEnteredValue.stringValue==='=IMPORTXML("private")')));
     assert.ok(!JSON.stringify(write).includes('formulaValue'));
     database.prepare("UPDATE visitantes SET proxima_acao='Nova visita' WHERE id=?").run(personId);

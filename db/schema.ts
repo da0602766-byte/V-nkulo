@@ -224,12 +224,23 @@ export const visitanteCategorias = sqliteTable(
   ],
 );
 
+export const visitanteCampos = sqliteTable("visitante_campos", {
+  id: integer("id").primaryKey({ autoIncrement:true }),
+  comunidadeId: integer("comunidade_id").notNull(),
+  nome: text("nome").notNull(),
+  chave: text("chave").notNull(),
+  tipo: text("tipo").notNull().default("TEXTO"),
+  criadoPor: integer("criado_por").notNull(),
+  criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, table => [uniqueIndex("visitante_campos_comunidade_chave_idx").on(table.comunidadeId, table.chave)]);
+
 export const visitantes = sqliteTable(
   "visitantes",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     comunidadeId: integer("comunidade_id").notNull(),
     nomeCompleto: text("nome_completo").notNull(),
+    camposPersonalizados: text("campos_personalizados").notNull().default("{}"),
     dataNascimento: text("data_nascimento"),
     telefone: text("telefone"),
     email: text("email"),

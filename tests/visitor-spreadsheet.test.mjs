@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import XLSX from 'xlsx';
-import { importDate, visitorWorkbookTables, prepareImportRows, readVisitorWorkbook, visitorExportWorksheet, suggestField } from '../app/lib/visitor-spreadsheet.ts';
+import { inferCustomFieldType, importDate, visitorWorkbookTables, prepareImportRows, readVisitorWorkbook, visitorExportWorksheet, suggestField } from '../app/lib/visitor-spreadsheet.ts';
 import { createPilotD1, createPilotUser } from './helpers/sqlite-d1.mjs';
 import { cpfLoginRequest } from './helpers/cpf-login.mjs';
 
@@ -14,7 +14,7 @@ test('reconhece os títulos do arquivo legado e mantém categorias, contatos e d
  const w=example(); w.Sheets[w.SheetNames[0]].A2.z='dd/mm/yyyy hh:mm';w.Sheets[w.SheetNames[0]].C2.z='mm/dd/yy';w.Sheets[w.SheetNames[0]].F2.z='mm/dd/yy';
  const [table]=visitorWorkbookTables(w),[row]=prepare(table);
  assert.equal(row.payload.telefone,'47999998888');assert.equal(row.payload.categoriaNome,'O2');assert.equal(row.payload.dataEntrada,'2024-04-14');assert.equal(row.payload.dataNascimento,'2002-08-29');assert.equal(row.payload.batizado,'SIM');assert.equal(row.payload.encontroComDeus,false);assert.deepEqual(row.issues,[]);
- assert.match(row.payload.observacoes,/Carimbo de data\/hora: 2024-04-14 13:30:00/);assert.match(row.payload.observacoes,/Motivo da Visita: Convidado/);assert.match(row.payload.observacoes,/EC 27\/08 ESTATUS: Convidado/);
+ assert.equal(row.payload.observacoes,'');assert.equal(row.customValues[0],'2024-04-14T13:30:00');assert.equal(row.customValues[9],'Convidado');assert.equal(row.customValues[14],'Convidado');
  assert.equal(suggestField('  RESPONSÁVEL  - Teen '),'parente');
 });
 test('não adivinha datas inválidas nem perde o valor original',()=>{
@@ -39,10 +39,10 @@ test('usa datas do sistema 1904 e preserva zeros no telefone textual',()=>{
 });
 test('categorias são revisáveis, campos desconhecidos preservados e excesso bloqueado',()=>{
  const [table]=visitorWorkbookTables(workbook([['Nome','Data','Tipo','Célula','Nova coluna'],['Teste','14/04/2024','Teen','Horizonte','Contexto']]));
- const [row]=prepare(table,{categories:[{id:7,nome:'TEEN'}],cells:[{id:4,nome:'Horizonte'}]});assert.equal(row.payload.categoriaId,'7');assert.equal(row.payload.celulaId,'4');assert.match(row.payload.observacoes,/Nova coluna: Contexto/);
+ const [row]=prepare(table,{categories:[{id:7,nome:'TEEN'}],cells:[{id:4,nome:'Horizonte'}]});assert.equal(row.payload.categoriaId,'7');assert.equal(row.payload.celulaId,'4');assert.equal(row.payload.observacoes,'');assert.equal(row.customValues[4],'Contexto');
  const [other]=prepare(table,{categories:[{id:8,nome:'Jovens'}],choices:{Teen:'8'}});assert.equal(other.payload.categoriaNome,'Jovens');assert.equal(other.payload.categoriaId,'8');
  const [none]=prepare(table,{choices:{Teen:'none'}});assert.equal(none.payload.categoriaNome,'');assert.match(none.payload.observacoes,/Categoria original: Teen/);
- table.rows[0].values[4]='x'.repeat(1100);assert.match(prepare(table)[0].issues.join(),/1000 caracteres/);
+ table.rows[0].values[4]='x'.repeat(2100);assert.match(prepare(table)[0].issues.join(),/2000 caracteres/);
 });
 test('exportação tem datas numéricas ordenáveis e reimporta o mesmo dia, categoria e telefone',()=>{
  const rows=[{Nome:'Teste','Data de nascimento':'2002-08-29','Data de entrada':'2024-04-14',Telefone:'001234567',Categoria:'Kids',Observações:'Motivo da Visita: Convidado'}];
@@ -60,7 +60,11 @@ test('Worker salva campos reconhecidos, exporta observações e bloqueia duplica
   const login=await worker.fetch(await cpfLoginRequest(env,new Request('http://localhost/api/auth/login',{method:'POST',body:new URLSearchParams({email:'import@example.test',senha:'TestImport123'})})),env,ctx);assert.equal(login.status,303);
   const cookie=login.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ');
   const call=(path,body,auth=cookie)=>worker.fetch(new Request('http://localhost'+path,{method:body?'POST':'GET',headers:{cookie:auth,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})}),env,ctx);
-  const [table]=visitorWorkbookTables(example()),[row]=prepare(table);const result=await call('/api/pilot/visitantes',row.payload);assert.equal(result.status,201,await result.clone().text());
-  const {id}=await result.json();const exported=await (await call('/api/pilot/visitantes/exportar')).json(),saved=exported.rows.find(item=>item.ID===id);assert.equal(saved.Categoria,'O2');assert.equal(saved.Telefone,'47999998888');assert.equal(saved['Data de entrada'],'2024-04-14');assert.match(saved.Observações,/Motivo da Visita: Convidado/);assert.equal((await call('/api/pilot/visitantes',row.payload)).status,409);assert.notEqual((await call('/api/pilot/visitantes',row.payload,'')).status,201);
+  const [table]=visitorWorkbookTables(example()),[row]=prepare(table);
+  const drafts=table.headers.flatMap((nome,i)=>table.mapping[i]==='extra'?[{nome,tipo:inferCustomFieldType(table.rows.map(r=>r.values[i]))}]:[]);
+  const defined=await call('/api/pilot/visitantes/campos',{campos:drafts});assert.equal(defined.status,201,await defined.clone().text());const {campos}=await defined.json();
+  row.payload.camposPersonalizados=JSON.stringify(Object.fromEntries(Object.entries(row.customValues).map(([i,value])=>[campos.find(f=>f.nome===table.headers[i]).id,value])));
+  const result=await call('/api/pilot/visitantes',row.payload);assert.equal(result.status,201,await result.clone().text());
+  const {id}=await result.json();const exported=await (await call('/api/pilot/visitantes/exportar')).json(),saved=exported.rows.find(item=>item.ID===id);assert.equal(saved.Categoria,'O2');assert.equal(saved.Telefone,'47999998888');assert.equal(saved['Data de entrada'],'2024-04-14');assert.equal(saved.Observações,'');assert.equal(saved['Motivo da Visita'],'Convidado');assert.equal(saved['EC 27/08 ESTATUS'],'Convidado');assert.equal((await call('/api/pilot/visitantes',row.payload)).status,409);assert.notEqual((await call('/api/pilot/visitantes',row.payload,'')).status,201);
  }finally{database.close();}
 });

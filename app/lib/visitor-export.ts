@@ -1,3 +1,5 @@
+import { visitorCustomFields } from "./visitor-custom-fields";
+import { readCustomValues, type VisitorCustomField } from "./visitor-spreadsheet";
 import { getD1 } from "../../db";
 import { visitorToday } from "./visitor-attention";
 import { visitorAge, visitorAgeGroup } from "./visitor-care";
@@ -15,10 +17,10 @@ export async function visitorExportRows(db: ReturnType<typeof getD1>, communityI
     LEFT JOIN ministerios_comunidade m ON m.id = vc.ministerio_id AND m.comunidade_id = v.comunidade_id AND m.status = 'ATIVO' AND vc.ativa = 1
     WHERE v.comunidade_id = ? AND v.escopo_confirmado = 1 ORDER BY v.id LIMIT 10001`).bind(communityId).all<Record<string, unknown>>();
   if (result.results.length > 10000) throw new Error("O limite de 10.000 fichas por exportação foi excedido. Nenhuma exportação parcial foi gerada.");
-  return mapVisitorExportRows(result.results);
+  return mapVisitorExportRows(result.results, await visitorCustomFields(db, communityId));
 }
 
-export function mapVisitorExportRows(rows: Record<string, unknown>[]) {
+export function mapVisitorExportRows(rows: Record<string, unknown>[], fields: VisitorCustomField[] = []) {
   const today = visitorToday();
   const answer = (value: unknown) => value === "SIM" ? "Sim" : value === "NAO" ? "Não" : "Não informado";
   return rows.map(v => ({
@@ -36,5 +38,6 @@ export function mapVisitorExportRows(rows: Record<string, unknown>[]) {
     "Último contato": String(v.ultimo_contato || ""), "Próximo contato": String(v.proximo_contato || ""),
     Status: String(v.status), Arquivado: v.ativo ? "Não" : "Sim", Observações: String(v.observacoes || ""),
     Parente: String(v.parente || ""), Endereço: String(v.endereco || ""), "Atualizado em": String(v.atualizado_em || ""),
+    ...Object.fromEntries(fields.map(field => { const value = readCustomValues(v.campos_personalizados)[field.id] ?? ""; return [field.nome, field.tipo === "SIM_NAO" && value !== "" ? value === "SIM" ? "Sim" : "Não" : value]; })),
   }));
 }

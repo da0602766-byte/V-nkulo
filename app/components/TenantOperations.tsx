@@ -22,10 +22,12 @@ import { type VisitorCare, visitorAge, visitorAgeGroup } from "../lib/visitor-ca
 import { VisitorCareFields, VisitorCareSummary } from "./VisitorCareFields";
 import { VisitorSheetSettings } from "./VisitorSheetSettings";
 import VisitorSpreadsheetImport from "./VisitorSpreadsheetImport";
-import { visitorExportWorksheet } from "../lib/visitor-spreadsheet";
+import { VisitorCustomFields, customValuesFromForm } from "./VisitorCustomFields";
+import { type VisitorCustomField, visitorExportWorksheet } from "../lib/visitor-spreadsheet";
 import VisitorDirectory, { type DirectoryView } from "./VisitorDirectory";
 
 type Visitor = VisitorCare & {
+  campos_personalizados?: string | null;
   id: number;
   nome_completo: string;
   data_nascimento: string | null;
@@ -343,6 +345,13 @@ export function VisitorsWorkspace({
     [querySearch, queryCategory, queryVision, queryKey],
   );
 
+  const [customFields, setCustomFields] = useState<VisitorCustomField[]>([]);
+  const [customFieldsError, setCustomFieldsError] = useState("");
+  const loadCustomFields = useCallback(async () => {
+    try { const result = await apiJson<{ campos: VisitorCustomField[] }>("/api/pilot/visitantes/campos"); setCustomFields(result.campos); setCustomFieldsError(""); }
+    catch { setCustomFieldsError("Não foi possível carregar os campos adicionais. Tente novamente antes de editar esses dados."); }
+  }, []);
+
   const loadCells = useCallback(async () => {
     try {
       const result = await apiJson<{ celulas: Cell[] }>("/api/pilot/celulas");
@@ -429,10 +438,10 @@ export function VisitorsWorkspace({
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      void Promise.all([loadCells(), loadCategories()]);
+      void Promise.all([loadCells(), loadCategories(), loadCustomFields()]);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [loadCategories, loadCells]);
+  }, [loadCategories, loadCells, loadCustomFields]);
 
   useEffect(() => {
     if (!settingsOpen) return;
@@ -730,7 +739,8 @@ export function VisitorsWorkspace({
     setError("");
     setWarning("");
     const form = event.currentTarget;
-    const body = Object.fromEntries(new FormData(form).entries());
+    const data = new FormData(form);
+    const body = { ...Object.fromEntries(data.entries()), camposPersonalizados:customValuesFromForm(data) };
     try {
       await apiJson("/api/pilot/visitantes", {
         method: "POST",
@@ -863,9 +873,9 @@ export function VisitorsWorkspace({
     if (exporting) return;
     setExporting(true); setError("");
     try {
-      const result = await apiJson<{ rows: Record<string, string | number>[] }>("/api/pilot/visitantes/exportar");
+      const result = await apiJson<{ rows: Record<string, string | number>[]; campos: VisitorCustomField[]; headers: string[] }>("/api/pilot/visitantes/exportar");
       const XLSX = await import("xlsx");
-      const worksheet = visitorExportWorksheet(XLSX, result.rows);
+      const worksheet = visitorExportWorksheet(XLSX, result.rows, result.campos, result.headers);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Pessoas");
       XLSX.writeFile(workbook, "pessoas-completo-" + hojeLocal() + ".xlsx", { compression: true });
@@ -885,7 +895,7 @@ export function VisitorsWorkspace({
     setError("");
     setWarning("");
     const data = new FormData(event.currentTarget);
-    const body = { ...Object.fromEntries(data.entries()), encontroComDeus: data.has("encontroComDeus"), cursoMembros: data.has("cursoMembros") };
+    const body = { ...Object.fromEntries(data.entries()), camposPersonalizados:customValuesFromForm(data), encontroComDeus: data.has("encontroComDeus"), cursoMembros: data.has("cursoMembros") };
     try {
       await apiJson(`/api/pilot/visitantes/${visitor.id}`, {
         method: "PATCH",
@@ -1275,6 +1285,8 @@ export function VisitorsWorkspace({
             </section>
             <section className="visitor-registration-section visitor-registration-form-section">
               <VisitorCareFields />
+              {customFieldsError && <p className="visitor-wide-field" role="alert">{customFieldsError}<button type="button" onClick={() => void loadCustomFields()}>Tentar novamente</button></p>}
+              <VisitorCustomFields fields={customFields} />
               <header><span><b>4</b><strong>Finalização</strong><small>Entrada, status e observações</small></span></header>
               <fieldset>
                 <legend>Observações e finalização</legend>
@@ -1403,7 +1415,7 @@ export function VisitorsWorkspace({
             <header className="visitor-sheet-head-v2">
               <div><p className="pilot-kicker">DIRETÓRIO CENTRAL</p><h2 id="visitor-sheet-title">Pessoas e próximos cuidados</h2><span>Uma ficha por pessoa, em todas as visões.</span></div>
               <div>
-                {canCreate && <VisitorSpreadsheetImport categories={categories} cells={cells} canManageCategories={canManageCategories} onImported={async (text) => { setMessage(text); await Promise.all([loadVisitors(), loadCategories()]); }} />}
+                {canCreate && <VisitorSpreadsheetImport categories={categories} cells={cells} canManageCategories={canManageCategories} onImported={async (text) => { setMessage(text); await Promise.all([loadVisitors(), loadCategories(), loadCustomFields()]); }} />}
                 <button type="button" disabled={exporting} onClick={() => setExportReviewOpen(true)}>{exporting ? "Exportando…" : "⇩ Exportar todas as fichas"}</button>
               </div>
             </header>
@@ -1553,8 +1565,10 @@ export function VisitorsWorkspace({
               <p>Se o ministério não aparecer, a gestão precisa associá-lo a uma categoria compatível em Configurar categorias.</p>
             </details>}
             <details className="vd-integration-details"><summary>Integração, discipulado e apoio</summary><VisitorCareSummary person={selectedVisitor} /></details>
+            {customFieldsError && <p role="alert">{customFieldsError}<button type="button" onClick={() => void loadCustomFields()}>Tentar novamente</button></p>}
+            <VisitorCustomFields fields={customFields} values={selectedVisitor.campos_personalizados} readOnly />
             {selectedVisitor.observacoes && <section className="visitor-care-summary"><h3>Observações do cuidado</h3><p className="visitor-preserve-lines">{selectedVisitor.observacoes}</p></section>}
-            {canEdit && Boolean(selectedVisitor.ativo) && <details className="visitor-edit-compact-v2"><summary>Editar dados completos</summary><form key={`${selectedVisitor.id}-${selectedVisitor.atualizado_em}`} className="pilot-form visitor-edit-form" onSubmit={(event) => updateVisitor(event, selectedVisitor)}><label>Nome completo*<input name="nomeCompleto" required maxLength={120} defaultValue={selectedVisitor.nome_completo} /></label><label>Data de nascimento<input name="dataNascimento" type="date" defaultValue={selectedVisitor.data_nascimento || ""} /></label><label>Telefone<input name="telefone" maxLength={30} defaultValue={selectedVisitor.telefone || ""} /></label><label>E-mail<input name="email" type="email" maxLength={180} defaultValue={selectedVisitor.email || ""} /></label><label>Endereço<input name="endereco" maxLength={250} defaultValue={selectedVisitor.endereco || ""} /></label><label>Quem recebeu<input name="acompanhante" maxLength={120} defaultValue={selectedVisitor.acompanhante || ""} /></label><label>Parente<input name="parente" maxLength={120} defaultValue={selectedVisitor.parente || ""} /></label><label>Ministério<input name="ministerio" maxLength={120} defaultValue={selectedVisitor.ministerio || ""} /></label><label>Célula<select name="celulaId" defaultValue={selectedVisitor.celula_id || ""}><option value="">Sem célula</option>{cells.map((cell) => <option key={cell.id} value={cell.id}>{cell.nome}</option>)}</select></label><label>Categoria<select name="categoriaId" defaultValue={selectedVisitor.categoria_id || ""}><option value="">Sem categoria</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.nome}</option>)}</select></label><label>Batismo<select name="batizado" defaultValue={selectedVisitor.batizado}><option value="NAO_INFORMADO">Não informado</option><option value="SIM">Sim</option><option value="NAO">Não</option></select></label><label>Status<select name="status" defaultValue={selectedVisitor.status}><option value="NOVO">Novo</option><option value="EM_CONTATO">Em contato</option><option value="EM_ACOMPANHAMENTO">Em acompanhamento</option><option value="INTEGRADO">Integrado</option></select></label><label>Entrada<input name="dataEntrada" type="date" required defaultValue={selectedVisitor.data_entrada} /></label><label className="visitor-check"><input name="encontroComDeus" type="checkbox" defaultChecked={Boolean(selectedVisitor.encontro_com_deus)} />Encontro com Deus</label><label className="visitor-check"><input name="cursoMembros" type="checkbox" defaultChecked={Boolean(selectedVisitor.curso_membros)} />Curso de membros</label><label className="visitor-wide-field">Observações<textarea name="observacoes" rows={3} maxLength={1000} defaultValue={selectedVisitor.observacoes || ""} /></label><VisitorCareFields person={selectedVisitor} key={`${selectedVisitor.id}-${selectedVisitor.atualizado_em}`} /><button disabled={saving}>Salvar alterações</button></form></details>}
+            {canEdit && Boolean(selectedVisitor.ativo) && <details className="visitor-edit-compact-v2"><summary>Editar dados completos</summary><form key={`${selectedVisitor.id}-${selectedVisitor.atualizado_em}`} className="pilot-form visitor-edit-form" onSubmit={(event) => updateVisitor(event, selectedVisitor)}><label>Nome completo*<input name="nomeCompleto" required maxLength={120} defaultValue={selectedVisitor.nome_completo} /></label><label>Data de nascimento<input name="dataNascimento" type="date" defaultValue={selectedVisitor.data_nascimento || ""} /></label><label>Telefone<input name="telefone" maxLength={30} defaultValue={selectedVisitor.telefone || ""} /></label><label>E-mail<input name="email" type="email" maxLength={180} defaultValue={selectedVisitor.email || ""} /></label><label>Endereço<input name="endereco" maxLength={250} defaultValue={selectedVisitor.endereco || ""} /></label><label>Quem recebeu<input name="acompanhante" maxLength={120} defaultValue={selectedVisitor.acompanhante || ""} /></label><label>Parente<input name="parente" maxLength={120} defaultValue={selectedVisitor.parente || ""} /></label><label>Ministério<input name="ministerio" maxLength={120} defaultValue={selectedVisitor.ministerio || ""} /></label><label>Célula<select name="celulaId" defaultValue={selectedVisitor.celula_id || ""}><option value="">Sem célula</option>{cells.map((cell) => <option key={cell.id} value={cell.id}>{cell.nome}</option>)}</select></label><label>Categoria<select name="categoriaId" defaultValue={selectedVisitor.categoria_id || ""}><option value="">Sem categoria</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.nome}</option>)}</select></label><label>Batismo<select name="batizado" defaultValue={selectedVisitor.batizado}><option value="NAO_INFORMADO">Não informado</option><option value="SIM">Sim</option><option value="NAO">Não</option></select></label><label>Status<select name="status" defaultValue={selectedVisitor.status}><option value="NOVO">Novo</option><option value="EM_CONTATO">Em contato</option><option value="EM_ACOMPANHAMENTO">Em acompanhamento</option><option value="INTEGRADO">Integrado</option></select></label><label>Entrada<input name="dataEntrada" type="date" required defaultValue={selectedVisitor.data_entrada} /></label><label className="visitor-check"><input name="encontroComDeus" type="checkbox" defaultChecked={Boolean(selectedVisitor.encontro_com_deus)} />Encontro com Deus</label><label className="visitor-check"><input name="cursoMembros" type="checkbox" defaultChecked={Boolean(selectedVisitor.curso_membros)} />Curso de membros</label><label className="visitor-wide-field">Observações<textarea name="observacoes" rows={3} maxLength={1000} defaultValue={selectedVisitor.observacoes || ""} /></label><VisitorCareFields person={selectedVisitor} key={`${selectedVisitor.id}-${selectedVisitor.atualizado_em}`} /><VisitorCustomFields fields={customFields} values={selectedVisitor.campos_personalizados} /><button disabled={saving}>Salvar alterações</button></form></details>}
             {canFollowup && Boolean(selectedVisitor.ativo) && <details className="visitor-followup-details-v2"><summary><span><strong>Novo acompanhamento</strong><small>Registre o cuidado sem sair da ficha.</small></span><i aria-hidden="true">⌄</i></summary><form className="visitor-followup-quick-v2" onSubmit={createFollowup}><label>Canal<select name="tipo" defaultValue="WHATSAPP"><option value="WHATSAPP">WhatsApp</option><option value="TELEFONE">Telefone</option><option value="PRESENCIAL">Presencial</option><option value="VISITA">Visita</option><option value="EMAIL">E-mail</option><option value="OUTRO">Outro</option></select></label><label>Resultado<input name="resultado" required maxLength={160} placeholder="Resumo do contato" /></label><label>Próximo contato<input name="proximoContato" type="date" /></label><label className="wide">Observações<textarea name="descricao" rows={3} maxLength={1500} /></label><button disabled={saving}>{saving ? "Salvando…" : "Registrar acompanhamento"}</button></form></details>}
             <section className="visitor-timeline-v2" aria-busy={followupsLoading}><header><strong>Histórico</strong>{!followupsLoading && !followupsError && <b>{followups.length}</b>}</header>{followupsLoading ? <p role="status">Carregando histórico…</p> : followupsError ? <div className="visitor-query-error"><p role="alert">{followupsError}</p><button type="button" onClick={() => void loadFollowups(selectedVisitor.id)}>Tentar novamente</button></div> : <>{followups.map((item) => <article key={item.id}><span aria-hidden="true" /><div><header><b>{item.tipo}</b><time>{formatDateTime(item.criado_em)}</time></header><strong>{item.resultado}</strong>{item.responsavel_email && <small>Por {item.responsavel_email}</small>}{item.descricao && <p>{item.descricao}</p>}{item.proximo_contato && <small>Próximo contato: {formatDate(item.proximo_contato)}</small>}</div></article>)}{!followups.length && <p className="operations-muted">{permissions.includes("followups.view") ? "Nenhum acompanhamento registrado." : "Seu perfil não tem permissão para consultar o histórico."}</p>}{followupCursor && <button type="button" disabled={followupsLoading} onClick={() => void loadFollowups(selectedVisitor.id, followupCursor)}>Carregar histórico anterior</button>}</>}</section>
           </aside>

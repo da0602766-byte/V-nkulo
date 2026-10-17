@@ -23,10 +23,64 @@ export const IMPORT_FIELDS = [
   ["endereco", "Endereço", "endereco"], ["acompanhante", "Quem recebeu", "quem recebeu"],
   ["celulaId", "Célula existente", "celula"], ["observacoes", "Observações", "observacoes"],
 ] as const;
-export type ImportField = typeof IMPORT_FIELDS[number][0] | "extra" | "ignore";
+export type ImportField = typeof IMPORT_FIELDS[number][0] | "extra" | "ignore" | `custom:${number}`;
+export const CUSTOM_FIELD_TYPES = { TEXTO:"Texto", NUMERO:"Número", DATA:"Data", DATA_HORA:"Data e hora", SIM_NAO:"Sim / Não" } as const;
+export type CustomFieldType = keyof typeof CUSTOM_FIELD_TYPES;
+export type VisitorCustomField = { id: number; nome: string; chave: string; tipo: CustomFieldType };
+export type CustomFieldDraft = { nome: string; tipo: CustomFieldType };
+export const MAX_CUSTOM_FIELDS = 50;
 export type SheetTable = { name: string; sheet: string; headerRow: number; headers: string[]; rows: { line: number; values: unknown[] }[]; mapping: ImportField[] };
 export type ImportPerson = Record<string, string | boolean> & { nomeCompleto: string; categoriaNome: string; categoriaId: string; dataEntrada: string };
 export const normalizeColumn = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/^0(?=responsavel)/, "").trim().replace(/\s+/g, " ");
+
+export function customFieldNameIssue(name: string) {
+  const key = normalizeColumn(name);
+  const reserved = ["ID", "Idade", "Faixa etária", "Arquivado", "Atualizado em", "Último contato", "Próximo contato", ...IMPORT_FIELDS.flatMap(field => [...field])];
+  if (!key || name.trim().length > 80 || /[\r\n\t]/.test(name)) return "Use um nome de campo entre 1 e 80 caracteres, sem quebras de linha.";
+  if (reserved.some(value => normalizeColumn(value) === key)) return `“${name}” já corresponde a um campo padrão. Escolha esse destino ou outro nome.`;
+  return "";
+}
+
+export function customFieldValue(raw: unknown, type: CustomFieldType): { value: string | number; error?: string } {
+  if (raw === null || raw === undefined || raw === "") return { value:"" };
+  if (!["string", "number", "boolean"].includes(typeof raw) && !(raw instanceof Date)) return { value:"", error:"valor inválido" };
+  const text = cellText(raw);
+  if (!text) return { value:"" };
+  if (type === "TEXTO") return text.length <= 2000 ? { value:text } : { value:"", error:"texto excede 2000 caracteres" };
+  if (type === "NUMERO") {
+    const number = Number(text.replace(",", "."));
+    return /^[+-]?\d+(?:[.,]\d+)?$/.test(text) && text.replace(/[^0-9]/g, "").replace(/^0+/, "").length <= 15 && Number.isFinite(number) && Math.abs(number) <= Number.MAX_SAFE_INTEGER ? { value:number } : { value:"", error:"número inválido; use Texto para códigos ou números muito grandes" };
+  }
+  if (type === "SIM_NAO") {
+    const value = normalizeColumn(text);
+    return ["sim", "true", "1"].includes(value) ? { value:"SIM" } : ["nao", "false", "0"].includes(value) ? { value:"NAO" } : { value:"", error:"use Sim ou Não" };
+  }
+  const date = importDate(raw);
+  if (!date) return { value:"", error:"data inválida" };
+  if (typeof raw === "string" && !/^(?:\d{4}-\d{2}-\d{2}|\d{1,2}[/.\-]\d{1,2}[/.\-]\d{4})(?:[T\s]\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?)?$/.test(text)) return { value:"", error:"data ou horário inválido" };
+  if (typeof raw === "number" && !Number.isInteger(raw)) return { value:"", error:"há horário no número da planilha; formate a célula como data e hora" };
+  const time = text.match(/[T\s](\d{2}):(\d{2})(?::(\d{2})(\.\d{1,3})?)?$/);
+  if (time && (Number(time[1]) > 23 || Number(time[2]) > 59 || Number(time[3] || 0) > 59)) return { value:"", error:"horário inválido" };
+  if (type === "DATA") return time && /[1-9]/.test(time.slice(1).join("")) ? { value:"", error:"há horário neste valor; escolha Data e hora para preservá-lo" } : { value:date };
+  if (!time) return { value:"", error:"informe data e hora" };
+  return { value:`${date}T${time[1]}:${time[2]}:${time[3] || "00"}${time[4] || ""}` };
+}
+
+export function inferCustomFieldType(values: unknown[]): CustomFieldType {
+  const present = values.filter(value => cellText(value));
+  if (!present.length) return "TEXTO";
+  if (present.every(value => /^(sim|nao|true|false)$/i.test(normalizeColumn(cellText(value))))) return "SIM_NAO";
+  if (present.every(value => (value instanceof Date || typeof value === "string") && importDate(value))) {
+    return present.some(value => /[T\s]\d{2}:\d{2}/.test(cellText(value)) && /[1-9]/.test(cellText(value).split(/[T\s]/)[1] || "")) ? "DATA_HORA" : "DATA";
+  }
+  if (present.every(value => !/^[-+]?0\d/.test(cellText(value)) && !customFieldValue(value, "NUMERO").error)) return "NUMERO";
+  return "TEXTO";
+}
+
+export function readCustomValues(raw: unknown): Record<string, string | number> {
+  try { const value = typeof raw === "string" ? JSON.parse(raw) : raw; return value && typeof value === "object" && !Array.isArray(value) ? { ...value } : {}; } catch { return {}; }
+}
+export const displayCustomValue = (value: unknown, type: CustomFieldType) => value === "" || value === undefined || value === null ? "" : type === "SIM_NAO" ? value === "SIM" ? "Sim" : "Não" : type === "DATA" || type === "DATA_HORA" ? String(value).replace(/^(\d{4})-(\d{2})-(\d{2})/, "$3/$2/$1").replace("T", " ") : String(value);
 
 export function suggestField(header: string): ImportField {
   return IMPORT_FIELDS.find(field => (field.slice(2) as readonly string[]).includes(normalizeColumn(header)))?.[0] || "extra";
@@ -105,17 +159,22 @@ export function visitorWorkbookTables(workbook: WorkBook): SheetTable[] {
 }
 
 const answer = (value: string) => ["sim", "true", "1", "participou", "ja participou", "foi"].includes(normalizeColumn(value)) ? "SIM" : ["nao", "false", "0", "nao participou", "nao foi"].includes(normalizeColumn(value)) ? "NAO" : "NAO_INFORMADO";
-export function prepareImportRows(table: SheetTable, mapping: ImportField[], categories: { id: number; nome: string }[], cells: { id: number; nome: string }[], categoryChoices: Record<string, string>, fallbackDate: string, today: string) {
+export function prepareImportRows(table: SheetTable, mapping: ImportField[], categories: { id: number; nome: string }[], cells: { id: number; nome: string }[], categoryChoices: Record<string, string>, fallbackDate: string, today: string, custom: CustomFieldDraft[] = table.headers.map((nome, i) => ({ nome, tipo:inferCustomFieldType(table.rows.map(row => row.values[i])) }))) {
   return table.rows.map(source => {
     const payload: ImportPerson = { nomeCompleto: "", categoriaNome: "", categoriaId: "", dataEntrada: "", status: "NOVO" };
     const issues: string[] = [], notes: string[] = [];
     const extras: string[] = [];
+    const customValues: Record<number, string | number> = {};
     const values = new Map<string, string[]>();
-    const addNote = (i: number) => { const value = cellText(source.values[i]); if (value) extras.push(`${table.headers[i]}: ${value}`); };
     mapping.forEach((field, index) => {
       const raw = source.values[index], text = cellText(raw);
       if (!text || field === "ignore") return;
-      if (field === "extra") { addNote(index); return; }
+      if (field === "extra" || field.startsWith("custom:")) {
+        const converted = customFieldValue(raw, custom[index].tipo);
+        if (converted.error) issues.push(`${custom[index].nome}: ${converted.error}`);
+        else customValues[index] = converted.value;
+        return;
+      }
       if (field === "observacoes") { notes.push(text); return; }
       let value = text;
       if (["dataEntrada", "dataNascimento", "dataProximaAcao"].includes(field)) {
@@ -162,24 +221,26 @@ export function prepareImportRows(table: SheetTable, mapping: ImportField[], cat
     payload.observacoes = notes.join("\n\n");
     const limits: Record<string, number> = { nomeCompleto:120, telefone:30, email:180, categoriaNome:80, parente:120, ministerio:120, endereco:250, acompanhante:120, observacoes:1000, discipulador:120, funcaoOficial:120, responsavelAcompanhamento:120, proximaAcao:300, doacoesRealizadas:1500 };
     for (const [field, limit] of Object.entries(limits)) if (String(payload[field] || "").length > limit) issues.push(`${IMPORT_FIELDS.find(f => f[0] === field)?.[1]} excede ${limit} caracteres; revise a planilha ou o destino das colunas.`);
-    return { line: source.line, payload, issues };
+    return { line: source.line, payload, issues, customValues };
   });
 }
 
 export function formatImportDate(value: string) { return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value.split("-").reverse().join("/") : value; }
 
 // Excel exports use numeric date cells; text/phone identifiers remain literal strings.
-export function visitorExportWorksheet(XLSX: typeof import("xlsx"), rows: Record<string, string | number>[]) {
-  const sheet = XLSX.utils.json_to_sheet(rows);
-  const headers = Object.keys(rows[0] || {});
+export function visitorExportWorksheet(XLSX: typeof import("xlsx"), rows: Record<string, string | number>[], fields: VisitorCustomField[] = [], exportHeaders?: string[]) {
+  const headers = exportHeaders || Object.keys(rows[0] || {});
+  const sheet = XLSX.utils.json_to_sheet(rows, { header:headers });
   const dateHeaders = new Set(["Data de nascimento", "Data de entrada", "Prazo da ação"]);
   headers.forEach((header, col) => {
-    if (!dateHeaders.has(header)) return;
+    const type = fields.find(field => field.nome === header)?.tipo;
+    if (!dateHeaders.has(header) && type !== "DATA" && type !== "DATA_HORA") return;
     rows.forEach((row, i) => {
       const iso = importDate(row[header]);
       if (!iso) return;
-      const serial = (Date.parse(iso + "T00:00:00Z") - Date.UTC(1899, 11, 30)) / 86400000 - (iso < "1900-03-01" ? 1 : 0);
-      sheet[XLSX.utils.encode_cell({ r:i+1, c:col })] = { t:"n", v:serial, z:"dd/mm/yyyy" };
+      const datetime = type === "DATA_HORA" ? customFieldValue(row[header], "DATA_HORA") : null;
+      const serial = (Date.parse(datetime && !datetime.error ? `${datetime.value}Z` : iso + "T00:00:00Z") - Date.UTC(1899, 11, 30)) / 86400000 - (iso < "1900-03-01" ? 1 : 0);
+      sheet[XLSX.utils.encode_cell({ r:i+1, c:col })] = { t:"n", v:serial, z:type === "DATA_HORA" ? "dd/mm/yyyy hh:mm:ss.000" : "dd/mm/yyyy" };
     });
   });
   sheet["!cols"] = headers.map(header => ({ wch: header === "Observações" ? 64 : header === "Nome" ? 36 : /Data|Prazo|contato/.test(header) ? 20 : Math.min(34, Math.max(18, header.length + 2)) }));

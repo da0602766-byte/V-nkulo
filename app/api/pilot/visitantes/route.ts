@@ -1,3 +1,4 @@
+import { validateVisitorCustomValues } from "../../../lib/visitor-custom-fields";
 import { CARE_FIELDS, parseVisitorCare, isVisitorDate, visitorBoolean } from "../../../lib/visitor-care";
 import { visitorToday } from "../../../lib/visitor-attention";
 import { readVisitorDirectory } from "../../../lib/visitor-directory";
@@ -73,7 +74,7 @@ export async function GET(request: Request) {
         v.batizado, v.status, v.tipo_pessoa, v.certificado_batismo, v.discipulado, v.discipulador, v.doa_a_doa, v.doa_receber, v.doacoes_realizadas, v.oficial, v.funcao_oficial, v.responsavel_acompanhamento, v.proxima_acao, v.data_proxima_acao, v.endereco, v.acompanhante, v.parente,
         v.encontro_com_deus, v.curso_membros, v.ministerio,
         v.data_entrada, v.observacoes, v.celula_id, v.categoria_id, v.criado_por,
-        v.ativo, v.criado_em, v.atualizado_em,
+        v.ativo, v.criado_em, v.atualizado_em, v.campos_personalizados,
         c.nome AS celula_nome, vc.nome AS categoria_nome, vc.icone AS categoria_icone,
         vc.cor AS categoria_cor,
         (SELECT MAX(a.criado_em) FROM acompanhamentos a
@@ -292,6 +293,8 @@ export async function POST(request: Request) {
   }
 
   const db = getD1();
+  const custom = await validateVisitorCustomValues(db, access.context.comunidadeId, payload.camposPersonalizados);
+  if (custom.error) return Response.json({ error:custom.error }, { status:400 });
   const duplicates = await findPotentialDuplicates(db, access.context.comunidadeId, {
     nome,
     telefone,
@@ -398,8 +401,8 @@ export async function POST(request: Request) {
         comunidade_id, nome_completo, data_nascimento, telefone, email,
         batizado, status, endereco, acompanhante, parente, celula, celula_id, categoria_id,
         encontro_com_deus, curso_membros, ministerio, data_entrada,
-        observacoes, criado_por, ${Object.values(CARE_FIELDS).join(", ")}, ativo, escopo_confirmado
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${Object.keys(CARE_FIELDS).map(() => "?").join(", ")}, 1, 1)`,
+        observacoes, criado_por, campos_personalizados, ${Object.values(CARE_FIELDS).join(", ")}, ativo, escopo_confirmado
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${Object.keys(CARE_FIELDS).map(() => "?").join(", ")}, 1, 1)`,
     )
     .bind(
       access.context.comunidadeId,
@@ -421,6 +424,7 @@ export async function POST(request: Request) {
       dataEntrada,
       observacoes || null,
       access.user.email,
+      custom.json!,
       ...Object.values(care.values),
     )
     .run();
