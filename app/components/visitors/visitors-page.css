@@ -105,6 +105,21 @@ body:has(.visitor-app){padding-bottom:0;overflow:hidden}
 }
 .vp-status-trigger{display:none}
 @media(max-width:767px){
+  .visitor-app .care-notes-grid{grid-template-columns:minmax(0,min(100%,360px));gap:10px;min-height:0}
+  .visitor-app .care-note{min-height:0;max-height:none;padding:10px 12px;gap:6px;overflow:visible;border-radius:4px 4px 16px 4px}
+  .visitor-app .care-note>header{gap:4px}
+  .visitor-app .care-note>header button{min-width:44px;min-height:44px;padding:0 8px;font-size:13px}
+  .visitor-app .care-note h3{font-size:15px;line-height:1.35;overflow-wrap:anywhere}
+  .visitor-app .care-note>p{font-size:14px;line-height:1.4;overflow-wrap:anywhere}
+  .visitor-app .care-note-reminder{font-size:12px;line-height:1.4;overflow-wrap:anywhere}
+  .visitor-app .care-note>nav{gap:4px}
+  .visitor-app .care-note>nav a{min-height:44px}
+  .visitor-app .care-note-checklist{gap:0;padding-top:4px}
+  .visitor-app .care-note-checklist label{min-height:44px;align-items:center;font-size:13px;line-height:1.4}
+  .visitor-app .care-note-checklist label span{overflow-wrap:anywhere;min-width:0}
+  .visitor-app .care-note-checklist input{width:18px;height:18px;min-height:0;margin:0}
+}
+@media(max-width:767px){
   .visitor-app .care-notes-board>header{padding-bottom:10px;gap:8px}
   .visitor-app .care-note-composer{width:100%;max-width:440px;grid-template-columns:minmax(0,1fr);gap:10px;padding-top:10px}
   .visitor-app .care-note-composer label{gap:4px;font-size:12px}
