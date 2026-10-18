@@ -104,14 +104,14 @@ body:has(.visitor-app){padding-bottom:0;overflow:hidden}
 .vp-status-options h3{margin:0 0 7px;font-size:12px;font-weight:700;letter-spacing:.04em;color:#5f6683}
 .vp-status-option-count{display:flex;align-items:center;gap:8px;flex-shrink:0;font-size:12px;font-variant-numeric:tabular-nums}
 @media(max-width:767px){
-  .vp-dialog:has(.vp-status-options){padding:12px}
-  .vp-dialog:has(.vp-status-options)>header{gap:8px;margin-bottom:8px;padding-bottom:6px}
-  .vp-dialog:has(.vp-status-options)>header button{width:44px;height:44px}
+  .vp-dialog:has(.vp-choice-options){padding:12px}
+  .vp-dialog:has(.vp-choice-options)>header{gap:8px;margin-bottom:8px;padding-bottom:6px}
+  .vp-dialog:has(.vp-choice-options)>header button{width:44px;height:44px}
   .vp-status-options{gap:8px}
   .vp-status-options h3{margin-bottom:2px}
-  .vp-status-options .vp-choice-options{gap:0}
-  .vp-status-options .vp-choice-options button{min-height:44px;padding:6px 10px;border-color:transparent;border-radius:8px}
-  .vp-status-options .vp-choice-options button[aria-pressed=true]{border-color:#4f46e5}
+  .vp-choice-options{gap:0}
+  .vp-choice-options button{min-height:44px;padding:6px 10px;border-color:transparent;border-radius:8px}
+  .vp-choice-options button[aria-pressed=true]{border-color:#4f46e5}
   .vp-status-shortcuts{display:none}
   .vp-status-trigger{display:flex;align-items:center;gap:8px;width:100%;min-height:44px;padding:8px 12px;border:1px solid #d9d5fa;border-radius:12px;background:#f3f1ff;color:#4338ca;text-align:left;font-size:14px;font-weight:600;line-height:1.4}
   .vp-status-trigger>span{flex:1;min-width:0;white-space:normal;overflow-wrap:anywhere}
