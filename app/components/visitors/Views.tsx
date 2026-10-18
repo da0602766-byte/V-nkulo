@@ -297,7 +297,7 @@ export function Pessoas({
   }
 
   return (
-    <>
+    <div className="vp-people-page">
       <Header
         title="Pessoas"
         sub={`${pessoas.filter((p) => !p.arquivado).length} visitantes e membros cadastrados`}
@@ -315,7 +315,7 @@ export function Pessoas({
       </Header>
 
       {/* Metric Cards: 2 cols on mobile, 4 on desktop */}
-      <div className="px-4 sm:px-8 py-3 sm:pb-6 grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 bg-white shrink-0">
+      <div className="vp-people-metrics px-4 sm:px-8 py-3 sm:pb-6 grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 bg-white shrink-0">
         {[
           [
             'Visitantes ativos',
@@ -391,7 +391,7 @@ export function Pessoas({
         })}
       </div>
 
-      <div className="flex-1 min-h-0 flex border-t border-stone-100">
+      <div className="vp-people-body flex-1 min-h-0 flex border-t border-stone-100">
         {/* Desktop Sidebar Recortes */}
         <div className="hidden xl:block w-60 shrink-0 border-r border-stone-200 overflow-y-auto py-5 px-3">
           {(['Etapa', 'Atenção', 'Integração'] as const).map((g) => (
@@ -431,7 +431,7 @@ export function Pessoas({
         {/* Content Area */}
         <section className="flex-1 min-w-0 flex flex-col bg-white">
           {/* Filter Bar */}
-          <div className="p-3 sm:px-6 sm:py-3.5 border-b border-stone-100 space-y-2 shrink-0">
+          <div className="vp-people-filters p-3 sm:px-6 sm:py-3.5 border-b border-stone-100 space-y-2 shrink-0">
             <div className="vp-filterbar">
               <div className="relative flex-1">
                 <Icon d={I.search} className="size-4 absolute left-3 top-3 text-stone-400" />
@@ -496,7 +496,7 @@ export function Pessoas({
 
             {/* Expandable Advanced Operational Filters */}
             {showFiltrosAvancados && (
-              <div className="p-4 rounded-2xl bg-stone-50 ring-1 ring-stone-200 mt-2 space-y-3 [animation:rise_.2s_ease]">
+              <div className="vp-advanced-filters p-4 rounded-2xl bg-stone-50 ring-1 ring-stone-200 mt-2 space-y-3 [animation:rise_.2s_ease]">
                 <div className="flex items-center justify-between">
                   <span className="text-[12px] uppercase font-bold tracking-wider text-stone-500 flex items-center gap-1.5">
                     <Icon d={I.sliders} className="size-3.5" />
@@ -716,7 +716,7 @@ export function Pessoas({
           )}
 
           {/* Records Display Area: Table for Desktop, Cards for Mobile */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="vp-people-list flex-1 overflow-y-auto">
             {lista.length === 0 ? (
               <div className="h-full min-h-[300px] grid place-items-center p-6 text-center">
                 <div className="max-w-md">
@@ -1002,7 +1002,7 @@ export function Pessoas({
           }}
         />
       )}
-    </>
+    </div>
   )
 }
 
