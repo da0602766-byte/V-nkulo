@@ -22,7 +22,7 @@ export function PersonForm({person,categories,cells,fields,onClose,onSave}:{pers
     body.camposPersonalizados=customValuesFromForm(fd); body.encontroComDeus=fd.has('encontroComDeus');body.cursoMembros=fd.has('cursoMembros');body.confirmarDuplicidade=fd.has('confirmarDuplicidade');
     try {await onSave(body);} catch(caught) {const e=caught as Error&{duplicates?:Raw[]};setError(e.message);setDuplicates(e.duplicates||[]);} finally {setBusy(false);}
   }
-  return <Dialog wide title={person?'Editar cadastro':'Novo cadastro'} onClose={()=>{if(!busy)onClose();}}><form className="vp-form" onSubmit={submit}>
+  return <Dialog wide title={person?'Editar cadastro':'Novo cadastro'} onClose={()=>{if(!busy)onClose();}}><form className="vp-form vp-person-form" onSubmit={submit}>
     <p className="vp-muted">Uma ficha por pessoa. Os campos com * são obrigatórios.</p>
     <fieldset disabled={busy}><legend>Identificação e contato</legend><div className="vp-form-grid">
       {text('nomeCompleto','nome_completo','Nome completo *',120,'text',true)}
@@ -85,7 +85,7 @@ export function PersonDetails({person:p,fields,profile,canViewHistory,onClose,on
 
 export function ContactForm({person,onClose,onSave}:{person:Pessoa;onClose:()=>void;onSave:Save}) {
   const [busy,setBusy]=useState(false),[error,setError]=useState('');
-  return <Dialog title={`Registrar contato · ${person.nome}`} onClose={()=>{if(!busy)onClose();}}><form className="vp-form" onSubmit={async e=>{e.preventDefault();if(busy)return;setBusy(true);setError('');const data=Object.fromEntries(new FormData(e.currentTarget));try{await onSave({...data,visitanteId:Number(person.id)});}catch(e){setError((e as Error).message);}finally{setBusy(false);}}}>
+  return <Dialog title={`Registrar contato · ${person.nome}`} onClose={()=>{if(!busy)onClose();}}><form className="vp-form vp-person-form" onSubmit={async e=>{e.preventDefault();if(busy)return;setBusy(true);setError('');const data=Object.fromEntries(new FormData(e.currentTarget));try{await onSave({...data,visitanteId:Number(person.id)});}catch(e){setError((e as Error).message);}finally{setBusy(false);}}}>
     <Field label="Canal"><select name="tipo">{[['WHATSAPP','WhatsApp'],['TELEFONE','Telefone'],['PRESENCIAL','Presencial'],['VISITA','Visita'],['EMAIL','E-mail'],['OUTRO','Outro']].map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></Field>
     <Field label="Resultado *"><input name="resultado" required maxLength={160} placeholder="Ex.: conversamos e combinamos uma visita"/></Field>
     <Field label="Anotações do contato"><textarea name="descricao" rows={4} maxLength={1500}/></Field>

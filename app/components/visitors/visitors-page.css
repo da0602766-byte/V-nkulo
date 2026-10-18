@@ -101,6 +101,22 @@ body:has(.visitor-app){padding-bottom:0;overflow:hidden}
 }
 .vp-status-trigger{display:none}
 @media(max-width:767px){
+  .vp-dialog:has(.vp-person-form){padding:12px;scroll-padding-block:12px 88px}
+  .vp-dialog:has(.vp-person-form)>header{gap:8px;margin-bottom:8px;padding-bottom:6px}
+  .vp-dialog:has(.vp-person-form)>header button{width:44px;height:44px}
+  .vp-person-form{gap:12px}
+  .vp-person-form legend{margin-bottom:8px;padding-top:2px}
+  .vp-person-form fieldset+fieldset{padding-top:10px}
+  .vp-person-form .vp-form-grid{gap:10px}
+  .vp-person-form .vp-field{gap:4px}
+  .vp-person-form .vp-field :is(input,select,textarea){min-height:44px;padding:8px 10px;font-size:16px;line-height:1.4}
+  .vp-person-form fieldset>.vp-field{margin-top:10px}
+  .vp-person-form .vp-check{min-height:44px;line-height:1.4}
+  .vp-person-form>.vp-muted{line-height:1.4}
+  .vp-person-form>footer{position:sticky;bottom:-12px;z-index:2;background:#fff;gap:8px;padding:8px 0 max(12px,env(safe-area-inset-bottom));box-shadow:0 -6px 12px #fff;align-self:end}
+  .vp-person-form>footer button{flex:1;min-width:0;min-height:44px;padding:8px;font-size:14px;line-height:1.4;white-space:normal}
+}
+@media(max-width:767px){
   .vp-dialog:has(.vp-details){padding:12px;scroll-padding-top:76px}
   .vp-dialog:has(.vp-details)>header{gap:8px;margin-bottom:8px;padding-bottom:6px}
   .vp-dialog:has(.vp-details)>header button{width:44px;height:44px}
