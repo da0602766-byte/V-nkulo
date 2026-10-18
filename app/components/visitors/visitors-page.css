@@ -57,6 +57,10 @@ body:has(.visitor-app){padding-bottom:0;overflow:hidden}
   .vp-people-filters:has(.vp-advanced-filters){position:static}
 }
 @media(max-width:767px){
+  .vp-dialog:has(.care-note-composer){padding:12px;scroll-padding-block:12px 100px}
+  .vp-dialog:has(.care-note-composer)>header{gap:8px;margin-bottom:8px;padding-bottom:6px}
+  .vp-dialog:has(.care-note-composer)>header button{width:44px;height:44px}
+  .visitor-app .vp-dialog .care-note-composer{padding-top:0;border-top:0;max-width:none;background:#fff}
   .vp-people-page>header{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;padding:12px 16px}
   .vp-people-page>header>div:last-child{flex-wrap:nowrap}
   .vp-people-page>header>div:last-child button{padding-inline:10px}
@@ -100,6 +104,20 @@ body:has(.visitor-app){padding-bottom:0;overflow:hidden}
   .vp-filterbar>div:last-child{align-items:center}
 }
 .vp-status-trigger{display:none}
+@media(max-width:767px){
+  .visitor-app .care-notes-board>header{padding-bottom:10px;gap:8px}
+  .visitor-app .care-note-composer{width:100%;max-width:440px;grid-template-columns:minmax(0,1fr);gap:10px;padding-top:10px}
+  .visitor-app .care-note-composer label{gap:4px;font-size:12px}
+  .visitor-app .care-note-composer :is(input,select,textarea){min-height:44px;font-size:16px;line-height:1.4;padding:8px 10px;min-width:0;max-width:100%}
+  .visitor-app .care-note-composer label small{font-size:12px;line-height:1.4}
+  .visitor-app .care-note-options{min-width:0}
+  .visitor-app .care-note-options summary{min-height:44px;align-content:center;cursor:pointer}
+  .visitor-app .care-note-options>div{display:grid;gap:10px}
+  .visitor-app .care-note-composer footer{position:sticky;bottom:-12px;z-index:2;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 8px;padding:8px 0 max(12px,env(safe-area-inset-bottom));background:#fff;border-top:1px solid #dde0ee;box-shadow:0 -5px 10px #fff}
+  .visitor-app .care-note-composer footer>span{grid-column:1/-1;font-size:12px}
+  .visitor-app .care-note-composer footer button{min-height:44px;padding:8px;font-size:14px;line-height:1.4;white-space:normal}
+  .visitor-app .care-note-composer footer .care-note-cancel{background:#fff;color:#4338ca;border:1px solid #dde0ee;box-shadow:none}
+}
 @media(max-width:767px){
   .vp-dialog:has(.vp-person-form){padding:12px;scroll-padding-block:12px 88px}
   .vp-dialog:has(.vp-person-form)>header{gap:8px;margin-bottom:8px;padding-bottom:6px}

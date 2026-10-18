@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "./StableLink";
+import { Dialog } from "./visitors/Dialog";
 
 type ChecklistItem = { id: string; texto: string; concluido: boolean };
 type CareNote = {
@@ -24,9 +25,11 @@ type Option = { id: number; nome?: string; nome_completo?: string; titulo?: stri
 export default function CareNotesBoard({
   compact = false,
   side = false,
+  editorDialog = false,
 }: {
   compact?: boolean;
   side?: boolean;
+  editorDialog?: boolean;
 }) {
   const [notes, setNotes] = useState<CareNote[]>([]);
   const [events, setEvents] = useState<Option[]>([]);
@@ -120,13 +123,7 @@ export default function CareNotesBoard({
     finally { setSaving(false); }
   }
 
-  return (
-    <section className={`care-notes-board ${compact ? "is-compact" : ""} ${side ? "is-side" : ""}`} aria-labelledby={compact ? "care-notes-title-compact" : "care-notes-title"}>
-      <header>
-        <div><span aria-hidden="true">▰</span><div><p className="pilot-kicker">POST-ITS</p><h2 id={compact ? "care-notes-title-compact" : "care-notes-title"}>Minhas anotações de cuidado</h2><small>Privadas para você · vínculos opcionais</small></div></div>
-        <button type="button" onClick={() => { setEditing(null); setComposerOpen((open) => !open); }} aria-expanded={composerOpen}>{composerOpen ? "Fechar" : "＋ Novo post-it"}</button>
-      </header>
-      {composerOpen && <form key={editing?.id || "new"} className="care-note-composer" onSubmit={createNote}>
+  const composer = <form key={editing?.id || "new"} className="care-note-composer" onSubmit={createNote}>
         <label>Título<input name="titulo" defaultValue={editing?.titulo || ""} maxLength={100} required placeholder="Ex.: Ligar para a família Oliveira" /></label>
         <label>Cor<select name="cor" defaultValue={editing?.cor || "amarelo"}><option value="amarelo">Amarelo</option><option value="rosa">Rosa</option><option value="azul">Azul</option><option value="verde">Verde</option></select></label>
         <label className="wide">Anotação<textarea name="texto" defaultValue={editing?.texto || ""} rows={3} maxLength={1200} placeholder="Contexto que você quer lembrar…" /></label>
@@ -136,8 +133,17 @@ export default function CareNotesBoard({
         <label className="wide">Checklist <small>uma tarefa por linha</small><textarea name="checklist" defaultValue={editing?.checklist.map(item => item.texto).join("\n") || ""} rows={2} maxLength={1800} placeholder={"Enviar mensagem\nConfirmar presença\nRegistrar retorno"} /></label>
         </div></details>
         <label className="wide">Lembrete <small>opcional · horário deste aparelho</small><input type="datetime-local" name="lembreteEm" defaultValue={editing?.lembreteEm ? localReminder(editing.lembreteEm) : ""} /><small>Aviso privado na central. No dispositivo, ative as notificações nas configurações. Pode levar alguns minutos.</small></label>
-        <footer><span>{editing ? "Editar anotação" : "Nova anotação privada"}</span><button disabled={saving}>{saving ? "Salvando…" : editing ? "Salvar alterações" : "Criar post-it"}</button></footer>
-      </form>}
+        {editorDialog && error && <p className="wide vp-error" role="alert">{error}</p>}
+        <footer><span>{editing ? "Editar anotação" : "Nova anotação privada"}</span><button type="button" className="care-note-cancel" disabled={saving} onClick={() => { setComposerOpen(false); setEditing(null); }}>Cancelar</button><button disabled={saving}>{saving ? "Salvando…" : editing ? "Salvar alterações" : "Criar post-it"}</button></footer>
+      </form>;
+
+  return (
+    <section className={`care-notes-board ${compact ? "is-compact" : ""} ${side ? "is-side" : ""}`} aria-labelledby={compact ? "care-notes-title-compact" : "care-notes-title"}>
+      <header>
+        <div><span aria-hidden="true">▰</span><div><p className="pilot-kicker">POST-ITS</p><h2 id={compact ? "care-notes-title-compact" : "care-notes-title"}>Minhas anotações de cuidado</h2><small>Privadas para você · vínculos opcionais</small></div></div>
+        <button type="button" onClick={() => { setEditing(null); setComposerOpen((open) => !open); }} aria-expanded={composerOpen}>{composerOpen ? "Fechar" : "＋ Novo post-it"}</button>
+      </header>
+      {composerOpen && (editorDialog ? <Dialog title={editing ? "Editar anotação" : "Nova anotação"} onClose={() => { if (!saving) { setComposerOpen(false); setEditing(null); } }}>{composer}</Dialog> : composer)}
       {(feedback || error) && <p className={`care-note-feedback ${error ? "is-error" : ""}`} role="status">{error || feedback}</p>}
       <div className="care-notes-grid" aria-busy={loading}>
         {visibleNotes.map((note) => {
