@@ -30943,7 +30943,7 @@ html[data-pilot-theme="escuro"] .request-care-status.tone-blue { background:#173
 .care-notes-board.is-side .care-note-composer :is(.wide,footer) { grid-column:1; }
 .care-notes-board.is-side .care-note-composer footer { align-items:stretch; flex-direction:column; }
 .care-notes-board.is-side .care-notes-grid { grid-template-columns:1fr; }
-.care-notes-board.is-side .care-note { aspect-ratio:1; min-height:220px; max-height:300px; padding:12px; overflow-y:auto; }
+.care-notes-board.is-side .care-note { height:auto; min-height:0; padding:12px; }
 
 /* Visitantes — central de relacionamento legível e orientada a decisões. */
 .relationship-command-center-v3 { min-width:0; display:grid; gap:16px; border:1px solid var(--pilot-line); border-radius:18px; background:var(--pilot-surface); padding:20px; }
@@ -31126,7 +31126,7 @@ html[data-pilot-theme="escuro"] .request-care-status.tone-blue { background:#173
 @media (max-width:900px) {
   .care-notes-board.is-side { position:static; }
   .care-notes-board.is-side .care-notes-grid { display:flex; overflow-x:auto; scroll-snap-type:x proximity; padding-bottom:4px; }
-  .care-notes-board.is-side .care-note { flex:0 0 min(240px,82vw); min-height:220px; scroll-snap-align:start; }
+  .care-notes-board.is-side .care-note { flex:0 0 min(240px,82vw); align-self:start; scroll-snap-align:start; }
   .relationship-head-v3 { grid-template-columns:1fr; align-items:start; }
   .relationship-head-v3 dl { width:100%; }
   .relationship-priority-grid-v3 { grid-template-columns:1fr; }

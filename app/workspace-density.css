@@ -1,8 +1,7 @@
 /* Content-sized objects inside spacious work areas. Scoped to the affected modules. */
 .pilot-dashboard .care-notes-board:not(.is-compact):not(.is-side) { min-height:360px; align-content:start; }
 .pilot-dashboard .care-notes-board .care-notes-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),280px)); align-items:start; align-content:start; justify-content:start; gap:16px; }
-.pilot-dashboard .care-note { width:100%; min-width:0; min-height:230px; max-height:340px; overflow:auto; align-content:start; padding:16px; border-radius:4px 4px 22px 4px; box-sizing:border-box; }
-.pilot-dashboard .care-note { overflow-x:hidden; overflow-y:auto; }
+.pilot-dashboard .care-notes-board .care-note { width:100%; min-width:0; height:auto; min-height:0; max-height:none; aspect-ratio:auto; overflow:visible; align-self:start; align-content:start; padding:12px; gap:6px; border-radius:4px 4px 22px 4px; box-sizing:border-box; }
 .pilot-dashboard .care-note::after { right:0; bottom:0; width:22px; height:22px; border-radius:22px 0 0 0; }
 .pilot-dashboard .care-note header { grid-template-columns:8px minmax(0,1fr) auto auto; gap:6px; }
 .pilot-dashboard .care-note header small { margin-right:auto; }
