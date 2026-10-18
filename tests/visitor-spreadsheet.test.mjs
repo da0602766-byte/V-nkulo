@@ -10,6 +10,17 @@ function workbook(rows, name='Cadastros de Pessoas') { const w=XLSX.utils.book_n
 function example() { return workbook([headers,[45396.5625,'Pessoa de teste',37497,'Abril','Domingo',45396,'Grupo de exemplo','Sim',47999998888,'Convidado','O2','','','Não participou','Convidado']]); }
 const prepare=(table, options={})=>prepareImportRows(table,options.mapping||table.mapping,options.categories||[],options.cells||[],options.choices||{},options.fallback||'','2026-10-16');
 
+test('reimportar exportação ignora metadados gerados e mantém campos de cadastro e desconhecidos',()=>{
+ const [table]=visitorWorkbookTables(workbook([
+  ['ID','Nome','Data de entrada','Idade','Faixa etária','Arquivado','Atualizado em','Último contato','Próximo contato','Motivo da visita','Status do acompanhamento'],
+  [901,'Teste reimportação','10/10/2026',24,'Adulto','Sim','2026-10-11 13:00:00','2026-10-11','','Convidado','EM_CONTATO']
+ ]));
+ assert.deepEqual(table.mapping,['ignore','nomeCompleto','dataEntrada','ignore','ignore','ignore','ignore','ignore','ignore','extra','status']);
+ const [row]=prepare(table);assert.deepEqual(row.issues,[]);assert.equal(row.payload.status,'EM_CONTATO');
+ assert.equal(row.payload.nomeCompleto,'Teste reimportação');assert.deepEqual(row.customValues,{9:'Convidado'});
+ assert.equal(row.payload.ativo,undefined);assert.equal(row.payload.id,undefined);
+});
+
 test('reconhece os títulos do arquivo legado e mantém categorias, contatos e datas',()=>{
  const w=example(); w.Sheets[w.SheetNames[0]].A2.z='dd/mm/yyyy hh:mm';w.Sheets[w.SheetNames[0]].C2.z='mm/dd/yy';w.Sheets[w.SheetNames[0]].F2.z='mm/dd/yy';
  const [table]=visitorWorkbookTables(w),[row]=prepare(table);

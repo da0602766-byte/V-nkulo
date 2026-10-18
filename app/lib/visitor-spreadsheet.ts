@@ -83,7 +83,11 @@ export function readCustomValues(raw: unknown): Record<string, string | number> 
 export const displayCustomValue = (value: unknown, type: CustomFieldType) => value === "" || value === undefined || value === null ? "" : type === "SIM_NAO" ? value === "SIM" ? "Sim" : "Não" : type === "DATA" || type === "DATA_HORA" ? String(value).replace(/^(\d{4})-(\d{2})-(\d{2})/, "$3/$2/$1").replace("T", " ") : String(value);
 
 export function suggestField(header: string): ImportField {
-  return IMPORT_FIELDS.find(field => (field.slice(2) as readonly string[]).includes(normalizeColumn(header)))?.[0] || "extra";
+  const key = normalizeColumn(header);
+  // Generated export metadata is not editable input. In particular, importing an
+  // archived flag must never silently reactivate, archive or overwrite a record.
+  if (["id", "idade", "faixa etaria", "arquivado", "atualizado em", "ultimo contato", "proximo contato"].includes(key)) return "ignore";
+  return IMPORT_FIELDS.find(field => (field.slice(1) as readonly string[]).some(label => normalizeColumn(label) === key))?.[0] || "extra";
 }
 
 export function readVisitorWorkbook(XLSX: typeof import("xlsx"), bytes: ArrayBuffer, csv = false) {

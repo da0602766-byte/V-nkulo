@@ -17,6 +17,11 @@ test('página dedicada protege acesso, redireciona links antigos e mantém cadas
   for(const cookie of [member,'']){const r=await call('/painel/visitantes','GET',null,cookie);assert.ok([302,303,307].includes(r.status));assert.match(r.headers.get('location'),/login|acesso-negado/);}
   let r=await call('/painel?view=visitantes&sheetSetup=authorized&visitante=19');assert.ok([302,303,307].includes(r.status));assert.equal(new URL(r.headers.get('location'),'http://localhost').pathname+new URL(r.headers.get('location'),'http://localhost').search,'/painel/visitantes?sheetSetup=authorized&visitante=19');
   r=await call('/painel/visitantes');assert.equal(r.status,200);assert.match(await r.text(),/Visitantes/);
+  db.prepare("INSERT INTO visitante_campos(comunidade_id,nome,chave,tipo,criado_por) VALUES(1,'Campo local','campo local','TEXTO','test'),(2,'Campo privado','campo privado','TEXTO','foreign')").run();
+  const snapshot=await (await call('/api/pilot/visitantes/pagina')).json();
+  assert.ok(snapshot.campos.some(f=>f.nome==='Campo local'));assert.equal(snapshot.campos.some(f=>f.nome==='Campo privado'),false);
+  assert.ok(Array.isArray(snapshot.categorias));assert.ok(Array.isArray(snapshot.celulas));
+  assert.ok(snapshot.responsaveis.some(p=>p.nome==='Gestor da página'));assert.ok(Array.isArray(snapshot.ministerios));
   r=await call('/api/pilot/visitantes','POST',{nomeCompleto:'Pessoa da página dedicada',dataEntrada:'2026-10-01',dataNascimento:'2000-10-22',proximaAcao:'Receber na célula',dataProximaAcao:'2026-10-20'});assert.equal(r.status,201);const {id}=await r.json();
   db.prepare("INSERT INTO visitantes(comunidade_id,nome_completo,data_entrada,criado_por,escopo_confirmado) VALUES(2,'Pessoa privada','2026-10-01','foreign',1)").run();
   r=await call('/api/pilot/acompanhamentos','POST',{visitanteId:id,tipo:'PRESENCIAL',resultado:'Contato de teste',proximoContato:'2026-10-21'});assert.equal(r.status,201);

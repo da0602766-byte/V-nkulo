@@ -5,6 +5,7 @@ import CommunityHighlight from "./CommunityHighlight";
 import InviteRevocationList from './InviteRevocationList';
 
 import Link from "./StableLink";
+import VinkuloLoading from "./VinkuloLoading";
 import dynamic from "next/dynamic";
 import { type CSSProperties, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PilotFeatureState } from "../lib/pilot-data";
@@ -256,6 +257,12 @@ export default function PilotDashboard({
   const [quickActionSearch, setQuickActionSearch] = useState("");
   const [switching, setSwitching] = useState(false);
   const [viewLoading, setViewLoading] = useState(false);
+  const [openingVisitors, setOpeningVisitors] = useState(false);
+  useEffect(() => {
+    const reset = () => setOpeningVisitors(false);
+    window.addEventListener('pageshow', reset);
+    return () => window.removeEventListener('pageshow', reset);
+  }, []);
   const [fontScale, setFontScale] = useState(1);
   const [fontScaleHydrated, setFontScaleHydrated] = useState(false);
   const [inviteMessage, setInviteMessage] = useState("");
@@ -807,7 +814,13 @@ export default function PilotDashboard({
       : "inicio";
 
   function openView(nextView: View, focus?: NavigationFocus) {
-    if (nextView === "visitantes") { window.location.assign("/painel/visitantes" + (focus?.event === "vinkulo:new-visitor" ? "?novo=1" : "")); return; }
+    if (nextView === "visitantes") {
+      if (openingVisitors) return;
+      setOpeningVisitors(true);
+      setMobileMenu(null);
+      window.setTimeout(() => window.location.assign("/painel/visitantes" + (focus?.event === "vinkulo:new-visitor" ? "?novo=1" : "")), 60);
+      return;
+    }
     if (nextView === "solicitacoes") {
       window.setTimeout(() => window.dispatchEvent(new CustomEvent("vinkulo:requests-opened")), 320);
     }
@@ -983,6 +996,7 @@ export default function PilotDashboard({
       } as CSSProperties}
     >
       <CloseDetailsOnOutside />
+      {openingVisitors && <VinkuloLoading label="Abrindo Visitantes…" />}
       <header className="pilot-topbar" data-editor-key="cabecalho" data-smart-scroll-header>
         <button
           className="vinkulo-brand community-brand-trigger"
