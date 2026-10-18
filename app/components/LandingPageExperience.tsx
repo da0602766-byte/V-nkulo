@@ -49,27 +49,6 @@ const FAQS = [
 
 export default function LandingPageExperience({ signedIn, panelHref, canEdit, plans, siteName = "Vínkulo", logoUrl = "" }: LandingPageExperienceProps) {
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
-  const [ownerAccessOpen, setOwnerAccessOpen] = useState(false);
-  const ownerAccess = useRef<HTMLDivElement>(null);
-  const ownerAccessButton = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (!ownerAccessOpen) return;
-    const outside = (event: PointerEvent) => {
-      if (!ownerAccess.current?.contains(event.target as Node)) setOwnerAccessOpen(false);
-    };
-    const escape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOwnerAccessOpen(false);
-        ownerAccessButton.current?.focus();
-      }
-    };
-    document.addEventListener("pointerdown", outside);
-    document.addEventListener("keydown", escape);
-    return () => {
-      document.removeEventListener("pointerdown", outside);
-      document.removeEventListener("keydown", escape);
-    };
-  }, [ownerAccessOpen]);
   const signupHref = signedIn ? panelHref : "/log1";
   const loginHref = signedIn ? panelHref : "/login";
 
@@ -84,7 +63,7 @@ export default function LandingPageExperience({ signedIn, panelHref, canEdit, pl
           <div className="lp-nav-actions">
             <ThemeControl compact cycle />
             {canEdit && <span id="global-editor-toolbar-slot" className="global-editor-toolbar-slot" aria-label="Aparência" />}
-            {canEdit ? <div className="lp-owner-access" ref={ownerAccess} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setOwnerAccessOpen(false); }}><button ref={ownerAccessButton} type="button" className="lp-button lp-button-small" aria-expanded={ownerAccessOpen} aria-controls="landing-owner-links" onClick={() => setOwnerAccessOpen((open) => !open)}>Proprietário <span aria-hidden="true">⌄</span></button>{ownerAccessOpen && <div id="landing-owner-links" className="lp-owner-access-menu"><Link href="/proprietario" showLoading>Central do proprietário</Link><Link href="/painel" showLoading>Entrar na comunidade</Link></div>}</div> : <Link className="lp-button lp-button-small" href={loginHref} showLoading>{signedIn ? "Abrir painel" : "Entrar"} <span aria-hidden="true">→</span></Link>}
+            <Link className="lp-button lp-button-small" href={signedIn ? "/painel" : "/login"} showLoading>{signedIn ? "Abrir painel" : "Entrar"} <span aria-hidden="true">→</span></Link>
           </div>
         </div>
       </nav>

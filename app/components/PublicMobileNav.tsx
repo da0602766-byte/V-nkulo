@@ -25,14 +25,14 @@ export default async function PublicMobileNav({
       <CreateCommunityShortcut signedIn={Boolean(user)} compact />
       <Link
         className="public-mobile-profile-link"
-        href={user?.system_owner ? "/proprietario" : user ? "/painel" : "/login"}
+        href={user ? "/painel?view=conta" : "/login"}
         showLoading={Boolean(user)}
-        loadingLabel={user?.system_owner ? "Abrindo a Área do proprietário…" : "Abrindo seu painel…"}
+        loadingLabel="Abrindo seu perfil…"
       >
         <span className="public-mobile-profile-avatar" aria-hidden="true">
           {user?.foto_perfil ? <SafeImage loading="lazy" fallbackName={user.nome} fallbackKind="avatar" src={user.foto_perfil} alt="" /> : user ? initials : <PublicIcon name="user" size={18} />}
         </span>
-        {user?.system_owner ? "Proprietário ✓" : user ? "Meu perfil" : "Entrar"}
+        {user ? "Meu perfil" : "Entrar"}
       </Link>
     </nav>
   );

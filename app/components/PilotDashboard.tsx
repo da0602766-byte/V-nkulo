@@ -1272,19 +1272,6 @@ export default function PilotDashboard({
           </div>
           <div className="pilot-profile-card"><span>{userPhotoUrl ? <SafeImage fallbackName={userName} fallbackKind="avatar" loading="lazy" src={userPhotoUrl} alt="" /> : userInitials}</span><div><small><VerifiedOwnerName name={userName} verified={active.isOwner} /></small><strong>{active.communityAccess === "FEED_ONLY" ? "Proprietário · somente feed" : active.isOwner ? "Proprietário do sistema" : ROLE_LABELS[active.papel] || active.papel}</strong></div></div>
           <nav aria-label="Menu por perfil" data-editor-key="navegacao-principal">
-            {active.isOwner && (
-              <Link
-                className="pilot-owner-area-link"
-                href="/proprietario"
-                showLoading
-                loadingLabel="Abrindo a Área do proprietário…"
-                aria-label="Área do proprietário"
-                title="Área do proprietário"
-              >
-                <span className="pilot-sidebar-icon" aria-hidden="true">⌘</span>
-                <span className="pilot-sidebar-label">Área do proprietário</span>
-              </Link>
-            )}
             {sidebarGroups.map((group) => (
               <section className="pilot-sidebar-group" key={group.label} aria-label={group.label}>
                 <h2>{group.label}</h2>
@@ -1785,11 +1772,6 @@ export default function PilotDashboard({
                 >
                   Perfil e configurações
                 </button>
-                {active.isOwner && (
-                  <Link className="pilot-profile-manage" href="/proprietario" showLoading loadingLabel="Abrindo a Área do proprietário…">
-                    Abrir Área do Proprietário
-                  </Link>
-                )}
                 <details className="pilot-profile-community-switcher">
                   <summary>Trocar comunidade</summary>
                   <input
