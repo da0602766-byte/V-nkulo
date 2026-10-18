@@ -85,3 +85,17 @@ body:has(.visitor-app){padding-bottom:0;overflow:hidden}
   .vp-person-card--simple .vp-person-card-meta{align-self:center}
   .vp-person-card--simple .vp-person-card-actions{grid-column:2;align-self:center}
 }
+.vp-choice-trigger{display:none}
+.vp-choice-options{display:grid;gap:6px}
+.vp-choice-options button{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:10px 12px;border:1px solid #dde0ee;border-radius:10px;text-align:left;font-size:16px;line-height:1.4;color:#30344d;background:#fff}
+.vp-choice-options button span{min-width:0;overflow-wrap:anywhere;white-space:normal}
+.vp-choice-options button svg{flex-shrink:0}
+.vp-choice-options button[aria-pressed=true]{border-color:#4f46e5;background:#f0efff;color:#4338ca;font-weight:600}
+@media(max-width:767px){
+  .vp-filterbar .vp-choice-native{display:none}
+  .vp-choice-trigger{display:flex;align-items:center;justify-content:space-between;gap:6px;flex:1;min-width:0;min-height:44px;padding:7px 10px;border:1px solid #dde0ee;border-radius:12px;background:#fff;color:#30344d;font-size:14px;line-height:1.35;text-align:left}
+  .vp-choice-trigger span{min-width:0;white-space:normal;overflow-wrap:anywhere}
+  .vp-choice-trigger svg{width:14px;height:14px;flex-shrink:0}
+  .vp-choice-trigger:first-child{flex:1.5}
+  .vp-filterbar>div:last-child{align-items:center}
+}

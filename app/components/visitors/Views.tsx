@@ -177,6 +177,9 @@ export function Pessoas({
 }) {
   const [q, setQ] = useState('')
   const [cat, setCat] = useState('')
+  const [filterPicker, setFilterPicker] = useState<'categoria' | 'ordem' | null>(null)
+  const orderOptions = [{value:'az',label:'Nome (A–Z)'},{value:'za',label:'Nome (Z–A)'},{value:'recente',label:'Contato recente'},{value:'acao',label:'Próxima ação'}]
+  const categoryOptions = [{value:'',label:'Todas categorias'},...categorias.map(c=>({value:c.nome,label:c.nome})),{value:'__sem',label:'Sem categoria'}]
   const [rec, setRec] = useState<Recorte>('ativos')
   const [ordem, setOrdem] = useState<'az' | 'za' | 'recente' | 'acao'>('az')
   const [sel, setSel] = useState<Set<string>>(new Set())
@@ -449,8 +452,9 @@ export function Pessoas({
               </div>
 
               <div className="flex items-center gap-2">
+                <button type="button" className="vp-choice-trigger" aria-label={`Filtrar categoria: ${categoryOptions.find(o=>o.value===cat)?.label || cat}`} aria-haspopup="dialog" aria-expanded={filterPicker==='categoria'} onClick={()=>setFilterPicker('categoria')}><span>{categoryOptions.find(o=>o.value===cat)?.label || cat}</span><Icon d={I.chevronDown}/></button>
                 <select
-                  className={`${input} w-36 sm:w-44 text-[13px]`}
+                  className={`vp-choice-native ${input} w-36 sm:w-44 text-[13px]`}
                   aria-label="Filtrar categoria" value={cat}
                   onChange={(e) => setCat(e.target.value)}
                 >
@@ -463,8 +467,9 @@ export function Pessoas({
                   <option value="__sem">Sem categoria</option>
                 </select>
 
+                <button type="button" className="vp-choice-trigger" aria-label={`Ordenar pessoas: ${orderOptions.find(o=>o.value===ordem)?.label}`} aria-haspopup="dialog" aria-expanded={filterPicker==='ordem'} onClick={()=>setFilterPicker('ordem')}><span>{orderOptions.find(o=>o.value===ordem)?.label}</span><Icon d={I.chevronDown}/></button>
                 <select
-                  className={`${input} w-36 sm:w-40 text-[13px]`}
+                  className={`vp-choice-native ${input} w-36 sm:w-40 text-[13px]`}
                   aria-label="Ordenar pessoas" value={ordem}
                   onChange={(e) => setOrdem(e.target.value as typeof ordem)}
                 >
@@ -982,6 +987,11 @@ export function Pessoas({
         </section>
       </div>
 
+      {filterPicker && <Dialog title={filterPicker==='categoria'?'Filtrar categoria':'Ordenar pessoas'} onClose={()=>setFilterPicker(null)}>
+        <div className="vp-choice-options">
+          {(filterPicker==='categoria'?categoryOptions:orderOptions).map(option=><button type="button" key={option.value} aria-pressed={(filterPicker==='categoria'?cat:ordem)===option.value} onClick={()=>{if(filterPicker==='categoria')setCat(option.value);else setOrdem(option.value as typeof ordem);setFilterPicker(null)}}><span>{option.label}</span>{(filterPicker==='categoria'?cat:ordem)===option.value&&<Icon d={I.check}/>}</button>)}
+        </div>
+      </Dialog>}
       {confirm && (
         <Confirm
           danger={confirm === 'excluir'}
