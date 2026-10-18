@@ -69,6 +69,7 @@ body:has(.visitor-app){padding-bottom:0;overflow:hidden}
 /* Compact phone cards retain readable content and full-size touch actions. */
 @media(max-width:767px){
   .vp-person-card{padding:10px 12px;gap:5px}
+  .vp-people-list{padding-bottom:128px}
   .vp-person-card-header{gap:8px;align-items:center}
   .vp-person-card-avatar{width:32px;height:32px;border-radius:11px}
   .vp-person-card-title{align-items:flex-start;flex-wrap:wrap;gap:3px 6px}
