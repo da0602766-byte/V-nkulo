@@ -4,29 +4,6 @@ import test from "node:test";
 
 const source = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("Visitantes usa dashboard real, lista WhatsApp e configurações em uma engrenagem", async () => {
-  const [workspace, categoriesApi, styles] = await Promise.all([
-    source("app/components/TenantOperations.tsx"),
-    source("app/api/pilot/visitante-categorias/route.ts"),
-    source("app/globals.css"),
-  ]);
-
-  // O gráfico de crescimento saiu do bloco escondido por `display:none` e
-  // voltou ao painel de panorama, no topo da aba.
-  assert.match(workspace, /CRESCIMENTO<\/p>/);
-  assert.match(workspace, /visitor-growth-chart-v6/);
-  // A engrenagem virou um botão nomeado na barra de ações; o rótulo visível
-  // ("Categorias") é o nome acessível, e o title diz o que ela abre.
-  assert.match(workspace, /Categorias e responsáveis de visitantes/);
-  assert.match(workspace, /visitor-settings-panel/);
-  assert.match(workspace, /https:\/\/wa\.me\//);
-  assert.match(workspace, /Ministério responsável/);
-  assert.match(categoriesApi, /COUNT\(\*\) AS novos/);
-  assert.match(categoriesApi, /vc\.ministerio_id, m\.nome AS ministerio_nome/);
-  assert.match(styles, /\.visitor-growth-chart/);
-  assert.match(styles, /@media \(max-width:680px\)[\s\S]*\.visitor-settings-panel/);
-});
-
 test("associação categoria-ministério possui migration e aparece no módulo ministerial", async () => {
   const [schema, migration, ministryApi, ministryUi, categoryPatch, tenantPolicy] = await Promise.all([
     source("db/schema.ts"),

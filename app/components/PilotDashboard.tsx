@@ -45,7 +45,6 @@ const PrivateChatWorkspace = dynamic(() => import("./PrivateChatWorkspace"), { l
 const RequestsWorkspace = dynamic(() => import("./RequestsWorkspace"), { loading: moduleLoading });
 const SecretaryMinisterialWorkspace = dynamic(() => import("./SecretaryMinisterialWorkspace"), { loading: moduleLoading });
 const CellsWorkspace = dynamic(() => import("./CellsWorkspace"), { loading: moduleLoading });
-const VisitorsWorkspace = dynamic(() => import("./TenantOperations").then((module) => module.VisitorsWorkspace), { loading: moduleLoading });
 
 type FeedItem = {
   id: number;
@@ -808,6 +807,7 @@ export default function PilotDashboard({
       : "inicio";
 
   function openView(nextView: View, focus?: NavigationFocus) {
+    if (nextView === "visitantes") { window.location.assign("/painel/visitantes" + (focus?.event === "vinkulo:new-visitor" ? "?novo=1" : "")); return; }
     if (nextView === "solicitacoes") {
       window.setTimeout(() => window.dispatchEvent(new CustomEvent("vinkulo:requests-opened")), 320);
     }
@@ -1355,13 +1355,7 @@ export default function PilotDashboard({
           {visibleView === "fio" && !accessDeniedView && (
             <DayThreadWorkspace permissions={active.permissions} />
           )}
-          {visibleView === "visitantes" && (
-            <VisitorsWorkspace
-              key={active.comunidadeId}
-              permissions={active.permissions}
-              communityName={active.comunidadeNome}
-            />
-          )}
+          {visibleView === "visitantes" && <a href="/painel/visitantes">Abrir Visitantes →</a>}
           {visibleView === "eventos" && (
             <EventsWorkspace
               permissions={active.permissions}

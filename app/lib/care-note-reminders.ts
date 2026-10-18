@@ -35,7 +35,7 @@ export async function deliverCareNoteReminders(db: D1Database, userId?: number) 
         (tipo,titulo,mensagem,area,usuario_id,comunidade_id,destino_rota,criado_por)
         SELECT 'IMPORTANTE','Lembrete de post-it','Você tem uma anotação para revisar.','VISITANTES',usuario_id,comunidade_id,?,'care-note-reminder'
         FROM layouts_interface WHERE ${guard}`)
-        .bind(`/painel?view=visitantes&anotacao=${encodeURIComponent(note.note_id)}`, ...bindings),
+        .bind(`/painel/visitantes?anotacao=${encodeURIComponent(note.note_id)}`, ...bindings),
       db.prepare(`UPDATE layouts_interface SET configuracao=json_set(configuracao,?||'.lembreteEnviadoEm',?),
         versao=versao+1, atualizado_em=CURRENT_TIMESTAMP WHERE ${guard}`)
         .bind(path, new Date().toISOString(), ...bindings),

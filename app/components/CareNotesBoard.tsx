@@ -145,14 +145,14 @@ export default function CareNotesBoard({
           return <article id={`care-note-${note.id}`} className="care-note" tabIndex={-1} data-color={note.cor} key={note.id}>
             <header><span aria-hidden="true">●</span><small>{note.checklist.length ? `${completed}/${note.checklist.length} concluídos` : "Anotação"}</small><button type="button" onClick={() => { setEditing(note); setComposerOpen(true); }} aria-label={`Editar ${note.titulo}`}>Editar</button><button type="button" disabled={saving} onClick={() => void removeNote(note)} aria-label={`Excluir ${note.titulo}`}>×</button></header>
             <h3>{note.titulo}</h3>{note.lembreteEm && <time className="care-note-reminder" dateTime={note.lembreteEm}>{note.lembreteEnviadoEm ? "Lembrete enviado · " : "Lembrar · "}{new Date(note.lembreteEm).toLocaleString("pt-BR", {day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</time>}{note.texto && <p>{note.texto}</p>}
-            {(note.visitanteNome || note.eventoTitulo) && <nav aria-label="Vínculos do post-it">{note.visitanteNome && <Link href={`/painel?view=visitantes&visitante=${note.visitanteId}`}>Pessoa · {note.visitanteNome}</Link>}{note.eventoTitulo && <Link href={`/painel?view=eventos&evento=${note.eventoId}`}>Evento · {note.eventoTitulo}</Link>}</nav>}
+            {(note.visitanteNome || note.eventoTitulo) && <nav aria-label="Vínculos do post-it">{note.visitanteNome && <Link href={`/painel/visitantes?visitante=${note.visitanteId}`}>Pessoa · {note.visitanteNome}</Link>}{note.eventoTitulo && <Link href={`/painel?view=eventos&evento=${note.eventoId}`}>Evento · {note.eventoTitulo}</Link>}</nav>}
             {note.checklist.length > 0 && <div className="care-note-checklist">{note.checklist.map((item) => <label className={item.concluido ? "done" : ""} key={item.id}><input type="checkbox" checked={item.concluido} onChange={() => void updateNote({ ...note, checklist: note.checklist.map((entry) => entry.id === item.id ? { ...entry, concluido: !entry.concluido } : entry) })} /><span>{item.texto}</span></label>)}</div>}
           </article>;
         })}
         {!loading && !notes.length && <div className="care-notes-empty"><span aria-hidden="true">▱</span><strong>Nenhum post-it ainda</strong><p>Crie uma lembrança livre ou, se desejar, relacione uma pessoa ou evento.</p></div>}
         {loading && <div className="care-notes-empty"><strong>Organizando suas anotações…</strong></div>}
       </div>
-      {compact && notes.length > visibleNotes.length && <Link className="care-notes-more" href="/painel?view=visitantes">Ver todos os {notes.length} post-its em Visitantes →</Link>}
+      {compact && notes.length > visibleNotes.length && <Link className="care-notes-more" href="/painel/visitantes?section=anotacoes">Ver todos os {notes.length} post-its em Visitantes →</Link>}
     </section>
   );
 }

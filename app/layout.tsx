@@ -7,7 +7,6 @@ import {
 import "./globals.css";
 import "./interface-fixes.css";
 import "./secretary.css";
-import "./visitors.css";
 import "./recepcao.css";
 import "./landing-vinkulo.css";
 import "./mobile-quick-actions.css";

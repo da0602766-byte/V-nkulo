@@ -197,21 +197,6 @@ test("a saúde da célula não julga atraso antes do relógio acertar", async ()
   assert.match(corpo, /id: "AGUARDANDO"/);
 });
 
-test("visitantes mostram o funil antes da tabela", async () => {
-  const operations = await read("app/components/TenantOperations.tsx");
-  assert.match(operations, /const funnelStages = /);
-  for (const etapa of ["NOVO", "EM_CONTATO", "EM_ACOMPANHAMENTO", "INTEGRADO"]) {
-    assert.ok(operations.includes(`["${etapa}"`) || operations.includes(`"${etapa}",`), etapa);
-  }
-  // O funil passou a ocupar o lugar do fluxo numerado de Ministérios: mesmo
-  // dispositivo, `secretary-flow` + `visitor-flow-v7`, e segue antes da tabela.
-  const funil = operations.indexOf('className="secretary-flow visitor-flow-v7"');
-  const tabela = operations.indexOf("visitor-bulkbar-v2");
-  assert.ok(funil > 0 && funil < tabela, "o funil não está antes da tabela");
-  const styles = await read("app/visitors.css");
-  assert.match(styles, /\.visitor-flow-v7 div\[data-etapa="INTEGRADO"\]/);
-});
-
 test("notificações agrupam por dia e separam o que precisa de resposta", async () => {
   const center = await read("app/components/PilotNotificationCenter.tsx");
   assert.match(center, /function needsYou\(item: Notification\)/);

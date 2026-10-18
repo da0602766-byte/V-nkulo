@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+
 import "./visitor-spreadsheet.css";
 import { CUSTOM_FIELD_TYPES, MAX_CUSTOM_FIELDS, customFieldNameIssue, inferCustomFieldType, displayCustomValue, IMPORT_FIELDS, cellText, formatImportDate, normalizeColumn, prepareImportRows, readVisitorWorkbook, visitorWorkbookTables, type CustomFieldDraft, type VisitorCustomField, type ImportField, type SheetTable } from "../lib/visitor-spreadsheet";
 
@@ -121,7 +121,7 @@ export default function VisitorSpreadsheetImport({ categories, cells, canManageC
     <input ref={input} className="visitor-import-input-v2" type="file" accept=".xlsx,.xls,.csv" aria-label="Arquivo Excel para importar pessoas" onChange={event => { const file = event.target.files?.[0]; if (file) void readFile(file); }} />
     <button ref={trigger} type="button" disabled={busy} onClick={() => input.current?.click()}>{busy && !open ? "Lendo planilha…" : "⇧ Importar Excel"}</button>
     {error && !open && <p role="alert">{error}</p>}
-    {open && createPortal(<dialog ref={dialog} className="visitor-import-dialog-v2 visitor-import-mapping" aria-labelledby="visitor-import-title" onCancel={event => { event.preventDefault(); close(); }}>
+    {open && <dialog ref={dialog} className="visitor-import-dialog-v2 visitor-import-mapping" aria-labelledby="visitor-import-title" onCancel={event => { event.preventDefault(); close(); }}>
       <header><div><h2 id="visitor-import-title">Revisar importação</h2><p>{filename}</p></div><button type="button" aria-label="Fechar importação" disabled={busy} onClick={close}>×</button></header>
       <div className="visitor-import-content">
         <div className="visitor-import-summary"><label>Lista da planilha<select value={selected} disabled={busy} onChange={event => selectTable(Number(event.target.value))}>{tables.map((item, index) => <option key={item.name} value={index}>{item.name} · {item.rows.length} pessoas</option>)}</select></label><p><strong>{rows.length} pessoas · {table.headers.length} colunas</strong><span>Importe uma lista por vez. Abas de resumo podem repetir pessoas.</span></p></div>
@@ -145,6 +145,6 @@ export default function VisitorSpreadsheetImport({ categories, cells, canManageC
         {error && <p role="alert">{error}</p>}<p role="status" aria-live="polite">{progress}</p>
       </div>
       <footer><span>{[newFields.length > 0 ? `${newFields.length} novo(s) campo(s)` : "", newCategories.length > 0 ? `${newCategories.length} categoria(s)` : ""].filter(Boolean).join(" e ") || "Nenhuma estrutura nova"} · criação somente ao confirmar.</span><button type="button" onClick={close} disabled={busy}>{rows.length ? "Cancelar" : "Concluir"}</button>{rows.length > 0 && <button type="button" onClick={() => void confirm()} disabled={busy || invalid > 0 || fieldIssues.length > 0 || (!canManageCategories && newCategories.length > 0) || (!canManageFields && newFields.length > 0)}>{busy ? "Importando…" : `Importar ${rows.length} pessoas`}</button>}</footer>
-    </dialog>, document.body)}
+    </dialog>}
   </>;
 }

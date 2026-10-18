@@ -36,7 +36,7 @@ export async function GET(request: Request) {
     }
     return redirectWithError(
       url.origin,
-      state.visitorSheets ? "/painel?view=visitantes&sheetSetup=error" : state.purpose === "drive" ? "/painel?view=conta" : "/login",
+      state.visitorSheets ? "/painel/visitantes?sheetSetup=error" : state.purpose === "drive" ? "/painel?view=conta" : "/login",
       message,
     );
   }
@@ -78,7 +78,7 @@ export async function GET(request: Request) {
     }
     if (state.purpose === "drive") {
       if (state.visitorSheets) {
-        const target = new URL(state.returnTo || "/painel?view=visitantes", url.origin);
+        const target = new URL(state.returnTo || "/painel/visitantes", url.origin);
         target.searchParams.set("google", "connected");
         return clearStateCookie(mutableRedirect(target));
       }
@@ -119,7 +119,7 @@ export async function GET(request: Request) {
     }
     return redirectWithError(
       url.origin,
-      state.visitorSheets ? "/painel?view=visitantes&sheetSetup=error" : state.purpose === "drive" ? "/painel?view=conta" : "/login",
+      state.visitorSheets ? "/painel/visitantes?sheetSetup=error" : state.purpose === "drive" ? "/painel?view=conta" : "/login",
       (error as Error).message,
     );
   }

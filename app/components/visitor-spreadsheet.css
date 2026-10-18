@@ -1,4 +1,5 @@
-.visitor-import-dialog-v2.visitor-import-mapping { position:fixed; inset:0; margin:auto; width:min(1080px,calc(100% - 32px)); max-height:calc(100dvh - 32px); padding:0; box-sizing:border-box; background:var(--pilot-card,#091321); color:var(--pilot-text,#edf4fc); }
+.visitor-import-input-v2 { display:none; }
+.visitor-import-dialog-v2.visitor-import-mapping { position:fixed; inset:0; margin:auto; width:min(1080px,calc(100% - 32px)); max-height:calc(100dvh - 32px); padding:0; box-sizing:border-box; background:var(--pilot-card,#091321); color:var(--pilot-text,#edf4fc); border:1px solid var(--pilot-line); border-radius:18px; }
 .visitor-import-mapping::backdrop { background:#020913b8; backdrop-filter:blur(10px); }
 .visitor-import-mapping>header { position:sticky; top:0; z-index:2; background:var(--pilot-card,#091321); padding:18px 22px; }
 .visitor-import-mapping h2,.visitor-import-mapping p { margin:0; }
@@ -57,3 +58,14 @@
   .visitor-import-new-field { grid-template-columns:minmax(0,1fr); }
   .visitor-custom-fields-grid :is(input,select,textarea) { font-size:16px; min-height:44px; }
 }
+
+/* Shared import and Google connection dialogs. */
+.visitor-import-dialog-v2 {
+  --secretary-purple: #6f46e8;
+  --secretary-purple-soft: color-mix(in srgb, var(--secretary-purple) 11%, var(--pilot-surface));
+  --pilot-primary: var(--secretary-purple);
+  --pilot-purple: var(--secretary-purple);
+  --pilot-gradient: linear-gradient(135deg, var(--secretary-purple), #8c56f1);
+}
+.visitor-import-dialog-v2 .visitor-notice-v6 { border-radius: 16px; }
+.visitor-import-dialog-v2 { border-radius: 24px; }

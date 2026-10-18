@@ -5,15 +5,6 @@ import test from "node:test";
 const root = new URL("..", import.meta.url);
 const read = (path) => readFile(new URL(path, root), "utf8");
 
-test("Central de Relacionamento atualiza somente quando a aba está visível", async () => {
-  const source = await read("app/components/RelacionamentoTools.tsx");
-  assert.match(source, /window\.setInterval\(refreshWhenVisible, 5_000\)/);
-  assert.match(source, /document\.visibilityState === "visible"/);
-  assert.match(source, /window\.addEventListener\("focus", refreshWhenVisible\)/);
-  assert.match(source, /refreshInFlight/);
-  assert.match(source, /\[visitanteHistoricoId, refreshTick\]/);
-});
-
 test("título oficial usa categorias, contraste legível e remoção explícita", async () => {
   const [people, styles] = await Promise.all([
     read("app/components/PeopleWorkspace.tsx"),

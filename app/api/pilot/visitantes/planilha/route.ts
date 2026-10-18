@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   if (current && current.lock_ate > Date.now()) return Response.json({ error: "Uma sincronização está em andamento. Aguarde alguns segundos." }, { status: 409 });
   try {
     if (body.action === "authorize") {
-      const authorization = await createGoogleAuthorization(new URL(request.url).origin, { purpose: "drive", visitorSheets: true, userId: access.user.id, returnTo: "/painel?view=visitantes&sheetSetup=authorized" });
+      const authorization = await createGoogleAuthorization(new URL(request.url).origin, { purpose: "drive", visitorSheets: true, userId: access.user.id, returnTo: "/painel/visitantes?sheetSetup=authorized" });
       return Response.json({ url: authorization.url }, { headers: { "Set-Cookie": `__Host-vinkulo_google_state=${authorization.nonce}; Path=/; Max-Age=600; HttpOnly; Secure; SameSite=Lax`, "Cache-Control": "no-store" } });
     }
     if (body.action === "pause") {

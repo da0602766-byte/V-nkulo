@@ -45,14 +45,20 @@ const VALID_VIEWS = new Set([
 export default async function PilotPanelPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const session = await getSessionState();
   if (!session.user) redirect(`/login?motivo=${session.reason}`);
   if (!session.user.ativo) redirect("/acesso-negado");
   const tenant = await getActiveTenantContext(session.user);
   if (!tenant.context) redirect("/sem-comunidade");
-  const requestedView = (await searchParams).view || "inicio";
+  const query = await searchParams;
+  const requestedView = String(query.view || "inicio");
+  if (requestedView === "visitantes") {
+    const next = new URLSearchParams();
+    for (const [key,value] of Object.entries(query)) if (key !== "view" && typeof value === "string") next.set(key,value);
+    redirect('/painel/visitantes' + (next.size ? '?' + next.toString() : ''));
+  }
   const initialView = VALID_VIEWS.has(requestedView) ? requestedView : "inicio";
   const db = getD1();
   const [feed, features, parkingEnabled, communityTheme, promocao, introducao] =

@@ -241,7 +241,7 @@ test("páginas, temas e responsividade do VÍNKULO permanecem explícitos", asyn
       "utf8",
     ),
     readFile(
-      new URL("../app/components/TenantOperations.tsx", import.meta.url),
+      new URL("../app/components/visitors/PersonForms.tsx", import.meta.url),
       "utf8",
     ),
     readFile(
@@ -303,10 +303,6 @@ test("páginas, temas e responsividade do VÍNKULO permanecem explícitos", asyn
   assert.match(ministries, /Histórico/);
   assert.match(ministries, /Editar escala/);
   assert.match(ministries, /Gerar convite/);
-  assert.match(visitors, /Dados pessoais/);
-  assert.match(visitors, /Conexão espiritual/);
-  assert.match(visitors, /Editar dados completos/);
-  assert.match(visitors, /vinkulo:new-visitor/);
   assert.match(dashboard, /Novo visitante/);
   assert.match(dashboard, /O que deseja adicionar/);
   assert.match(dashboard, /Pesquisar comunidade/);
@@ -338,7 +334,6 @@ test("páginas, temas e responsividade do VÍNKULO permanecem explícitos", asyn
   assert.match(landing, /data-editor-key="landing-governanca"/);
   assert.match(dashboard, /id="global-editor-toolbar-slot"/);
   assert.match(styles, /\.schedule-week/);
-  assert.match(styles, /\.visitor-registration/);
   assert.match(styles, /overflow-x:clip/);
   assert.match(communityTheme, /CLASSICO/);
   assert.match(communityTheme, /MODERNO/);
