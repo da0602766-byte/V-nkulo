@@ -858,17 +858,17 @@ export function Pessoas({
                   {visiveis.map((p) => {
                     const r = respEfetivo(p, categorias)
                     const u = ultimo(p)
-                    const telRaw = p.telefone?.replace(/D/g, '')
+                    const telRaw = p.telefone?.replace(/\D/g, '')
 
                     return (
                       <div
                         key={p.id}
                         onClick={() => onOpen(p.id)}
-                        className={`p-4 bg-white active:bg-brand-50/50 transition-colors flex flex-col gap-2.5 ${
+                        className={`vp-person-card ${!telRaw && !p.proximaAcao && !proximoContato(p) ? 'vp-person-card--simple' : ''} p-4 bg-white active:bg-brand-50/50 transition-colors flex flex-col gap-2.5 ${
                           p.arquivado ? 'opacity-60 bg-stone-50/70' : ''
                         }`}
                       >
-                        <div className="flex items-start gap-3">
+                        <div className="vp-person-card-header flex items-start gap-3">
                           <div
                             onClick={(e) => e.stopPropagation()}
                             className="pt-1"
@@ -881,7 +881,7 @@ export function Pessoas({
                           </div>
 
                           <div
-                            className={`size-10 shrink-0 rounded-2xl grid place-items-center text-xs font-bold ${
+                            className={`vp-person-card-avatar size-10 shrink-0 rounded-2xl grid place-items-center text-xs font-bold ${
                               p.tipo === 'Membro'
                                 ? 'bg-gold-100 text-gold-500'
                                 : 'bg-brand-100 text-brand-700'
@@ -895,7 +895,7 @@ export function Pessoas({
                           </div>
 
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-1">
+                            <div className="vp-person-card-title flex items-center justify-between gap-1">
                               <h3 className="font-bold text-stone-900 text-sm truncate">{p.nome}</h3>
                               <Badge s={p.status} />
                             </div>
@@ -906,7 +906,7 @@ export function Pessoas({
                         </div>
 
                         {/* Details pills */}
-                        <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-stone-600 pl-8">
+                        <div className="vp-person-card-meta flex flex-wrap items-center gap-1.5 text-[11px] text-stone-600 pl-8">
                           <span className="bg-stone-100 px-2 py-0.5 rounded-md font-medium">
                             {p.categoria ?? 'Sem cat.'}
                           </span>
@@ -922,14 +922,14 @@ export function Pessoas({
 
                         {/* Next action preview */}
                         {(p.proximaAcao || proximoContato(p)) && (
-                          <div className="pl-8 text-xs bg-stone-50 rounded-xl p-2 text-stone-700">
+                          <div className="vp-person-card-next pl-8 text-xs bg-stone-50 rounded-xl p-2 text-stone-700">
                             <Acao p={p} />
                           </div>
                         )}
 
                         {/* Quick Touch Actions */}
                         <div
-                          className="flex items-center gap-2 pt-1 pl-8"
+                          className="vp-person-card-actions flex items-center gap-2 pt-1 pl-8"
                           onClick={(e) => e.stopPropagation()}
                         >
                           {telRaw ? (

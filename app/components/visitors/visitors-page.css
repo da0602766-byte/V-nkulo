@@ -65,3 +65,22 @@ body:has(.visitor-app){padding-bottom:0;overflow:hidden}
   .vp-people-metrics>div>div:last-child{font-size:28px}
 }
 @media(max-width:359px){.vp-people-page>header{grid-template-columns:1fr}.vp-people-page>header>div:last-child{flex-wrap:wrap}}
+
+/* Compact phone cards retain readable content and full-size touch actions. */
+@media(max-width:767px){
+  .vp-person-card{padding:10px 12px;gap:5px}
+  .vp-person-card-header{gap:8px;align-items:center}
+  .vp-person-card-avatar{width:32px;height:32px;border-radius:11px}
+  .vp-person-card-title{align-items:flex-start;flex-wrap:wrap;gap:3px 6px}
+  .vp-person-card-title h3{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;line-height:1.3}
+  .vp-person-card-title>span{flex-shrink:0}
+  .vp-person-card-meta{padding-left:0;gap:3px 6px;overflow-wrap:anywhere;line-height:1.4}
+  .vp-person-card-next{padding:5px 8px;border-radius:8px}
+  .vp-person-card-next .truncate{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
+  .vp-person-card-actions{padding:0;gap:6px;flex-wrap:wrap}
+  .vp-person-card-actions :is(a,button){min-height:44px;display:inline-flex;align-items:center;justify-content:center;padding:6px 10px}
+  .vp-person-card--simple{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:8px}
+  .vp-person-card--simple .vp-person-card-header{grid-column:1/-1}
+  .vp-person-card--simple .vp-person-card-meta{align-self:center}
+  .vp-person-card--simple .vp-person-card-actions{grid-column:2;align-self:center}
+}
