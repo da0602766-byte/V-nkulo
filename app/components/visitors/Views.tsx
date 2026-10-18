@@ -177,6 +177,7 @@ export function Pessoas({
 }) {
   const [q, setQ] = useState('')
   const [cat, setCat] = useState('')
+  const [statusPicker, setStatusPicker] = useState(false)
   const [filterPicker, setFilterPicker] = useState<'categoria' | 'ordem' | null>(null)
   const orderOptions = [{value:'az',label:'Nome (A–Z)'},{value:'za',label:'Nome (Z–A)'},{value:'recente',label:'Contato recente'},{value:'acao',label:'Próxima ação'}]
   const categoryOptions = [{value:'',label:'Todas categorias'},...categorias.map(c=>({value:c.nome,label:c.nome})),{value:'__sem',label:'Sem categoria'}]
@@ -364,8 +365,8 @@ export function Pessoas({
         ))}
       </div>
 
-      {/* Mobile Recortes Horizontal Scrollable Bar */}
-      <div className="xl:hidden border-y border-stone-200 bg-stone-50/80 px-3 py-2 overflow-x-auto flex gap-1.5 scrollbar-none shrink-0">
+      {/* Tablet shortcuts; phones use the complete grouped selector below. */}
+      <div className="vp-status-shortcuts xl:hidden border-y border-stone-200 bg-stone-50/80 px-3 py-2 overflow-x-auto flex gap-1.5 scrollbar-none shrink-0">
         {recortes.map((r) => {
           const isAtivo = rec === r.id
           return (
@@ -435,6 +436,9 @@ export function Pessoas({
         <section className="flex-1 min-w-0 flex flex-col bg-white">
           {/* Filter Bar */}
           <div className="vp-people-filters p-3 sm:px-6 sm:py-3.5 border-b border-stone-100 space-y-2 shrink-0">
+            <button type="button" className="vp-status-trigger" aria-label={`Filtrar status e acompanhamento: ${recortes.find(r=>r.id===rec)?.label}`} aria-haspopup="dialog" aria-expanded={statusPicker} onClick={()=>setStatusPicker(true)}>
+              <Icon d={I.filter}/><span>{recortes.find(r=>r.id===rec)?.label}</span><strong>{count(rec)}</strong><Icon d={I.chevronDown}/>
+            </button>
             <div className="vp-filterbar">
               <div className="relative flex-1">
                 <Icon d={I.search} className="size-4 absolute left-3 top-3 text-stone-400" />
@@ -987,6 +991,13 @@ export function Pessoas({
         </section>
       </div>
 
+      {statusPicker && <Dialog title="Status e acompanhamento" onClose={()=>setStatusPicker(false)}>
+        <div className="vp-status-options">
+          {(['Etapa','Atenção','Integração'] as const).map(group=><section key={group} aria-label={group}><h3>{group}</h3><div className="vp-choice-options">
+            {recortes.filter(r=>r.group===group).map(option=><button type="button" key={option.id} aria-pressed={rec===option.id} onClick={()=>{setRec(option.id);setSel(new Set());setStatusPicker(false)}}><span>{option.label}</span><span className="vp-status-option-count">{count(option.id)}{rec===option.id&&<Icon d={I.check}/>}</span></button>)}
+          </div></section>)}
+        </div>
+      </Dialog>}
       {filterPicker && <Dialog title={filterPicker==='categoria'?'Filtrar categoria':'Ordenar pessoas'} onClose={()=>setFilterPicker(null)}>
         <div className="vp-choice-options">
           {(filterPicker==='categoria'?categoryOptions:orderOptions).map(option=><button type="button" key={option.value} aria-pressed={(filterPicker==='categoria'?cat:ordem)===option.value} onClick={()=>{if(filterPicker==='categoria')setCat(option.value);else setOrdem(option.value as typeof ordem);setFilterPicker(null)}}><span>{option.label}</span>{(filterPicker==='categoria'?cat:ordem)===option.value&&<Icon d={I.check}/>}</button>)}

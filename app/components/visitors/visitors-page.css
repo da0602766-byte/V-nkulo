@@ -99,3 +99,14 @@ body:has(.visitor-app){padding-bottom:0;overflow:hidden}
   .vp-choice-trigger:first-child{flex:1.5}
   .vp-filterbar>div:last-child{align-items:center}
 }
+.vp-status-trigger{display:none}
+.vp-status-options{display:grid;gap:16px}
+.vp-status-options h3{margin:0 0 7px;font-size:12px;font-weight:700;letter-spacing:.04em;color:#5f6683}
+.vp-status-option-count{display:flex;align-items:center;gap:8px;flex-shrink:0;font-size:12px;font-variant-numeric:tabular-nums}
+@media(max-width:767px){
+  .vp-status-shortcuts{display:none}
+  .vp-status-trigger{display:flex;align-items:center;gap:8px;width:100%;min-height:44px;padding:8px 12px;border:1px solid #d9d5fa;border-radius:12px;background:#f3f1ff;color:#4338ca;text-align:left;font-size:14px;font-weight:600;line-height:1.4}
+  .vp-status-trigger>span{flex:1;min-width:0;white-space:normal;overflow-wrap:anywhere}
+  .vp-status-trigger>strong{padding:1px 7px;border-radius:20px;background:#e4e0ff;font-size:12px;font-variant-numeric:tabular-nums}
+  .vp-status-trigger>svg{flex-shrink:0}
+}
