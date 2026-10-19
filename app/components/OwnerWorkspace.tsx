@@ -1,5 +1,6 @@
 "use client";
 import SafeImage from "./SafeImage";
+import ActionDialog from "./ActionDialog";
 
 
 import TransientFeedback from "./TransientFeedback";
@@ -16,7 +17,7 @@ const PlatformControlsWorkspace = dynamic(() => import("./PlatformControlsWorksp
 const EditorialAutomationWorkspace = dynamic(() => import("./EditorialAutomationWorkspace"), { loading: () => <p className="oc-loading" role="status">Carregando área…</p> });
 const StatisticsWorkspace = dynamic(() => import("./StatisticsWorkspace"), { loading: () => <p className="oc-loading" role="status">Carregando área…</p> });
 const PlatformOptimizerWorkspace = dynamic(() => import("./PlatformOptimizerWorkspace"), { loading: () => <p className="oc-loading" role="status">Carregando área…</p> });
-const OwnerLaboratoryWorkspace = dynamic(() => import("./OwnerLaboratoryWorkspace"), { loading: () => <p className="oc-loading" role="status">Carregando área…</p> });
+const OwnerLaboratoryWorkspace = dynamic(() => import("./LabStudio"), { loading: () => <p className="oc-loading" role="status">Carregando área…</p> });
 const OwnerAppearanceWorkspace = dynamic(() => import("./OwnerAppearanceWorkspace"), { loading: () => <p className="oc-loading" role="status">Carregando área…</p> });
 const PlatformPlansWorkspace = dynamic(() => import("./CommercialPlansWorkspace"), { loading: () => <p className="oc-loading" role="status">Carregando área…</p> });
 const OwnerOnboardingWorkspace = dynamic(() => import('./OwnerOnboardingWorkspace'));
@@ -245,11 +246,13 @@ export default function OwnerWorkspace({
     }
   }
 
+  const [deleteTarget, setDeleteTarget] = useState<{id:number;name:string}|null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [deleteError, setDeleteError] = useState("");
+  const [deleteSuccess, setDeleteSuccess] = useState("");
   async function deleteUserPermanently(id: number, name: string) {
-    const confirmation = window.prompt(
-      `Exclusão definitiva de ${name}. A conta, seus vínculos e registros pessoais serão removidos. Os líderes serão avisados. Esta ação não pode ser desfeita. Digite EXCLUIR para confirmar.`,
-    );
-    if (confirmation !== "EXCLUIR") return;
+    if (deleteConfirmation.trim() !== "EXCLUIR" || working !== null) return;
+    setDeleteError("");
     setWorking(id);
     setMessage("");
     try {
@@ -263,10 +266,13 @@ export default function OwnerWorkspace({
       });
       const result = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) throw new Error(result.error || "Não foi possível excluir a conta.");
+      setDeleteTarget(null);
+      setDeleteSuccess(name);
+      setDeleteConfirmation("");
       setMessage("Conta excluída definitivamente. Avisos registrados para os líderes vinculados.");
       await load(true);
     } catch (error) {
-      setMessage((error as Error).message);
+      setDeleteError((error as Error).message || "Não foi possível excluir. Tente novamente.");
     } finally {
       setWorking(null);
     }
@@ -367,7 +373,7 @@ export default function OwnerWorkspace({
 
   return (
     <main className="owner-area owner-area-v3 owner-console" data-ui-version="owner-console" data-visual-editor-root data-editor-key="area-proprietario">
-      <OwnerConsoleShell tab={tab} onSelect={selectTab} onSearchDirectory={(next, query) => { selectTab(next); setSearch(query); }} data={data} ownerName={ownerName} ownerPhoto={ownerPhoto} brandName={brandName} brandLogo={brandLogo}>
+      <>{deleteSuccess && <ActionDialog title="Conta excluída" onClose={() => setDeleteSuccess("")}><p role="status">A conta de <strong>{deleteSuccess}</strong> foi excluída definitivamente. Os avisos aos líderes vinculados foram registrados.</p><footer><button onClick={() => setDeleteSuccess("")}>Concluir</button></footer></ActionDialog>}{deleteTarget && <ActionDialog title="Excluir conta definitivamente?" busy={working !== null} onClose={() => setDeleteTarget(null)}><p><strong>{deleteTarget.name}</strong></p><p>A conta, os vínculos e os registros pessoais serão removidos. Dados compartilhados da comunidade permanecem. Os líderes vinculados serão avisados. Esta ação não pode ser desfeita.</p><label>Digite EXCLUIR para confirmar<input autoComplete="off" value={deleteConfirmation} disabled={working !== null} onChange={event => setDeleteConfirmation(event.target.value)} /></label>{deleteError && <p role="alert">{deleteError}</p>}{working !== null && <p role="status">Excluindo conta… Aguarde a confirmação.</p>}<footer><button disabled={working !== null} onClick={() => setDeleteTarget(null)}>Cancelar</button><button className="danger" disabled={working !== null || deleteConfirmation.trim() !== "EXCLUIR"} onClick={() => void deleteUserPermanently(deleteTarget.id,deleteTarget.name)}>{working !== null ? "Excluindo…" : "Excluir definitivamente"}</button></footer></ActionDialog>}<OwnerConsoleShell tab={tab} onSelect={selectTab} onSearchDirectory={(next, query) => { selectTab(next); setSearch(query); }} data={data} ownerName={ownerName} ownerPhoto={ownerPhoto} brandName={brandName} brandLogo={brandLogo}>
         <header className="oc-page-head">
           <div><p className="oc-eyebrow">Console do proprietário · Escopo global</p><h1>{tabLabel(tab)}</h1><p>{tabDescription(tab)}</p></div>
           <div className="oc-head-actions">{!["plans", "appearance", "editorial", "statistics", "optimization", "controls", "laboratory"].includes(tab) && <button type="button" className="oc-button" disabled={loading || working !== null} onClick={() => void load()}>Atualizar dados</button>}{tab === "overview" && <button type="button" className="oc-button primary" onClick={() => selectTab("decisions")}>Revisar pendências</button>}</div>
@@ -453,7 +459,7 @@ export default function OwnerWorkspace({
                         const id = Number(item.id);
                         const active = Number(item.ativo) === 1;
                         const name = String(item.nome);
-                        return <details key={id}><summary><OwnerAvatar image={String(item.foto_perfil || "")} name={name} /><div><h2>{name}</h2><small>{String(item.telefone || item.email || "Contato não informado")}</small></div><b className={active ? "active" : "inactive"}>{active ? "ATIVO" : "INATIVO"}</b><i aria-hidden="true">⌄</i></summary><div className="owner-user-details"><span><small>E-mail</small><strong>{String(item.email || "Não informado")}</strong></span><span><small>Telefone</small><strong>{String(item.telefone || "Não informado")}</strong></span><span><small>Comunidades</small><strong>{String(item.comunidades_nomes || "Sem vínculo")}</strong></span><span><small>Perfil global</small><strong>{String(item.perfil || "MEMBRO")}</strong></span><div className="owner-user-actions"><button type="button" disabled={working === id || id === data.owner.id || Number(item.system_owner) === 1} onClick={() => void changeUserStatus(id, name, !active)}>{active ? "Desativar conta" : "Reativar conta"}</button><button type="button" className="danger" disabled={working === id || id === data.owner.id || Number(item.system_owner) === 1} onClick={() => void deleteUserPermanently(id, name)}>Excluir definitivamente</button></div><p>{id === data.owner.id || Number(item.system_owner) === 1 ? "Conta do proprietário protegida: desativação e exclusão não são permitidas." : "O proprietário pode excluir contas com vínculos. Os líderes são avisados; a conta, os vínculos e registros pessoais são removidos. Dados compartilhados da comunidade permanecem."}</p></div></details>;
+                        return <details key={id}><summary><OwnerAvatar image={String(item.foto_perfil || "")} name={name} /><div><h2>{name}</h2><small>{String(item.telefone || item.email || "Contato não informado")}</small></div><b className={active ? "active" : "inactive"}>{active ? "ATIVO" : "INATIVO"}</b><i aria-hidden="true">⌄</i></summary><div className="owner-user-details"><span><small>E-mail</small><strong>{String(item.email || "Não informado")}</strong></span><span><small>Telefone</small><strong>{String(item.telefone || "Não informado")}</strong></span><span><small>Comunidades</small><strong>{String(item.comunidades_nomes || "Sem vínculo")}</strong></span><span><small>Perfil global</small><strong>{String(item.perfil || "MEMBRO")}</strong></span><div className="owner-user-actions"><button type="button" disabled={working !== null || id === data.owner.id || Number(item.system_owner) === 1} onClick={() => void changeUserStatus(id, name, !active)}>{active ? "Desativar conta" : "Reativar conta"}</button><button type="button" className="danger" disabled={working !== null || id === data.owner.id || Number(item.system_owner) === 1} onClick={() => { setDeleteTarget({id,name}); setDeleteConfirmation(""); setDeleteError(""); }}>Excluir definitivamente</button></div><p>{id === data.owner.id || Number(item.system_owner) === 1 ? "Conta do proprietário protegida: desativação e exclusão não são permitidas." : "O proprietário pode excluir contas com vínculos. Os líderes são avisados; a conta, os vínculos e registros pessoais são removidos. Dados compartilhados da comunidade permanecem."}</p></div></details>;
                       })}
                       {!visibleDirectoryRows.length && <Empty title="Nenhuma pessoa encontrada" text="Ajuste a pesquisa para ver outros resultados." />}
                     </div>
@@ -474,7 +480,7 @@ export default function OwnerWorkspace({
           {tab === 'onboarding' && <OwnerOnboardingWorkspace />}
           {tab === 'reset' && <OwnerResetWorkspace onReset={() => void load(true)} />}
           {tab === "controls" && <PlatformControlsWorkspace features={features} currentCommunityId={currentCommunityId} />}
-      </OwnerConsoleShell>
+      </OwnerConsoleShell></>
       <GlobalVisualEditor canEdit communityName="Área do Proprietário" screenId={`owner:${tab}`} rootSelector=".owner-console" />
     </main>
   );
@@ -720,7 +726,7 @@ function tabDescription(tab: OwnerTab) {
     optimization: "Diagnostique e execute retenções seguras sem remover dados ativos.",
     appearance: "Aplique paleta, logotipo, banner e papel de parede a uma comunidade ou a todas de uma vez.",
     plans: 'Configure valores, recursos, limites e assinaturas das comunidades.',
-    laboratory: "Crie e valide protótipos isolados, sem modificar páginas ou dados reais.",
+    laboratory: "Crie abas, configure funções e publique para suas comunidades.",
     passwords: "Consulte os eventos de credenciais disponíveis na auditoria.",
     deleted: "Confira cadastros inativos e eventos de desativação disponíveis.",
     finance: "Confira a disponibilidade da integração financeira.",

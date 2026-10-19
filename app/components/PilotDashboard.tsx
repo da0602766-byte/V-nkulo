@@ -1,6 +1,7 @@
 "use client";
 import VinkuloMark from "./VinkuloMark";
 import SafeImage from "./SafeImage";
+import LabModuleNav from "./LabModuleNav";
 import CommunityHighlight from "./CommunityHighlight";
 
 import InviteRevocationList from './InviteRevocationList';
@@ -1293,6 +1294,7 @@ export default function PilotDashboard({
                 ))}
               </section>
             ))}
+            <LabModuleNav communityId={active.comunidadeId}/>
             <Link
               className="pilot-public-directory-link"
               href="/comunidades"
