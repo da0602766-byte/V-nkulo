@@ -1,9 +1,9 @@
-const CACHE = "vinkulo-shell-v8";
-const RUNTIME_CACHE = "vinkulo-static-v7";
+const CACHE = "vinkulo-shell-v9";
+const RUNTIME_CACHE = "vinkulo-static-v8";
 const IS_LOCAL_PREVIEW = ["localhost", "127.0.0.1", "[::1]"].includes(self.location.hostname);
 // Cache only public, static resources. An unavailable home page must not block
 // installation of the recovery page, and authenticated HTML is never cached.
-const APP_SHELL = ["/offline.html", "/manifest.webmanifest", "/vinkulo-app-icon-192.png", "/vinkulo-app-icon-512.png"];
+const APP_SHELL = ["/offline.html", "/manifest.webmanifest", "/vinkulo-logo.png", "/vinkulo-logo.png"];
 const NAVIGATION_TIMEOUT_MS = 12_000;
 const TEMPORARY_ERRORS = new Set([502, 503, 504]);
 const RECOVERY_HTML = `<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Vínkulo — Tente novamente</title><style>html{color-scheme:light dark;font:17px/1.6 system-ui;background:#10151e;color:#edf1f5}body{margin:0;min-height:100vh;display:grid;place-items:center}main{max-width:440px;margin:24px;padding:28px;border:1px solid #394354;border-radius:20px}h1{font-size:1.7rem;line-height:1.2}button{padding:14px 22px;background:#a893ff;color:#171221;border:0;border-radius:12px;font:inherit;font-weight:700;cursor:pointer}button:focus-visible{outline:3px solid white;outline-offset:4px}</style><main><strong>VÍNKULO</strong><h1>Não foi possível carregar agora</h1><p>A conexão ou o serviço está temporariamente indisponível. Tente novamente para voltar à mesma tela.</p><p>Os cadastros já salvos continuam no sistema. Alterações sem confirmação precisam ser verificadas ao retornar.</p><button type="button" onclick="location.reload()">Tentar novamente</button></main></html>`;
@@ -155,8 +155,8 @@ self.addEventListener("push", (event) => {
     if (!notification) return;
     await self.registration.showNotification(notification.title, {
       body: notification.body,
-      icon: "/vinkulo-app-icon-192.png",
-      badge: "/vinkulo-app-icon-192.png",
+      icon: "/vinkulo-logo.png",
+      badge: "/vinkulo-logo.png",
       tag: notification.tag,
       renotify: false,
       data: { notificationId: payload.notificationId, bindingId: payload.bindingId },

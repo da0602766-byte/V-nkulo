@@ -1,4 +1,5 @@
 "use client";
+import VinkuloMark from "./VinkuloMark";
 import SafeImage from "./SafeImage";
 
 
@@ -107,7 +108,7 @@ export default function OwnerConsoleShell({ tab, onSelect, onSearchDirectory, da
       event.preventDefault(); buttons[0].click();
     }
   }
-  const brand = <Link href="/" className="oc-brand">{brandLogo ? <SafeImage src={brandLogo} alt="" /> : <span className="oc-brand-mark">{brandName.slice(0, 1)}</span>}<span><strong>{brandName}</strong><small>Console do proprietário</small></span></Link>;
+  const brand = <Link href="/" className="oc-brand"><VinkuloMark size={40}/><span><strong>{brandName}</strong><small>Console do proprietário</small></span></Link>;
   return <div className={`oc-shell${collapsed ? " is-collapsed" : ""}`}>
     <a href="#owner-console-content" className="oc-skip">Ir para o conteúdo</a>
     <aside className="oc-sidebar" ref={sidebar}>

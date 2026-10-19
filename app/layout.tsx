@@ -56,9 +56,9 @@ export const metadata: Metadata = {
     follow: false,
   },
   icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
-    apple: "/vinkulo-app-icon-192.png",
+    icon: "/vinkulo-logo.png",
+    shortcut: "/vinkulo-logo.png",
+    apple: "/vinkulo-logo.png",
   },
   manifest: "/manifest.webmanifest",
   appleWebApp: {

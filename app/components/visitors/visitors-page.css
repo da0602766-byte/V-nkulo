@@ -190,3 +190,5 @@ body:has(.visitor-app){padding-bottom:0;overflow:hidden}
   .vp-status-trigger>strong{padding:1px 7px;border-radius:20px;background:#e4e0ff;font-size:12px;font-variant-numeric:tabular-nums}
   .vp-status-trigger>svg{flex-shrink:0}
 }
+
+.vp-mobile-header a{display:inline-flex;align-items:center;gap:8px}

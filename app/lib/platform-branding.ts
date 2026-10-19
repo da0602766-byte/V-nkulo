@@ -1,3 +1,4 @@
+import { VINKULO_LOGO } from "./brand-identity";
 import { getD1 } from "../../db";
 
 export type PlatformBranding = {
@@ -24,7 +25,7 @@ export const PLATFORM_THEME_PRESETS: PlatformThemePreset[] = [
 
 export const DEFAULT_PLATFORM_BRANDING: PlatformBranding = {
   siteName: "VÍNKULO",
-  logoUrl: "",
+  logoUrl: VINKULO_LOGO,
   feedBannerUrl: "",
   // Cobre é o acento único da Reforma Visual V5. Violeta continua disponível
   // como preset nomeado para quem já o escolheu.
@@ -61,7 +62,7 @@ export function parsePlatformBranding(value: unknown): PlatformBranding {
     : DEFAULT_PLATFORM_BRANDING.themePreset;
   return {
     siteName: safeText(source.siteName, DEFAULT_PLATFORM_BRANDING.siteName, 60),
-    logoUrl: safeAsset(source.logoUrl, "platform-logo"),
+    logoUrl: VINKULO_LOGO,
     feedBannerUrl: safeAsset(source.feedBannerUrl, "platform-feed-banner"),
     themePreset,
   };

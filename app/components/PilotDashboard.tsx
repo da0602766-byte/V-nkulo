@@ -1,4 +1,5 @@
 "use client";
+import VinkuloMark from "./VinkuloMark";
 import SafeImage from "./SafeImage";
 import CommunityHighlight from "./CommunityHighlight";
 
@@ -1005,6 +1006,7 @@ export default function PilotDashboard({
           onClick={openCommunityInfo}
           aria-label={`Ver informações de ${active.comunidadeNome}`}
         >
+          <VinkuloMark size={36}/>
           <span className="adote-mark community-brand-mark" aria-hidden="true">
             {communityTheme.logoUrl ? (
               <SafeImage fallbackName={active.comunidadeNome} loading="lazy" src={communityTheme.logoUrl} alt="" />

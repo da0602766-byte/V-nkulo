@@ -349,3 +349,7 @@ html body .pilot-dashboard .pilot-message-popover:has(.private-chat-layout:not(.
 html body .pilot-dashboard .pilot-message-popover .private-chat-layout:not(.has-thread){max-width:none!important;overflow:auto!important;min-height:0!important}
 html body .pilot-dashboard .pilot-message-popover:has(.private-chat-layout:not(.has-thread)) .private-chat-shell{overflow:auto!important;min-height:0!important}
 html body .pilot-dashboard .pilot-message-popover .private-chat-thread>header>button{display:block!important}
+
+/* Official artwork stays proportional and is never recolored by a theme. */
+.vinkulo-loading-mark{display:grid;place-items:center;width:96px;height:96px;border:0;border-radius:12px;background:transparent}
+.access-orbits>span{background:transparent;transform:none}

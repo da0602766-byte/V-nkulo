@@ -1,4 +1,5 @@
 "use client";
+import VinkuloMark from "./VinkuloMark";
 
 import TransientFeedback from "./TransientFeedback";
 
@@ -91,12 +92,7 @@ export default function PlatformBrandingWorkspace() {
               onChange={(event) => setSiteName(event.target.value)}
             />
           </label>
-          <NativeImageUpload
-            label="Logo global da plataforma · ícone das páginas públicas"
-            value={logoUrl}
-            purpose="platform-logo"
-            onChange={setLogoUrl}
-          />
+          <div><VinkuloMark size={48}/><p>Logo oficial do Vínkulo. A mesma identidade é usada em todas as áreas.</p></div>
         </div>
         <fieldset className="platform-theme-presets">
           <legend>Paleta da página principal</legend>

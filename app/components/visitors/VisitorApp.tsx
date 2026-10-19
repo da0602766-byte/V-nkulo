@@ -1,4 +1,5 @@
 "use client";
+import VinkuloMark from "../VinkuloMark";
 import {lazy,Suspense,useCallback,useEffect,useRef,useState} from 'react';
 import Link from '../StableLink';
 import VisitorLoading from './VisitorLoading';
@@ -50,9 +51,9 @@ export default function VisitorApp({communityName,userName,permissions,isOwner}:
   }
   const openedPerson=data?.people.find(p=>p.id===opened),active=data?.people.filter(p=>!p.arquivado)||[];
   return <div className="visitor-app">
-    <header className="vp-mobile-header"><button aria-label="Abrir menu de Visitantes" aria-expanded={menu} onClick={()=>setMenu(!menu)}><Icon d={I.menu}/></button><Link href="/painel" showLoading loadingLabel="Voltando ao painel…">Vínkulo</Link><span>Visitantes</span></header>
+    <header className="vp-mobile-header"><button aria-label="Abrir menu de Visitantes" aria-expanded={menu} onClick={()=>setMenu(!menu)}><Icon d={I.menu}/></button><Link href="/painel" showLoading loadingLabel="Voltando ao painel…"><VinkuloMark size={32}/>Vínkulo</Link><span>Visitantes</span></header>
     {menu&&<button className="vp-nav-backdrop" aria-label="Fechar menu" onClick={()=>setMenu(false)}/>}
-    <aside className={`vp-sidebar ${menu?'is-open':''}`}><a className="vp-brand" href="/painel"><span>V</span><div><strong>Vínkulo</strong><small>Visitantes</small></div></a><p className="vp-community">{communityName}</p><nav aria-label="Áreas de Visitantes">{sections.filter(s=>s.id!=='anotacoes'||allowed('dashboard.view')).map(s=><button key={s.id} aria-current={section===s.id?'page':undefined} onClick={()=>navigate(s.id)}><Icon d={s.icon}/>{s.label}{s.id==='pessoas'&&data&&<span>{active.length}</span>}</button>)}<Link className="vp-back" href="/painel" showLoading loadingLabel="Voltando ao painel…"><span aria-hidden="true">←</span> Voltar ao painel</Link></nav><footer><span className="vp-avatar">{userName.slice(0,1)}</span><div><strong>{userName}</strong><small>{profile.papel}</small></div></footer></aside>
+    <aside className={`vp-sidebar ${menu?'is-open':''}`}><a className="vp-brand" href="/painel"><VinkuloMark size={43}/><div><strong>Vínkulo</strong><small>Visitantes</small></div></a><p className="vp-community">{communityName}</p><nav aria-label="Áreas de Visitantes">{sections.filter(s=>s.id!=='anotacoes'||allowed('dashboard.view')).map(s=><button key={s.id} aria-current={section===s.id?'page':undefined} onClick={()=>navigate(s.id)}><Icon d={s.icon}/>{s.label}{s.id==='pessoas'&&data&&<span>{active.length}</span>}</button>)}<Link className="vp-back" href="/painel" showLoading loadingLabel="Voltando ao painel…"><span aria-hidden="true">←</span> Voltar ao painel</Link></nav><footer><span className="vp-avatar">{userName.slice(0,1)}</span><div><strong>{userName}</strong><small>{profile.papel}</small></div></footer></aside>
     <main className="vp-main" aria-label="Gestão de visitantes" aria-busy={loading||busy}>
       <div className="vp-context"><span>{communityName}</span><button disabled={loading||refreshing||busy} onClick={()=>void load()}><span className={refreshing?'vp-spinning':''}><Icon d={I.refresh}/></span>{refreshing?'Atualizando…':'Atualizar'}</button><Link href="/painel?view=avisos" showLoading loadingLabel="Abrindo notificações…" aria-label="Abrir notificações"><Icon d={I.bell}/></Link></div>
       {error&&<div role="alert" className="vp-error vp-page-error">{error}<button onClick={()=>void load()}>Tentar novamente</button></div>}

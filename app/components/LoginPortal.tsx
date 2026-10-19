@@ -1,4 +1,5 @@
 "use client";
+import VinkuloMark from "./VinkuloMark";
 import SafeImage from "./SafeImage";
 
 
@@ -357,9 +358,7 @@ export default function LoginPortal({
 
       <div className="login-v2-controls-row">
         <div className="login-v2-page-brand" aria-label={siteName}>
-          {config.logoUrl
-            ? <SafeImage loading="lazy" src={config.logoUrl} alt="" />
-            : <VinkuloMark />}
+          <VinkuloMark />
           <div>
             <strong>vínkulo</strong>
             <small>{config.kicker || "GESTÃO PARA IGREJAS"}</small>
@@ -495,18 +494,6 @@ export default function LoginPortal({
   );
 }
 
-function VinkuloMark() {
-  return (
-    <svg className="login-last-mark" width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
-      <rect width="28" height="28" rx="8" fill="currentColor" />
-      <path d="M14 5v7m0 4v7" stroke="#F97316" strokeWidth="1.7" strokeLinecap="round" strokeDasharray="0 0 7 4 0 0 2 2" />
-      <circle cx="14" cy="14" r="2.5" fill="#F97316" />
-      <path d="M7 14h4m6 0h4" stroke="#fff" strokeWidth="1.7" strokeLinecap="round" />
-      <circle cx="6" cy="14" r="1.5" fill="#fff" opacity=".72" />
-      <circle cx="22" cy="14" r="1.5" fill="#fff" opacity=".72" />
-    </svg>
-  );
-}
 
 function signupAutocomplete(id: string, type: PilotSignupField["type"]) {
   if (id === "telefone" || type === "tel") return "tel";
