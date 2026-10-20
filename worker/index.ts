@@ -212,7 +212,9 @@ function validateApiRequest(request: Request, url: URL) {
   }
   const contentLength = Number(request.headers.get("content-length") || 0);
   const maximumBodyBytes =
-    url.pathname === "/api/pilot/uploads"
+    /^\/api\/proprietario\/modulos\/[a-f0-9-]{36}\/imagens$/.test(url.pathname)
+      ? 8 * 1024 * 1024
+      : url.pathname === "/api/pilot/uploads"
       ? MAX_UPLOAD_BODY_BYTES
       : MAX_API_BODY_BYTES;
   if (
