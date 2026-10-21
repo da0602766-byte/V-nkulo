@@ -165,6 +165,7 @@ test("push: entrega registra aceite e falha, sem enviar conteúdo privado ou ses
       return new Response(null, { status });
     } });
     const delivery = await loadModule("app/lib/push-delivery-queue.ts", {
+      "./owner-notifications": await loadModule("app/lib/owner-notifications.ts", {}),
       "./chat-push": { getAuthorizedChatPush: async () => null },
       "./firebase-integration": { readFirebaseConfig: async () => null, nativeToken: () => null },
       "../../db/runtime-env": { getRuntimeEnv: () => f.env }, "./web-push": transport,

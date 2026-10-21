@@ -37,6 +37,7 @@ async function fixture(t) {
     "../../../lib/chat-retention": retention, "../../../lib/push-delivery-queue": { scheduleWebPushDelivery: db => wakeups.push(db) },
   });
   const queue = await moduleAt("app/lib/push-delivery-queue.ts", {
+    "./owner-notifications": await moduleAt("app/lib/owner-notifications.ts"),
     "./chat-push": authorize, "../../db/runtime-env": { getRuntimeEnv: () => ({}) },
     "./firebase-integration": { readFirebaseConfig: async () => ({}), nativeToken: endpoint => endpoint.startsWith("fcm:") ? endpoint.slice(4) : null,
       sendFcm: async (_config, endpoint, payload) => { sends.push({ endpoint, payload, native: true }); return new Response(null, { status: 200 }); } },
@@ -44,6 +45,7 @@ async function fixture(t) {
       sendWebPush: async (subscription, payload, _config, options) => { sends.push({ endpoint: subscription.endpoint, payload: JSON.parse(payload), options }); return new Response(null, { status: 201 }); } },
   });
   const resolve = await moduleAt("app/api/push-subscriptions/notification/route.ts", {
+    "../../../lib/owner-notifications": await moduleAt("app/lib/owner-notifications.ts"),
     "../../../lib/device-notification-content": await moduleAt("app/lib/device-notification-content.ts"),
     "../../../../db": { getD1: () => d1 }, "../../../lib/chat-push": authorize,
     "../../../lib/local-auth": { getSessionUser: async () => currentUser ? { id: currentUser, ativo: true } : null, getCurrentSessionTokenHash: async () => `session-${sessionUser}` },
@@ -99,8 +101,9 @@ test("chat: não envia nem exibe depois de leitura, perda de vínculo, mudança 
     await f.post(); f.database.exec(mutate);
     assert.equal(await f.authorize.getAuthorizedChatPush(f.d1, f.notification().id, f.recipient), null);
     assert.equal((await f.request()).status, 404);
+    f.database.prepare("UPDATE notificacoes_push_fila SET proxima_tentativa_em=0 WHERE estado='PENDENTE'").run();
     await f.queue.drainPushQueue(f.d1);
-    assert.equal(f.rows().at(-1).estado, "CANCELADA"); f.database.exec(restore);
+    assert.equal(f.rows().at(-1).estado, "CANCELADA", mutate); f.database.exec(restore);
   }
   assert.equal(f.sends.length, 0);
 });

@@ -1,5 +1,6 @@
 import type { getD1 } from "../../db";
 import type { TenantContext } from "./tenant";
+import { notificationVisibilitySql } from "./owner-notifications";
 import { hasGlobalMinistryManagement } from "./ministry-access";
 import { safeCentralDestination, type CentralData, type CentralMinistry, type CentralSchedule } from "./community-central";
 
@@ -68,8 +69,8 @@ export async function loadCommunityCentral(db: ReturnType<typeof getD1>, context
     const [rows, count] = await Promise.all([
       db.prepare(`SELECT n.id,n.titulo AS title,n.mensagem AS message,n.area,n.ministerio AS ministry,n.criado_em AS createdAt,n.destino_rota AS destination,CASE WHEN l.id IS NULL THEN 0 ELSE 1 END AS is_read
         FROM notificacoes_sistema n LEFT JOIN notificacoes_lidas l ON l.notificacao_id=n.id AND l.usuario_id=?
-        WHERE n.usuario_id=? AND n.comunidade_id=? AND n.area <> 'CHAT' ORDER BY n.criado_em DESC,n.id DESC LIMIT 31`).bind(uid, uid, cid).all<Record<string, unknown>>(),
-      db.prepare(`SELECT COUNT(*) AS total FROM notificacoes_sistema n WHERE n.usuario_id=? AND n.comunidade_id=? AND n.area <> 'CHAT' AND NOT EXISTS (SELECT 1 FROM notificacoes_lidas l WHERE l.notificacao_id=n.id AND l.usuario_id=?)`).bind(uid, cid, uid).first<{ total: number }>(),
+        WHERE n.usuario_id=? AND n.comunidade_id=? AND n.area <> 'CHAT' AND ${notificationVisibilitySql(context.isOwner)} ORDER BY n.criado_em DESC,n.id DESC LIMIT 31`).bind(uid, uid, cid).all<Record<string, unknown>>(),
+      db.prepare(`SELECT COUNT(*) AS total FROM notificacoes_sistema n WHERE n.usuario_id=? AND n.comunidade_id=? AND n.area <> 'CHAT' AND ${notificationVisibilitySql(context.isOwner)} AND NOT EXISTS (SELECT 1 FROM notificacoes_lidas l WHERE l.notificacao_id=n.id AND l.usuario_id=?)`).bind(uid, cid, uid).first<{ total: number }>(),
     ]);
     data.unread = Number(count?.total || 0); data.limits.notices = rows.results.length > 30;
     data.notices = rows.results.slice(0, 30).map(r => ({ id: Number(r.id), title: String(r.title), message: String(r.message), area: String(r.area), ministry: String(r.ministry || ""), createdAt: String(r.createdAt), read: Boolean(r.is_read), destination: safeCentralDestination(r.destination) }));

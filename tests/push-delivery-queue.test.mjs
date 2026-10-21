@@ -33,6 +33,7 @@ async function fixture(t) {
     sendWebPush: async (sub, payload, config, options) => { calls.push({ sub, payload: JSON.parse(payload), options }); return sender(sub, payload); },
   };
   const queue = await moduleAt("app/lib/push-delivery-queue.ts", {
+    "./owner-notifications": await moduleAt("app/lib/owner-notifications.ts", {}),
     "./chat-push": { getAuthorizedChatPush: async () => null },
     "./firebase-integration": { readFirebaseConfig: async () => firebase ? {} : null, nativeToken: endpoint => endpoint.startsWith("fcm:") ? endpoint.slice(4) : null,
       sendFcm: async (config, endpoint, payload, ttl) => { calls.push({ sub: { endpoint }, payload, options: { ttl }, native: true }); return sender({ endpoint }, payload); } },
@@ -44,6 +45,14 @@ async function fixture(t) {
   return { database, d1, userId, binding, session, calls, queue, notify, rows, due, jobs,
     sender: fn => { sender = fn; }, configured: value => { configured = value; }, firebase: value => { firebase = value; } };
 }
+
+test("fila push: avisos do Proprietário não despertam dispositivos de sessões comuns", async t => {
+  const f = await fixture(t);
+  const id = f.notify('MENU', 'IMPORTANTE');
+  f.database.prepare("UPDATE notificacoes_sistema SET destino_rota='/proprietario',titulo='Falha na sincronização Supabase' WHERE id=?").run(id);
+  f.due(); await f.queue.drainPushQueue(f.d1);
+  assert.equal(f.rows()[0].estado, 'CANCELADA'); assert.equal(f.calls.length, 0);
+});
 
 test("fila FCM: aguarda configuração, funciona sem VAPID e revoga tokens expirados", async t => {
   const f = await fixture(t);

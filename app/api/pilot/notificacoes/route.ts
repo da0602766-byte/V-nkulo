@@ -1,6 +1,7 @@
 import { deliverCareNoteReminders } from "../../../lib/care-note-reminders";
 import { getD1 } from "../../../../db";
 import { getSessionUser } from "../../../lib/local-auth";
+import { notificationVisibilitySql } from "../../../lib/owner-notifications";
 
 type NotificationRow = {
   id: number;
@@ -68,7 +69,7 @@ export async function GET(request: Request) {
       LEFT JOIN usuarios remetente ON remetente.id = n.remetente_usuario_id
       LEFT JOIN notificacoes_lidas nl
         ON nl.notificacao_id = n.id AND nl.usuario_id = ?
-      WHERE n.usuario_id = ? AND n.area <> 'CHAT'
+      WHERE n.usuario_id = ? AND n.area <> 'CHAT' AND ${notificationVisibilitySql(Boolean(user.system_owner))}
         AND (
           ? = 0
           OR n.criado_em < ?
@@ -109,7 +110,7 @@ export async function GET(request: Request) {
        FROM notificacoes_sistema n
        LEFT JOIN notificacoes_lidas nl
          ON nl.notificacao_id = n.id AND nl.usuario_id = ?
-       WHERE n.usuario_id = ? AND n.area <> 'CHAT' AND nl.id IS NULL`,
+       WHERE n.usuario_id = ? AND n.area <> 'CHAT' AND nl.id IS NULL AND ${notificationVisibilitySql(Boolean(user.system_owner))}`,
     )
     .bind(user.id, user.id)
     .all<NotificationRow>();
@@ -194,8 +195,8 @@ export async function PATCH(request: Request) {
     await db
       .prepare(
         `INSERT OR IGNORE INTO notificacoes_lidas (notificacao_id, usuario_id)
-        SELECT id, ? FROM notificacoes_sistema
-        WHERE usuario_id = ? AND area <> 'CHAT'`,
+        SELECT n.id, ? FROM notificacoes_sistema n
+        WHERE n.usuario_id = ? AND n.area <> 'CHAT' AND ${notificationVisibilitySql(Boolean(user.system_owner))}`,
       )
       .bind(user.id, user.id)
       .run();
@@ -207,7 +208,7 @@ export async function PATCH(request: Request) {
   }
   const owned = await db
     .prepare(
-      "SELECT id FROM notificacoes_sistema WHERE id = ? AND usuario_id = ? AND area <> 'CHAT' LIMIT 1",
+      `SELECT n.id FROM notificacoes_sistema n WHERE n.id = ? AND n.usuario_id = ? AND n.area <> 'CHAT' AND ${notificationVisibilitySql(Boolean(user.system_owner))} LIMIT 1`,
     )
     .bind(id, user.id)
     .first<{ id: number }>();
@@ -232,7 +233,7 @@ export async function DELETE(request: Request) {
   const db = getD1();
   if (payload.lidas === true) {
     await db.prepare(`DELETE FROM notificacoes_sistema
-      WHERE usuario_id = ? AND area <> 'CHAT'
+      WHERE usuario_id = ? AND area <> 'CHAT' AND ${notificationVisibilitySql(Boolean(user.system_owner), "notificacoes_sistema")}
       AND EXISTS (
         SELECT 1 FROM notificacoes_lidas nl
         WHERE nl.notificacao_id = notificacoes_sistema.id AND nl.usuario_id = ?
@@ -246,7 +247,7 @@ export async function DELETE(request: Request) {
   const readNotification = await db.prepare(`SELECT n.id
     FROM notificacoes_sistema n
     JOIN notificacoes_lidas nl ON nl.notificacao_id = n.id AND nl.usuario_id = ?
-    WHERE n.id = ? AND n.usuario_id = ? AND n.area <> 'CHAT' LIMIT 1`)
+    WHERE n.id = ? AND n.usuario_id = ? AND n.area <> 'CHAT' AND ${notificationVisibilitySql(Boolean(user.system_owner))} LIMIT 1`)
     .bind(user.id, id, user.id).first<{ id: number }>();
   if (!readNotification) {
     return Response.json({ error: "Visualize a notificação antes de limpá-la." }, { status: 409 });

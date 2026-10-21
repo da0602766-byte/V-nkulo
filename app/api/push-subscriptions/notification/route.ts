@@ -3,6 +3,7 @@ import { getCurrentSessionTokenHash, getSessionUser } from "../../../lib/local-a
 import { safeDestination } from "../../../lib/web-push";
 import { getAuthorizedChatPush } from "../../../lib/chat-push";
 import { deviceNotificationContent } from "../../../lib/device-notification-content";
+import { notificationVisibilitySql } from "../../../lib/owner-notifications";
 
 // Push pode ficar na fila do provedor depois do logout. O service worker
 // consulta esta rota antes de exibir ou abrir um aviso, sempre com a sessão
@@ -20,7 +21,7 @@ export async function GET(request: Request) {
   if (!sessionHash) return new Response(null, { status: 401 });
   const notification = await getD1().prepare(
     `SELECT n.destino_rota,n.area,n.titulo,n.mensagem FROM notificacoes_sistema n
-     WHERE n.id = ? AND n.usuario_id = ?
+     WHERE n.id = ? AND n.usuario_id = ? AND ${notificationVisibilitySql(Boolean(user.system_owner))}
        AND NOT EXISTS (SELECT 1 FROM notificacoes_lidas l
          WHERE l.notificacao_id = n.id AND l.usuario_id = ?)
        AND EXISTS (SELECT 1 FROM notificacoes_push_dispositivos p

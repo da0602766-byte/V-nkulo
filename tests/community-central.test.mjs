@@ -8,7 +8,7 @@ import { createPilotD1, createPilotUser } from './helpers/sqlite-d1.mjs';
 function moduleFile(name, deps={}) { const exports={}; runInNewContext(ts.transpileModule(readFileSync(new URL('../app/lib/'+name+'.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports,require:n=>deps[n],Date,Response,URL,Number,Promise}); return exports; }
 const helpers=moduleFile('community-central');
 const ministry=moduleFile('ministry-access');
-const {loadCommunityCentral}=moduleFile('community-central-data',{'./ministry-access':ministry,'./community-central':helpers});
+const {loadCommunityCentral}=moduleFile('community-central-data',{'./ministry-access':ministry,'./community-central':helpers,'./owner-notifications':moduleFile('owner-notifications')});
 const now=new Date('2026-10-09T12:00:00Z');
 const permissions=['dashboard.view','leadership.panel.view','pastoral.panel.view','people.view','ministries.view','schedules.view','cells.view','events.view'];
 export async function centralFixture() {

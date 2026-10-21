@@ -7,6 +7,7 @@ import { getProfileDetailsAutoSyncEnabled } from "./supabase-profile-details-aut
 import { loadSourceProfileDetails, previewProfileDetails, syncProfileDetails } from "./supabase-profile-details";
 import { markProfileDetailsCopy } from "./supabase-profile-details-copy-state";
 import { createSystemNotification } from "./system-notifications";
+import { reconcileDeletedProfiles } from "./supabase-deleted-profiles";
 
 const KEY = "supabase_auto_sync";
 const INTERVAL_MS = 5 * 60_000;
@@ -97,7 +98,11 @@ async function reconcile(db: D1Database, actorId: number): Promise<NonNullable<A
   }
 
   const profiles = await loadSourceProfiles();
-  const profileBefore = await previewProfiles(profiles);
+  let profileBefore = await previewProfiles(profiles);
+  if (profileBefore.extraDestinationCount) {
+    await reconcileDeletedProfiles(db, profileBefore.extraDestinationIds);
+    profileBefore = await previewProfiles(profiles);
+  }
   if (profileBefore.extraDestinationCount) throw new Error("Há perfis extras no Supabase; revisão manual necessária.");
   if (!profileBefore.ready) {
     await syncProfiles(profiles, actorId);
