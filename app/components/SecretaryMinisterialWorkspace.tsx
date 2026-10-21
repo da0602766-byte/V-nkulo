@@ -255,6 +255,7 @@ export default function SecretaryMinisterialWorkspace({
   const [canCreate, setCanCreate] = useState(false);
   const [selectedMinistryId, setSelectedMinistryId] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>("painel");
+  const [memberOptionsId, setMemberOptionsId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [catalogSearch, setCatalogSearch] = useState("");
   const [catalogCategory, setCatalogCategory] = useState("");
@@ -1871,18 +1872,20 @@ export default function SecretaryMinisterialWorkspace({
             <div className="secretary-section-grid">
               {tab === "integrantes" && <section className="secretary-card secretary-wide-card">
                 <header><div><p className="pilot-kicker">EQUIPE DO MINISTÉRIO</p><h2>{selectedMinistry.voluntarios.length} integrantes</h2></div><span>Carregamento automático nas escalas</span></header>
-                <div className="secretary-members">
+                <div className="ministry-member-list">
                   {selectedMinistry.voluntarios.map((volunteer) => (
                     <article key={volunteer.id}>
                       <span className="secretary-avatar">{initials(volunteer.nome)}</span>
-                      <div><strong>{volunteer.nome}</strong><small>{volunteer.funcao}</small></div>
-                      <span className={`secretary-role ${volunteer.papel.toLowerCase()}`}>{volunteer.papel === "LIDER" ? "Líder" : "Integrante"}</span>
-                      <small>
-                        {volunteer.escalas_ativas} escala(s) futura(s) · {Math.max(0, volunteer.limite_escalas - volunteer.escalas_ativas)} restante(s)
-                      </small>
+                      <div className="ministry-member-copy"><strong>{volunteer.nome}</strong><small>{volunteer.funcao || "Função não informada"} · {volunteer.papel === "LIDER" ? "Líder" : "Integrante"}</small>
+                        <small>{volunteer.escalas_ativas} escala(s) futura(s) · Limite {volunteer.limite_escalas} · {Math.max(0, volunteer.limite_escalas - volunteer.escalas_ativas)} restante(s)</small>
+                      </div>
                       {canManage && (
+                        <button type="button" className="ministry-member-options" aria-label={`Opções de ${volunteer.nome}`} aria-expanded={memberOptionsId === volunteer.id} aria-controls={`member-options-${volunteer.id}`} onClick={() => setMemberOptionsId(memberOptionsId === volunteer.id ? null : volunteer.id)}>Opções <span aria-hidden="true">⌄</span></button>
+                      )}
+                      {canManage && memberOptionsId === volunteer.id && (
                         <form
-                          className="secretary-capacity-form"
+                          id={`member-options-${volunteer.id}`}
+                          className="ministry-member-editor"
                           onSubmit={(event) => void updateScheduleLimit(volunteer, event)}
                         >
                           <label>

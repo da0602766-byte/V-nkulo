@@ -109,16 +109,20 @@
 .pilot-dashboard .parking-space-card:has(.parking-space-reservations) .parking-space-current { min-height:0; }
 @media(max-width:760px) { .pilot-dashboard .garage-actions button { min-height:44px; } }
 
-/* Member actions share the existing last column and wrap within it. */
-.pilot-dashboard .secretary-members .secretary-capacity-form { flex-wrap:wrap; gap:8px; min-width:0; }
-.pilot-dashboard[data-ui-version="v2"] .secretary-members .secretary-capacity-form .secretary-remove-member { flex-basis:100%; min-height:calc(45px * var(--vinkulo-ui-scale-inverse,1))!important; padding:8px; white-space:normal; background:transparent; color:var(--pilot-danger,#b42338); border:1px solid currentColor; font-size:13px; }
-.pilot-dashboard .secretary-members article > div > strong { overflow-wrap:anywhere; }
+.pilot-dashboard .ministry-member-list > article { display:grid; grid-template-columns:32px minmax(0,1fr) auto; gap:10px; align-items:center; padding:12px 0; border-bottom:1px solid var(--pilot-border,#dce1e8); }
+.pilot-dashboard .ministry-member-list > article:last-child { border-bottom:0; }
+.pilot-dashboard .ministry-member-list .secretary-avatar { width:32px; height:32px; border-radius:10px; font-size:11px; }
+.pilot-dashboard .ministry-member-copy { min-width:0; display:grid; gap:3px; }
+.pilot-dashboard .ministry-member-copy strong { font-size:14px; overflow-wrap:anywhere; }
+.pilot-dashboard .ministry-member-copy small { font-size:12px; color:var(--pilot-muted); overflow-wrap:anywhere; }
+.pilot-dashboard .ministry-member-options,
+.pilot-dashboard .ministry-member-editor button { width:auto; min-height:calc(44px * var(--vinkulo-ui-scale-inverse,1)); padding:6px 10px; font-size:13px; border-radius:9px; }
+.pilot-dashboard .ministry-member-options { background:transparent; color:var(--pilot-ink); border:1px solid var(--pilot-border,#dce1e8); }
+.pilot-dashboard .ministry-member-editor { grid-column:2/-1; display:flex; flex-wrap:wrap; align-items:end; gap:8px; padding:8px 0 2px; }
+.pilot-dashboard .ministry-member-editor label { display:grid; gap:4px; font-size:12px; }
+.pilot-dashboard .ministry-member-editor input { width:76px; font-size:16px; min-height:calc(44px * var(--vinkulo-ui-scale-inverse,1)); padding:6px 8px; }
+.pilot-dashboard .ministry-member-editor .secretary-remove-member { background:transparent; color:var(--pilot-danger,#b42338); border:1px solid currentColor; }
 .pilot-dashboard .secretary-day-picker label { position:relative; }
 .pilot-dashboard .secretary-day-picker input[type="checkbox"] { width:1px!important; height:1px!important; min-height:0!important; padding:0!important; inset:0; }
 .pilot-dashboard .secretary-day-picker input:focus-visible + span { outline:2px solid var(--pilot-primary); outline-offset:2px; }
-@media(max-width:760px) {
-  .pilot-dashboard[data-ui-version="v2"] .secretary-members .secretary-capacity-form { justify-self:stretch; }
-  .pilot-dashboard[data-ui-version="v2"] .secretary-members .secretary-capacity-form label::before { content:none; }
-  .pilot-dashboard[data-ui-version="v2"] .secretary-members .secretary-capacity-form input { font-size:16px; min-height:calc(45px * var(--vinkulo-ui-scale-inverse,1))!important; }
-  .pilot-dashboard[data-ui-version="v2"] .secretary-members .secretary-capacity-form button { min-height:calc(45px * var(--vinkulo-ui-scale-inverse,1))!important; }
-}
+@media(max-width:760px) { .pilot-dashboard .ministry-member-editor { grid-column:1/-1; } }

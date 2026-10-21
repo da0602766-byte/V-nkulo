@@ -9,6 +9,21 @@ const exports = {};
 runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, { exports });
 const notice = (id, text = "Falha ao carregar", actions = 0, content = text) => ({ id, fingerprint: `error:${text}`, content, tone: "error", actions });
 
+test("aviso visualizado ou excluído desaparece e não volta por rerender ou duplicata", () => {
+  const store = exports.createFeedbackStore();
+  let calls = 0;
+  store.publish({ ...notice("screen"), onDismiss: () => calls++ });
+  store.acknowledge("error:Falha ao carregar");
+  store.publish(notice("screen"));
+  store.publish(notice("duplicate"));
+  assert.equal(store.getSnapshot().length, 0);
+  assert.equal(calls, 1);
+  store.publish(notice("screen", "Novo aviso"));
+  assert.equal(store.getSnapshot().length, 1);
+  store.acknowledge();
+  assert.equal(store.getSnapshot().length, 0);
+});
+
 test("avisos iguais são agrupados, preservando a ação de recuperação", () => {
   const store = exports.createFeedbackStore();
   const retry = () => "retry";

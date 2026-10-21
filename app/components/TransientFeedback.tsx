@@ -56,11 +56,11 @@ function ToastCard({ entry, history = false }: { entry: FeedbackEntry<ReactNode>
   }, [leaving, history, paused, entry.fingerprint]);
   return <div ref={card} className={`app-toast-card is-${entry.tone}${leaving && !paused ? " is-leaving" : ""}`}
     role={history ? undefined : entry.tone === "error" ? "alert" : "status"}
-    onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+    onPointerEnter={event => { if (event.pointerType === "mouse") setHovered(true); }} onPointerLeave={() => setHovered(false)}
     onFocusCapture={() => setFocused(true)} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false); }}>
     <span className="app-toast-symbol" aria-hidden="true">{entry.tone === "error" ? "!" : entry.tone === "success" ? "✓" : "i"}</span>
-    <div className="app-toast-content">{entry.content}</div>
-    {!history && <button type="button" className="app-toast-close" aria-label="Fechar aviso" title="Fechar este aviso" onClick={() => store.dismiss(entry.fingerprint)}><span aria-hidden="true">×</span> Fechar</button>}
+    <div className="app-toast-content" onClick={event => { if ((event.target as HTMLElement).closest("button,a")) store.acknowledge(entry.fingerprint); }}>{entry.content}</div>
+    <button type="button" className="app-toast-close" aria-label={history ? "Excluir aviso" : "Fechar aviso"} onClick={() => store.acknowledge(entry.fingerprint)}><span aria-hidden="true">×</span> {history ? "Excluir" : "Fechar"}</button>
   </div>;
 }
 
@@ -70,10 +70,29 @@ export function TransientFeedbackViewport() {
   const historyButton = useRef<HTMLButtonElement>(null);
   const region = useRef<HTMLElement>(null);
   useFeedbackPosition(region);
+  const newestRevision = entries[0]?.revision;
+  useEffect(() => {
+    if (!entries.length) return;
+    // The history affordance has its own lifetime; rerenders do not restart it.
+    // Give keyboard users time to finish interacting with actions.
+    const expire = () => {
+      if (region.current?.contains(document.activeElement) && document.activeElement?.matches(":focus-visible") && !historyOpen) {
+        timer = window.setTimeout(expire, 1000);
+        return;
+      }
+      store.acknowledge();
+      setHistoryOpen(false);
+    };
+    let timer = window.setTimeout(expire, historyOpen ? 10000 : 18000);
+    return () => window.clearTimeout(timer);
+  // Contents can rerender without representing a new notice.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newestRevision, historyOpen]);
   useEffect(() => {
     if (!historyOpen) return;
-    const outside = (event: PointerEvent) => { if (event.target instanceof Node && !region.current?.contains(event.target)) setHistoryOpen(false); };
-    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") { setHistoryOpen(false); historyButton.current?.focus(); } };
+    const close = () => { setHistoryOpen(false); store.acknowledge(); };
+    const outside = (event: PointerEvent) => { if (event.target instanceof Node && !region.current?.contains(event.target)) close(); };
+    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") close(); };
     document.addEventListener("pointerdown", outside);
     document.addEventListener("keydown", escape);
     return () => { document.removeEventListener("pointerdown", outside); document.removeEventListener("keydown", escape); };
@@ -82,10 +101,10 @@ export function TransientFeedbackViewport() {
   const visible = entries.filter(entry => !entry.dismissed).slice(0, 1);
   return createPortal(<aside className={`app-toast-viewport${visible.length || historyOpen ? " has-active-notice" : ""}`} aria-label="Avisos do sistema" ref={region}>
     {historyOpen ? <section id="app-toast-history" className="app-toast-history" aria-label="Avisos desta tela">
-      <header><strong>Avisos desta tela</strong><button type="button" aria-label="Fechar avisos recentes" onClick={() => { setHistoryOpen(false); historyButton.current?.focus(); }}>×</button></header>
+      <header><strong>Avisos desta tela</strong><button type="button" aria-label="Fechar avisos recentes" onClick={() => { setHistoryOpen(false); store.acknowledge(); }}>×</button></header>
       <div>{entries.map(entry => <ToastCard key={entry.id + entry.revision} entry={entry} history />)}</div>
     </section> : <div className="app-toast-stack">{visible.map(entry => <ToastCard key={entry.id + entry.revision} entry={entry} />)}</div>}
-    <button ref={historyButton} type="button" className="app-toast-history-toggle" aria-expanded={historyOpen} aria-controls="app-toast-history" onClick={() => setHistoryOpen(value => !value)}>
+    <button ref={historyButton} type="button" className="app-toast-history-toggle" aria-expanded={historyOpen} aria-controls="app-toast-history" onClick={() => { setHistoryOpen(!historyOpen); if (historyOpen) store.acknowledge(); }}>
       <span aria-hidden="true">◷</span> {historyOpen ? "Fechar avisos" : `Avisos recentes · ${entries.length}`}
     </button>
   </aside>, document.body);

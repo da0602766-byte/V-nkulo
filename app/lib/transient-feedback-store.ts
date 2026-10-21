@@ -4,6 +4,7 @@ export type FeedbackEntry<T> = {
   revision: number; dismissed: boolean; actions: number;
   onDismiss?: () => void;
   durationMs?: number;
+  acknowledged?: boolean;
 };
 
 /** Memory only: notices and their callbacks disappear with their owning screen. */
@@ -15,6 +16,7 @@ export function createFeedbackStore<T>() {
   const emit = () => {
     const unique = new Map<string, FeedbackEntry<T>>();
     for (const entry of entries.values()) {
+      if (entry.acknowledged) continue;
       const prior = unique.get(entry.fingerprint);
       if (!prior || entry.actions > prior.actions || (entry.actions === prior.actions && entry.revision > prior.revision)) unique.set(entry.fingerprint, entry);
     }
@@ -29,10 +31,21 @@ export function createFeedbackStore<T>() {
       const same = old?.fingerprint === input.fingerprint;
       const peer = [...entries.values()].find(entry => entry.fingerprint === input.fingerprint);
       entries.set(input.id, { ...input, revision: same ? old.revision : ++revision,
-        dismissed: same ? old.dismissed : peer?.dismissed ?? false });
+        dismissed: same ? old.dismissed : peer?.dismissed ?? false,
+        acknowledged: same ? old.acknowledged : peer?.acknowledged ?? false });
       emit();
     },
     remove(id: string) { if (entries.delete(id)) emit(); },
+    acknowledge(fingerprint?: string) {
+      const callbacks = new Set<() => void>();
+      for (const [id, entry] of entries) {
+        if (fingerprint && entry.fingerprint !== fingerprint) continue;
+        if (!entry.dismissed && !entry.acknowledged && entry.onDismiss) callbacks.add(entry.onDismiss);
+        entries.set(id, { ...entry, dismissed: true, acknowledged: true });
+      }
+      emit();
+      callbacks.forEach(callback => callback());
+    },
     dismiss(fingerprint: string) {
       const callbacks = new Set<() => void>();
       for (const entry of entries.values()) if (entry.fingerprint === fingerprint && !entry.dismissed && entry.onDismiss) callbacks.add(entry.onDismiss);
