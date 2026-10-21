@@ -1,5 +1,6 @@
 "use client";
 import SafeImage from "./SafeImage";
+import { usePathname } from "next/navigation";
 
 
 import { FormEvent, useEffect, useRef, useState } from "react";
@@ -42,6 +43,8 @@ const REPORT_CATEGORIES = [
 ] as const;
 
 export default function GlobalFeedbackLauncher() {
+  const pathname = usePathname();
+  const helpLivesInMenu = pathname === "/painel" || pathname.startsWith("/painel/");
   const [menuOpen, setMenuOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [type, setType] = useState<FeedbackType | null>(null);
@@ -182,7 +185,7 @@ export default function GlobalFeedbackLauncher() {
 
   return (
     <>
-      <aside className={`global-feedback-launcher${menuOpen ? " open" : ""}`} aria-label="Ajuda e feedback">
+      {!helpLivesInMenu && <aside className={`global-feedback-launcher${menuOpen ? " open" : ""}`} aria-label="Ajuda e feedback">
         {menuOpen && <div className="global-feedback-menu">{OPTIONS.map((item) => (
           <button key={item.type} type="button" onClick={() => choose(item.type)}>
             <span>{item.icon}</span><div><strong>{item.label}</strong><small>{item.detail}</small></div>
@@ -191,7 +194,7 @@ export default function GlobalFeedbackLauncher() {
         <button ref={triggerRef} className="global-feedback-trigger" type="button" onClick={() => setMenuOpen((value) => !value)} aria-expanded={menuOpen} aria-label="Abrir opções para reportar problema, sugestão ou melhoria">
           <span aria-hidden="true">?</span><strong>Ajuda</strong>
         </button>
-      </aside>
+      </aside>}
 
       {helpOpen && <div className="global-feedback-backdrop" role="presentation">
         <section ref={dialogRef} tabIndex={-1} className="global-feedback-dialog" role="dialog" aria-modal="true" aria-labelledby="global-help-title">
