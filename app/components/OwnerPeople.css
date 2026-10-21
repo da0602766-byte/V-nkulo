@@ -1,0 +1,23 @@
+.owner-console .owner-user-directory .owner-user-list {gap:0;padding:0}
+.owner-person-row {min-width:0;border-bottom:1px solid var(--owner-line);}
+.owner-person-row:last-child {border-bottom:0}
+.owner-person-line {display:grid;grid-template-columns:36px minmax(0,1fr) auto auto;align-items:center;gap:10px;padding:10px 12px}
+.owner-person-line>div {display:grid;gap:3px;min-width:0}
+.owner-person-line h2 {font-size:14px;line-height:1.35;overflow-wrap:anywhere}
+.owner-person-line small {font-size:12px;line-height:1.4;color:var(--owner-muted);overflow-wrap:anywhere}
+.owner-person-line>button {min-height:44px;padding:8px 12px}
+.owner-person-status {font-size:12px;color:var(--owner-muted)}
+.owner-person-row .owner-user-details {grid-template-columns:minmax(0,1fr);padding:12px;background:var(--owner-surface)}
+.owner-person-identity {display:grid;gap:4px;min-width:0;font-size:14px;line-height:1.5;overflow-wrap:anywhere}
+.owner-person-identity>span {font-size:13px;color:var(--owner-muted,#52616b)}
+.owner-person-identity dl {display:grid;gap:8px;margin:8px 0}
+.owner-person-identity dt {font-size:12px;color:var(--owner-muted,#52616b)}
+.owner-person-identity dd {margin:0;display:grid;gap:4px}
+.v-action-dialog .owner-person-identity {padding:10px 0;border-block:1px solid #dce3e7}
+@media(max-width:600px){
+ .owner-person-line {grid-template-columns:32px minmax(0,1fr) auto;gap:8px;padding:10px}
+ .owner-person-line>button {grid-column:3;grid-row:1}
+ .owner-person-status {grid-column:2;font-size:12px}
+ .owner-person-row .owner-user-actions {display:flex;flex-wrap:wrap;gap:8px}
+ .owner-person-row .owner-user-actions button {min-height:44px}
+}

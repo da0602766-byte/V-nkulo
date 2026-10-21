@@ -20,7 +20,8 @@ async function fixture() {
   };
   const auth = await login(env.SYSTEM_OWNER_EMAIL), member = await login('target@deletion.test');
   const call = (userId = target, cookie = auth, path = '/api/proprietario', body = {}) => worker.fetch(new Request('https://test.invalid' + path, { method: path === '/api/proprietario' ? 'PATCH' : 'DELETE', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ action: 'EXCLUIR_USUARIO_DEFINITIVO', userId, ...body }) }), env, ctx);
-  return { db, owner, target, leader, other, auth, member, call };
+  const directory = async () => (await worker.fetch(new Request("https://test.invalid/api/proprietario?section=users", {headers:{cookie:auth}}),env,ctx)).json();
+  return { db, owner, target, leader, other, auth, member, call, directory };
 }
 
 test('proprietário exclui conta vinculada, preserva dados compartilhados e avisa líderes uma vez por comunidade', async () => {
@@ -75,5 +76,24 @@ test('exclusão na comunidade usa a mesma regra global', async () => {
     const r = await f.call(f.target, f.auth, '/api/pilot/pessoas', { action: 'DELETE_ACCOUNT', membershipId });
     assert.equal(r.status, 200, await r.clone().text());
     assert.equal(f.db.prepare('SELECT id FROM usuarios WHERE id=?').get(f.target), undefined);
+  } finally { f.db.close(); }
+});
+
+
+test('identifica assinante e membro separadamente e preserva assinatura ao excluir responsável', async () => {
+  const f = await fixture();
+  try {
+    f.db.prepare('UPDATE comunidades SET proprietario_usuario_id=? WHERE id=1').run(f.target);
+    f.db.prepare("INSERT INTO assinaturas_comunidade(comunidade_id,plano_id,status,contrato,fundamento,aprovado_por) VALUES(1,'gratuito','ATIVA','{}','GRATUITO',?)").run(f.target);
+    const directory=await f.directory();
+    const subscriber=directory.users.find(row=>row.id===f.target), member=directory.users.find(row=>row.id===f.leader);
+    assert.equal(JSON.parse(subscriber.assinaturas_detalhes)[0].vigente,1);
+    assert.equal(JSON.parse(subscriber.vinculos_detalhes)[0].papel,'MEMBRO');
+    assert.equal(JSON.parse(member.assinaturas_detalhes).length,0);
+    const result=await f.call();assert.equal(result.status,200,await result.clone().text());
+    assert.equal(f.db.prepare('SELECT id FROM usuarios WHERE id=?').get(f.target),undefined);
+    const subscription=f.db.prepare('SELECT * FROM assinaturas_comunidade WHERE comunidade_id=1').get();
+    assert.equal(subscription.status,'ATIVA');assert.equal(subscription.aprovado_por,f.owner);
+    assert.equal(f.db.prepare('SELECT proprietario_usuario_id FROM comunidades WHERE id=1').get().proprietario_usuario_id,null);
   } finally { f.db.close(); }
 });

@@ -114,6 +114,15 @@ export async function GET(request?: Request) {
       .prepare(
         `SELECT u.id, u.nome, u.email, u.telefone, u.foto_perfil, u.perfil,
           u.titulo_eclesiastico, u.ativo, u.criado_em,
+          (SELECT json_group_array(json_object('nome',c.nome,'papel',uc.papel,'status',uc.status))
+            FROM usuario_comunidades uc JOIN comunidades c ON c.id=uc.comunidade_id
+            WHERE uc.usuario_id=u.id) AS vinculos_detalhes,
+          (SELECT json_group_array(json_object('nome',c.nome,'plano',p.nome,'status',s.status,'termina_em',s.termina_em,
+            'vigente',CASE WHEN s.status='ATIVA' AND (s.termina_em IS NULL OR datetime(s.termina_em)>datetime('now')) THEN 1 ELSE 0 END))
+            FROM assinaturas_comunidade s JOIN comunidades c ON c.id=s.comunidade_id
+            JOIN planos_plataforma p ON p.id=s.plano_id LEFT JOIN solicitacoes_log1 l ON l.id=s.solicitacao_id
+            WHERE c.proprietario_usuario_id=u.id OR l.usuario_id=u.id) AS assinaturas_detalhes,
+          (SELECT GROUP_CONCAT(c.nome, ' • ') FROM comunidades c WHERE c.proprietario_usuario_id=u.id) AS comunidades_responsavel,
           (SELECT COUNT(*) FROM usuario_comunidades uc
             WHERE uc.usuario_id = u.id AND uc.status = 'ATIVO') AS comunidades,
           COALESCE((SELECT GROUP_CONCAT(c.nome, ' • ')
