@@ -31,6 +31,8 @@ type Ministry = {
   youtube_url: string;
   spotify_url: string;
   can_manage: number;
+  can_remove_members?: number;
+  can_remove_leaders?: number;
   voluntarios: Volunteer[];
 };
 type AvailableUser = {
@@ -876,7 +878,7 @@ export default function MinistriesWorkspace({
                   }
                   onRemoveVolunteer={(volunteer) =>
                     window.confirm(
-                      `Excluir ${volunteer.nome} desta equipe? A ação será auditada.`,
+                      `Remover ${volunteer.nome} deste ministério? O cadastro na comunidade e o histórico serão preservados.`,
                     )
                       ? request(
                           `remove-volunteer-${volunteer.id}`,
@@ -886,7 +888,7 @@ export default function MinistriesWorkspace({
                             acao: "REMOVER_VOLUNTARIO",
                             voluntarioId: volunteer.id,
                           },
-                          "Pessoa excluída da equipe.",
+                          "Pessoa removida do ministério.",
                         )
                       : Promise.resolve(false)
                   }
@@ -2290,13 +2292,13 @@ function MinistryCard({
                 </small>
               </span>
               <em>{volunteer.papel === "LIDER" ? "Líder" : "Voluntário"}</em>
-              {ministry.can_manage &&
-              (volunteer.papel !== "LIDER" || globalManager) ? (
+              {ministry.can_remove_members &&
+              (volunteer.papel !== "LIDER" || ministry.can_remove_leaders) ? (
                 <button
                   disabled={busy === `remove-volunteer-${volunteer.id}`}
                   onClick={() => void onRemoveVolunteer(volunteer)}
                 >
-                  Excluir da equipe
+                  Remover do ministério
                 </button>
               ) : null}
             </div>

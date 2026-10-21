@@ -53,6 +53,8 @@ type Ministry = {
   responsavel_nome: string | null;
   criado_em: string;
   can_manage: number;
+  can_remove_members?: number;
+  can_remove_leaders?: number;
   can_archive?: number;
   can_delete: number;
   fio_habilitado: number;
@@ -680,6 +682,18 @@ export default function SecretaryMinisterialWorkspace({
         periodoPreferido: data.get("periodoPreferido"),
       },
       "Sua disponibilidade foi atualizada.",
+    );
+  }
+
+  async function removeVolunteer(volunteer: Volunteer) {
+    if (!selectedMinistry?.can_remove_members || busy) return;
+    if (!window.confirm(`Remover ${volunteer.nome} do ministério “${selectedMinistry.nome}”?\n\nA pessoa continuará cadastrada na comunidade e o histórico de escalas será preservado.`)) return;
+    await submit(
+      `remove-volunteer-${volunteer.id}`,
+      `/api/pilot/ministerios/${selectedMinistry.id}`,
+      "PATCH",
+      { acao: "REMOVER_VOLUNTARIO", voluntarioId: volunteer.id },
+      `${volunteer.nome} foi removido(a) do ministério.`,
     );
   }
 
@@ -1882,6 +1896,11 @@ export default function SecretaryMinisterialWorkspace({
                             />
                           </label>
                           <button disabled={busy === `capacity-${volunteer.id}`}>Salvar</button>
+                          {Boolean(selectedMinistry.can_remove_members) && (volunteer.papel !== "LIDER" || Boolean(selectedMinistry.can_remove_leaders)) && (
+                            <button type="button" className="secretary-remove-member" disabled={Boolean(busy)} aria-label={`Remover ${volunteer.nome} do ministério`} onClick={() => void removeVolunteer(volunteer)}>
+                              {busy === `remove-volunteer-${volunteer.id}` ? "Removendo…" : "Remover do ministério"}
+                            </button>
+                          )}
                         </form>
                       )}
                     </article>

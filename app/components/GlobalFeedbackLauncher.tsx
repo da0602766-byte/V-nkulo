@@ -43,6 +43,7 @@ const REPORT_CATEGORIES = [
 
 export default function GlobalFeedbackLauncher() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [type, setType] = useState<FeedbackType | null>(null);
   const [entityType, setEntityType] = useState("");
   const [entityId, setEntityId] = useState<number | null>(null);
@@ -58,7 +59,7 @@ export default function GlobalFeedbackLauncher() {
   const submittingRef = useRef(false);
 
   useEffect(() => {
-    if (!type) return;
+    if (!type && !helpOpen) return;
     const dialog = dialogRef.current;
     dialog?.focus();
     const handleKey = (event: KeyboardEvent) => {
@@ -77,13 +78,24 @@ export default function GlobalFeedbackLauncher() {
     };
     // Opening and closing the dialog own focus, independently of form updates.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [type]);
+  }, [type, helpOpen]);
+
+  useEffect(() => {
+    const openHelp = () => {
+      returnFocusRef.current = document.activeElement as HTMLElement | null;
+      setMenuOpen(false);
+      setHelpOpen(true);
+    };
+    window.addEventListener("vinkulo:open-help", openHelp);
+    return () => window.removeEventListener("vinkulo:open-help", openHelp);
+  }, []);
 
   useEffect(() => {
     const open = (event: Event) => {
       returnFocusRef.current = document.activeElement as HTMLElement | null;
       const detail = (event as CustomEvent<OpenFeedbackDetail>).detail || {};
       setMenuOpen(false);
+      setHelpOpen(false);
       setType(detail.type || "PROBLEMA");
       setEntityType(String(detail.entityType || ""));
       setEntityId(Number(detail.entityId || 0) || null);
@@ -103,8 +115,9 @@ export default function GlobalFeedbackLauncher() {
   }, [message]);
 
   function choose(nextType: Exclude<FeedbackType, "DENUNCIA">) {
-    returnFocusRef.current = document.activeElement as HTMLElement | null;
+    if (!helpOpen) returnFocusRef.current = document.activeElement as HTMLElement | null;
     setType(nextType);
+    setHelpOpen(false);
     setMenuOpen(false);
     setEntityType("");
     setEntityId(null);
@@ -115,6 +128,7 @@ export default function GlobalFeedbackLauncher() {
   function closeDialog() {
     if (submittingRef.current) return;
     setType(null);
+    setHelpOpen(false);
     setImage(null);
     setImagePreview("");
     setMessage("");
@@ -178,6 +192,17 @@ export default function GlobalFeedbackLauncher() {
           <span aria-hidden="true">?</span><strong>Ajuda</strong>
         </button>
       </aside>
+
+      {helpOpen && <div className="global-feedback-backdrop" role="presentation">
+        <section ref={dialogRef} tabIndex={-1} className="global-feedback-dialog" role="dialog" aria-modal="true" aria-labelledby="global-help-title">
+          <header><div><h2 id="global-help-title">Ajuda</h2><p>Como podemos ajudar?</p></div><button type="button" onClick={closeDialog} aria-label="Fechar">×</button></header>
+          <div className="global-feedback-menu global-help-options">{OPTIONS.map((item) => (
+            <button key={item.type} type="button" onClick={() => choose(item.type)}>
+              <span aria-hidden="true">{item.icon}</span><div><strong>{item.label}</strong><small>{item.detail}</small></div>
+            </button>
+          ))}</div>
+        </section>
+      </div>}
 
       {type && <div className="global-feedback-backdrop" role="presentation">
         <section ref={dialogRef} tabIndex={-1} className="global-feedback-dialog" role="dialog" aria-modal="true" aria-labelledby="global-feedback-title">

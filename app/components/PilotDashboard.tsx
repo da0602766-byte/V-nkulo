@@ -1295,6 +1295,10 @@ export default function PilotDashboard({
               </section>
             ))}
             <LabModuleNav communityId={active.comunidadeId}/>
+            <button type="button" aria-label="Ajuda" title="Ajuda" onClick={() => window.dispatchEvent(new CustomEvent("vinkulo:open-help"))}>
+              <span className="pilot-sidebar-icon" aria-hidden="true">?</span>
+              <span className="pilot-sidebar-label">Ajuda</span>
+            </button>
             <Link
               className="pilot-public-directory-link"
               href="/comunidades"
@@ -1655,6 +1659,13 @@ export default function PilotDashboard({
                   >
                     <span aria-hidden="true"><MenuIcon id="drive" /></span>
                     <strong>Google Drive</strong>
+                  </button>
+                  <button type="button" onClick={() => {
+                    setMobileMenu(null);
+                    requestAnimationFrame(() => window.dispatchEvent(new CustomEvent("vinkulo:open-help")));
+                  }}>
+                    <span aria-hidden="true">?</span>
+                    <strong>Ajuda</strong>
                   </button>
                 </div>
               </div>

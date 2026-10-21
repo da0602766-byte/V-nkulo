@@ -44,7 +44,7 @@ test("líder do próprio ministério pode nomear co-líder sem ampliar o escopo"
   assert.match(route, /if \(!canManage\)/);
   assert.match(access, /own_leadership\.papel = 'LIDER'/);
   assert.match(workspace, /Líderes do ministério, pastores e proprietários podem nomear outro líder/);
-  assert.match(route, /Líderes só podem ser removidos pela gestão global/);
+  assert.match(route, /Somente o proprietário da comunidade pode remover líderes/);
 });
 
 test("gestão recebe líderes promovidos mesmo antes do primeiro ministério", async () => {

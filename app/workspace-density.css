@@ -108,3 +108,17 @@
 .pilot-dashboard[data-ui-version="v2"] .secretary-workspace.secretary-catalog.ministry-project .ministry-directory-card .secretary-ministry-meta { margin:0 16px!important; align-self:stretch; }
 .pilot-dashboard .parking-space-card:has(.parking-space-reservations) .parking-space-current { min-height:0; }
 @media(max-width:760px) { .pilot-dashboard .garage-actions button { min-height:44px; } }
+
+/* Member actions share the existing last column and wrap within it. */
+.pilot-dashboard .secretary-members .secretary-capacity-form { flex-wrap:wrap; gap:8px; min-width:0; }
+.pilot-dashboard[data-ui-version="v2"] .secretary-members .secretary-capacity-form .secretary-remove-member { flex-basis:100%; min-height:calc(45px * var(--vinkulo-ui-scale-inverse,1))!important; padding:8px; white-space:normal; background:transparent; color:var(--pilot-danger,#b42338); border:1px solid currentColor; font-size:13px; }
+.pilot-dashboard .secretary-members article > div > strong { overflow-wrap:anywhere; }
+.pilot-dashboard .secretary-day-picker label { position:relative; }
+.pilot-dashboard .secretary-day-picker input[type="checkbox"] { width:1px!important; height:1px!important; min-height:0!important; padding:0!important; inset:0; }
+.pilot-dashboard .secretary-day-picker input:focus-visible + span { outline:2px solid var(--pilot-primary); outline-offset:2px; }
+@media(max-width:760px) {
+  .pilot-dashboard[data-ui-version="v2"] .secretary-members .secretary-capacity-form { justify-self:stretch; }
+  .pilot-dashboard[data-ui-version="v2"] .secretary-members .secretary-capacity-form label::before { content:none; }
+  .pilot-dashboard[data-ui-version="v2"] .secretary-members .secretary-capacity-form input { font-size:16px; min-height:calc(45px * var(--vinkulo-ui-scale-inverse,1))!important; }
+  .pilot-dashboard[data-ui-version="v2"] .secretary-members .secretary-capacity-form button { min-height:calc(45px * var(--vinkulo-ui-scale-inverse,1))!important; }
+}

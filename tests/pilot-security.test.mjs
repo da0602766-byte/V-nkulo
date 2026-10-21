@@ -373,7 +373,7 @@ test("Ministérios, Diaconia, uploads e Aparência mantêm os novos bloqueios", 
   ]);
   assert.match(ministryRoute, /export async function DELETE/);
   assert.match(ministryRoute, /canManageMinistry/);
-  assert.match(ministryRoute, /DELETE FROM ministerio_voluntarios/);
+  assert.match(ministryRoute, /UPDATE ministerio_voluntarios SET ativo = 0/);
   assert.match(resourcesRoute, /EXCLUIR_FUNCAO/);
   assert.match(resourcesRoute, /EXCLUIR_MODELO/);
   assert.match(diaconiaRoute, /EXCLUIR_ITEM/);

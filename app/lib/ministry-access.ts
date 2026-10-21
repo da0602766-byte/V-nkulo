@@ -3,8 +3,28 @@ import type { TenantContext } from "./tenant";
 
 type D1Database = ReturnType<typeof getD1>;
 
+// Shared by the list and mutation: administrative roles alone do not grant removal.
+export const ministryMemberRemovalCondition = `m.status = 'ATIVO' AND (
+  ? = 1 OR m.responsavel_usuario_id = ? OR EXISTS (
+    SELECT 1 FROM ministerio_voluntarios removal_leadership
+    WHERE removal_leadership.ministerio_id = m.id
+      AND removal_leadership.comunidade_id = m.comunidade_id
+      AND removal_leadership.usuario_id = ?
+      AND removal_leadership.papel = 'LIDER' AND removal_leadership.ativo = 1
+  )
+)`;
+
+export async function canRemoveMinistryMembers(db: D1Database, context: TenantContext, userId: number, ministryId: number) {
+  const ministry = await db.prepare(`SELECT m.id FROM ministerios_comunidade m
+    WHERE m.id = ? AND m.comunidade_id = ? AND (${ministryMemberRemovalCondition})`)
+    .bind(ministryId, context.comunidadeId, context.isCommunityOwner ? 1 : 0, userId, userId)
+    .first<{ id: number }>();
+  return Boolean(ministry);
+}
+
 export function hasGlobalMinistryManagement(context: TenantContext) {
   return (
+    context.isCommunityOwner ||
     context.isOwner ||
     context.communityAccess === "OWNER" ||
     context.papel === "PASTOR" ||

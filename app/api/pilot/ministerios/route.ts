@@ -1,5 +1,5 @@
 import { getD1 } from "../../../../db";
-import { hasGlobalMinistryManagement } from "../../../lib/ministry-access";
+import { hasGlobalMinistryManagement, ministryMemberRemovalCondition } from "../../../lib/ministry-access";
 import { parseMinistryPayload } from "../../../lib/ministry-validation";
 import { recordPromotionNotice } from "../../../lib/recepcao";
 import { recordTenantAudit } from "../../../lib/tenant-audit";
@@ -23,6 +23,8 @@ export async function GET() {
         m.fio_habilitado, m.fio_etapas,
         m.responsavel_usuario_id, responsavel.nome AS responsavel_nome,
         m.criado_em, m.atualizado_em,
+        CASE WHEN ${ministryMemberRemovalCondition} THEN 1 ELSE 0 END AS can_remove_members,
+        ? AS can_remove_leaders,
         CASE WHEN m.status = 'ATIVO' AND (
           ? = 1
           OR m.responsavel_usuario_id = ?
@@ -84,6 +86,10 @@ export async function GET() {
       LIMIT 100`,
     )
     .bind(
+      access.context.isCommunityOwner ? 1 : 0,
+      access.user.id,
+      access.user.id,
+      access.context.isCommunityOwner ? 1 : 0,
       globalManager ? 1 : 0,
       access.user.id,
       access.user.id,
