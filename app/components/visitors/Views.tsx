@@ -2,6 +2,7 @@
 import {useMemo,useState,useEffect,useRef,type ReactNode} from 'react';
 import {type Pessoa,type Categoria,type PerfilConfig,type Status,today,age,whatsapp} from './data';
 import {Dialog} from './Dialog';
+import {useVisitorPreference,useColumnWidths,ColumnHandle} from './WorkspaceControls';
 import {visitorBirthdayInYear} from '../../lib/visitor-birthday';
 /* ---------- helpers & styles ---------- */
 const STATUS: Status[] = ['Novo', 'Em contato', 'Em acompanhamento', 'Integrado']
@@ -178,6 +179,8 @@ export function Pessoas({
   categoryFilter: string
   onCategoryChange: (value:string) => void
 }) {
+  const [stagesCollapsed,setStagesCollapsed]=useVisitorPreference('stages');
+  const columns=useColumnWidths();
   const [q, setQ] = useState('')
   const filtersRef = useRef<HTMLDivElement>(null);
   useEffect(()=>{
@@ -409,7 +412,7 @@ export function Pessoas({
 
       <div className="vp-people-body flex-1 min-h-0 flex border-t border-stone-100">
         {/* Desktop Sidebar Recortes */}
-        <div className="vp-people-stages hidden xl:block w-60 shrink-0 border-r border-stone-200 overflow-y-auto py-5 px-3">
+        <div id="vp-stage-panel" data-collapsed={stagesCollapsed} className="vp-people-stages hidden xl:block w-60 shrink-0 border-r border-stone-200 overflow-y-auto py-5 px-3">
           {(['Etapa', 'Atenção', 'Integração'] as const).map((g) => (
             <div key={g} className="mb-4">
               <div className="px-2 mb-1.5 text-[11px] uppercase tracking-[.14em] text-stone-400 font-semibold">
@@ -451,6 +454,7 @@ export function Pessoas({
             <button type="button" className="vp-status-trigger" aria-label={`Filtrar status e acompanhamento: ${recortes.find(r=>r.id===rec)?.label}`} aria-haspopup="dialog" aria-expanded={statusPicker} onClick={()=>setStatusPicker(true)}>
               <Icon d={I.filter}/><span>{recortes.find(r=>r.id===rec)?.label}</span><strong>{count(rec)}</strong><Icon d={I.chevronDown}/>
             </button>
+            <div className="vp-workspace-controls"><button className="vp-stage-toggle" aria-controls="vp-stage-panel" aria-expanded={!stagesCollapsed} onClick={()=>setStagesCollapsed(!stagesCollapsed)}><Icon d={I.filter}/>{stagesCollapsed?'Mostrar etapas':'Recolher etapas'}</button><button className="vp-width-reset" onClick={columns.reset} title="Restaurar as larguras originais das colunas">Restaurar colunas</button></div>
             <div className="vp-filterbar">
               <div className="relative flex-1">
                 <Icon d={I.search} className="size-4 absolute left-3 top-3 text-stone-400" />
@@ -757,7 +761,8 @@ export function Pessoas({
               <>
                 {/* Desktop Table View */}
                 <div className="vp-people-table hidden xl:block">
-                  <table className="w-full text-[13px]">
+                  <table ref={columns.tableRef} style={columns.widths?{width:columns.widths.reduce((a,b)=>a+b,0),minWidth:0}:undefined} className="w-full text-[13px]">
+                    <colgroup>{(columns.widths||[6,28,15,15,10,13,13]).map((w,i)=><col key={i} style={{width:columns.widths?w:`${w}%`}}/>)}</colgroup>
                     <thead className="sticky top-0 z-10 bg-stone-50 text-left text-[11px] uppercase tracking-[.12em] text-stone-500 border-b border-stone-200">
                       <tr>
                         <th className="pl-6 w-8 py-3">
@@ -769,12 +774,12 @@ export function Pessoas({
                             }
                           />
                         </th>
-                        <th className="px-3 font-semibold">Pessoa</th>
-                        <th className="px-3 font-semibold">Categoria / Ministério</th>
-                        <th className="px-3 font-semibold">Responsável</th>
-                        <th className="px-3 font-semibold">Status</th>
-                        <th className="px-3 font-semibold">Último contato</th>
-                        <th className="px-3 pr-6 font-semibold">Próxima ação</th>
+                        <th className="px-3 font-semibold">Pessoa<ColumnHandle index={1} label="Pessoa" columns={columns}/></th>
+                        <th className="px-3 font-semibold">Categoria / Ministério<ColumnHandle index={2} label="Categoria / Ministério" columns={columns}/></th>
+                        <th className="px-3 font-semibold">Responsável<ColumnHandle index={3} label="Responsável" columns={columns}/></th>
+                        <th className="px-3 font-semibold">Status<ColumnHandle index={4} label="Status" columns={columns}/></th>
+                        <th className="px-3 font-semibold">Último contato<ColumnHandle index={5} label="Último contato" columns={columns}/></th>
+                        <th className="px-3 pr-6 font-semibold">Próxima ação<ColumnHandle index={6} label="Próxima ação" columns={columns}/></th>
                       </tr>
                     </thead>
                     <tbody>

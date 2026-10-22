@@ -56,12 +56,6 @@ body:has(.visitor-app){padding-bottom:0;overflow:hidden}
 .vp-people-table thead{top:var(--vp-filter-height,64px);z-index:15}
 .vp-people-table th{background:#f3f4fb}
 .vp-people-table table{table-layout:fixed;width:100%}
-.vp-people-table th:nth-child(1){width:6%;padding-left:12px}
-.vp-people-table th:nth-child(2){width:28%}
-.vp-people-table th:nth-child(3){width:15%}
-.vp-people-table th:nth-child(4){width:15%}
-.vp-people-table th:nth-child(5){width:10%}
-.vp-people-table th:nth-child(6),.vp-people-table th:nth-child(7){width:13%}
 .vp-people-table td{overflow-wrap:break-word;word-break:normal;padding-inline:8px}
 .vp-people-table th{padding-inline:8px;overflow-wrap:normal}
 .vp-people-table td:first-child{padding-left:12px}
@@ -273,4 +267,25 @@ body:has(.visitor-app){padding-bottom:0;overflow:hidden}
   .vp-people-metrics>div>div:last-child{font-size:24px}
   .vp-notice-row{flex-wrap:wrap;gap:6px}
   .vp-notice-row>div{flex-basis:100%}
+}
+
+/* Independent workspace panels and spreadsheet-style column resizing. */
+.vp-menu-rail{display:none}
+.vp-workspace-controls{display:none;align-items:center;gap:8px;margin-bottom:6px;color:#5f6683;font-size:11px}
+.vp-workspace-controls button{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:4px 8px;border:1px solid #dde0ee;border-radius:8px;background:#fff}
+.vp-workspace-controls .vp-width-reset{margin-left:auto}
+.vp-column-handle{position:absolute;right:0;top:0;width:12px;height:100%;cursor:col-resize;touch-action:none;user-select:none;border-right:2px solid #d2d5e8;z-index:2}
+.vp-column-handle:hover,.vp-column-handle:focus-visible{background:#4f46e522;border-right-color:#4f46e5;outline:2px solid #4f46e5;outline-offset:-2px}
+.vp-people-table th{position:relative;padding-right:16px}
+@media(min-width:1024px){
+ .vp-menu-rail{display:flex;flex:0 0 44px;justify-content:center;padding-top:14px}
+ .vp-menu-rail button{width:40px;height:44px;border-radius:10px;background:#ffffffb8;color:#4338ca;display:grid;place-items:center}
+ .vp-menu-collapsed .vp-sidebar{display:none}
+}
+@media(min-width:1280px){
+ .vp-people-stages[data-collapsed=true]{display:none}
+ .vp-workspace-controls{display:flex}
+ .vp-people-table{overflow:auto;max-height:calc(100dvh * var(--vinkulo-ui-scale-inverse,1) - var(--vp-filter-height,110px) - 30px);overscroll-behavior:contain}
+ .vp-people-table thead{top:0}
+ .vp-people-table table{min-width:100%}
 }
