@@ -235,6 +235,7 @@ export async function GET(request: Request) {
       .prepare(
         `SELECT d.id, d.escala_id, d.voluntario_id, d.usuario_id, d.equipe_id,
           u.nome, u.telefone, u.foto_perfil, u.email AS owner_email,
+          (SELECT official.titulo FROM oficiais_comunidade official JOIN usuario_comunidades membership ON membership.id=official.usuario_comunidade_id WHERE membership.usuario_id=d.usuario_id AND membership.comunidade_id=d.comunidade_id AND membership.status='ATIVO' LIMIT 1) AS titulo_oficial,
           u.criado_em AS owner_criado_em, d.funcao, d.status,
           equipe.nome AS equipe_nome, equipe.cor AS equipe_cor,
           CASE WHEN d.usuario_id = ? THEN 1 ELSE 0 END AS is_mine

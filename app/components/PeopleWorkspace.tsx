@@ -95,6 +95,7 @@ const PERMISSION_LABELS: Record<string, string> = {
 };
 
 const TITLES = [
+  "ASPIRANTE",
   "LÍDER",
   "DIÁCONO",
   "DIACONISA",
@@ -116,6 +117,7 @@ const TITLES = [
 ];
 
 const TITLE_CATEGORIES = [
+  { label: "Formação", titles: ["ASPIRANTE"] },
   { label: "Liderança de células", titles: ["LÍDER", "SUPERVISOR DE CÉLULAS", "SUPERVISORA DE CÉLULAS"] },
   { label: "Cuidado e diaconia", titles: ["GESTOR DE CUIDADO", "GESTORA DE CUIDADO", "DIÁCONO", "DIACONISA"] },
   { label: "Ministérios", titles: ["COORDENADOR DE MINISTÉRIO", "COORDENADORA DE MINISTÉRIO", "EVANGELISTA", "MISSIONÁRIO", "MISSIONÁRIA"] },
@@ -124,6 +126,7 @@ const TITLE_CATEGORIES = [
 ] as const;
 
 const HIERARCHY_PERMISSION_PRESETS: Record<string, string[]> = {
+  "ASPIRANTE": [],
   "LÍDER": ["visitors.view", "visitors.create", "visitors.edit", "followups.view", "followups.manage", "cells.view", "events.view", "ministries.view", "schedules.view", "feed.publish"],
   "DIÁCONO": ["visitors.view", "followups.view", "events.view", "ministries.view", "schedules.view", "parking.view", "parking.report"],
   "DIACONISA": ["visitors.view", "followups.view", "events.view", "ministries.view", "schedules.view", "parking.view", "parking.report"],
@@ -532,7 +535,7 @@ export default function PeopleWorkspace({
             <div className="people-card-main">
               <button type="button" className="people-person-button" onClick={() => setRecord(person)} aria-label={`Abrir ficha de ${person.nome}`}>
                 <span className="people-avatar">{person.foto_perfil ? <SafeImage src={person.foto_perfil} alt="" fallbackName={person.nome} fallbackKind="avatar" /> : getInitials(person.nome)}</span>
-                <span><VerifiedOwnerName name={person.nome} verified={Boolean(person.owner_verified)} /><small>Unção: {person.oficial ? person.titulo_oficial || "Não informada" : "Não informada"} · Função: {roleLabel(person.papel)}</small></span>
+                <span><VerifiedOwnerName name={person.nome} verified={Boolean(person.owner_verified)} official={Boolean(person.oficial)} officialTitle={person.oficial?person.titulo_oficial:null} /><small>Unção: {person.oficial ? person.titulo_oficial || "Não informada" : "Não informada"} · Função: {roleLabel(person.papel)}</small></span>
               </button>
             </div>
             <div className="people-directory-ministry"><small className="people-mobile-label">Ministérios</small><span>{person.ministerios || "Sem vínculo ativo"}</span></div>
@@ -799,7 +802,7 @@ function SelfProfile({
       <header className="workspace-heading people-heading">
         <div>
           <p className="pilot-kicker">MEU PERFIL</p>
-          <h1>Olá, <VerifiedOwnerName name={me.nome} verified={Boolean(me.owner_verified)} /></h1>
+          <h1>Olá, <VerifiedOwnerName name={me.nome} verified={Boolean(me.owner_verified)} official={Boolean(me.oficial)} officialTitle={me.oficial?me.titulo_oficial:null} /></h1>
           <p>
             Mantenha seus contatos atualizados e consulte seus vínculos nesta comunidade.
           </p>
@@ -811,7 +814,7 @@ function SelfProfile({
       <div className="self-profile-card">
         <aside>
           <span className="self-profile-avatar" aria-hidden="true">{getInitials(me.nome)}</span>
-          <VerifiedOwnerName name={me.nome} verified={Boolean(me.owner_verified)} />
+          <VerifiedOwnerName name={me.nome} verified={Boolean(me.owner_verified)} official={Boolean(me.oficial)} officialTitle={me.oficial?me.titulo_oficial:null} />
           <small>{me.email}</small>
           <em>{me.oficial ? me.titulo_oficial || "Oficial" : "Membro"}</em>
         </aside>

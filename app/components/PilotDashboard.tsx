@@ -1072,7 +1072,7 @@ export default function PilotDashboard({
                 )}
               </span>
               <div>
-                <VerifiedOwnerName name={userName} verified={active.isOwner} />
+                <VerifiedOwnerName name={userName} verified={active.isOwner} officialTitle={memberships.find(m=>m.comunidadeId===active.comunidadeId)?.tituloOficial} />
                 <small>{active.isOwner ? "Proprietário" : ROLE_LABELS[active.papel] || active.papel}</small>
               </div>
               <i aria-hidden="true">⌄</i>
@@ -1080,7 +1080,7 @@ export default function PilotDashboard({
             <div className="pilot-user-popover">
               <header className="pilot-user-popover-head-v3">
                 <span>{userPhotoUrl ? <SafeImage fallbackName={userName} fallbackKind="avatar" loading="lazy" src={userPhotoUrl} alt="" /> : userInitials}</span>
-                <div className="pilot-user-popover-identity"><VerifiedOwnerName name={userName} verified={active.isOwner} /><small>{userEmail}</small><em>{active.isOwner ? "Proprietário" : ROLE_LABELS[active.papel] || active.papel}</em></div>
+                <div className="pilot-user-popover-identity"><VerifiedOwnerName name={userName} verified={active.isOwner} officialTitle={memberships.find(m=>m.comunidadeId===active.comunidadeId)?.tituloOficial} /><small>{userEmail}</small><em>{active.isOwner ? "Proprietário" : ROLE_LABELS[active.papel] || active.papel}</em></div>
               </header>
               <dl>
                 <div><dt>Comunidade ativa</dt><dd>{active.comunidadeNome}</dd></div>
@@ -1273,7 +1273,7 @@ export default function PilotDashboard({
               <strong>{sidebarCollapsed ? "Expandir" : "Recolher"}</strong>
             </button>
           </div>
-          <div className="pilot-profile-card"><span>{userPhotoUrl ? <SafeImage fallbackName={userName} fallbackKind="avatar" loading="lazy" src={userPhotoUrl} alt="" /> : userInitials}</span><div><small><VerifiedOwnerName name={userName} verified={active.isOwner} /></small><strong>{active.communityAccess === "FEED_ONLY" ? "Proprietário · somente feed" : active.isOwner ? "Proprietário do sistema" : ROLE_LABELS[active.papel] || active.papel}</strong></div></div>
+          <div className="pilot-profile-card"><span>{userPhotoUrl ? <SafeImage fallbackName={userName} fallbackKind="avatar" loading="lazy" src={userPhotoUrl} alt="" /> : userInitials}</span><div><small><VerifiedOwnerName name={userName} verified={active.isOwner} officialTitle={memberships.find(m=>m.comunidadeId===active.comunidadeId)?.tituloOficial} /></small><strong>{active.communityAccess === "FEED_ONLY" ? "Proprietário · somente feed" : active.isOwner ? "Proprietário do sistema" : ROLE_LABELS[active.papel] || active.papel}</strong></div></div>
           <nav aria-label="Menu por perfil" data-editor-key="navegacao-principal">
             {sidebarGroups.map((group) => (
               <section className="pilot-sidebar-group" key={group.label} aria-label={group.label}>
@@ -1374,6 +1374,8 @@ export default function PilotDashboard({
           )}
           {visibleView === "ministerios" && (
             <SecretaryMinisterialWorkspace
+              key={active.comunidadeId}
+              preferenceKey={`${active.comunidadeId}:${active.userId}`}
               permissions={active.permissions}
               communityName={active.comunidadeNome}
             />
@@ -1772,7 +1774,7 @@ export default function PilotDashboard({
                 <div className="pilot-mobile-profile-card">
                   <span>{userPhotoUrl ? <SafeImage fallbackName={userName} fallbackKind="avatar" loading="lazy" src={userPhotoUrl} alt="" /> : userInitials}</span>
                   <div>
-                    <VerifiedOwnerName name={userName} verified={active.isOwner} />
+                    <VerifiedOwnerName name={userName} verified={active.isOwner} officialTitle={memberships.find(m=>m.comunidadeId===active.comunidadeId)?.tituloOficial} />
                     <small>{userEmail}</small>
                     <em>{active.communityAccess === "FEED_ONLY" ? "Proprietário · somente feed" : active.isOwner ? "Proprietário do sistema" : ROLE_LABELS[active.papel] || active.papel}</em>
                   </div>

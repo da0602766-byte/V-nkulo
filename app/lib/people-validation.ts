@@ -2,6 +2,7 @@ import { normalizeOfficialPermissions } from "./tenant-policy.mjs";
 import { normalizeBrazilianPhone } from "./brazilian-validation";
 
 const OFFICIAL_TITLES = [
+  "ASPIRANTE",
   "LÍDER",
   "DIÁCONO",
   "DIACONISA",

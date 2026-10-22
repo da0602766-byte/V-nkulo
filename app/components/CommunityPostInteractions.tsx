@@ -13,6 +13,7 @@ type Comment = {
   foto: string;
   papel: string;
   ownerVerified?: boolean;
+  officialTitle?: string | null;
   isOwner?: boolean;
 };
 
@@ -160,7 +161,7 @@ export default function CommunityPostInteractions({
                       : <span aria-hidden="true">{initials(comment.autor)}</span>}
                     <div className="community-comment-body">
                       <header>
-                        <VerifiedOwnerName className="community-comment-name" name={comment.autor} verified={Boolean(comment.ownerVerified)} />
+                        <VerifiedOwnerName className="community-comment-name" name={comment.autor} verified={Boolean(comment.ownerVerified)} officialTitle={comment.officialTitle} />
                         {comment.papel && (
                           <span className="community-comment-role" data-highlight={HIGHLIGHTED_ROLES.includes(comment.papel) ? "true" : undefined}>
                             {comment.papel}

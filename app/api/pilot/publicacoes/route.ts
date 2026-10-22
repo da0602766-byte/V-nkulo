@@ -39,6 +39,7 @@ export async function GET(request: Request) {
       p.imagem_thumbnail_url, p.imagem_alt, p.imagem_width, p.imagem_height,
       p.links_json, p.audiencia_tipo, p.ministerios_json,
       p.canal_feed, p.canal_lateral, p.aprovacao_status,
+      (SELECT oc.titulo FROM oficiais_comunidade oc JOIN usuario_comunidades membership ON membership.id=oc.usuario_comunidade_id WHERE membership.usuario_id=p.criado_por AND membership.comunidade_id=p.comunidade_id AND membership.status='ATIVO' LIMIT 1) AS autor_titulo_oficial,
       u.nome AS autor_nome, u.foto_perfil AS autor_foto,
       u.email AS autor_email, u.criado_em AS autor_criado_em,
       (SELECT uc.papel FROM usuario_comunidades uc

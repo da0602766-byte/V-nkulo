@@ -20,6 +20,7 @@ type PresencePerson = {
   canMessage: boolean;
   communicationGroup: "MEMBRO" | "OFICIAL";
   ownerVerified?: boolean;
+  officialTitle?: string | null;
 };
 
 type PresenceResponse = {
@@ -174,7 +175,7 @@ export default function CommunityPresencePanel() {
                 <i className={person.online ? "online" : ""} />
               </span>
               <div>
-                <VerifiedOwnerName name={person.name} verified={Boolean(person.ownerVerified)} />
+                <VerifiedOwnerName name={person.name} verified={Boolean(person.ownerVerified)} officialTitle={person.officialTitle} />
                 <small>{formatHierarchy(person.hierarchy)}</small>
               </div>
               <em className={person.online ? "online" : ""}>
@@ -189,7 +190,7 @@ export default function CommunityPresencePanel() {
               <FeedPresencePopover id={`${profileId}-${person.userId}`} label={`Perfil de ${person.name}`} anchorRef={selectedRowRef} triggerRef={selectedTriggerRef} onClose={closeProfile} onDismiss={() => setSelectedPersonId(null)}>
                 <header>
                   <div>
-                    <VerifiedOwnerName name={person.name} verified={Boolean(person.ownerVerified)} />
+                    <VerifiedOwnerName name={person.name} verified={Boolean(person.ownerVerified)} officialTitle={person.officialTitle} />
                     <small>{formatHierarchy(person.hierarchy)}</small>
                   </div>
                   <button type="button" onClick={closeProfile} aria-label="Fechar perfil">×</button>

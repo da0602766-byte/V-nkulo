@@ -7,6 +7,7 @@ type PresenceRow = {
   nome: string;
   foto_perfil: string | null;
   hierarquia: string;
+  titulo_oficial: string | null;
   ultima_atividade: string;
   exibir_ultima_atividade: number;
   online: number;
@@ -36,7 +37,7 @@ async function listPresence(
 ) {
   const result = await getD1()
     .prepare(
-      `SELECT p.usuario_id, u.nome, u.foto_perfil,
+      `SELECT p.usuario_id, u.nome, u.foto_perfil, oc.titulo AS titulo_oficial,
         u.email AS owner_email, u.criado_em AS owner_criado_em,
         COALESCE(json_extract(u.cadastro_dados, '$.biografia.value'), '') AS biografia,
         CASE
@@ -89,6 +90,7 @@ async function listPresence(
       name: item.nome,
       avatarUrl: item.foto_perfil,
       hierarchy: item.hierarquia,
+      officialTitle: item.titulo_oficial,
       online: Boolean(item.online),
       lastSeen:
         item.online ||

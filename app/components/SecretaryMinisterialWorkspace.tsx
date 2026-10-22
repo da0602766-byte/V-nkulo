@@ -1,5 +1,6 @@
 "use client";
 import "./directory-controls.css";
+import "./ministry-catalog.css";
 import { matchesDirectorySearch } from "../lib/directory-search";
 import SafeImage from "./SafeImage";
 import FileSaveActions from "./FileSaveActions";
@@ -39,6 +40,8 @@ type Volunteer = {
   limite_escalas: number;
   escalas_ativas: number;
   is_mine: number;
+  foto_perfil?: string | null;
+  titulo_oficial?: string | null;
 };
 type Ministry = {
   id: number;
@@ -49,6 +52,9 @@ type Ministry = {
   youtube_url: string;
   spotify_url: string;
   banner_url: string;
+  total_integrantes: number;
+  confirmacoes_pendentes: number;
+  responsavel_titulo_oficial?: string | null;
   responsavel_usuario_id: number | null;
   responsavel_nome: string | null;
   criado_em: string;
@@ -83,6 +89,7 @@ type Assignment = {
   telefone?: string;
   foto_perfil?: string | null;
   owner_verified?: number;
+  titulo_oficial?: string | null;
 };
 type ScheduleTeam = {
   equipe_id: number;
@@ -242,11 +249,17 @@ const DAYS = [
 export default function SecretaryMinisterialWorkspace({
   permissions,
   communityName,
+  preferenceKey,
 }: {
+  preferenceKey: string;
   permissions: string[];
   communityName: string;
 }) {
   const [ministries, setMinistries] = useState<Ministry[]>([]);
+  const [favorites,setFavorites]=useState<number[]>([]);
+  useEffect(()=>{try{const saved=JSON.parse(localStorage.getItem(`ministry-favorites:${preferenceKey}`)||'[]');setFavorites(Array.isArray(saved)?saved.filter(n=>Number.isSafeInteger(n)&&n>0):[]);}catch{setFavorites([]);}},[preferenceKey]);
+  function toggleFavorite(id:number){setFavorites(current=>{const next=current.includes(id)?current.filter(n=>n!==id):[...current,id];try{localStorage.setItem(`ministry-favorites:${preferenceKey}`,JSON.stringify(next));}catch{}return next;});}
+
   const [availableUsers, setAvailableUsers] = useState<AvailableUser[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
@@ -1388,24 +1401,22 @@ export default function SecretaryMinisterialWorkspace({
                 data-editor-key={`ministerios-catalogo-item-${ministry.id}`}
                 key={ministry.id}
               >
-                <button
-                  type="button"
-                  className={`secretary-ministry-tile ministry-directory-card ${ministry.banner_url ? "has-banner" : ""}`}
-                  onClick={() => openMinistry(ministry)}
-                >
-                  <span className={`secretary-ministry-tile-media ${ministry.banner_url ? "" : "is-placeholder"}`} aria-hidden="true">
-                    {ministry.banner_url ? <SafeImage src={ministry.banner_url} alt="" loading="lazy" /> : <span>{ministrySymbol(ministry.categoria)}</span>}
-                  </span>
-                  <span className="secretary-ministry-copy">
-                    {ministry.categoria !== "OUTRO" && (CATEGORY_LABELS[ministry.categoria] || ministry.categoria).toLocaleLowerCase("pt-BR") !== ministry.nome.toLocaleLowerCase("pt-BR") && <small>{CATEGORY_LABELS[ministry.categoria] || ministry.categoria}</small>}
-                    <strong>{ministry.nome}</strong>
-                    {ministry.descricao && <span>{ministry.descricao}</span>}
-                  </span>
-                  <span className="secretary-ministry-meta">
-                    {ministry.responsavel_nome && <strong title={`Liderança: ${ministry.responsavel_nome}`}>{ministry.responsavel_nome}</strong>}
-                    <span className="ministry-card-action">{ministry.can_manage ? "Gerenciar" : "Minhas escalas"}<b aria-hidden="true">→</b></span>
-                  </span>
-                </button>
+                <div className="ministry-design-cover">
+                  {ministry.banner_url ? <SafeImage src={ministry.banner_url} alt="" loading="lazy" /> : <div className="ministry-design-placeholder" aria-hidden="true">{ministrySymbol(ministry.categoria)}</div>}
+                  <span className="ministry-design-category">{CATEGORY_LABELS[ministry.categoria] || ministry.categoria}</span>
+                  <button type="button" className="ministry-design-favorite" aria-pressed={favorites.includes(ministry.id)} aria-label={`${favorites.includes(ministry.id)?'Remover dos favoritos':'Favoritar'}: ${ministry.nome}`} title="Favoritos neste navegador" onClick={()=>toggleFavorite(ministry.id)}>
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill={favorites.includes(ministry.id)?'currentColor':'none'} stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></svg>
+                  </button>
+                </div>
+                <div className="ministry-design-body">
+                  <div className="ministry-design-title"><h2>{ministry.nome}</h2>{ministry.status==='INATIVO'&&<span>Inativo</span>}{ministry.confirmacoes_pendentes>0&&<span title={ministry.can_manage?'Confirmações pendentes nas próximas escalas':'Suas confirmações pendentes nas próximas escalas'}>{ministry.confirmacoes_pendentes} {ministry.confirmacoes_pendentes===1?'confirmação pendente':'confirmações pendentes'}</span>}</div>
+                  <p>{ministry.descricao || 'Conheça a equipe e acompanhe as atividades deste ministério.'}</p>
+                  <div className="ministry-design-meta">
+                    <div className="ministry-design-members"><div className="ministry-design-avatars" aria-hidden="true">{ministry.voluntarios.slice(0,2).map(v=><span key={v.id}>{v.foto_perfil?<SafeImage src={v.foto_perfil} alt="" loading="lazy"/>:v.nome.trim().split(/\s+/).slice(0,2).map(n=>n[0]).join('')}</span>)}</div><span>{ministry.total_integrantes} {ministry.total_integrantes===1?'integrante':'integrantes'}</span></div>
+                    <div className="ministry-design-leader"><small>Liderança</small>{ministry.responsavel_nome?<VerifiedOwnerName name={ministry.responsavel_nome} officialTitle={ministry.responsavel_titulo_oficial}/>:<span>A definir</span>}</div>
+                  </div>
+                  <button type="button" className="ministry-design-open" aria-label={`Abrir ministério ${ministry.nome}`} onClick={()=>openMinistry(ministry)}>Abrir ministério <span aria-hidden="true">→</span></button>
+                </div>
               </article>
             ))}
             {!visibleMinistries.length && ministries.length > 0 && <div className="secretary-empty secretary-catalog-empty"><h2>Nenhum ministério encontrado</h2><p>Ajuste sua busca ou use Limpar filtros para ver os ministérios disponíveis.</p></div>}
@@ -1578,7 +1589,7 @@ export default function SecretaryMinisterialWorkspace({
             <article key={assignment.id} data-status={assignment.status.toLowerCase()}>
               <span className="secretary-avatar">{initials(assignment.nome)}</span>
               <div>
-                <VerifiedOwnerName name={assignment.nome} verified={Boolean(assignment.owner_verified)} />
+                <VerifiedOwnerName name={assignment.nome} verified={Boolean(assignment.owner_verified)} officialTitle={assignment.titulo_oficial} />
                 <small>{assignment.funcao} · {assignmentStatusLabel(assignment.status)}</small>
               </div>
               {Boolean(assignment.is_mine) && assignment.status === "PENDENTE" && schedule.status === "PUBLICADA" && (
@@ -1746,7 +1757,7 @@ export default function SecretaryMinisterialWorkspace({
         </div>
         <div className="secretary-community">
           <span>Líder responsável</span>
-          <strong>{selectedMinistry.responsavel_nome || "Não definido"}</strong>
+          <strong><VerifiedOwnerName name={selectedMinistry.responsavel_nome || "Não definido"} officialTitle={selectedMinistry.responsavel_titulo_oficial}/></strong>
           <small>{communityName} · acesso controlado</small>
           {selectedMinistry.categorias_visitantes?.length > 0 && (
             <small className="secretary-visitor-care">
@@ -1839,7 +1850,7 @@ export default function SecretaryMinisterialWorkspace({
                   <header><div><p className="pilot-kicker">MINISTÉRIO SELECIONADO</p><h2>{selectedMinistry.nome}</h2></div><span>{CATEGORY_LABELS[selectedMinistry.categoria] || selectedMinistry.categoria}</span></header>
                   <p>{selectedMinistry.descricao || "Adicione uma descrição nas configurações do ministério."}</p>
                   <dl>
-                    <div><dt>Responsável</dt><dd>{selectedMinistry.responsavel_nome || "Não definido"}</dd></div>
+                    <div><dt>Responsável</dt><dd><VerifiedOwnerName name={selectedMinistry.responsavel_nome || "Não definido"} officialTitle={selectedMinistry.responsavel_titulo_oficial}/></dd></div>
                     <div><dt>Categorias de visitantes</dt><dd>{selectedMinistry.categorias_visitantes?.length ? selectedMinistry.categorias_visitantes.map((item) => item.nome).join(", ") : "Nenhuma associada"}</dd></div>
                     <div><dt>Status</dt><dd>{selectedMinistry.status === "ATIVO" ? "Ativo" : "Inativo"}</dd></div>
                     <div><dt>Criado em</dt><dd>{formatDate(selectedMinistry.criado_em, false)}</dd></div>
@@ -1876,7 +1887,7 @@ export default function SecretaryMinisterialWorkspace({
                   {selectedMinistry.voluntarios.map((volunteer) => (
                     <article key={volunteer.id}>
                       <span className="secretary-avatar">{initials(volunteer.nome)}</span>
-                      <div className="ministry-member-copy"><strong>{volunteer.nome}</strong><small>{volunteer.funcao || "Função não informada"} · {volunteer.papel === "LIDER" ? "Líder" : "Integrante"}</small>
+                      <div className="ministry-member-copy"><strong><VerifiedOwnerName name={volunteer.nome} officialTitle={volunteer.titulo_oficial}/></strong><small>{volunteer.funcao || "Função não informada"} · {volunteer.papel === "LIDER" ? "Líder" : "Integrante"}</small>
                         <small>{volunteer.escalas_ativas} escala(s) futura(s) · Limite {volunteer.limite_escalas} · {Math.max(0, volunteer.limite_escalas - volunteer.escalas_ativas)} restante(s)</small>
                       </div>
                       {canManage && (
@@ -1958,7 +1969,7 @@ export default function SecretaryMinisterialWorkspace({
                               disabled={!canManage}
                             />
                             <span>{initials(volunteer.nome)}</span>
-                            <small>{volunteer.nome}</small>
+                            <small><VerifiedOwnerName name={volunteer.nome} officialTitle={volunteer.titulo_oficial}/></small>
                           </label>
                         ))}
                       </div>
@@ -3507,7 +3518,7 @@ function ShareDialogV2({
                     : initials(assignment.nome)}
                 </span>
                 <div>
-                  <VerifiedOwnerName name={assignment.nome} verified={Boolean(assignment.owner_verified)} />
+                  <VerifiedOwnerName name={assignment.nome} verified={Boolean(assignment.owner_verified)} officialTitle={assignment.titulo_oficial} />
                   <small>{assignment.funcao}</small>
                 </div>
                 <i aria-hidden="true">{selected ? "✓" : ""}</i>

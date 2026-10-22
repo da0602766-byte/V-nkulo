@@ -1,0 +1,5 @@
+.verified-owner-badge[data-rank=aspirant]{background:#6b7280;color:#fff;border:1px solid #505762;box-shadow:none}
+.verified-owner-badge[data-rank=deacon]{background:#865535;color:#fff;border:1px solid #684128;box-shadow:none}
+.verified-owner-badge[data-rank=elder]{background:linear-gradient(135deg,#f1f4f7,#aeb8c5);color:#273444;border:1px solid #8a96a5;box-shadow:none}
+.verified-owner-badge[data-rank=pastor]{background:linear-gradient(135deg,#ffe49a,#c89a32);color:#473000;border:1px solid #9d731b;box-shadow:none}
+.verified-owner-badge[data-rank=official]{background:var(--pilot-surface-2,#edf1f5);color:var(--pilot-text,#293440);border:1px solid var(--pilot-line,#a8b2bf);box-shadow:none}

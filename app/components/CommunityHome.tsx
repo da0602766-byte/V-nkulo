@@ -49,6 +49,7 @@ type FeedItem = {
   autor_foto?: string | null;
   autor_papel?: string | null;
   autor_verificado?: number;
+  autor_titulo_oficial?: string | null;
   total_comentarios?: number;
   reacoes_json?: string;
   minhas_reacoes_json?: string;
@@ -841,7 +842,7 @@ export default function CommunityHome({
                     <div>
                       <VerifiedOwnerName
                         name={post.autor_nome || communityName}
-                        verified={Boolean(post.autor_verificado)}
+                        verified={Boolean(post.autor_verificado)} officialTitle={post.autor_titulo_oficial}
                       />
                       <small>
                         {post.autor_papel ? `${roleLabel(post.autor_papel)} · ` : ""}{formatDate(post.criado_em)} ·{" "}
