@@ -532,7 +532,7 @@ export default function PeopleWorkspace({
             <div className="people-card-main">
               <button type="button" className="people-person-button" onClick={() => setRecord(person)} aria-label={`Abrir ficha de ${person.nome}`}>
                 <span className="people-avatar">{person.foto_perfil ? <SafeImage src={person.foto_perfil} alt="" fallbackName={person.nome} fallbackKind="avatar" /> : getInitials(person.nome)}</span>
-                <span><VerifiedOwnerName name={person.nome} verified={Boolean(person.owner_verified)} /><small>{person.oficial ? person.titulo_oficial || "Oficial" : roleLabel(person.papel)}</small></span>
+                <span><VerifiedOwnerName name={person.nome} verified={Boolean(person.owner_verified)} /><small>Unção: {person.oficial ? person.titulo_oficial || "Não informada" : "Não informada"} · Função: {roleLabel(person.papel)}</small></span>
               </button>
             </div>
             <div className="people-directory-ministry"><small className="people-mobile-label">Ministérios</small><span>{person.ministerios || "Sem vínculo ativo"}</span></div>

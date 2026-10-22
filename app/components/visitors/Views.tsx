@@ -163,7 +163,8 @@ export function Pessoas({
   onBulk,
   celulas,
   notify,
-  onGoToImport,
+  categoryFilter,
+  onCategoryChange,
 }: {
   pessoas: Pessoa[]
   categorias: Categoria[]
@@ -173,10 +174,12 @@ export function Pessoas({
   onBulk: (ids:string[], action:"arquivar"|"excluir") => Promise<boolean>
   celulas:string[]
   notify: (m: string, tipo?: 'info' | 'error' | 'success') => void
-  onGoToImport: () => void
+  categoryFilter: string
+  onCategoryChange: (value:string) => void
 }) {
   const [q, setQ] = useState('')
-  const [cat, setCat] = useState('')
+  const cat = categoryFilter
+  const setCat = onCategoryChange
   const [statusPicker, setStatusPicker] = useState(false)
   const [filterPicker, setFilterPicker] = useState<'categoria' | 'ordem' | null>(null)
   const orderOptions = [{value:'az',label:'Nome (A–Z)'},{value:'za',label:'Nome (Z–A)'},{value:'recente',label:'Contato recente'},{value:'acao',label:'Próxima ação'}]
@@ -188,6 +191,8 @@ export function Pessoas({
   const [limite, setLimite] = useState(10)
   const [showFiltrosAvancados, setShowFiltrosAvancados] = useState(false)
   const [filtros, setFiltros] = useState<FiltrosAvancados>(filtrosIniciais)
+
+  const categoryPeople = pessoas.filter(p=>!cat || (cat==='__sem' ? !p.categoria : p.categoria===cat))
 
   // Advanced operational filters count
   const countFiltrosAvancados = Object.values(filtros).filter(Boolean).length
@@ -260,7 +265,7 @@ export function Pessoas({
   useEffect(()=>{setSel(new Set());setLimite(10);},[q,cat,rec,filtros]);
   const visiveis = lista.slice(0, limite)
   const filtrosAtivosTotal = (q ? 1 : 0) + (cat ? 1 : 0) + (rec !== 'ativos' ? 1 : 0) + countFiltrosAvancados
-  const count = (r: Recorte) => pessoas.filter((p) => matchRecorte(p, r)).length
+  const count = (r: Recorte) => pessoas.filter((p) => matchRecorte(p, r) && (!cat || (cat === '__sem' ? !p.categoria : p.categoria === cat))).length
   const toggle = (id: string) =>
     setSel((s) => {
       const n = new Set(s)
@@ -303,13 +308,9 @@ export function Pessoas({
   return (
     <div className="vp-people-page">
       <Header
-        title="Pessoas"
-        sub={`${pessoas.filter((p) => !p.arquivado).length} visitantes e membros cadastrados`}
+        title={cat ? (cat === '__sem' ? 'Sem categoria' : cat) : 'Pessoas'}
+        sub={`${pessoas.filter((p) => !p.arquivado && (!cat || (cat === '__sem' ? !p.categoria : p.categoria === cat))).length} visitantes e membros${cat ? ' nesta categoria' : ' cadastrados'}`}
       >
-        <button className={btnSec} aria-label="Importar cadastros" onClick={onGoToImport}>
-          <Icon d={I.upload} />
-          <span className="hidden sm:inline">Importar</span>
-        </button>
         {perfil.podeCriarPessoa && (
           <button className={btnPri} onClick={onNew}>
             <Icon d={I.plus} />
@@ -323,28 +324,28 @@ export function Pessoas({
         {[
           [
             'Visitantes ativos',
-            pessoas.filter((p) => !p.arquivado).length,
+            categoryPeople.filter((p) => !p.arquivado).length,
             'na comunidade',
             'from-brand-600 to-brand-700 text-white shadow-md shadow-brand-600/30',
             'text-white/80',
           ],
           [
             'Novos esta semana',
-            pessoas.filter((p) => !p.arquivado && dias(p.entrada, today()) <= 7).length,
+            categoryPeople.filter((p) => !p.arquivado && p.status === 'Novo' && dias(p.entrada, today()) >= 0 && dias(p.entrada, today()) <= 7).length,
             'aguardando acolhida',
             'from-sky-50 to-sky-100 text-sky-900 ring-1 ring-sky-200/60',
             'text-sky-800/70',
           ],
           [
             'Retornos pendentes',
-            pessoas.filter((p) => !p.arquivado && pendente(p)).length,
+            categoryPeople.filter((p) => !p.arquivado && pendente(p)).length,
             'vencidos ou hoje',
             'from-gold-100 to-orange-100 text-gold-500 ring-1 ring-gold-200/60',
             'text-gold-500/80',
           ],
           [
             'Integrados',
-            pessoas.filter((p) => !p.arquivado && p.status === 'Integrado').length,
+            categoryPeople.filter((p) => !p.arquivado && p.status === 'Integrado').length,
             'servindo ativamente',
             'from-emerald-50 to-emerald-100 text-emerald-900 ring-1 ring-emerald-200/60',
             'text-emerald-800/70',
