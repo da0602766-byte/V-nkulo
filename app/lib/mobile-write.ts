@@ -1,4 +1,5 @@
 import { getD1 } from '../../db';
+import { visitorDriveConfig } from './visitor-drive-store';
 import { getCurrentSessionTokenHash } from './local-auth';
 import { requireTenantPermission } from './tenant';
 import { privateHash, secureToken, rateLimit } from './access-security';
@@ -32,12 +33,14 @@ export const uuid = (value: unknown): value is string => typeof value === 'strin
   && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value);
 
 export async function mobileWriteAccess(request: Request) {
+  // Offline receipts cannot atomically commit together with an external file.
   if (request.headers.get('origin') !== new URL(request.url).origin
       || request.headers.get('sec-fetch-site') === 'cross-site'
       || request.headers.get('x-vinkulo-client') !== 'android-write-1') {
     return { error: mobileReply({error:'Origem ou versão incompatível.'},403) } as const;
   }
   const access = await requireTenantPermission('visitors.create');
+  if(!('error' in access)&&await visitorDriveConfig(access.context.comunidadeId))return {error:mobileReply({error:'Esta comunidade usa o Google Drive. Abra Visitantes online para concluir o cadastro; a fila local não foi confirmada.',code:'DRIVE_ONLINE_REQUIRED'},409)} as const;
   if ('error' in access) return {error:mobileReply({error:'Entre novamente e confira seu acesso.'},access.error.status)} as const;
   if (!access.user.ativo || access.context.temporaryAccess || access.context.communityAccess === 'FEED_ONLY') {
     return {error:mobileReply({error:'Este acesso exige o sistema online.'},403)} as const;

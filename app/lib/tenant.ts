@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { attachVisitorDrive } from './visitor-drive-runtime';
 import { getD1 } from "../../db";
 import { getRuntimeEnv } from "../../db/runtime-env";
 import type { AppUser } from "./access";
@@ -299,9 +300,7 @@ export async function getActiveTenantContext(
   permissions = filterPermissionsForCommunityModules(permissions, modules);
   permissions = filterPlanPermissions(permissions, subscription?.plan || null, subscription?.active ?? true);
 
-  return {
-    memberships,
-    context: {
+  const context: TenantContext = {
       userId: user.id,
       membershipId: membership.membershipId,
       comunidadeId: membership.comunidadeId,
@@ -317,8 +316,9 @@ export async function getActiveTenantContext(
       communityAccess: membership.communityAccess,
       ambienteDemo: membership.ambienteDemo,
       temporaryAccess,
-    },
-  };
+    };
+  await attachVisitorDrive(context);
+  return { memberships, context };
 }
 
 async function getCommunityModules(

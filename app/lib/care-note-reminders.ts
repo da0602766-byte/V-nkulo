@@ -1,4 +1,5 @@
 import { scheduleWebPushDelivery } from "./push-delivery-queue";
+import { getRuntimeEnv } from '../../db/runtime-env';
 
 export function normalizeReminder(value: unknown, previous?: string | null, now = Date.now()): string | null | undefined {
   if (value === null || value === undefined || value === "") return null;
@@ -11,6 +12,7 @@ export function normalizeReminder(value: unknown, previous?: string | null, now 
 
 /** Scheduled and foreground consumers share the same atomic insert + receipt. */
 export async function deliverCareNoteReminders(db: D1Database, userId?: number) {
+  if(getRuntimeEnv().visitorDrive)return {delivered:0};
   const due = await db.prepare(`SELECT l.id, l.comunidade_id, l.usuario_id, j.key AS note_index,
     json_extract(j.value,'$.id') AS note_id, json_extract(j.value,'$.lembreteEm') AS due_at
     FROM layouts_interface l JOIN usuarios u ON u.id=l.usuario_id AND u.ativo=1

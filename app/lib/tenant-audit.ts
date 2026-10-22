@@ -1,5 +1,6 @@
 import type { getD1 } from "../../db";
 import type { TenantContext } from "./tenant";
+import { getRuntimeEnv } from '../../db/runtime-env';
 
 type D1Database = ReturnType<typeof getD1>;
 
@@ -23,6 +24,8 @@ export async function recordTenantAudit(
   result: "SUCESSO" | "NEGADO" | "ERRO",
   metadata: Record<string, unknown> = {},
 ) {
+  // Visitor content and record references remain external after the switch.
+  if(getRuntimeEnv().visitorDrive && /VISITANTE|ACOMPANHAMENTO|ANOTACAO_CUIDADO/.test(event))return;
   await db.batch([
     db
       .prepare(

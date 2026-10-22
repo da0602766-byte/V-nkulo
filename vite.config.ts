@@ -52,6 +52,17 @@ export default defineConfig(async () => {
         : {}),
     },
     plugins: [
+      {
+        name: 'visitor-sql-worker-location',
+        enforce: 'pre' as const,
+        transform(code: string, id: string) {
+          if (!id.replaceAll('\\', '/').endsWith('/sql.js/dist/sql-asm.js')) return;
+          // Cloudflare exposes WorkerGlobalScope but no browser Location.
+          // The asm build is self-contained; it has no external assets to resolve.
+          if (!code.includes('self.location.href')) throw new Error('Review the sql.js Worker adapter after upgrading sql.js.');
+          return { code: code.replace('self.location.href', '(self.location?.href ?? "")'), map: null };
+        },
+      },
       vinext(),
       sites(),
       cloudflare({
@@ -62,3 +73,4 @@ export default defineConfig(async () => {
     ],
   };
 });
+

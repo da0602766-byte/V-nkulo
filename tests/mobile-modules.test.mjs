@@ -13,7 +13,7 @@ async function fixture(t){
   db.prepare("INSERT INTO sessoes(usuario_id,token_hash,expira_em) VALUES(?,'module-session',datetime('now','+1 day'))").run(id);
   const permissions=['dashboard.view','followups.view','followups.manage','ministries.view','schedules.view','cells.view','parking.reserve','parking.edit'];
   const access={user:{id,email:'module@example.test',ativo:true},context:{comunidadeId:1,comunidadeNome:'Teste',communityAccess:'MEMBER',permissions}};
-  const deps={'../../db':{getD1:()=>d1},'./local-auth':{getCurrentSessionTokenHash:async()=>'module-session'},
+  const deps={'./visitor-drive-store':{visitorDriveConfig:async id=>db.prepare('SELECT * FROM visitante_drive WHERE comunidade_id=?').get(id)},'../../db':{getD1:()=>d1},'./local-auth':{getCurrentSessionTokenHash:async()=>'module-session'},
     './tenant':{requireTenantPermission:async p=>permissions.includes(p)?access:{error:new Response('',{status:403})}},
     './push-delivery-queue':{scheduleWebPushDelivery(){}},
     './access-security':{secureToken:()=>createHash('sha256').update(randomUUID()).digest('hex'),privateHash:async(p,v)=>createHash('sha256').update(p+v).digest('hex'),rateLimit:async()=>true}};

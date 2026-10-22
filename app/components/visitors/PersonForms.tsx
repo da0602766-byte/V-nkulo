@@ -20,6 +20,7 @@ export function PersonForm({person,categories,cells,fields,onClose,onSave}:{pers
     event.preventDefault();if(busy)return;setBusy(true);setError('');
     const fd=new FormData(event.currentTarget), body:Record<string,unknown>=Object.fromEntries(fd.entries());
     body.camposPersonalizados=customValuesFromForm(fd); body.encontroComDeus=fd.has('encontroComDeus');body.cursoMembros=fd.has('cursoMembros');body.confirmarDuplicidade=fd.has('confirmarDuplicidade');
+    if(v._driveRevision!==undefined)body._visitorRevision=v._driveRevision;
     try {await onSave(body);} catch(caught) {const e=caught as Error&{duplicates?:Raw[]};setError(e.message);setDuplicates(e.duplicates||[]);} finally {setBusy(false);}
   }
   return <Dialog wide title={person?'Editar cadastro':'Novo cadastro'} onClose={()=>{if(!busy)onClose();}}><form className="vp-form vp-person-form" onSubmit={submit}>

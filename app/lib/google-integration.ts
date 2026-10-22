@@ -20,6 +20,7 @@ type GoogleIdentity = {
 type OAuthState = {
   purpose: "login" | "drive";
   visitorSheets?: boolean;
+  visitorStorage?: boolean;
   userId: number;
   returnTo: string;
   nonce: string;
@@ -232,6 +233,7 @@ export async function getDriveAccessToken(userId: number) {
   const env = requireGoogleConfig();
   const refreshToken = await decryptSecret(connection.refresh_token_ciphertext, connection.refresh_token_iv);
   const response = await fetch(GOOGLE_TOKEN_ENDPOINT, {
+    signal: AbortSignal.timeout(20000),
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
     body: new URLSearchParams({
@@ -266,6 +268,7 @@ export async function getDriveAccessToken(userId: number) {
 
 export async function createDriveFolder(accessToken: string, name: string, parentId?: string) {
   const response = await fetch(`${DRIVE_API}/files?fields=id,name`, {
+    signal: AbortSignal.timeout(20000),
     method: "POST",
     headers: googleHeaders(accessToken, "application/json"),
     body: JSON.stringify({
@@ -315,6 +318,7 @@ export async function uploadDriveFile(
   body.set(file.bytes, prefix.length);
   body.set(suffix, prefix.length + file.bytes.length);
   const response = await fetch(`${DRIVE_UPLOAD_API}/files?uploadType=multipart&fields=id,name,mimeType,size,createdTime`, {
+    signal: AbortSignal.timeout(20000),
     method: "POST",
     headers: googleHeaders(accessToken, `multipart/related; boundary=${boundary}`),
     body,

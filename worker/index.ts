@@ -9,6 +9,8 @@ import { runAutoSyncIfDue } from "../app/lib/supabase-auto-sync";
 import { scheduleWebPushDelivery } from "../app/lib/push-delivery-queue";
 import { purgeAccessRequests } from "../app/lib/access-retention";
 import { syncPendingVisitorSheets } from "../app/lib/visitor-sheets";
+import { getRuntimeEnv } from '../db/runtime-env';
+import { VisitorDriveError } from '../app/lib/visitor-drive-store';
 
 interface Env {
   ASSETS: Fetcher;
@@ -102,9 +104,24 @@ const worker = {
         purgeExpiredPrivateMessagesIfDue(env.DB).catch(() => undefined),
       );
 
-      const response = await runWithRuntimeEnv({ ...env, executionContext: ctx }, () =>
-        handler.fetch(request, env, ctx),
-      );
+      const revisionHeader=request.headers.get('X-Vinkulo-Visitor-Revision');
+      const response = await runWithRuntimeEnv({ ...env, executionContext: ctx, requestMethod:request.method,visitorExpectedRevision:revisionHeader===null?undefined:Number(revisionHeader) }, async () => {
+        try {
+          const result=await handler.fetch(request, env, ctx);
+          const drive=getRuntimeEnv().visitorDrive;
+          if(!drive)return result;
+          // Complete streamed reads before releasing and clearing request-local memory.
+          const body=await result.arrayBuffer();
+          if(drive.error){await drive.finish(false);return Response.json({error:drive.error.message},{status:drive.error.status,headers:{'Cache-Control':'no-store'}});}
+          await drive.finish(result.status<400);
+          const headers=new Headers(result.headers);headers.set('Cache-Control','private, no-store');
+          return new Response(body,{status:result.status,statusText:result.statusText,headers});
+        } catch(error) {
+          await getRuntimeEnv().visitorDrive?.finish(false).catch(()=>undefined);
+          if(error instanceof VisitorDriveError || String(error).includes('VISITOR_DRIVE_REQUIRED'))return Response.json({error:error instanceof VisitorDriveError?error.message:'A migração protege os dados contra alterações. Conclua ou cancele a preparação em Visitantes.'},{status:error instanceof VisitorDriveError?error.status:409,headers:{'Cache-Control':'no-store'}});
+          throw error;
+        }
+      });
       if (resetRequest) return withSecurityHeaders(response, url.pathname);
       const now = Date.now();
       const visitorMutation = UNSAFE_METHODS.has(request.method) && /^\/api\/(pilot\/(visitantes|acompanhamentos|celulas|visitante-categorias)|mobile\/visitors)(\/|$)/.test(url.pathname);
@@ -212,6 +229,7 @@ function validateApiRequest(request: Request, url: URL) {
   }
   const contentLength = Number(request.headers.get("content-length") || 0);
   const maximumBodyBytes =
+    url.pathname === '/api/pilot/visitantes/armazenamento' ? 5 * 1024 * 1024 :
     /^\/api\/proprietario\/modulos\/[a-f0-9-]{36}\/imagens$/.test(url.pathname)
       ? 8 * 1024 * 1024
       : url.pathname === "/api/pilot/uploads"

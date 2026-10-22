@@ -2,6 +2,7 @@ import { getD1 } from "../../db";
 import { getDriveAccessToken, getGoogleConnection } from "./google-integration";
 import { visitorExportRows, mapVisitorExportRows } from "./visitor-export";
 import { visitorCustomFields } from "./visitor-custom-fields";
+import { visitorDriveConfig } from './visitor-drive-store';
 
 export const VISITOR_SHEET_SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive.metadata.readonly"];
 export type VisitorSheetConfig = { comunidade_id: number; usuario_id: number; spreadsheet_id: string; sheet_id: number; habilitada: number; versao: number; versao_sincronizada: number; linhas: number; sincronizado_em: string | null; ultimo_erro: string | null; lock_ate: number };
@@ -65,6 +66,7 @@ export async function ensureVisitorSheet(token: string, config: VisitorSheetConf
 }
 
 export async function syncVisitorSheet(db: ReturnType<typeof getD1>, communityId: number) {
+  if(await visitorDriveConfig(communityId))return;
   const tokenId = crypto.randomUUID();
   const now = Date.now();
   const lease = await db.prepare("UPDATE visitante_planilha SET lock_token = ?, lock_ate = ? WHERE comunidade_id = ? AND habilitada = 1 AND lock_ate < ?").bind(tokenId, now + 120000, communityId, now).run();

@@ -1,0 +1,89 @@
+VISITANTES — ARMAZENAMENTO E ACESSOS
+Análise e implementação — 22/10/2026
+
+COMPORTAMENTO ANTERIOR
+Os cadastros eram compartilhados dentro da comunidade com quem tivesse
+visitors.view. Não eram particulares por autor. Ficavam no banco D1;
+a integração Google Sheets mantinha uma cópia, sem retirar a origem.
+
+DECISÕES CONFIRMADAS
+Google Drive como fonte principal e backup no dispositivo. A plataforma
+mantém configurações de armazenamento, referências e permissões. A migração
+real exige confirmação do gestor depois da verificação do arquivo.
+
+IMPLEMENTAÇÃO
+- Nova seção Visitantes > Armazenamento e acessos.
+- Conexão Google individual do gestor responsável; pasta e arquivo privados.
+  Concessão pelo Vínkulo a membros ativos: consulta ou consulta e edição.
+  As permissões originais dos módulos continuam obrigatórias.
+- Revogação checada em cada operação, também antes de concluir a resposta.
+  Alterações de acesso invalidam operações concorrentes pela revisão do arquivo.
+- Migração congela a origem, envia JSON completo e relê os bytes no Drive.
+  SHA-256, comunidade, estrutura, relações e quantidades são conferidos.
+- Confirmação MIGRAR VISITANTES ativa o Drive e remove as tabelas operacionais
+  correspondentes em uma transação. Nenhuma migração real foi executada pelo agente.
+- Abrange fichas ativas/arquivadas, categorias, campos adicionais, históricos,
+  acompanhamentos, contatos, visitas e anotações privadas criptografadas.
+- Consultas usam SQLite efêmero por solicitação. O conteúdo não é regravado
+  no D1. O banco em memória é fechado ao finalizar a resposta.
+- Cada gravação gera arquivo imutável; o ponteiro muda somente após releitura.
+  Controle de revisão evita sobrescrever edição concorrente. A edição da ficha
+  também verifica a revisão que estava aberta no formulário.
+- Arquivamento de célula e retirada do vínculo das fichas são confirmados juntos.
+- Backup completo JSON com download, verificação e restauração. Restauração
+  pode criar nova pasta quando a anterior foi perdida. Não executa SQL do arquivo.
+- Excel/CSV continuam para planilhas, mas não substituem o backup completo.
+- Estados animados de carregar, enviar, verificar, baixar, salvar e restaurar;
+  botões bloqueados durante operações e respeito a movimento reduzido.
+
+LIMITES QUE A INTERFACE INFORMA
+- Internet e autorização Google válida são necessárias. Falha no Drive não
+  habilita gravação silenciosa no banco da plataforma.
+- Arquivo até 4 MB; exceder recusa a alteração e preserva a versão anterior.
+- Cópias baixadas não podem ser apagadas remotamente ao revogar acesso.
+- Versões anteriores e a planilha antiga permanecem no Drive do responsável.
+- Backups técnicos antigos do provedor seguem a retenção do provedor; a exclusão
+  confirmada diz respeito às tabelas operacionais, não a apagar backups externos.
+- Anotações privadas exigem a chave criptográfica desta instalação na recuperação.
+- Envios offline móveis de visitantes, notas e acompanhamentos são bloqueados
+  após configurar o Drive; rascunhos não são confirmados como enviados.
+- Avisos automáticos de post-its em segundo plano ficam suspensos após migrar;
+  as datas permanecem preservadas nas anotações.
+- A conta responsável pelo Drive precisa manter vínculo ativo de gestão.
+
+VALIDAÇÃO
+TypeScript: aprovado. Build de produção: aprovado. Lint dos novos módulos: aprovado.
+54 testes pertinentes aprovados, incluindo migração, corrupção, falha de envio,
+revogação durante operação, leitura/edição, isolamento de comunidades, notas
+privadas, recuperação, arquivo incompatível, edição concorrente, importação/
+exportação, categorias, campos adicionais, células, arquivamento e offline.
+Leitor SQLite do build executado no workerd/Miniflare: aprovado. Corrigida a
+incompatibilidade de WorkerGlobalScope sem Location, com teste de regressão.
+Suíte completa: 794 testes, 767 aprovados, 27 falhas. As mesmas 27 falhas foram
+reproduzidas nas fontes anteriores em comparação isolada (13 arquivos, 107 testes).
+Nenhum caso adicional falhou. As falhas antigas envolvem expectativas de interface
+fora desta alteração; não foram ocultadas nem marcadas como aprovadas.
+
+REVISÃO COMO USUÁRIO
+Gestor e segundo gestor fictícios, banco em memória e transporte Google simulado.
+Conferidos estados de preparação/ativação, controles de acesso, confirmação de
+revogação, download real pelo navegador e consulta restrita.
+Larguras 390, 768 e 1864 px, sem overflow horizontal. Ações secundárias compactas
+em Opções. Backup baixado pelo navegador foi relido e continha a ficha fictícia.
+A conexão OAuth real, permissões da conta Google do proprietário e migração de
+produção dependem da conexão e conferência na tela; não foram simuladas como reais.
+
+EVIDÊNCIAS LOCAIS
+.task-tools/visitor-drive-types.log
+.task-tools/visitor-drive-build.log
+.task-tools/visitor-drive-focused.log
+.task-tools/visitor-drive-full-suite.log
+.task-tools/visitor-drive-baseline-comparison.log
+.task-tools/visitor-drive-lint.log
+.task-tools/visitantes-migracao-tablet.jpg
+.task-tools/visitantes-drive-desktop.jpg
+.task-tools/visitantes-drive-mobile.jpg
+
+REFERÊNCIAS CONSULTADAS NA ANÁLISE
+https://developers.google.com/workspace/drive/api/guides/manage-sharing
+https://developers.google.com/workspace/drive/api/guides/manage-downloads

@@ -20,6 +20,10 @@ export type R2BucketBinding = {
 };
 
 type RuntimeBindings = {
+  requestMethod?: string;
+  visitorExpectedRevision?: number;
+  visitorDrive?: import('../app/lib/visitor-drive-runtime').VisitorDriveRuntime;
+  routedDB?: D1Database;
   DB?: D1Database;
   BUCKET?: R2BucketBinding;
   AUTH_SECRET?: string;

@@ -10,7 +10,7 @@ export function getDb() {
     );
   }
 
-  return drizzle(env.DB, { schema });
+  return drizzle(getD1(), { schema });
 }
 
 export function getD1() {
@@ -18,5 +18,15 @@ export function getD1() {
   if (!env.DB) {
     throw new Error("O banco de dados do ADOTE ainda não está disponível.");
   }
-  return env.DB;
+  // Some pages obtain a database handle before resolving the active tenant.
+  // Resolve the destination at execution time so those handles cannot read or
+  // write the legacy visitor tables after Drive authorization is attached.
+  env.routedDB ??= new Proxy(env.DB, {
+    get(_target, key) {
+      const target=env.visitorDrive?.db ?? env.DB!;
+      const value=Reflect.get(target,key,target);
+      return typeof value==='function'?value.bind(target):value;
+    },
+  });
+  return env.routedDB;
 }

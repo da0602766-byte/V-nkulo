@@ -9,6 +9,22 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
+// Metadata only: visitor contents live in the community owner's Google Drive.
+export const visitanteDrive = sqliteTable('visitante_drive', {
+  comunidadeId: integer('comunidade_id').primaryKey().references(() => comunidades.id),
+  usuarioId: integer('usuario_id').notNull().references(() => usuarios.id),
+  estado: text('estado').notNull(),
+  pastaId: text('pasta_id'), arquivoId: text('arquivo_id'), hash: text('hash'),
+  revisao: integer('revisao').notNull().default(0), verificadoEm: text('verificado_em'),
+}, table => [check('visitante_drive_estado', sql`${table.estado} IN ('LOCKED','REVIEW','PURGING','ACTIVE')`),
+  check('visitante_drive_revisao', sql`${table.revisao} >= 0`)]);
+export const visitanteDriveAcessos = sqliteTable('visitante_drive_acessos', {
+  comunidadeId: integer('comunidade_id').notNull().references(() => visitanteDrive.comunidadeId, { onDelete: 'cascade' }),
+  usuarioId: integer('usuario_id').notNull().references(() => usuarios.id, { onDelete: 'cascade' }),
+  papel: text('papel').notNull(),
+}, table => [primaryKey({ columns: [table.comunidadeId, table.usuarioId] }),
+  check('visitante_drive_papel', sql`${table.papel} IN ('READ','EDIT')`)]);
+
 // Stable Drive IDs make retries and simultaneous copies idempotent.
 export const userFileCopies = sqliteTable("user_file_copies", {
   usuarioId: integer("usuario_id").notNull(),

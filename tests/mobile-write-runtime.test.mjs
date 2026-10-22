@@ -8,7 +8,7 @@ test('mobile write in Workers/D1: real transaction receipt, lost response replay
   const source=await readFile(new URL('../app/lib/mobile-write.ts',import.meta.url),'utf8');
   const compiled=ts.transpileModule(source.replace(/^import .*;\r?\n/gm,''),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText.replace(/^export /gm,'');
   const mf=new Miniflare({modules:true,compatibilityDate:'2026-05-15',cf:false,d1Databases:['DB'],script:`
-    let db;function getD1(){return db;}
+    let db;function getD1(){return db;}async function visitorDriveConfig(){return null;} /* Legacy-storage fixture; Drive tested in visitor-drive.test.mjs */
     async function getCurrentSessionTokenHash(){return 'session';}
     async function requireTenantPermission(){return {user:{id:1,email:'runtime@example.test',ativo:true},context:{comunidadeId:1,comunidadeNome:'Test',communityAccess:'MEMBER'}};}
     const secureToken=()=>'a'.repeat(64);const rateLimit=async()=>true;

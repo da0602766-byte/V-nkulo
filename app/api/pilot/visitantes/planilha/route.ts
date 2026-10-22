@@ -1,4 +1,5 @@
 import { getD1 } from "../../../../../db";
+import { visitorDriveConfig } from '../../../../lib/visitor-drive-store';
 import { requireTenantPermission } from "../../../../lib/tenant";
 import { recordTenantAudit } from "../../../../lib/tenant-audit";
 import { createGoogleAuthorization, googleIntegrationAvailable } from "../../../../lib/google-integration";
@@ -22,6 +23,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const access = await accessForSheets();
   if ("error" in access) return access.error;
+  if(await visitorDriveConfig(access.context.comunidadeId))return Response.json({error:'Os cadastros agora usam o armazenamento Drive. A antiga cópia em Planilhas está desativada.'},{status:409});
   const body = await request.json() as { action?: string; url?: string };
   const db = getD1();
   const communityId = access.context.comunidadeId;

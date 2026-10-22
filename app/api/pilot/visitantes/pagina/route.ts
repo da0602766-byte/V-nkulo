@@ -2,6 +2,7 @@ import { getD1 } from "../../../../../db";
 import { requireTenantPermission } from "../../../../lib/tenant";
 import { migrateVisitorAgeCategories } from "../../../../lib/visitor-category-rules";
 import { visitorCustomFields } from "../../../../lib/visitor-custom-fields";
+import { getRuntimeEnv } from '../../../../../db/runtime-env';
 
 // One community-scoped snapshot powers the directory, birthdays and care views.
 // History remains behind followups.view and is fetched only when a file opens.
@@ -36,6 +37,8 @@ export async function GET() {
       .bind(community).all(),
   ]);
   if (people.results.length > 10000) return Response.json({ error:"Esta comunidade excede o limite de 10.000 fichas desta visualização." }, {status:422});
-  return Response.json({ visitantes:people.results, celulas:cells.results, categorias:categories.results, campos:fields,
+  const revision=getRuntimeEnv().visitorDrive?.config.revisao;
+  if(revision!==undefined)for(const row of people.results as Record<string,unknown>[])row._driveRevision=revision;
+  return Response.json({ permissions:access.context.permissions, visitantes:people.results, celulas:cells.results, categorias:categories.results, campos:fields,
     responsaveis:responsibles.results, ministerios:ministries.results }, {headers:{"Cache-Control":"private, no-store"}});
 }

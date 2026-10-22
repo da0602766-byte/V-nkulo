@@ -8,7 +8,7 @@ test('module outbox in real D1: note JSON append/receipt changes, replay and tra
   const files=['mobile-write','mobile-module-contract','mobile-module-storage','mobile-module-snapshot','mobile-module-operations','mobile-modules'];
   const sources=await Promise.all(files.map(async name=>ts.transpileModule((await readFile(new URL('../app/lib/'+name+'.ts',import.meta.url),'utf8')).replace(/^import .*;\r?\n/gm,''),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText.replace(/^export /gm,'')));
   const mf=new Miniflare({modules:true,compatibilityDate:'2026-05-15',cf:false,d1Databases:['DB'],script:`
-    let db;function getD1(){return db;}async function getCurrentSessionTokenHash(){return 'session';}
+    let db;function getD1(){return db;}async function visitorDriveConfig(){return null;} /* Legacy-storage fixture; Drive tested in visitor-drive.test.mjs */async function getCurrentSessionTokenHash(){return 'session';}
     async function requireTenantPermission(){return {user:{id:1,email:'runtime@example.test',ativo:true},context:{comunidadeId:1,comunidadeNome:'Test',communityAccess:'MEMBER',permissions:['dashboard.view']}};}
     const secureToken=()=>'a'.repeat(64);const rateLimit=async()=>true;function scheduleWebPushDelivery(){}
     async function privateHash(p,v){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(p+v))),n=>n.toString(16).padStart(2,'0')).join('');}
