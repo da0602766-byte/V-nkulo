@@ -157,6 +157,7 @@ export function Header({
 }
 
 export function Pessoas({
+  menuToggle,
   pessoas,
   categorias,
   perfil,
@@ -168,6 +169,7 @@ export function Pessoas({
   categoryFilter,
   onCategoryChange,
 }: {
+  menuToggle: ReactNode
   pessoas: Pessoa[]
   categorias: Categoria[]
   perfil: PerfilConfig
@@ -454,7 +456,7 @@ export function Pessoas({
             <button type="button" className="vp-status-trigger" aria-label={`Filtrar status e acompanhamento: ${recortes.find(r=>r.id===rec)?.label}`} aria-haspopup="dialog" aria-expanded={statusPicker} onClick={()=>setStatusPicker(true)}>
               <Icon d={I.filter}/><span>{recortes.find(r=>r.id===rec)?.label}</span><strong>{count(rec)}</strong><Icon d={I.chevronDown}/>
             </button>
-            <div className="vp-workspace-controls"><button className="vp-stage-toggle" aria-controls="vp-stage-panel" aria-expanded={!stagesCollapsed} onClick={()=>setStagesCollapsed(!stagesCollapsed)}><Icon d={I.filter}/>{stagesCollapsed?'Mostrar etapas':'Recolher etapas'}</button><button className="vp-width-reset" onClick={columns.reset} title="Restaurar as larguras originais das colunas">Restaurar colunas</button></div>
+            <div className="vp-workspace-controls">{menuToggle}<button className="vp-stage-toggle" aria-controls="vp-stage-panel" aria-expanded={!stagesCollapsed} onClick={()=>setStagesCollapsed(!stagesCollapsed)}><Icon d={I.filter}/>{stagesCollapsed?'Mostrar etapas':'Recolher etapas'}</button><button className="vp-width-reset" onClick={columns.reset} title="Restaurar as larguras originais das colunas">Restaurar colunas</button></div>
             <div className="vp-filterbar">
               <div className="relative flex-1">
                 <Icon d={I.search} className="size-4 absolute left-3 top-3 text-stone-400" />

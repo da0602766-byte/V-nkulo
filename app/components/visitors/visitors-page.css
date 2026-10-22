@@ -259,7 +259,7 @@ body:has(.visitor-app){padding-bottom:0;overflow:hidden}
 @media(max-width:767px){
   .vp-context{padding:4px 10px;gap:2px;flex-wrap:wrap}
   .vp-context>span{flex:1 1 100%;font-size:11px;white-space:normal}
-  .vp-context>button:nth-child(2){margin-right:auto}
+  .vp-context>button:nth-of-type(2){margin-right:auto}
   .vp-people-page>header{padding:10px 14px}
   .vp-people-page>header h1{font-size:21px;overflow-wrap:anywhere}
   .vp-people-metrics{padding:6px 14px 10px}
@@ -270,7 +270,7 @@ body:has(.visitor-app){padding-bottom:0;overflow:hidden}
 }
 
 /* Independent workspace panels and spreadsheet-style column resizing. */
-.vp-menu-rail{display:none}
+.visitor-app .vp-menu-toggle{display:none}
 .vp-workspace-controls{display:none;align-items:center;gap:8px;margin-bottom:6px;color:#5f6683;font-size:11px}
 .vp-workspace-controls button{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:4px 8px;border:1px solid #dde0ee;border-radius:8px;background:#fff}
 .vp-workspace-controls .vp-width-reset{margin-left:auto}
@@ -278,11 +278,12 @@ body:has(.visitor-app){padding-bottom:0;overflow:hidden}
 .vp-column-handle:hover,.vp-column-handle:focus-visible{background:#4f46e522;border-right-color:#4f46e5;outline:2px solid #4f46e5;outline-offset:-2px}
 .vp-people-table th{position:relative;padding-right:16px}
 @media(min-width:1024px){
- .vp-menu-rail{display:flex;flex:0 0 44px;justify-content:center;padding-top:14px}
- .vp-menu-rail button{width:40px;height:44px;border-radius:10px;background:#ffffffb8;color:#4338ca;display:grid;place-items:center}
+ .visitor-app .vp-menu-toggle{width:44px;min-width:44px;height:44px;min-height:44px;padding:0;border:1px solid #dde0ee;border-radius:8px;background:#fff;color:#4338ca;display:inline-grid;place-items:center}
+ .vp-menu-collapsed .vp-main{margin-left:14px}
  .vp-menu-collapsed .vp-sidebar{display:none}
 }
 @media(min-width:1280px){
+ .vp-context-people>.vp-menu-toggle{display:none}
  .vp-people-stages[data-collapsed=true]{display:none}
  .vp-workspace-controls{display:flex}
  .vp-people-table{overflow:auto;max-height:calc(100dvh * var(--vinkulo-ui-scale-inverse,1) - var(--vp-filter-height,110px) - 30px);overscroll-behavior:contain}
