@@ -1,5 +1,5 @@
 "use client";
-import {useMemo,useState,useEffect,type ReactNode} from 'react';
+import {useMemo,useState,useEffect,useRef,type ReactNode} from 'react';
 import {type Pessoa,type Categoria,type PerfilConfig,type Status,today,age,whatsapp} from './data';
 import {Dialog} from './Dialog';
 /* ---------- helpers & styles ---------- */
@@ -178,6 +178,16 @@ export function Pessoas({
   onCategoryChange: (value:string) => void
 }) {
   const [q, setQ] = useState('')
+  const filtersRef = useRef<HTMLDivElement>(null);
+  useEffect(()=>{
+    const filters=filtersRef.current;
+    if(!filters)return;
+    const update=()=>filters.parentElement?.style.setProperty('--vp-filter-height',filters.offsetHeight+'px');
+    update();
+    const observer=new ResizeObserver(update);
+    observer.observe(filters);
+    return()=>observer.disconnect();
+  },[]);
   const cat = categoryFilter
   const setCat = onCategoryChange
   const [statusPicker, setStatusPicker] = useState(false)
@@ -398,7 +408,7 @@ export function Pessoas({
 
       <div className="vp-people-body flex-1 min-h-0 flex border-t border-stone-100">
         {/* Desktop Sidebar Recortes */}
-        <div className="hidden xl:block w-60 shrink-0 border-r border-stone-200 overflow-y-auto py-5 px-3">
+        <div className="vp-people-stages hidden xl:block w-60 shrink-0 border-r border-stone-200 overflow-y-auto py-5 px-3">
           {(['Etapa', 'Atenção', 'Integração'] as const).map((g) => (
             <div key={g} className="mb-4">
               <div className="px-2 mb-1.5 text-[11px] uppercase tracking-[.14em] text-stone-400 font-semibold">
@@ -436,7 +446,7 @@ export function Pessoas({
         {/* Content Area */}
         <section className="flex-1 min-w-0 flex flex-col bg-white">
           {/* Filter Bar */}
-          <div className="vp-people-filters p-3 sm:px-6 sm:py-3.5 border-b border-stone-100 space-y-2 shrink-0">
+          <div ref={filtersRef} className="vp-people-filters p-3 sm:px-6 sm:py-3.5 border-b border-stone-100 space-y-2 shrink-0">
             <button type="button" className="vp-status-trigger" aria-label={`Filtrar status e acompanhamento: ${recortes.find(r=>r.id===rec)?.label}`} aria-haspopup="dialog" aria-expanded={statusPicker} onClick={()=>setStatusPicker(true)}>
               <Icon d={I.filter}/><span>{recortes.find(r=>r.id===rec)?.label}</span><strong>{count(rec)}</strong><Icon d={I.chevronDown}/>
             </button>
@@ -745,8 +755,8 @@ export function Pessoas({
             ) : (
               <>
                 {/* Desktop Table View */}
-                <div className="hidden xl:block overflow-x-auto">
-                  <table className="w-full text-[13px] min-w-[850px]">
+                <div className="vp-people-table hidden xl:block">
+                  <table className="w-full text-[13px]">
                     <thead className="sticky top-0 z-10 bg-stone-50 text-left text-[11px] uppercase tracking-[.12em] text-stone-500 border-b border-stone-200">
                       <tr>
                         <th className="pl-6 w-8 py-3">

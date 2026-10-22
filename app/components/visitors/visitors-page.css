@@ -50,7 +50,12 @@ body:has(.visitor-app){padding-bottom:0;overflow:hidden}
 .vp-main{display:block;overscroll-behavior-y:contain;scroll-padding-block:12px}
 .vp-people-page{display:block}
 .vp-people-body{flex:none;min-height:0;align-items:flex-start}
-.vp-people-body>div{overflow:visible}
+.vp-people-body>.vp-people-stages{position:sticky;top:0;max-height:calc(100dvh * var(--vinkulo-ui-scale-inverse,1) - 30px);overflow-y:auto;overscroll-behavior:contain;padding-top:10px;padding-bottom:10px}
+.vp-people-filters{position:sticky;top:0;z-index:20;background:#fff;box-shadow:0 3px 8px #25215c08}
+.vp-people-table{overflow:visible}
+.vp-people-table thead{top:var(--vp-filter-height,64px);z-index:15}
+.vp-people-table th{background:#f3f4fb}
+.vp-people-table td{overflow-wrap:anywhere}
 .vp-people-list{overflow:visible;flex:none;padding-bottom:24px}
 .vp-scroll{overflow:visible;flex:none}
 @media(max-width:1023px){
@@ -58,7 +63,6 @@ body:has(.visitor-app){padding-bottom:0;overflow:hidden}
   .vp-people-page{display:block}
   .vp-people-body{display:block}
   .vp-people-list{overflow:visible;flex:none;padding-bottom:72px}
-  .vp-people-filters{position:sticky;top:0;z-index:10;background:#fff;box-shadow:0 3px 8px #25215c08}
   .vp-people-filters:has(.vp-advanced-filters){position:static}
 }
 @media(max-width:767px){
@@ -215,7 +219,10 @@ body:has(.visitor-app){padding-bottom:0;overflow:hidden}
 .vp-tool>i{position:absolute;right:6px;top:6px;width:7px;height:7px;border-radius:50%;background:#d97706}
 .vp-notices-trigger>b{position:absolute;right:0;top:1px;min-width:18px;border-radius:12px;padding:0 4px;background:#4f46e5;color:#fff;font-size:10px;line-height:18px}
 .vp-category-nav{display:grid;gap:2px;border-top:1px solid #d8dbee;padding-top:10px;margin-top:4px}
-.vp-category-nav>small{padding:0 12px 4px;color:#5f6683;font-size:11px}
+.vp-sidebar nav .vp-category-toggle{min-height:44px;padding:6px 10px;color:#5f6683;font-size:11px;border-radius:8px}
+.vp-category-toggle svg{margin-left:auto}
+.vp-category-links{display:grid;gap:2px}
+.vp-category-links[hidden]{display:none}
 .vp-sidebar nav .vp-category-nav button{padding:7px 12px;font-weight:500}
 .vp-category-nav b{font-weight:inherit;min-width:0;overflow-wrap:anywhere;flex:1}
 .vp-category-nav svg{flex-shrink:0}
