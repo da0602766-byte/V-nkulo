@@ -2,6 +2,7 @@
 import {useMemo,useState,useEffect,useRef,type ReactNode} from 'react';
 import {type Pessoa,type Categoria,type PerfilConfig,type Status,today,age,whatsapp} from './data';
 import {Dialog} from './Dialog';
+import {visitorBirthdayInYear} from '../../lib/visitor-birthday';
 /* ---------- helpers & styles ---------- */
 const STATUS: Status[] = ['Novo', 'Em contato', 'Em acompanhamento', 'Integrado']
 const statusStyle: Record<Status, string> = {
@@ -795,8 +796,8 @@ export function Pessoas({
                                 onChange={() => toggle(p.id)}
                               />
                             </td>
-                            <td className="px-3">
-                              <div className="flex items-center gap-3">
+                            <td className="vp-directory-person px-3">
+                              <div className="vp-directory-identity flex items-center gap-3">
                                 <div
                                   className={`size-9 shrink-0 rounded-2xl grid place-items-center text-[12px] font-bold ${
                                     p.tipo === 'Membro'
@@ -811,7 +812,7 @@ export function Pessoas({
                                     .join('')}
                                 </div>
                                 <div>
-                                  <div className="font-semibold text-[14px] text-stone-900 flex items-center gap-1.5">
+                                  <div className="vp-directory-name font-semibold text-[14px] text-stone-900 flex items-center gap-1.5">
                                     <button className="text-left hover:underline" onClick={e=>{e.stopPropagation();onOpen(p.id)}} aria-label={`Abrir ficha de ${p.nome}`}>{p.nome}</button>
                                     {p.tipo === 'Membro' && (
                                       <span className="text-[10px] uppercase tracking-wide text-stone-400 font-semibold bg-stone-100 px-1.5 py-0.2 rounded">
@@ -1319,7 +1320,8 @@ export function Aniversarios({
   onOpen: (id: string) => void
   notify: (m: string, tipo?: 'info' | 'error' | 'success') => void
 }) {
-  const [mes, setMes] = useState(Number(today().slice(5,7)))
+  const currentDay = today()
+  const [mes, setMes] = useState(Number(currentDay.slice(5,7)))
   const [sel, setSel] = useState<Pessoa | null>(null)
   const [texto, setTexto] = useState(modelosParabens[0])
 
@@ -1335,10 +1337,11 @@ export function Aniversarios({
     <>
       <Header
         title="Aniversários"
-        sub="Mensagens de felicitações e acompanhamento"
+        sub={`Aniversários de ${currentDay.slice(0,4)} · Felicitações e acompanhamento`}
       >
         <select
           className={`${input} w-44 font-semibold text-stone-800`}
+          aria-label="Mês dos aniversários"
           value={mes}
           onChange={(e) => {
             setMes(+e.target.value)
@@ -1384,6 +1387,7 @@ export function Aniversarios({
           ) : (
             <div className="divide-y divide-stone-100">
               {lista.map((p) => {
+                const birthday = visitorBirthdayInYear(p.nascimento!,currentDay)
                 const dia = p.nascimento!.slice(8)
                 const isSelected = sel?.id === p.id
                 const pTel = p.telefone?.replace(/\D/g, '')
@@ -1392,7 +1396,7 @@ export function Aniversarios({
                   <div
                     key={p.id}
                     onClick={() => setSel(p)}
-                    className={`p-4 sm:px-6 sm:py-3.5 flex items-center gap-3 sm:gap-4 transition-colors cursor-pointer ${
+                    className={`vp-birthday-row p-4 sm:px-6 sm:py-3.5 flex items-center gap-3 sm:gap-4 transition-colors cursor-pointer ${
                       isSelected ? 'bg-brand-50/80 border-l-4 border-brand-600' : 'bg-white hover:bg-stone-50'
                     }`}
                   >
@@ -1401,11 +1405,16 @@ export function Aniversarios({
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <div className="font-bold text-stone-900 text-sm truncate">{p.nome}</div>
-                      <div className="text-xs text-stone-500 truncate mt-0.5">
-                        Faz {(idade(p.nascimento) ?? 0) + (p.nascimento!.slice(5) > today().slice(5) ? 1 : 0)} anos ·{' '}
+                      <div className="vp-birthday-name font-bold text-stone-900 text-sm">{p.nome}</div>
+                      <div className="vp-birthday-meta">
+                        <span className="vp-birthday-category">{p.categoria || 'Sem categoria'}</span>
+                        {birthday&&<span className="vp-birthday-countdown" data-state={birthday.days<0?'past':birthday.days===0?'today':'upcoming'}>{birthday.label}</span>}
+                      </div>
+                      <div className="text-xs text-stone-500 mt-0.5">
+                        {birthday ? <>{birthday.days<0?'Fez':'Faz'} {birthday.age} {birthday.age===1?'ano':'anos'} · </> : null}
                         {p.telefone ?? 'Sem telefone'}
                       </div>
+                      {birthday?.adjusted&&<small className="vp-muted">29/02: contagem em 28/02 neste ano.</small>}
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
@@ -1460,7 +1469,7 @@ export function Aniversarios({
                   Felicitações para {primeiroNome}
                 </div>
                 <div className="text-xs text-stone-500">
-                  Dia {sel.nascimento!.slice(8)} · {sel.telefone ?? 'Sem contato'}
+                  Dia {sel.nascimento!.slice(8)} · {sel.categoria || 'Sem categoria'} · {visitorBirthdayInYear(sel.nascimento!,currentDay)?.label} · {sel.telefone ?? 'Sem contato'}
                 </div>
               </div>
 

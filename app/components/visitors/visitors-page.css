@@ -55,7 +55,28 @@ body:has(.visitor-app){padding-bottom:0;overflow:hidden}
 .vp-people-table{overflow:visible}
 .vp-people-table thead{top:var(--vp-filter-height,64px);z-index:15}
 .vp-people-table th{background:#f3f4fb}
-.vp-people-table td{overflow-wrap:anywhere}
+.vp-people-table table{table-layout:fixed;width:100%}
+.vp-people-table th:nth-child(1){width:6%;padding-left:12px}
+.vp-people-table th:nth-child(2){width:28%}
+.vp-people-table th:nth-child(3){width:15%}
+.vp-people-table th:nth-child(4){width:15%}
+.vp-people-table th:nth-child(5){width:10%}
+.vp-people-table th:nth-child(6),.vp-people-table th:nth-child(7){width:13%}
+.vp-people-table td{overflow-wrap:break-word;word-break:normal;padding-inline:8px}
+.vp-people-table th{padding-inline:8px;overflow-wrap:normal}
+.vp-people-table td:first-child{padding-left:12px}
+.vp-directory-identity{min-width:0;gap:8px}
+.vp-directory-identity>div:last-child{min-width:0;flex:1}
+.vp-directory-name{flex-wrap:wrap;align-items:center;gap:3px 6px;line-height:1.4}
+.vp-directory-name>button{min-width:0;max-width:100%;word-break:normal;overflow-wrap:break-word}
+.vp-directory-name>span{white-space:nowrap;flex-shrink:0;word-break:normal;overflow-wrap:normal}
+.vp-birthday-name{overflow-wrap:break-word;line-height:1.4}
+.vp-birthday-meta{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;margin-top:4px;font-size:12px;line-height:1.5}
+.vp-birthday-category{padding:1px 7px;border-radius:6px;background:#f0efff;color:#4338ca;overflow-wrap:anywhere}
+.vp-birthday-countdown{font-weight:600;color:#4338ca}
+.vp-birthday-countdown[data-state=past]{color:#5f6683;font-weight:400}
+.vp-birthday-countdown[data-state=today]{color:#08785b}
+@media(max-width:767px){.vp-birthday-row{flex-wrap:wrap;gap:8px}.vp-birthday-row>div:nth-child(2){flex-basis:calc(100% - 60px)}.vp-birthday-row>div:last-child{margin-left:52px}.vp-birthday-row>div:last-child :is(a,button){min-height:44px;display:inline-flex;align-items:center;padding:6px 10px}}
 .vp-people-list{overflow:visible;flex:none;padding-bottom:24px}
 .vp-scroll{overflow:visible;flex:none}
 @media(max-width:1023px){
