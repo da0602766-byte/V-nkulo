@@ -96,7 +96,7 @@ function CellGrid({
   });
 
   const healthPills: { key: "all" | CellHealthId; label: string; count: number }[] = [
-    { key: "all", label: "Saúde: todas", count: 0 },
+    { key: "all", label: "Todas", count: 0 },
     { key: "SEM_RELATORIO", label: "Sem relatório", count: noReport },
     { key: "ATENCAO", label: "Atenção", count: healthCounts.ATENCAO || 0 },
     { key: "MULTIPLICAR", label: "Prontas p/ multiplicar", count: ready },
@@ -104,12 +104,12 @@ function CellGrid({
   ];
 
   return (
-    <section className="cgestao-shell" aria-busy={cells.loading}>
+    <section className="cgestao-shell cgestao-directory" aria-busy={cells.loading}>
       <header className="cgestao-header">
         <div>
-          <p className="cgestao-kicker">CÉLULAS · {communityName}</p>
-          <h1>Grupos que aproximam pessoas</h1>
-          <p className="cgestao-subtitle">Acompanhe líderes, encontros e relatórios sem perder a visão de cada célula.</p>
+          <p className="cgestao-kicker">{communityName}</p>
+          <h1>Células</h1>
+          <p className="cgestao-subtitle">Escolha uma célula para acompanhar.</p>
         </div>
         <div className="cgestao-header-actions">
           {onPreviewParticipacao && (
@@ -125,18 +125,24 @@ function CellGrid({
 
       <OperationFeedback message={cells.message} error={cells.error} />
 
-      <section className="cgestao-stats" aria-label="Resumo das células">
+      <details className="cgestao-overview">
+        <summary>
+          <span className="cgestao-overview-counts"><span><strong>{active.length}</strong> {active.length === 1 ? "ativa" : "ativas"}</span><span><strong>{people}</strong> pessoas</span>{pendingRequests > 0 && <span className="cgestao-pending"><strong>{pendingRequests}</strong> {pendingRequests === 1 ? "solicitação" : "solicitações"}</span>}</span>
+          <span className="cgestao-overview-toggle">Indicadores <span aria-hidden="true">⌄</span></span>
+        </summary>
+        <section className="cgestao-stats" aria-label="Resumo das células">
         <StatCard tom="acc" label="Total de células" value={list.length} sub={`${archived.length} arquivadas`} />
         <StatCard tom="info" label="Ativas" value={active.length} sub={`${meetings} próximos encontros`} />
         <StatCard tom="warn" label="Solicitações" value={pendingRequests} sub="aguardando decisão" />
-        <StatCard tom="bad" label="Sem relatório" value={noReport} sub="há mais de 3 semanas" alerta={noReport > 0} />
+        <StatCard tom="bad" label="Sem relatório" value={noReport} sub="nunca enviado ou há mais de 3 semanas" alerta={noReport > 0} />
         <StatCard tom="ok" label="Pessoas nas células" value={people} sub="membros e visitantes ativos" />
         <StatCard tom="teal" label="Prontas p/ multiplicar" value={ready} sub="média de 15+ presentes" />
-      </section>
+        </section>
+      </details>
 
       <div className="cgestao-filters">
         <label className="cgestao-search">
-          <span aria-hidden="true">⌕</span>
+          <span>Buscar</span>
           <input type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -144,31 +150,25 @@ function CellGrid({
             aria-label="Buscar célula, líder ou bairro"
           />
         </label>
-        <div className="cgestao-status-toggle" role="group" aria-label="Filtrar por situação">
+        <label className="cgestao-filter-field">
+          <span>Situação</span>
+          <select value={status} onChange={(event) => setStatus(event.target.value as typeof status)}>
           {([["all", "Todas"], ["active", "Ativas"], ["archived", "Arquivadas"]] as const).map(([value, label]) => (
-            <button key={value} type="button" aria-pressed={status === value} className={status === value ? "active" : ""} onClick={() => setStatus(value)}>
-              {label}
-            </button>
+            <option key={value} value={value}>{label}</option>
           ))}
-        </div>
-        <div className="cgestao-health-filter" role="group" aria-label="Filtrar por saúde">
+          </select>
+        </label>
+        <label className="cgestao-filter-field">
+          <span>Saúde</span>
+          <select value={healthFilter} onChange={(event) => setHealthFilter(event.target.value as typeof healthFilter)}>
           {healthPills.map((pill) => (
-            <button
-              key={pill.key}
-              type="button"
-              aria-pressed={healthFilter === pill.key}
-              data-saude={pill.key}
-              className={healthFilter === pill.key ? "active" : ""}
-              onClick={() => setHealthFilter(pill.key)}
-            >
-              {pill.label}
-              {pill.key !== "all" && <span>{pill.count}</span>}
-            </button>
+            <option key={pill.key} value={pill.key}>{pill.label}</option>
           ))}
-        </div>
+          </select>
+        </label>
       </div>
 
-      <div className="cell-directory-results"><p role="status">{visible.length} de {list.length} células</p>{(search.trim() || status !== "all" || healthFilter !== "all") && <button type="button" onClick={() => { setSearch(""); setStatus("all"); setHealthFilter("all"); }}>Limpar filtros</button>}</div>
+      <div className="cell-directory-results"><p role="status">{visible.length} de {list.length} {list.length === 1 ? "célula" : "células"}</p>{(search.trim() || status !== "all" || healthFilter !== "all") && <button type="button" onClick={() => { setSearch(""); setStatus("all"); setHealthFilter("all"); }}>Limpar filtros</button>}</div>
       {visible.length === 0 ? (
         <p className="cgestao-empty">{list.length ? "Nenhuma célula corresponde à busca. Ajuste os filtros ou use Limpar filtros." : cells.canManage ? "Nenhuma célula cadastrada. Use Criar célula para começar." : "Nenhuma célula disponível. Consulte a liderança da comunidade."}</p>
       ) : (
@@ -202,7 +202,6 @@ function StatCard({
 }) {
   return (
     <article className="cgestao-stat" data-tom={tom} data-alerta={alerta ? "1" : undefined}>
-      <span className="cgestao-stat-icon" aria-hidden="true" />
       <p className="cgestao-stat-label">{label}</p>
       <p className="cgestao-stat-value">{value}</p>
       <p className="cgestao-stat-sub">{sub}</p>
@@ -239,11 +238,12 @@ function CellCard({
           <p className="cgestao-card-status">{archived ? "Arquivada" : "Ativa"}</p>
           <p className="cgestao-card-name">{cell.nome}</p>
         </div>
-        {cell.solicitacoes.length > 0 && <span className="cgestao-card-badge">{cell.solicitacoes.length}</span>}
       </div>
-      <p className="cgestao-card-desc">{cell.descricao_publica || "Descrição pública ainda não informada."}</p>
+      <p className="cgestao-card-lead">Liderança · {cell.lider_nome || cell.responsavel || "A definir"}</p>
+      {cell.descricao_publica && <p className="cgestao-card-desc">{cell.descricao_publica}</p>}
       <div className="cgestao-card-health">
         <span className="cgestao-health-pill" data-saude={health.id}>{health.label}</span>
+        {cell.solicitacoes.length > 0 && <span className="cgestao-card-badge">{cell.solicitacoes.length} {cell.solicitacoes.length === 1 ? "solicitação" : "solicitações"}</span>}
         <span className="cgestao-card-weeks">
           <MiniBarChart weeks={health.weeks} />
           <small>{health.semanasEmDia}/8 rel.</small>
@@ -251,10 +251,10 @@ function CellCard({
       </div>
       <div className="cgestao-card-footer">
         <div>
-          <p><strong>{cell.dias_reuniao.map((day) => DAY_LABELS[day] || day).join(", ") || "A definir"}</strong> · {cell.membros_total + cell.visitantes_ativos} pessoas</p>
-          <p className="cgestao-card-lead">{cell.lider_nome || cell.responsavel || "Liderança a definir"}</p>
+          <p><strong>{cell.dias_reuniao.map((day) => DAY_LABELS[day] || day).join(", ") || "Dia a definir"}{cell.horario_texto ? ` · ${cell.horario_texto}` : ""}</strong></p>
+          <p>{cell.membros_total + cell.visitantes_ativos} pessoas</p>
         </div>
-        <span className="cgestao-card-cta">Gerenciar →</span>
+        <span className="cgestao-card-cta">{cell.can_operate ? "Gerenciar" : "Ver célula"} →</span>
       </div>
     </button>
   );
