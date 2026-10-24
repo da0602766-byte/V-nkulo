@@ -60,10 +60,10 @@ Publicado no Sites 431 em 24/10/2026 às 16h46 (Brasília), status succeeded. Fo
   manual, perda de conexão, reconexão, retorno à aplicação e câmera/QR.
   Depende de aparelho disponível, não de novo provedor. Entrega real de push
   e retorno de provedores ficam fora deste recorte sem serviços externos.
-- **Página comercial e contratação — revisão funcional validada:** aceite por plano/versão, bloqueio de reenvio, foco e navegação corrigidos; afirmações comerciais sem fonte retiradas. 859/859 testes, tipos/build/lint aprovados e navegador em 390/768/1864 px. Ver REVISAO_COMERCIAL_2026-10-24.md. Zoom nativo/leitor de tela seguem como avaliação específica de acessibilidade; publicação em preparação.
-- **Continuidade offline:** avaliar a indicação de validade do acesso e envios
-  pendentes no painel, proposta no relatório de 13/10. Não marcar como implementada
-  sem conferir a versão atual do APK e da ponte.
+- **Página comercial e contratação — revisão funcional validada:** aceite por plano/versão, bloqueio de reenvio, foco e navegação corrigidos; afirmações comerciais sem fonte retiradas. 859/859 testes, tipos/build/lint aprovados e navegador em 390/768/1864 px. Ver REVISAO_COMERCIAL_2026-10-24.md. Zoom nativo/leitor de tela seguem como avaliação específica de acessibilidade; publicado no Sites 432.
+- **Continuidade offline — bloco web validado:** entrada também em Perfil e conta; consulta global protegida contra resposta antiga, timeout e reconexão; orientação de validade e confirmação dos envios. 866/866 testes web e 52/52 testes JavaScript do APK 1.23.0. **Prazo e contagem reais no painel ainda pendentes:** a ponte publicada só disponibiliza esses dados no espaço local; exigem nova versão Android. Ver CONTINUIDADE_OFFLINE_2026-10-24.md. Publicação web em preparação; APK físico adiado.
+
+Publicado no Sites 432 em 24/10/2026 às 17h00 (Brasília), status succeeded. Fonte 39abe090768eb19dcfdd390bdb70f721c894e4a5; deployment appgdep_6add0e609b0881918fd357eed8e233d2; URL https://adote-gestao.da0602766.chatgpt.site. Audiência pública preservada, sem migração ou alteração de dados reais. Registro documental posterior ao deploy.
 
 ## Grupo 3 — Manutenção e eficiência
 

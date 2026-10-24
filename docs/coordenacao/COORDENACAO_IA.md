@@ -17,6 +17,14 @@ Antes de alterar o código, leia este documento e atualize a seção **Trabalho 
 
 ## Trabalho em andamento
 
+Continuidade offline validada: 866/866 testes web, 52/52 testes JavaScript da fonte exata Android 1.23.0, TypeScript/build e lint zero erros/38 avisos. Corrigidos acesso do membro à entrada manual e ciclo da política global. Nenhum APK alterado; resumo nativo direto no painel depende de nova ponte e continua pendente. Relatório CONTINUIDADE_OFFLINE_2026-10-24.md; publicação web em preparação.
+
+Extensão da continuidade offline: reservar app/components/PilotDashboard.tsx para disponibilizar a entrada em Perfil e conta. Navegador com membro confirmou que Configurações é administrativa e bloqueava o único acesso manual ao offline. Preservar todas as permissões administrativas; a entrada não concede capacidades nativas.
+
+Continuidade offline — Codex, 24/10/2026, base Sites 432. Reserva: app/components/{useAndroidOfflineEnabled,OfflineModeEntry,CommunityAdminWorkspace}.tsx/ts, app/components/community-settings.css, tests/offline-continuity.test.mjs, tests/settings-parking-ux.test.mjs (mock compatível), docs/relatorios/CONTINUIDADE_OFFLINE_2026-10-24.md, PENDENCIAS_PRIORIZADAS.md e esta coordenação. Conferida fonte Android 1.23.0 no commit 6a1efe33de3caf80c15e3f8119314c95b4ccedbf: consulta de validade/fila restrita a /mobile-app, sem ponte de resumo para o painel; não contornar essa proteção. Corrigir respostas obsoletas, timeout/reconexão e orientação de validade/pendências. Testes com banco fictício e ponte simulada; publicação autorizada após validação, aparelho físico adiado. Preservar blocos anteriores e briefing Figma.
+
+Bloco comercial concluído; reservas encerradas. Publicado no Sites 432 em 24/10/2026 às 17h00 (Brasília), status succeeded. Fonte 39abe090768eb19dcfdd390bdb70f721c894e4a5; deployment appgdep_6add0e609b0881918fd357eed8e233d2; URL https://adote-gestao.da0602766.chatgpt.site. Audiência pública preservada, sem migração ou alteração de dados reais. Registro documental posterior ao deploy. 859/859 testes, TypeScript/build aprovados e lint zero erros/38 avisos. APK físico adiado; próximo bloco local: continuidade offline.
+
 Bloco comercial validado em 24/10/2026: 859/859 testes, TypeScript/build aprovados, lint zero erros/38 avisos preexistentes. Navegador 390/768/1864 px, proposta também 320 px, teclado e temas claro/escuro; sem erro de console no percurso. Correções de aceite, reenvio, foco, navegação e alegações estáticas. Sem migração ou dados reais. Relatório REVISAO_COMERCIAL_2026-10-24.md. Publicação autorizada em preparação.
 
 Extensão do bloco comercial: reservar tests/public-reception-redesign.test.mjs para substituir a exigência histórica de prova social estática por ausência de métricas/depoimentos sem fonte; conservar o editor de planos exclusivo do proprietário.

@@ -1414,7 +1414,7 @@ export default function PilotDashboard({
           {visibleView === "pessoas" && (
             <PeopleWorkspace communityName={active.comunidadeNome} />
           )}
-          {visibleView === "conta" && <AccountProfileWorkspace />}
+          {visibleView === "conta" && <><OfflineModeEntry /><AccountProfileWorkspace /></>}
           {visibleView === "configuracoes" && (
             <section className="community-central-workspace settings-redesign">
               <header className="settings-heading"><div><h1>Configurações</h1><p>Escolha um assunto. As alterações valem para {active.comunidadeNome}.</p></div><a href="/painel?view=conta">Meu perfil e conta →</a></header>

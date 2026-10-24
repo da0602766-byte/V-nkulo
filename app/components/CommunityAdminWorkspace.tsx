@@ -4,7 +4,7 @@ import TransientFeedback from "./TransientFeedback";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./community-settings.css";
-import { useAndroidOfflineEnabled } from "./useAndroidOfflineEnabled";
+import { useAndroidOfflinePolicy } from "./useAndroidOfflineEnabled";
 import { matchesDirectorySearch } from "../lib/directory-search";
 import CommunityThemeEditor from "./CommunityThemeEditor";
 import MemberRegistrationLinkManager from "./MemberRegistrationLinkManager";
@@ -54,7 +54,7 @@ export default function CommunityAdminWorkspace({
   contentSlot?: React.ReactNode;
   deviceSlot?: React.ReactNode;
 }) {
-  const offlineEnabled = useAndroidOfflineEnabled();
+  const offlineEnabled = useAndroidOfflinePolicy().enabled !== false;
   const [requests, setRequests] = useState<JoinRequest[]>([]);
   const [parkingActive, setParkingActive] = useState(false);
   const [parkingName, setParkingName] = useState("Estacionamento");

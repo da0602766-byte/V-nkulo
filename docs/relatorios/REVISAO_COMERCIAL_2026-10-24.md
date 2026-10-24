@@ -24,4 +24,4 @@ Verificação visual e de contraste amostral, sem certificação integral de ace
 
 ## Publicação
 
-Validação concluída; publicação em preparação. Audiência pública existente será preservada.
+Publicado no Sites 432 em 24/10/2026 às 17h00 (Brasília), status succeeded. Fonte 39abe090768eb19dcfdd390bdb70f721c894e4a5; deployment appgdep_6add0e609b0881918fd357eed8e233d2; URL https://adote-gestao.da0602766.chatgpt.site. Audiência pública preservada, sem migração ou alteração de dados reais. Registro documental posterior ao deploy.
