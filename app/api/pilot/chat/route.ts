@@ -22,8 +22,7 @@ type Message = {
 // ministérios ativos em que a pessoa atua, para dar contexto profissional à
 // conversa sem expor mais dados do que isso.
 const HIERARCHY_CASE = `CASE
-  WHEN u.perfil = 'ADMIN' THEN 'Proprietário do sistema'
-  WHEN uc.papel = 'ADMIN_COMUNIDADE' THEN 'Administrador da comunidade'
+  WHEN uc.papel IN ('ADMIN_COMUNIDADE', 'SUPERADMIN') THEN 'Administrador da comunidade'
   WHEN uc.papel = 'PASTOR' THEN 'Pastor'
   WHEN uc.papel = 'LIDER' THEN 'Líder'
   ELSE 'Membro'
@@ -36,8 +35,7 @@ const MINISTRY_SUBQUERY = (userColumn: string, communityColumn: string) => `COAL
     AND mv.ativo = 1 AND m.status = 'ATIVO'
 ), '')`;
 const COMMUNICATION_GROUP_CASE = `CASE
-  WHEN u.perfil = 'ADMIN'
-    OR uc.papel IN ('ADMIN_COMUNIDADE', 'PASTOR', 'LIDER')
+  WHEN uc.papel IN ('ADMIN_COMUNIDADE', 'SUPERADMIN', 'PASTOR', 'LIDER')
     OR EXISTS (SELECT 1 FROM oficiais_comunidade oc2 WHERE oc2.usuario_comunidade_id = uc.id)
   THEN 'OFICIAL' ELSE 'MEMBRO' END`;
 

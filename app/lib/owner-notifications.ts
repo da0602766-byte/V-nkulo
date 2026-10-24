@@ -6,5 +6,5 @@ export function notificationVisibilitySql(owner: boolean, alias = "n") {
 
 export function ownerNotificationSql(alias = "n") {
   return `(lower(trim(COALESCE(${alias}.destino_rota, ''))) LIKE '/proprietario%'
-    OR ${alias}.titulo = 'Falha na sincronização Supabase')`;
+    OR ${alias}.titulo IN ('Falha na sincronização Supabase', 'Nova solicitação de continuidade'))`;
 }

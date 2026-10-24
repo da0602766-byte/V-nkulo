@@ -22,6 +22,22 @@ test('login comum do proprietário com vínculo legado não herda sua sessão gl
 });
 
 const globalPaths=['/api/pilot/estatisticas','/api/pilot/editorial','/api/pilot/editorial/programacoes','/api/pilot/feature-flags','/api/pilot/usuarios-cadastro','/api/proprietario?section=users'];
+
+test('comentário público oculta identidade privada e e-mail de ADMIN legado',async()=>{
+  const f=await roleFixture();
+  try {
+    const author=await f.account('MEMBRO'), legacy=await f.account('MEMBRO',{perfil:'ADMIN'}), owner=await f.account('MEMBRO',{owner:true});
+    const id=Number(f.db.prepare("INSERT INTO publicacoes_piloto(comunidade_id,titulo,resumo,conteudo,categoria,visibilidade,status,origem,criado_por,comentarios_habilitados) VALUES (NULL,'Auditoria','','Texto','COMUNIDADE','PLATAFORMA','PUBLICADA','PLATAFORMA',?,1)").run(owner.id).lastInsertRowid);
+    f.db.prepare("INSERT INTO comentarios_publicacao(publicacao_id,usuario_id,autor_nome_snapshot,texto,perfil_visivel) VALUES (?,?,'Identidade privada','Comentário de teste',0)").run(id,author.id);
+    for(const [cookie,exposeName,exposeEmail] of [['',false,false],[legacy.cookie,false,false],[author.cookie,true,false],[owner.cookie,true,true]]) {
+      const response=await f.call(`/api/publicacoes/${id}/comentarios`,{cookie});
+      assert.equal(response.status,200);
+      const comment=(await response.json()).comentarios[0];
+      assert.equal(comment.autor,exposeName?'Teste MEMBRO':'Usuário da plataforma');
+      assert.equal(comment.email,exposeEmail?author.email:null);
+    }
+  } finally {f.db.close();}
+});
 for(const scenario of [
   {role:'MEMBRO'}, {role:'LIDER'}, {role:'PASTOR'}, {role:'ADMIN_COMUNIDADE'},
   {role:'MEMBRO',perfil:'ADMIN'}, {role:'SUPERADMIN'}, {role:'PROPRIETARIO_VISUALIZADOR'},
@@ -148,5 +164,41 @@ test('pastor não altera nem remove proprietário cadastrado, mesmo com papel me
       assert.equal(response.status,403,method);
     }
     assert.equal(f.db.prepare('SELECT status FROM usuario_comunidades WHERE id=?').get(target.membership).status,'ATIVO');
+  } finally {f.db.close();}
+});
+
+
+test('ADMIN legado com vínculo membro continua no grupo de comunicação de membros',async()=>{
+  const f=await roleFixture();
+  try {
+    const legacy=await f.account('MEMBRO',{perfil:'ADMIN'}), member=await f.account('MEMBRO'), leader=await f.account('LIDER');
+    const data=await (await f.call('/api/pilot/chat',{cookie:legacy.cookie})).json();
+    assert.ok(data.people.some(p=>p.id===member.id));
+    assert.ok(!data.people.some(p=>p.id===leader.id));
+    await f.call('/api/pilot/presenca',{cookie:member.cookie,method:'POST'});
+    await f.call('/api/pilot/presenca',{cookie:leader.cookie,method:'POST'});
+    const presence=await (await f.call('/api/pilot/presenca',{cookie:legacy.cookie,method:'POST'})).json();
+    assert.equal(presence.people.find(p=>p.userId===member.id).canMessage,true);
+    assert.equal(presence.people.find(p=>p.userId===leader.id).canMessage,false);
+    const denied=await f.call('/api/pilot/chat',{cookie:legacy.cookie,method:'POST',body:{targetUserId:leader.id,message:'Mensagem fictícia'}});
+    assert.equal(denied.status,403);
+    assert.equal(f.db.prepare('SELECT COUNT(*) n FROM conversas_privadas').get().n,0);
+    assert.equal((await f.call('/api/pilot/chat',{cookie:legacy.cookie,method:'POST',body:{targetUserId:member.id}})).status,200);
+  } finally {f.db.close();}
+});
+
+test('aviso de continuidade vai somente ao proprietário protegido e exige sessão global para leitura',async()=>{
+  const f=await roleFixture();
+  try {
+    const owner=await f.account('MEMBRO',{owner:true}), legacy=await f.account('MEMBRO',{perfil:'ADMIN'}), requester=await f.account('ADMIN_COMUNIDADE',{communityOwner:true});
+    const response=await f.call('/api/pilot/continuidade',{cookie:requester.cookie,method:'POST',body:{type:'DESATIVACAO',category:'OUTRO',reason:'Auditoria local',description:'Solicitação fictícia da auditoria de acessos.',password:'AuditOnly123!',confirmation:'SOLICITAR'}});
+    assert.equal(response.status,201,await response.clone().text());
+    const notifications=f.db.prepare("SELECT usuario_id,destino_rota FROM notificacoes_sistema WHERE titulo='Nova solicitação de continuidade'").all();
+    assert.deepEqual(notifications.map(n=>n.usuario_id),[owner.id]);
+    assert.equal(notifications[0].destino_rota,'/proprietario');
+    // Avisos antigos dirigidos por engano ao ADMIN legado também ficam ocultos.
+    f.db.prepare("INSERT INTO notificacoes_sistema(tipo,titulo,mensagem,area,usuario_id,criado_por) VALUES ('ALERTA','Nova solicitação de continuidade','Privado','CONTINUIDADE',?,'teste')").run(legacy.id);
+    const notices=await (await f.call('/api/pilot/notificacoes',{cookie:legacy.cookie})).text();
+    assert.ok(!notices.includes('Nova solicitação de continuidade'));
   } finally {f.db.close();}
 });

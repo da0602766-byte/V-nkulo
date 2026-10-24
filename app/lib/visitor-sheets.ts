@@ -80,7 +80,7 @@ export async function syncVisitorSheet(db: ReturnType<typeof getD1>, communityId
     // Revoked membership cannot keep exporting with a previously saved Google token.
     const operator = await db.prepare(`SELECT u.id FROM usuarios u JOIN usuario_comunidades uc ON uc.usuario_id = u.id JOIN comunidades c ON c.id = uc.comunidade_id
       WHERE u.id = ? AND u.ativo = 1 AND uc.comunidade_id = ? AND uc.status = 'ATIVO' AND c.status = 'ATIVA'
-      AND (uc.papel IN ('PASTOR','ADMIN_COMUNIDADE','SUPERADMIN') OR c.proprietario_usuario_id = u.id OR u.perfil = 'ADMIN')`).bind(config.usuario_id, communityId).first();
+      AND (uc.papel IN ('PASTOR','ADMIN_COMUNIDADE','SUPERADMIN') OR c.proprietario_usuario_id = u.id)`).bind(config.usuario_id, communityId).first();
     if (!operator) throw new Error("O responsável pela conexão perdeu o acesso de gestão. Um gestor deve reconectar a planilha.");
     const token = await visitorSheetToken(config.usuario_id);
     await assertSheetPrivate(token, config.spreadsheet_id);

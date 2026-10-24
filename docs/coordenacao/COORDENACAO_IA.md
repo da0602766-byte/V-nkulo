@@ -17,6 +17,12 @@ Antes de alterar o código, leia este documento e atualize a seção **Trabalho 
 
 ## Trabalho em andamento
 
+Auditoria — complemento validado: 855/855 testes, TypeScript/build aprovados, lint zero erros/38 avisos. Regressões em tests/role-access-audit.test.mjs, tests/legacy-access-policies.test.mjs e tests/chat-push.test.mjs. Removidos os últimos usos de usuarios.perfil para autorização/grupo/destinatário, preservando apenas a atribuição do proprietário após autenticação exclusiva. Publicação final em preparação; o pacote intermediário não foi publicado.
+
+Extensão da revisão de perfil legado: reservar app/api/pilot/{chat,presenca,agenda,publicacoes,continuidade}/route.ts, app/lib/{chat-push,pilot-notifications,owner-notifications,local-auth,visitor-sheets}.ts e regressões. Remover decisões baseadas em usuarios.perfil da comunicação, destinatários administrativos e autorização de sincronização; validar com dados fictícios/mocks, sem enviar mensagens ou acessar serviços reais.
+
+Complemento da auditoria antes da publicação: reservado app/api/publicacoes/[id]/comentarios/route.ts e regressão de privacidade em role-access-audit. Revisão final encontrou exposição de nome oculto/e-mail pelo campo legado ADMIN fora do tenant; corrigir e recompilar antes de salvar/publicar a versão.
+
 Auditoria de acessos — validação local concluída em 24/10/2026. Corrigidas elevação global por perfis legados, alteração de hierarquia de pares/superiores/proprietários e ações indevidas na lista. 849/849 testes, tipos/build aprovados, lint zero erros/38 avisos. Matriz com contas fictícias; navegador com seis perfis e Pessoas em 390/768/1864 px. Publicação autorizada em preparação; sem migração ou alteração de dados reais. Relatório AUDITORIA_ACESSOS_2026-10-24.md. APK físico adiado.
 
 Auditoria de acessos por perfil — Codex, 24/10/2026, sobre Sites 430. Reserva: app/lib/tenant.ts, app/lib/tenant-policy.mjs, app/api/pilot/pessoas/route.ts, app/components/PilotDashboard.tsx, app/components/PeopleWorkspace.tsx, tests/pilot-integration.test.mjs e tests/people-visitor-navigation.test.mjs (fixtures globais e autorização por pessoa), testes novos role-access-audit e helper de matriz, docs/relatorios/AUDITORIA_ACESSOS_2026-10-24.md e PENDENCIAS_PRIORIZADAS.md. Reproduzir e corrigir autorização global legada e gestão de hierarquia; conferir perfis, isolamento, revogação e navegação em banco fictício. Preservar trabalhos anteriores e briefing Figma. APK físico adiado por pedido expresso; publicar bloco após validação, conforme autorização vigente.

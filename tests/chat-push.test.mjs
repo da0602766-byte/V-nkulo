@@ -166,3 +166,13 @@ test("chat no D1 real: batch devolve RETURNING, isola envios concorrentes e reve
   assert.equal((await db.prepare("SELECT COUNT(*) n FROM mensagens_privadas").first()).n, 2);
   assert.equal((await db.prepare("SELECT COUNT(*) n FROM notificacoes_sistema").first()).n, 2);
 });
+
+
+test('chat: perfil ADMIN legado não muda o grupo nem a autorização da prévia',async t=>{
+  const f=await fixture(t);
+  f.database.prepare("UPDATE usuarios SET perfil='ADMIN' WHERE id=?").run(f.sender);
+  assert.equal((await f.post()).status,201);
+  assert.ok(await f.authorize.getAuthorizedChatPush(f.d1,f.notification().id,f.recipient));
+  f.database.prepare("UPDATE usuario_comunidades SET papel='LIDER' WHERE usuario_id=?").run(f.recipient);
+  assert.equal(await f.authorize.getAuthorizedChatPush(f.d1,f.notification().id,f.recipient),null);
+});

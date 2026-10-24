@@ -3905,11 +3905,11 @@ test("comentários públicos exigem login, respeitam privacidade e podem ser des
   const superCommentsJson = await superComments.json();
   assert.equal(
     superCommentsJson.comentarios[0].autor,
-    "Membro Comentarista",
+    "Usuário da plataforma",
   );
   assert.equal(
     superCommentsJson.comentarios[0].email,
-    "membro.comentario@example.test",
+    null,
   );
 
   database

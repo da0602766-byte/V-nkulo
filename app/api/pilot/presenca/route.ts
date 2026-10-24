@@ -43,14 +43,13 @@ async function listPresence(
         CASE
           WHEN c.proprietario_usuario_id = u.id THEN 'PROPRIETÁRIO'
           WHEN NULLIF(oc.titulo, '') IS NOT NULL THEN oc.titulo
-          WHEN uc.papel = 'ADMIN_COMUNIDADE' THEN 'ADMINISTRADOR'
+          WHEN uc.papel IN ('ADMIN_COMUNIDADE', 'SUPERADMIN') THEN 'ADMINISTRADOR'
           WHEN uc.papel = 'PASTOR' THEN 'PASTOR'
           WHEN uc.papel = 'LIDER' THEN 'LÍDER'
           ELSE 'MEMBRO'
         END AS hierarquia,
         CASE
-          WHEN u.perfil = 'ADMIN'
-            OR uc.papel IN ('ADMIN_COMUNIDADE', 'PASTOR', 'LIDER')
+          WHEN uc.papel IN ('ADMIN_COMUNIDADE', 'SUPERADMIN', 'PASTOR', 'LIDER')
             OR EXISTS (
               SELECT 1 FROM oficiais_comunidade oc2
               WHERE oc2.usuario_comunidade_id = uc.id

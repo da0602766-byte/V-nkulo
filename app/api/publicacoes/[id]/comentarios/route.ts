@@ -22,7 +22,7 @@ export async function GET(_request: Request, context: Context) {
   }
   const viewer = await getSessionUser();
   const viewerIsSuperadmin = Boolean(
-    viewer?.ativo && (viewer.perfil === "ADMIN" || viewer.system_owner),
+    viewer?.ativo && viewer.system_owner === true,
   );
   const result = await db
     .prepare(
