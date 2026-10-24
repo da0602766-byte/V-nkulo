@@ -30,7 +30,7 @@ const people=()=>{const f=harness('PeopleWorkspace.tsx',{communityName:'Demonstr
 const searchInput=tree=>find(tree,'input',n=>n.props.type==='search');
 
 test('modelo de atuação só preenche permissões autorizadas e preserva título e papel', async () => {
- const f=people();await reply(f.requests[0],{...peopleResponse([{...person(1,'Pessoa'),oficial:1,titulo_oficial:'DIACONISA'}]),canManage:true,permissionCatalog:['visitors.view','events.view']});
+ const f=people();await reply(f.requests[0],{...peopleResponse([{...person(1,'Pessoa'),canEditHierarchy:true,oficial:1,titulo_oficial:'DIACONISA'}]),canManage:true,permissionCatalog:['visitors.view','events.view']});
  button(f.render(),'Editar função').props.onClick();
  const editor=()=>find(f.render(),'section',n=>n.props['aria-label']==='Editar função de Pessoa');
  assert.match(editor().props.className,/people-role-editor/);
@@ -43,6 +43,13 @@ test('modelo de atuação só preenche permissões autorizadas e preserva títul
  assert.match(text(editor()),/Revise as permissões e salve/);
  assert.equal(f.requests.length,1,'escolher e aplicar não salva antes da confirmação do formulário');
 });
+test('Pessoas obedece à autorização individual mesmo quando o perfil pode gerenciar outros registros',async()=>{
+ const f=people();await reply(f.requests[0],{...peopleResponse([{...person(1,'Protegida'),canEditHierarchy:false,canRemove:false}]),canManage:true,canRemoveCommunity:true});
+ assert.equal(button(f.render(),'Editar função'),undefined);
+ assert.equal(button(f.render(),'Remover pessoa'),undefined);
+ assert.ok(button(f.render(),'Ver ficha de Protegida'));
+});
+
 test('Pessoas mantém a busca montada e ignora respostas de consultas anteriores',async()=>{
  const f=people();await reply(f.requests[0],peopleResponse([person(1,'Anterior')]));
  change(searchInput(f.render()),'lento');assert.ok(searchInput(f.render()));assert.equal(find(f.render(),'article',n=>n.props.className?.includes('people-card')),undefined);f.render();f.flush();const slow=f.requests.at(-1);

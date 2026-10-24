@@ -1309,7 +1309,7 @@ export default function PilotDashboard({
               <span className="pilot-sidebar-label">Explorar comunidades</span>
             </Link>
           </nav>
-          {(systemOwner || active.papel === "SUPERADMIN") && (
+          {systemOwner && (
             <EditorialSidebarSchedule onOpen={() => window.location.assign("/proprietario?tab=editorial")} />
           )}
           <div className="pilot-sidebar-note"><strong>{allowedMenu.length} áreas disponíveis</strong><p>As demais dependem das permissões do seu perfil.</p></div>

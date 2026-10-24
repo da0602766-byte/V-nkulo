@@ -6,7 +6,7 @@ import { isSystemOwnerAccount } from "../../../lib/local-auth";
 import { notifyUser } from "../../../lib/pilot-notifications";
 import { recordPromotionNotice } from "../../../lib/recepcao";
 import { recordTenantAudit } from "../../../lib/tenant-audit";
-import { requireTenantPermission } from "../../../lib/tenant";
+import { requireTenantPermission, type TenantContext } from "../../../lib/tenant";
 
 // Lote pedido a cada carregamento. A lista antes baixava até 2.000 pessoas de
 // uma vez e paginava no navegador; agora o corte é por cursor no servidor, e a
@@ -143,6 +143,7 @@ export async function GET(request: Request) {
       .prepare(
         `SELECT uc.id AS membership_id, u.id AS usuario_id, u.nome, u.email,
           u.criado_em AS owner_criado_em,
+          (SELECT proprietario_usuario_id FROM comunidades WHERE id = uc.comunidade_id) AS community_owner_id,
           u.telefone, u.foto_perfil, uc.papel,
           COALESCE((SELECT group_concat(m.nome, ', ')
             FROM ministerio_voluntarios mv JOIN ministerios_comunidade m
@@ -232,7 +233,11 @@ export async function GET(request: Request) {
   return Response.json(
     {
       me: verifiedMe,
-      people: people.map(withOwnerVerification),
+      people: people.map((person) => ({
+        ...withOwnerVerification(person),
+        canEditHierarchy: access.context.permissions.includes("officials.manage") && canManagePerson(access.context, person),
+        canRemove: canRemoveCommunity && Number(person.usuario_id) !== access.user.id && canManagePerson(access.context, person),
+      })),
       nextCursor,
       counts: {
         membros: Number(totals?.membros || 0),
@@ -254,7 +259,8 @@ export async function GET(request: Request) {
 
 function withOwnerVerification(row: Record<string, unknown> | null) {
   if (!row) return row;
-  const { owner_criado_em, ...safeRow } = row;
+  const { owner_criado_em, community_owner_id, ...safeRow } = row;
+  void community_owner_id;
   return {
     ...safeRow,
     owner_verified: isSystemOwnerAccount({
@@ -262,6 +268,19 @@ function withOwnerVerification(row: Record<string, unknown> | null) {
       criado_em: String(owner_criado_em || ""),
     }),
   };
+}
+
+// Verifica também o alvo: poder conceder um cargo menor não permite
+// rebaixar superiores, pares ou os proprietários cadastrados.
+function canManagePerson(context: TenantContext, target: Record<string, unknown>) {
+  if (context.isOwner) return true;
+  if (Number(target.usuario_id) === context.userId ||
+      Number(target.community_owner_id) === Number(target.usuario_id) ||
+      isSystemOwnerAccount({email: String(target.email || ""), criado_em: String(target.owner_criado_em || "")})) return false;
+  const rank: Record<string, number> = {MEMBRO: 0, LIDER: 1, PASTOR: 2, ADMIN_COMUNIDADE: 3, SUPERADMIN: 3, PROPRIETARIO_VISUALIZADOR: 3};
+  const actorRank = rank[context.papel] ?? -1;
+  const targetRank = rank[String(target.papel)] ?? Number.POSITIVE_INFINITY;
+  return actorRank > targetRank;
 }
 
 export async function DELETE(request: Request) {
@@ -293,7 +312,9 @@ export async function DELETE(request: Request) {
   const db = getD1();
   const target = await db
     .prepare(
-      `SELECT uc.id, uc.usuario_id, u.nome, u.email
+      `SELECT uc.id, uc.usuario_id, uc.papel, u.nome, u.email,
+         u.criado_em AS owner_criado_em,
+         (SELECT proprietario_usuario_id FROM comunidades WHERE id = uc.comunidade_id) AS community_owner_id
        FROM usuario_comunidades uc
        JOIN usuarios u ON u.id = uc.usuario_id
        WHERE uc.id = ? AND uc.comunidade_id = ? AND uc.status = 'ATIVO'
@@ -305,6 +326,9 @@ export async function DELETE(request: Request) {
       usuario_id: number;
       nome: string;
       email: string;
+      papel: string;
+      owner_criado_em: string;
+      community_owner_id: number | null;
     }>();
   if (!target) {
     return Response.json(
@@ -317,6 +341,10 @@ export async function DELETE(request: Request) {
       { error: "A conta proprietária não pode remover a si mesma." },
       { status: 409 },
     );
+  }
+
+  if (!canManagePerson(access.context, target)) {
+    return Response.json({error: "Seu perfil não pode remover esta pessoa da comunidade."}, {status: 403});
   }
 
   if (action === "REMOVE_COMMUNITY") {
@@ -488,7 +516,8 @@ export async function PATCH(request: Request) {
   const db = getD1();
   const target = await db
     .prepare(
-      `SELECT uc.id, uc.usuario_id, uc.papel,
+      `SELECT uc.id, uc.usuario_id, uc.papel, u.email, u.criado_em AS owner_criado_em,
+        (SELECT proprietario_usuario_id FROM comunidades WHERE id = uc.comunidade_id) AS community_owner_id,
         CASE WHEN oc.id IS NULL THEN 0 ELSE 1 END AS oficial
        FROM usuario_comunidades uc
        JOIN usuarios u ON u.id = uc.usuario_id
@@ -504,12 +533,19 @@ export async function PATCH(request: Request) {
       usuario_id: number;
       papel: string;
       oficial: number;
+      email: string;
+      owner_criado_em: string;
+      community_owner_id: number | null;
     }>();
   if (!target) {
     return Response.json(
       { error: "Pessoa não encontrada nesta comunidade." },
       { status: 404 },
     );
+  }
+
+  if (!canManagePerson(access.context, target)) {
+    return Response.json({error: "Seu perfil não pode alterar a hierarquia desta pessoa."}, {status: 403});
   }
 
   const membershipUpdate = db

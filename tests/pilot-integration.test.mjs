@@ -929,7 +929,7 @@ test("redes V4.5 exigem flags, isolam unidades e não processam cobrança", asyn
   });
 
   const worker = await loadWorker();
-  const env = createEnv(d1);
+  const env = createEnv(d1, {SYSTEM_OWNER_EMAIL: "super.redes@example.test", SYSTEM_OWNER_LOCKED_BEFORE: "2099-01-01"});
   const superCookie = await login(
     worker,
     env,
@@ -1450,7 +1450,7 @@ test("cadastro público fechado não cria conta, vínculo ou sessão", async () 
   database.close();
 });
 
-test("dados de cadastro são consultáveis somente pelo SuperAdmin e nunca expõem credenciais", async () => {
+test("dados de cadastro são consultáveis somente pela sessão do proprietário e nunca expõem credenciais", async () => {
   const { database, d1 } = await createPilotD1();
   await createPilotUser(database, {
     nome: "Superadmin Fictício",
@@ -1478,7 +1478,7 @@ test("dados de cadastro são consultáveis somente pelo SuperAdmin e nunca expõ
       "membro.cadastro@example.test",
     );
   const worker = await loadWorker();
-  const env = createEnv(d1);
+  const env = createEnv(d1, {SYSTEM_OWNER_EMAIL: "superadmin.cadastro@example.test", SYSTEM_OWNER_LOCKED_BEFORE: "2099-01-01"});
   const adminCookie = await login(
     worker,
     env,
@@ -1534,7 +1534,7 @@ test("sessão, tenant e gates críticos são validados no backend", async () => 
     ],
   });
   const worker = await loadWorker();
-  const env = createEnv(d1);
+  const env = createEnv(d1, {SYSTEM_OWNER_EMAIL: "admin.piloto@example.test", SYSTEM_OWNER_LOCKED_BEFORE: "2099-01-01"});
   const sessionCookie = await login(
     worker,
     env,
@@ -3276,7 +3276,7 @@ test("feed interno, solicitação de entrada, retenção e estatísticas usam re
     memberships: [{ comunidadeId: 1, papel: "ADMIN_COMUNIDADE" }],
   });
   const worker = await loadWorker();
-  const env = createEnv(d1);
+  const env = createEnv(d1, {SYSTEM_OWNER_EMAIL: "super.feed@example.test", SYSTEM_OWNER_LOCKED_BEFORE: "2099-01-01"});
   const pastorCookie = await login(
     worker,
     env,
@@ -4139,7 +4139,7 @@ test("editorial mantém IA em revisão e agenda somente conteúdo autorizado", a
     memberships: [{ comunidadeId: 1, papel: "MEMBRO" }],
   });
   const worker = await loadWorker();
-  const env = createEnv(d1);
+  const env = createEnv(d1, {SYSTEM_OWNER_EMAIL: "editorial.admin@example.test", SYSTEM_OWNER_LOCKED_BEFORE: "2099-01-01"});
   const adminCookie = await login(
     worker,
     env,

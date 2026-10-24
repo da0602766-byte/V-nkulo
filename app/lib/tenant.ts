@@ -5,6 +5,7 @@ import { getRuntimeEnv } from "../../db/runtime-env";
 import type { AppUser } from "./access";
 import {
   normalizeTenantRole,
+  effectiveTenantRole,
   normalizeOfficialPermissions,
   permissionsForTenantRole,
 } from "./tenant-policy.mjs";
@@ -146,11 +147,7 @@ export async function listTenantMemberships(
     comunidadeId: Number(row.comunidade_id),
     comunidadeNome: row.comunidade_nome,
     comunidadeSlug: row.comunidade_slug,
-    papel: user.system_owner
-      ? normalizeTenantRole(row.papel)
-      : user.perfil === "ADMIN"
-        ? "SUPERADMIN"
-        : normalizeTenantRole(row.papel),
+    papel: effectiveTenantRole(row.papel, Boolean(user.system_owner)),
     status: row.status,
     ambienteDemo: Boolean(row.ambiente_demo),
     oficial: Boolean(row.oficial),
@@ -177,10 +174,7 @@ export async function getActiveTenantContext(
   const membership =
     memberships.find((item) => item.membershipId === selected?.membershipId) ??
     memberships[0];
-  const papel =
-    user.system_owner || user.perfil === "ADMIN"
-      ? "SUPERADMIN"
-      : normalizeTenantRole(membership.papel);
+  const papel = effectiveTenantRole(membership.papel, Boolean(user.system_owner));
   let permissions = permissionsForTenantRole(papel);
   const isCommunityOwner = membership.isCommunityOwner;
   const continuityPermissions = new Set([
@@ -279,6 +273,14 @@ export async function getActiveTenantContext(
     }
   }
 
+  // Privilégios da plataforma exigem a sessão exclusiva do proprietário,
+  // inclusive quando um vínculo legado carrega um papel global.
+  if (!user.system_owner) {
+    permissions = permissions.filter((permission) =>
+      !permission.startsWith("platform.") && !permission.startsWith("feature_flags."),
+    );
+  }
+
   // Permissões personalizadas, ministeriais ou temporárias nunca podem
   // transformar um cargo em dono da comunidade. Reaplicamos a política após
   // todas as extensões de escopo para que a autorização dependa somente do
@@ -310,7 +312,7 @@ export async function getActiveTenantContext(
       permissions,
       modules,
       isSuperadmin:
-        papel === "SUPERADMIN" || Boolean(user.system_owner),
+        Boolean(user.system_owner),
       isOwner: Boolean(user.system_owner),
       isCommunityOwner,
       communityAccess: membership.communityAccess,

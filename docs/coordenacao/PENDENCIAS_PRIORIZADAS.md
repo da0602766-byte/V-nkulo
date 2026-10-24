@@ -11,8 +11,8 @@ plataforma funcione sem sua hospedagem e seus armazenamentos atuais.
 | --- | --- | --- |
 | Recuperação verificável | Implementada ferramenta que reconstrói arquivo existente em outro SQLite, preserva a conta atual do proprietário e exclui acessos antigos; ensaio pelo Worker aprovado | Entrega local concluída; backup periódico completo, recuperação de mídia e homologação com base real ainda pendentes |
 | Concorrência de convites | Dois defeitos reproduzidos e corrigidos: ultrapassar dez pendentes e duplicar links ativos para o mesmo e-mail | Transação única, testes de concorrência, substituição com cota cheia e rollback de auditoria aprovados; publicado no Sites 429 |
-| Auditoria de comunidades e permissões | Fluxos de CPF, LOG1, contratação, cotas, convites, revogação, acesso temporário e isolamento cobertos pelo bloco de regressão executado | Completar matriz de navegação por papel em navegador e medições com volume; testes automatizados não encerram sozinhos a etapa 6 |
-| Confiabilidade da validação geral | Bloco 2 concluído localmente: 826/826 testes, TypeScript/build aprovados e lint com zero erros/38 avisos | Mocks e verificações históricas atualizados; carregamentos, preferências e referências corrigidos sem desativar regras; publicação em preparação |
+| Auditoria de comunidades e permissões | Matriz por perfil concluída neste recorte; corrigidos privilégios globais legados e gestão indevida de hierarquia. 849/849 testes e navegador com seis perfis aprovados; ver AUDITORIA_ACESSOS_2026-10-24.md | Medições com volume e validações externas permanecem separadas; publicação do bloco em preparação |
+| Confiabilidade da validação geral | Bloco 2 publicado no Sites 430: 826/826 testes, TypeScript/build aprovados e lint com zero erros/38 avisos | Mocks e verificações históricas atualizados; carregamentos, preferências e referências corrigidos sem desativar regras; publicado no Sites 430 |
 
 Validação do primeiro bloco: **52/52 testes críticos**, build, Worker/manifesto,
 TypeScript e lint dos arquivos alterados aprovados. Comparação da suíte geral:
@@ -26,6 +26,11 @@ asserções estruturais antigas e regras de hooks/lint. Elas não equivalem a 27
 defeitos funcionais confirmados. Somente os checks executados podem ser declarados
 aprovados. Evidências locais em `.task-tools/priority-*-tests.log`,
 `.task-tools/priority-lint.log` e `.task-tools/priority-build.log`.
+
+Segundo bloco publicado no Sites **430**, fonte `08d9cd2afa7bff7e12b8cae0bad22956a76f2276`,
+deployment `appgdep_6add0604ed508191be9981e4884fbb85`, confirmado em
+24/10/2026 às 16h25 (Brasília). URL: https://adote-gestao.da0602766.chatgpt.site.
+Este registro documental é posterior ao deploy.
 
 Segundo bloco: eliminadas as 27 falhas anteriores e os 47 erros de lint.
 Sete novos testes verificam snapshot de servidor, sincronização de preferências,
@@ -49,7 +54,7 @@ perfis em todas as telas nem os testes em APK físico.
 
 ## Grupo 2 — Alta necessidade: uso cotidiano e contratação
 
-- **APK em aparelho físico:** atualização sem perder rascunhos, modo offline
+- **APK em aparelho físico — adiado por pedido expresso em 24/10/2026:** atualização sem perder rascunhos, modo offline
   manual, perda de conexão, reconexão, retorno à aplicação e câmera/QR.
   Depende de aparelho disponível, não de novo provedor. Entrega real de push
   e retorno de provedores ficam fora deste recorte sem serviços externos.
@@ -84,7 +89,7 @@ autenticação e recuperação, não apenas ativar um botão.
 
 1. Entregar recuperação local e correções comprovadas de concorrência.
 2. Sanear a validação geral e completar a auditoria funcional dos acessos.
-3. Validar APK com aparelho e revisar página comercial/contratação.
+3. Revisar página comercial/contratação; retomar APK físico quando solicitado.
 4. Refatorar CSS e melhorar desempenho em blocos pequenos, medidos e verificáveis.
 
 Não há autorização implícita neste documento para reiniciar, apagar ou restaurar

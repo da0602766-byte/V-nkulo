@@ -11,6 +11,8 @@ import "./leadership-member-ux.css";
 import "./people-role-editor.css";
 
 type Person = {
+  canEditHierarchy?: boolean;
+  canRemove?: boolean;
   membership_id: number;
   usuario_id: number;
   nome: string;
@@ -546,13 +548,13 @@ export default function PeopleWorkspace({
             <div className="people-directory-schedules"><small className="people-mobile-label">Próximas escalas</small><span>{person.proximas_escalas || 0}</span></div>
             <div className="people-card-actions">
               <button type="button" className="people-open-record" onClick={() => setRecord(person)} aria-label={`Ver ficha de ${person.nome}`}>Ver ficha</button>
-              {(data.canManage || data.canRemoveCommunity) && <details className="people-row-menu"><summary aria-label={`Mais ações para ${person.nome}`}>⋯</summary><div>
-              {data.canManage && (
+              {(person.canEditHierarchy || person.canRemove) && <details className="people-row-menu"><summary aria-label={`Mais ações para ${person.nome}`}>⋯</summary><div>
+              {person.canEditHierarchy && (
                 <button type="button" onClick={() => { const title = person.titulo_oficial || "LÍDER"; setEditing(person); setModelApplied(false); setPermissionDraft(person.permissoes.split(",").filter(Boolean)); setPresetTitle(title); setOfficialTitle(title); setIsOfficial(Boolean(person.oficial)); }}>
                   Editar função
                 </button>
               )}
-              {data.canRemoveCommunity && (
+              {person.canRemove && (
                 <button
                   type="button"
                   className="danger"
