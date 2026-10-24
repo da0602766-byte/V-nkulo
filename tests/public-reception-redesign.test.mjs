@@ -17,7 +17,9 @@ test("landing pública usa navegação compacta, tema e ícones responsivos", as
 
   assert.match(page, /LandingPageExperience/);
   assert.match(experience, /className="lp-nav"/);
-  assert.match(experience, /className="lp-social-proof"/);
+  // Métricas e depoimentos estáticos não são evidência comercial.
+  assert.doesNotMatch(experience, /TESTIMONIALS|1\.200|180K|94%|4\.9★|Mais popular/);
+  assert.match(experience, /href="\/planos">Planos/);
   assert.match(experience, /id="recursos"/);
   assert.match(experience, /ThemeControl compact cycle/);
   assert.match(experience, /IntersectionObserver/);

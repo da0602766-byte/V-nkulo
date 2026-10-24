@@ -11,7 +11,7 @@ plataforma funcione sem sua hospedagem e seus armazenamentos atuais.
 | --- | --- | --- |
 | Recuperação verificável | Implementada ferramenta que reconstrói arquivo existente em outro SQLite, preserva a conta atual do proprietário e exclui acessos antigos; ensaio pelo Worker aprovado | Entrega local concluída; backup periódico completo, recuperação de mídia e homologação com base real ainda pendentes |
 | Concorrência de convites | Dois defeitos reproduzidos e corrigidos: ultrapassar dez pendentes e duplicar links ativos para o mesmo e-mail | Transação única, testes de concorrência, substituição com cota cheia e rollback de auditoria aprovados; publicado no Sites 429 |
-| Auditoria de comunidades e permissões | Matriz por perfil concluída neste recorte; corrigidos privilégios globais legados, gestão de hierarquia, privacidade de comentários, grupos de chat, destinatários e revogação da sincronização. 855/855 testes e navegador com seis perfis aprovados; ver AUDITORIA_ACESSOS_2026-10-24.md | Medições com volume e validações externas permanecem separadas; publicação do bloco em preparação |
+| Auditoria de comunidades e permissões | Matriz por perfil concluída neste recorte; corrigidos privilégios globais legados, gestão de hierarquia, privacidade de comentários, grupos de chat, destinatários e revogação da sincronização. 855/855 testes e navegador com seis perfis aprovados; ver AUDITORIA_ACESSOS_2026-10-24.md | Medições com volume e validações externas permanecem separadas; publicado no Sites 431 |
 | Confiabilidade da validação geral | Bloco 2 publicado no Sites 430: 826/826 testes, TypeScript/build aprovados e lint com zero erros/38 avisos | Mocks e verificações históricas atualizados; carregamentos, preferências e referências corrigidos sem desativar regras; publicado no Sites 430 |
 
 Validação do primeiro bloco: **52/52 testes críticos**, build, Worker/manifesto,
@@ -52,14 +52,15 @@ e persistência do menu/colunas após recarregar. Sem overflow horizontal da pá
 ou erros de console nesse percurso. Isso não substitui a matriz completa de
 perfis em todas as telas nem os testes em APK físico.
 
+Publicado no Sites 431 em 24/10/2026 às 16h46 (Brasília), status succeeded. Fonte bdba5b5b94de6f727d8420d0e66d1d8725b0f047; deployment appgdep_6add0afd49588191bbb34a6235e4bfce; URL https://adote-gestao.da0602766.chatgpt.site. Audiência pública preservada; sem migração ou alteração de dados de produção. Registro documental posterior ao deploy.
+
 ## Grupo 2 — Alta necessidade: uso cotidiano e contratação
 
 - **APK em aparelho físico — adiado por pedido expresso em 24/10/2026:** atualização sem perder rascunhos, modo offline
   manual, perda de conexão, reconexão, retorno à aplicação e câmera/QR.
   Depende de aparelho disponível, não de novo provedor. Entrega real de push
   e retorno de provedores ficam fora deste recorte sem serviços externos.
-- **Página comercial e contratação:** coerência entre recursos/ofertas/contratos,
-  percurso até revisão manual, celular, teclado, foco, zoom e contraste.
+- **Página comercial e contratação — revisão funcional validada:** aceite por plano/versão, bloqueio de reenvio, foco e navegação corrigidos; afirmações comerciais sem fonte retiradas. 859/859 testes, tipos/build/lint aprovados e navegador em 390/768/1864 px. Ver REVISAO_COMERCIAL_2026-10-24.md. Zoom nativo/leitor de tela seguem como avaliação específica de acessibilidade; publicação em preparação.
 - **Continuidade offline:** avaliar a indicação de validade do acesso e envios
   pendentes no painel, proposta no relatório de 13/10. Não marcar como implementada
   sem conferir a versão atual do APK e da ponte.

@@ -44,4 +44,4 @@ Líder com permissão explícita pode gerenciar categorias; a revogação da per
 
 A auditoria cobre os caminhos acima e a regressão existente; não é uma certificação de todos os endpoints ou integrações externas. As verificações de plano, módulos, acesso temporário e isolamento existentes passaram na suíte completa. Medições com volume e comportamento do APK em aparelho físico permanecem pendentes. Não houve migração de schema, contratação de serviços, recuperação ou reinicialização de produção.
 
-Publicação deste bloco será registrada após confirmação do serviço.
+Publicado no Sites 431 em 24/10/2026 às 16h46 (Brasília), status succeeded. Fonte bdba5b5b94de6f727d8420d0e66d1d8725b0f047; deployment appgdep_6add0afd49588191bbb34a6235e4bfce; URL https://adote-gestao.da0602766.chatgpt.site. Audiência pública preservada; sem migração ou alteração de dados de produção. Registro documental posterior ao deploy.
