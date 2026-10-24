@@ -7,7 +7,7 @@ import LabModuleRuntime from "../../../components/LabModuleRuntime";
 export const dynamic="force-dynamic";
 export default async function Page({params}:{params:Promise<{id:string}>}){
  const {id}=await params,user=await getSessionUser();if(!user?.ativo)redirect('/login');
- const {context}=await getActiveTenantContext(user),module=await readLabModule(id);
- if(!context||!module?.published||module.archived||!canUseModule(module.published.definition,context))redirect('/acesso-negado');
+ const {context}=await getActiveTenantContext(user),labModule=await readLabModule(id);
+ if(!context||!labModule?.published||labModule.archived||!canUseModule(labModule.published.definition,context))redirect('/acesso-negado');
  return <LabModuleRuntime key={`${id}-${context.comunidadeId}`} id={id}/>;
 }

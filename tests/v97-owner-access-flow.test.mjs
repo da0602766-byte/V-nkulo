@@ -80,5 +80,7 @@ test("central do proprietário e categorias possuem layout responsivo padronizad
   assert.doesNotMatch(panelPage, /"editorial"|"estatisticas"|"plataforma"/);
   assert.match(css, /\.owner-insights-grid/);
   assert.match(css, /@media\(max-width:760px\)/);
-  assert.match(css, /\.visitor-category-grid \{ grid-template-columns: repeat\(3,minmax\(0,1fr\)\)/);
+  const visitorsCss = source("app/components/visitors/visitors-page.css");
+  assert.match(visitorsCss, /\.vp-category-grid\{[^}]*repeat\(auto-fill,minmax\(min\(100%,280px\),340px\)\)/);
+  assert.match(visitorsCss, /\.vp-category-grid\{grid-template-columns:minmax\(0,340px\);justify-content:center/);
 });

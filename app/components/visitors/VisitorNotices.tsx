@@ -6,16 +6,19 @@ import {api,today,type Pessoa,type Categoria} from './data';
 import {buildVisitorNotices,noticeGroups,relevantVisitorNotes,type VisitorCareNote} from '../../lib/visitor-notices';
 export default function VisitorNotices({people,categories,canViewFollowups,canViewNotes,onOpen,onNote}:{people:Pessoa[];categories:Categoria[];canViewFollowups:boolean;canViewNotes:boolean;onOpen:(id:string)=>void;onNote:(id:string)=>void}){
   const [open,setOpen]=useState(false),[group,setGroup]=useState('todos'),[query,setQuery]=useState('');
-  const [notes,setNotes]=useState<VisitorCareNote[]>([]),[notesError,setNotesError]=useState(''),[loading,setLoading]=useState(false),[retry,setRetry]=useState(0);
+  const [retry,setRetry]=useState(0);
+  const queryKey=useMemo(()=>({people,canViewNotes,retry,open}),[people,canViewNotes,retry,open]);
+  const [result,setResult]=useState<{key:object;notes:VisitorCareNote[];error:string}|null>(null);
+  const current=result?.key===queryKey?result:null;
+  const notes=current?.notes||[],notesError=current?.error||'',loading=canViewNotes&&!current;
   const date=today();
   const notices=useMemo(()=>buildVisitorNotices(people,categories,date,canViewFollowups),[people,categories,date,canViewFollowups]);
   useEffect(()=>{
     let current=true;
-    if(!canViewNotes){setNotes([]);setNotesError('');return;}
-    setLoading(true);
-    api<{anotacoes:VisitorCareNote[]}>('/api/pilot/anotacoes').then(v=>{if(current){setNotes(v.anotacoes);setNotesError('');}}).catch(()=>{if(current){setNotes([]);setNotesError('Não foi possível conferir os lembretes das anotações.');}}).finally(()=>{if(current)setLoading(false);});
+    if(!canViewNotes)return;
+    api<{anotacoes:VisitorCareNote[]}>('/api/pilot/anotacoes').then(v=>{if(current)setResult({key:queryKey,notes:v.anotacoes,error:''});}).catch(()=>{if(current)setResult({key:queryKey,notes:[],error:'Não foi possível conferir os lembretes das anotações.'});});
     return()=>{current=false;};
-  },[people,canViewNotes,retry,open]);
+  },[canViewNotes,queryKey]);
   const relevantNotes=canViewNotes?relevantVisitorNotes(notes,people,date):[];
   const count=notices.length+relevantNotes.length;
   const visible=notices.filter(n=>(group==='todos'||n.reasons.some(r=>r.group===group))&&`${n.person.nome} ${n.person.categoria||''} ${n.reasons.map(r=>r.text).join(' ')}`.toLocaleLowerCase('pt-BR').includes(query.toLocaleLowerCase('pt-BR')));

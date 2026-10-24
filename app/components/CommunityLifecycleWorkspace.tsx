@@ -71,18 +71,15 @@ export default function CommunityLifecycleWorkspace({ mode = "community", curren
   const [formOpen, setFormOpen] = useState(false);
   const requestRef = useRef<AbortController | null>(null);
   const mutationRef = useRef(false);
-  const load = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     requestRef.current?.abort(); const controller = new AbortController(); requestRef.current = controller;
-    setLoading(true); setLoadError("");
-    try {
-      const response = await fetch("/api/pilot/continuidade", { cache: "no-store", signal: controller.signal });
+    return fetch("/api/pilot/continuidade", { cache: "no-store", signal: controller.signal }).then(async response=>{
       const result = await response.json();
       if (!response.ok || !result.protection || !Array.isArray(result.requests)) throw new Error(result.error || "Não foi possível consultar a continuidade.");
       if (!controller.signal.aborted) setData(result);
-    } catch (cause) { if (!controller.signal.aborted) setLoadError((cause as Error).message); }
-    finally { if (!controller.signal.aborted) setLoading(false); }
-  }, []);
-  useEffect(() => { void load(); return () => requestRef.current?.abort(); }, [load]);
+    }).catch(cause=>{ if (!controller.signal.aborted) setLoadError((cause as Error).message); }).finally(()=>{ if (!controller.signal.aborted) setLoading(false); });},[]);
+  const load=useCallback(()=>{setLoading(true); setLoadError("");return fetchData();},[fetchData]);
+ useEffect(() => { void fetchData(); return () => requestRef.current?.abort(); }, [fetchData]);
   const visibleRequests = useMemo(() => data?.requests.filter(r => mode === "support" || r.communityId === currentCommunityId) || [], [data, currentCommunityId, mode]);
   const evidenceRequired = ["SEGURANCA", "DENUNCIA", "RETENCAO_LEGAL"].includes(category);
 

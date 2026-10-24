@@ -1,5 +1,5 @@
 "use client";
-import {useEffect,useState,type FormEvent,type ReactNode} from 'react';
+import {useCallback,useEffect,useRef,useState,type FormEvent,type ReactNode} from 'react';
 import {Dialog} from './Dialog';
 import {Badge,btnPri,btnSec,fmt} from './Views';
 import {api,answer,today,age,statuses,whatsapp,type Pessoa,type Categoria,type Named,type PerfilConfig,type Raw} from './data';
@@ -62,9 +62,17 @@ export function PersonForm({person,categories,cells,fields,onClose,onSave}:{pers
 
 type History = {id:number;tipo:string;resultado:string;descricao:string;proximo_contato:string;criado_em:string;responsavel_email:string};
 export function PersonDetails({person:p,fields,profile,canViewHistory,onClose,onEdit,onAction,onContact}:{person:Pessoa;fields:VisitorCustomField[];profile:PerfilConfig;canViewHistory:boolean;onClose:()=>void;onEdit:()=>void;onAction:(action:'arquivar'|'excluir'|'reativar'|'concluir')=>void;onContact:()=>void}) {
-  const [history,setHistory]=useState<History[]>([]),[cursor,setCursor]=useState<number|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(false);
-  async function load(cursor?:number) {setLoading(true);setError('');try{const r=await api<{acompanhamentos:History[];nextCursor:number|null}>(`/api/pilot/acompanhamentos?visitanteId=${p.id}&limite=50${cursor?`&cursor=${cursor}`:''}`);setHistory(old=>cursor?[...old,...r.acompanhamentos]:r.acompanhamentos);setCursor(r.nextCursor);}catch(e){setError((e as Error).message);}finally{setLoading(false);}}
-  useEffect(()=>{if(canViewHistory)void load();},[p.id,canViewHistory,p.ultimo]);
+  const [history,setHistory]=useState<History[]>([]),[cursor,setCursor]=useState<number|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(canViewHistory);
+  const requestId=useRef(0);
+  const fetchHistory=useCallback((cursor?:number)=>{
+    const id=++requestId.current;
+    return api<{acompanhamentos:History[];nextCursor:number|null}>(`/api/pilot/acompanhamentos?visitanteId=${p.id}&limite=50${cursor?`&cursor=${cursor}`:''}`).then(r=>{if(id!==requestId.current)return;setHistory(old=>cursor?[...old,...r.acompanhamentos]:r.acompanhamentos);setCursor(r.nextCursor);setError('');}).catch(e=>{if(id===requestId.current)setError(e.message);}).finally(()=>{if(id===requestId.current)setLoading(false);});
+  },[p.id]);
+  function load(cursor?:number){setLoading(true);setError('');return fetchHistory(cursor);}
+  const queryKey=JSON.stringify([p.id,canViewHistory,p.ultimo]);
+  const [previousQueryKey,setPreviousQueryKey]=useState(queryKey);
+  if(previousQueryKey!==queryKey){setPreviousQueryKey(queryKey);setHistory([]);setCursor(null);setError('');setLoading(canViewHistory);}
+  useEffect(()=>{if(canViewHistory)void fetchHistory();return()=>{requestId.current++;};},[fetchHistory,canViewHistory,p.ultimo]);
   const v=p.raw, gaps=visitorIntegrationGaps(v), details:[string,string][]=[['Nascimento',p.nascimento?`${fmt(p.nascimento)} · ${age(p.nascimento)} anos`:'Não informado'],['Chegada',fmt(p.entrada)],['Categoria',p.categoria||'Sem categoria'],['Célula',p.celula||'Não vinculada'],['Ministério',p.ministerio||'Não informado'],['Responsável',p.responsavel||String(v.responsavel_categoria||'Não definido')],['Quem recebeu',p.recebeu||'Não informado'],['Batismo',p.batizado],['Certificado',p.certificado],['Discipulado',`${p.discipulado}${v.discipulador?` · ${v.discipulador}`:''}`],['Encontro com Deus',v.encontro_com_deus?'Sim':'Não registrado'],['Curso de membros',v.curso_membros?'Sim':'Não registrado'],['Doa a Doa',answer(v.doa_a_doa)],['Receber apoio',p.apoio],['Oficial',`${answer(v.oficial)}${v.funcao_oficial?` · ${v.funcao_oficial}`:''}`],['Endereço',String(v.endereco||'Não informado')],['Parente',String(v.parente||'Não informado')]];
   return <Dialog wide title={p.nome} onClose={onClose}><div className="vp-details"><div className="vp-person-heading"><span>{p.tipo}</span><Badge s={p.status}/>{p.arquivado&&<strong>Arquivado</strong>}</div>
     {!p.arquivado&&(profile.podeEditarPessoa||profile.podeRegistrarContato)&&<div className="vp-actions vp-person-primary-actions">

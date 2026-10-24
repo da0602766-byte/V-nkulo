@@ -10,21 +10,42 @@ plataforma funcione sem sua hospedagem e seus armazenamentos atuais.
 | Trabalho | Situação atual | Critério de conclusão |
 | --- | --- | --- |
 | Recuperação verificável | Implementada ferramenta que reconstrói arquivo existente em outro SQLite, preserva a conta atual do proprietário e exclui acessos antigos; ensaio pelo Worker aprovado | Entrega local concluída; backup periódico completo, recuperação de mídia e homologação com base real ainda pendentes |
-| Concorrência de convites | Dois defeitos reproduzidos e corrigidos: ultrapassar dez pendentes e duplicar links ativos para o mesmo e-mail | Transação única, testes de concorrência, substituição com cota cheia e rollback de auditoria aprovados; publicação pendente |
+| Concorrência de convites | Dois defeitos reproduzidos e corrigidos: ultrapassar dez pendentes e duplicar links ativos para o mesmo e-mail | Transação única, testes de concorrência, substituição com cota cheia e rollback de auditoria aprovados; publicado no Sites 429 |
 | Auditoria de comunidades e permissões | Fluxos de CPF, LOG1, contratação, cotas, convites, revogação, acesso temporário e isolamento cobertos pelo bloco de regressão executado | Completar matriz de navegação por papel em navegador e medições com volume; testes automatizados não encerram sozinhos a etapa 6 |
-| Confiabilidade da validação geral | Primeira execução desta tarefa encontrou 27 testes falhando e lint com 47 erros/38 avisos em arquivos preexistentes | Diagnosticar e corrigir, preservando a intenção dos testes; não suprimir falhas para liberar publicação |
+| Confiabilidade da validação geral | Bloco 2 concluído localmente: 826/826 testes, TypeScript/build aprovados e lint com zero erros/38 avisos | Mocks e verificações históricas atualizados; carregamentos, preferências e referências corrigidos sem desativar regras; publicação em preparação |
 
 Validação do primeiro bloco: **52/52 testes críticos**, build, Worker/manifesto,
 TypeScript e lint dos arquivos alterados aprovados. Comparação da suíte geral:
 **789/816 antes e 792/819 depois**, com as mesmas **27 falhas** e nenhuma nova.
 Os 10 testes de recuperação foram repetidos após o ajuste final da cópia SQLite
-e limpeza das páginas livres, todos aprovados. Nenhuma publicação foi realizada.
+e limpeza das páginas livres, todos aprovados. Primeiro bloco publicado no Sites
+429, fonte `25621f96d8b9e52d08052b464bc18e18d7dd1311`.
 
 As falhas gerais incluem mocks de componentes/hooks que não acompanham o código,
 asserções estruturais antigas e regras de hooks/lint. Elas não equivalem a 27
 defeitos funcionais confirmados. Somente os checks executados podem ser declarados
 aprovados. Evidências locais em `.task-tools/priority-*-tests.log`,
 `.task-tools/priority-lint.log` e `.task-tools/priority-build.log`.
+
+Segundo bloco: eliminadas as 27 falhas anteriores e os 47 erros de lint.
+Sete novos testes verificam snapshot de servidor, sincronização de preferências,
+armazenamento bloqueado, resposta atrasada, recuperação de erro e mudança de
+comunidade. Favoritos, menu e larguras de colunas usam assinaturas do armazenamento;
+carregamentos iniciais não repetem os resets das ações manuais. Consultas de abas
+cancelam respostas substituídas e fichas descartam históricos obsoletos.
+
+Validação final: **826/826 testes**, **zero erros/38 avisos de lint**, TypeScript,
+build e Worker/manifesto aprovados. Executar os testes que importam `dist/` **após**
+o build, nunca enquanto ele reconstrói o diretório. O simulador Workers/D1 requer
+acesso ao localhost. Evidências em `.task-tools/block2-verified-tests.log`,
+`block2-final-lint.json`, `block2-types.log` e `block2-final-build.log`.
+
+Prévia de Visitantes com banco fictício em memória conferida em **390, 768 e
+1864 px**: vários registros, busca com um resultado, vazio, ficha/histórico,
+seleção limpa ao trocar filtro, teclado para redimensionar colunas, restauração
+e persistência do menu/colunas após recarregar. Sem overflow horizontal da página
+ou erros de console nesse percurso. Isso não substitui a matriz completa de
+perfis em todas as telas nem os testes em APK físico.
 
 ## Grupo 2 — Alta necessidade: uso cotidiano e contratação
 

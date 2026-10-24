@@ -182,7 +182,7 @@ export function Pessoas({
   onCategoryChange: (value:string) => void
 }) {
   const [stagesCollapsed,setStagesCollapsed]=useVisitorPreference('stages');
-  const columns=useColumnWidths();
+  const {tableRef, ...columns}=useColumnWidths();
   const [q, setQ] = useState('')
   const filtersRef = useRef<HTMLDivElement>(null);
   useEffect(()=>{
@@ -278,7 +278,9 @@ export function Pessoas({
       })
   }, [pessoas, q, cat, rec, ordem, filtros, categorias])
 
-  useEffect(()=>{setSel(new Set());setLimite(10);},[q,cat,rec,filtros]);
+  const filterKey=JSON.stringify([q,cat,rec,filtros]);
+  const [previousFilterKey,setPreviousFilterKey]=useState(filterKey);
+  if(previousFilterKey!==filterKey){setPreviousFilterKey(filterKey);setSel(new Set());setLimite(10);}
   const visiveis = lista.slice(0, limite)
   const filtrosAtivosTotal = (q ? 1 : 0) + (cat ? 1 : 0) + (rec !== 'ativos' ? 1 : 0) + countFiltrosAvancados
   const count = (r: Recorte) => pessoas.filter((p) => matchRecorte(p, r) && (!cat || (cat === '__sem' ? !p.categoria : p.categoria === cat))).length
@@ -665,7 +667,7 @@ export function Pessoas({
                 <span className="text-stone-400 font-medium text-[11px]">Filtros ativos:</span>
                 {q && (
                   <span className="inline-flex items-center gap-1 bg-stone-100 text-stone-700 px-2 py-0.5 rounded-full">
-                    Busca: "{q}"
+                    Busca: &quot;{q}&quot;
                     <button onClick={() => setQ('')}><Icon d={I.x} className="size-3" /></button>
                   </span>
                 )}
@@ -763,7 +765,7 @@ export function Pessoas({
               <>
                 {/* Desktop Table View */}
                 <div className="vp-people-table hidden xl:block">
-                  <table ref={columns.tableRef} style={columns.widths?{width:columns.widths.reduce((a,b)=>a+b,0),minWidth:0}:undefined} className="w-full text-[13px]">
+                  <table ref={tableRef} style={columns.widths?{width:columns.widths.reduce((a,b)=>a+b,0),minWidth:0}:undefined} className="w-full text-[13px]">
                     <colgroup>{(columns.widths||[6,28,15,15,10,13,13]).map((w,i)=><col key={i} style={{width:columns.widths?w:`${w}%`}}/>)}</colgroup>
                     <thead className="sticky top-0 z-10 bg-stone-50 text-left text-[11px] uppercase tracking-[.12em] text-stone-500 border-b border-stone-200">
                       <tr>
@@ -776,12 +778,12 @@ export function Pessoas({
                             }
                           />
                         </th>
-                        <th className="px-3 font-semibold">Pessoa<ColumnHandle index={1} label="Pessoa" columns={columns}/></th>
-                        <th className="px-3 font-semibold">Categoria / Ministério<ColumnHandle index={2} label="Categoria / Ministério" columns={columns}/></th>
-                        <th className="px-3 font-semibold">Responsável<ColumnHandle index={3} label="Responsável" columns={columns}/></th>
-                        <th className="px-3 font-semibold">Status<ColumnHandle index={4} label="Status" columns={columns}/></th>
-                        <th className="px-3 font-semibold">Último contato<ColumnHandle index={5} label="Último contato" columns={columns}/></th>
-                        <th className="px-3 pr-6 font-semibold">Próxima ação<ColumnHandle index={6} label="Próxima ação" columns={columns}/></th>
+                        <th className="px-3 font-semibold">Pessoa<ColumnHandle index={1} label="Pessoa" columns={columns} tableRef={tableRef}/></th>
+                        <th className="px-3 font-semibold">Categoria / Ministério<ColumnHandle index={2} label="Categoria / Ministério" columns={columns} tableRef={tableRef}/></th>
+                        <th className="px-3 font-semibold">Responsável<ColumnHandle index={3} label="Responsável" columns={columns} tableRef={tableRef}/></th>
+                        <th className="px-3 font-semibold">Status<ColumnHandle index={4} label="Status" columns={columns} tableRef={tableRef}/></th>
+                        <th className="px-3 font-semibold">Último contato<ColumnHandle index={5} label="Último contato" columns={columns} tableRef={tableRef}/></th>
+                        <th className="px-3 pr-6 font-semibold">Próxima ação<ColumnHandle index={6} label="Próxima ação" columns={columns} tableRef={tableRef}/></th>
                       </tr>
                     </thead>
                     <tbody>

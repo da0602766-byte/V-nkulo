@@ -51,9 +51,12 @@ test("imagem de publicação usa bucket próprio e oferece visualizar ou baixar"
   assert.ok(publicationBranch > 0 && publicationBranch < drivePreference);
   assert.match(upload, /storage: "PUBLICATION"/);
   assert.match(client, /purpose === "post-image"/);
-  assert.match(image, /"Visualizar"/);
+  const imageActions = await read("app/components/feed/FeedImageActions.tsx");
+  assert.match(imageActions, /"Visualizar imagem"/);
   assert.match(image, /setRequestedLoad/);
-  assert.match(image, /<FileSaveActions source=\{src\}/);
+  assert.match(image, /<FeedImageActions source=\{src\}/);
+  assert.match(imageActions, /<FileSaveActions source=\{source\}/);
+  assert.match(imageActions, /close\(\); onView\(\)/);
   const actions = await read("app/components/FileSaveActions.tsx");
   assert.match(actions, /run\("download"\)/);
   assert.match(actions, /Baixar no aparelho/);

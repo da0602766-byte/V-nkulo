@@ -17,7 +17,15 @@ export default function AndroidOfflineControl() {
       setEnabled(data.offlineEnabled);
     } catch (failure) { setError((failure as Error).message); }
   }
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/proprietario/android", { cache: "no-store", signal: controller.signal }).then(async response => {
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Não foi possível consultar a configuração.");
+      if (!controller.signal.aborted) setEnabled(data.offlineEnabled);
+    }).catch(failure => { if (!controller.signal.aborted) setError(failure.message); });
+    return () => controller.abort();
+  }, []);
   async function toggle() {
     setBusy(true); setError(""); setMessage("");
     try {

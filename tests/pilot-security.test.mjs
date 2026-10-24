@@ -296,7 +296,7 @@ test("páginas, temas e responsividade do VÍNKULO permanecem explícitos", asyn
     /async function openView/,
     "abrir o menu móvel não deve depender de rede",
   );
-  assert.match(mobileNav, /user \? "\/painel" : "\/login"/);
+  assert.match(mobileNav, /user \? "\/painel\?view=conta" : "\/login"/);
   assert.match(mobileNav, /Meu perfil/);
   assert.match(ministries, /Visão geral/);
   assert.match(ministries, /Participantes/);

@@ -1,4 +1,5 @@
 "use client";
+import {useBrowserSearch} from "./useBrowserSearch";
 import { useEffect, useRef, useState } from "react";
 
 type Config = { spreadsheet_id: string; sheet_id: number; habilitada: number; versao: number; versao_sincronizada: number; linhas: number; sincronizado_em: string | null; ultimo_erro: string | null };
@@ -7,7 +8,11 @@ const endpoint = "/api/pilot/visitantes/planilha";
 const pendingKey = (data: Snapshot) => `vinkulo:sheet-setup:${data.communityId}:${data.userId}`;
 
 export function VisitorSheetSettings({ canManage }: { canManage: boolean }) {
-  const [open, setOpen] = useState(false);
+  const search=useBrowserSearch();
+  const [selectedOpen,setOpen]=useState<boolean|null>(null);
+  const hasSetup=new URLSearchParams(search).has("sheetSetup");
+  if(selectedOpen===null&&hasSetup)setOpen(true);
+  const open=selectedOpen??hasSetup;
   const [data, setData] = useState<Snapshot | null>(null);
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(true);
@@ -17,11 +22,9 @@ export function VisitorSheetSettings({ canManage }: { canManage: boolean }) {
   const [message, setMessage] = useState("");
   const working = useRef(false);
   const resumed = useRef(false);
-  useEffect(() => { if (new URLSearchParams(window.location.search).has("sheetSetup")) setOpen(true); }, []);
   useEffect(() => {
     if (!open || !canManage) return;
     const controller = new AbortController();
-    setLoading(true);
     fetch(endpoint, { signal: controller.signal, cache: "no-store" }).then(async response => {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Não foi possível consultar a conexão.");
@@ -85,7 +88,7 @@ export function VisitorSheetSettings({ canManage }: { canManage: boolean }) {
   const status = failure ? "Precisa de atenção" : active ? pending ? "Atualização pendente" : "Sincronizada" : config?.sincronizado_em ? "Pausada" : "Não conectada";
   const ready = data?.google.available && !loading && !busy;
   const lastSync = config?.sincronizado_em ? new Date(config.sincronizado_em.replace(" ", "T") + "Z").toLocaleString("pt-BR") : null;
-  return <details className="visitor-sheets-panel visitor-sheets-v2" open={open} onToggle={event => { if (event.target === event.currentTarget) setOpen(event.currentTarget.open); }}>
+  return <details className="visitor-sheets-panel visitor-sheets-v2" open={open} onToggle={event => { if (event.target === event.currentTarget) { if(event.currentTarget.open&&!open)setLoading(true);setOpen(event.currentTarget.open); } }}>
     <summary><span className="visitor-sheets-icon" aria-hidden="true">▤</span><span><strong>Planilha Google</strong><small>Uma cópia dos cadastros, atualizada pelo Vínkulo</small></span><span className="visitor-sheets-status" data-state={failure ? "error" : active && !pending ? "success" : "idle"}>{data ? status : "Configurar"}</span></summary>
     {open && <div className="visitor-sheets-body">
       {loading ? <p role="status">Verificando a conexão…</p> : <>

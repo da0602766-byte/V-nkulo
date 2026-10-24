@@ -46,7 +46,7 @@ export default function MemberRegistrationForm({
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const sendingRef = useRef(false);
-  const clockStart = useRef(Date.now());
+  const [clockStart] = useState(() => Date.now());
   const reloaded = useRef(false);
   const reviewHeading = useRef<HTMLHeadingElement>(null);
   const formHeading = useRef<HTMLHeadingElement>(null);
@@ -65,7 +65,7 @@ export default function MemberRegistrationForm({
     if (registration.state !== "AGUARDANDO" && registration.state !== "ABERTO") return;
     const timer = window.setInterval(() => {
       const target = Date.parse(registration.state === "AGUARDANDO" ? registration.opensAt : registration.closesAt);
-      const next = Math.max(0, target - (registration.serverNow + Date.now() - clockStart.current));
+      const next = Math.max(0, target - (registration.serverNow + Date.now() - clockStart));
       setRemaining(next);
       if (!next && registration.state === "AGUARDANDO" && !reloaded.current) {
         reloaded.current = true;
@@ -73,7 +73,7 @@ export default function MemberRegistrationForm({
       }
     }, 1_000);
     return () => window.clearInterval(timer);
-  }, [registration]);
+  }, [registration, clockStart]);
   useEffect(() => {
     if (reviewing) { reviewedOnce.current = true; reviewHeading.current?.focus(); }
     else if (reviewedOnce.current) formHeading.current?.focus();

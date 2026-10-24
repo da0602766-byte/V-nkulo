@@ -14,14 +14,14 @@ const source = ts.transpileModule(readFileSync(new URL('../app/components/Global
 
 for (const pathname of ['/painel','/painel/visitantes','/']) {
   test(`Help launcher rendering on ${pathname} does not depend on CSS`,()=>{
-    const module={exports:{}};
-    runInNewContext(source,{exports:module.exports,module,require(name){
+    const compiledModule={exports:{}};
+    runInNewContext(source,{exports:compiledModule.exports,module:compiledModule,require(name){
       if(name==='next/navigation')return {usePathname:()=>pathname};
       if(name==='./SafeImage')return {default:()=>null};
       if(name==='../lib/client-image')return {};
       return require(name);
     }});
-    const html=renderToStaticMarkup(React.createElement(module.exports.default));
+    const html=renderToStaticMarkup(React.createElement(compiledModule.exports.default));
     assert.equal(html.includes('global-feedback-launcher'),pathname==='/');
   });
 }

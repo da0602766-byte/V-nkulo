@@ -5,9 +5,9 @@ import {readLabModule,auditLab} from "../../../lib/lab-module-storage";
 import {canUseModule,validateModuleValues,validModuleId,type ModuleRecord} from "../../../lib/lab-modules";
 async function access(id:string,write=false){
   const user=await getSessionUser();if(!user?.ativo)return {error:Response.json({error:"Faça login."},{status:401})} as const;
-  const {context}=await getActiveTenantContext(user),module=await readLabModule(id);
-  if(!context||!module?.published||module.archived||!canUseModule(module.published.definition,context,write))return {error:Response.json({error:"Esta aba não está disponível para seu perfil nesta comunidade."},{status:403})} as const;
-  return {user,context,module,definition:module.published.definition,prefix:`lab.record.${id}.${context.comunidadeId}.`} as const;
+  const {context}=await getActiveTenantContext(user),labModule=await readLabModule(id);
+  if(!context||!labModule?.published||labModule.archived||!canUseModule(labModule.published.definition,context,write))return {error:Response.json({error:"Esta aba não está disponível para seu perfil nesta comunidade."},{status:403})} as const;
+  return {user,context,module:labModule,definition:labModule.published.definition,prefix:`lab.record.${id}.${context.comunidadeId}.`} as const;
 }
 export async function GET(request:Request,{params}:{params:Promise<{id:string}>}){
   const {id}=await params,a=await access(id);if('error' in a)return a.error;

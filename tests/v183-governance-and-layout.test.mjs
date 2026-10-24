@@ -47,13 +47,14 @@ test("agenda pública exige aprovação e votação reconcilia em tempo real", (
 
 test("gestão, visitantes, notificações e mensagens seguem o novo layout", () => {
   const styles = read("app/globals.css");
-  const visitors = read("app/components/TenantOperations.tsx");
+  const visitors = read("app/components/visitors/VisitorApp.tsx");
   const dashboard = read("app/components/PilotDashboard.tsx");
   const people = read("app/components/PeopleWorkspace.tsx");
   assert.match(styles, /scrollbar-width:none/);
   assert.match(styles, /community-central-workspace/);
-  assert.match(visitors, /Exportar informações revisadas/);
-  assert.match(visitors, /Categorias sugeridas/);
+  assert.match(visitors, /Revise as colunas, as categorias e as datas antes de salvar/);
+  assert.match(visitors, /<VisitorSpreadsheetImport categories=\{data.categories\}/);
+  assert.match(visitors, /canManageCategories=\{profile.podeEditarCategorias\}/);
   assert.match(dashboard, /pilot-message-popover/);
   assert.match(people, /HIERARCHY_PERMISSION_PRESETS/);
 });

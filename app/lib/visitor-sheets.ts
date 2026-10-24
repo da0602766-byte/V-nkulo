@@ -21,7 +21,7 @@ export function spreadsheetIdFromUrl(value: string) {
   try { const url = new URL(value); return url.protocol === "https:" && url.hostname === "docs.google.com" ? url.pathname.match(/^\/spreadsheets\/d\/([\w-]{20,120})(?:\/|$)/)?.[1] || null : null; } catch { return null; }
 }
 
-export async function sheetGoogle(token: string, url: string, body?: unknown) {
+export async function sheetGoogle<T = Record<string, unknown>>(token: string, url: string, body?: unknown) {
   const response = await fetch(url, { method: body ? "POST" : "GET", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, ...(body ? { body: JSON.stringify(body) } : {}), signal: AbortSignal.timeout(20000) });
   if (!response.ok) {
     const body = await response.json().catch(() => ({})) as { error?: { details?: { reason?: string; metadata?: { consumer?: string } }[]; errors?: { reason?: string }[] } };
@@ -36,7 +36,7 @@ export async function sheetGoogle(token: string, url: string, body?: unknown) {
     if (response.status === 404) throw new VisitorSheetError("Planilha não encontrada. Confira o link e compartilhe o arquivo com a conta Google conectada.", "SHEET_NOT_FOUND");
     throw new VisitorSheetError(response.status === 429 ? "O Google limitou as atualizações temporariamente. Aguarde um minuto e tente novamente." : "O Google está indisponível no momento. Seus cadastros continuam salvos; tente novamente.", "GOOGLE_UNAVAILABLE");
   }
-  return response.json() as Promise<Record<string, any>>;
+  return response.json() as Promise<T>;
 }
 
 export async function visitorSheetToken(userId: number) {
@@ -57,10 +57,13 @@ export async function assertSheetPrivate(token: string, id: string) {
 
 export async function ensureVisitorSheet(token: string, config: VisitorSheetConfig) {
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${config.spreadsheet_id}`;
-  const metadata = await sheetGoogle(token, `${url}?fields=sheets.properties`);
-  const sheet = metadata.sheets?.find((s: any) => s.properties.sheetId === config.sheet_id);
-  if (sheet) return sheet.properties;
-  if (metadata.sheets?.some((s: any) => s.properties.title === TITLE)) throw new Error("Já existe uma aba Vínkulo — Pessoas sem vínculo com esta integração. Renomeie essa aba para preservar seu conteúdo e tente novamente.");
+  const metadata = await sheetGoogle<{sheets?: {properties: {sheetId: number; title: string; gridProperties?: {rowCount: number; columnCount: number}}}[]}>(token, `${url}?fields=sheets.properties`);
+  const sheet = metadata.sheets?.find((s) => s.properties.sheetId === config.sheet_id);
+  if (sheet) {
+    if (!sheet.properties.gridProperties) throw new Error("A aba vinculada não possui uma grade de células válida.");
+    return {...sheet.properties, gridProperties:sheet.properties.gridProperties};
+  }
+  if (metadata.sheets?.some((s) => s.properties.title === TITLE)) throw new Error("Já existe uma aba Vínkulo — Pessoas sem vínculo com esta integração. Renomeie essa aba para preservar seu conteúdo e tente novamente.");
   await sheetGoogle(token, `${url}:batchUpdate`, { requests: [{ addSheet: { properties: { sheetId: config.sheet_id, title: TITLE, gridProperties: { rowCount: 1001, columnCount: 40, frozenRowCount: 1 } } } }] });
   return { gridProperties: { rowCount: 1001, columnCount: 40 } };
 }

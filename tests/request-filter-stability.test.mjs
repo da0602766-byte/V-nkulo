@@ -22,7 +22,7 @@ function harness() {
     window: { location: { origin: 'http://localhost' }, setTimeout(fn) { timers.set(++timerId, fn); return timerId; }, clearTimeout(id) { timers.delete(id); }, setInterval() { return 1; }, clearInterval() {}, addEventListener() {}, removeEventListener() {} },
     document: { visibilityState: 'visible', addEventListener() {}, removeEventListener() {} },
     fetch: (url, options) => new Promise((resolve, reject) => requests.push({ url: String(url), options, resolve, reject })),
-    require(name) { if (name === 'react') return hooks; if (name === 'react/jsx-runtime') return jsx; if (['./TransientFeedback', './SafeImage'].includes(name)) return { default: () => null }; throw new Error(name); },
+    require(name) { if (name === 'react') return hooks; if (name === 'react/jsx-runtime') return jsx; if (['./TransientFeedback', './SafeImage', './PrayerWelcomeArt'].includes(name)) return { default: () => null }; throw new Error(name); },
   });
   return { requests, render() { cursor = 0; return exports.default({ communityName: 'Comunidade teste' }); }, flush() { for (const fn of effects.splice(0)) fn(); const batch = [...timers.values()]; timers.clear(); for (const fn of batch) fn(); } };
 }

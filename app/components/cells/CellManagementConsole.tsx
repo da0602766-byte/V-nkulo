@@ -1,4 +1,5 @@
 "use client";
+import {useBrowserSearch} from "../useBrowserSearch";
 import { matchesDirectorySearch } from "../../lib/directory-search";
 import SafeImage from "../SafeImage";
 
@@ -25,8 +26,9 @@ export default function CellManagementConsole({
   cells: CellsData;
   onPreviewParticipacao?: () => void;
 }) {
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-  useEffect(() => { const id = Number(new URLSearchParams(window.location.search).get("celula")); if (id) setSelectedId(id); }, []);
+  const search=useBrowserSearch();
+  const [selection, setSelectedId] = useState<number | null | undefined>(undefined);
+  const selectedId=selection===undefined?(Number(new URLSearchParams(search).get("celula"))||null):selection;
   const selected = cells.cells.find((cell) => cell.id === selectedId) || null;
 
   if (selected) {
@@ -264,8 +266,9 @@ function CellCard({
 type DetailTab = "visao" | "integrantes" | "agenda" | "relatorio" | "solicitacoes" | "config" | "entrar";
 
 function CellDetailPage({ cell, cells, onBack }: { cell: Cell; cells: CellsData; onBack: () => void }) {
-  const [tab, setTab] = useState<DetailTab>("visao");
-  useEffect(() => { if (new URLSearchParams(window.location.search).get("aba") === "solicitacoes") setTab("solicitacoes"); }, []);
+  const search=useBrowserSearch();
+  const [selectedTab,setTab]=useState<DetailTab|null>(null);
+  const tab=selectedTab??(new URLSearchParams(search).get("aba")==="solicitacoes"?"solicitacoes":"visao");
   const [memberProfile, setMemberProfile] = useState<CellMember | null>(null);
   const health = cellHealth(cell, cells.agora);
 

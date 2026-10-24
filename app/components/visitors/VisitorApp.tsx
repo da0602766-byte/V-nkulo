@@ -31,17 +31,16 @@ export default function VisitorApp({communityName,userName,permissions,isOwner}:
   const allowed=(p:string)=>effectivePermissions.includes(p);
   const profile:PerfilConfig={papel:isOwner?'Administrador':'Equipe autorizada',podeCriarPessoa:allowed('visitors.create'),podeEditarPessoa:allowed('visitors.edit'),podeArquivar:allowed('visitors.deactivate'),podeExcluir:allowed('visitors.deactivate'),podeRegistrarContato:allowed('followups.manage'),podeEditarCategorias:allowed('visitor.categories.manage'),podeImportarExportar:allowed('visitors.create')};
   function notify(message:string,tone?:'info'|'success'|'error') {if(tone==='error'){setError(message);return;}setToast(message);clearTimeout(toastTimer.current);toastTimer.current=setTimeout(()=>setToast(''),5000);}
-  const load=useCallback(async(silent=false)=>{
+  const fetchData=useCallback(()=>{
     const id=++requestId.current;
-    if(!silent)setRefreshing(true);
-    try {
-      const v=await api<{permissions?:string[];visitantes:Raw[];celulas:Named[];categorias:Raw[];responsaveis:Named[];ministerios:Named[];campos:VisitorCustomField[]}>('/api/pilot/visitantes/pagina');
+    return api<{permissions?:string[];visitantes:Raw[];celulas:Named[];categorias:Raw[];responsaveis:Named[];ministerios:Named[];campos:VisitorCustomField[]}>('/api/pilot/visitantes/pagina').then(v=>{
       if(id===requestId.current&&v.permissions)setEffectivePermissions(v.permissions);
       if(id===requestId.current){setData({people:v.visitantes.map(person),cells:v.celulas,categories:v.categorias.map(category),responsibles:v.responsaveis,ministries:v.ministerios,fields:v.campos});setError('');}
-    }catch(e){if(id===requestId.current){setError((e as Error).message);if([401,403].includes((e as Error&{status?:number}).status||0)){setData(null);setOpened(null);setForm(null);setContact(null);setConfirm(null);}}}finally{if(id===requestId.current){setLoading(false);setRefreshing(false);}}
+    }).catch(e=>{if(id===requestId.current){setError((e as Error).message);if([401,403].includes((e as Error&{status?:number}).status||0)){setData(null);setOpened(null);setForm(null);setContact(null);setConfirm(null);}}}).finally(()=>{if(id===requestId.current){setLoading(false);setRefreshing(false);}});
   },[]);
+  const load=useCallback((silent=false)=>{if(!silent)setRefreshing(true);return fetchData();},[fetchData]);
   useEffect(()=>{const controller=new AbortController();fetch('/api/pilot/visitantes/armazenamento',{cache:'no-store',signal:controller.signal}).then(r=>r.ok?r.json():null).then(v=>{if(v)setDriveState(v.state);}).catch(()=>undefined);return()=>controller.abort();},[section]);
-  useEffect(()=>{void load();return()=>{requestId.current++;clearTimeout(toastTimer.current);};},[load]);
+  useEffect(()=>{void fetchData();return()=>{requestId.current++;clearTimeout(toastTimer.current);};},[fetchData]);
   useEffect(()=>{const sync=()=>{const q=new URLSearchParams(location.search);const v=q.get('section')||q.get('aba');setSelectedCategory(q.get('categoria')||'');setSection(q.has('sheetSetup')?'planilha':sections.some(s=>s.id===v)?v as Section:q.has('anotacao')?'anotacoes':'pessoas');const id=q.get('visitante')||q.get('id');if(id&&/^\d+$/.test(id))setOpened(id);if(q.get('novo')==='1'&&permissions.includes('visitors.create'))setForm('new');};sync();window.addEventListener('popstate',sync);return()=>window.removeEventListener('popstate',sync);},[]);
   useEffect(()=>{const timer=setInterval(()=>{if(document.visibilityState==='visible'&&!mutation.current)void load(true);},60000);return()=>clearInterval(timer);},[load,form,opened,contact,confirm]);
   function navigate(s:Section) {setSection(s);setMenu(false);const u=new URL(location.href);u.searchParams.set('section',s);u.hash='';history.pushState(null,'',u);}

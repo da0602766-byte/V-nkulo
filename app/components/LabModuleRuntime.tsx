@@ -1,5 +1,5 @@
 "use client";
-import {useCallback,useEffect,useState} from "react";
+import {useCallback,useEffect,useRef,useState} from "react";
 import Link from "./StableLink";
 import VinkuloMark from "./VinkuloMark";
 import LabModuleForm from "./LabModuleForm";
@@ -10,9 +10,14 @@ import "./LabStudio.css";
 type Data={definition:ModuleDefinition;version:number;community:string;canWrite:boolean;records:ModuleRecord[];total:number;page:number};
 export default function LabModuleRuntime({id}:{id:string}){
  const [data,setData]=useState<Data|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[page,setPage]=useState(0),[archived,setArchived]=useState(false),[search,setSearch]=useState(''),[editing,setEditing]=useState<ModuleRecord|null|undefined>(undefined),[notice,setNotice]=useState('');
- const load=useCallback(async()=>{setLoading(true);setError('');try{const r=await fetch(`/api/modulos/${id}?page=${page}&archived=${archived}`,{cache:'no-store'}),j=await r.json();if(!r.ok)throw new Error(j.error);setData(j);}catch(e){setError((e as Error).message);setData(null);}finally{setLoading(false);}},[id,page,archived]);
- useEffect(()=>{void load();},[load]);
- async function mutate(action:string,record:ModuleRecord|null,values?:Record<string,string|boolean>){if(!data)return;setBusy(true);setError('');try{const r=await fetch(`/api/modulos/${id}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,id:record?.id,revision:record?.revision,version:data.version,values})}),j=await r.json();if(!r.ok)throw new Error(j.error);setEditing(undefined);setNotice(action==='archive'?'Registro arquivado. Você pode restaurá-lo na lista de arquivados.':'Alteração salva.');await load();}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
+ const requestRef=useRef<AbortController|null>(null);
+ const fetchData=useCallback(async()=>{requestRef.current?.abort();const controller=new AbortController();requestRef.current=controller;return fetch(`/api/modulos/${id}?page=${page}&archived=${archived}`,{cache:'no-store',signal:controller.signal}).then(async r=>{const j=await r.json();if(!r.ok)throw new Error(j.error);if(!controller.signal.aborted)setData(j);}).catch(e=>{if(!controller.signal.aborted){setError((e as Error).message);setData(null);}}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});},[id,page,archived]);
+ const load=useCallback(()=>{setLoading(true);setError('');return fetchData();},[fetchData]);
+ useEffect(()=>{void fetchData();return()=>requestRef.current?.abort();},[fetchData]);
+const queryKey=JSON.stringify([id,page,archived]);
+ const [previousQueryKey,setPreviousQueryKey]=useState(queryKey);
+ if(previousQueryKey!==queryKey){setPreviousQueryKey(queryKey);setLoading(true);setError('');}
+  async function mutate(action:string,record:ModuleRecord|null,values?:Record<string,string|boolean>){if(!data)return;setBusy(true);setError('');try{const r=await fetch(`/api/modulos/${id}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,id:record?.id,revision:record?.revision,version:data.version,values})}),j=await r.json();if(!r.ok)throw new Error(j.error);setEditing(undefined);setNotice(action==='archive'?'Registro arquivado. Você pode restaurá-lo na lista de arquivados.':'Alteração salva.');await load();}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
  return <main className="lab-studio lab-runtime"><header className="lab-top"><Link href="/painel" showLoading><VinkuloMark size={36}/> Voltar ao painel</Link><span>{data?.community}</span><button disabled={loading||busy} onClick={()=>void load()}>Atualizar</button></header>
  {error&&<p className="lab-error" role="alert">{error}</p>}{notice&&<p role="status" className="lab-notice">{notice}</p>}
  {loading?<p role="status">Carregando aba…</p>:data&&<><header className="lab-top"><div><h1>{data.definition.name}</h1><p>{data.definition.description}</p></div>{data.canWrite&&data.definition.allowCreate&&<button className="lab-primary" disabled={busy} onClick={()=>setEditing(null)}>＋ Novo registro</button>}</header>

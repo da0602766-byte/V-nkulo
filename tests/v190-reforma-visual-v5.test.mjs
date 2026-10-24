@@ -61,10 +61,11 @@ test("as seções do trilho são Dia, Comunidade e Gestão", async () => {
   assert.doesNotMatch(dashboard, /label: "Principal"/);
 });
 
-test("Mural e Escalas levam a destinos próprios em vez de repetir a view", async () => {
+test("navegação oferece Início e Ministérios sem duplicar Mural", async () => {
   const dashboard = await read("app/components/PilotDashboard.tsx");
-  assert.match(dashboard, /makeItem\("inicio", "Mural", "mural", \{ anchor: "mural" \}\)/);
-  assert.match(dashboard, /event: "vinkulo:open-schedules"/);
+  assert.match(dashboard, /makeItem\("inicio", "Início"/);
+  assert.match(dashboard, /makeItem\("ministerios", "Ministérios"/);
+  assert.doesNotMatch(dashboard, /makeItem\("inicio", "Mural"/);
   assert.match(dashboard, /openView\(item\.id, item\.focus\)/);
 
   const home = await read("app/components/CommunityHome.tsx");
@@ -169,9 +170,9 @@ test("o fio não lê o relógio durante a renderização nem escreve estado dire
   assert.doesNotMatch(render, /new Date\(\)/);
   // A busca cancela respostas antigas: trocar de dia rápido não pode deixar a
   // resposta anterior sobrescrever a mais nova.
-  assert.match(workspace, /let cancelado = false/);
-  assert.match(workspace, /if \(cancelado\) return;/);
-  assert.match(workspace, /cancelado = true;/);
+  assert.match(workspace, /new AbortController\(\)/);
+  assert.match(workspace, /controller\.signal\.aborted/);
+  assert.match(workspace, /controller\.abort\(\)/);
 });
 
 test("células ganham mapa de saúde calculado dos relatórios já carregados", async () => {
@@ -271,7 +272,9 @@ test("configurações têm navegação por assunto em vez de uma página só", a
     assert.ok(admin.includes(`"${secao}" as const`), `seção ${secao} ausente`);
   }
   // Cada bloco só aparece na sua seção.
-  assert.match(admin, /secaoAtiva === "aparencia" && canManageCommunity && <CommunityThemeEditor \/>/);
+  assert.match(admin, /visitedSections\.includes\("aparencia"\) && canManageCommunity/);
+  assert.match(admin, /hidden=\{secaoAtiva !== "aparencia"\}/);
+  assert.match(admin, /<CommunityThemeEditor active=\{secaoAtiva === "aparencia"\}/);
   assert.match(admin, /secaoAtiva === "solicitacoes" && canManageRequests/);
   const styles = await read("app/globals.css");
   assert.match(styles, /\.community-settings-nav-v5 button\.active/);
@@ -287,7 +290,7 @@ test("o convite mora na seção Acessos, não flutuando acima das abas", async (
     /invite-generator/,
   );
   assert.match(admin, /accessSlot\?: React\.ReactNode;/);
-  assert.match(admin, /secaoAtiva === "acessos" && \(/);
+  assert.match(admin, /hidden=\{secaoAtiva !== "acessos"\}/);
   // Acessos precisa existir quando só há convite, sem link de cadastro.
   assert.match(admin, /canManageRegistrationLinks \|\| Boolean\(accessSlot\)/);
 });
@@ -305,7 +308,7 @@ test("o fio devolve o resumo do dia e a página o exibe", async () => {
   const workspace = await read("app/components/DayThreadWorkspace.tsx");
   assert.match(workspace, /day-thread-stats-v5/);
   assert.match(workspace, /day-thread-aside-v5/);
-  assert.match(workspace, /setResumo\(resultado\.resumo \|\| null\)/);
+  assert.match(workspace, /setResultadoAtual\(\{ key: consultaKey, itens: resultado\.itens, resumo: resultado\.resumo \|\| null \}\)/);
   // Escala incompleta é a única marcada: é a única que pede ação.
   assert.match(workspace, /resumo\.escalas\.confirmadas < resumo\.escalas\.total/);
   const styles = await read("app/globals.css");
@@ -325,22 +328,24 @@ test("o diálogo de célula separa o que vai para a internet do que é interno",
   assert.doesNotMatch(bloco, /name="observacoes"/);
 });
 
-test("os diálogos dizem a consequência no rodapé", async () => {
-  const operations = await read("app/components/TenantOperations.tsx");
-  const rodapes = operations.match(/form-consequence-v5/g) || [];
-  assert.ok(rodapes.length >= 2, `esperava ao menos 2 rodapés, achei ${rodapes.length}`);
-  assert.match(operations, /Só o nome é obrigatório/);
-  const styles = await read("app/globals.css");
-  assert.match(styles, /\.form-consequence-v5/);
+test("cadastro sinaliza campos obrigatórios e exclusão de categoria explica consequência", async () => {
+  const form = await read("app/components/visitors/PersonForms.tsx");
+  const categories = await read("app/components/visitors/Categories.tsx");
+  assert.match(form, /Os campos com \* são obrigatórios/);
+  assert.match(form, /'Nome completo \*',120,'text',true/);
+  assert.match(form, /name="dataEntrada" required/);
+  assert.match(categories, /As pessoas continuam cadastradas e ficam sem esta categoria/);
+  assert.match(categories, /A regra automática desta categoria também será removida/);
 });
 
 test("a data de entrada do visitante usa o fuso local, não UTC", async () => {
-  const operations = await read("app/components/TenantOperations.tsx");
+  const operations = await read("app/components/visitors/PersonForms.tsx");
+  const data = await read("app/components/visitors/data.ts");
   // toISOString devolve UTC: no Brasil, das 21h em diante a data já virou e um
   // visitante do culto de domingo à noite era gravado como segunda.
-  assert.match(operations, /function hojeLocal\(\)/);
-  assert.doesNotMatch(operations, /new Date\(\)\.toISOString\(\)\.slice\(0, 10\)/);
-  assert.match(operations, /defaultValue=\{hojeLocal\(\)\}/);
+  assert.match(data, /timeZone:'America\/Sao_Paulo'/);
+  assert.doesNotMatch(data, /new Date\(\)\.toISOString\(\)\.slice\(0, 10\)/);
+  assert.match(operations, /defaultValue=\{String\(v.data_entrada\|\|today\(\)\)\}/);
 });
 
 test("o diálogo portalizado carrega os tokens que perde ao sair do escopo", async () => {

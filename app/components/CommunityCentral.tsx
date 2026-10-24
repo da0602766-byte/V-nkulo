@@ -45,20 +45,20 @@ export default function CommunityCentral({ mode = "overview", communityId, onNot
   const [exportMessage, setExportMessage] = useState("");
   const requestRef = useRef<AbortController | null>(null);
   const personal = mode === "member";
-  const load = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     requestRef.current?.abort(); const controller = new AbortController(); requestRef.current = controller;
-    setLoading(true); setError(""); setData(null);
-    try {
-      const response = await fetch(`/api/pilot/central?days=${days}${personal ? "&scope=me" : ""}`, { cache: "no-store", signal: controller.signal });
+    return fetch(`/api/pilot/central?days=${days}${personal ? "&scope=me" : ""}`, { cache: "no-store", signal: controller.signal }).then(async response=>{
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Não foi possível consultar a Central.");
       if (result.community?.id !== communityId || !Array.isArray(result.ministries) || !Array.isArray(result.metrics) || !Array.isArray(result.errors) || !Array.isArray(result.notices) || !Array.isArray(result.schedules) || !result.capabilities || !Array.isArray(result.areas) || !Array.isArray(result.events) || !Array.isArray(result.cellReports)) throw new Error("A consulta retornou dados incompletos. Tente novamente.");
       if (!controller.signal.aborted) { setData(result); setMinistryId(current => result.ministries.some((m: { id: number }) => String(m.id) === current) ? current : ""); }
-    } catch (cause) { if (!controller.signal.aborted) setError((cause as Error).message); }
-    finally { if (!controller.signal.aborted) setLoading(false); }
-  }, [communityId, days, personal]);
-  useEffect(() => { void load(); return () => requestRef.current?.abort(); }, [load]);
-  const ministries = data?.ministries.filter(m => (!ministryId || String(m.id) === ministryId) && matchesDirectorySearch(query, m.name, m.leader)) || [];
+    }).catch(cause=>{ if (!controller.signal.aborted) setError((cause as Error).message); }).finally(()=>{ if (!controller.signal.aborted) setLoading(false); });},[communityId, days, personal]);
+  const load=useCallback(()=>{setLoading(true); setError(""); setData(null);return fetchData();},[fetchData]);
+ useEffect(() => { void fetchData(); return () => requestRef.current?.abort(); }, [fetchData]);
+const queryKey=JSON.stringify([communityId,days,personal]);
+ const [previousQueryKey,setPreviousQueryKey]=useState(queryKey);
+ if(previousQueryKey!==queryKey){setPreviousQueryKey(queryKey);setLoading(true); setError(""); setData(null);}
+   const ministries = data?.ministries.filter(m => (!ministryId || String(m.id) === ministryId) && matchesDirectorySearch(query, m.name, m.leader)) || [];
   const notices = data?.notices.filter(n => (!onlyUnread || !n.read) && matchesDirectorySearch(query, n.title, n.message, n.ministry)) || [];
   const reportMode = mode === "reports";
   const noticesMode = mode === "notices";

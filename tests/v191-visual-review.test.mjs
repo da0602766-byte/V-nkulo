@@ -24,11 +24,12 @@ test("Agenda mantém ações juntas e editor sem faixa duplicada", async () => {
     read("app/components/EventsWorkspace.tsx"),
   ]);
 
-  const layers = agenda.indexOf('className="agenda-camadas"');
-  const newEvent = agenda.indexOf('className="agenda-novo-evento"');
-  const commitment = agenda.indexOf('className="agenda-novo"');
-  assert.ok(layers >= 0 && newEvent > layers && commitment > newEvent);
-  assert.match(events, /className="event-form-summary"/);
+  assert.match(agenda, /aria-label="Camadas do calendário"/);
+  const choices = agenda.slice(agenda.indexOf('className={styles.dayChoices}'), agenda.indexOf('{formAberto && ('));
+  assert.match(choices, /aoCriarEvento && <button/);
+  assert.match(choices, /const day = diaSelecionado; setDiaAberto\(null\); aoCriarEvento\(day\)/);
+  assert.match(choices, /abrirCompromisso\(diaSelecionado\)/);
+  assert.match(events, /className="event-form-actions"/);
   assert.match(events, />\s*Fechar\s*<\/button>/);
 });
 

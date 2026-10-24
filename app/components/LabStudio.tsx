@@ -1,5 +1,5 @@
 "use client";
-import {useCallback,useEffect,useState} from "react";
+import {useCallback,useEffect,useRef,useState} from "react";
 import dynamic from "next/dynamic";
 import {FIELD_TYPES,MODULE_ROLES,newModuleDefinition,moduleIssues,type LabModule,type ModuleDefinition,type ModuleField} from "../lib/lab-modules";
 import LabLayoutEditor from './LabLayoutEditor';
@@ -16,8 +16,10 @@ function template(kind:string){const d=newModuleDefinition(kind==='tasks'?'Taref
 export default function LabStudio(){
  const [items,setItems]=useState<LabModule[]>([]),[communities,setCommunities]=useState<Community[]>([]),[active,setActive]=useState<LabModule|null>(null),[draft,setDraft]=useState<ModuleDefinition>(newModuleDefinition()),[section,setSection]=useState('fields'),[legacy,setLegacy]=useState(false),[showArchived,setShowArchived]=useState(false),[search,setSearch]=useState(''),[notice,setNotice]=useState(''),[error,setError]=useState(''),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[confirm,setConfirm]=useState<Confirmation|null>(null),[releaseNote,setReleaseNote]=useState('');
  const dirty=!!active&&JSON.stringify(draft)!==JSON.stringify(active.draft);
- const load=useCallback(async()=>{setLoading(true);setError('');try{const r=await fetch('/api/proprietario/modulos',{cache:'no-store'}),j=await r.json();if(!r.ok)throw new Error(j.error);setItems(j.modules);setCommunities(j.communities);}catch(e){setError((e as Error).message);}finally{setLoading(false);}},[]);
- useEffect(()=>{void load();},[load]);
+ const requestRef=useRef<AbortController|null>(null);
+ const fetchData=useCallback(async()=>{requestRef.current?.abort();const controller=new AbortController();requestRef.current=controller;return fetch('/api/proprietario/modulos',{cache:'no-store',signal:controller.signal}).then(async r=>{const j=await r.json();if(!r.ok)throw new Error(j.error);if(!controller.signal.aborted){setItems(j.modules);setCommunities(j.communities);}}).catch(e=>{if(!controller.signal.aborted)setError((e as Error).message);}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});},[]);
+ const load=useCallback(()=>{setLoading(true);setError('');return fetchData();},[fetchData]);
+ useEffect(()=>{void fetchData();return()=>requestRef.current?.abort();},[fetchData]);
  useEffect(()=>{if(!dirty)return;const warn=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue='';};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[dirty]);
  async function run(action:string,definition?:ModuleDefinition,version?:number){if(definition?.layout)definition={...definition,layout:resolvedLayout(definition)};setBusy(true);setError('');try{const r=await fetch('/api/proprietario/modulos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,id:action==='create'?undefined:active?.id,revision:active?.revision,definition,version,note:releaseNote})}),j=await r.json();if(!r.ok)throw new Error(j.error);setActive(j.module);setDraft(j.module.draft);setItems(old=>[j.module,...old.filter(m=>m.id!==j.module.id)]);setConfirm(null);setReleaseNote('');setNotice(action==='publish'?'Aba publicada. Ela já aparece no menu das comunidades selecionadas.':action==='unpublish'?'Publicação retirada. Os registros foram preservados.':action==='rollback'?'Versão restaurada na publicação. O rascunho atual foi preservado.':'Alterações salvas.');return true;}catch(e){setError((e as Error).message);return false;}finally{setBusy(false);}}
  function open(m:LabModule){setActive(m);setDraft(m.draft);setSection('fields');setNotice('');setError('');}

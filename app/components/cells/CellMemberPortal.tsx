@@ -1,4 +1,5 @@
 "use client";
+import {useBrowserSearch} from "../useBrowserSearch";
 
 import TransientFeedback from "../TransientFeedback";
 
@@ -51,14 +52,14 @@ export default function CellMemberPortal({
   onBackToGestao?: () => void;
 }) {
   const [pendingIds, setPendingIds] = useState<Set<number>>(() => new Set());
-  const [mobileSelectedId, setMobileSelectedId] = useState<number | null>(null);
+  const search=useBrowserSearch();
+  const [mobileSelection, setMobileSelectedId] = useState<number | null | undefined>(undefined);
+  const mobileSelectedId=mobileSelection===undefined?(Number(new URLSearchParams(search).get("celula"))||null):mobileSelection;
   // Abaixo de 680px, mostrar a interface própria do celular.
   const [isRealMobile, setIsRealMobile] = useState(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setPendingIds(readPendingIds()), 0);
-    const cellId = Number(new URLSearchParams(window.location.search).get("celula"));
-    if (cellId > 0) setMobileSelectedId(cellId);
     return () => window.clearTimeout(timer);
   }, []);
 
@@ -191,11 +192,9 @@ function CellPortalDesktop({
   onRequestEntry: (cell: Cell, nome: string, contato: string, mensagem: string) => Promise<boolean>;
   onBackToGestao?: () => void;
 }) {
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-  useEffect(() => {
-    const cellId = Number(new URLSearchParams(window.location.search).get("celula"));
-    if (cellId > 0) setSelectedId(cellId);
-  }, []);
+  const search=useBrowserSearch();
+  const [selection, setSelectedId] = useState<number | null | undefined>(undefined);
+  const selectedId=selection===undefined?(Number(new URLSearchParams(search).get("celula"))||null):selection;
   const { filtered } = directory;
   const selected = filtered.find((cell) => cell.id === selectedId) || filtered[0] || null;
   const myCell = list.find((cell) => cell.minha_participacao);

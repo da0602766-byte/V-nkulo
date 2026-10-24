@@ -1,4 +1,5 @@
 "use client";
+import {useBrowserStorage} from "./useBrowserStorage";
 import "./directory-controls.css";
 import "./ministry-catalog.css";
 import { matchesDirectorySearch } from "../lib/directory-search";
@@ -246,6 +247,8 @@ const DAYS = [
   ["SAB", "Sáb"],
 ];
 
+function parseFavorites(raw:string|null):number[]{try{const saved=JSON.parse(raw||'[]');return Array.isArray(saved)?saved.filter(n=>Number.isSafeInteger(n)&&n>0):[];}catch{return [];}}
+
 export default function SecretaryMinisterialWorkspace({
   permissions,
   communityName,
@@ -256,9 +259,8 @@ export default function SecretaryMinisterialWorkspace({
   communityName: string;
 }) {
   const [ministries, setMinistries] = useState<Ministry[]>([]);
-  const [favorites,setFavorites]=useState<number[]>([]);
-  useEffect(()=>{try{const saved=JSON.parse(localStorage.getItem(`ministry-favorites:${preferenceKey}`)||'[]');setFavorites(Array.isArray(saved)?saved.filter(n=>Number.isSafeInteger(n)&&n>0):[]);}catch{setFavorites([]);}},[preferenceKey]);
-  function toggleFavorite(id:number){setFavorites(current=>{const next=current.includes(id)?current.filter(n=>n!==id):[...current,id];try{localStorage.setItem(`ministry-favorites:${preferenceKey}`,JSON.stringify(next));}catch{}return next;});}
+  const [favorites,setFavorites]=useBrowserStorage(`ministry-favorites:${preferenceKey}`,parseFavorites);
+  function toggleFavorite(id:number){setFavorites(current=>current.includes(id)?current.filter(n=>n!==id):[...current,id]);}
 
   const [availableUsers, setAvailableUsers] = useState<AvailableUser[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);

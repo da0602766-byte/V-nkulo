@@ -63,7 +63,11 @@ export default function StoragePrivacyWorkspace() {
 
   useEffect(() => {
     const controller = new AbortController();
-    void load(controller.signal).catch((error) => {
+    fetch("/api/storage/preferences", { cache: "no-store", signal: controller.signal }).then(async response => {
+      const result = await response.json() as StorageData;
+      if (!response.ok) throw new Error(result.error || "Não foi possível carregar a privacidade.");
+      if (!controller.signal.aborted) setData(result);
+    }).catch((error) => {
       if (!controller.signal.aborted) setLoadError((error as Error).message);
     });
     return () => controller.abort();
