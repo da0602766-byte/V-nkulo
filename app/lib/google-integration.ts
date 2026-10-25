@@ -21,6 +21,7 @@ type OAuthState = {
   purpose: "login" | "drive";
   visitorSheets?: boolean;
   visitorStorage?: boolean;
+  personalVisitors?: boolean;
   userId: number;
   returnTo: string;
   nonce: string;

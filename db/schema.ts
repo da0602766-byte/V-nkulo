@@ -9,6 +9,16 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
+// Only storage pointers/preferences live on the platform; personal contacts do not.
+export const visitantePessoalStorage = sqliteTable('visitante_pessoal_storage', {
+  usuarioId: integer('usuario_id').notNull().references(() => usuarios.id, {onDelete:'cascade'}),
+  comunidadeId: integer('comunidade_id').notNull().references(() => comunidades.id, {onDelete:'cascade'}),
+  provider: text('provider').notNull(),
+  revisao: integer('revisao').notNull().default(0),
+  pastaId: text('pasta_id'), arquivoId: text('arquivo_id'), hash: text('hash'),
+}, table => [primaryKey({columns:[table.usuarioId,table.comunidadeId]}),
+  check('visitor_personal_provider',sql`${table.provider} IN ('LOCAL','GOOGLE_DRIVE')`)]);
+
 export const visitanteAcessoHistorico = sqliteTable('visitante_acesso_historico', {
   id: integer('id').primaryKey({autoIncrement:true}),
   operacao: text('operacao').notNull().unique(),

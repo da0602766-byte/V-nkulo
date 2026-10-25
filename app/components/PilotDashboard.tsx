@@ -369,6 +369,7 @@ export default function PilotDashboard({
       MENU.filter(
         (item) =>
           (active.permissions.includes(item.permission) ||
+            (item.id === "visitantes" && active.visitorPersonalAccess) ||
             (item.id === "estacionamento" && active.permissions.includes("parking.reserve")) ||
             (active.isOwner && item.id === "pessoas")) &&
           (!VIEW_MODULE[item.id] ||
@@ -392,6 +393,7 @@ export default function PilotDashboard({
       active.modules,
       active.papel,
       active.permissions,
+      active.visitorPersonalAccess,
       features.networkModuleEnabled,
       parkingEnabled,
     ],

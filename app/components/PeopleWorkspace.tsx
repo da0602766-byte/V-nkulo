@@ -73,7 +73,7 @@ type RemovalBlocker = {
 };
 
 const PERMISSION_LABELS: Record<string, string> = {
-  "visitors.view": "Consultar visitantes",
+  "visitors.view": "Abrir Visitantes (lista pessoal)",
   "visitors.create": "Cadastrar visitantes",
   "visitors.edit": "Editar visitantes",
   "followups.view": "Consultar acompanhamentos",
@@ -172,7 +172,7 @@ const ACTIVITY_MODELS = [
 ];
 
 const PERMISSION_GROUPS = [
-  { title: "Pessoas e cuidado", detail: "Visitantes, acompanhamentos e células.", permissions: ["visitors.view", "visitors.create", "visitors.edit", "visitor.categories.manage", "followups.view", "followups.manage", "cells.view", "requests.manage"] },
+  { title: "Pessoas e cuidado", detail: "A página Visitantes libera a lista pessoal do oficial. O acesso à sua lista exige “Compartilhar lista”.", permissions: ["visitors.view", "visitors.create", "visitors.edit", "visitor.categories.manage", "followups.view", "followups.manage", "cells.view", "requests.manage"] },
   { title: "Agenda e equipes", detail: "Eventos, ministérios e escalas.", permissions: ["events.view", "events.manage", "ministries.view", "schedules.view", "schedules.manage"] },
   { title: "Diaconia e apoio", detail: "Rotinas de serviço e relatórios.", permissions: ["diaconia.view", "diaconia.checklist.update", "diaconia.manage", "diaconia.report", "parking.view", "parking.reserve", "parking.report"] },
   { title: "Comunicação", detail: "Publicações no mural da comunidade.", permissions: ["feed.publish"] },

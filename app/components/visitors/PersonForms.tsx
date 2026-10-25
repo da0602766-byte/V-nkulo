@@ -9,7 +9,7 @@ import {visitorIntegrationGaps} from '../../lib/visitor-care';
 
 type Save = (body:Record<string,unknown>)=>Promise<boolean>;
 export function Field({label,children}:{label:string;children:ReactNode}) {return <label className="vp-field"><span>{label}</span>{children}</label>;}
-export function PersonForm({person,categories,cells,fields,onClose,onSave}:{person?:Pessoa;categories:Categoria[];cells:Named[];fields:VisitorCustomField[];onClose:()=>void;onSave:Save}) {
+export function PersonForm({person,categories,cells,fields,onClose,onSave,personal=false}:{person?:Pessoa;categories:Categoria[];cells:Named[];fields:VisitorCustomField[];onClose:()=>void;onSave:Save;personal?:boolean}) {
   const v=person?.raw||{};
   const [discipulado,setDiscipulado]=useState(String(v.discipulado||'NAO_INFORMADO'));
   const [oficial,setOficial]=useState(String(v.oficial||'NAO_INFORMADO'));
@@ -35,8 +35,8 @@ export function PersonForm({person,categories,cells,fields,onClose,onSave}:{pers
     </div></fieldset>
     <fieldset disabled={busy}><legend>Integração e acompanhamento</legend><div className="vp-form-grid">
       <Field label="Status"><select name="status" defaultValue={String(v.status||'NOVO')}>{Object.entries(statuses).map(([k,n])=><option key={k} value={k}>{n}</option>)}</select></Field>
-      <Field label="Categoria"><select name="categoriaId" defaultValue={String(v.categoria_id||'')}><option value="">Automática pela idade / sem categoria</option>{categories.map(c=><option key={c.id} value={c.id}>{c.nome}</option>)}</select></Field>
-      <Field label="Célula"><select name="celulaId" defaultValue={String(v.celula_id||'')}><option value="">Ainda sem célula</option>{cells.map(c=><option key={c.id} value={c.id}>{c.nome}</option>)}</select></Field>
+      {personal?text('categoriaNome','categoria_nome','Categoria'): <Field label="Categoria"><select name="categoriaId" defaultValue={String(v.categoria_id||'')}><option value="">Automática pela idade / sem categoria</option>{categories.map(c=><option key={c.id} value={c.id}>{c.nome}</option>)}</select></Field>}
+      {personal?text('celulaNome','celula_nome','Célula'): <Field label="Célula"><select name="celulaId" defaultValue={String(v.celula_id||'')}><option value="">Ainda sem célula</option>{cells.map(c=><option key={c.id} value={c.id}>{c.nome}</option>)}</select></Field>}
       {text('ministerio','ministerio','Ministério')}{tri('batizado','batizado','Já se batizou?')}{tri('certificadoBatismo','certificado_batismo','Recebeu o certificado de batismo?')}
       {tri('discipulado','discipulado','Participa de discipulado?',setDiscipulado)}
       <Field label={`Discipulador ou discipuladora${discipulado==='SIM'?' *':''}`}><input name="discipulador" defaultValue={String(v.discipulador||'')} maxLength={120} required={discipulado==='SIM'} disabled={discipulado==='NAO'}/></Field>
@@ -61,13 +61,14 @@ export function PersonForm({person,categories,cells,fields,onClose,onSave}:{pers
 }
 
 type History = {id:number;tipo:string;resultado:string;descricao:string;proximo_contato:string;criado_em:string;responsavel_email:string};
-export function PersonDetails({person:p,fields,profile,canViewHistory,onClose,onEdit,onAction,onContact}:{person:Pessoa;fields:VisitorCustomField[];profile:PerfilConfig;canViewHistory:boolean;onClose:()=>void;onEdit:()=>void;onAction:(action:'arquivar'|'excluir'|'reativar'|'concluir')=>void;onContact:()=>void}) {
+export function PersonDetails({person:p,fields,profile,canViewHistory,onClose,onEdit,onAction,onContact,personalHistory}:{person:Pessoa;fields:VisitorCustomField[];profile:PerfilConfig;canViewHistory:boolean;onClose:()=>void;onEdit:()=>void;onAction:(action:'arquivar'|'excluir'|'reativar'|'concluir')=>void;onContact:()=>void;personalHistory?:History[]}) {
   const [history,setHistory]=useState<History[]>([]),[cursor,setCursor]=useState<number|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(canViewHistory);
   const requestId=useRef(0);
   const fetchHistory=useCallback((cursor?:number)=>{
     const id=++requestId.current;
-    return api<{acompanhamentos:History[];nextCursor:number|null}>(`/api/pilot/acompanhamentos?visitanteId=${p.id}&limite=50${cursor?`&cursor=${cursor}`:''}`).then(r=>{if(id!==requestId.current)return;setHistory(old=>cursor?[...old,...r.acompanhamentos]:r.acompanhamentos);setCursor(r.nextCursor);setError('');}).catch(e=>{if(id===requestId.current)setError(e.message);}).finally(()=>{if(id===requestId.current)setLoading(false);});
-  },[p.id]);
+    const request=personalHistory!==undefined?Promise.resolve({acompanhamentos:personalHistory.filter(h=>!cursor||h.id<cursor).slice(0,50),nextCursor:personalHistory.filter(h=>!cursor||h.id<cursor).length>50?personalHistory.filter(h=>!cursor||h.id<cursor)[49].id:null}):api<{acompanhamentos:History[];nextCursor:number|null}>(`/api/pilot/acompanhamentos?visitanteId=${p.id}&limite=50${cursor?`&cursor=${cursor}`:''}`);
+    return request.then(r=>{if(id!==requestId.current)return;setHistory(old=>cursor?[...old,...r.acompanhamentos]:r.acompanhamentos);setCursor(r.nextCursor);setError('');}).catch(e=>{if(id===requestId.current)setError(e.message);}).finally(()=>{if(id===requestId.current)setLoading(false);});
+  },[p.id,personalHistory]);
   function load(cursor?:number){setLoading(true);setError('');return fetchHistory(cursor);}
   const queryKey=JSON.stringify([p.id,canViewHistory,p.ultimo]);
   const [previousQueryKey,setPreviousQueryKey]=useState(queryKey);

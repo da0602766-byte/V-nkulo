@@ -169,6 +169,7 @@ export function Pessoas({
   notify,
   categoryFilter,
   onCategoryChange,
+  personal=false,
 }: {
   menuToggle: ReactNode
   pessoas: Pessoa[]
@@ -176,12 +177,13 @@ export function Pessoas({
   perfil: PerfilConfig
   onOpen: (id: string) => void
   onNew: () => void
-  onShare: () => void
+  onShare?: () => void
   onBulk: (ids:string[], action:"arquivar"|"excluir") => Promise<boolean>
   celulas:string[]
   notify: (m: string, tipo?: 'info' | 'error' | 'success') => void
   categoryFilter: string
   onCategoryChange: (value:string) => void
+  personal?: boolean
 }) {
   const [stagesCollapsed,setStagesCollapsed]=useVisitorPreference('stages');
   const {tableRef, ...columns}=useColumnWidths();
@@ -331,7 +333,7 @@ export function Pessoas({
         title={cat ? (cat === '__sem' ? 'Sem categoria' : cat) : 'Pessoas'}
         sub={`${pessoas.filter((p) => !p.arquivado && (!cat || (cat === '__sem' ? !p.categoria : p.categoria === cat))).length} visitantes e membros${cat ? ' nesta categoria' : ' cadastrados'}`}
       >
-        <button className={`${btnSec} vp-share-entry`} onClick={onShare}><Icon d={I.users}/><span>Compartilhar lista</span></button>
+        {onShare&&<button className={`${btnSec} vp-share-entry`} onClick={onShare}><Icon d={I.users}/><span>Compartilhar lista</span></button>}
         {perfil.podeCriarPessoa && (
           <button className={btnPri} onClick={onNew}>
             <Icon d={I.plus} />
@@ -346,7 +348,7 @@ export function Pessoas({
           [
             'Visitantes ativos',
             categoryPeople.filter((p) => !p.arquivado).length,
-            'na comunidade',
+            personal?'na minha lista':'na comunidade',
             'from-brand-600 to-brand-700 text-white shadow-md shadow-brand-600/30',
             'text-white/80',
           ],
@@ -755,12 +757,12 @@ export function Pessoas({
                   <div className="size-14 rounded-2xl bg-brand-50 text-brand-600 grid place-items-center mx-auto mb-3">
                     <Icon d={I.search} className="size-7" />
                   </div>
-                  <div className="font-bold text-stone-800 text-base">Nenhuma pessoa encontrada nesta consulta</div>
+                  <div className="font-bold text-stone-800 text-base">{personal&&!pessoas.length?'Sua lista está pronta para começar':'Nenhuma pessoa encontrada nesta consulta'}</div>
                   <p className="text-stone-500 text-[13px] mt-1.5 leading-relaxed">
-                    A comunidade possui {pessoas.length} cadastros no total. Tente ajustar a busca ou limpar os filtros operacionais.
+                    {personal?(!pessoas.length?'Use “Novo cadastro” para adicionar a primeira pessoa.':`Sua lista tem ${pessoas.length} cadastros. Ajuste a busca ou limpe os filtros.`):`A comunidade possui ${pessoas.length} cadastros no total. Tente ajustar a busca ou limpar os filtros operacionais.`}
                   </p>
-                  <button className={`${btnSec} mt-4`} onClick={resetAllFilters}>
-                    Limpar todos os filtros
+                  <button className={`${btnSec} mt-4`} onClick={personal&&!pessoas.length?onNew:resetAllFilters}>
+                    {personal&&!pessoas.length?'Cadastrar primeira pessoa':'Limpar todos os filtros'}
                   </button>
                 </div>
               </div>

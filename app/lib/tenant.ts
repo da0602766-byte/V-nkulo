@@ -51,6 +51,7 @@ export type TenantContext = {
   comunidadeSlug: string;
   papel: string;
   permissions: string[];
+  visitorPersonalAccess?: boolean;
   modules: CommunityModuleKey[];
   isSuperadmin: boolean;
   isOwner: boolean;
@@ -307,6 +308,15 @@ export async function getActiveTenantContext(
   permissions = filterPermissionsForCommunityModules(permissions, modules);
   permissions = filterPlanPermissions(permissions, subscription?.plan || null, subscription?.active ?? true);
 
+  // Opening an official's own workspace does not grant access to the existing
+  // community/owner list. Keep this capability before the Drive list ACL filter.
+  const visitorPersonalAccess = membership.oficial &&
+    membership.customPermissions.some(p => ['visitors.view', 'visitors.create', 'visitors.edit'].includes(p) && permissions.includes(p));
+  if (membership.oficial && !isCommunityOwner && !user.system_owner && !['PASTOR','ADMIN_COMUNIDADE'].includes(papel)) {
+    const shared = new Set(visitorSharePermissions(visitorSharing));
+    permissions = permissions.filter(p => !/^(visitors\.|visitor\.categories\.|followups\.)/.test(p) || shared.has(p));
+  }
+
   const context: TenantContext = {
       userId: user.id,
       membershipId: membership.membershipId,
@@ -315,6 +325,7 @@ export async function getActiveTenantContext(
       comunidadeSlug: membership.comunidadeSlug,
       papel,
       permissions,
+      visitorPersonalAccess,
       modules,
       isSuperadmin:
         Boolean(user.system_owner),
@@ -333,9 +344,9 @@ async function getCommunityModules(
 ): Promise<CommunityModuleKey[]> {
   const row = await getD1()
     .prepare(
-      "SELECT valor FROM configuracoes WHERE chave = 'community_modules:' || ? LIMIT 1",
+      "SELECT valor FROM configuracoes WHERE chave = ? LIMIT 1",
     )
-    .bind(comunidadeId)
+    .bind(`community_modules:${comunidadeId}`)
     .first<{ valor: string }>();
   if (!row?.valor) {
     return COMMUNITY_MODULES.map((module) => module.key);

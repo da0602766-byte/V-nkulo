@@ -36,7 +36,7 @@ export async function GET(request: Request) {
     }
     return redirectWithError(
       url.origin,
-      state.visitorStorage ? "/painel/visitantes?section=armazenamento" : state.visitorSheets ? "/painel/visitantes?sheetSetup=error" : state.purpose === "drive" ? "/painel?view=conta" : "/login",
+      state.personalVisitors ? "/painel/visitantes?lista=pessoal" : state.visitorStorage ? "/painel/visitantes?section=armazenamento" : state.visitorSheets ? "/painel/visitantes?sheetSetup=error" : state.purpose === "drive" ? "/painel?view=conta" : "/login",
       message,
     );
   }
@@ -77,7 +77,7 @@ export async function GET(request: Request) {
       ).bind(identity.picture, userId).run();
     }
     if (state.purpose === "drive") {
-      if (state.visitorSheets || state.visitorStorage) {
+      if (state.visitorSheets || state.visitorStorage || state.personalVisitors) {
         const target = new URL(state.returnTo || "/painel/visitantes", url.origin);
         target.searchParams.set("google", "connected");
         return clearStateCookie(mutableRedirect(target));
@@ -119,7 +119,7 @@ export async function GET(request: Request) {
     }
     return redirectWithError(
       url.origin,
-      state.visitorStorage ? "/painel/visitantes?section=armazenamento" : state.visitorSheets ? "/painel/visitantes?sheetSetup=error" : state.purpose === "drive" ? "/painel?view=conta" : "/login",
+      state.personalVisitors ? "/painel/visitantes?lista=pessoal" : state.visitorStorage ? "/painel/visitantes?section=armazenamento" : state.visitorSheets ? "/painel/visitantes?sheetSetup=error" : state.purpose === "drive" ? "/painel?view=conta" : "/login",
       (error as Error).message,
     );
   }
