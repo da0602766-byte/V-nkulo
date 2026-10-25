@@ -28,6 +28,7 @@ test('avisos operacionais exigem sessão Proprietário na lista, contagem, leitu
   insert('Falha na sincronização Supabase', '', other); // legacy/misdirected data
   const route = await moduleAt('app/api/pilot/notificacoes/route.ts', {
     '../../../../db': { getD1: () => d1 }, '../../../lib/local-auth': { getSessionUser: async () => user },
+    '../../../lib/notification-category': await moduleAt('app/lib/notification-category.ts'),
     '../../../lib/owner-notifications': privacy, '../../../lib/care-note-reminders': { deliverCareNoteReminders: async () => {} },
   });
   const request = (method = 'GET', body) => new Request('https://test.invalid/api/pilot/notificacoes?limite=1', { method, ...(body ? { body: JSON.stringify(body) } : {}) });

@@ -69,16 +69,15 @@ Publicado no Sites 433 em 24/10/2026 às 17h26 (Brasília), status succeeded. Fo
 
 ## Grupo 3 — Manutenção e eficiência
 
-- **CSS:** separar gradualmente responsabilidades do arquivo global e remover
-  sobreposições comprovadas, com evidência visual de cada bloco. A existência
-  de arquivos CSS novos não significa que a dívida global esteja encerrada.
-- **Desempenho:** medir consultas e carregamento com volume representativo,
-  separando resultado local de latência real da hospedagem.
+- **CSS — primeiro bloco publicado no Sites 434:** estilos offline isolados e 22 regras comerciais sem uso removidas; comparação responsiva aprovada. A separação do restante do arquivo global e a revisão de sobreposições continuam pendentes. Ver MANUTENCAO_CSS_2026-10-25.md.
+- **Desempenho — primeiro bloco validado:** Pessoas, Agenda e Notificações medidas localmente em bases de até 10 mil pessoas/50 mil notificações. Corrigidos enriquecimento antes da paginação e transferência do histórico para contagem. Pessoas ~56 → 8 ms; Notificações ~186 → 57 ms no cenário maior com categorias ativas. 870/870 testes e tipos/build/lint aprovados. Ver DESEMPENHO_VOLUME_2026-10-25.md. Publicação em preparação; concorrência, outras rotas, renderização e latência real continuam pendentes.
 - **Indicadores:** validar os limiares da saúde de células e a classificação
   de notificações com usuários, sem tratar heurística como diagnóstico definitivo.
 - **Documentação:** conciliar estados históricos contraditórios. Este inventário
   passa a orientar a ordem atual; relatórios anteriores continuam como evidência
   da data em que foram escritos.
+
+Publicado no Sites 434 em 25/10/2026 às 12h55 (Brasília), status succeeded. Fonte 845097a895946ff781d5bf93a05ca37ccfa47ae1; deployment appgdep_6ade264b82e48191b54f3486574f06a2; URL https://adote-gestao.da0602766.chatgpt.site. Audiência pública preservada. Registro documental posterior ao deploy.
 
 ## Fora do recorte atual
 

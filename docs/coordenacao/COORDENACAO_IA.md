@@ -17,6 +17,16 @@ Antes de alterar o código, leia este documento e atualize a seção **Trabalho 
 
 ## Trabalho em andamento
 
+Desempenho validado: 870/870 testes, TypeScript/build aprovados, lint zero erros/38 avisos. Medianas locais na base maior: Pessoas 56,21 → 7,87 ms; filtro com escala 68,83 → 21,02 ms; Notificações 185,70 → 56,81 ms (todas as categorias). Contador retorna 1–5 linhas em vez de 25 mil. Resultados paginados equivalentes à SQL anterior; sem migrações ou dados reais. Relatório DESEMPENHO_VOLUME_2026-10-25.md. Publicação em preparação.
+
+Reserva adicional: tests/owner-notification-privacy.test.mjs para fornecer ao harness a nova dependência real de classificação; preservar as verificações de privacidade existentes.
+
+Extensão da reserva de desempenho: app/api/pilot/{pessoas,notificacoes}/route.ts e app/lib/notification-category.ts. Gargalos reproduzidos na base 10 mil/50 mil: Pessoas 56–69 ms e Notificações 186 ms; contador transfere 25 mil linhas. Limitar enriquecimento às páginas e agregar contagem por categoria no banco, com testes de equivalência, paginação e isolamento. Agenda medida sem alteração neste bloco.
+
+Desempenho com volume — Codex, 25/10/2026, base Sites 434. Reserva inicial: scripts/performance/, tests/performance-volume.test.mjs, docs/relatorios/DESEMPENHO_VOLUME_2026-10-25.md, PENDENCIAS_PRIORIZADAS.md e esta coordenação. Medir Pessoas, Agenda e Notificações pelo Worker com SQLite fictício, registrar consultas/linhas/bytes/tempos e reservar os arquivos de correção conforme os gargalos reproduzidos. Preservar trabalhos anteriores e briefing Figma. Publicação autorizada após validação; APK físico adiado.
+
+Manutenção CSS — bloco concluído; reservas encerradas. Publicado no Sites 434 em 25/10/2026 às 12h55 (Brasília), status succeeded. Fonte 845097a895946ff781d5bf93a05ca37ccfa47ae1; deployment appgdep_6ade264b82e48191b54f3486574f06a2; URL https://adote-gestao.da0602766.chatgpt.site. Audiência pública preservada. Registro documental posterior ao deploy. 866/866 testes, TypeScript/build e comparação responsiva aprovados; zero erros/38 avisos de lint. Demais refatorações CSS e medições de desempenho continuam no inventário. APK físico adiado.
+
 Manutenção CSS validada: extração do acesso offline sem alteração de declarações, remoção de 22 regras comerciais órfãs, 213 regras por seletor ativo equivalentes. Navegador em 390/768/1864 px sem diferenças de geometria/estilos comparados ou overflow. 866/866 testes, TypeScript/build aprovados, lint zero erros/38 avisos. CSS compilado: 2.010.470 → 2.008.219 bytes. Publicação autorizada em preparação; APK físico adiado.
 
 Manutenção CSS — Codex, 25/10/2026, base Sites 433. Reserva: app/globals.css, app/landing-vinkulo.css, app/components/{OfflineModeEntry.tsx,community-settings.css,offline-mode-entry.css}, docs/relatorios/MANUTENCAO_CSS_2026-10-25.md, PENDENCIAS_PRIORIZADAS.md e esta coordenação. Extrair apenas regras do cartão offline em ordem preservada e remover apenas estilos das seções comerciais retiradas na versão 432. Comparar CSS ativo e medidas no navegador antes/depois; medir bytes reais, sem alegar ganho de latência. Publicação autorizada após validação; APK físico adiado. Preservar histórico e briefing Figma.

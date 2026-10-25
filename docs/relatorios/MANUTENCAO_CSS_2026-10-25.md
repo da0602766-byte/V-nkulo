@@ -35,4 +35,4 @@ A dívida do CSS global permanece: separar responsabilidades e remover sobreposi
 
 ## Publicação
 
-Validação concluída; publicação em preparação. O resultado definitivo será registrado após o retorno do Sites.
+Publicado no Sites 434 em 25/10/2026 às 12h55 (Brasília), status succeeded. Fonte 845097a895946ff781d5bf93a05ca37ccfa47ae1; deployment appgdep_6ade264b82e48191b54f3486574f06a2; URL https://adote-gestao.da0602766.chatgpt.site. Audiência pública preservada. Registro documental posterior ao deploy.

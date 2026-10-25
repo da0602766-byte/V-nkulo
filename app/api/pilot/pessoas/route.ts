@@ -141,25 +141,8 @@ export async function GET(request: Request) {
   const [rows, totals] = await Promise.all([
     db
       .prepare(
-        `SELECT uc.id AS membership_id, u.id AS usuario_id, u.nome, u.email,
-          u.criado_em AS owner_criado_em,
-          (SELECT proprietario_usuario_id FROM comunidades WHERE id = uc.comunidade_id) AS community_owner_id,
-          u.telefone, u.foto_perfil, uc.papel,
-          COALESCE((SELECT group_concat(m.nome, ', ')
-            FROM ministerio_voluntarios mv JOIN ministerios_comunidade m
-              ON m.id = mv.ministerio_id AND m.comunidade_id = mv.comunidade_id
-            WHERE mv.usuario_id = u.id AND mv.comunidade_id = uc.comunidade_id AND mv.ativo = 1
-              AND m.status = 'ATIVO'), '') AS ministerios,
-          (SELECT COUNT(DISTINCT d.escala_id) FROM escala_designacoes d
-            JOIN escalas_ministerio s ON s.id = d.escala_id AND s.comunidade_id = d.comunidade_id
-            WHERE d.usuario_id = u.id AND d.comunidade_id = uc.comunidade_id AND d.ativo = 1
-              AND d.status IN ('CONFIRMADA', 'PENDENTE') AND s.status IN ('PUBLICADA', 'AGUARDANDO_CHECKLIST')
-              AND datetime(s.termina_em) >= datetime('now')) AS proximas_escalas,
-          CASE WHEN oc.id IS NULL THEN 0 ELSE 1 END AS oficial,
-          COALESCE(oc.titulo, '') AS titulo_oficial,
-          COALESCE(oc.permissoes, '') AS permissoes,
-          uc.status, uc.criado_em,
-          COALESCE(oc.atualizado_em, uc.criado_em) AS atualizado_em
+        `WITH page AS MATERIALIZED (
+         SELECT uc.id
          FROM usuario_comunidades uc
          JOIN usuarios u ON u.id = uc.usuario_id
          LEFT JOIN oficiais_comunidade oc
@@ -181,7 +164,34 @@ export async function GET(request: Request) {
              OR (u.nome = ? AND uc.id > ?)
            )
          ORDER BY u.nome ASC, uc.id ASC
-         LIMIT ?`,
+         LIMIT ?
+        )
+        SELECT uc.id AS membership_id, u.id AS usuario_id, u.nome, u.email,
+          u.criado_em AS owner_criado_em,
+          (SELECT proprietario_usuario_id FROM comunidades WHERE id = uc.comunidade_id) AS community_owner_id,
+          u.telefone, u.foto_perfil, uc.papel,
+          COALESCE((SELECT group_concat(m.nome, ', ')
+            FROM ministerio_voluntarios mv JOIN ministerios_comunidade m
+              ON m.id = mv.ministerio_id AND m.comunidade_id = mv.comunidade_id
+            WHERE mv.usuario_id = u.id AND mv.comunidade_id = uc.comunidade_id AND mv.ativo = 1
+              AND m.status = 'ATIVO'), '') AS ministerios,
+          (SELECT COUNT(DISTINCT d.escala_id) FROM escala_designacoes d
+            JOIN escalas_ministerio s ON s.id = d.escala_id AND s.comunidade_id = d.comunidade_id
+            WHERE d.usuario_id = u.id AND d.comunidade_id = uc.comunidade_id AND d.ativo = 1
+              AND d.status IN ('CONFIRMADA', 'PENDENTE') AND s.status IN ('PUBLICADA', 'AGUARDANDO_CHECKLIST')
+              AND datetime(s.termina_em) >= datetime('now')) AS proximas_escalas,
+          CASE WHEN oc.id IS NULL THEN 0 ELSE 1 END AS oficial,
+          COALESCE(oc.titulo, '') AS titulo_oficial,
+          COALESCE(oc.permissoes, '') AS permissoes,
+          uc.status, uc.criado_em,
+          COALESCE(oc.atualizado_em, uc.criado_em) AS atualizado_em
+
+         FROM page
+         JOIN usuario_comunidades uc ON uc.id = page.id
+         JOIN usuarios u ON u.id = uc.usuario_id
+         LEFT JOIN oficiais_comunidade oc
+           ON oc.usuario_comunidade_id = uc.id
+         ORDER BY u.nome ASC, uc.id ASC`,
       )
       .bind(
         access.context.comunidadeId,
