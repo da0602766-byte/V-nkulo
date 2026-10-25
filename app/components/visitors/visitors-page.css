@@ -269,6 +269,18 @@ body:has(.visitor-app){padding-bottom:0;overflow:hidden}
   .vp-notice-row>div{flex-basis:100%}
 }
 
+.vp-sharing{width:100%;max-width:880px;box-sizing:border-box}
+.vp-sharing-grants{list-style:none;margin:12px 0;padding:0}
+.vp-sharing-grants li{padding:10px 0;border-bottom:1px solid #eaecf6}
+.vp-sharing-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.vp-sharing-row>div{min-width:0;overflow-wrap:anywhere}
+.vp-sharing-row small{display:block;color:#64748b}
+.vp-sharing-row button{flex-shrink:0}
+.vp-sharing-options{margin-top:10px}
+.vp-sharing .vp-actions{flex-wrap:wrap}
+.vp-sharing .vp-drive-share label{min-width:0}
+.vp-sharing .vp-drive-share button{flex-shrink:0}
+
 /* Independent workspace panels and spreadsheet-style column resizing. */
 .visitor-app .vp-menu-toggle{display:none}
 .vp-workspace-controls{display:none;align-items:center;gap:8px;margin-bottom:6px;color:#5f6683;font-size:11px}

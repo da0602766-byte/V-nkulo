@@ -9,6 +9,13 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
+export const visitanteAcessos = sqliteTable('visitante_acessos', {
+  comunidadeId: integer('comunidade_id').notNull().references(() => comunidades.id, { onDelete: 'cascade' }),
+  usuarioId: integer('usuario_id').notNull().references(() => usuarios.id, { onDelete: 'cascade' }),
+  papel: text('papel').notNull(),
+}, table => [primaryKey({ columns: [table.comunidadeId, table.usuarioId] }),
+  check('visitante_acessos_papel', sql`${table.papel} IN ('READ','EDIT')`)]);
+
 // Metadata only: visitor contents live in the community owner's Google Drive.
 export const visitanteDrive = sqliteTable('visitante_drive', {
   comunidadeId: integer('comunidade_id').primaryKey().references(() => comunidades.id),

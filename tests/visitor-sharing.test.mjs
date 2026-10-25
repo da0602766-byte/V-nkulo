@@ -1,0 +1,61 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {createPilotD1,createPilotUser} from './helpers/sqlite-d1.mjs';
+import {cpfLoginRequest} from './helpers/cpf-login.mjs';
+
+test('Visitantes: compartilhar com membro comum, editar, revogar e respeitar comunidade e cargo',async()=>{
+  const {database:db,d1}=await createPilotD1();
+  try {
+    const worker=(await import('../dist/server/index.js')).default;
+    const env={DB:d1,AUTH_SECRET:'visitor-sharing-test-only',ASSETS:{fetch:async()=>new Response('',{status:404})}};
+    const ctx={waitUntil(){},passThroughOnException(){}};
+    const create=(nome,papel='MEMBRO',comunidadeId=1)=>createPilotUser(db,{nome,email:`${nome}@example.test`,senha:'SharingTest123',memberships:[{comunidadeId,papel}]});
+    const admin=await create('admin','ADMIN_COMUNIDADE'),member=await create('member'),other=await create('other','MEMBRO',2),leader=await create('leader','LIDER');
+    const login=async name=>{const r=await worker.fetch(await cpfLoginRequest(env,new Request('https://localhost/api/auth/login',{method:'POST',body:new URLSearchParams({email:`${name}@example.test`,senha:'SharingTest123'})})),env,ctx);assert.equal(r.status,303);return r.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ');};
+    const adminCookie=await login('admin'),memberCookie=await login('member'),otherCookie=await login('other'),leaderCookie=await login('leader');
+    const call=(path,method='GET',body,cookie=adminCookie)=>worker.fetch(new Request('https://localhost'+path,{method,headers:{cookie,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})}),env,ctx);
+    const sharing='/api/pilot/visitantes/compartilhamento',page='/api/pilot/visitantes/pagina';
+    const share=(userId,role='READ',action='grant',cookie=adminCookie)=>call(sharing,'POST',{action,userId,role},cookie);
+    const ok=async r=>{assert.equal(r.status,200,await r.clone().text());return r.json();};
+    assert.equal((await call(page,'GET',null,memberCookie)).status,403);
+    assert.equal((await call(sharing,'GET',null,'')).status,401);
+    const hidden=await ok(await call(sharing,'GET',null,memberCookie));assert.equal(hidden.canManage,false);assert.deepEqual(hidden.members,[]);
+    assert.equal((await share(member,'EDIT','grant',leaderCookie)).status,403);
+    assert.equal((await share(other)).status,400);assert.equal((await share(admin)).status,400);assert.equal((await share(member,'ADMIN')).status,400);
+    const list=await ok(await call(sharing));assert.ok(list.members.some(m=>m.id===member));assert.ok(!list.members.some(m=>m.id===other));
+    assert.deepEqual((await ok(await call(`${sharing}?busca=member`))).members.map(m=>m.id),[member]);
+    await ok(await share(member));
+    let snapshot=await ok(await call(page,'GET',null,memberCookie));assert.ok(snapshot.permissions.includes('visitors.view'));assert.ok(!snapshot.permissions.includes('visitors.edit'));
+    assert.equal((await call('/painel/visitantes','GET',null,memberCookie)).status,200);
+    await ok(await call('/api/pilot/visitantes/exportar','GET',null,memberCookie));
+    assert.equal((await call('/api/pilot/visitantes','POST',{nomeCompleto:'Negado'},memberCookie)).status,403);
+    assert.equal((await share(other,'EDIT','grant',memberCookie)).status,403);
+    await ok(await share(member,'EDIT'));
+    const created=await call('/api/pilot/visitantes','POST',{nomeCompleto:'Ficha compartilhada',dataEntrada:'2026-10-25'},memberCookie);assert.equal(created.status,201,await created.clone().text());const {id}=await created.json();
+    await ok(await call(`/api/pilot/visitantes/${id}`,'PATCH',{nomeCompleto:'Ficha atualizada'},memberCookie));
+    assert.equal((await call(`/api/pilot/visitantes/${id}`,'DELETE',null,memberCookie)).status,403);
+    assert.equal((await call('/api/pilot/acompanhamentos','POST',{visitanteId:id,tipo:'TELEFONE',resultado:'Contato compartilhado'},memberCookie)).status,201);
+    assert.equal((await call('/api/pilot/visitante-categorias','POST',{nome:'Negado'},memberCookie)).status,403);
+    await ok(await share(member,'READ'));
+    assert.equal((await call(`/api/pilot/visitantes/${id}`,'PATCH',{nomeCompleto:'Negado'},memberCookie)).status,403);
+    db.prepare("UPDATE usuario_comunidades SET status='INATIVO' WHERE usuario_id=?").run(member);
+    assert.notEqual((await call(page,'GET',null,memberCookie)).status,200);assert.equal((await share(member)).status,400);
+    await ok(await share(member,undefined,'revoke'));
+    db.prepare("UPDATE usuario_comunidades SET status='ATIVO' WHERE usuario_id=?").run(member);
+    assert.equal((await call(page,'GET',null,memberCookie)).status,403);
+    await ok(await share(leader));await ok(await share(leader,undefined,'revoke'));
+    await ok(await call(page,'GET',null,leaderCookie));
+    assert.equal((await call(page,'GET',null,otherCookie)).status,403);
+    assert.equal(db.prepare("SELECT COUNT(*) n FROM oficiais_comunidade WHERE usuario_comunidade_id IN (SELECT id FROM usuario_comunidades WHERE usuario_id=?)").get(member).n,0);
+    assert.ok(db.prepare("SELECT COUNT(*) n FROM auditoria_piloto WHERE evento='VISITOR_SHARING'").get().n>=6);
+    // Grants survive switching storage; Drive's restriction still caps the access.
+    await ok(await share(member));
+    db.prepare("INSERT INTO visitante_drive(comunidade_id,usuario_id,estado) VALUES(1,?,'ACTIVE')").run(admin);
+    const drivePermissions=await ok(await call('/api/pilot/visitantes/compartilhamento','GET',null,memberCookie));assert.equal(drivePermissions.canManage,false);
+    await ok(await share(member,'EDIT'));
+    assert.equal(db.prepare('SELECT papel FROM visitante_drive_acessos WHERE comunidade_id=1 AND usuario_id=?').get(member).papel,'EDIT');
+    await ok(await share(member,undefined,'revoke'));
+    assert.equal(db.prepare('SELECT COUNT(*) n FROM visitante_drive_acessos WHERE usuario_id=?').get(member).n,0);
+    assert.equal((await call(page,'GET',null,memberCookie)).status,403);
+  } finally {db.close();}
+});

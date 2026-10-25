@@ -31,7 +31,7 @@ convites_comunidade google_connections google_native_handoffs links_cadastro_mem
 links_contratacao mobile_checklist_versions mobile_module_grants mobile_module_receipts
 mobile_visitor_receipts mobile_write_grants notificacoes_push_controle
 notificacoes_push_dispositivos notificacoes_push_fila redefinicoes_senha sessoes
-user_drive_storage user_file_copies visitante_drive visitante_drive_acessos visitante_planilha
+user_drive_storage user_file_copies visitante_drive visitante_drive_acessos visitante_acessos visitante_planilha
 supabase_storage_copies
 `.trim().split(/\s+/));
 

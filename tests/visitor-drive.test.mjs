@@ -12,7 +12,9 @@ test('Drive: migração verificada, fonte externa, isolamento, concessão/revoga
     const owner=await createPilotUser(db,{nome:'Gestor Drive',email:'drive-owner@example.test',senha:'DriveTest123',memberships:[{comunidadeId:1,papel:'ADMIN_COMUNIDADE'}]});
     const editor=await createPilotUser(db,{nome:'Outro gestor',email:'drive-editor@example.test',senha:'DriveTest123',memberships:[{comunidadeId:1,papel:'ADMIN_COMUNIDADE'}]});
     await createPilotUser(db,{nome:'Outra comunidade',email:'drive-other@example.test',senha:'DriveTest123',memberships:[{comunidadeId:2,papel:'ADMIN_COMUNIDADE'}]});
+    const member=await createPilotUser(db,{nome:'Membro compartilhado',email:'drive-member@example.test',senha:'DriveTest123',memberships:[{comunidadeId:1,papel:'MEMBRO'}]});
     const login=async email=>{const r=await worker.fetch(await cpfLoginRequest(env,new Request('https://localhost/api/auth/login',{method:'POST',body:new URLSearchParams({email,senha:'DriveTest123'})})),env,ctx);assert.equal(r.status,303);return r.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ');};
+    const memberCookie=await login('drive-member@example.test');
     const ownerCookie=await login('drive-owner@example.test'),editorCookie=await login('drive-editor@example.test'),otherCookie=await login('drive-other@example.test');
     const call=(path,method='GET',body,cookie=ownerCookie)=>worker.fetch(new Request('https://localhost'+path,{method,headers:{cookie,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})}),env,ctx);
     const storage=(action,extra={},cookie=ownerCookie)=>call('/api/pilot/visitantes/armazenamento','POST',{action,...extra},cookie);
@@ -56,6 +58,16 @@ test('Drive: migração verificada, fonte externa, isolamento, concessão/revoga
     let verified=await ok(await storage('verify'));assert.equal((await storage('activate',{revision:verified.revision,confirmation:'SEM CONFIRMAÇÃO'})).status,409);
     const backupBefore=await ok(await call('/api/pilot/visitantes/backup'));assert.equal(backupBefore.tables.acompanhamentos.length,1);assert.ok(!JSON.stringify(backupBefore).includes('Somente o autor'));
     await ok(await storage('activate',{revision:verified.revision,confirmation:'MIGRAR VISITANTES'}));
+    // A common member can use the complete sharing flow without an official role.
+    await ok(await call('/api/pilot/visitantes/compartilhamento','POST',{action:'grant',userId:member,role:'READ'}));
+    const shared=await ok(await call('/api/pilot/visitantes/pagina','GET',null,memberCookie));assert.equal(shared.visitantes[0].id,id);
+    assert.equal((await call(`/api/pilot/visitantes/${id}`,'PATCH',{nomeCompleto:'Negado'},memberCookie)).status,403);
+    assert.equal((await ok(await call('/api/pilot/anotacoes','GET',null,memberCookie))).anotacoes.length,0);
+    await ok(await call('/api/pilot/visitantes/compartilhamento','POST',{action:'grant',userId:member,role:'EDIT'}));
+    await ok(await call(`/api/pilot/visitantes/${id}`,'PATCH',{nomeCompleto:'Pessoa com histórico'},memberCookie));
+    // The old storage endpoint must also revoke the new sharing grant.
+    await ok(await storage('revoke',{userId:member}));
+    assert.equal((await call('/api/pilot/visitantes/pagina','GET',null,memberCookie)).status,403);
     for(const table of ['visitantes','acompanhamentos','visitor_contacts','visitor_visits','visitante_categorias','visitante_campos'])assert.equal(db.prepare(`SELECT count(*) n FROM ${table} WHERE comunidade_id=1`).get().n,0,table);
     assert.equal(db.prepare("SELECT count(*) n FROM layouts_interface WHERE comunidade_id=1 AND escopo LIKE 'care-notes:user:%'").get().n,0);
     assert.equal(db.prepare('SELECT count(*) n FROM visitantes WHERE comunidade_id=2').get().n,1);

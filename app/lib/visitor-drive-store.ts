@@ -1,4 +1,5 @@
 import { getRuntimeEnv } from '../../db/runtime-env';
+import { visitorShareRole } from './visitor-sharing';
 import { getDriveAccessToken, createDriveFolder, uploadDriveFile, encryptDrivePayload, decryptDrivePayload } from './google-integration';
 import { archiveHash, validateVisitorArchive, MAX_VISITOR_ARCHIVE_BYTES, type VisitorArchive } from './visitor-drive-format';
 
@@ -12,7 +13,7 @@ export async function visitorDriveConfig(communityId: number) {
 export async function driveAccess(config: VisitorDriveConfig, userId: number) {
   if (config.usuario_id === userId) return 'EDIT';
   const grant = await platformDB().prepare('SELECT papel FROM visitante_drive_acessos WHERE comunidade_id=? AND usuario_id=?').bind(config.comunidade_id, userId).first<{papel:'READ'|'EDIT'}>();
-  return grant?.papel || null;
+  return grant?.papel || await visitorShareRole(config.comunidade_id, userId);
 }
 export async function ownerToken(config: VisitorDriveConfig) {
   const owner = await platformDB().prepare(`SELECT u.id FROM usuarios u JOIN usuario_comunidades uc ON uc.usuario_id=u.id

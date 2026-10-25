@@ -79,7 +79,7 @@ export async function POST(request:Request) {
       if(!member&&body.action==='grant')throw new VisitorDriveError('A pessoa não possui vínculo ativo nesta comunidade.');
       if(body.action==='grant'&&!['READ','EDIT'].includes(body.role))throw new VisitorDriveError('Permissão inválida.');
       // Incrementing revision invalidates reads/edits already in flight.
-      await db.batch([body.action==='grant'?db.prepare('INSERT INTO visitante_drive_acessos(comunidade_id,usuario_id,papel) VALUES(?,?,?) ON CONFLICT(comunidade_id,usuario_id) DO UPDATE SET papel=excluded.papel').bind(community,id,body.role):db.prepare('DELETE FROM visitante_drive_acessos WHERE comunidade_id=? AND usuario_id=?').bind(community,id),db.prepare('UPDATE visitante_drive SET revisao=revisao+1 WHERE comunidade_id=?').bind(community)]);
+      await db.batch([body.action==='grant'?db.prepare('INSERT INTO visitante_acessos(comunidade_id,usuario_id,papel) VALUES(?,?,?) ON CONFLICT(comunidade_id,usuario_id) DO UPDATE SET papel=excluded.papel').bind(community,id,body.role):db.prepare('DELETE FROM visitante_acessos WHERE comunidade_id=? AND usuario_id=?').bind(community,id),body.action==='grant'?db.prepare('INSERT INTO visitante_drive_acessos(comunidade_id,usuario_id,papel) VALUES(?,?,?) ON CONFLICT(comunidade_id,usuario_id) DO UPDATE SET papel=excluded.papel').bind(community,id,body.role):db.prepare('DELETE FROM visitante_drive_acessos WHERE comunidade_id=? AND usuario_id=?').bind(community,id),db.prepare('UPDATE visitante_drive SET revisao=revisao+1 WHERE comunidade_id=?').bind(community)]);
       return reply({ok:true});
     }
     if(body.action==='restore') {

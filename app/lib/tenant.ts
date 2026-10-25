@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { attachVisitorDrive } from './visitor-drive-runtime';
+import { visitorSharePermissions, visitorShareRole } from './visitor-sharing';
 import { getD1 } from "../../db";
 import { getRuntimeEnv } from "../../db/runtime-env";
 import type { AppUser } from "./access";
@@ -190,15 +191,19 @@ export async function getActiveTenantContext(
   // Não reutilize o resultado entre requisições: mudanças de acesso são imediatas.
   const fullAccess = membership.communityAccess !== "FEED_ONLY";
   const [diaconiaPermissions, networkPermissions, parkingAssignment, parkingLeaderPermissions,
-    subscription, configuredModules] = await Promise.all([
+    subscription, configuredModules, visitorSharing] = await Promise.all([
     fullAccess ? getDiaconiaPermissions(user.id, membership.comunidadeId) : Promise.resolve([]),
     fullAccess ? getNetworkPermissions(user.id, membership.comunidadeId) : Promise.resolve([]),
     fullAccess ? getActiveParkingAssignment(user.id, membership.comunidadeId) : Promise.resolve(null),
     fullAccess ? getParkingLeaderPermissions(user.id, membership.comunidadeId) : Promise.resolve([]),
     getSubscription(membership.comunidadeId),
     getCommunityModules(membership.comunidadeId),
+    fullAccess ? visitorShareRole(membership.comunidadeId, user.id) : Promise.resolve(null),
   ]);
   if (membership.communityAccess !== "FEED_ONLY") {
+    for (const permission of visitorSharePermissions(visitorSharing)) {
+      if (!permissions.includes(permission)) permissions.push(permission);
+    }
     for (const permission of membership.customPermissions) {
       if (!permissions.includes(permission)) permissions.push(permission);
     }
