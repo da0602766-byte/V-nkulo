@@ -1,5 +1,5 @@
 /* Dedicated visitors workspace, adapted from the supplied ZIP. */
-.vp-personal-switch{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:8px 24px;background:#ede9fe;color:#4338ca;flex-shrink:0}.vp-personal-switch strong{overflow-wrap:anywhere;min-width:0}.vp-personal-switch :is(a,button){display:inline-flex;align-items:center;min-height:calc(44px * var(--vinkulo-ui-scale-inverse,1));text-decoration:underline}
+.vp-personal-switch{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:8px 24px;background:#ede9fe;color:#4338ca;flex-shrink:0}.vp-personal-switch strong{overflow-wrap:anywhere;min-width:0}.visitor-app .vp-personal-switch :is(a[href],button){display:inline-flex;align-items:center;min-height:calc(44px * var(--vinkulo-ui-scale-inverse,1));text-decoration:underline}
 body:has(.visitor-app){padding-bottom:0;overflow:hidden}
 .visitor-app .care-note::after{right:0;bottom:0;width:22px;height:22px;border-radius:22px 0 0 0}
 .visitor-app {
