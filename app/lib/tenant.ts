@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { attachVisitorDrive } from './visitor-drive-runtime';
+import { attachVisitorDrive, applyVisitorDriveAccess } from './visitor-drive-runtime';
 import { visitorSharePermissions, visitorShareRole } from './visitor-sharing';
 import { getD1 } from "../../db";
 import { getRuntimeEnv } from "../../db/runtime-env";
@@ -165,6 +165,7 @@ export async function listTenantMemberships(
 
 export async function getActiveTenantContext(
   user: Pick<AppUser, "id" | "perfil" | "system_owner">,
+  options: {communityId?:number; attachDrive?:boolean} = {},
 ): Promise<{ context: TenantContext | null; memberships: TenantMembership[] }> {
   const memberships = await listTenantMemberships(user);
   if (!memberships.length) return { context: null, memberships };
@@ -173,9 +174,10 @@ export async function getActiveTenantContext(
   const selected = await readCommunityCookie(
     jar.get(ACTIVE_COMMUNITY_COOKIE)?.value,
   );
-  const membership =
-    memberships.find((item) => item.membershipId === selected?.membershipId) ??
-    memberships[0];
+  const membership = options.communityId !== undefined
+    ? memberships.find(item => item.comunidadeId === options.communityId)
+    : memberships.find((item) => item.membershipId === selected?.membershipId) ?? memberships[0];
+  if (!membership) return {context:null,memberships};
   const papel = effectiveTenantRole(membership.papel, Boolean(user.system_owner));
   let permissions = permissionsForTenantRole(papel);
   const isCommunityOwner = membership.isCommunityOwner;
@@ -335,7 +337,8 @@ export async function getActiveTenantContext(
       ambienteDemo: membership.ambienteDemo,
       temporaryAccess,
     };
-  await attachVisitorDrive(context);
+  if(options.attachDrive === false) await applyVisitorDriveAccess(context);
+  else await attachVisitorDrive(context);
   return { memberships, context };
 }
 

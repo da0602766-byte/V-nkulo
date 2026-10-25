@@ -39,8 +39,8 @@ export async function changeVisitorSharing(input: Change) {
       AND ${drive?"EXISTS(SELECT 1 FROM visitante_drive WHERE comunidade_id=? AND revisao=? AND estado='ACTIVE' AND usuario_id=?)":"NOT EXISTS(SELECT 1 FROM visitante_drive WHERE comunidade_id=?)"}`)
     .bind(operation,community,actorId,userId,event,previous,next,community,userId,current?.papel||'',community,userId,current?.drive_papel||'',...drive?[community,drive.revisao,actorId]:[community])];
   const guard='EXISTS (SELECT 1 FROM visitante_acesso_historico WHERE operacao=?)';
-  statements.push(next?db.prepare(`INSERT INTO visitante_acessos(comunidade_id,usuario_id,papel) SELECT ?,?,? WHERE ${guard}
-    ON CONFLICT(comunidade_id,usuario_id) DO UPDATE SET papel=excluded.papel`).bind(community,userId,next,operation)
+  statements.push(next?db.prepare(`INSERT INTO visitante_acessos(comunidade_id,usuario_id,papel,concedido_por) SELECT ?,?,?,? WHERE ${guard}
+    ON CONFLICT(comunidade_id,usuario_id) DO UPDATE SET papel=excluded.papel,concedido_por=excluded.concedido_por`).bind(community,userId,next,actorId,operation)
     :db.prepare(`DELETE FROM visitante_acessos WHERE comunidade_id=? AND usuario_id=? AND ${guard}`).bind(community,userId,operation));
   if(drive||!next){
     statements.push(next?db.prepare(`INSERT INTO visitante_drive_acessos(comunidade_id,usuario_id,papel) SELECT ?,?,? WHERE ${guard}

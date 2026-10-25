@@ -34,6 +34,7 @@ export const visitanteAcessoHistorico = sqliteTable('visitante_acesso_historico'
   check('visitor_share_history_previous',sql`${table.papelAnterior} IS NULL OR ${table.papelAnterior} IN ('READ','EDIT')`)]);
 
 export const visitanteAcessos = sqliteTable('visitante_acessos', {
+  concedidoPor: integer('concedido_por').references(() => usuarios.id, { onDelete: 'set null' }),
   comunidadeId: integer('comunidade_id').notNull().references(() => comunidades.id, { onDelete: 'cascade' }),
   usuarioId: integer('usuario_id').notNull().references(() => usuarios.id, { onDelete: 'cascade' }),
   papel: text('papel').notNull(),

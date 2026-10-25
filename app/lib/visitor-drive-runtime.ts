@@ -169,6 +169,12 @@ export async function attachVisitorDrive(context:TenantContext) {
   env.visitorDrive=new VisitorDriveRuntime(config,context,role,env.requestMethod);
   filterDrivePermissions(context,role);
 }
+// Permission-only resolution never attaches a different community's data runtime.
+export async function applyVisitorDriveAccess(context:TenantContext) {
+  const config=await visitorDriveConfig(context.comunidadeId);
+  if(config && !['LOCKED','PURGING'].includes(config.estado))
+    filterDrivePermissions(context,context.temporaryAccess?null:await driveAccess(config,context.userId));
+}
 function filterDrivePermissions(context:TenantContext,role:'READ'|'EDIT'|null) {
   if(role!=='EDIT')context.permissions=context.permissions.filter(p=>!['visitors.create','visitors.edit','visitors.deactivate','visitor.categories.manage','followups.manage'].includes(p));
   if(!role)context.permissions=context.permissions.filter(p=>!['visitors.view','followups.view'].includes(p));
