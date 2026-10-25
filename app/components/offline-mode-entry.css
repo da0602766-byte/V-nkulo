@@ -1,0 +1,131 @@
+/* Estilos do acesso offline: base, responsividade e contexto do painel. */
+.offline-mode-entry {
+  grid-column: 1/-1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 12px 16px;
+  padding: 16px 20px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+}
+.offline-mode-entry strong {
+  font-size: 1rem;
+}
+.offline-mode-entry p {
+  margin: 4px 0 0;
+  font-size: .875rem;
+  line-height: 1.5;
+}
+.offline-mode-entry__actions {
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 420px;
+}
+.offline-mode-entry__actions a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: var(--primary,#6243d7);
+  color: white;
+  text-decoration: none;
+  font-weight: 700;
+}
+.offline-mode-entry__actions small {
+  font-size: .75rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+@media(max-width:760px) {
+.offline-mode-entry {
+  flex-direction: column;
+  align-items: stretch;
+  margin: 8px 12px;
+  padding: 14px;
+}
+.offline-mode-entry__actions {
+  max-width: none;
+}
+.offline-mode-entry__actions a {
+  width: 100%;
+}
+}
+.offline-mode-settings {
+  margin: 0;
+  align-items: flex-start;
+  padding: 24px;
+  background: var(--pilot-surface);
+  border-color: var(--pilot-line);
+  color: var(--pilot-text);
+}
+.offline-mode-settings h2 {
+  margin: 0 0 10px;
+  font-size: 20px;
+}
+.offline-mode-settings p {
+  max-width: 580px;
+  color: var(--pilot-muted);
+  line-height: 1.6;
+}
+.offline-mode-settings .offline-mode-entry__actions {
+  flex-shrink: 0;
+  max-width: 330px;
+}
+.offline-mode-entry__details {
+  min-width: 0;
+  max-width: 620px;
+}
+.offline-mode-entry__status {
+  margin: 16px 0;
+  display: grid;
+  gap: 12px;
+}
+.offline-mode-entry__status dt {
+  font-size: 14px;
+  font-weight: 700;
+}
+.offline-mode-entry__status dd {
+  margin: 4px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--pilot-muted);
+  overflow-wrap: anywhere;
+}
+.offline-mode-settings .offline-mode-entry__hint {
+  font-size: 13px;
+}
+.offline-mode-entry__actions button {
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--pilot-line);
+  border-radius: 10px;
+  background: var(--pilot-surface);
+  color: var(--pilot-text);
+  font: inherit;
+  cursor: pointer;
+}
+.offline-mode-settings .offline-mode-entry__actions {
+  min-width: 0;
+  flex-shrink: 1;
+}
+.offline-mode-settings :is(a,button):focus-visible {
+  outline: 3px solid var(--pilot-primary,var(--pilot-purple));
+  outline-offset: 3px;
+}
+/* Compensa a escala de densidade do painel mantendo alvo de toque legível. */
+.pilot-dashboard .offline-mode-entry.offline-mode-settings {
+  max-width: 1000px!important;
+  justify-content: flex-start;
+}
+.offline-mode-settings .offline-mode-entry__actions :is(a,button) {
+  min-height: 52px;
+  font-size: 16px;
+}

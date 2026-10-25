@@ -1,6 +1,6 @@
 # Pendências por grau de necessidade
 
-Revisão de 24/10/2026, baseada no código local e em verificações desta tarefa.
+Revisão de 25/10/2026, baseada no código local e em verificações desta tarefa.
 “Sem serviços externos” significa que o desenvolvimento e a validação local
 não exigem contratar ou configurar outro provedor. Não significa que toda a
 plataforma funcione sem sua hospedagem e seus armazenamentos atuais.
@@ -61,9 +61,11 @@ Publicado no Sites 431 em 24/10/2026 às 16h46 (Brasília), status succeeded. Fo
   Depende de aparelho disponível, não de novo provedor. Entrega real de push
   e retorno de provedores ficam fora deste recorte sem serviços externos.
 - **Página comercial e contratação — revisão funcional validada:** aceite por plano/versão, bloqueio de reenvio, foco e navegação corrigidos; afirmações comerciais sem fonte retiradas. 859/859 testes, tipos/build/lint aprovados e navegador em 390/768/1864 px. Ver REVISAO_COMERCIAL_2026-10-24.md. Zoom nativo/leitor de tela seguem como avaliação específica de acessibilidade; publicado no Sites 432.
-- **Continuidade offline — bloco web validado:** entrada também em Perfil e conta; consulta global protegida contra resposta antiga, timeout e reconexão; orientação de validade e confirmação dos envios. 866/866 testes web e 52/52 testes JavaScript do APK 1.23.0. **Prazo e contagem reais no painel ainda pendentes:** a ponte publicada só disponibiliza esses dados no espaço local; exigem nova versão Android. Ver CONTINUIDADE_OFFLINE_2026-10-24.md. Publicação web em preparação; APK físico adiado.
+- **Continuidade offline — bloco web validado:** entrada também em Perfil e conta; consulta global protegida contra resposta antiga, timeout e reconexão; orientação de validade e confirmação dos envios. 866/866 testes web e 52/52 testes JavaScript do APK 1.23.0. **Prazo e contagem reais no painel ainda pendentes:** a ponte publicada só disponibiliza esses dados no espaço local; exigem nova versão Android. Ver CONTINUIDADE_OFFLINE_2026-10-24.md. Publicado no Sites 433; APK físico adiado.
 
 Publicado no Sites 432 em 24/10/2026 às 17h00 (Brasília), status succeeded. Fonte 39abe090768eb19dcfdd390bdb70f721c894e4a5; deployment appgdep_6add0e609b0881918fd357eed8e233d2; URL https://adote-gestao.da0602766.chatgpt.site. Audiência pública preservada, sem migração ou alteração de dados reais. Registro documental posterior ao deploy.
+
+Publicado no Sites 433 em 24/10/2026 às 17h26 (Brasília), status succeeded. Fonte ef1d0870e5593c11aca35af634cb5948669d53bf; deployment appgdep_6add147721d881919c6757c7c1f2a601; URL https://adote-gestao.da0602766.chatgpt.site. Audiência pública preservada, sem migração ou alteração de dados reais. Registro documental posterior ao deploy.
 
 ## Grupo 3 — Manutenção e eficiência
 

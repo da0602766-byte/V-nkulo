@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import "./community-settings.css";
+import "./offline-mode-entry.css";
 import { useAndroidOfflinePolicy } from "./useAndroidOfflineEnabled";
 import { needsAndroidPolicyUpdate } from "../lib/android-version";
 

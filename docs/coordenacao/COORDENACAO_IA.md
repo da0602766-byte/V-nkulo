@@ -17,6 +17,12 @@ Antes de alterar o código, leia este documento e atualize a seção **Trabalho 
 
 ## Trabalho em andamento
 
+Manutenção CSS validada: extração do acesso offline sem alteração de declarações, remoção de 22 regras comerciais órfãs, 213 regras por seletor ativo equivalentes. Navegador em 390/768/1864 px sem diferenças de geometria/estilos comparados ou overflow. 866/866 testes, TypeScript/build aprovados, lint zero erros/38 avisos. CSS compilado: 2.010.470 → 2.008.219 bytes. Publicação autorizada em preparação; APK físico adiado.
+
+Manutenção CSS — Codex, 25/10/2026, base Sites 433. Reserva: app/globals.css, app/landing-vinkulo.css, app/components/{OfflineModeEntry.tsx,community-settings.css,offline-mode-entry.css}, docs/relatorios/MANUTENCAO_CSS_2026-10-25.md, PENDENCIAS_PRIORIZADAS.md e esta coordenação. Extrair apenas regras do cartão offline em ordem preservada e remover apenas estilos das seções comerciais retiradas na versão 432. Comparar CSS ativo e medidas no navegador antes/depois; medir bytes reais, sem alegar ganho de latência. Publicação autorizada após validação; APK físico adiado. Preservar histórico e briefing Figma.
+
+Continuidade offline — bloco web concluído; reservas encerradas. Publicado no Sites 433 em 24/10/2026 às 17h26 (Brasília), status succeeded. Fonte ef1d0870e5593c11aca35af634cb5948669d53bf; deployment appgdep_6add147721d881919c6757c7c1f2a601; URL https://adote-gestao.da0602766.chatgpt.site. Audiência pública preservada, sem migração ou alteração de dados reais. Registro documental posterior ao deploy. 866/866 testes web e 52/52 testes JavaScript Android aprovados. Resumo nativo direto no painel depende de nova ponte Android e permanece pendente; aparelho físico adiado.
+
 Continuidade offline validada: 866/866 testes web, 52/52 testes JavaScript da fonte exata Android 1.23.0, TypeScript/build e lint zero erros/38 avisos. Corrigidos acesso do membro à entrada manual e ciclo da política global. Nenhum APK alterado; resumo nativo direto no painel depende de nova ponte e continua pendente. Relatório CONTINUIDADE_OFFLINE_2026-10-24.md; publicação web em preparação.
 
 Extensão da continuidade offline: reservar app/components/PilotDashboard.tsx para disponibilizar a entrada em Perfil e conta. Navegador com membro confirmou que Configurações é administrativa e bloqueava o único acesso manual ao offline. Preservar todas as permissões administrativas; a entrada não concede capacidades nativas.

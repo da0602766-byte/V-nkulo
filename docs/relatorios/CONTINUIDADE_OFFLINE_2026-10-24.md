@@ -26,4 +26,4 @@ Evidências locais: .task-tools/offline-release-tests.log, offline-release-build
 
 ## Publicação
 
-Validação concluída; publicação em preparação. Preservar audiência e configurações atuais.
+Publicado no Sites 433 em 24/10/2026 às 17h26 (Brasília), status succeeded. Fonte ef1d0870e5593c11aca35af634cb5948669d53bf; deployment appgdep_6add147721d881919c6757c7c1f2a601; URL https://adote-gestao.da0602766.chatgpt.site. Audiência pública preservada, sem migração ou alteração de dados reais. Registro documental posterior ao deploy.
