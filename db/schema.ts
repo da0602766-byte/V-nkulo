@@ -9,6 +9,20 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
+export const visitanteAcessoHistorico = sqliteTable('visitante_acesso_historico', {
+  id: integer('id').primaryKey({autoIncrement:true}),
+  operacao: text('operacao').notNull().unique(),
+  comunidadeId: integer('comunidade_id').notNull().references(() => comunidades.id, {onDelete:'cascade'}),
+  autorId: integer('autor_id').references(() => usuarios.id, {onDelete:'set null'}),
+  membroId: integer('membro_id').references(() => usuarios.id, {onDelete:'set null'}),
+  acao: text('acao').notNull(), papelAnterior: text('papel_anterior'), papel: text('papel'),
+  criadoEm: text('criado_em').notNull().default(sql`CURRENT_TIMESTAMP`),
+}, table => [index('visitor_share_history_community').on(table.comunidadeId,table.id),
+  index('visitor_share_history_expiry').on(table.criadoEm),
+  check('visitor_share_history_action',sql`${table.acao} IN ('CONCEDIDO','ALTERADO','REMOVIDO')`),
+  check('visitor_share_history_role',sql`${table.papel} IS NULL OR ${table.papel} IN ('READ','EDIT')`),
+  check('visitor_share_history_previous',sql`${table.papelAnterior} IS NULL OR ${table.papelAnterior} IN ('READ','EDIT')`)]);
+
 export const visitanteAcessos = sqliteTable('visitante_acessos', {
   comunidadeId: integer('comunidade_id').notNull().references(() => comunidades.id, { onDelete: 'cascade' }),
   usuarioId: integer('usuario_id').notNull().references(() => usuarios.id, { onDelete: 'cascade' }),

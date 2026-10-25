@@ -9,6 +9,7 @@ import { runAutoSyncIfDue } from "../app/lib/supabase-auto-sync";
 import { scheduleWebPushDelivery } from "../app/lib/push-delivery-queue";
 import { purgeAccessRequests } from "../app/lib/access-retention";
 import { syncPendingVisitorSheets } from "../app/lib/visitor-sheets";
+import { purgeVisitorSharingHistory } from '../app/lib/visitor-sharing-history';
 import { getRuntimeEnv } from '../db/runtime-env';
 import { VisitorDriveError } from '../app/lib/visitor-drive-store';
 
@@ -105,7 +106,7 @@ const worker = {
       );
 
       const revisionHeader=request.headers.get('X-Vinkulo-Visitor-Revision');
-      const response = await runWithRuntimeEnv({ ...env, executionContext: ctx, requestMethod:request.method,visitorExpectedRevision:revisionHeader===null?undefined:Number(revisionHeader) }, async () => {
+      const response = await runWithRuntimeEnv({ ...env, executionContext: ctx, requestUrl:request.url, requestMethod:request.method,visitorExpectedRevision:revisionHeader===null?undefined:Number(revisionHeader) }, async () => {
         try {
           const result=await handler.fetch(request, env, ctx);
           const drive=getRuntimeEnv().visitorDrive;
@@ -132,6 +133,7 @@ const worker = {
       if (now >= nextAccessCleanupAt && env.DB) {
         nextAccessCleanupAt = now + 10 * 60_000;
         ctx.waitUntil(purgeAccessRequests(env.DB).catch(() => undefined));
+        ctx.waitUntil(purgeVisitorSharingHistory(env.DB).catch(() => undefined));
       }
       if (response.status < 400 && now >= nextPushQueueCheckAt &&
           url.pathname !== "/api/system/supabase-sync" &&

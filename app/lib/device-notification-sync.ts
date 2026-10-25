@@ -83,5 +83,5 @@ function persistShownNotificationIds(ids: Set<number>) {
 }
 
 function isSafeInternalDestination(value: string) {
-  return value.startsWith("/painel?") || value.startsWith("/comunidades") || value.startsWith("/proprietario");
+  return value.startsWith("/painel?") || value.startsWith("/painel/visitantes?") || value.startsWith("/comunidades") || value.startsWith("/proprietario");
 }

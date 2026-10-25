@@ -1,3 +1,4 @@
+import { changeVisitorSharing } from '../../../../lib/visitor-sharing-history';
 import { requireTenantPermission } from '../../../../lib/tenant';
 import { createGoogleAuthorization, getGoogleConnection, googleIntegrationAvailable } from '../../../../lib/google-integration';
 import { archiveCounts, validateVisitorArchive, MAX_VISITOR_ARCHIVE_BYTES } from '../../../../lib/visitor-drive-format';
@@ -78,9 +79,7 @@ export async function POST(request:Request) {
       const member=await db.prepare('SELECT u.id FROM usuario_comunidades uc JOIN usuarios u ON u.id=uc.usuario_id WHERE uc.comunidade_id=? AND uc.usuario_id=? AND uc.status=\'ATIVO\' AND u.ativo=1').bind(community,id).first();
       if(!member&&body.action==='grant')throw new VisitorDriveError('A pessoa não possui vínculo ativo nesta comunidade.');
       if(body.action==='grant'&&!['READ','EDIT'].includes(body.role))throw new VisitorDriveError('Permissão inválida.');
-      // Incrementing revision invalidates reads/edits already in flight.
-      await db.batch([body.action==='grant'?db.prepare('INSERT INTO visitante_acessos(comunidade_id,usuario_id,papel) VALUES(?,?,?) ON CONFLICT(comunidade_id,usuario_id) DO UPDATE SET papel=excluded.papel').bind(community,id,body.role):db.prepare('DELETE FROM visitante_acessos WHERE comunidade_id=? AND usuario_id=?').bind(community,id),body.action==='grant'?db.prepare('INSERT INTO visitante_drive_acessos(comunidade_id,usuario_id,papel) VALUES(?,?,?) ON CONFLICT(comunidade_id,usuario_id) DO UPDATE SET papel=excluded.papel').bind(community,id,body.role):db.prepare('DELETE FROM visitante_drive_acessos WHERE comunidade_id=? AND usuario_id=?').bind(community,id),db.prepare('UPDATE visitante_drive SET revisao=revisao+1 WHERE comunidade_id=?').bind(community)]);
-      return reply({ok:true});
+      return reply(await changeVisitorSharing({community,communityName:a.context.comunidadeNome,actorId:a.user.id,userId:id,action:body.action,role:body.role,drive:c}));
     }
     if(body.action==='restore') {
       if(c.estado!=='ACTIVE'||body.revision!==c.revisao||body.confirmation!=='RESTAURAR BACKUP')throw new VisitorDriveError('Confirme RESTAURAR BACKUP para substituir o arquivo atual.');

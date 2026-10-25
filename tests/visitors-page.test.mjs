@@ -14,7 +14,8 @@ test('página dedicada protege acesso, redireciona links antigos e mantém cadas
   const auth=await login('vp@example.test'),member=await login('vp-member@example.test');
   const call=(path,method='GET',body,cookie=auth)=>worker.fetch(new Request('http://localhost'+path,{method,headers:{cookie,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})}),env,ctx);
   for(const cookie of [member,''])assert.notEqual((await call('/api/pilot/visitantes/pagina','GET',null,cookie)).status,200);
-  for(const cookie of [member,'']){const r=await call('/painel/visitantes','GET',null,cookie);assert.ok([302,303,307].includes(r.status));assert.match(r.headers.get('location'),/login|acesso-negado/);}
+  const denied=await call('/painel/visitantes','GET',null,member);assert.equal(denied.status,200);assert.match(await denied.text(),/Acesso a Visitantes indisponível/);
+  const signedOut=await call('/painel/visitantes','GET',null,'');assert.ok([302,303,307].includes(signedOut.status));assert.match(signedOut.headers.get('location'),/login/);
   let r=await call('/painel?view=visitantes&sheetSetup=authorized&visitante=19');assert.ok([302,303,307].includes(r.status));assert.equal(new URL(r.headers.get('location'),'http://localhost').pathname+new URL(r.headers.get('location'),'http://localhost').search,'/painel/visitantes?sheetSetup=authorized&visitante=19');
   r=await call('/painel/visitantes');assert.equal(r.status,200);assert.match(await r.text(),/Visitantes/);
   db.prepare("INSERT INTO visitante_campos(comunidade_id,nome,chave,tipo,criado_por) VALUES(1,'Campo local','campo local','TEXTO','test'),(2,'Campo privado','campo privado','TEXTO','foreign')").run();

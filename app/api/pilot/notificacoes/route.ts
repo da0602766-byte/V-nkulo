@@ -162,6 +162,7 @@ function parseNotificationConfig(value?: string) {
 function normalizeDestination(value: string) {
   const destination = String(value || "");
   return destination.startsWith("/painel?") ||
+    destination.startsWith("/painel/visitantes?") ||
     destination.startsWith("/comunidades") ||
     destination.startsWith("/proprietario")
     ? destination

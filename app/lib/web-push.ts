@@ -111,7 +111,7 @@ function isVapidSubject(value: string) {
 }
 
 export function safeDestination(value: string) {
-  return value.startsWith("/painel?") || value.startsWith("/comunidades") || value.startsWith("/proprietario")
+  return value.startsWith("/painel?") || value.startsWith("/painel/visitantes?") || value.startsWith("/comunidades") || value.startsWith("/proprietario")
     ? value.slice(0, 300)
     : "/painel";
 }

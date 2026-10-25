@@ -163,6 +163,7 @@ export function Pessoas({
   perfil,
   onOpen,
   onNew,
+  onShare,
   onBulk,
   celulas,
   notify,
@@ -175,6 +176,7 @@ export function Pessoas({
   perfil: PerfilConfig
   onOpen: (id: string) => void
   onNew: () => void
+  onShare: () => void
   onBulk: (ids:string[], action:"arquivar"|"excluir") => Promise<boolean>
   celulas:string[]
   notify: (m: string, tipo?: 'info' | 'error' | 'success') => void
@@ -329,6 +331,7 @@ export function Pessoas({
         title={cat ? (cat === '__sem' ? 'Sem categoria' : cat) : 'Pessoas'}
         sub={`${pessoas.filter((p) => !p.arquivado && (!cat || (cat === '__sem' ? !p.categoria : p.categoria === cat))).length} visitantes e membros${cat ? ' nesta categoria' : ' cadastrados'}`}
       >
+        <button className={`${btnSec} vp-share-entry`} onClick={onShare}><Icon d={I.users}/><span>Compartilhar lista</span></button>
         {perfil.podeCriarPessoa && (
           <button className={btnPri} onClick={onNew}>
             <Icon d={I.plus} />

@@ -46,6 +46,6 @@ export function centralReportRows(data: CentralData, ministries: CentralMinistry
 }
 
 export function safeCentralDestination(value: unknown) {
-  if (typeof value !== "string" || !/^\/painel(?:[?#]|$)/.test(value) || /[\\\r\n]/.test(value)) return "/painel?view=avisos";
+  if (typeof value !== "string" || !/^\/painel(?:\/visitantes)?(?:[?#]|$)/.test(value) || /[\\\r\n]/.test(value)) return "/painel?view=avisos";
   return value;
 }

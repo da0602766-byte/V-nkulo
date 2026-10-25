@@ -20,6 +20,7 @@ export type R2BucketBinding = {
 };
 
 type RuntimeBindings = {
+  requestUrl?: string;
   requestMethod?: string;
   visitorExpectedRevision?: number;
   visitorDrive?: import('../app/lib/visitor-drive-runtime').VisitorDriveRuntime;

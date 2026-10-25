@@ -428,6 +428,13 @@
       "when": 1792964611505,
       "tag": "0089_visitor_sharing",
       "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "6",
+      "when": 1792965693667,
+      "tag": "0090_visitor_sharing_history",
+      "breakpoints": true
     }
   ]
 }

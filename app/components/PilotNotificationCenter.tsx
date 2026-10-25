@@ -461,6 +461,7 @@ export default function PilotNotificationCenter({
 function isSafeInternalDestination(value: string) {
   return (
     value.startsWith("/painel?") ||
+    value.startsWith("/painel/visitantes?") ||
     value.startsWith("/comunidades") ||
     value.startsWith("/proprietario")
   );
