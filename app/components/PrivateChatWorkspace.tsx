@@ -2,7 +2,7 @@
 import SafeImage from "./SafeImage";
 
 
-import { ChangeEvent, FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type Person = {
   id: number;
@@ -72,7 +72,7 @@ type ThreadItem =
       fresh: boolean;
       pulse: boolean;
       status?: TickStatus;
-      onRetry?: () => void;
+      retryId?: number;
     };
 
 const FALLBACK_RETENTION_NOTICE =
@@ -98,7 +98,30 @@ export default function PrivateChatWorkspace({
   const [confirmed, setConfirmed] = useState<Message[]>([]);
   const [pending, setPending] = useState<PendingMessage[]>([]);
   const [activeId, setActiveId] = useState(initialConversation);
+  // A new scope also invalidates an earlier visit to the same conversation.
+  const activeScopeRef = useRef({ id: initialConversation });
+  const aliveRef = useRef(true);
+  const messagesRequestRef = useRef(0);
+  const openingRequestRef = useRef(0);
+  const listRequestRef = useRef(0);
+  const pollScopeRef = useRef<object | null>(null);
+  const pendingIdRef = useRef(0);
   const shellRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    aliveRef.current = true;
+    const openingRequest = openingRequestRef, listRequest = listRequestRef;
+    return () => {
+      aliveRef.current = false;
+      activeScopeRef.current = { id: activeScopeRef.current.id };
+      openingRequest.current++;
+      listRequest.current++;
+    };
+  }, []);
+
+  const isCurrentScope = useCallback((scope: { id: number }) => {
+    return aliveRef.current && activeScopeRef.current === scope;
+  }, []);
 
   // The keyboard changes the visible viewport without resizing the layout
   // viewport on mobile Safari and Android. Keep the composer inside that area.
@@ -148,6 +171,10 @@ export default function PrivateChatWorkspace({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   async function loadWorkspace(conversationId: number) {
+    const scope = activeScopeRef.current;
+    if (scope.id !== conversationId) return;
+    const messagesRequest = ++messagesRequestRef.current;
+    const listRequest = ++listRequestRef.current;
     const isInitial = !workspaceLoadedRef.current;
     if (isInitial) setLoading(true);
     if (conversationId > 0) setMessagesLoading(true);
@@ -156,41 +183,52 @@ export default function PrivateChatWorkspace({
       const response = await fetch(`/api/pilot/chat${query}`, { cache: "no-store" });
       const result = (await readResult(response)) as ApiResponse;
       if (!response.ok) throw new Error(result.error || "Não foi possível carregar as mensagens.");
+      if (!isCurrentScope(scope)) return;
       workspaceLoadedRef.current = true;
-      setWorkspace({
+      if (listRequest === listRequestRef.current) setWorkspace({
         people: result.people || [],
         conversations: result.conversations || [],
         currentUserId: Number(result.currentUserId || 0),
         retentionNotice: result.retentionNotice || FALLBACK_RETENTION_NOTICE,
         nextPurgeAt: result.nextPurgeAt || null,
       });
-      if (conversationId > 0) setConfirmed(result.messages || []);
+      if (conversationId > 0 && messagesRequest === messagesRequestRef.current) setConfirmed(result.messages || []);
       setError("");
     } catch (loadError) {
-      setError((loadError as Error).message);
+      if (isCurrentScope(scope)) setError((loadError as Error).message);
     } finally {
-      if (isInitial) setLoading(false);
-      if (conversationId > 0) setMessagesLoading(false);
+      if (isCurrentScope(scope)) {
+        if (isInitial) setLoading(false);
+        if (conversationId > 0) setMessagesLoading(false);
+      }
     }
   }
 
-  async function refreshMessages(conversationId: number) {
+  const refreshMessages = useCallback(async (conversationId: number) => {
     if (conversationId <= 0) return;
+    const scope = activeScopeRef.current;
+    if (scope.id !== conversationId || pollScopeRef.current === scope) return;
+    pollScopeRef.current = scope;
+    const request = ++messagesRequestRef.current;
     try {
       const response = await fetch(`/api/pilot/chat?conversation=${conversationId}&messagesOnly=1`, { cache: "no-store" });
       const result = (await readResult(response)) as ApiResponse;
-      if (!response.ok) return;
+      if (!response.ok || !isCurrentScope(scope) || request !== messagesRequestRef.current) return;
       setConfirmed(result.messages || []);
     } catch {
       // Sondagem silenciosa: uma falha passageira não deve interromper a conversa.
+    } finally {
+      if (pollScopeRef.current === scope) pollScopeRef.current = null;
     }
-  }
+  }, [isCurrentScope]);
 
   async function refreshList() {
+    if (!workspaceLoadedRef.current || !aliveRef.current) return;
+    const request = ++listRequestRef.current;
     try {
       const response = await fetch("/api/pilot/chat", { cache: "no-store" });
       const result = (await readResult(response)) as ApiResponse;
-      if (!response.ok) return;
+      if (!response.ok || !aliveRef.current || request !== listRequestRef.current) return;
       setWorkspace((current) =>
         current ? { ...current, people: result.people || [], conversations: result.conversations || [] } : current,
       );
@@ -200,7 +238,7 @@ export default function PrivateChatWorkspace({
   }
 
   async function markRead(conversationId: number) {
-    if (conversationId <= 0) return;
+    if (conversationId <= 0 || !aliveRef.current || activeScopeRef.current.id !== conversationId) return;
     try {
       await fetch("/api/pilot/chat", {
         method: "PATCH",
@@ -230,7 +268,7 @@ export default function PrivateChatWorkspace({
       void markRead(activeId);
     }, MESSAGE_POLL_MS);
     return () => window.clearInterval(timer);
-  }, [activeId]);
+  }, [activeId, refreshMessages]);
 
   useEffect(() => {
     const tick = () => {
@@ -253,9 +291,25 @@ export default function PrivateChatWorkspace({
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
     };
-  }, [activeId]);
+  }, [activeId, refreshMessages]);
+
+  function resetComposer(form: HTMLFormElement) {
+    form.reset();
+    setHasDraft(false);
+    setDraftLength(0);
+    const el = textareaRef.current;
+    if (el) el.style.height = "auto";
+  }
 
   function changeActiveConversation(conversationId: number) {
+    activeScopeRef.current = { id: conversationId };
+    openingRequestRef.current++;
+    messagesRequestRef.current++;
+    setConfirmed([]);
+    setPending([]);
+    setSending(false);
+    setError("");
+    if (textareaRef.current?.form) resetComposer(textareaRef.current.form);
     stickToBottomRef.current = true;
     seenIdsRef.current = null;
     statusRef.current = null;
@@ -306,8 +360,6 @@ export default function PrivateChatWorkspace({
 
   async function openConversation(conversationId: number) {
     changeActiveConversation(conversationId);
-    setConfirmed([]);
-    setPending([]);
     const address = new URL(window.location.href);
     address.searchParams.set("view", "mensagens");
     address.searchParams.set("conversation", String(conversationId));
@@ -317,17 +369,23 @@ export default function PrivateChatWorkspace({
   }
 
   async function openWithUser(userId: number) {
-    const response = await fetch("/api/pilot/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ targetUserId: userId }),
-    });
-    const result = (await readResult(response)) as { conversationId?: number; error?: string };
-    if (!response.ok || !result.conversationId) {
-      setError(result.error || "Não foi possível abrir a conversa.");
-      return;
+    const request = ++openingRequestRef.current;
+    try {
+      const response = await fetch("/api/pilot/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetUserId: userId }),
+      });
+      const result = (await readResult(response)) as { conversationId?: number; error?: string };
+      if (!aliveRef.current || request !== openingRequestRef.current) return;
+      if (!response.ok || !result.conversationId) {
+        setError(result.error || "Não foi possível abrir a conversa.");
+        return;
+      }
+      await openConversation(result.conversationId);
+    } catch (openError) {
+      if (aliveRef.current && request === openingRequestRef.current) setError((openError as Error).message || "Não foi possível abrir a conversa.");
     }
-    await openConversation(result.conversationId);
   }
 
   async function startConversation(person: Person) {
@@ -342,15 +400,10 @@ export default function PrivateChatWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialTargetUserId]);
 
-  function resetComposer(form: HTMLFormElement) {
-    form.reset();
-    setHasDraft(false);
-    setDraftLength(0);
-    const el = textareaRef.current;
-    if (el) el.style.height = "auto";
-  }
 
   async function deliver(conversationId: number, participantId: number, text: string, tempId: number) {
+    const scope = activeScopeRef.current;
+    if (scope.id !== conversationId) return;
     const response = await fetch("/api/pilot/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -358,6 +411,10 @@ export default function PrivateChatWorkspace({
     });
     const result = (await readResult(response)) as { error?: string; message?: Message };
     if (!response.ok || !result.message) throw new Error(result.error || "Não foi possível enviar a mensagem.");
+    if (!isCurrentScope(scope)) return;
+    // A poll started before this write must not erase the confirmed message.
+    messagesRequestRef.current++;
+    setError("");
     setConfirmed((current) => mergeMessages(current, [result.message!]));
     setPending((current) => current.filter((item) => item.tempId !== tempId));
     void refreshList();
@@ -369,17 +426,20 @@ export default function PrivateChatWorkspace({
     const text = String(new FormData(form).get("message") || "").trim();
     const conversation = workspace?.conversations.find((item) => item.id === activeId);
     if (!text || !conversation) return;
-    const tempId = -Date.now();
+    const scope = activeScopeRef.current;
+    if (scope.id !== conversation.id) return;
+    const tempId = --pendingIdRef.current;
     setPending((current) => [...current, { tempId, mensagem: text, criadoEm: new Date(), status: "sending" }]);
     resetComposer(form);
     setSending(true);
     try {
       await deliver(conversation.id, conversation.participante_id, text, tempId);
     } catch (sendError) {
+      if (!isCurrentScope(scope)) return;
       setPending((current) => current.map((item) => (item.tempId === tempId ? { ...item, status: "failed" } : item)));
       setError((sendError as Error).message);
     } finally {
-      setSending(false);
+      if (isCurrentScope(scope)) setSending(false);
     }
   }
 
@@ -387,10 +447,12 @@ export default function PrivateChatWorkspace({
     const item = pending.find((candidate) => candidate.tempId === tempId);
     const conversation = workspace?.conversations.find((candidate) => candidate.id === activeId);
     if (!item || !conversation) return;
+    const scope = activeScopeRef.current;
     setPending((current) => current.map((candidate) => (candidate.tempId === tempId ? { ...candidate, status: "sending" } : candidate)));
     try {
       await deliver(conversation.id, conversation.participante_id, item.mensagem, tempId);
     } catch {
+      if (!isCurrentScope(scope)) return;
       setPending((current) => current.map((candidate) => (candidate.tempId === tempId ? { ...candidate, status: "failed" } : candidate)));
     }
   }
@@ -447,8 +509,7 @@ export default function PrivateChatWorkspace({
   }, [workspace?.conversations, search]);
   const activeConversation = workspace?.conversations.find((item) => Number(item.id) === activeId);
   const threadItems = useMemo(
-    () => buildThreadItems(confirmed, pending, workspace?.currentUserId || 0, retryPending, freshIds, pulseIds),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    () => buildThreadItems(confirmed, pending, workspace?.currentUserId || 0, freshIds, pulseIds),
     [confirmed, pending, workspace?.currentUserId, freshIds, pulseIds],
   );
   const purgeCountdown = useMemo(() => formatPurgeCountdown(workspace?.nextPurgeAt || null), [workspace?.nextPurgeAt]);
@@ -577,8 +638,8 @@ export default function PrivateChatWorkspace({
                             <Tick status={item.status} pulse={item.pulse} />
                           </footer>
                         </div>
-                        {item.onRetry && (
-                          <button type="button" className="private-chat-retry" onClick={item.onRetry}>
+                        {item.retryId !== undefined && (
+                          <button type="button" className="private-chat-retry" onClick={() => void retryPending(item.retryId!)}>
                             Falha ao enviar · toque para reenviar
                           </button>
                         )}
@@ -750,13 +811,12 @@ function buildThreadItems(
   confirmed: Message[],
   pending: PendingMessage[],
   currentUserId: number,
-  retry: (tempId: number) => void,
   freshIds: number[] = [],
   pulseIds: number[] = [],
 ): ThreadItem[] {
   const fresh = new Set(freshIds);
   const pulse = new Set(pulseIds);
-  type Normalized = { key: string; own: boolean; text: string; date: Date; senderId: number; status?: TickStatus; onRetry?: () => void; fresh: boolean; pulse: boolean };
+  type Normalized = { key: string; own: boolean; text: string; date: Date; senderId: number; status?: TickStatus; retryId?: number; fresh: boolean; pulse: boolean };
   const normalized: Normalized[] = [
     ...confirmed.map((message): Normalized => ({
       key: `m${message.id}`,
@@ -775,7 +835,7 @@ function buildThreadItems(
       date: item.criadoEm,
       senderId: currentUserId,
       status: item.status,
-      onRetry: item.status === "failed" ? () => retry(item.tempId) : undefined,
+      retryId: item.status === "failed" ? item.tempId : undefined,
       fresh: true,
       pulse: false,
     })),
@@ -806,7 +866,7 @@ function buildThreadItems(
       fresh: item.fresh,
       pulse: item.pulse,
       status: item.status,
-      onRetry: item.onRetry,
+      retryId: item.retryId,
     });
   });
   return items;

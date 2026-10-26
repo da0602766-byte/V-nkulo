@@ -39,7 +39,7 @@ export function formatConsoleDate(value: string) {
   return Number.isNaN(date.getTime()) ? "Data não informada" : date.toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
-export default function OwnerConsoleShell({ tab, onSelect, onSearchDirectory, data, ownerName, ownerPhoto, brandName, brandLogo, children }: { tab: OwnerTab; onSelect: (tab: OwnerTab) => void; onSearchDirectory: (tab: "communities" | "users", query: string) => void; data: OwnerData | null; ownerName: string; ownerPhoto: string; brandName: string; brandLogo: string; children: ReactNode }) {
+export default function OwnerConsoleShell({ tab, onSelect, onSearchDirectory, data, ownerName, ownerPhoto, brandName, children }: { tab: OwnerTab; onSelect: (tab: OwnerTab) => void; onSearchDirectory: (tab: "communities" | "users", query: string) => void; data: OwnerData | null; ownerName: string; ownerPhoto: string; brandName: string; brandLogo: string; children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [modal, setModal] = useState<"search" | "alerts" | "menu" | null>(null);
   const [query, setQuery] = useState("");

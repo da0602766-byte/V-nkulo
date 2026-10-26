@@ -154,6 +154,7 @@ async function findPublicPost(db: ReturnType<typeof getD1>, id: number) {
       WHERE p.id = ?
         AND p.status = 'PUBLICADA'
         AND p.visibilidade = 'PLATAFORMA'
+        AND p.audiencia_tipo = 'PUBLICO'
         AND (
           (p.comunidade_id IS NULL AND p.origem = 'PLATAFORMA')
           OR (

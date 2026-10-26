@@ -69,6 +69,7 @@ test("categorias de Visitantes respeitam Pastor, Líder autorizado e tenant", as
        VALUES (?, 'LIDER_AUTORIZADO', 'visitor.categories.manage', ?)`,
     )
     .run(authorizedMembership, authorizedLeaderId);
+  database.prepare("INSERT INTO visitante_acessos(comunidade_id,usuario_id,papel) VALUES(1,?,'EDIT')").run(authorizedLeaderId);
   const northMinistryId = Number(database.prepare(
     `INSERT INTO ministerios_comunidade
      (comunidade_id, nome, descricao, categoria, status, responsavel_usuario_id, criado_por, atualizado_por)

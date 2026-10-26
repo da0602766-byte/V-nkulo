@@ -33,6 +33,7 @@ mobile_visitor_receipts mobile_write_grants notificacoes_push_controle
 notificacoes_push_dispositivos notificacoes_push_fila redefinicoes_senha sessoes
 user_drive_storage user_file_copies visitante_drive visitante_drive_acessos visitante_acessos visitante_acesso_historico visitante_planilha
 supabase_storage_copies
+visitante_pessoal_storage
 `.trim().split(/\s+/));
 
 export const BASELINE_TABLES = new Set(['planos_plataforma', 'planos_rede', 'controlled_auth_rate_limits', 'auth_rate_limits']);

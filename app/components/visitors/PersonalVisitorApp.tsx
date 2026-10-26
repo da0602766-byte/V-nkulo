@@ -20,6 +20,8 @@ export default function PersonalVisitorApp({userId,communityId,userName,communit
   const [storage,setStorage]=useState<Storage|null>(null),[doc,setDoc]=useState<PersonalVisitors|null>(null),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
   const [section,setSection]=useState<'pessoas'|'relacionamento'|'aniversarios'|'listas'>(initialSection),[menu,setMenu]=useState(false),[settings,setSettings]=useState(false),[showHistory,setShowHistory]=useState(false),[categoryFilter,setCategoryFilter]=useState('');
   const [opened,setOpened]=useState<string|null>(null),[form,setForm]=useState<Pessoa|'new'|null>(null),[contact,setContact]=useState<Pessoa|null>(null),[confirm,setConfirm]=useState<{ids:number[];action:Action}|null>(null),[restore,setRestore]=useState<PersonalVisitors|null>(null);
+  const [historyNow,setHistoryNow]=useState(Date.now);
+  useEffect(()=>{const timer=setInterval(()=>setHistoryNow(Date.now()),60000);return()=>clearInterval(timer);},[]);
   const pending=useRef(false),generation=useRef(0),fileInput=useRef<HTMLInputElement>(null);
   const clearPrivate=useCallback(()=>{setDoc(null);setOpened(null);setForm(null);setContact(null);setConfirm(null);setRestore(null);setSettings(false);setShowHistory(false);},[]);
   const refresh=useCallback(async()=>{
@@ -31,7 +33,7 @@ export default function PersonalVisitorApp({userId,communityId,userName,communit
     }catch(e){if(current===generation.current){setError((e as Error).message);if([401,403,409].includes((e as Error&{status?:number}).status||0)){clearPrivate();setStorage(null);}}}
     finally{if(current===generation.current)setLoading(false);}
   },[endpoint,userId,communityId,clearPrivate]);
-  useEffect(()=>{void refresh();const query=new URLSearchParams(location.search);if(query.get('googleErro'))setNotice(query.get('googleErro')!);else if(query.get('google')==='connected')setNotice('Conta Google conectada.');return()=>{generation.current++;};},[refresh]);
+  useEffect(()=>{const timer=setTimeout(()=>{void refresh();const query=new URLSearchParams(location.search);if(query.get('googleErro'))setNotice(query.get('googleErro')!);else if(query.get('google')==='connected')setNotice('Conta Google conectada.');},0);return()=>{clearTimeout(timer);generation.current++;};},[refresh]);
   // Detect a sign-out, account switch or permission revocation in an already open tab.
   useEffect(()=>{const check=()=>{if(document.visibilityState!=='visible'||pending.current)return;void api<Storage>(endpoint).catch(e=>{if([401,403,409].includes(e.status)){clearPrivate();setStorage(null);setError(e.message);}});};const timer=setInterval(check,60000);window.addEventListener('focus',check);return()=>{clearInterval(timer);window.removeEventListener('focus',check);};},[endpoint,clearPrivate]);
   const people=useMemo(()=>doc?.people.map(person)||[],[doc]);
@@ -82,7 +84,7 @@ export default function PersonalVisitorApp({userId,communityId,userName,communit
   useEffect(()=>{const sync=()=>{const value=new URLSearchParams(location.search).get('section');setSection(value==='listas'||value==='relacionamento'||value==='aniversarios'?value:'pessoas');};window.addEventListener('popstate',sync);return()=>window.removeEventListener('popstate',sync);},[]);
   function navigate(value:'pessoas'|'relacionamento'|'aniversarios'|'listas'){setSection(value);setMenu(false);const url=new URL(location.href);url.searchParams.set('section',value);history.pushState(null,'',url);}
   const setup=!loading&&storage&&!doc&&storage.provider!=='GOOGLE_DRIVE';
-  const events=(doc?.events||[]).filter(e=>Date.parse(e.at)>Date.now()-30*86400000).slice().reverse();
+  const events=(doc?.events||[]).filter(e=>Date.parse(e.at)>historyNow-30*86400000).slice().reverse();
   return <div className="visitor-app vp-personal">
     <header className="vp-mobile-header"><button aria-label="Abrir menu de Visitantes" aria-expanded={menu} onClick={()=>setMenu(!menu)}><Icon d={I.menu}/></button><a href="/painel"><VinkuloMark size={32}/>Vínkulo</a><span>Visitantes</span></header>
     {menu&&<button className="vp-nav-backdrop" aria-label="Fechar menu" onClick={()=>setMenu(false)}/>}

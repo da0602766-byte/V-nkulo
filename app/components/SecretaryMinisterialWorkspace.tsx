@@ -250,7 +250,7 @@ const DAYS = [
 function parseFavorites(raw:string|null):number[]{try{const saved=JSON.parse(raw||'[]');return Array.isArray(saved)?saved.filter(n=>Number.isSafeInteger(n)&&n>0):[];}catch{return [];}}
 
 export default function SecretaryMinisterialWorkspace({
-  permissions,
+
   communityName,
   preferenceKey,
 }: {

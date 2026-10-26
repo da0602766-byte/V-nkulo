@@ -22,6 +22,7 @@ async function fixture(t) {
   db.prepare('INSERT INTO identidades_cpf(usuario_id,cpf_hash,finais) VALUES(?,?,?)').run(memberId, 'member-cpf', '08');
   db.prepare('INSERT INTO sessoes(usuario_id,token_hash,expira_em) VALUES(?,?,?)').run(memberId, 'expired-session', '2099-01-01');
   db.prepare("INSERT INTO configuracoes(chave,valor,atualizado_por) VALUES('secret-integration',?,'test')").run('do-not-restore');
+  db.prepare("INSERT INTO visitante_pessoal_storage(usuario_id,comunidade_id,provider,pasta_id,arquivo_id,hash) VALUES(?,1,'GOOGLE_DRIVE','private-folder','private-document','private-hash')").run(memberId);
   const list = db.prepare("SELECT name,sql FROM sqlite_master WHERE type='table' ORDER BY name").all().filter(row => !/^(sqlite_|_cf_|__drizzle|platform_reset_)|^d1_migrations$/.test(row.name) && !['planos_plataforma','planos_rede','controlled_auth_rate_limits','auth_rate_limits','supabase_storage_copies'].includes(row.name));
   const tables = list.map(table => ({ name: table.name, schema: table.sql, rows: db.prepare(`SELECT * FROM "${table.name}"`).all().filter(row => table.name === 'usuarios' ? row.id !== ownerId : ['identidades_cpf','sessoes'].includes(table.name) ? row.usuario_id !== ownerId : table.name === 'configuracoes' ? row.chave !== 'supabase_integration' : true) }));
   const archive = { format: 'vinkulo-reset-v1', ownerId, createdAt: new Date().toISOString(), tables, files: ['images/test.jpg'], summary: { rows: tables.reduce((n, table) => n + table.rows.length, 0), users: tables.find(table => table.name === 'usuarios').rows.length, communities: tables.find(table => table.name === 'comunidades').rows.length, files: 1, tables: tables.map(table => ({ name: table.name, rows: table.rows.length })) } };
@@ -51,6 +52,8 @@ test('recupera dados reais em outro SQLite, preserva proprietário e não reabre
   assert.deepEqual({ ...restored.prepare('SELECT ativo,senha_hash,senha_salt FROM usuarios WHERE id=?').get(f.memberId) }, { ativo: 0, senha_hash: null, senha_salt: null });
   assert.equal(restored.prepare('SELECT COUNT(*) n FROM sessoes').get().n, 0);
   assert.equal(restored.prepare('SELECT COUNT(*) n FROM configuracoes').get().n, 0);
+  assert.equal(restored.prepare('SELECT COUNT(*) n FROM visitante_pessoal_storage').get().n, 0);
+  assert.equal(report.tables.find(table=>table.name==='visitante_pessoal_storage').action, 'excluded');
   assert.equal(restored.prepare('SELECT COUNT(*) n FROM usuario_comunidades WHERE usuario_id=?').get(f.memberId).n, 1);
   assert.deepEqual(restored.prepare('PRAGMA foreign_key_check').all(), []);
   assert.deepEqual(restored.prepare("SELECT name,sql FROM sqlite_master WHERE type='trigger' ORDER BY name").all(), f.db.prepare("SELECT name,sql FROM sqlite_master WHERE type='trigger' ORDER BY name").all());

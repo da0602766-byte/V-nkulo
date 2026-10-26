@@ -13,11 +13,11 @@ function observeConcurrentReads(d1, patterns) {
   let release;
   let timer;
   const gate = new Promise(resolve => { release = resolve; });
-  const wrap = (statement, query) => new Proxy(statement, {
+  const wrap = (statement, query, bindings = []) => new Proxy(statement, {
     get(target, property) {
-      if (property === "bind") return (...args) => wrap(target.bind(...args), query);
+      if (property === "bind") return (...args) => wrap(target.bind(...args), query, args);
       if (property === "first" || property === "all") return async (...args) => {
-        const index = patterns.findIndex(pattern => pattern.test(query));
+        const index = patterns.findIndex(pattern => typeof pattern === 'function' ? pattern(query, bindings) : pattern.test(query));
         if (index >= 0) {
           started.add(index);
           timer ??= setTimeout(() => { timedOut = true; release(); }, 1000);
@@ -62,7 +62,9 @@ test("access reads overlap; module and membership revocations apply to the next 
   assert.ok(cookie);
   const reads = observeConcurrentReads(d1, [
     /AS lider,/, /FROM rede_administradores ra/, /SELECT d.id, d.escala_id/,
-    /AS voluntarioLider/, /FROM assinaturas_comunidade/, /chave = 'community_modules:'/,
+    /AS voluntarioLider/, /FROM assinaturas_comunidade/,
+    (query, bindings) => /FROM configuracoes WHERE chave = \?/.test(query) && bindings[0] === 'community_modules:1',
+    /FROM visitante_acessos a/,
   ]);
   const request = () => new Request("http://localhost/api/pilot/publicacoes?limit=10", { headers: { cookie } });
   try {
@@ -77,9 +79,9 @@ test("access reads overlap; module and membership revocations apply to the next 
 
     const eventsRequest = () => new Request("http://localhost/api/pilot/eventos", { headers: { cookie } });
     assert.equal((await worker.fetch(eventsRequest(), runtime, context)).status, 200);
-    // node:sqlite binds JS numbers as REAL (1.0); use the same concatenation
-    // as the adapter instead of assuming SQLite will format them as integers.
-    const moduleKey = database.prepare("SELECT 'community_modules:' || ? AS chave").get(1).chave;
+    // The adapter binds the complete key as text; SQL numeric concatenation
+    // would create community_modules:1.0 in node:sqlite, a different key.
+    const moduleKey = 'community_modules:1';
     database.prepare("INSERT INTO configuracoes(chave,valor,atualizado_por) VALUES (?,'[]',?) ON CONFLICT(chave) DO UPDATE SET valor='[]'").run(moduleKey, String(userId));
     assert.equal((await worker.fetch(eventsRequest(), runtime, context)).status, 403);
     database.prepare("DELETE FROM configuracoes WHERE chave=?").run(moduleKey);

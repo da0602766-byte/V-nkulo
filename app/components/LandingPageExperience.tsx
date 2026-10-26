@@ -44,7 +44,7 @@ const FAQS = [
 export default function LandingPageExperience({ signedIn, panelHref, canEdit, plans, siteName = "Vínkulo", logoUrl = "" }: LandingPageExperienceProps) {
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
   const signupHref = signedIn ? panelHref : "/log1";
-  const loginHref = signedIn ? panelHref : "/login";
+
 
   return (
     <main className="vinkulo-site vinkulo-reception vinkulo-landing" data-visual-editor-root data-editor-key="landing-page" aria-label="VÍNKULO — gestão para igrejas e comunidades">

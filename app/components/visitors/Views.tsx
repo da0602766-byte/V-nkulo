@@ -1,6 +1,6 @@
 "use client";
 import {useMemo,useState,useEffect,useRef,type ReactNode} from 'react';
-import {type Pessoa,type Categoria,type PerfilConfig,type Status,today,age,whatsapp} from './data';
+import {type Pessoa,type Categoria,type PerfilConfig,type Status,today,whatsapp} from './data';
 import {Dialog} from './Dialog';
 import {useVisitorPreference,useColumnWidths,ColumnHandle} from './WorkspaceControls';
 import {visitorBirthdayInYear} from '../../lib/visitor-birthday';
@@ -15,7 +15,7 @@ const statusStyle: Record<Status, string> = {
 
 export const fmt = (d?: string) => (d ? d.slice(0, 10).split('-').reverse().join('/') : '')
 const dias = (a: string, b: string) => Math.round((new Date(b).getTime() - new Date(a.slice(0, 10)).getTime()) / 864e5)
-const idade = age
+
 const ultimo = (p: Pessoa) => p.ultimo
 const proximoContato = (p: Pessoa) => p.retorno
 const respEfetivo = (p: Pessoa, cats: Categoria[]) => p.responsavel ?? cats.find((c) => c.nome === p.categoria)?.responsavel
@@ -69,7 +69,7 @@ export const I = {
 export const btn = 'inline-flex items-center justify-center gap-1.5 rounded-xl px-4 h-10 text-[13px] font-medium transition-all active:scale-[.98] disabled:opacity-40 disabled:pointer-events-none cursor-pointer'
 export const btnPri = `${btn} bg-gradient-to-r from-brand-600 to-brand-700 text-white shadow-md shadow-brand-600/30 hover:brightness-110`
 export const btnSec = `${btn} bg-white ring-1 ring-stone-200 text-stone-700 hover:ring-stone-300 hover:bg-stone-50`
-const btnGhost = `${btn} text-stone-600 hover:bg-stone-100`
+
 export const input = 'h-10 w-full rounded-xl bg-white px-3 text-sm ring-1 ring-stone-200 outline-none transition focus:ring-2 focus:ring-brand-600 placeholder:text-stone-400'
 
 export const Badge = ({ s }: { s: Status }) => (
@@ -78,7 +78,7 @@ export const Badge = ({ s }: { s: Status }) => (
 const Missing = ({ children }: { children: ReactNode }) => <span className="text-stone-400 italic">{children}</span>
 
 /* ---------- app types ---------- */
-type View = 'pessoas' | 'pendencias' | 'aniversarios' | 'categorias' | 'anotacoes' | 'planilha'
+
 type Recorte = 'ativos' | Status | 'pendencias' | 'sem15' | 'arquivados' | 'semCelula' | 'discipulado' | 'semMinisterio' | 'certificado' | 'apoio'
 
 const recortes: { id: Recorte; label: string; group: 'Etapa' | 'Atenção' | 'Integração' }[] = [
@@ -1128,7 +1128,7 @@ export function Relacionamento({
   pessoas,
   categorias,
   onOpen,
-  notify,
+
   onExport,
 }: {
   pessoas: Pessoa[]
@@ -1328,7 +1328,7 @@ const modelosParabens = [
 export function Aniversarios({
   pessoas,
   onOpen,
-  notify,
+
 }: {
   pessoas: Pessoa[]
   onOpen: (id: string) => void

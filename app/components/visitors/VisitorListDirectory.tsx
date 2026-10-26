@@ -14,7 +14,7 @@ export default function VisitorListDirectory(){
     catch(e){if(id===generation.current){setLists([]);setError((e as Error).message);}}
     finally{if(id===generation.current)setLoading(false);}
   },[]);
-  useEffect(()=>{void refresh();const focus=()=>{if(!working.current)void refresh();};window.addEventListener('focus',focus);const timer=setInterval(()=>{if(document.visibilityState==='visible')focus();},60000);return()=>{generation.current++;window.removeEventListener('focus',focus);clearInterval(timer);};},[refresh]);
+  useEffect(()=>{const initial=setTimeout(()=>void refresh(),0);const focus=()=>{if(!working.current)void refresh();};window.addEventListener('focus',focus);const timer=setInterval(()=>{if(document.visibilityState==='visible')focus();},60000);return()=>{clearTimeout(initial);generation.current++;window.removeEventListener('focus',focus);clearInterval(timer);};},[refresh]);
   async function open(e:MouseEvent<HTMLAnchorElement>,entry:VisitorListEntry){
     if(e.button!==0||e.ctrlKey||e.metaKey||e.shiftKey||e.altKey)return;
     e.preventDefault();if(working.current)return;working.current=true;setOpening(entry.id);setError('');

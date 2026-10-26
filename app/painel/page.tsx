@@ -63,7 +63,11 @@ export default async function PilotPanelPage({
   const db = getD1();
   const [feed, features, parkingEnabled, communityTheme, promocao, introducao] =
     await Promise.all([
-      getPilotFeed(tenant.context.comunidadeId, session.user.id, tenant.context.permissions.includes("feed.moderate"), session.user.system_owner === true),
+      // Other workspaces do not render the feed. CommunityHome fetches it on
+      // mount when the user later navigates back to the overview.
+      initialView === "inicio"
+        ? getPilotFeed(tenant.context.comunidadeId, session.user.id, tenant.context.permissions.includes("feed.moderate"), session.user.system_owner === true)
+        : Promise.resolve([]),
       getPilotFeatureState(tenant.context.comunidadeId),
       getParkingModuleState(tenant.context.comunidadeId),
       getCommunityTheme(tenant.context.comunidadeId),

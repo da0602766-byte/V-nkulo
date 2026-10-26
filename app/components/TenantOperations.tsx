@@ -2,7 +2,7 @@
 import {createPortal} from 'react-dom';
 import SafeImage from './SafeImage';
 import TransientFeedback from './TransientFeedback';
-import {type FormEvent,useCallback,useEffect,useMemo,useState} from 'react';
+import {type FormEvent,useCallback,useEffect,useState} from 'react';
 type Cell = {
   id: number;
   nome: string;
@@ -445,20 +445,9 @@ async function apiJson<T = { ok: boolean }>(
   return result;
 }
 
-function formatDate(value: string) {
-  const [year, month, day] = value.slice(0, 10).split("-");
-  return year && month && day ? `${day}/${month}/${year}` : value;
-}
 
-function formatDateTime(value: string) {
-  const date = new Date(value.includes("T") ? value : `${value.replace(" ", "T")}Z`);
-  return Number.isNaN(date.getTime())
-    ? value
-    : new Intl.DateTimeFormat("pt-BR", {
-        dateStyle: "short",
-        timeStyle: "short",
-      }).format(date);
-}
+
+
 
 function whatsappHref(phone: string | null) {
   if (!phone) return null;

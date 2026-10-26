@@ -96,27 +96,7 @@ const PERMISSION_LABELS: Record<string, string> = {
   "requests.manage": "Atender pedidos da comunidade",
 };
 
-const TITLES = [
-  "ASPIRANTE",
-  "LÍDER",
-  "DIÁCONO",
-  "DIACONISA",
-  "PRESBÍTERO",
-  "PRESBÍTERA",
-  "EVANGELISTA",
-  "MISSIONÁRIO",
-  "MISSIONÁRIA",
-  "PASTOR",
-  "PASTORA",
-  "SECRETÁRIO",
-  "SECRETÁRIA",
-  "COORDENADOR DE MINISTÉRIO",
-  "COORDENADORA DE MINISTÉRIO",
-  "SUPERVISOR DE CÉLULAS",
-  "SUPERVISORA DE CÉLULAS",
-  "GESTOR DE CUIDADO",
-  "GESTORA DE CUIDADO",
-];
+
 
 const TITLE_CATEGORIES = [
   { label: "Formação", titles: ["ASPIRANTE"] },

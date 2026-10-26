@@ -6,8 +6,10 @@ migração nova, leia isto.
 
 ## Próximo número livre
 
-**`0089`**. Use o próximo inteiro disponível a partir daí — não reaproveite
+**`0093`**. Use o próximo inteiro disponível a partir daí — não reaproveite
 um número já usado, mesmo que o arquivo tenha sido escrito à mão.
+
+`0089`–`0092`: acesso compartilhado, histórico, armazenamento pessoal e identificação do responsável. A recuperação exclui vínculos de armazenamento e concessões de acesso; eles exigem nova autorização após restaurar.
 
 `0085_visitor_care.sql` amplia a ficha de Visitantes com integração, apoio social e plano de cuidado, sem modificar os registros anteriores.
 `0086_visitor_sheets.sql` guarda o vínculo privado com a planilha e as versões de sincronização. Seus triggers são obrigatórios para capturar alterações online, móveis e exclusões. A migração não ativa nem envia dados ao Google; a conexão exige ação de um gestor.

@@ -89,11 +89,21 @@ test('permissão explícita de categoria é revogável sem novo login',async()=>
     const actor=await f.account('LIDER');
     f.db.prepare("INSERT INTO oficiais_comunidade(usuario_comunidade_id,titulo,permissoes) VALUES (?,'LÍDER','visitor.categories.manage')").run(actor.membership);
     let result=await f.call('/api/pilot/visitante-categorias',{cookie:actor.cookie,method:'POST',body:{nome:'Permitida',cor:'#225588'}});
+    assert.equal(result.status,403); // A page permission cannot open someone else's list.
+    f.db.prepare("INSERT INTO visitante_acessos(comunidade_id,usuario_id,papel) VALUES(1,?,'READ')").run(actor.id);
+    result=await f.call('/api/pilot/visitante-categorias',{cookie:actor.cookie,method:'POST',body:{nome:'Leitura',cor:'#225588'}});
+    assert.equal(result.status,403);
+    f.db.prepare("UPDATE visitante_acessos SET papel='EDIT' WHERE comunidade_id=1 AND usuario_id=?").run(actor.id);
+    result=await f.call('/api/pilot/visitante-categorias',{cookie:actor.cookie,method:'POST',body:{nome:'Permitida',cor:'#225588'}});
     assert.equal(result.status,201,await result.clone().text());
     f.db.prepare("UPDATE oficiais_comunidade SET permissoes='' WHERE usuario_comunidade_id=?").run(actor.membership);
     result=await f.call('/api/pilot/visitante-categorias',{cookie:actor.cookie,method:'POST',body:{nome:'Negada',cor:'#225588'}});
     assert.equal(result.status,403);
     assert.equal(f.db.prepare("SELECT COUNT(*) n FROM visitante_categorias WHERE nome='Negada'").get().n,0);
+    f.db.prepare("UPDATE oficiais_comunidade SET permissoes='visitor.categories.manage' WHERE usuario_comunidade_id=?").run(actor.membership);
+    f.db.prepare('DELETE FROM visitante_acessos WHERE usuario_id=?').run(actor.id);
+    result=await f.call('/api/pilot/visitante-categorias',{cookie:actor.cookie,method:'POST',body:{nome:'Compartilhamento revogado',cor:'#225588'}});
+    assert.equal(result.status,403);
   } finally {f.db.close();}
 });
 

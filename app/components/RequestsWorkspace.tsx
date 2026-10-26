@@ -95,7 +95,7 @@ function buildOperationalAddress(path: string, filters: Record<string, string>, 
   return address;
 }
 
-export default function RequestsWorkspace({ communityName, communityId }: { communityName: string; communityId?:number }) {
+export default function RequestsWorkspace({ communityId }: { communityName: string; communityId?:number }) {
   const [items, setItems] = useState<CommunityRequest[]>([]);
   // Alimenta só "Meus pedidos" (todos os tipos, sem filtro) — o painel de
   // Atendimento usa a fila à parte abaixo (opsGeneralItems), já filtrada

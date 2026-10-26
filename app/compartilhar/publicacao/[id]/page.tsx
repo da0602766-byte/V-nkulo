@@ -30,6 +30,8 @@ async function getSharedPost(id: number) {
      FROM publicacoes_piloto p
      JOIN comunidades c ON c.id = p.comunidade_id
      WHERE p.id = ? AND p.status = 'PUBLICADA'
+       AND p.visibilidade = 'PLATAFORMA' AND p.audiencia_tipo = 'PUBLICO'
+       AND c.status = 'ATIVA' AND c.feed_publico_habilitado = 1
      LIMIT 1`,
   ).bind(id).first<SharedPost>();
 }

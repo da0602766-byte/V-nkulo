@@ -8,7 +8,7 @@ import VinkuloLoading from './VinkuloLoading';
 import Link from './StableLink';
 import { useThemePreference } from '../lib/use-theme-preference';
 
-export function AccessShell({children,owner=false,logoUrl='',siteName='Vínkulo'}:{children:ReactNode;owner?:boolean;logoUrl?:string;siteName?:string}) {
+export function AccessShell({children,owner=false,siteName='Vínkulo'}:{children:ReactNode;owner?:boolean;logoUrl?:string;siteName?:string}) {
   const {theme,updateTheme}=useThemePreference();
   return <main className="access-shell" data-owner={owner}>
     <aside className="access-story">

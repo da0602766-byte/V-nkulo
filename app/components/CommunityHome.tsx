@@ -1069,7 +1069,7 @@ export default function CommunityHome({
                       {post.status === "RASCUNHO" ? "Rascunho" : post.status === "EM_ANALISE" ? "Aguardando aprovação" : "Publicada"}
                     </span>
                     {post.status === "PUBLICADA" && <CommunityPostReactions postId={post.id} initialCounts={post.reacoes_json} initialMine={post.minhas_reacoes_json} />}
-                    {post.status === "PUBLICADA" && (
+                    {post.status === "PUBLICADA" && post.visibilidade === "PLATAFORMA" && post.audiencia_tipo === "PUBLICO" && (
                       <CommunityPostShare
                         postId={post.id}
                         title={post.titulo}

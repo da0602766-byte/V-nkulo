@@ -1,6 +1,6 @@
 "use client";
 import VinkuloMark from "./VinkuloMark";
-import SafeImage from "./SafeImage";
+
 
 
 import { FormEvent, useEffect, useState } from "react";

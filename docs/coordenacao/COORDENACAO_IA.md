@@ -17,6 +17,18 @@ Antes de alterar o código, leia este documento e atualize a seção **Trabalho 
 
 ## Trabalho em andamento
 
+Auditoria técnica validada — 889/889 testes, TypeScript com noUnused e build/artefato aprovados; lint completo zero erros/28 avisos. Dois arquivos órfãos e 17 declarações locais removidos. Diretório: 20 → 11 consultas, resposta preservada. Corrigidos chat, publicação privada em URL pública, categorias com autorização explícita e recuperação do armazenamento pessoal. Seis pacotes com alertas e 12 candidatos legados documentados como pendentes; sem QA visual novo por indisponibilidade de navegador. Publicação autorizada em preparação. Relatório AUDITORIA_TECNICA_2026-10-26.md.
+
+Extensão funcional: reservar app/lib/tenant.ts. A combinação de compartilhamento EDIT com permissão explícita visitor.categories.manage era descartada pelo filtro da lista pessoal. Restaurar somente essa combinação; sem compartilhamento ou com READ, continuar negando. Cobrir revogação do compartilhamento e da permissão.
+
+Extensão de QA: reservar app/components/visitors/{PersonalVisitorApp,VisitorListDirectory}.tsx para corrigir os três erros de hooks já presentes na base; scripts/recovery/, drizzle/README.md, tests/{loading-performance,role-access-audit,temporary-access,platform-recovery}.test.mjs para revisar incompatibilidades reveladas pela suíte completa com as tabelas/ACL de Visitantes. Preservar as exigências de autorização e a rejeição de tabelas desconhecidas no backup.
+
+Extensão de segurança: reservar app/compartilhar/publicacao/[id]/page.tsx, app/api/publicacoes/[id]/comentarios/route.ts, app/components/CommunityHome.tsx e tests/publication-share-privacy.test.mjs. Alinhar compartilhamento público à visibilidade PLATAFORMA, audiência PUBLICO e feed público ativo; cobrir conteúdo e metadados com Worker/SQLite fictício. Não expor conteúdo interno pela prévia pública.
+
+Extensão da auditoria técnica: reservar app/page.tsx, app/painel/page.tsx e tests/page-loading.test.mjs. Paralelizar leituras independentes da página inicial e evitar buscar o feed ao abrir outra aba; CommunityHome já atualiza o feed quando montado. Verificar o contrato de carregamento e os redirecionamentos.
+
+Auditoria técnica — Codex, 26/10/2026, base Sites 440. Reserva: app/components/{AccessPortal,LandingPageExperience,LoginCustomizationWorkspace,OwnerConsoleShell,PeopleWorkspace,PilotDashboard,PrivateChatWorkspace,RequestsWorkspace,SecretaryMinisterialWorkspace,TenantOperations,MemberCellsExperience}.tsx, app/components/visitors/Views.tsx, app/lib/birthdays.ts, app/api/pilot/visitantes/listas/route.ts, scripts/audit/, tests/chat-lifecycle.test.mjs, tests/visitor-list-directory.test.mjs e docs/relatorios/AUDITORIA_TECNICA_2026-10-26.md. Sequência: remover código comprovadamente sem uso; analisar as 28 páginas e reduzir trabalho redundante; reproduzir e corrigir falhas assíncronas do chat. Preservar trabalhos alheios usando checkout isolado. Sem migração ou alteração de dados reais; publicar após validação conforme autorização vigente.
+
 Desempenho validado: 870/870 testes, TypeScript/build aprovados, lint zero erros/38 avisos. Medianas locais na base maior: Pessoas 56,21 → 7,87 ms; filtro com escala 68,83 → 21,02 ms; Notificações 185,70 → 56,81 ms (todas as categorias). Contador retorna 1–5 linhas em vez de 25 mil. Resultados paginados equivalentes à SQL anterior; sem migrações ou dados reais. Relatório DESEMPENHO_VOLUME_2026-10-25.md. Publicação em preparação.
 
 Reserva adicional: tests/owner-notification-privacy.test.mjs para fornecer ao harness a nova dependência real de classificação; preservar as verificações de privacidade existentes.

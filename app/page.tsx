@@ -18,8 +18,10 @@ export default async function Home() {
     : user
       ? "/painel"
       : "/login";
-  const plans = await getLandingPlans();
-  const branding = await getPlatformBranding();
+  const [plans, branding] = await Promise.all([
+    getLandingPlans(),
+    getPlatformBranding(),
+  ]);
   return <>
     <StableLink className="sr-only" href={panelHref}>Abrir painel</StableLink>
     <LandingPageExperience

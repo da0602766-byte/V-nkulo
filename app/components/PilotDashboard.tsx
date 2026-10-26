@@ -895,7 +895,7 @@ export default function PilotDashboard({
     );
   }
 
-  function openMobileShortcut(slot: number, item: (typeof MENU)[number]) {
+  function openMobileShortcut(item: (typeof MENU)[number]) {
     cancelMobileShortcutPress();
     if (mobileShortcutLongPress.current) {
       mobileShortcutLongPress.current = false;
@@ -1469,7 +1469,7 @@ export default function PilotDashboard({
             type="button"
             key={`${slot}:${item.id}`}
             className={visibleView === item.id && !mobileMenu ? "active" : ""}
-            onClick={() => openMobileShortcut(slot, item)}
+            onClick={() => openMobileShortcut(item)}
             onPointerDown={() => beginMobileShortcutPress(slot)}
             onPointerUp={cancelMobileShortcutPress}
             onPointerCancel={cancelMobileShortcutPress}
@@ -1506,7 +1506,7 @@ export default function PilotDashboard({
               type="button"
               key={`${slot}:${item.id}`}
               className={visibleView === item.id && !mobileMenu ? "active" : ""}
-              onClick={() => openMobileShortcut(slot, item)}
+              onClick={() => openMobileShortcut(item)}
               onPointerDown={() => beginMobileShortcutPress(slot)}
               onPointerUp={cancelMobileShortcutPress}
               onPointerCancel={cancelMobileShortcutPress}

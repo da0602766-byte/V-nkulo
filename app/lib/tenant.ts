@@ -316,7 +316,10 @@ export async function getActiveTenantContext(
     membership.customPermissions.some(p => ['visitors.view', 'visitors.create', 'visitors.edit'].includes(p) && permissions.includes(p));
   if (membership.oficial && !isCommunityOwner && !user.system_owner && !['PASTOR','ADMIN_COMUNIDADE'].includes(papel)) {
     const shared = new Set(visitorSharePermissions(visitorSharing));
-    permissions = permissions.filter(p => !/^(visitors\.|visitor\.categories\.|followups\.)/.test(p) || shared.has(p));
+    // Editing contacts alone does not grant category administration. Preserve
+    // that separate permission only while this list is explicitly shared EDIT.
+    const manageCategories = visitorSharing === 'EDIT' && permissions.includes('visitor.categories.manage');
+    permissions = permissions.filter(p => !/^(visitors\.|visitor\.categories\.|followups\.)/.test(p) || shared.has(p) || (p === 'visitor.categories.manage' && manageCategories));
   }
 
   const context: TenantContext = {

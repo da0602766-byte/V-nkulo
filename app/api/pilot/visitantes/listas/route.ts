@@ -9,11 +9,9 @@ export async function GET(){
   if(!user.ativo)return Response.json({error:'Usuário inativo.'},{status:403});
   const {context:active}=await getActiveTenantContext(user,{attachDrive:false});
   const lists:VisitorListEntry[]=[];
-  const memberships=active?[{comunidadeId:active.comunidadeId}]:[];
   // Metadata only: do not attach Drive runtimes or read anyone's contacts here.
-  for(const membership of memberships){
-    const {context}=await getActiveTenantContext(user,{communityId:membership.comunidadeId,attachDrive:false});
-    if(!context)continue;
+  // Reuse the already authorized context for this request.
+  for(const context of active?[active]:[]){
     const common={communityId:context.comunidadeId,communityName:context.comunidadeNome};
     if(!context.permissions.includes('visitors.view'))continue;
     const info=await platformDB().prepare(`SELECT COALESCE(d.usuario_id,c.proprietario_usuario_id) owner_id,
