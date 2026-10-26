@@ -23,14 +23,16 @@ test('Diretório: lista pessoal, responsáveis, acesso entre comunidades e revog
     const ok=async r=>{assert.equal(r.status,200,await r.clone().text());return r.json();};
     const directory=()=>call('/api/pilot/visitantes/listas');
     let response=await directory();assert.match(response.headers.get('cache-control'),/no-store/);
-    let lists=(await ok(response)).lists;assert.deepEqual(lists.map(l=>l.id),['pessoal:1']);assert.equal(lists[0].ownerName,'Bruno');
+    let lists=(await ok(response)).lists;assert.deepEqual(lists,[]);
+    assert.deepEqual((await ok(await call('/api/pilot/visitantes/listas','GET',null,managerCookie))).lists,[]);
+    assert.deepEqual((await ok(await call('/api/pilot/visitantes/listas','GET',null,await login('Clara')))).lists,[]);
     assert.deepEqual((await ok(await call('/api/pilot/visitantes/listas','GET',null,outsiderCookie))).lists,[]);
     assert.equal((await call('/api/pilot/visitantes/listas','GET',null,'')).status,401);
     for(const [cookie,role] of [[managerCookie,'READ'],[secondCookie,'EDIT']])await ok(await call('/api/pilot/visitantes/compartilhamento','POST',{action:'grant',userId:member,role},cookie));
-    lists=(await ok(await directory())).lists;assert.equal(lists.length,3);
+    lists=(await ok(await directory())).lists;assert.equal(lists.length,1);
     const first=lists.find(l=>l.id==='compartilhada:1'),second=lists.find(l=>l.id==='compartilhada:2');
     assert.equal(first.title,'Lista de Clara');assert.equal(first.ownerName,'Clara');assert.equal(first.sharedByName,'Daniel');assert.equal(first.access,'READ');assert.equal(first.own,false);
-    assert.equal(second.title,'Lista de Marina');assert.equal(second.access,'EDIT');
+    assert.equal(second,undefined);
     assert.match(await (await call('/painel/visitantes?lista=pessoal&section=listas')).text(),/Listas disponíveis/);
     // Listing other communities cannot change the active community or expose files/contacts.
     assert.equal((await ok(await call('/api/pilot/comunidade-ativa'))).context.comunidadeId,1);
@@ -41,7 +43,7 @@ test('Diretório: lista pessoal, responsáveis, acesso entre comunidades e revog
     assert.equal((await ok(await directory())).lists.find(l=>l.id===first.id).sharedByName,'Daniel');
     // Merely opening the directory must not connect to a Drive or require a token.
     db.prepare("INSERT INTO visitante_drive(comunidade_id,usuario_id,estado,pasta_id,arquivo_id,hash) VALUES(1,?,'ACTIVE','private-folder','private-file','private-hash')").run(owner);
-    assert.equal((await ok(await directory())).lists.length,3);
+    assert.equal((await ok(await directory())).lists.length,1);
     db.prepare('DELETE FROM visitante_acessos WHERE comunidade_id=1 AND usuario_id=?').run(member);
     db.prepare("INSERT INTO visitante_drive_acessos(comunidade_id,usuario_id,papel) VALUES(1,?,'READ')").run(member);
     assert.equal((await ok(await directory())).lists.find(l=>l.id===first.id).access,'READ');
@@ -61,7 +63,7 @@ test('Diretório: lista pessoal, responsáveis, acesso entre comunidades e revog
     assert.match(await (await call('/painel/visitantes?lista=pessoal','GET',null,switched)).text(),/Lista pessoal indisponível nesta comunidade/);
     const entry=await (await call('/painel/visitantes?lista=pessoal&section=pessoas&comunidade=1','GET',null,switched)).text();assert.match(entry,/Abrir esta comunidade/);assert.match(entry,/lista=pessoal/);assert.match(entry,/section=pessoas/);
     assert.match(await (await call('/painel/visitantes?lista=pessoal&section=pessoas&comunidade=1')).text(),/Meus visitantes/);
-    const auth=await call(second.href,'GET',null,'');assert.equal(auth.status,307);assert.match(decodeURIComponent(auth.headers.get('location')),/lista=compartilhada&section=pessoas/);
+    const auth=await call('/painel/visitantes?lista=compartilhada&section=pessoas&comunidade=2','GET',null,'');assert.equal(auth.status,307);assert.match(decodeURIComponent(auth.headers.get('location')),/lista=compartilhada&section=pessoas/);
     db.prepare("INSERT INTO configuracoes(chave,valor,atualizado_por) VALUES('community_modules:2','[\"people\"]','test')").run();
     assert.equal((await ok(await directory())).lists.some(l=>l.communityId===2),false);
     db.exec("DELETE FROM configuracoes WHERE chave='community_modules:2'; UPDATE usuario_comunidades SET status='INATIVO' WHERE comunidade_id=2");
