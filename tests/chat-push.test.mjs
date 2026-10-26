@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { runInNewContext } from "node:vm";
 import test from "node:test";
 import ts from "typescript";
-import { Miniflare } from "miniflare";
+import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import { createPilotD1, createPilotUser } from "./helpers/sqlite-d1.mjs";
 
 async function moduleAt(path, dependencies = {}) {
@@ -137,7 +137,7 @@ test("chat: retenção semanal apaga também metadados e fila, sem repetir hist�
 test("chat no D1 real: batch devolve RETURNING, isola envios concorrentes e reverte falha na fila", async t => {
   const f = await fixture(t);
   const created = await (await f.post()).json(), statements = f.batchStatements();
-  const mf = new Miniflare({ modules: true, compatibilityDate: "2026-05-15", cf: false, d1Databases: ["DB"], script: "export default { fetch(){ return new Response('test'); } };" });
+  const mf = new Miniflare(convertV4MiniflareOptions({ modules: true, compatibilityDate: "2026-05-15", cf: false, d1Databases: ["DB"], script: "export default { fetch(){ return new Response('test'); } };" }));
   t.after(() => mf.dispose());
   const db = await mf.getD1Database("DB");
   const definitions = [

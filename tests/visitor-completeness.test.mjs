@@ -2,15 +2,30 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createPilotD1, createPilotUser } from './helpers/sqlite-d1.mjs';
 import { cpfLoginRequest } from './helpers/cpf-login.mjs';
-import { visitorCsv } from '../app/lib/visitor-csv.ts';
+import * as XLSX from 'xlsx';
+import { visitorExportWorksheet } from '../app/lib/visitor-spreadsheet.ts';
 
 test('CSV preserva campos, acentos, quebras de linha e neutraliza fórmulas', () => {
-  const csv = visitorCsv([{ Nome: 'José; "Teste"', Observação: 'linha 1\nlinha 2', Telefone: '+5511912345678', Risco: ' =HYPERLINK("x")' }]);
+  const rows = [{ Nome: 'José; "Teste"', Observação: 'linha 1\nlinha 2', Telefone: '+5511912345678', Risco: ' =HYPERLINK("x")', Valor: -42 }];
+  const sheet = visitorExportWorksheet(XLSX, rows, [], undefined, 'csv');
+  const book = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(book, sheet, 'Pessoas');
+  const csv = XLSX.write(book, { type: 'buffer', bookType: 'csv', FS: ';', forceQuotes: true }).toString('utf8');
   assert.ok(csv.startsWith('\ufeff'));
   assert.ok(csv.includes('"José; ""Teste"""'));
   assert.ok(csv.includes('"linha 1\nlinha 2"'));
-  assert.ok(csv.includes('"\'+5511912345678"'));
-  assert.ok(csv.includes('"\' =HYPERLINK(""x"")"'));
+  assert.ok(csv.includes("'+5511912345678"));
+  assert.ok(csv.includes("' =HYPERLINK"));
+  assert.equal(sheet.E2.t, 'n');
+  assert.equal(sheet.E2.v, -42);
+  assert.equal(visitorExportWorksheet(XLSX, rows).C2.v, '+5511912345678');
+  for (const text of ['=1+1', '+1', '-2+1', '@SUM(A1)', '\ttext', '\rtext', '\ntext', '\u0000=1']) {
+    const exported = visitorExportWorksheet(XLSX, [{ [text]: text }], [], undefined, 'csv');
+    assert.equal(exported.A1.v, "'" + text);
+    assert.equal(exported.A2.v, "'" + text);
+    assert.equal(exported.A2.f, undefined);
+  }
+
 });
 
 test('auditoria: vínculo real, responsável, busca, ficha por ID, prazos, contagem e exportação', async () => {

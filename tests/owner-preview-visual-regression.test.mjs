@@ -113,7 +113,7 @@ test('owner confirmations clear after six seconds while source failures remain d
   assert.equal(delay, 6000);
   onTimeout();
   assert.equal(exports.useTransientMessage()[0], '');
-  assert.match(read('app/components/PlatformPlansWorkspace.tsx'), /loadError \? "Planos indisponíveis"/);
+  assert.match(read('app/components/CommercialPlansWorkspace.tsx'), /catch\(e\)\{setMessage\(\(e as Error\).message\);\}finally\{setLoading\(false\);\}/);
   assert.match(read('app/components/OwnerWorkspace.tsx'), /loadError && <div className="owner-load-error"/);
 });
 test('growth uses exact calendar months and draws true zero-width bars', () => {

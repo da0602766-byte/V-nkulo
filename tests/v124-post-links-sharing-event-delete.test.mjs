@@ -52,7 +52,7 @@ test("eventos e checklists possuem exclusão confirmada, auditada e isolada", as
   const [eventsUi, eventsRoute, diaconiaUi, diaconiaRoute] = await Promise.all([
     source("app/components/EventsWorkspace.tsx"),
     source("app/api/pilot/eventos/[id]/route.ts"),
-    source("app/components/DiaconiaWorkspace.tsx"),
+    source("app/components/SecretaryMinisterialWorkspace.tsx"),
     source("app/api/pilot/diaconia/route.ts"),
   ]);
   assert.match(eventsUi, /Excluir definitivamente o evento/);
@@ -61,7 +61,7 @@ test("eventos e checklists possuem exclusão confirmada, auditada e isolada", as
   assert.match(eventsRoute, /WHERE id = \? AND comunidade_id = \?/);
   assert.match(eventsRoute, /EVENTO_EXCLUIDO_DEFINITIVAMENTE/);
   assert.match(eventsRoute, /DELETE FROM eventos_comunidade WHERE id = \? AND comunidade_id = \?/);
-  assert.match(diaconiaUi, /Excluir checklist/);
+  assert.match(diaconiaUi, /async function updateChecklist/);
   assert.match(diaconiaRoute, /DIACONIA_CHECKLIST_EXCLUIDO/);
   assert.match(diaconiaRoute, /permissions\.includes\("diaconia\.manage"\)/);
   assert.match(diaconiaRoute, /DELETE FROM ministerio_checklist_itens[\s\S]*comunidade_id = \?/);

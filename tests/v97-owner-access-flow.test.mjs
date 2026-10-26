@@ -7,7 +7,7 @@ const source = (path) => readFileSync(path, "utf8");
 test("acesso temporário identifica a pessoa e exige resposta da escala no backend", () => {
   const page = source("app/components/TemporaryAccessFlow.tsx");
   const api = source("app/api/acesso-temporario/[token]/route.ts");
-  const login = source("app/components/LoginPortal.tsx");
+  const login = source("app/components/AccessPortal.tsx");
 
   assert.match(page, /ACESSO PESSOAL PARA/);
   assert.match(page, /beneficiaryName/);
@@ -19,8 +19,8 @@ test("acesso temporário identifica a pessoa e exige resposta da escala no backe
   assert.match(api, /grant\.designacao_status !== "CONFIRMADA"/);
   assert.match(api, /requiresConfirmation: true/);
   assert.match(api, /hasScheduleConflict/);
-  assert.match(login, /login-temporary-access-context/);
-  assert.match(login, /returnTo\.startsWith\("\/acesso\/"\)/);
+  assert.match(login, /name="returnTo" value=\{returnTo\}/);
+  assert.match(login, /Object.fromEntries\(new FormData\(event.currentTarget\)\),returnTo/);
 });
 
 test("compartilhamento fica curto e histórico cancelável fica na aba do ministério", () => {
@@ -42,7 +42,7 @@ test("compartilhamento fica curto e histórico cancelável fica na aba do minist
 
 test("cadastro e aprovação preservam seleção de módulos com dependências e bloqueio real", () => {
   const catalog = source("app/lib/community-modules.ts");
-  const create = source("app/components/CreateCommunityShortcut.tsx");
+  const create = source("app/components/ContractingForm.tsx");
   const owner = source("app/components/OwnerWorkspace.tsx");
   const ownerApi = source("app/api/proprietario/route.ts");
   const tenant = source("app/lib/tenant.ts");
@@ -52,8 +52,8 @@ test("cadastro e aprovação preservam seleção de módulos com dependências e
   assert.match(catalog, /dependencies: \["cells"\]/);
   assert.match(catalog, /toggleCommunityModule/);
   assert.match(catalog, /filterPermissionsForCommunityModules/);
-  assert.match(create, /Abas da comunidade/);
-  assert.match(create, /modules: selectedModules/);
+  assert.match(create, /Recursos incluídos/);
+  assert.match(create, /COMMUNITY_MODULES.filter\(m=>plan.modulos.includes\(m.key\)\)/);
   assert.match(owner, /form\.getAll\("modules"\)/);
   assert.match(ownerApi, /community_modules:/);
   assert.match(tenant, /filterPermissionsForCommunityModules\(permissions, modules\)/);

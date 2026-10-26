@@ -2,14 +2,14 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import ts from "typescript";
-import { Miniflare } from "miniflare";
+import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 
 test("Supabase no Workers: verifica serviços e recusa redirecionamentos sem encaminhar credenciais", async () => {
   const source = await readFile(new URL("../app/lib/supabase-integration.ts", import.meta.url), "utf8");
   const compiled = ts.transpileModule(source.replace(/^import .*;\r?\n/gm, ""), {
     compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
   }).outputText.replace(/^export /gm, "");
-  const mf = new Miniflare({ modules: true, compatibilityDate: "2026-05-15", compatibilityFlags: ["nodejs_compat"],
+  const mf = new Miniflare(convertV4MiniflareOptions({ modules: true, compatibilityDate: "2026-05-15", compatibilityFlags: ["nodejs_compat"],
     cf: false, script: `
     let mode, calls;
     function getRuntimeEnv() { return { AUTH_SECRET: 'supabase-runtime-test-only' }; }
@@ -29,7 +29,7 @@ test("Supabase no Workers: verifica serviços e recusa redirecionamentos sem enc
         anonKey: 'sb_publishable_testonly123456789', serviceRoleKey: 'sb_secret_testonly123456789', ativa: true }, null);
       const result = await verifyIntegration(config);
       return Response.json({ result, calls });
-    }};` });
+    }};` }));
   try {
     const normal = await (await mf.dispatchFetch("https://runtime.test/")).json();
     assert.equal(normal.result.ok, true);

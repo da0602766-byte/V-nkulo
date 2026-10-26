@@ -2,17 +2,17 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {readFile} from 'node:fs/promises';
 import ts from 'typescript';
-import {Miniflare} from 'miniflare';
+import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import {createPilotD1} from './helpers/sqlite-d1.mjs';
 
 test('exclusão usa D1 real: consulta sem UNION excessivo, remoção atômica e motivo de falha', async () => {
   const compile = async path => ts.transpileModule((await readFile(new URL(path,import.meta.url),'utf8')).replace(/^import .*;\r?\n/gm,''),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText.replace(/^export /gm,'');
-  const mf = new Miniflare({modules:true,compatibilityDate:'2026-05-15',cf:false,d1Databases:['DB'],script:`
+  const mf = new Miniflare(convertV4MiniflareOptions({modules:true,compatibilityDate:'2026-05-15',cf:false,d1Databases:['DB'],script:`
     function isSystemOwnerAccount(user){return user.id===1;} function scheduleWebPushDelivery(){}
     ${await compile('../app/lib/account-deletion-recipients.ts')}
     ${await compile('../app/lib/delete-user-account.ts')}
     export default {fetch(request,env){return deleteUserAccount(env.DB,1,Number(new URL(request.url).searchParams.get('id')||2));}}
-  `});
+  `}));
   try {
     const db=await mf.getD1Database('DB');
     const {database}=await createPilotD1();

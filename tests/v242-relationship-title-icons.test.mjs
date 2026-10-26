@@ -20,12 +20,12 @@ test("título oficial usa categorias, contraste legível e remoção explícita"
 
 test("recepção usa ícones vetoriais nos pontos que antes exibiam emojis", async () => {
   const [experience, styles] = await Promise.all([
-    read("app/components/ReceptionExperience.tsx"),
-    read("app/recepcao.css"),
+    read("app/components/LandingPageExperience.tsx"),
+    read("app/landing-vinkulo.css"),
   ]);
-  assert.match(experience, /function ReceptionIcon/);
-  assert.match(experience, /<ReceptionIcon name=\{item\.icon\}/);
-  assert.match(experience, /<ReceptionIcon name=\{feature\.icone\}/);
+  assert.match(experience, /function FeatureIcon/);
+  assert.match(experience, /<FeatureIcon/);
+  assert.match(experience, /<svg viewBox="0 0 24 24" aria-hidden="true"/);
   assert.doesNotMatch(experience, /[👥🎚️💬📅✨🙋🧭🎉]/u);
-  assert.match(styles, /\.rc-icon/);
+  assert.match(styles, /\.lp-module/);
 });

@@ -78,7 +78,7 @@ Para reverter uma regressão, mantenha tabelas, identidades e contratos. Desativ
 
 ## Serviços externos
 
-`app/lib/external-access-providers.ts` define os contratos de integração de pagamento e segundo fator. Os provedores permanecem desabilitados. `/api/payments/webhook` retorna 503 e não aceita uma mensagem “approved” como pagamento.
+Os provedores de pagamento e segundo fator permanecem desabilitados. Os contratos TypeScript sem consumidores foram retirados na revisão de 26/10/2026; uma integração futura precisa implementar verificação de assinatura, deduplicação e validação do desafio. `/api/payments/webhook` retorna 503 e não aceita uma mensagem “approved” como pagamento.
 
 Ainda dependem de implementação/configuração do provedor: checkout real, validação criptográfica de webhook, transações e reconciliação idempotente, renovação/cobrança, mensageria por e-mail/SMS/WhatsApp e desafio/enrolamento de segundo fator. A interface de segundo fator é um ponto de extensão, não 2FA ativo. Nenhuma assinatura é marcada como “paga”; a ativação interna registra somente o fundamento auditável escolhido pelo Proprietário.
 

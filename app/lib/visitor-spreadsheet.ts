@@ -232,7 +232,7 @@ export function prepareImportRows(table: SheetTable, mapping: ImportField[], cat
 export function formatImportDate(value: string) { return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value.split("-").reverse().join("/") : value; }
 
 // Excel exports use numeric date cells; text/phone identifiers remain literal strings.
-export function visitorExportWorksheet(XLSX: typeof import("xlsx"), rows: Record<string, string | number>[], fields: VisitorCustomField[] = [], exportHeaders?: string[]) {
+export function visitorExportWorksheet(XLSX: typeof import("xlsx"), rows: Record<string, string | number>[], fields: VisitorCustomField[] = [], exportHeaders?: string[], format: "xlsx" | "csv" = "xlsx") {
   const headers = exportHeaders || Object.keys(rows[0] || {});
   const sheet = XLSX.utils.json_to_sheet(rows, { header:headers });
   const dateHeaders = new Set(["Data de nascimento", "Data de entrada", "Prazo da ação"]);
@@ -247,6 +247,18 @@ export function visitorExportWorksheet(XLSX: typeof import("xlsx"), rows: Record
       sheet[XLSX.utils.encode_cell({ r:i+1, c:col })] = { t:"n", v:serial, z:type === "DATA_HORA" ? "dd/mm/yyyy hh:mm:ss.000" : "dd/mm/yyyy" };
     });
   });
+  // CSV drops cell types. Escape formula-like text (including custom headers)
+  // before Excel can interpret it; preserve typed numbers/dates and XLSX text.
+  if (format === "csv") {
+    for (const [address, cell] of Object.entries(sheet)) {
+      if (!/^[A-Z]+\d+$/.test(address) || cell.t !== "s") continue;
+      const text = String(cell.v ?? "");
+      if (/^[\s\u0000-\u001f]*[=+@-]/.test(text) || /^[\t\r\n]/.test(text)) {
+        cell.v = "'" + text;
+        delete cell.w;
+      }
+    }
+  }
   sheet["!cols"] = headers.map(header => ({ wch: header === "Observações" ? 64 : header === "Nome" ? 36 : /Data|Prazo|contato/.test(header) ? 20 : Math.min(34, Math.max(18, header.length + 2)) }));
   if (sheet["!ref"]) sheet["!autofilter"] = { ref:sheet["!ref"] };
   return sheet;

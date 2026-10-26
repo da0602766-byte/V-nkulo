@@ -88,20 +88,17 @@ test("proprietário controla identidade global, comunidades e organização dos 
   assert.match(ownerApi, /normalizeMetricOrder/);
 });
 
-test("portal de acesso oferece tema moderno, redes oficiais e Conta Google real", async () => {
-  const [config, portal, customization] = await Promise.all([
-    source("../app/lib/pilot-login-config.ts"),
-    source("../app/components/LoginPortal.tsx"),
-    source("../app/components/LoginCustomizationWorkspace.tsx"),
+test("acesso atual mantém tema e conecta o Drive pela área da conta", async () => {
+  const [portal, storage, account] = await Promise.all([
+    source("../app/components/AccessPortal.tsx"),
+    source("../app/components/StoragePrivacyWorkspace.tsx"),
+    source("../app/components/AccountProfileWorkspace.tsx"),
   ]);
-
-  assert.match(config, /cleanHttpsUrl/);
-  assert.match(config, /instagramUrl/);
-  assert.match(portal, /login-v2-social/);
-  assert.match(portal, /data-login-theme/);
-  assert.match(customization, /Redes sociais oficiais/);
-  assert.match(portal, /Entrar com Google/);
-  assert.match(portal, /api\/auth\/google\/start/);
+  assert.match(portal, /useThemePreference/);
+  assert.match(portal, /aria-pressed/);
+  assert.match(account, /Arquivos e Google Drive/);
+  assert.match(storage, /api\/auth\/google\/start\?purpose=drive/);
+  assert.match(storage, /Conectar Google Drive/);
 });
 
 test("ajustes operacionais V4.7.4 conectam estacionamento, escalas, pessoas e eventos", async () => {

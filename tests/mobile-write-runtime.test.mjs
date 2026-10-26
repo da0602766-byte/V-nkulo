@@ -2,12 +2,12 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import test from 'node:test';
 import ts from 'typescript';
-import {Miniflare} from 'miniflare';
+import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 
 test('mobile write in Workers/D1: real transaction receipt, lost response replay and rollback',async()=>{
   const source=await readFile(new URL('../app/lib/mobile-write.ts',import.meta.url),'utf8');
   const compiled=ts.transpileModule(source.replace(/^import .*;\r?\n/gm,''),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText.replace(/^export /gm,'');
-  const mf=new Miniflare({modules:true,compatibilityDate:'2026-05-15',cf:false,d1Databases:['DB'],script:`
+  const mf=new Miniflare(convertV4MiniflareOptions({modules:true,compatibilityDate:'2026-05-15',cf:false,d1Databases:['DB'],script:`
     let db;function getD1(){return db;}async function visitorDriveConfig(){return null;} /* Legacy-storage fixture; Drive tested in visitor-drive.test.mjs */
     async function getCurrentSessionTokenHash(){return 'session';}
     async function requireTenantPermission(){return {user:{id:1,email:'runtime@example.test',ativo:true},context:{comunidadeId:1,comunidadeNome:'Test',communityAccess:'MEMBER'}};}
@@ -15,7 +15,7 @@ test('mobile write in Workers/D1: real transaction receipt, lost response replay
     async function privateHash(p,v){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(p+v))),n=>n.toString(16).padStart(2,'0')).join('');}
     ${compiled}
     export default {async fetch(request,env){db=env.DB;try{return new URL(request.url).pathname==='/prepare'?await prepareMobileWrite(request):await createMobileVisitor(request);}catch{return Response.json({error:'transaction failed'},{status:500});}}}
-  `});
+  `}));
   try {
     const db=await mf.getD1Database('DB');
     await db.batch([

@@ -32,7 +32,7 @@ Critério de encerramento: nenhum papel acessa dados ou ações de outra comunid
 
 ## 7 — Logins e segurança
 
-Estado: segundo fator continua sem provedor implementado em `external-access-providers.ts`.
+Estado: segundo fator continua sem provedor implementado. O contrato TypeScript sem consumidores foi removido na revisão de 26/10/2026; isso não ativa segundo fator.
 
 Revisar recuperação, associação CPF de contas existentes, Google, sessões revogadas, troca de contas e retorno nativo. Implementar segundo fator com cadastro, confirmação, desafio, limite de tentativas, recuperação e desativação protegida. Preservar acesso recuperável do proprietário e não confundir senha reconfirmada com segundo fator.
 

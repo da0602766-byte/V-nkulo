@@ -64,7 +64,7 @@ test("toda ação com o Google termina em um aviso animado", async () => {
   const [toast, css, portal, storage, appReturn, sharedToast, sharedCss] = await Promise.all([
     read("app/components/GoogleStatusToast.tsx"),
     read("app/globals.css"),
-    read("app/components/LoginPortal.tsx"),
+    read("app/components/AccessPortal.tsx"),
     read("app/components/StoragePrivacyWorkspace.tsx"),
     read("app/components/GoogleAppReturn.tsx"),
     read("app/components/TransientFeedback.tsx"),
@@ -94,10 +94,10 @@ test("toda ação com o Google termina em um aviso animado", async () => {
   }
   assert.match(css, /prefers-reduced-motion: reduce/);
 
-  // Pontos de disparo: login, cadastro e Drive.
-  assert.match(portal, /<GoogleStatusToast state=\{googleToast\}/);
-  assert.match(portal, /title: "Abrindo a Conta Google"/);
-  assert.match(portal, /title: "Conta criada"/);
+  // Google remains available through Drive; the login now uses CPF.
+  assert.match(portal, /<CpfField/);
+  assert.match(portal, /role="alert"/);
+  assert.match(storage, /title: "Abrindo a Conta Google"/);
   assert.match(storage, /<GoogleStatusToast state=\{googleToast\}/);
   assert.match(storage, /title: "Google Drive conectado"/);
   assert.match(storage, /title: "Google Drive desconectado"/);

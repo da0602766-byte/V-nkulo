@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
-import { Miniflare } from 'miniflare';
+import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import { volumeFixture } from '../scripts/performance/volume-fixture.mjs';
 import { notificationCategory, NOTIFICATION_CATEGORY_SQL } from '../app/lib/notification-category.ts';
 
@@ -50,7 +50,7 @@ test('categorias: SQLite e JavaScript mantêm precedência, caixa e acentos', as
 });
 
 test('categorias e paginação materializada executam no D1/workerd', async t => {
-  const mf=new Miniflare({modules:true,compatibilityDate:'2026-05-15',cf:false,d1Databases:['DB'],script:"export default {fetch(){return new Response('test')}}"});t.after(()=>mf.dispose());
+  const mf=new Miniflare(convertV4MiniflareOptions({modules:true,compatibilityDate:'2026-05-15',cf:false,d1Databases:['DB'],script:"export default {fetch(){return new Response('test')}}"}));t.after(()=>mf.dispose());
   const db=await mf.getD1Database('DB');
   await db.prepare('CREATE TABLE notificacoes_sistema(id INTEGER PRIMARY KEY,tipo TEXT,area TEXT,titulo TEXT)').run();
   await db.batch(['ORAÇÃO','Escala','Evento'].map((title,i)=>db.prepare("INSERT INTO notificacoes_sistema VALUES (?,'INFO','MENU',?)").bind(i+1,title)));

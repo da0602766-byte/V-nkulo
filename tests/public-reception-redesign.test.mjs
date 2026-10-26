@@ -9,7 +9,7 @@ test("landing pública usa navegação compacta, tema e ícones responsivos", as
     source("app/page.tsx"),
     source("app/components/LandingPageExperience.tsx"),
     source("app/components/PublicHeader.tsx"),
-    source("app/components/PublicMobileNav.tsx"),
+    source("app/components/PublicHeader.tsx"),
     source("app/components/PublicIcon.tsx"),
     source("app/globals.css"),
     source("app/landing-vinkulo.css"),
@@ -28,7 +28,7 @@ test("landing pública usa navegação compacta, tema e ícones responsivos", as
   assert.match(header, /Sair da plataforma/);
   assert.match(header, /global-editor-toolbar-slot/);
   assert.match(mobile, /PublicIcon name="home"/);
-  assert.match(mobile, /public-mobile-profile-avatar/);
+  assert.match(mobile, /public-account-avatar/);
   assert.match(icons, /strokeLinecap="round"/);
   assert.match(styles, /V8\.2 — recepção pública profissional/);
   assert.match(styles, /@media \(max-width: 680px\)/);

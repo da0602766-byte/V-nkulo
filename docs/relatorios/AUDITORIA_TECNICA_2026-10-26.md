@@ -1,5 +1,7 @@
 # Auditoria técnica — 26/10/2026
 
+Continuação concluída: os seis alertas de dependências e os 12 candidatos legados abaixo foram resolvidos na [revisão de segurança e legados](SEGURANCA_E_LEGADOS_2026-10-26.md). Este relatório mantém a evidência da primeira etapa.
+
 Base: Sites 440, fonte `1a59c65dfb3939d6f97a1ba786467d981477cd61`. Trabalho executado em checkout isolado para preservar alterações existentes na pasta principal.
 
 ## Resultado e alcance
