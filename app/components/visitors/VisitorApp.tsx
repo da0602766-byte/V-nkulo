@@ -37,7 +37,13 @@ export default function VisitorApp({communityName,userName,permissions,isOwner,p
   const fetchData=useCallback(()=>{
     const id=++requestId.current;
     return api<{permissions?:string[];visitantes:Raw[];celulas:Named[];categorias:Raw[];responsaveis:Named[];ministerios:Named[];campos:VisitorCustomField[]}>('/api/pilot/visitantes/pagina').then(v=>{
-      if(id===requestId.current&&v.permissions)setEffectivePermissions(v.permissions);
+      if(id===requestId.current&&v.permissions){
+        const next=v.permissions;
+        setEffectivePermissions(next);
+        setForm(current=>current&&!next.includes(current==='new'?'visitors.create':'visitors.edit')?null:current);
+        if(!next.includes('followups.manage'))setContact(null);
+        setConfirm(current=>current&&!next.includes(current.action==='arquivar'||current.action==='excluir'?'visitors.deactivate':'visitors.edit')?null:current);
+      }
       if(id===requestId.current){setData({people:v.visitantes.map(person),cells:v.celulas,categories:v.categorias.map(category),responsibles:v.responsaveis,ministries:v.ministerios,fields:v.campos});setError('');}
     }).catch(e=>{if(id===requestId.current){setError((e as Error).message);if([401,403].includes((e as Error&{status?:number}).status||0)){setData(null);setOpened(null);setForm(null);setContact(null);setConfirm(null);}}}).finally(()=>{if(id===requestId.current){setLoading(false);setRefreshing(false);}});
   },[]);

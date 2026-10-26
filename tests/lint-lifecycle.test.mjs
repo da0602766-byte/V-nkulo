@@ -11,7 +11,7 @@ const nodes=node=>Array.isArray(node)?node.flatMap(nodes):node&&typeof node==='o
 const text=node=>Array.isArray(node)?node.map(text).join(''):node&&typeof node==='object'?text(node.props?.children):node==null||typeof node==='boolean'?'':String(node);
 
 function harness(file,initialProps={},exportName='default'){
-  const slots=[],effects=[],requests=[],timers=new Map(),listeners=new Map();
+  const slots=[],effects=[],requests=[],timers=new Map(),intervals=new Map(),listeners=new Map();
   let cursor=0,timerId=0,props=initialProps,closed=false,lateUpdates=0;
   const same=(a,b)=>a&&b&&a.length===b.length&&a.every((value,i)=>Object.is(value,b[i]));
   const memo=(factory,deps)=>{const i=cursor++;if(!slots[i]||!same(slots[i].deps,deps))slots[i]={value:factory(),deps};return slots[i].value;};
@@ -19,7 +19,7 @@ function harness(file,initialProps={},exportName='default'){
     useState(initial){const i=cursor++;if(!(i in slots))slots[i]=typeof initial==='function'?initial():initial;return [slots[i],value=>{if(closed)lateUpdates++;slots[i]=typeof value==='function'?value(slots[i]):value;}];},
     useRef(initial){const i=cursor++;return slots[i]??={current:initial};},useMemo:memo,useCallback:(fn,deps)=>memo(()=>fn,deps),
     useEffect(fn,deps){const i=cursor++;if(!slots[i]||!same(slots[i].deps,deps)){slots[i]?.cleanup?.();slots[i]={deps};effects.push(()=>{slots[i].cleanup=fn();});}}};
-  const clock={setTimeout(fn){timers.set(++timerId,fn);return timerId;},clearTimeout(id){timers.delete(id);},setInterval(){return ++timerId;},clearInterval(){}};
+  const clock={setTimeout(fn){timers.set(++timerId,fn);return timerId;},clearTimeout(id){timers.delete(id);},setInterval(fn){intervals.set(++timerId,fn);return timerId;},clearInterval(id){intervals.delete(id);}};
   const events={addEventListener(name,fn){let set=listeners.get(name);if(!set)listeners.set(name,set=new Set());set.add(fn);},removeEventListener(name,fn){listeners.get(name)?.delete(fn);}};
   const document={activeElement:null,body:{style:{}},visibilityState:'visible'};
   const location={search:'',href:'https://vinkulo.test/painel/visitantes',origin:'https://vinkulo.test'};
@@ -33,13 +33,14 @@ function harness(file,initialProps={},exportName='default'){
       if(name==='react')return hooks;if(name==='react/jsx-runtime')return jsx;if(name==='react-dom')return {createPortal:node=>node};
       if(name==='next/navigation')return {usePathname:()=>'/login'};
       if(name==='./data')return data;if(name==='./Views'||name==='./Dialog')return views;
+      if(name==='./PersonForms')return {PersonForm:'person-form',PersonDetails:'person-details',ContactForm:'contact-form'};
       if(name==='./WorkspaceControls')return {useVisitorPreference:()=>[false,()=>{}]};
       if(name.endsWith('/visitor-care'))return {visitorIntegrationGaps:()=>[]};
       return {default:name};
     }});
   return {requests,document,location,listeners,get lateUpdates(){return lateUpdates;},render(next=props){props=next;cursor=0;return exports[exportName](props);},
     flush(){for(const fn of effects.splice(0))fn();},timers(){const batch=[...timers.values()];timers.clear();for(const fn of batch)fn();},
-    event(name,event={}){for(const fn of listeners.get(name)||[])fn(event);},close(){closed=true;slots.forEach(slot=>slot?.cleanup?.());},
+    tick(){for(const fn of intervals.values())fn();},event(name,event={}){for(const fn of listeners.get(name)||[])fn(event);},close(){closed=true;slots.forEach(slot=>slot?.cleanup?.());},
     async reply(request,value){request.resolve(value);await settle();}};
 }
 
@@ -51,6 +52,19 @@ test('document navigation preserves local paths, query and fragment on the curre
   }
   for(const route of ['javascript:alert(1)','https://other.test/painel','//other.test','https://user:pass@vinkulo.test/painel'])assert.throws(()=>exports.navigateDocument(route),/inválido/);
   assert.equal(visited.length,4);
+});
+
+test('an open visitor editor closes when refreshed permissions become read-only and stays closed on regrant',async()=>{
+  const permissions=['visitors.view','visitors.create','visitors.edit','followups.manage'];
+  const h=harness('visitors/VisitorApp',{communityName:'Teste',userName:'Pessoa',permissions,isOwner:false});
+  h.location.search='?novo=1';h.render();h.flush();
+  const snapshot={permissions,visitantes:[],categorias:[],celulas:[],responsaveis:[],ministerios:[],campos:[]};
+  await h.reply(h.requests.find(r=>r.url.endsWith('/pagina')),snapshot);
+  assert.ok(nodes(h.render()).some(n=>n.type==='person-form'));h.flush();
+  h.tick();await h.reply(h.requests.filter(r=>r.url.endsWith('/pagina')).at(-1),{...snapshot,permissions:['visitors.view']});
+  assert.equal(nodes(h.render()).some(n=>n.type==='person-form'),false);h.flush();
+  h.tick();await h.reply(h.requests.filter(r=>r.url.endsWith('/pagina')).at(-1),snapshot);
+  assert.equal(nodes(h.render()).some(n=>n.type==='person-form'),false);h.flush();h.close();
 });
 
 test('dialog cleanup closes its original node and restores the original focus',()=>{

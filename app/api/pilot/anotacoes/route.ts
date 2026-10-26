@@ -139,12 +139,12 @@ export async function GET() {
          AND datetime(inicia_em) >= datetime('now', '-1 day')
        ORDER BY datetime(inicia_em), id LIMIT 40`,
     ).bind(access.context.comunidadeId).all<{ id: number; titulo: string; inicia_em: string }>(),
-    db.prepare(
+    access.context.permissions.includes("visitors.view") ? db.prepare(
       `SELECT id, nome_completo
        FROM visitantes
        WHERE comunidade_id = ? AND ativo = 1 AND escopo_confirmado = 1
        ORDER BY nome_completo LIMIT 120`,
-    ).bind(access.context.comunidadeId).all<{ id: number; nome_completo: string }>(),
+    ).bind(access.context.comunidadeId).all<{ id: number; nome_completo: string }>() : Promise.resolve({ results: [] }),
   ]);
   return Response.json({
     anotacoes: stored.notes,
