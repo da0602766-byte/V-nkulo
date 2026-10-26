@@ -23,7 +23,7 @@ export default function VisitorDriveSettings({onChanged}:{onChanged:(state:strin
       onChanged(updated.state);
       if(body.counts)setCounts(body.counts);
       setVerified(action==='verify'?body.revision:null);
-      setMessage(body.message||({grant:'Acesso concedido. A pessoa também precisa da permissão da aba.',revoke:'Acesso revogado. Cópias já baixadas não podem ser recolhidas.',verify:'Arquivo relido e validado. Confira as quantidades antes de confirmar.'} as Record<string,string>)[action]||'Concluído.');
+      setMessage(body.message||({grant:'Acesso concedido. A pessoa também precisa da permissão da aba.',revoke:'Acesso revogado. Cópias já baixadas não podem ser recolhidas.',verify:updated.state==='ACTIVE'?'Arquivo atual relido e validado no Google Drive.': 'Arquivo relido e validado. Confira as quantidades antes de confirmar.'} as Record<string,string>)[action]||'Concluído.');
       if(action==='activate'||action==='restore'||action==='cancel'){setConfirmation('');setRestore('');setBackup(null);}
       if(updated.state==='LEGACY')setCounts(null);
     }catch(e){setError(e instanceof Error?e.message:'Não foi possível concluir.');await refresh().catch(()=>undefined);}finally{working.current=false;setBusy('');}

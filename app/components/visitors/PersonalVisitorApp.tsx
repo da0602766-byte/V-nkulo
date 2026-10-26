@@ -34,15 +34,39 @@ export default function PersonalVisitorApp({userId,communityId,userName,communit
     finally{if(current===generation.current)setLoading(false);}
   },[endpoint,userId,communityId,clearPrivate]);
   useEffect(()=>{const timer=setTimeout(()=>{void refresh();const query=new URLSearchParams(location.search);if(query.get('googleErro'))setNotice(query.get('googleErro')!);else if(query.get('google')==='connected')setNotice('Conta Google conectada.');},0);return()=>{clearTimeout(timer);generation.current += 1;};},[refresh]);
-  // Detect a sign-out, account switch or permission revocation in an already open tab.
-  useEffect(()=>{const check=()=>{if(document.visibilityState!=='visible'||pending.current)return;void api<Storage>(endpoint).catch(e=>{if([401,403,409].includes(e.status)){clearPrivate();setStorage(null);setError(e.message);}});};const timer=setInterval(check,60000);window.addEventListener('focus',check);return()=>{clearInterval(timer);window.removeEventListener('focus',check);};},[endpoint,clearPrivate]);
+  // Check access and remote revisions without downloading unchanged Drive files.
+  useEffect(()=>{
+    if(loading)return;
+    let active=true,checking=false;
+    const check=async()=>{
+      if(document.visibilityState!=='visible'||pending.current||checking)return;
+      checking=true;const current=generation.current;
+      const valid=()=>active&&current===generation.current&&!pending.current;
+      try{
+        const state=await api<Storage>(endpoint);if(!valid())return;
+        const changed=state.provider!==storage?.provider||(state.provider==='GOOGLE_DRIVE'&&(!doc||state.revision!==doc.revision));
+        if(!changed){setStorage(state);return;}
+        if(form||contact||confirm||restore){setNotice('Sua lista mudou em outro aparelho. Feche a edição e use Atualizar antes de continuar.');return;}
+        const latest=state.provider==='GOOGLE_DRIVE'?await api<Storage>(endpoint+'&dados=1'):state;
+        const value=latest.provider==='GOOGLE_DRIVE'?latest.document:latest.provider==='LOCAL'?await readPersonalLocal(userId,communityId):null;
+        if(!valid())return;
+        setStorage(latest);setDoc(value||null);setError('');setNotice('Lista atualizada com as alterações salvas.');
+      }catch(e){if(valid()){
+        const failure=e as Error&{status?:number};setError(failure.message);
+        if([401,403,409].includes(failure.status||0)){clearPrivate();setStorage(null);}
+      }}finally{checking=false;}
+    };
+    const timer=setInterval(()=>void check(),60000);
+    const onFocus=()=>void check();window.addEventListener('focus',onFocus);
+    return()=>{active=false;clearInterval(timer);window.removeEventListener('focus',onFocus);};
+  },[endpoint,clearPrivate,userId,communityId,loading,storage?.provider,doc,form,contact,confirm,restore]);
   const people=useMemo(()=>doc?.people.map(person)||[],[doc]);
   const categories=useMemo(()=>[...new Set(people.map(p=>p.categoria).filter(Boolean))].map((name,i)=>category({id:i+1,nome:name!})),[people]);
   const active=people.filter(p=>!p.arquivado),selected=people.find(p=>p.id===opened);
   const personalHistory=useMemo(()=>doc?.contacts.filter(c=>String(c.visitante_id)===opened).sort((a,b)=>b.id-a.id)||[],[doc,opened]);
   function notify(message:string,tone?:'info'|'success'|'error'){if(tone==='error')setError(message);else setNotice(message);}
   async function exclusive<T>(work:()=>Promise<T>):Promise<T>{
-    if(pending.current)throw new Error('Aguarde a operação atual.');pending.current=true;setBusy(true);setError('');setNotice('');
+    if(pending.current)throw new Error('Aguarde a operação atual.');pending.current=true;generation.current+=1;setBusy(true);setError('');setNotice('');
     try{return await work();}catch(e){setError((e as Error).message);if([401,403].includes((e as Error&{status?:number}).status||0)){clearPrivate();setStorage(null);}throw e;}finally{pending.current=false;setBusy(false);}
   }
   async function choose(provider:'LOCAL'|'GOOGLE_DRIVE'){

@@ -24,7 +24,7 @@ function harness(file,initialProps={},exportName='default'){
   const document={activeElement:null,body:{style:{}},visibilityState:'visible'};
   const location={search:'',href:'https://vinkulo.test/painel/visitantes',origin:'https://vinkulo.test'};
   const api=(url)=>new Promise((resolve,reject)=>requests.push({url,resolve,reject}));
-  const views={I:{},Icon:'icon',Dialog:'dialog',Header:'header',fmt:String,btnSec:'secondary',btnPri:'primary'};
+  const views={I:{},Icon:'icon',Dialog:'dialog',Header:'header',Pessoas:'people',fmt:String,btnSec:'secondary',btnPri:'primary'};
   const data={api,answer:String,age:()=>0,person:p=>p,category:c=>c};
   const exports={};
   runInNewContext(compile('components/'+file+'.tsx'),{exports,URL,URLSearchParams,AbortController,Date,Error,...clock,document,location,window:{...clock,...events,location},
@@ -52,6 +52,50 @@ test('document navigation preserves local paths, query and fragment on the curre
   }
   for(const route of ['javascript:alert(1)','https://other.test/painel','//other.test','https://user:pass@vinkulo.test/painel'])assert.throws(()=>exports.navigateDocument(route),/inválido/);
   assert.equal(visited.length,4);
+});
+
+const personalProps={userId:1,communityId:1,userName:'Pessoa',communityName:'Teste',canOpenShared:false};
+const personalState=(revision=1)=>({provider:'GOOGLE_DRIVE',revision,userId:1,communityId:1,googleAvailable:true,googleConnected:true});
+const personalDoc=(revision=1)=>({userId:1,communityId:1,revision,people:[{id:'1',nome:'Versão '+revision}],contacts:[],events:[]});
+async function readyPersonal(){
+  const h=harness('visitors/PersonalVisitorApp',personalProps);h.render();h.flush();h.timers();
+  await h.reply(h.requests[0],personalState());await h.reply(h.requests[1],{...personalState(),document:personalDoc()});
+  h.render();h.flush();return h;
+}
+const personalRevision=h=>nodes(h.render()).find(n=>n.type==='people')?.props.pessoas[0]?.nome;
+test('personal Drive sync fetches a newer version on focus and avoids unchanged downloads',async()=>{
+  const h=await readyPersonal();h.event('focus');await h.reply(h.requests.at(-1),personalState(2));
+  assert.match(h.requests.at(-1).url,/dados=1/);
+  await h.reply(h.requests.at(-1),{...personalState(2),document:personalDoc(2)});
+  assert.equal(personalRevision(h),'Versão 2');h.flush();
+  const count=h.requests.length;h.event('focus');await h.reply(h.requests.at(-1),personalState(2));
+  assert.equal(h.requests.length,count+1);h.close();
+});
+test('personal Drive sync preserves an open draft until closed',async()=>{
+  const h=await readyPersonal();nodes(h.render()).find(n=>n.type==='people').props.onNew();h.render();h.flush();
+  h.event('focus');await h.reply(h.requests.at(-1),personalState(2));
+  assert.equal(personalRevision(h),'Versão 1');assert.match(text(h.render()),/outro aparelho/);
+  nodes(h.render()).find(n=>n.type==='person-form').props.onClose();h.render();h.flush();
+  h.event('focus');await h.reply(h.requests.at(-1),personalState(2));await h.reply(h.requests.at(-1),{...personalState(2),document:personalDoc(2)});
+  assert.equal(personalRevision(h),'Versão 2');h.close();
+});
+test('personal Drive sync ignores late failures from a previous account and coalesces slow checks',async()=>{
+  const h=await readyPersonal();const before=h.requests.length;
+  h.event('focus');const old=h.requests.at(-1);h.event('focus');h.tick();assert.equal(h.requests.length,before+1);
+  h.render({...personalProps,userId:2});h.flush();
+  const updates=h.lateUpdates;h.close();old.reject(Object.assign(new Error('Conta anterior'),{status:403}));await settle();
+  assert.equal(h.lateUpdates,updates);
+});
+test('personal Drive sync retains the loaded list on a temporary read failure and recovers',async()=>{
+  const h=await readyPersonal();h.event('focus');await h.reply(h.requests.at(-1),personalState(2));
+  h.requests.at(-1).reject(Object.assign(new Error('Drive indisponível'),{status:503}));await settle();
+  assert.equal(personalRevision(h),'Versão 1');assert.match(text(h.render()),/Drive indisponível/);h.flush();
+  h.event('focus');await h.reply(h.requests.at(-1),personalState(2));await h.reply(h.requests.at(-1),{...personalState(3),document:personalDoc(3)});
+  assert.equal(personalRevision(h),'Versão 3');assert.doesNotMatch(text(h.render()),/Drive indisponível/);h.close();
+});
+test('personal Drive sync clears private data when access is revoked',async()=>{
+  const h=await readyPersonal();h.event('focus');h.requests.at(-1).reject(Object.assign(new Error('Acesso removido'),{status:403}));await settle();
+  assert.equal(personalRevision(h),undefined);assert.match(text(h.render()),/Acesso removido/);h.close();
 });
 
 test('an open visitor editor closes when refreshed permissions become read-only and stays closed on regrant',async()=>{

@@ -17,6 +17,8 @@ Antes de alterar o código, leia este documento e atualize a seção **Trabalho 
 
 ## Trabalho em andamento
 
+Drive real — Codex, 26/10/2026, base publicada 444. Reserva: app/components/visitors/{PersonalVisitorApp,VisitorDriveSettings}.tsx, tests/lint-lifecycle.test.mjs e docs/relatorios/DRIVE_REAL_2026-10-26.md. Testar leitura/gravação real com ficha fictícia identificada, preservar contatos existentes; corrigir atualização por versão da lista pessoal e mensagens de verificação. Usuário informou não ter segunda sessão/aparelho disponível: não afirmar validação física nem de outro usuário. Publicar correções após regressões e build. Reservas adicionais somente após reprodução.
+
 Extensão do QA por perfil: reservar app/api/pilot/anotacoes/route.ts, app/components/visitors/VisitorApp.tsx, build/font-asset-urls.ts, vite.config.ts, tests/font-asset-urls.test.mjs e tests/lint-lifecycle.test.mjs. Verificar exposição de nomes pela consulta auxiliar de anotações, formulários abertos após redução de permissão e URLs de fontes geradas no Windows. Correções acompanhadas por regressões e build real.
 
 QA por perfil — Codex, 26/10/2026, base publicada 443. Reserva inicial: tests/helpers/role-journey.mjs, tests/page-role-journeys.test.mjs, tests/visitor-role-journeys.test.mjs e docs/relatorios/QA_PERFIS_2026-10-26.md. Testar páginas e ações como membro, oficial com permissão explícita e administrador, priorizando isolamento, acesso pessoal e compartilhamento de Visitantes. Prévia e banco fictícios; preservar dados reais e alterações alheias. Reservar correções de aplicação após reproduzir falhas; publicar quando validado, conforme autorizado.
