@@ -21,7 +21,8 @@ export async function centralFixture() {
  const m=(name,owner,community=cid)=>Number(db.prepare('INSERT INTO ministerios_comunidade(comunidade_id,nome,responsavel_usuario_id) VALUES(?,?,?)').run(community,name,owner).lastInsertRowid);
  const louvor=m('Louvor',leader), acolhimento=m('Acolhimento',pastor), foreign=m('Ministério externo',other,otherCid);
  const v=(min,user,role='VOLUNTARIO',community=cid)=>Number(db.prepare("INSERT INTO ministerio_voluntarios(comunidade_id,ministerio_id,usuario_id,funcao,papel) VALUES(?,?,?,'Equipe',?)").run(community,min,user,role).lastInsertRowid);
- const lv=v(louvor,leader,'LIDER'), mv=v(louvor,member), pv=v(louvor,pastor), av=v(acolhimento,pastor,'LIDER'), fv=v(foreign,other,'LIDER',otherCid);
+ const lv=v(louvor,leader,'LIDER'), mv=v(louvor,member), av=v(acolhimento,pastor,'LIDER'), fv=v(foreign,other,'LIDER',otherCid);
+ v(louvor,pastor);
  const schedule=(min,title,date,status='PUBLICADA',community=cid)=>Number(db.prepare('INSERT INTO escalas_ministerio(comunidade_id,ministerio_id,titulo,inicia_em,termina_em,status) VALUES(?,?,?,?,?,?)').run(community,min,title,date,date.replace('10:00','12:00'),status).lastInsertRowid);
  const past=schedule(louvor,'Encontro anterior','2026-10-05T10:00:00Z'), next=schedule(louvor,'Celebração de domingo','2026-10-11T10:00:00Z'), otherNext=schedule(acolhimento,'Acolhimento do domingo','2026-10-11T10:00:00Z'), foreignNext=schedule(foreign,'Outra comunidade','2026-10-11T10:00:00Z','PUBLICADA',otherCid), draft=schedule(louvor,'Rascunho privado','2026-10-07T10:00:00Z','RASCUNHO');
  const assignment=(s,vol,user,status,community=cid)=>db.prepare("INSERT INTO escala_designacoes(comunidade_id,escala_id,voluntario_id,usuario_id,funcao,status) VALUES(?,?,?,?,'Equipe',?)").run(community,s,vol,user,status);

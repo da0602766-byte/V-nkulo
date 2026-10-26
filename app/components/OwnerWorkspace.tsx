@@ -1,4 +1,5 @@
 "use client";
+import { navigateDocument } from '../lib/document-navigation';
 import SafeImage from "./SafeImage";
 import ActionDialog from "./ActionDialog";
 import OwnerPersonIdentity, { ownerPersonKind } from "./OwnerPersonIdentity";
@@ -192,7 +193,7 @@ export default function OwnerWorkspace({
       });
       const result = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(result.error || "Não foi possível abrir a comunidade.");
-      window.location.assign(`/painel?view=inicio${postId ? `#publicacao-${postId}` : ""}`);
+      navigateDocument(`/painel?view=inicio${postId ? `#publicacao-${postId}` : ""}`);
     } catch (error) {
       setMessage((error as Error).message);
       setWorking(null);

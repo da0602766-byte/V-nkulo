@@ -261,6 +261,7 @@ test("páginas, temas e responsividade do VÍNKULO permanecem explícitos", asyn
     readFile(new URL("../app/secretary.css", import.meta.url), "utf8"),
     readFile(new URL("../app/components/LoginCustomizationWorkspace.tsx", import.meta.url), "utf8"),
   ]);
+  assert.match(visitors, /Histórico de contatos/);
   assert.match(home, /LandingPageExperience/);
   assert.match(landing, /VÍNKULO/);
   assert.match(landing, /vinkulo-reception vinkulo-landing/);
@@ -456,7 +457,7 @@ test("comunidades novas exigem solicitação ao proprietário, ficha rígida e a
   assert.match(editorUi, /value="COMUNIDADE"/);
   assert.doesNotMatch(dashboard, /pilot-desktop-community-switcher/);
   assert.match(dashboard, /Trocar comunidade pelo menu da conta/);
-  assert.match(dashboard, /window\.location\.assign\("\/painel\?view=inicio"\)/);
+  assert.match(dashboard, /navigateDocument\("\/painel\?view=inicio"\)/);
   assert.match(mobileNav, /href="\/login"/);
   assert.match(styles, /grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/);
   assert.match(styles, /create-community-shortcut\.compact \{ grid-column:3/);

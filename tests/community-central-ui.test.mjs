@@ -27,13 +27,6 @@ async function reply(request,data,status=200){request.resolve(Response.json(data
 
 function expand(node){if(Array.isArray(node))return node.map(expand);if(!node||typeof node!=="object")return node;if(typeof node.type==="function")return expand(node.type(node.props));return {...node,props:{...node.props,children:expand(node.props?.children)}}}
 
-const person=(id,nome='Pessoa de demonstração')=>({membership_id:id,usuario_id:id,nome,email:'pessoa@example.invalid',papel:'MEMBRO',oficial:0});
-const lead=(name='Liderança de demonstração',canManage=true)=>({leaders:[{...person(9,name),papel:'LIDER',titulo:'Líder'}],history:[],canManage});
-const members=(people,nextCursor=null,canManage=true)=>({people,nextCursor,canManage});
-const charts={canViewCharts:true,canManageAccess:true,metrics:{members:3,visitors:1,posts30d:5,upcomingEvents:1,ministries:1,cells:1},series:[{month:'2026-01',label:'jan',posts:0,events:0},{month:'2026-02',label:'fev',posts:5,events:1}],cellReports:[],pastors:[]};
-const request=(f,part)=>f.requests.findLast(r=>String(r.url).includes(part));
-function leader(mode='leader'){const f=harness('LeadershipWorkspace.tsx',{mode,communityName:'Demonstração'});f.render();f.flush();return f}
-
 const centralData={community:{id:7,name:'Demonstração'},generatedAt:'2026-10-09T12:00:00Z',period:{days:30,from:'2026-09-10T00:00:00Z',to:'2026-10-09T23:59:59Z'},scope:'leadership',scopeLabel:'Ministérios que você lidera',pastoralLocked:false,capabilities:{ministries:true,schedules:true,events:false,cellReports:false},areas:[],events:[],metrics:[],ministries:[{id:1,name:'Louvor',leader:'Líder de exemplo',volunteers:3,schedules:2,confirmed:3,absent:0,pending:1,replacements:0}],schedules:[],notices:[],unread:0,cellReports:[],limits:{ministries:false,schedules:false,notices:false,cellReports:false},errors:[]};
 async function ready(mode='reports'){const h=harness('CommunityCentral.tsx',{communityId:7,mode});h.render();h.flush();await reply(h.requests[0],centralData);h.render();return h;}
 test('Navegação de membro não oferece liderança, pessoas ou continuidade',()=>{const h=harness('CommunityCentral.tsx',{communityName:'Teste',roleLabel:'Membro',current:'membro',allowed:['comunidade','membro','relatorios','avisos','conta'],onNavigate(){}},'CentralNavigation');const t=text(h.render());assert.doesNotMatch(t,/Liderança|Pessoas|Continuidade|Configurações/);assert.match(t,/Minha participação/)});

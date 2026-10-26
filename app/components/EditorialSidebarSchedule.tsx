@@ -1,4 +1,5 @@
 "use client";
+import { navigateDocument } from '../lib/document-navigation';
 
 import { useEffect, useState } from "react";
 
@@ -91,7 +92,7 @@ export default function EditorialSidebarSchedule({ onOpen }: { onOpen: () => voi
         <button
           className="editorial-sidebar-alert"
           type="button"
-          onClick={() => window.location.assign(latest.destination || "/painel?view=inicio")}
+          onClick={() => navigateDocument(latest.destination || "/painel?view=inicio")}
         >
           <span>{latest.read ? "Aviso recente" : "Novo aviso"}</span>
           <strong>{latest.title}</strong>
@@ -99,7 +100,7 @@ export default function EditorialSidebarSchedule({ onOpen }: { onOpen: () => voi
         </button>
       )}
       {posts.length > 0 && <div className="editorial-sidebar-posts" aria-label="Publicações na lateral">
-        {posts.map((post) => <button key={post.id} type="button" onClick={() => window.location.assign(`/painel?view=inicio#publicacao-${post.id}`)}><small>{post.categoria.replaceAll("_", " ")}</small><strong>{post.titulo}</strong><span>{post.resumo || post.conteudo}</span></button>)}
+        {posts.map((post) => <button key={post.id} type="button" onClick={() => navigateDocument(`/painel?view=inicio#publicacao-${post.id}`)}><small>{post.categoria.replaceAll("_", " ")}</small><strong>{post.titulo}</strong><span>{post.resumo || post.conteudo}</span></button>)}
       </div>}
       {next ? (
         <button className="editorial-sidebar-next" type="button" onClick={onOpen}>

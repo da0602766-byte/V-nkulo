@@ -1,4 +1,5 @@
 "use client";
+import { navigateDocument } from '../lib/document-navigation';
 import VinkuloMark from "./VinkuloMark";
 import SafeImage from "./SafeImage";
 import LabModuleNav from "./LabModuleNav";
@@ -786,25 +787,6 @@ export default function PilotDashboard({
     };
   }, [active.isOwner, allowedMenu]);
 
-  // O painel de presença ("Quem está online") pede a conversa por evento em vez
-  // de abrir uma segunda tela de chat: no celular vai para a aba Mensagens, no
-  // desktop abre o popover. Quem pode falar com quem continua sendo decidido em
-  // /api/pilot/chat.
-  useEffect(() => {
-    if (active.communityAccess === "FEED_ONLY") return;
-    const handleOpenChat = (event: Event) => {
-      const userId = Number(
-        (event as CustomEvent<{ userId?: number }>).detail?.userId || 0,
-      );
-      if (userId <= 0) return;
-      setChatTargetUserId(userId);
-      if (window.matchMedia("(max-width: 760px)").matches) openView("mensagens");
-      else setMessageCenterOpen(true);
-    };
-    window.addEventListener("vinkulo:open-chat", handleOpenChat);
-    return () => window.removeEventListener("vinkulo:open-chat", handleOpenChat);
-  }, [active.communityAccess]);
-
   const accessDeniedView =
     view !== "inicio" &&
     view !== "conta" &&
@@ -817,12 +799,12 @@ export default function PilotDashboard({
       ? view
       : "inicio";
 
-  function openView(nextView: View, focus?: NavigationFocus) {
+  const openView = useCallback((nextView: View, focus?: NavigationFocus) => {
     if (nextView === "visitantes") {
       if (openingVisitors) return;
       setOpeningVisitors(true);
       setMobileMenu(null);
-      window.setTimeout(() => window.location.assign("/painel/visitantes" + (focus?.event === "vinkulo:new-visitor" ? "?novo=1" : "")), 60);
+      window.setTimeout(() => navigateDocument("/painel/visitantes" + (focus?.event === "vinkulo:new-visitor" ? "?novo=1" : "")), 60);
       return;
     }
     if (nextView === "solicitacoes") {
@@ -867,7 +849,26 @@ export default function PilotDashboard({
       }),
     );
     window.setTimeout(() => setViewLoading(false), 280);
-  }
+  }, [openingVisitors]);
+
+  // O painel de presença ("Quem está online") pede a conversa por evento em vez
+  // de abrir uma segunda tela de chat: no celular vai para a aba Mensagens, no
+  // desktop abre o popover. Quem pode falar com quem continua sendo decidido em
+  // /api/pilot/chat.
+  useEffect(() => {
+    if (active.communityAccess === "FEED_ONLY") return;
+    const handleOpenChat = (event: Event) => {
+      const userId = Number(
+        (event as CustomEvent<{ userId?: number }>).detail?.userId || 0,
+      );
+      if (userId <= 0) return;
+      setChatTargetUserId(userId);
+      if (window.matchMedia("(max-width: 760px)").matches) openView("mensagens");
+      else setMessageCenterOpen(true);
+    };
+    window.addEventListener("vinkulo:open-chat", handleOpenChat);
+    return () => window.removeEventListener("vinkulo:open-chat", handleOpenChat);
+  }, [active.communityAccess, openView]);
 
   function cancelMobileShortcutPress() {
     if (mobileShortcutPressTimer.current !== null) {
@@ -947,7 +948,7 @@ export default function PilotDashboard({
       });
       const result = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(result.error || "Não foi possível trocar de comunidade.");
-      window.location.assign("/painel?view=inicio");
+      navigateDocument("/painel?view=inicio");
       return;
     } catch (error) {
       window.alert((error as Error).message);
@@ -1312,7 +1313,7 @@ export default function PilotDashboard({
             </Link>
           </nav>
           {systemOwner && (
-            <EditorialSidebarSchedule onOpen={() => window.location.assign("/proprietario?tab=editorial")} />
+            <EditorialSidebarSchedule onOpen={() => navigateDocument("/proprietario?tab=editorial")} />
           )}
           <div className="pilot-sidebar-note"><strong>{allowedMenu.length} áreas disponíveis</strong><p>As demais dependem das permissões do seu perfil.</p></div>
           {visibleView === "inicio" && <CommunityHighlight key={active.comunidadeId} communityId={active.comunidadeId} />}

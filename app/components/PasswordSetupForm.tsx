@@ -1,4 +1,5 @@
 "use client";
+import { navigateDocument } from '../lib/document-navigation';
 
 import { FormEvent, useState } from "react";
 
@@ -20,5 +21,5 @@ export default function PasswordSetupForm({ endpoint, token }: { endpoint: strin
     } catch (error) { setMessage((error as Error).message || "Não foi possível alterar a senha."); }
     finally { setLoading(false); }
   }
-  return <form method="post" action={endpoint} className="setup-form access-form" onSubmit={handle}><label>Nova senha<input name="senha" type="password" minLength={8} required autoComplete="new-password" disabled={loading || done} /></label><label>Confirmar nova senha<input name="confirmacao" type="password" minLength={8} required autoComplete="new-password" disabled={loading || done} /></label><p>Use pelo menos 8 caracteres, com letras e números.</p>{message && <div className="login-feedback" role="status">{message}</div>}{done ? <button type="button" className="access-primary" onClick={() => { window.location.href = "/login"; }}>Entrar no VÍNKULO</button> : <button className="access-primary" disabled={loading}>{loading ? "Salvando com segurança…" : "Salvar nova senha"}</button>}</form>;
+  return <form method="post" action={endpoint} className="setup-form access-form" onSubmit={handle}><label>Nova senha<input name="senha" type="password" minLength={8} required autoComplete="new-password" disabled={loading || done} /></label><label>Confirmar nova senha<input name="confirmacao" type="password" minLength={8} required autoComplete="new-password" disabled={loading || done} /></label><p>Use pelo menos 8 caracteres, com letras e números.</p>{message && <div className="login-feedback" role="status">{message}</div>}{done ? <button type="button" className="access-primary" onClick={() => { navigateDocument("/login"); }}>Entrar no VÍNKULO</button> : <button className="access-primary" disabled={loading}>{loading ? "Salvando com segurança…" : "Salvar nova senha"}</button>}</form>;
 }

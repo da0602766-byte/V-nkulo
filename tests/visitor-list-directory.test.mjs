@@ -13,7 +13,7 @@ test('Diretório: lista pessoal, responsáveis, acesso entre comunidades e revog
     const manager=await create('Daniel',[{comunidadeId:1,papel:'ADMIN_COMUNIDADE'}]);
     const secondOwner=await create('Marina',[{comunidadeId:2,papel:'PASTOR'}]);
     const member=await create('Bruno',[{comunidadeId:1,papel:'MEMBRO'},{comunidadeId:2,papel:'MEMBRO'}]);
-    const outsider=await create('Carla',[{comunidadeId:1,papel:'MEMBRO'}]);
+    await create('Carla',[{comunidadeId:1,papel:'MEMBRO'}]);
     db.prepare('UPDATE comunidades SET proprietario_usuario_id=? WHERE id=1').run(owner);
     db.prepare('UPDATE comunidades SET proprietario_usuario_id=? WHERE id=2').run(secondOwner);
     db.prepare("INSERT INTO oficiais_comunidade(usuario_comunidade_id,titulo,permissoes) SELECT id,'DIÁCONO','visitors.view' FROM usuario_comunidades WHERE usuario_id=? AND comunidade_id=1").run(member);

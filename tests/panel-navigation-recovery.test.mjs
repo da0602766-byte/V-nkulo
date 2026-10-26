@@ -10,7 +10,7 @@ function harness({ fetcher = async () => new Response('online'), cached, cacheEr
   let claimed = false, skipped = false;
   const failCache = (operation) => { if (cacheError === operation || cacheError === 'all') throw new Error(`storage ${operation} unavailable`); };
   const cache = {
-    async match(key) { failCache('match'); return cached?.clone(); },
+    async match() { failCache('match'); return cached?.clone(); },
     async put(key, response) { failCache('put'); writes.push({ key, body: await response.text() }); },
     async add(key) { additions.push(key); if (key === addError) throw Error('asset unavailable'); },
   };

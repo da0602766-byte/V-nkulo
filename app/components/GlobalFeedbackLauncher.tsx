@@ -64,6 +64,8 @@ export default function GlobalFeedbackLauncher() {
   useEffect(() => {
     if (!type && !helpOpen) return;
     const dialog = dialogRef.current;
+    const returnFocus = returnFocusRef.current;
+    const fallbackTrigger = triggerRef.current;
     dialog?.focus();
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !submittingRef.current) { event.preventDefault(); closeDialog(); }
@@ -76,11 +78,8 @@ export default function GlobalFeedbackLauncher() {
     dialog?.addEventListener("keydown", handleKey);
     return () => {
       dialog?.removeEventListener("keydown", handleKey);
-      const trigger = returnFocusRef.current;
-      (trigger?.isConnected ? trigger : triggerRef.current)?.focus({ preventScroll: true });
+      (returnFocus?.isConnected ? returnFocus : fallbackTrigger)?.focus({ preventScroll: true });
     };
-    // Opening and closing the dialog own focus, independently of form updates.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [type, helpOpen]);
 
   useEffect(() => {

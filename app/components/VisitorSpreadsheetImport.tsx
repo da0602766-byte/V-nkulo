@@ -52,9 +52,10 @@ export default function VisitorSpreadsheetImport({ categories, cells, canManageC
   useEffect(() => {
     if (!open) return;
     const previous = document.body.style.overflow;
+    const returnFocus = trigger.current;
     document.body.style.overflow = "hidden";
     dialog.current?.showModal();
-    return () => { document.body.style.overflow = previous; trigger.current?.focus(); };
+    return () => { document.body.style.overflow = previous; returnFocus?.focus(); };
   }, [open]);
   function close() { if (!busy) { setTables([]); setError(""); setProgress(""); } }
   function configureTable(item: SheetTable, available: VisitorCustomField[]) {

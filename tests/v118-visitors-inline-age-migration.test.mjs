@@ -1,11 +1,9 @@
 import { cpfLoginRequest } from './helpers/cpf-login.mjs';
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { createPilotD1, createPilotUser } from "./helpers/sqlite-d1.mjs";
 
 const context = { waitUntil() {}, passThroughOnException() {} };
-const source = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
 async function loadWorker() {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);

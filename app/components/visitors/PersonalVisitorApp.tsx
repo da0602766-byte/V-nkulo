@@ -33,7 +33,7 @@ export default function PersonalVisitorApp({userId,communityId,userName,communit
     }catch(e){if(current===generation.current){setError((e as Error).message);if([401,403,409].includes((e as Error&{status?:number}).status||0)){clearPrivate();setStorage(null);}}}
     finally{if(current===generation.current)setLoading(false);}
   },[endpoint,userId,communityId,clearPrivate]);
-  useEffect(()=>{const timer=setTimeout(()=>{void refresh();const query=new URLSearchParams(location.search);if(query.get('googleErro'))setNotice(query.get('googleErro')!);else if(query.get('google')==='connected')setNotice('Conta Google conectada.');},0);return()=>{clearTimeout(timer);generation.current++;};},[refresh]);
+  useEffect(()=>{const timer=setTimeout(()=>{void refresh();const query=new URLSearchParams(location.search);if(query.get('googleErro'))setNotice(query.get('googleErro')!);else if(query.get('google')==='connected')setNotice('Conta Google conectada.');},0);return()=>{clearTimeout(timer);generation.current += 1;};},[refresh]);
   // Detect a sign-out, account switch or permission revocation in an already open tab.
   useEffect(()=>{const check=()=>{if(document.visibilityState!=='visible'||pending.current)return;void api<Storage>(endpoint).catch(e=>{if([401,403,409].includes(e.status)){clearPrivate();setStorage(null);setError(e.message);}});};const timer=setInterval(check,60000);window.addEventListener('focus',check);return()=>{clearInterval(timer);window.removeEventListener('focus',check);};},[endpoint,clearPrivate]);
   const people=useMemo(()=>doc?.people.map(person)||[],[doc]);

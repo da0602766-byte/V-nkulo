@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile, stat } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const source = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
@@ -62,6 +62,7 @@ test("interface mostra históricos individuais e conecta Fio com Agenda", async 
     source("app/components/CareNotesBoard.tsx"),
   ]);
 
+  assert.match(tools, /Histórico de contatos/);
   assert.match(agenda, /href="\/painel\?view=fio"/);
   assert.match(thread, /href="\/painel\?view=eventos"/);
   assert.match(notes, /visitanteId: visitorId/);

@@ -70,7 +70,7 @@ test('Visitantes: avisos privados, histórico paginado, expiração, recuperaç�
     const admin=await create('admin',[{comunidadeId:1,papel:'ADMIN_COMUNIDADE'}]);
     const member=await create('member',[{comunidadeId:1,papel:'MEMBRO'},{comunidadeId:2,papel:'MEMBRO'}]);
     const peer=await create('peer',[{comunidadeId:1,papel:'MEMBRO'}]);
-    const outsider=await create('outsider',[{comunidadeId:2,papel:'ADMIN_COMUNIDADE'}]);
+    await create('outsider',[{comunidadeId:2,papel:'ADMIN_COMUNIDADE'}]);
     const login=async name=>{const r=await worker.fetch(await cpfLoginRequest(env,new Request('https://localhost/api/auth/login',{method:'POST',body:new URLSearchParams({email:`${name}@history.test`,senha:'HistoryTest123'})})),env,ctx);assert.equal(r.status,303);return r.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ');};
     const adminCookie=await login('admin'),memberCookie=await login('member'),peerCookie=await login('peer'),outsiderCookie=await login('outsider');
     const call=(path,method='GET',body,cookie=adminCookie)=>worker.fetch(new Request('https://localhost'+path,{method,headers:{cookie,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})}),env,ctx);

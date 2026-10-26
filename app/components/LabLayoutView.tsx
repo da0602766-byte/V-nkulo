@@ -1,4 +1,5 @@
 "use client";
+import SafeImage from './SafeImage';
 import type {CSSProperties,ReactNode} from 'react';
 import type {ModuleDefinition} from '../lib/lab-modules';
 import {resolvedLayout,safeLayoutUrl,type LayoutBlock,type LayoutScope} from '../lib/lab-layout';
@@ -12,7 +13,7 @@ export function LayoutContent({block:b,moduleId,children,total=0,onAction,canCre
   if(b.type==='stat')return <div className={`lab-layout-stat tone-${b.tone}`}><span>{b.title||'Total de registros'}</span><strong>{total}</strong>{b.text&&<small>{b.text}</small>}</div>;
   if(b.type==='image'){
     const src=b.assetId?`/api/modulos/${moduleId}/imagens/${b.assetId}`:/^https:\/\//.test(b.url)?safeLayoutUrl(b.url):'';
-    return <figure className={`lab-layout-image ratio-${b.ratio}`} style={{'--image-fit':b.fit} as CSSProperties}>{src?<img src={src} alt={b.alt} loading="lazy"/>:<div className="lab-image-placeholder"><span aria-hidden="true">▧</span>Adicione uma foto</div>}{(b.title||b.text)&&<figcaption>{b.title&&<strong>{b.title}</strong>}{b.text&&<span>{b.text}</span>}</figcaption>}</figure>;
+    return <figure className={`lab-layout-image ratio-${b.ratio}`} style={{'--image-fit':b.fit} as CSSProperties}>{src?<SafeImage src={src} alt={b.alt} loading="lazy" decoding="async"/>:<div className="lab-image-placeholder"><span aria-hidden="true">▧</span>Adicione uma foto</div>}{(b.title||b.text)&&<figcaption>{b.title&&<strong>{b.title}</strong>}{b.text&&<span>{b.text}</span>}</figcaption>}</figure>;
   }
   if(b.type==='button'){
     if(b.action==='create'&&!canCreate)return null;
