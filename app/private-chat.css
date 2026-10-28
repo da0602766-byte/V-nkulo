@@ -260,5 +260,6 @@ html[data-pilot-theme="escuro"] .incoming-message-card { background:#172338; }
 /* Keep the presence dot above the circular photo, never clipped by its frame. */
 .chat-redesign .private-chat-avatar { overflow:visible; }
 .chat-redesign .private-chat-avatar>img,.chat-redesign .private-chat-avatar>.safe-image-fallback { border-radius:50%; }
+.chat-redesign .private-chat-avatar>img { width:100%!important; height:100%!important; max-height:100%!important; aspect-ratio:1; object-fit:cover; }
 .chat-redesign .private-chat-avatar>i { z-index:2; right:-1px; bottom:-1px; width:11px; height:11px; border:2px solid var(--pilot-surface); box-sizing:border-box; }
 .chat-redesign .private-chat-avatar>i.online { background:#20b486; box-shadow:0 0 0 2px color-mix(in srgb,#20b486 13%,transparent); }

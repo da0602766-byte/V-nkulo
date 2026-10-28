@@ -126,6 +126,7 @@ html[data-theme] .pilot-dashboard[data-ui-version="v2"] .worship-feed .feed-reac
 /* Presence rows: name owns the full line; role and activity share a quiet second line. */
 .community-presence-panel .presence-list .presence-person { grid-template-columns:36px minmax(0,1fr); gap:10px; padding:10px 2px; min-height:64px; }
 .community-presence-panel .presence-avatar { width:36px; height:36px; border-radius:50%; font-size:12px; font-weight:650; }
+.community-presence-panel .presence-avatar img { width:100%!important; height:100%!important; max-height:100%!important; aspect-ratio:1; object-fit:cover; border-radius:50%; }
 .community-presence-panel .presence-person-copy { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:4px 8px; align-items:center; }
 .community-presence-panel .presence-person-copy>.verified-owner-name { grid-column:1/-1; display:flex; align-items:center; gap:5px; min-width:0; font-size:13px; font-weight:600; line-height:1.4; }
 .community-presence-panel .presence-person-copy>.verified-owner-name>span:first-child { display:block; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
