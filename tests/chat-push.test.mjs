@@ -56,6 +56,7 @@ async function fixture(t) {
   const notification = () => database.prepare("SELECT * FROM notificacoes_sistema WHERE area='CHAT' ORDER BY id DESC LIMIT 1").get();
   const request = () => resolve.GET(new Request(`https://test.invalid/api/push-subscriptions/notification?id=${notification().id}&binding=${rows()[0].vinculo_id}`));
   return { database, d1, ids, sender, recipient, outsider, chat, queue, authorize, retention, sends, wakeups, post, rows, notification, request, batchStatements: () => batchStatements,
+    asChat: user => { access.user.id = user; },
     as: (user, session = user) => { currentUser = user; sessionUser = session; }, feedOnly: () => { access.context.communityAccess = "FEED_ONLY"; } };
 }
 
@@ -175,4 +176,22 @@ test('chat: perfil ADMIN legado não muda o grupo nem a autorização da prévia
   assert.ok(await f.authorize.getAuthorizedChatPush(f.d1,f.notification().id,f.recipient));
   f.database.prepare("UPDATE usuario_comunidades SET papel='LIDER' WHERE usuario_id=?").run(f.recipient);
   assert.equal(await f.authorize.getAuthorizedChatPush(f.d1,f.notification().id,f.recipient),null);
+});
+
+
+test("chat: aviso usa última recebida não lida, mesmo após resposta própria, e respeita preferência", async t => {
+  const f=await fixture(t);
+  const sent=await (await f.post("Mensagem recebida para a prévia")).json();
+  f.asChat(f.recipient);
+  await f.post("Minha resposta não deve virar aviso",f.sender);
+  const get=async()=>await (await f.chat.GET(new Request("https://test.invalid/api/pilot/chat"))).json();
+  let payload=await get();
+  assert.equal(payload.conversations[0].ultima_mensagem,"Minha resposta não deve virar aviso");
+  assert.equal(payload.conversations[0].ultima_recebida,"Mensagem recebida para a prévia");
+  assert.equal(payload.conversations[0].ultima_recebida_id,sent.message.id);
+  assert.equal(payload.messageNotificationsEnabled,true);
+  f.database.prepare("INSERT INTO configuracoes(chave,valor,atualizado_por) VALUES (?,?,'test')").run('notification_preferences:'+f.recipient,JSON.stringify({mensagens:false}));
+  assert.equal((await get()).messageNotificationsEnabled,false);
+  await f.chat.PATCH(new Request("https://test.invalid/api/pilot/chat",{method:"PATCH",body:JSON.stringify({conversationId:sent.conversationId})}));
+  payload=await get();assert.equal(payload.conversations[0].ultima_recebida_id,null);assert.equal(payload.conversations[0].ultima_recebida,null);
 });

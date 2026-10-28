@@ -26,6 +26,7 @@ import PilotNotificationCenter, {
   type NotificationUnreadSummary,
 } from "./PilotNotificationCenter";
 import IncomingMessageToast, { type IncomingMessage } from "./IncomingMessageToast";
+import { incomingChatArrivals, type ChatArrivalConversation } from "../lib/chat-arrivals";
 import ThemeControl from "./ThemeControl";
 import OfflineModeEntry from "./OfflineModeEntry";
 import WorkspaceErrorBoundary from "./WorkspaceErrorBoundary";
@@ -297,6 +298,9 @@ export default function PilotDashboard({
     });
   const [messageCenterOpen, setMessageCenterOpen] = useState(view === "mensagens");
   const [chatTargetUserId, setChatTargetUserId] = useState<number | null>(null);
+  const [chatOpenSequence, setChatOpenSequence] = useState(0);
+  const readingChatUserRef = useRef<number | null>(null);
+  const handleReadingChat = useCallback((id: number | null) => { readingChatUserRef.current = id; }, []);
   useEffect(() => { if (view === "mensagens") setMessageCenterOpen(true); }, [view]);
 
   useEffect(() => {
@@ -670,20 +674,15 @@ export default function PilotDashboard({
   useEffect(() => {
     if (active.communityAccess === "FEED_ONLY") return;
     let cancelled = false;
+    let syncing = false;
+    setIncomingMessage(null);
     const syncUnread = async () => {
+      if (syncing || cancelled) return;
+      syncing = true;
       try {
         const response = await fetch("/api/pilot/chat", { cache: "no-store" });
         if (!response.ok) return;
-        const payload = (await response.json()) as {
-          conversations?: {
-            id?: number;
-            participante_id?: number;
-            participante_nome?: string;
-            participante_foto?: string | null;
-            ultima_mensagem?: string | null;
-            nao_lidas?: number;
-          }[];
-        };
+        const payload = (await response.json()) as { conversations?: ChatArrivalConversation[]; messageNotificationsEnabled?: boolean; };
         if (cancelled) return;
         const conversations = payload.conversations || [];
         const total = conversations.reduce(
@@ -701,7 +700,7 @@ export default function PilotDashboard({
         const snapshot = new Map(
           conversations.map((conversation) => [
             Number(conversation.id || 0),
-            Number(conversation.nao_lidas || 0),
+            Number(conversation.ultima_recebida_id || 0),
           ]),
         );
         // O retrato vale só para a comunidade em que foi tirado: ao trocar de
@@ -714,32 +713,25 @@ export default function PilotDashboard({
           comunidadeId: active.comunidadeId,
           porConversa: snapshot,
         };
-        if (!previous) return;
-        // Quem está lendo as mensagens não precisa de aviso flutuante: a
-        // própria lista já mostra a conversa subindo com o contador.
-        if (view === "mensagens" || messageCenterOpen) return;
-        const arrived = conversations.find(
-          (conversation) =>
-            Number(conversation.nao_lidas || 0) >
-            (previous.get(Number(conversation.id || 0)) ?? 0),
-        );
+        if (payload.messageNotificationsEnabled === false) setIncomingMessage(null);
+        const arrived = incomingChatArrivals(conversations, previous, readingChatUserRef.current, payload.messageNotificationsEnabled !== false)[0];
         if (!arrived) return;
         setIncomingMessage({
-          key: Date.now(),
+          key: Number(arrived.ultima_recebida_id),
           userId: Number(arrived.participante_id || 0),
           name: String(arrived.participante_nome || "Alguém da comunidade"),
           photo: arrived.participante_foto || null,
-          preview: String(arrived.ultima_mensagem || ""),
+          preview: String(arrived.ultima_recebida || ""),
           count: Number(arrived.nao_lidas || 0),
         });
       } catch {
         // O atalho continua funcional mesmo quando a contagem não responde.
-      }
+      } finally { syncing = false; }
     };
     void syncUnread();
     const timer = window.setInterval(() => {
       if (document.visibilityState === "visible") void syncUnread();
-    }, 15_000);
+    }, 5_000);
     const refreshWhenVisible = () => {
       if (document.visibilityState === "visible") void syncUnread();
     };
@@ -749,7 +741,7 @@ export default function PilotDashboard({
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
-  }, [active.communityAccess, active.comunidadeId, view, messageCenterOpen]);
+  }, [active.communityAccess, active.comunidadeId]);
 
   function openCommunityInfo() {
     setCommunityInfoLoading(true);
@@ -864,6 +856,7 @@ export default function PilotDashboard({
       );
       if (userId <= 0) return;
       setChatTargetUserId(userId);
+      setChatOpenSequence(sequence => sequence + 1);
       if (window.matchMedia("(max-width: 760px)").matches) openView("mensagens");
       else setMessageCenterOpen(true);
     };
@@ -1125,13 +1118,14 @@ export default function PilotDashboard({
           onOpen={(userId) => {
             setIncomingMessage(null);
             setChatTargetUserId(userId);
+            setChatOpenSequence(sequence => sequence + 1);
             if (window.matchMedia("(max-width: 760px)").matches) openView("mensagens");
             else setMessageCenterOpen(true);
           }}
         />
       )}
       {messageCenterOpen && active.communityAccess !== "FEED_ONLY" && (
-        <PrivateChatDock key={active.comunidadeId} initialTargetUserId={chatTargetUserId} onClose={() => {
+        <PrivateChatDock key={active.comunidadeId} initialTargetUserId={chatTargetUserId} openSequence={chatOpenSequence} onReadingChange={handleReadingChat} onClose={() => {
           setMessageCenterOpen(false);
           setChatTargetUserId(null);
           const address = new URL(window.location.href);
@@ -1899,4 +1893,3 @@ function MenuIcon({ id }: { id: MenuIconId }) {
     </svg>
   );
 }
-

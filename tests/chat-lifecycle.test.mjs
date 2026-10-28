@@ -29,7 +29,7 @@ function harness() {
     exports, window, URL, document: {visibilityState:'visible',addEventListener(){},removeEventListener(){}},
     FormData: class {constructor(form) {this.form=form;} get() {return this.form.message;}},
     fetch: (url,options) => new Promise((resolve,reject) => requests.push({url,options,resolve,reject})),
-    require(name) {if(name==='react')return hooks;if(name==='react/jsx-runtime')return jsx;if(name==='./SafeImage')return {default:'SafeImage'};throw Error(name);},
+    require(name) {if(name==='react')return hooks;if(name==='react/jsx-runtime')return jsx;if(name==='./SafeImage')return {default:'SafeImage'};if(name==='./ChatEmoji')return {default:'ChatEmoji',EmojiText:'EmojiText'};if(name==='../lib/chat-emojis')return {CHAT_EMOJIS:[]};throw Error(name);},
   });
   return {
     requests,
@@ -146,4 +146,17 @@ test('minimizar enquanto carrega impede confirmação tardia de leitura', async(
   await reply(request,workspace([]));
   assert.equal(f.requests.filter(r=>r.options?.method==='PATCH').length,0);
   f.close();
+});
+
+test('aviso reabre o mesmo remetente depois de outra conversa', async()=>{
+  const f=await initialized();
+  f.render({initialTargetUserId:111,openSequence:1});f.flush();
+  const first=f.requests.filter(r=>r.options?.method==='POST').at(-1);
+  await reply(first,{conversationId:11});await reply(requestFor(f,11),workspace([]));
+  await ready(f,22);
+  f.render({initialTargetUserId:111,openSequence:2});f.flush();
+  const second=f.requests.filter(r=>r.options?.method==='POST').at(-1);
+  assert.notEqual(second,first);assert.equal(JSON.parse(second.options.body).targetUserId,111);
+  await reply(second,{conversationId:11});await reply(requestFor(f,11),workspace([message(30,'Conversa reaberta pelo aviso')]));
+  assert.match(text(f.render({initialTargetUserId:111,openSequence:2})),/Conversa reaberta pelo aviso/);f.close();
 });

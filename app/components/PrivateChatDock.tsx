@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import PrivateChatWorkspace from "./PrivateChatWorkspace";
 
-export default function PrivateChatDock({ initialTargetUserId, onClose }: { initialTargetUserId: number | null; onClose: () => void }) {
+export default function PrivateChatDock({ initialTargetUserId, onClose, onReadingChange, openSequence = 0 }: { initialTargetUserId: number | null; onClose: () => void; onReadingChange?: (userId: number | null) => void; openSequence?: number }) {
   const [minimized, setMinimized] = useState(false);
   const dockRef = useRef<HTMLElement>(null);
   const minimizeRef = useRef<HTMLButtonElement>(null);
@@ -12,10 +12,10 @@ export default function PrivateChatDock({ initialTargetUserId, onClose }: { init
     minimizeRef.current?.focus();
     return () => { if (previous?.isConnected) previous.focus(); };
   }, []);
-  useEffect(() => { setMinimized(false); }, [initialTargetUserId]);
+  useEffect(() => { setMinimized(false); }, [initialTargetUserId, openSequence]);
   useEffect(() => {
     if (minimized) restoreRef.current?.focus();
-    else minimizeRef.current?.focus();
+    else (dockRef.current?.querySelector<HTMLButtonElement>('.private-chat-thread button[aria-label="Minimizar conversas"]') || minimizeRef.current)?.focus();
   }, [minimized]);
   return <div className="pilot-message-popover-backdrop chat-dock-layer">
     <section ref={dockRef} className={`pilot-message-popover chat-dock ${minimized ? "is-minimized" : ""}`} role={minimized ? "region" : "dialog"} aria-modal="false" aria-label="Conversas privadas" onKeyDown={event => {
@@ -26,7 +26,7 @@ export default function PrivateChatDock({ initialTargetUserId, onClose }: { init
         <button className="chat-dock-close" type="button" onClick={onClose} aria-label="Fechar mensagens" title="Fechar">×</button>
       </header>
       <div className="chat-dock-content" hidden={minimized}>
-        <PrivateChatWorkspace initialTargetUserId={initialTargetUserId} visible={!minimized} />
+        <PrivateChatWorkspace initialTargetUserId={initialTargetUserId} openSequence={openSequence} visible={!minimized} onReadingChange={onReadingChange} onMinimize={() => setMinimized(true)} onClose={onClose} />
       </div>
     </section>
   </div>;

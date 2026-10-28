@@ -1,5 +1,7 @@
 "use client";
 import SafeImage from "./SafeImage";
+import ChatEmoji, { EmojiText } from "./ChatEmoji";
+import { CHAT_EMOJIS } from "../lib/chat-emojis";
 
 
 import { ChangeEvent, FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -80,16 +82,25 @@ const FALLBACK_RETENTION_NOTICE =
 const GROUP_GAP_MS = 3 * 60_000;
 const MESSAGE_POLL_MS = 3_000;
 const LIST_POLL_MS = 8_000;
+const CHAT_THEMES = [["brisa", "Brisa", "Leve e azul"], ["jardim", "Jardim", "Verde que acolhe"], ["lavanda", "Lavanda", "Calma em lilás"], ["areia", "Areia", "Luz e aconchego"], ["aurora", "Aurora", "Cores em movimento"], ["oceano", "Oceano", "Ondas tranquilas"], ["por-do-sol", "Pôr do sol", "Um fim de tarde"], ["cosmos", "Cosmos", "Entre as estrelas"], ["sakura", "Sakura", "Pétalas ao vento"], ["montanhas", "Montanhas", "Respire fundo"], ["confete", "Confete", "Pequenas alegrias"], ["liso", "Essencial", "Só o que importa"]];
 
 export default function PrivateChatWorkspace({
   initialTargetUserId = null,
   visible = true,
+  openSequence = 0,
+  onReadingChange,
+  onMinimize,
+  onClose,
 }: {
   // Quem o painel de presença pediu para abrir. A conversa é criada (ou
   // reaproveitada) no primeiro carregamento; a regra de quem pode falar com
   // quem continua sendo decidida pelo servidor em /api/pilot/chat.
   initialTargetUserId?: number | null;
   visible?: boolean;
+  openSequence?: number;
+  onReadingChange?: (userId: number | null) => void;
+  onMinimize?: () => void;
+  onClose?: () => void;
 } = {}) {
   const initialConversation = Number(
     typeof window === "undefined"
@@ -114,6 +125,8 @@ export default function PrivateChatWorkspace({
   const [now, setNow] = useState(() => Date.now());
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [emojiCategory, setEmojiCategory] = useState("Expressões");
+  const [emojiSearch, setEmojiSearch] = useState("");
   const [wallpaper, setWallpaper] = useState("brisa");
   const [customColor, setCustomColor] = useState("#e8edf5");
   const [preferenceUser, setPreferenceUser] = useState(0);
@@ -132,7 +145,7 @@ export default function PrivateChatWorkspace({
     setCustomColor("#e8edf5");
     try {
       const saved = JSON.parse(window.localStorage.getItem(`vinkulo:chat-appearance:${id}`) || "null");
-      if (saved && ["brisa", "jardim", "lavanda", "areia", "liso", "custom"].includes(saved.wallpaper)) setWallpaper(saved.wallpaper);
+      if (saved && [...CHAT_THEMES.map(theme => theme[0]), "custom"].includes(saved.wallpaper)) setWallpaper(saved.wallpaper);
       if (/^#[0-9a-f]{6}$/i.test(saved?.color)) setCustomColor(saved.color);
     } catch { /* Preferences are optional when browser storage is unavailable. */ }
     setPreferenceUser(id);
@@ -203,7 +216,7 @@ export default function PrivateChatWorkspace({
   const [pulseIds, setPulseIds] = useState<number[]>([]);
   const seenIdsRef = useRef<Set<number> | null>(null);
   const statusRef = useRef<Map<number, TickStatus | undefined> | null>(null);
-  const openedTargetRef = useRef(0);
+  const openedTargetRef = useRef("");
   const messagesRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -434,11 +447,12 @@ export default function PrivateChatWorkspace({
 
   useEffect(() => {
     if (!initialTargetUserId || initialTargetUserId <= 0) return;
-    if (openedTargetRef.current === initialTargetUserId) return;
-    openedTargetRef.current = initialTargetUserId;
+    const key = `${initialTargetUserId}:${openSequence}`;
+    if (openedTargetRef.current === key) return;
+    openedTargetRef.current = key;
     void openWithUser(initialTargetUserId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialTargetUserId]);
+  }, [initialTargetUserId, openSequence]);
 
 
   async function deliver(conversationId: number, participantId: number, text: string, tempId: number) {
@@ -502,7 +516,7 @@ export default function PrivateChatWorkspace({
     setHasDraft(el.value.trim().length > 0);
     setDraftLength(el.value.length);
     el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
+    el.style.height = `${Math.min(el.scrollHeight + 2, 140)}px`;
   }
 
   function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -548,6 +562,21 @@ export default function PrivateChatWorkspace({
     );
   }, [workspace?.conversations, search]);
   const activeConversation = workspace?.conversations.find((item) => Number(item.id) === activeId);
+  const readingUserId = visible && activeConversation ? Number(activeConversation.participante_id) : null;
+  useEffect(() => {
+    onReadingChange?.(readingUserId);
+    return () => onReadingChange?.(null);
+  }, [readingUserId, onReadingChange]);
+  useEffect(() => {
+    const shell = shellRef.current;
+    const form = textareaRef.current?.form;
+    if (!shell || !form || typeof ResizeObserver === "undefined") return;
+    const update = () => shell.style.setProperty("--chat-composer-height", `${form.offsetHeight}px`);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(form);
+    return () => observer.disconnect();
+  }, [activeId, Boolean(activeConversation)]);
   const threadItems = useMemo(
     () => buildThreadItems(confirmed, pending, workspace?.currentUserId || 0, freshIds, pulseIds),
     [confirmed, pending, workspace?.currentUserId, freshIds, pulseIds],
@@ -571,7 +600,7 @@ export default function PrivateChatWorkspace({
     setHasDraft(Boolean(field.value.trim()));
     setDraftLength(field.value.length);
     field.style.height = "auto";
-    field.style.height = `${Math.min(field.scrollHeight, 140)}px`;
+    field.style.height = `${Math.min(field.scrollHeight + 2, 140)}px`;
     field.focus();
   }
 
@@ -645,7 +674,8 @@ export default function PrivateChatWorkspace({
             <div className="private-chat-empty">
               <span aria-hidden="true">✉</span>
               <strong>Suas conversas privadas</strong>
-              <p>Escolha uma conversa na lista ao lado ou comece uma nova.</p>
+              <p>Esta conversa não está mais disponível.</p>
+              <button type="button" onClick={() => changeActiveConversation(0)}>Voltar às conversas</button>
             </div>
           ) : (
             <>
@@ -657,11 +687,14 @@ export default function PrivateChatWorkspace({
                   <small className={activeConversation.online ? "chat-presence is-online" : "chat-presence"}>{presenceLabel(activeConversation)}</small>
                 </div>
                 <button className="chat-appearance-toggle" type="button" aria-label="Personalizar fundo" title="Personalizar fundo" aria-expanded={appearanceOpen} aria-controls="chat-appearance" onClick={() => { setAppearanceOpen(!appearanceOpen); setEmojiOpen(false); }}><ChatIcon name="palette" /></button>
+                {onMinimize && <button className="chat-thread-control" type="button" aria-label="Minimizar conversas" title="Minimizar" onClick={onMinimize}>−</button>}
+                {onClose && <button className="chat-thread-control" type="button" aria-label="Fechar mensagens" title="Fechar" onClick={onClose}>×</button>}
               </header>
               {appearanceOpen && <div className="chat-appearance" id="chat-appearance">
-                <div><strong>Do seu jeito</strong><span>Fundo só para você, neste navegador.</span></div>
+                <div><strong>Encontre seu clima</strong><button type="button" className="chat-panel-close" aria-label="Fechar temas" onClick={() => setAppearanceOpen(false)}>×</button></div>
+                <p className="chat-theme-hint">Cores e detalhes só para você, neste navegador.</p>
                 <div className="chat-wallpapers" role="group" aria-label="Fundo da conversa">
-                  {[['brisa', 'Brisa'], ['jardim', 'Jardim'], ['lavanda', 'Lavanda'], ['areia', 'Areia'], ['liso', 'Liso']].map(([id, label]) => <button key={id} type="button" data-wallpaper={id} aria-pressed={wallpaper === id} onClick={() => setWallpaper(id)}><span aria-hidden="true">{wallpaper === id ? "✓" : ""}</span>{label}</button>)}
+                  {CHAT_THEMES.map(([id, label, detail]) => <button key={id} type="button" data-wallpaper={id} aria-label={label} title={detail} aria-pressed={wallpaper === id} onClick={() => setWallpaper(id)}><span className="chat-theme-preview" data-theme={id} aria-hidden="true"><i /><i /><b>{wallpaper === id ? "✓" : ""}</b></span><strong>{label}</strong><small>{detail}</small></button>)}
                   <label className="chat-custom-color"><input type="color" aria-label="Cor personalizada do fundo" value={customColor} onChange={(event) => { setCustomColor(event.target.value); setWallpaper("custom"); }} /><span>Sua cor</span></label>
                 </div>
               </div>}
@@ -692,7 +725,7 @@ export default function PrivateChatWorkspace({
                           />
                         )}
                         <div className="private-chat-bubble">
-                          <p>{item.text}</p>
+                          <p><EmojiText>{item.text}</EmojiText></p>
                           <footer>
                             <time>{item.time}</time>
                             <Tick status={item.status} pulse={item.pulse} />
@@ -709,8 +742,11 @@ export default function PrivateChatWorkspace({
                 )}
               </div>
               {emojiOpen && <div className="chat-emoji-picker" role="group" aria-label="Escolher emoji">
-                <div><strong>Um toque de expressão</strong><button type="button" onClick={() => setEmojiOpen(false)} aria-label="Fechar emojis">×</button></div>
-                <div>{["😊", "😄", "🥰", "😂", "🥹", "😍", "🤗", "😎", "🙏", "🙌", "👏", "👍", "💪", "🤝", "🫶", "👋", "❤️", "💙", "💜", "✨", "🎉", "🎵", "🌿", "☀️", "🕊️", "⛪", "📖", "✅", "💡", "📅", "☕", "🌻"].map(emoji => <button type="button" key={emoji} aria-label={`Inserir ${emoji}`} onMouseDown={event => event.preventDefault()} onClick={() => insertEmoji(emoji)}>{emoji}</button>)}</div>
+                <div><strong>Diga com um emoji</strong><button type="button" onClick={() => setEmojiOpen(false)} aria-label="Fechar emojis">×</button></div>
+                <input className="chat-emoji-search" value={emojiSearch} onChange={event => setEmojiSearch(event.target.value)} placeholder="Buscar emoji…" aria-label="Buscar emoji" />
+                <nav className="chat-emoji-categories" aria-label="Categorias de emojis">{["Expressões", "Gestos", "Afeto", "Vida"].map(category => <button key={category} type="button" aria-pressed={emojiCategory === category} onClick={() => { setEmojiCategory(category); setEmojiSearch(""); }}>{category}</button>)}</nav>
+                <div className="chat-emoji-grid">{CHAT_EMOJIS.filter(item => emojiSearch ? item.label.toLocaleLowerCase("pt-BR").normalize("NFD").replace(/\p{Diacritic}/gu, "").includes(emojiSearch.toLocaleLowerCase("pt-BR").normalize("NFD").replace(/\p{Diacritic}/gu, "")) : item.category === emojiCategory).map(({ emoji, label }) => <button type="button" key={emoji} aria-label={`Inserir ${label}`} title={label} onMouseDown={event => event.preventDefault()} onClick={() => insertEmoji(emoji)}><ChatEmoji emoji={emoji} /></button>)}</div>
+                <small className="chat-emoji-credit">Arte <a href="https://github.com/jdecked/twemoji" target="_blank" rel="noreferrer">Twemoji</a> · <a href="/chat-emoji/LICENSE.txt" target="_blank" rel="noreferrer">CC BY 4.0</a></small>
               </div>}
               <form onSubmit={send}>
                 <button type="button" className="chat-emoji-toggle" aria-label="Abrir emojis" aria-expanded={emojiOpen} onClick={() => { setEmojiOpen(!emojiOpen); setAppearanceOpen(false); }}><ChatIcon name="smile" /></button>
