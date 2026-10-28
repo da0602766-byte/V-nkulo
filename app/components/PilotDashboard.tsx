@@ -45,7 +45,7 @@ const LeadershipWorkspace = dynamic(() => import("./LeadershipWorkspace"), { loa
 const NetworkWorkspace = dynamic(() => import("./NetworkWorkspace"), { loading: moduleLoading });
 const ParkingWorkspace = dynamic(() => import("./ParkingWorkspace"), { loading: moduleLoading });
 const PeopleWorkspace = dynamic(() => import("./PeopleWorkspace"), { loading: moduleLoading });
-const PrivateChatWorkspace = dynamic(() => import("./PrivateChatWorkspace"), { loading: moduleLoading });
+const PrivateChatDock = dynamic(() => import("./PrivateChatDock"), { loading: moduleLoading });
 const RequestsWorkspace = dynamic(() => import("./RequestsWorkspace"), { loading: moduleLoading });
 const SecretaryMinisterialWorkspace = dynamic(() => import("./SecretaryMinisterialWorkspace"), { loading: moduleLoading });
 const CellsWorkspace = dynamic(() => import("./CellsWorkspace"), { loading: moduleLoading });
@@ -295,8 +295,9 @@ export default function PilotDashboard({
       mensagens: 0,
       sistema: 0,
     });
-  const [messageCenterOpen, setMessageCenterOpen] = useState(false);
+  const [messageCenterOpen, setMessageCenterOpen] = useState(view === "mensagens");
   const [chatTargetUserId, setChatTargetUserId] = useState<number | null>(null);
+  useEffect(() => { if (view === "mensagens") setMessageCenterOpen(true); }, [view]);
 
   useEffect(() => {
     const initial = window.setTimeout(() => {
@@ -792,14 +793,14 @@ export default function PilotDashboard({
     view !== "conta" &&
     !(view === "mensagens" && active.communityAccess !== "FEED_ONLY") &&
     !allowedMenu.some((item) => item.id === view);
-  const visibleView =
+  const visibleView = view === "mensagens" ? "inicio" :
     view === "conta" ||
-    (view === "mensagens" && active.communityAccess !== "FEED_ONLY") ||
     allowedMenu.some((item) => item.id === view)
       ? view
       : "inicio";
 
   const openView = useCallback((nextView: View, focus?: NavigationFocus) => {
+    if (nextView === "mensagens") { setMessageCenterOpen(true); setMobileMenu(null); return; }
     if (nextView === "visitantes") {
       if (openingVisitors) return;
       setOpeningVisitors(true);
@@ -1129,13 +1130,15 @@ export default function PilotDashboard({
           }}
         />
       )}
-      {messageCenterOpen && (
-        <div className="pilot-message-popover-backdrop" role="presentation" onMouseDown={() => setMessageCenterOpen(false)}>
-          <section className="pilot-message-popover" role="dialog" aria-modal="false" aria-label="Conversas" onMouseDown={(event) => event.stopPropagation()}>
-            <header><div><p className="pilot-kicker">MENSAGENS</p><h2>Conversas</h2></div><button type="button" onClick={() => setMessageCenterOpen(false)} aria-label="Fechar mensagens">×</button></header>
-            <PrivateChatWorkspace initialTargetUserId={chatTargetUserId} />
-          </section>
-        </div>
+      {messageCenterOpen && active.communityAccess !== "FEED_ONLY" && (
+        <PrivateChatDock key={active.comunidadeId} initialTargetUserId={chatTargetUserId} onClose={() => {
+          setMessageCenterOpen(false);
+          setChatTargetUserId(null);
+          const address = new URL(window.location.href);
+          address.searchParams.delete("conversation");
+          if (address.searchParams.get("view") === "mensagens") address.searchParams.set("view", visibleView);
+          window.history.replaceState(window.history.state, "", address);
+        }} />
       )}
       {navigationSearchOpen && (
         <div className="pilot-command-search-backdrop" role="presentation" onMouseDown={() => setNavigationSearchOpen(false)}>
@@ -1325,7 +1328,6 @@ export default function PilotDashboard({
               : ""
           }`}
           data-editor-key="conteudo-principal"
-          data-fullscreen-view={visibleView === "mensagens" ? "mensagens" : undefined}
         >
           {viewLoading && <div className="pilot-page-loading" role="status" aria-live="polite"><span className="pilot-loading-spinner" aria-hidden="true" />Carregando página…</div>}
           <WorkspaceErrorBoundary resetKey={`${active.comunidadeId}:${visibleView}`}>
@@ -1386,7 +1388,6 @@ export default function PilotDashboard({
           {visibleView === "solicitacoes" && (
             <RequestsWorkspace key={active.comunidadeId} communityId={active.comunidadeId} communityName={active.comunidadeNome} />
           )}
-          {visibleView === "mensagens" && <PrivateChatWorkspace initialTargetUserId={chatTargetUserId} />}
           {visibleView === "celulas" && (
             <CellsWorkspace
               permissions={active.permissions}
@@ -1898,3 +1899,4 @@ function MenuIcon({ id }: { id: MenuIconId }) {
     </svg>
   );
 }
+

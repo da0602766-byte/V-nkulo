@@ -33,7 +33,7 @@ function harness() {
   });
   return {
     requests,
-    render() {cursor=0; return exports.default();},
+    render(props) {cursor=0; return exports.default(props);},
     flush() {for(const fn of effects.splice(0))fn();for(const[id,t]of timers)if(t.ms===0){timers.delete(id);t.fn();}},
     poll() {for(const t of intervals.values())if(t.ms===3000)t.fn();},
     close() {slots.forEach(slot=>slot?.cleanup?.());},
@@ -127,4 +127,23 @@ test('reenviar mensagem com falha mantém o destinatário e remove a pendência'
   assert.doesNotMatch(text(f.render()),/toque para reenviar/);
   assert.doesNotMatch(text(f.render()),/Falha simulada/);
   assert.equal(nodes(f.render()).filter(n=>n.type==='p'&&text(n)==='Tentar novamente').length,1);f.close();
+});
+
+
+test('chat minimizado não confirma leitura e retoma ao restaurar', async()=>{
+  const f=await initialized();await ready(f,11);
+  f.render({visible:false});f.flush();
+  const before=f.requests.length;f.poll();
+  assert.equal(f.requests.length,before,'minimizado não deve buscar nem ler mensagens');
+  f.render({visible:true});f.flush();
+  assert.ok(f.requests.slice(before).some(r=>r.options?.method==='PATCH'),'restaurar confirma leitura');
+  f.close();
+});
+
+test('minimizar enquanto carrega impede confirmação tardia de leitura', async()=>{
+  const f=await initialized();open(f,11);const request=requestFor(f,11);
+  f.render({visible:false});f.flush();
+  await reply(request,workspace([]));
+  assert.equal(f.requests.filter(r=>r.options?.method==='PATCH').length,0);
+  f.close();
 });
