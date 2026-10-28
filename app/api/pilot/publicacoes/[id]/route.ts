@@ -17,11 +17,11 @@ export async function PATCH(request: Request, context: Context) {
   const db = getD1();
   const existing = await db
     .prepare(
-      `SELECT id, criado_por FROM publicacoes_piloto
+      `SELECT id, criado_por, status FROM publicacoes_piloto
       WHERE id = ? AND comunidade_id = ? AND status <> 'ARQUIVADA'`,
     )
     .bind(id, access.context.comunidadeId)
-    .first<{ id: number; criado_por: number | null }>();
+    .first<{ id: number; criado_por: number | null; status: string }>();
   if (!existing) {
     return Response.json(
       { error: "Publicação não encontrada." },
@@ -94,6 +94,7 @@ export async function PATCH(request: Request, context: Context) {
         visibilidade = ?, status = ?, aprovacao_status = ?, comentarios_habilitados = ?,
         imagem_url = ?, imagem_thumbnail_url = ?, imagem_alt = ?,
         imagem_width = ?, imagem_height = ?, links_json = ?,
+        aprovado_em = CASE WHEN ? = 'PUBLICADA' AND ? <> 'PUBLICADA' THEN CURRENT_TIMESTAMP ELSE aprovado_em END,
         atualizado_em = CURRENT_TIMESTAMP
       WHERE id = ? AND comunidade_id = ?`,
     )
@@ -112,6 +113,8 @@ export async function PATCH(request: Request, context: Context) {
       parsed.imagemWidth,
       parsed.imagemHeight,
       parsed.linksJson,
+      nextStatus,
+      existing.status,
       id,
       access.context.comunidadeId,
     )

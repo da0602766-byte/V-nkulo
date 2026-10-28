@@ -2,6 +2,8 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { CHAT_SOUND_EVENT, chatSoundsEnabled, setChatSoundsEnabled } from "../lib/chat-sounds";
+import "./notification-center.css";
 import {
   isNativeNotificationBridgeAvailable,
 } from "../lib/androidNativeBridge";
@@ -10,6 +12,7 @@ import {
   getWebPushSubscriptionState,
   isWebPushSupported,
   subscribeWebPushNotifications,
+  unsubscribeWebPushNotifications,
   type PushDeliveryStatus,
 } from "../lib/web-push-client";
 
@@ -65,6 +68,13 @@ export default function PilotNotificationCenter({
   const [message, setMessage] = useState("");
   const [canConfigure, setCanConfigure] = useState(false);
   const [configuring, setConfiguring] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [savingConfig, setSavingConfig] = useState(false);
+  useEffect(() => {
+    const sync = () => setSoundEnabled(chatSoundsEnabled());
+    sync(); window.addEventListener(CHAT_SOUND_EVENT, sync);
+    return () => window.removeEventListener(CHAT_SOUND_EVENT, sync);
+  }, []);
   const [config, setConfig] = useState<NotificationConfig>(DEFAULT_CONFIG);
   const [devicePermission, setDevicePermission] = useState<"unsupported" | NotificationPermission>("unsupported");
   const [webPushSubscribed, setWebPushSubscribed] = useState(false);
@@ -249,11 +259,15 @@ export default function PilotNotificationCenter({
   }
 
   async function saveConfig() {
+    if (savingConfig) return;
+    setSavingConfig(true);
+    try {
     const response = await fetch("/api/pilot/notificacoes", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ config }) });
     const result = (await response.json()) as { error?: string };
     if (!response.ok) { setMessage(result.error || "Não foi possível salvar."); return; }
     setConfiguring(false);
     await load();
+    } catch { setMessage("Não foi possível salvar. Verifique a conexão e tente novamente."); } finally { setSavingConfig(false); }
   }
 
   async function clearRead(id?: number) {
@@ -306,6 +320,17 @@ export default function PilotNotificationCenter({
     }
   }, [load]);
 
+  async function disableDeviceNotifications() {
+    if (activatingRef.current) return;
+    activatingRef.current = true; setDeviceActivating(true); setDeviceMessage("");
+    try {
+      await unsubscribeWebPushNotifications();
+      setWebPushSubscribed(false); setPushDelivery(null);
+      setDeviceMessage("Avisos em segundo plano desativados neste aparelho.");
+    } catch (error) { setDeviceMessage(error instanceof Error ? error.message : "Não foi possível desativar. Tente novamente."); }
+    finally { activatingRef.current = false; setDeviceActivating(false); }
+  }
+
   function handleDeviceNotificationPermission() {
     if (deviceCheckFailed) { setDeviceCheckRevision(value => value + 1); return; }
     if (devicePermission === "denied" && !nativePushAvailable) {
@@ -355,17 +380,21 @@ export default function PilotNotificationCenter({
             aria-label="Fechar notificações"
             onClick={() => setOpen(false)}
           />
-          <section ref={panelRef} tabIndex={-1} className="pilot-notification-panel" role="dialog" aria-modal="true" aria-label="Notificações">
+          <section ref={panelRef} tabIndex={-1} className="pilot-notification-panel notification-redesign" role="dialog" aria-modal="true" aria-label="Notificações">
             <header>
-              <div><p className="pilot-kicker">CENTRAL</p><h2>Notificações</h2></div>
+              <div className="notification-heading"><span className="notification-brand"><NotificationIcon id="system" /></span><div><h2>{configuring ? "Preferências" : "Notificações"}</h2><p>{configuring ? "Do seu jeito, no seu ritmo" : unread ? `${unread} ${unread === 1 ? "novidade para você" : "novidades para você"}` : "Você está em dia"}</p></div></div>
               <div className="notification-panel-actions">
-                {canConfigure && <button type="button" onClick={() => setConfiguring((value) => !value)} aria-label="Configurar notificações">⚙</button>}
+                <button type="button" onClick={() => setConfiguring(value => !value)} aria-pressed={configuring} aria-label={configuring ? "Voltar às notificações" : "Configurar notificações"}>{configuring ? <span aria-hidden="true">←</span> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M4 7h16M4 17h16M8 4v6m8 4v6"/></svg>}</button>
                 <button type="button" onClick={() => setOpen(false)} aria-label="Fechar">×</button>
               </div>
             </header>
+            <div className="notification-scroll">
+            {configuring ? <>
+            <section className="notification-sound-settings"><div><strong>Sons do chat</strong><p>Melodias suaves ao enviar e receber mensagens com o Vínkulo aberto.</p></div><label className="notification-toggle"><input type="checkbox" role="switch" aria-label="Sons do chat" checked={soundEnabled} onChange={event => { setChatSoundsEnabled(event.target.checked); setSoundEnabled(event.target.checked); }} /><span aria-hidden="true" /></label></section>
             <section className={`notification-device-permission status-${devicePermission}`} aria-label="Notificações neste aparelho" aria-busy={deviceChecking || deviceActivating}>
-              <div><strong>Avisos neste aparelho</strong><small>{deviceChecking ? "Conferindo a ativação neste aparelho…" : deviceCheckFailed ? "Não foi possível confirmar se os avisos estão ativados neste aparelho." : nativePushAvailable ? "A ativação é feita pelo aplicativo Android e depende da permissão de notificações do aparelho." : webPushSubscribed ? "Ativados para esta sessão, mesmo com o Vínkulo fechado" : devicePermission === "denied" ? "Bloqueados nas configurações do navegador ou aplicativo" : devicePermission === "unsupported" ? "Instale pelo navegador para receber avisos mesmo com o aplicativo fechado" : devicePermission === "granted" ? "Permissão liberada; conclua a ativação para receber avisos em segundo plano" : "Receba escalas, eventos, pedidos e demais avisos"}</small></div>
+              <div><strong>Notificações em segundo plano</strong><small>{deviceChecking ? "Conferindo a ativação neste aparelho…" : deviceCheckFailed ? "Não foi possível confirmar se os avisos estão ativados neste aparelho." : nativePushAvailable ? "A ativação é feita pelo aplicativo Android e depende da permissão de notificações do aparelho." : webPushSubscribed ? "Ativados para esta sessão, mesmo com o Vínkulo fechado" : devicePermission === "denied" ? "Bloqueados nas configurações do navegador ou aplicativo" : devicePermission === "unsupported" ? "Instale pelo navegador para receber avisos mesmo com o aplicativo fechado" : devicePermission === "granted" ? "Permissão liberada; conclua a ativação para receber avisos em segundo plano" : "Receba escalas, eventos, pedidos e demais avisos"}</small></div>
               {!webPushSubscribed && (nativePushAvailable || devicePermission !== "unsupported") && <button type="button" disabled={deviceChecking || deviceActivating} onClick={handleDeviceNotificationPermission}>{deviceActivating ? "Ativando…" : deviceCheckFailed ? "Verificar novamente" : nativePushAvailable ? "Solicitar ativação" : devicePermission === "denied" ? "Como liberar" : "Ativar"}</button>}
+              {webPushSubscribed && <button type="button" disabled={deviceActivating || deviceChecking} onClick={() => void disableDeviceNotifications()}>{deviceActivating ? "Desativando…" : "Desativar neste aparelho"}</button>}
             </section>
             {deviceMessage && <p className="notification-device-help" role="status">{deviceMessage}</p>}
             {webPushSubscribed && <section className="notification-device-help" aria-live="polite">
@@ -382,20 +411,23 @@ export default function PilotNotificationCenter({
                 <p>No celular, abra Configurações › Aplicativos › Vínkulo › Notificações e ative Permitir notificações. Se estiver no navegador, use o cadeado ao lado do endereço.</p>
               </section>
             )}
-            {configuring && <section className="notification-config" aria-label="Configuração de notificações">
-              <div><strong>O que a comunidade envia</strong><small>Defina quais grupos aparecem nesta central.</small></div>
+            {canConfigure && <section className="notification-config" aria-label="Configuração de notificações">
+              <div><strong>O que você recebe</strong><small>Escolha os assuntos que aparecem na sua central.</small></div>
               {(Object.keys(DEFAULT_CONFIG) as Array<keyof NotificationConfig>).map((key) => <label key={key}><input type="checkbox" checked={config[key]} onChange={(event) => setConfig((current) => ({ ...current, [key]: event.target.checked }))} /><span>{key[0].toUpperCase() + key.slice(1)}</span></label>)}
-              <button type="button" onClick={() => void saveConfig()}>Salvar preferências</button>
+              <button type="button" disabled={savingConfig} onClick={() => void saveConfig()}>{savingConfig ? "Salvando…" : "Salvar preferências"}</button>
             </section>}
+            <a className="notification-credits" href="/creditos" target="_blank" rel="noreferrer">Créditos e licenças ↗</a>
+            </> : <>
+            {!deviceChecking && !webPushSubscribed && devicePermission !== "unsupported" && <button className="notification-activate-hint" type="button" onClick={() => setConfiguring(true)}><NotificationIcon id="system" /><span>Receba avisos mesmo com o Vínkulo fechado</span><span aria-hidden="true">›</span></button>}
             <div className="notification-bulk-actions">
               {unread > 0 && <button className="notification-read-all" type="button" onClick={() => markRead()}>Marcar todas como lidas</button>}
               {items.some((item) => item.read) && <button className="notification-clear-read" type="button" onClick={() => void clearRead()}>Limpar visualizadas</button>}
             </div>
             {message && <p className="notification-device-help" role="status">{message}</p>}
             {loading ? (
-              <p className="notification-empty">Carregando…</p>
+              <div className="notification-skeleton" role="status" aria-label="Carregando notificações"><i/><i/><i/></div>
             ) : items.length === 0 ? (
-              <p className="notification-empty">Nenhuma notificação por enquanto.</p>
+              <div className="notification-empty"><span className="notification-empty-art"><NotificationIcon id="system" /><i/></span><h3>Tudo em dia por aqui</h3><p>Novidades da comunidade chegam neste espaço.</p><small>Enquanto isso, siga conectado.</small></div>
             ) : (
               <>
               <div className="notification-scope-v5" role="group" aria-label="Filtrar notificações">
@@ -425,7 +457,7 @@ export default function PilotNotificationCenter({
                       <NotificationIcon id={notificationVisual(item).key} />
                     </span>
                     <div>
-                      <strong>{item.title}</strong>
+                      <strong>{item.title}{!item.read && <i className="notification-unread-dot" aria-label="Não lida" />}</strong>
                       <small className="notification-source-label">{notificationVisual(item).label}</small>
                       {(item.senderName || item.hierarchy || item.ministry) && (
                         <small className="notification-sender-meta">
@@ -447,9 +479,9 @@ export default function PilotNotificationCenter({
               </div>
               </>
             )}
-            <footer>
-              E-mail e WhatsApp serão conectados futuramente por provedores externos.
-            </footer>
+            </>}
+            {configuring && message && <p className="notification-device-help" role="status">{message}</p>}
+            </div>
           </section>
         </>,
         document.body,

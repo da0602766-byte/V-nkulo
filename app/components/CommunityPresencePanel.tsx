@@ -174,10 +174,9 @@ export default function CommunityPresencePanel() {
                 )}
                 <i className={person.online ? "online" : ""} />
               </span>
-              <div>
+              <div className="presence-person-copy" title={person.name}>
                 <VerifiedOwnerName name={person.name} verified={Boolean(person.ownerVerified)} officialTitle={person.officialTitle} />
                 <small>{formatHierarchy(person.hierarchy)}</small>
-              </div>
               <em className={person.online ? "online" : ""}>
                 {person.online
                   ? "Online"
@@ -185,6 +184,7 @@ export default function CommunityPresencePanel() {
                     ? formatRelativeTime(person.lastSeen)
                     : "Atividade oculta"}
               </em>
+              </div>
             </button>
             {selectedPersonId === person.userId && (
               <FeedPresencePopover id={`${profileId}-${person.userId}`} label={`Perfil de ${person.name}`} anchorRef={selectedRowRef} triggerRef={selectedTriggerRef} onClose={closeProfile} onDismiss={() => setSelectedPersonId(null)}>

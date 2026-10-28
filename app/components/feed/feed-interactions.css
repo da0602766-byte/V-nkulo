@@ -123,3 +123,23 @@ html[data-theme] .pilot-dashboard[data-ui-version="v2"] .worship-feed .feed-reac
   .feed-reactions .vinkulo-reaction-symbol { transition: none; }
   .feed-channel-choices .feed-channel-choice, .feed-reactions .community-reaction-picker .feed-reaction-options button { transition: none; }
 }
+/* Presence rows: name owns the full line; role and activity share a quiet second line. */
+.community-presence-panel .presence-list .presence-person { grid-template-columns:36px minmax(0,1fr); gap:10px; padding:10px 2px; min-height:64px; }
+.community-presence-panel .presence-avatar { width:36px; height:36px; border-radius:50%; font-size:12px; font-weight:650; }
+.community-presence-panel .presence-person-copy { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:4px 8px; align-items:center; }
+.community-presence-panel .presence-person-copy>.verified-owner-name { grid-column:1/-1; display:flex; align-items:center; gap:5px; min-width:0; font-size:13px; font-weight:600; line-height:1.4; }
+.community-presence-panel .presence-person-copy>.verified-owner-name>span:first-child { display:block; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.community-presence-panel .presence-person-copy .verified-owner-badge { flex:none; width:14px; height:14px; }
+.community-presence-panel .presence-person-copy>small { font-size:11px!important; margin:0!important; font-weight:400; line-height:1.4; }
+.community-presence-panel .presence-person-copy>em { min-width:0; font-style:normal; font-size:10px; font-weight:500; line-height:1.4; white-space:nowrap; color:var(--pilot-muted); }
+.community-presence-panel .presence-person-copy>em.online { color:var(--pilot-success); }
+.community-presence-panel .presence-person:focus-visible { outline:2px solid var(--pilot-primary); outline-offset:2px; }
+.worship-moments-duration { font-size:10px; color:var(--pilot-muted); letter-spacing:.03em; }
+.worship-story.is-seen .worship-story-ring { background:var(--pilot-line); padding:2px; box-shadow:none; border-color:transparent; opacity:.65; }
+.worship-story.is-seen>small { font-size:10px; line-height:1; color:var(--pilot-muted); }
+.worship-moments-empty { align-self:center; margin:0 0 12px 8px; font-size:12px; color:var(--pilot-text); }
+.worship-moments-empty small { display:block; margin-top:4px; font-size:11px; color:var(--pilot-muted); }
+.composer-moment-option { grid-column:1/-1; display:flex!important; align-items:center; gap:12px; padding:12px!important; background:color-mix(in srgb,var(--pilot-primary) 6%,var(--pilot-surface)); border-radius:12px; min-height:54px; }
+.composer-moment-option input { flex:none; width:18px!important; height:18px; accent-color:var(--pilot-primary); }
+.composer-moment-option strong { display:block; font-size:13px; }
+.composer-moment-option small { display:block; font-size:11px; line-height:1.5; color:var(--pilot-muted); margin-top:3px; }

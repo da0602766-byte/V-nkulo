@@ -25,6 +25,7 @@ import GlobalVisualEditor from "./GlobalVisualEditorLazy";
 import PilotNotificationCenter, {
   type NotificationUnreadSummary,
 } from "./PilotNotificationCenter";
+import { initializeChatSounds, playChatSound } from "../lib/chat-sounds";
 import IncomingMessageToast, { type IncomingMessage } from "./IncomingMessageToast";
 import { incomingChatArrivals, type ChatArrivalConversation } from "../lib/chat-arrivals";
 import ThemeControl from "./ThemeControl";
@@ -298,6 +299,7 @@ export default function PilotDashboard({
     });
   const [messageCenterOpen, setMessageCenterOpen] = useState(view === "mensagens");
   const [chatTargetUserId, setChatTargetUserId] = useState<number | null>(null);
+  useEffect(() => initializeChatSounds(active.userId), [active.userId]);
   const [chatOpenSequence, setChatOpenSequence] = useState(0);
   const readingChatUserRef = useRef<number | null>(null);
   const handleReadingChat = useCallback((id: number | null) => { readingChatUserRef.current = id; }, []);
@@ -714,6 +716,8 @@ export default function PilotDashboard({
           porConversa: snapshot,
         };
         if (payload.messageNotificationsEnabled === false) setIncomingMessage(null);
+        const audible = incomingChatArrivals(conversations, previous, null, payload.messageNotificationsEnabled !== false)[0];
+        if (audible) playChatSound("received", Number(audible.ultima_recebida_id));
         const arrived = incomingChatArrivals(conversations, previous, readingChatUserRef.current, payload.messageNotificationsEnabled !== false)[0];
         if (!arrived) return;
         setIncomingMessage({

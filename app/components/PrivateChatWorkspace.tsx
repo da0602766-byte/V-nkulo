@@ -1,4 +1,6 @@
 "use client";
+import { playChatSound } from "../lib/chat-sounds";
+
 import SafeImage from "./SafeImage";
 import ChatEmoji, { EmojiText } from "./ChatEmoji";
 import { CHAT_EMOJIS } from "../lib/chat-emojis";
@@ -243,7 +245,10 @@ export default function PrivateChatWorkspace({
         retentionNotice: result.retentionNotice || FALLBACK_RETENTION_NOTICE,
         nextPurgeAt: result.nextPurgeAt || null,
       });
-      if (conversationId > 0 && messagesRequest === messagesRequestRef.current) setConfirmed(result.messages || []);
+      if (conversationId > 0 && messagesRequest === messagesRequestRef.current) {
+        seenIdsRef.current = new Set((result.messages || []).map(message => message.id));
+        setConfirmed(result.messages || []);
+      }
       setError("");
     } catch (loadError) {
       if (isCurrentScope(scope)) setError((loadError as Error).message);
@@ -390,6 +395,8 @@ export default function PrivateChatWorkspace({
     }
     const fresh = [...statuses.keys()].filter((id) => !knownIds.has(id));
     for (const id of fresh) knownIds.add(id);
+    const incoming = confirmed.filter(message => fresh.includes(message.id) && Number(message.remetente_id) !== currentUserId).at(-1);
+    if (incoming && visible) playChatSound("received", incoming.id);
     // O tique só pula quando o estado muda de fato (enviada → entregue →
     // lida). Sem isso, abrir a conversa faria todos os tiques antigos
     // pularem de uma vez, como se tudo tivesse acabado de acontecer.
@@ -465,6 +472,7 @@ export default function PrivateChatWorkspace({
     });
     const result = (await readResult(response)) as { error?: string; message?: Message };
     if (!response.ok || !result.message) throw new Error(result.error || "Não foi possível enviar a mensagem.");
+    playChatSound("sent", result.message.id);
     if (!isCurrentScope(scope)) return;
     // A poll started before this write must not erase the confirmed message.
     messagesRequestRef.current++;
@@ -746,7 +754,6 @@ export default function PrivateChatWorkspace({
                 <input className="chat-emoji-search" value={emojiSearch} onChange={event => setEmojiSearch(event.target.value)} placeholder="Buscar emoji…" aria-label="Buscar emoji" />
                 <nav className="chat-emoji-categories" aria-label="Categorias de emojis">{["Expressões", "Gestos", "Afeto", "Vida"].map(category => <button key={category} type="button" aria-pressed={emojiCategory === category} onClick={() => { setEmojiCategory(category); setEmojiSearch(""); }}>{category}</button>)}</nav>
                 <div className="chat-emoji-grid">{CHAT_EMOJIS.filter(item => emojiSearch ? item.label.toLocaleLowerCase("pt-BR").normalize("NFD").replace(/\p{Diacritic}/gu, "").includes(emojiSearch.toLocaleLowerCase("pt-BR").normalize("NFD").replace(/\p{Diacritic}/gu, "")) : item.category === emojiCategory).map(({ emoji, label }) => <button type="button" key={emoji} aria-label={`Inserir ${label}`} title={label} onMouseDown={event => event.preventDefault()} onClick={() => insertEmoji(emoji)}><ChatEmoji emoji={emoji} /></button>)}</div>
-                <small className="chat-emoji-credit">Arte <a href="https://github.com/jdecked/twemoji" target="_blank" rel="noreferrer">Twemoji</a> · <a href="/chat-emoji/LICENSE.txt" target="_blank" rel="noreferrer">CC BY 4.0</a></small>
               </div>}
               <form onSubmit={send}>
                 <button type="button" className="chat-emoji-toggle" aria-label="Abrir emojis" aria-expanded={emojiOpen} onClick={() => { setEmojiOpen(!emojiOpen); setAppearanceOpen(false); }}><ChatIcon name="smile" /></button>

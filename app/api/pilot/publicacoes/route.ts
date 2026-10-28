@@ -39,6 +39,8 @@ export async function GET(request: Request) {
       p.imagem_thumbnail_url, p.imagem_alt, p.imagem_width, p.imagem_height,
       p.links_json, p.audiencia_tipo, p.ministerios_json,
       p.canal_feed, p.canal_lateral, p.aprovacao_status,
+      CASE WHEN EXISTS (SELECT 1 FROM configuracoes moment WHERE moment.chave = 'feed_moment:' || p.comunidade_id || ':' || p.id AND moment.valor = 'true')
+        THEN datetime(COALESCE(p.aprovado_em, p.criado_em), '+24 hours') ELSE NULL END AS momento_expira_em,
       (SELECT oc.titulo FROM oficiais_comunidade oc JOIN usuario_comunidades membership ON membership.id=oc.usuario_comunidade_id WHERE membership.usuario_id=p.criado_por AND membership.comunidade_id=p.comunidade_id AND membership.status='ATIVO' LIMIT 1) AS autor_titulo_oficial,
       u.nome AS autor_nome, u.foto_perfil AS autor_foto,
       u.email AS autor_email, u.criado_em AS autor_criado_em,
@@ -164,6 +166,9 @@ export async function POST(request: Request) {
   }
   const canalFeed = payload.canalFeed !== false;
   const canalLateral = payload.canalLateral === true;
+  if (payload.mostrarMomento === true && !canalFeed) {
+    return Response.json({ error: "Para mostrar nos Momentos, selecione também o canal Feed." }, { status: 400 });
+  }
   if (!canalFeed && !canalLateral) {
     return Response.json({ error: "Escolha Feed, Lateral ou os dois." }, { status: 400 });
   }
@@ -234,6 +239,10 @@ export async function POST(request: Request) {
     )
     .run();
   const postId = Number(result.meta.last_row_id);
+  if (payload.mostrarMomento === true && canalFeed) {
+    await db.prepare("INSERT INTO configuracoes (chave, valor, atualizado_por, atualizado_em) VALUES (?, 'true', ?, CURRENT_TIMESTAMP) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor, atualizado_em = CURRENT_TIMESTAMP")
+      .bind(`feed_moment:${access.context.comunidadeId}:${postId}`, access.user.email).run();
+  }
   await recordTenantAudit(
     db,
     access.context,

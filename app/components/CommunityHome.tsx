@@ -22,6 +22,7 @@ import CommunityPostInteractions from "./CommunityPostInteractions";
 import CommunityPostShare from "./CommunityPostShare";
 import CommunityPostReactions from "./CommunityPostReactions";
 import VerifiedOwnerName from "./VerifiedOwnerName";
+import { momentIsActive } from "../lib/feed-moments";
 import FeedHighlights from "./feed/FeedHighlights";
 import FeedComposerBar, { type ComposerIntent } from "./feed/FeedComposerBar";
 import FeedIcon from "./feed/FeedIcon";
@@ -61,6 +62,7 @@ type FeedItem = {
   links_json?: string;
   audiencia_tipo?: "PUBLICO" | "MINISTERIOS";
   ministerios_json?: string;
+  momento_expira_em?: string | null;
   canal_feed?: number;
   canal_lateral?: number;
 };
@@ -416,15 +418,29 @@ export default function CommunityHome({
     return post.categoria !== "EVENTO" && post.audiencia_tipo !== "MINISTERIOS";
   }), [feedFilter, feedSearch, posts, communityName]);
   const [seenHighlights, setSeenHighlights] = useState<number[]>([]);
+  const [momentNow, setMomentNow] = useState(0);
+  const seenKey = `vinkulo:seen-moments:${communityId}:${currentUserId}`;
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      try { const saved: unknown = JSON.parse(sessionStorage.getItem(`vinkulo:seen-highlights:${communitySlug}`) || "[]"); setSeenHighlights(Array.isArray(saved) ? saved.filter((id): id is number => typeof id === "number") : []); } catch { setSeenHighlights([]); }
-    }, 0);
+    const sync = () => {
+      setMomentNow(Date.now());
+      try { const saved: unknown = JSON.parse(localStorage.getItem(seenKey) || "[]"); setSeenHighlights(Array.isArray(saved) ? saved.filter((id): id is number => typeof id === "number") : []); } catch { setSeenHighlights([]); }
+    };
+    sync();
+    window.addEventListener("storage", sync);
+    document.addEventListener("visibilitychange", sync);
+    return () => { window.removeEventListener("storage", sync); document.removeEventListener("visibilitychange", sync); };
+  }, [seenKey]);
+  useEffect(() => { setMomentNow(Date.now()); }, [posts]);
+  useEffect(() => {
+    const now = Date.now();
+    const expirations = posts.filter(post => momentIsActive(post, now)).map(post => Date.parse(post.momento_expira_em!.replace(" ", "T") + (/Z$|[+-]\d{2}:\d{2}$/.test(post.momento_expira_em!) ? "" : "Z")));
+    if (!expirations.length) return;
+    const timer = window.setTimeout(() => setMomentNow(Date.now()), Math.min(...expirations) - now + 25);
     return () => window.clearTimeout(timer);
-  }, [communitySlug]);
-  const highlights = useMemo(() => posts.filter((post) => post.status === "PUBLICADA" && !seenHighlights.includes(post.id)).slice(0, 8), [posts, seenHighlights]);
+  }, [posts, momentNow]);
+  const highlights = useMemo(() => posts.filter(post => momentIsActive(post, momentNow)).sort((a,b) => Number(seenHighlights.includes(a.id)) - Number(seenHighlights.includes(b.id))).slice(0, 12), [posts, seenHighlights, momentNow]);
   function openHighlight(id: number) {
-    setSeenHighlights((current) => { const next = [...new Set([...current, id])]; try { sessionStorage.setItem(`vinkulo:seen-highlights:${communitySlug}`, JSON.stringify(next)); } catch {} return next; });
+    setSeenHighlights(current => { const next = [...new Set([...current, id])].slice(-500); try { localStorage.setItem(seenKey, JSON.stringify(next)); } catch {} return next; });
     setFeedSearch("");
     setFeedFilter("TODOS");
     window.requestAnimationFrame(() => {
@@ -503,6 +519,7 @@ export default function CommunityHome({
           eventId: form.get("eventId") || undefined,
           audienciaTipo: audienceType,
           ministerioIds: audienceType === "MINISTERIOS" ? selectedMinistries : [],
+          mostrarMomento: form.get("mostrarMomento") === "on",
           canalFeed: form.get("publicationChannel") !== "sidebar",
           canalLateral: form.get("publicationChannel") !== "feed",
         }),
@@ -687,7 +704,7 @@ export default function CommunityHome({
 
       <div className={`worship-layout ${readOnlyFeed ? "feed-only" : ""}`}>
         <div className="worship-main">
-          <FeedHighlights items={highlights} onSelect={openHighlight} onCreate={canPublish ? () => openComposer() : undefined} />
+          <FeedHighlights items={highlights} seenIds={seenHighlights} onSelect={openHighlight} onCreate={canPublish ? () => openComposer() : undefined} />
       {canPublish && (
         <section className="worship-composer">
           <button type="button" hidden={composerOpen} className="worship-composer-prompt" aria-label="O que você quer compartilhar?" aria-expanded={composerOpen} aria-controls="community-publication-form" disabled={working} onClick={() => openComposer()}>
@@ -795,6 +812,7 @@ export default function CommunityHome({
               <span>Permitir comentários de usuários com conta ativa</span>
             </label>
             </div></details>
+            <label className="composer-share composer-moment-option"><input type="checkbox" name="mostrarMomento" /><span><strong>Mostrar nos Momentos por 24 horas</strong><small>Opcional · começa após a publicação ser aprovada; o post continua no feed.</small></span></label>
             {error && <TransientFeedback className="operations-feedback error composer-wide" role="alert">{error}</TransientFeedback>}
             <button disabled={working}>
               {working ? "Salvando…" : "Salvar publicação"}

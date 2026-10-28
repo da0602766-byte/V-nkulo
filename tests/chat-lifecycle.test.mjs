@@ -6,7 +6,7 @@ import ts from 'typescript';
 import * as jsx from 'react/jsx-runtime';
 
 function harness() {
-  const slots = [], effects = [], requests = [], timers = new Map(), intervals = new Map();
+  const slots = [], effects = [], requests = [], sounds = [], timers = new Map(), intervals = new Map();
   let cursor = 0, timerId = 0;
   const same = (a,b) => a && b && a.length === b.length && a.every((v,i) => Object.is(v,b[i]));
   const hooks = {
@@ -29,10 +29,10 @@ function harness() {
     exports, window, URL, document: {visibilityState:'visible',addEventListener(){},removeEventListener(){}},
     FormData: class {constructor(form) {this.form=form;} get() {return this.form.message;}},
     fetch: (url,options) => new Promise((resolve,reject) => requests.push({url,options,resolve,reject})),
-    require(name) {if(name==='react')return hooks;if(name==='react/jsx-runtime')return jsx;if(name==='./SafeImage')return {default:'SafeImage'};if(name==='./ChatEmoji')return {default:'ChatEmoji',EmojiText:'EmojiText'};if(name==='../lib/chat-emojis')return {CHAT_EMOJIS:[]};throw Error(name);},
+    require(name) {if(name==='react')return hooks;if(name==='react/jsx-runtime')return jsx;if(name==='./SafeImage')return {default:'SafeImage'};if(name==='./ChatEmoji')return {default:'ChatEmoji',EmojiText:'EmojiText'};if(name==='../lib/chat-sounds')return {playChatSound(...args){sounds.push(args);}};if(name==='../lib/chat-emojis')return {CHAT_EMOJIS:[]};throw Error(name);},
   });
   return {
-    requests,
+    requests, sounds,
     render(props) {cursor=0; return exports.default(props);},
     flush() {for(const fn of effects.splice(0))fn();for(const[id,t]of timers)if(t.ms===0){timers.delete(id);t.fn();}},
     poll() {for(const t of intervals.values())if(t.ms===3000)t.fn();},
@@ -159,4 +159,14 @@ test('aviso reabre o mesmo remetente depois de outra conversa', async()=>{
   assert.notEqual(second,first);assert.equal(JSON.parse(second.options.body).targetUserId,111);
   await reply(second,{conversationId:11});await reply(requestFor(f,11),workspace([message(30,'Conversa reaberta pelo aviso')]));
   assert.match(text(f.render({initialTargetUserId:111,openSequence:2})),/Conversa reaberta pelo aviso/);f.close();
+});
+
+
+test('sons: abrir histórico é silencioso e somente mensagem nova recebida toca',async()=>{
+  const f=await initialized();open(f,11);
+  await reply(requestFor(f,11),workspace([{...message(20,'Histórico'),remetente_id:8}]));f.render();f.flush();
+  assert.equal(f.sounds.length,0);
+  f.poll();const poll=f.requests.findLast(r=>r.url.includes('messagesOnly'));
+  await reply(poll,workspace([{...message(20,'Histórico'),remetente_id:8},{...message(21,'Nova'),remetente_id:8}]));f.render();f.flush();
+  assert.deepEqual(f.sounds,[['received',21]]);f.close();
 });
