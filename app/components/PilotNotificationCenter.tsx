@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { CHAT_SOUND_EVENT, chatSoundsEnabled, setChatSoundsEnabled } from "../lib/chat-sounds";
 import "./notification-center.css";
@@ -46,6 +46,15 @@ export default function PilotNotificationCenter({
   // servidor e cliente na hidratação.
   const [agora, setAgora] = useState(0);
   const [open, setOpen] = useState(false);
+  const centerRef = useRef<HTMLDivElement>(null);
+  const [panelTheme, setPanelTheme] = useState<CSSProperties>({});
+  useEffect(() => {
+    if (!open || !centerRef.current) return;
+    // Portals leave the community container; carry its palette into the dialog.
+    const styles = getComputedStyle(centerRef.current);
+    const tokens = ["primary", "purple", "accent", "text", "muted", "line", "surface", "surface-2", "surface-opaque", "success"];
+    setPanelTheme(Object.fromEntries(tokens.map(token => [`--pilot-${token}`, styles.getPropertyValue(`--pilot-${token}`).trim()]).filter(([, value]) => value)) as CSSProperties);
+  }, [open]);
   const panelRef = useRef<HTMLElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -350,7 +359,7 @@ export default function PilotNotificationCenter({
   }, [enableDeviceNotifications]);
 
   return (
-    <div className="pilot-notification-center">
+    <div ref={centerRef} className="pilot-notification-center">
       <button
         className="pilot-notification-trigger"
         type="button"
@@ -380,7 +389,7 @@ export default function PilotNotificationCenter({
             aria-label="Fechar notificações"
             onClick={() => setOpen(false)}
           />
-          <section ref={panelRef} tabIndex={-1} className="pilot-notification-panel notification-redesign" role="dialog" aria-modal="true" aria-label="Notificações">
+          <section ref={panelRef} style={panelTheme} tabIndex={-1} className="pilot-notification-panel notification-redesign" role="dialog" aria-modal="true" aria-label="Notificações">
             <header>
               <div className="notification-heading"><span className="notification-brand"><NotificationIcon id="system" /></span><div><h2>{configuring ? "Preferências" : "Notificações"}</h2><p>{configuring ? "Do seu jeito, no seu ritmo" : unread ? `${unread} ${unread === 1 ? "novidade para você" : "novidades para você"}` : "Você está em dia"}</p></div></div>
               <div className="notification-panel-actions">
