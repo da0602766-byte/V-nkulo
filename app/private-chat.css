@@ -1,7 +1,6 @@
 /* Private conversations: a compact, non-modal dock with independently scrolling panes. */
 html body .pilot-dashboard .chat-dock-layer { position:fixed; inset:0; z-index:165; display:block; background:none; pointer-events:none; }
 html body .pilot-dashboard .chat-dock { position:absolute; inset:auto 24px 18px auto; width:min(790px,calc(100vw * var(--vinkulo-ui-scale-inverse,1) - 48px))!important; height:min(640px,calc(100dvh * var(--vinkulo-ui-scale-inverse,1) - 94px))!important; max-height:calc(100dvh * var(--vinkulo-ui-scale-inverse,1) - 94px)!important; display:flex; flex-direction:column; border:1px solid var(--pilot-line); border-radius:22px; background:var(--pilot-surface); box-shadow:0 22px 70px -18px #172b4d55,0 2px 8px #172b4d10; pointer-events:auto; overflow:hidden; animation:chat-dock-rise .28s cubic-bezier(.2,.8,.2,1) both; }
-html body .pilot-dashboard .chat-dock:has(.private-chat-layout:not(.has-thread)) { width:min(390px,calc(100vw * var(--vinkulo-ui-scale-inverse,1) - 48px))!important; }
 html body .pilot-dashboard .chat-dock>.chat-dock-heading { min-height:76px; flex:none; padding:12px 16px; gap:8px; background:var(--pilot-surface); border-bottom:1px solid var(--pilot-line); }
 .chat-dock-title { display:flex; align-items:center; gap:11px; min-width:0; flex:1; }
 .chat-dock-brand { display:grid; place-items:center; width:38px; height:38px; flex:none; color:var(--pilot-primary); background:color-mix(in srgb,var(--pilot-primary) 10%,var(--pilot-surface)); border-radius:13px; font-size:24px; }
@@ -131,7 +130,7 @@ html body .pilot-dashboard .chat-dock .private-chat-thread>form { position:relat
 @keyframes chat-status-pop { 50% { transform:translateY(-2px); } }
 @keyframes chat-bar-glow { 50% { opacity:.3; } }
 @media(max-width:760px) {
-  html body .pilot-dashboard .chat-dock,html body .pilot-dashboard .chat-dock:has(.private-chat-layout:not(.has-thread)) { top:calc(var(--chat-visible-top,0px) * var(--vinkulo-ui-scale-inverse,1)); right:0; bottom:auto; width:100%!important; height:calc(var(--chat-visible-height,100dvh) * var(--vinkulo-ui-scale-inverse,1))!important; max-height:none!important; border-radius:0; border:0; }
+  html body .pilot-dashboard .chat-dock:not(.is-minimized) { top:calc(var(--chat-visible-top,0px) * var(--vinkulo-ui-scale-inverse,1)); right:0; bottom:auto; width:100%!important; height:calc(var(--chat-visible-height,100dvh) * var(--vinkulo-ui-scale-inverse,1))!important; max-height:none!important; border-radius:0; border:0; }
   html body .pilot-dashboard .chat-dock>.chat-dock-heading { min-height:64px; padding:8px 12px; padding-top:max(8px,env(safe-area-inset-top)); }
   .chat-dock-title p { font-size:11px; }
   .chat-dock-brand { width:34px; height:34px; }
@@ -150,6 +149,10 @@ html body .pilot-dashboard .chat-dock .private-chat-thread>form { position:relat
 @media(prefers-reduced-motion:reduce) {
   html body .pilot-dashboard .chat-dock,.chat-redesign *,.chat-redesign *:after { animation:none!important; transition:none!important; }
 }
+/* Keep the minimized bar above the dashboard navigation on tablets too. */
+@media(min-width:761px) and (max-width:900px) {
+  html body .pilot-dashboard .chat-dock.is-minimized { bottom:calc(82px + env(safe-area-inset-bottom)); }
+}
 /* Opaque base prevents the workspace from showing through translucent theme surfaces. */
 html body .pilot-dashboard .chat-dock { background:var(--pilot-surface-opaque,#fff); }
 html[data-pilot-theme="escuro"] body .pilot-dashboard .chat-dock { background:#111b2d; }
@@ -166,8 +169,7 @@ html[data-pilot-theme="escuro"] body .pilot-dashboard .chat-dock { background:#1
   .chat-emoji-picker button { min-height:var(--chat-touch); }
 }
 /* One conversation at a time, with controls resting above the wallpaper. */
-html body .pilot-dashboard .chat-dock,
-html body .pilot-dashboard .chat-dock:has(.private-chat-layout:not(.has-thread)) { width:min(404px,calc(100vw * var(--vinkulo-ui-scale-inverse,1) - 48px))!important; height:min(620px,calc(100dvh * var(--vinkulo-ui-scale-inverse,1) - 94px))!important; }
+html body .pilot-dashboard .chat-dock:not(.is-minimized) { width:min(404px,calc(100vw * var(--vinkulo-ui-scale-inverse,1) - 48px))!important; height:min(620px,calc(100dvh * var(--vinkulo-ui-scale-inverse,1) - 94px))!important; }
 html body .pilot-dashboard .chat-dock .private-chat-layout { grid-template-columns:minmax(0,1fr)!important; }
 html body .pilot-dashboard .chat-dock .private-chat-layout.has-thread .private-chat-sidebar { display:none; }
 html body .pilot-dashboard .chat-dock:not(.is-minimized):has(.private-chat-thread>header)>.chat-dock-heading { display:none; }
@@ -262,7 +264,7 @@ html[data-pilot-theme="escuro"] .incoming-message-card { background:#172338; }
 @keyframes message-preview-out { to { opacity:0; transform:translateY(12px) scale(.97); } }
 @keyframes message-lifetime { from { transform:scaleX(1); } to { transform:scaleX(0); } }
 @media(max-width:760px) {
- html body .pilot-dashboard .chat-dock,html body .pilot-dashboard .chat-dock:has(.private-chat-layout:not(.has-thread)) { width:100%!important; height:calc(var(--chat-visible-height,100dvh) * var(--vinkulo-ui-scale-inverse,1))!important; }
+ html body .pilot-dashboard .chat-dock:not(.is-minimized) { width:100%!important; height:calc(var(--chat-visible-height,100dvh) * var(--vinkulo-ui-scale-inverse,1))!important; }
  html body .pilot-dashboard .chat-dock.is-minimized { width:280px!important; height:auto!important; }
  html body .pilot-dashboard .chat-dock .private-chat-thread>header>button { min-width:var(--chat-touch); min-height:var(--chat-touch); }
  html body .pilot-dashboard .chat-dock .private-chat-thread>header { padding:8px 5px; gap:3px; }
