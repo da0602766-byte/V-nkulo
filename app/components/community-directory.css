@@ -1,6 +1,6 @@
 /* Public directory: scoped to preserve the other public surfaces. */
 .vkd-page { --vd-accent:#2e5fbe; --vd-soft:color-mix(in srgb,var(--vd-accent) 8%,var(--pilot-surface,#fff)); background:var(--pilot-bg,#f0f5fa)!important; color:var(--pilot-text,#192d40); min-height:100vh; }
-.vkd-page .reception-header { border-bottom:1px solid var(--pilot-line,#dce5ee); background:var(--pilot-surface,#fff)!important; backdrop-filter:none!important; -webkit-backdrop-filter:none!important; box-shadow:0 4px 18px #16304c04!important; }
+.vkd-page .reception-header { border-bottom:1px solid var(--pilot-line,#dce5ee); background:var(--pilot-surface,#fff)!important; -webkit-backdrop-filter:none!important; backdrop-filter:none!important; box-shadow:0 4px 18px #16304c04!important; }
 .vkd-page .reception-primary-nav a[href="/comunidades"] { color:var(--vd-accent); background:var(--vd-soft); border-radius:10px; padding:12px 16px; }
 .vkd-page .public-brand-copy strong { font-size:20px; letter-spacing:-.6px; }
 .vkd-page .public-brand-copy small { font-weight:500; letter-spacing:.02em; text-transform:none; }
