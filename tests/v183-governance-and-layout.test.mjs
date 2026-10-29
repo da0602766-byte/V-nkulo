@@ -55,6 +55,9 @@ test("gestão, visitantes, notificações e mensagens seguem o novo layout", () 
   assert.match(visitors, /Revise as colunas, as categorias e as datas antes de salvar/);
   assert.match(visitors, /<VisitorSpreadsheetImport categories=\{data.categories\}/);
   assert.match(visitors, /canManageCategories=\{profile.podeEditarCategorias\}/);
-  assert.match(dashboard, /pilot-message-popover/);
+  assert.match(dashboard, /<PrivateChatDock key=\{active.comunidadeId\}/);
+  const chatDock = read("app/components/PrivateChatDock.tsx");
+  assert.match(chatDock, /pilot-message-popover/);
+  assert.match(chatDock, /<PrivateChatWorkspace/);
   assert.match(people, /HIERARCHY_PERMISSION_PRESETS/);
 });

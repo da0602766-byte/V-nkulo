@@ -28,16 +28,19 @@ test("configuração de categorias permanece rolável e não corta campos", asyn
 });
 
 test("diretório mostra um perfil por vez com rotação acessível", async () => {
-  const [page, carousel, styles] = await Promise.all([
+  const [page, content, carousel, styles] = await Promise.all([
     source("app/comunidades/page.tsx"),
+    source("app/components/CommunityDirectoryContent.tsx"),
     source("app/components/CommunityDirectoryCarousel.tsx"),
-    source("app/globals.css"),
+    source("app/components/community-directory.css"),
   ]);
-  assert.match(page, /<CommunityDirectoryCarousel communities=\{communities\}/);
+  assert.match(page, /<CommunityDirectoryContent communities=\{communities\}/);
+  assert.match(content, /<CommunityDirectoryCarousel\s[^>]*communities=\{communities\}/);
   assert.doesNotMatch(page, /className="community-grid"/);
   assert.match(carousel, /window\.setInterval/);
   assert.match(carousel, /prefers-reduced-motion: reduce/);
   assert.match(carousel, /Pausar/);
-  assert.match(styles, /@keyframes directory-profile-arrive/);
-  assert.match(styles, /html\[data-pilot-theme="claro"\] \.directory-community-showcase/);
+  assert.match(styles, /@keyframes vkd-reveal/);
+  assert.match(styles, /prefers-reduced-motion:reduce/);
+  assert.match(carousel, /aria-roledescription="carrossel"/);
 });

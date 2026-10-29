@@ -143,7 +143,7 @@ function carousel() {
     return tree;
   };
   const walk = node => !node || typeof node !== 'object' ? [] : [node, ...[node.props?.children].flat(Infinity).flatMap(walk)];
-  const pauseButton = tree => walk(tree).find(node => node.props.className === 'directory-carousel-pause');
+  const pauseButton = tree => walk(tree).find(node => node.type === 'button' && /^(Pausar|Continuar) rotação automática$/.test(node.props['aria-label'] || ''));
   return { render, jobs, document, media, pauseButton, walk };
 }
 
@@ -178,7 +178,7 @@ test('carrossel: navegação manual e toque no conteúdo pausam sem inverter o b
   assert.equal(f.pauseButton(tree).props['aria-pressed'], true);
   f.pauseButton(tree).props.onClick(); tree = f.render();
   assert.equal(f.jobs.size, 1);
-  const viewport = f.walk(tree).find(node => node.props.className === 'directory-carousel-viewport');
+  const viewport = f.walk(tree).find(node => node.props['aria-atomic'] === 'true' && typeof node.props.onTouchStart === 'function');
   viewport.props.onTouchStart(); tree = f.render();
   assert.equal(f.jobs.size, 0);
   assert.equal(tree.props.onTouchStart, undefined, 'toque no botão não dispara pausa no ancestral');

@@ -29,8 +29,11 @@ test("a carga inicial não expõe posts de outra comunidade, outro ministério o
 test("destaques reutilizam publicações autorizadas e não carregam exemplos do protótipo", async () => {
   const home = await read("app/components/CommunityHome.tsx");
   const highlights = await read("app/components/feed/FeedHighlights.tsx");
-  assert.match(home, /posts\.filter\(\(post\) => post\.status === "PUBLICADA" && !seenHighlights\.includes\(post\.id\)\)\.slice\(0, 8\)/);
-  assert.match(highlights, /if \(!items.length\) return null/);
+  // Momentos agora exigem adesão explícita e expiram em 24h. Itens vistos
+  // continuam acessíveis; os testes de feed-moments cobrem validade e isolamento.
+  assert.match(home, /posts\.filter\(post => momentIsActive\(post, momentNow\)\)/);
+  assert.match(home, /<FeedHighlights items=\{highlights\} seenIds=\{seenHighlights\}/);
+  assert.match(highlights, /if \(!items.length && !onCreate\) return null/);
   assert.doesNotMatch(highlights, /avatar-ana|story-cultos|124 participantes|Juliana/);
   assert.match(home, /setFeedSearch\(""\);\s*setFeedFilter\("TODOS"\)/);
 });

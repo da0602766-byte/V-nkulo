@@ -56,17 +56,21 @@ test("interface VÍNKULO oferece chat, públicos e gestão responsiva", async ()
 });
 
 test("navegação pública usa links estáveis compatíveis com a hospedagem", async () => {
-  const [stableLink, publicHeader, publicHome, communities] = await Promise.all([
+  const [stableLink, publicHeader, publicHome, communities, directory, carousel] = await Promise.all([
     source("../app/components/StableLink.tsx"),
     source("../app/components/PublicHeader.tsx"),
     source("../app/page.tsx"),
     source("../app/comunidades/page.tsx"),
+    source("../app/components/CommunityDirectoryContent.tsx"),
+    source("../app/components/CommunityDirectoryCarousel.tsx"),
   ]);
 
   assert.match(stableLink, /<a href=\{href\}/);
   assert.match(publicHeader, /from "\.\/StableLink"/);
   assert.match(publicHome, /from "\.\/components\/StableLink"/);
-  assert.match(communities, /from "\.\.\/components\/StableLink"/);
+  assert.match(communities, /<CommunityDirectoryContent/);
+  assert.match(directory, /from ['"]\.\/StableLink['"]/);
+  assert.match(carousel, /from ['"]\.\/StableLink['"]/);
 });
 
 test("proprietário controla identidade global, comunidades e organização dos cartões", async () => {
