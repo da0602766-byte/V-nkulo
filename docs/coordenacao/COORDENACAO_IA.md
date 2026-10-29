@@ -17,6 +17,8 @@ Antes de alterar o código, leia este documento e atualize a seção **Trabalho 
 
 ## Trabalho em andamento
 
+Contraste do chat — Codex, 28/10/2026, base publicada 452. Reserva: app/private-chat.css. Ajustar fundos, balões, metadados e controles nos modos claro/escuro e nas 12 paletas, preservando preferências e dimensões. Validado: build Sites, 25/25 testes do chat e prévia com mensagens fictícias em 390/768/1864 px, sem overflow nem erros de console. Nas 12 paletas escuras, contraste mínimo medido de 7,68:1 no texto e 5,30:1 nos horários. Modo claro preservado; publicação desta correção em preparação.
+
 Drive real — Codex, 26/10/2026, base publicada 444. Reserva: app/components/visitors/{PersonalVisitorApp,VisitorDriveSettings}.tsx, tests/lint-lifecycle.test.mjs e docs/relatorios/DRIVE_REAL_2026-10-26.md. Testar leitura/gravação real com ficha fictícia identificada, preservar contatos existentes; corrigir atualização por versão da lista pessoal e mensagens de verificação. Usuário informou não ter segunda sessão/aparelho disponível: não afirmar validação física nem de outro usuário. Publicar correções após regressões e build. Reservas adicionais somente após reprodução.
 
 Extensão do QA por perfil: reservar app/api/pilot/anotacoes/route.ts, app/components/visitors/VisitorApp.tsx, build/font-asset-urls.ts, vite.config.ts, tests/font-asset-urls.test.mjs e tests/lint-lifecycle.test.mjs. Verificar exposição de nomes pela consulta auxiliar de anotações, formulários abertos após redução de permissão e URLs de fontes geradas no Windows. Correções acompanhadas por regressões e build real.
