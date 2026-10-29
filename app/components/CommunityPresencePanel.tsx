@@ -50,7 +50,10 @@ export default function CommunityPresencePanel() {
   }
 
   const applyResult = useCallback((result: PresenceResponse) => {
-    setPeople(result.people || []);
+    setPeople((result.people || []).map((person) => ({
+      ...person,
+      name: person.name.trim().toLocaleLowerCase("pt-BR").replace(/^\p{L}/u, (letter) => letter.toLocaleUpperCase("pt-BR")),
+    })));
     setShareLastSeen(result.currentUserSharesLastSeen !== false);
     setCurrentUserId(Number(result.currentUserId || 0));
   }, []);

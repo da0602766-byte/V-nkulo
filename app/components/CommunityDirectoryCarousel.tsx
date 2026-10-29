@@ -54,71 +54,28 @@ export default function CommunityDirectoryCarousel({
   if (!community) return null;
 
   return (
-    <section
-      className="directory-community-showcase"
-      aria-label="Perfis das comunidades"
-      aria-roledescription="carrossel"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onFocusCapture={() => setFocused(true)}
-      onBlurCapture={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);
-      }}
-    >
-      <div className="directory-carousel-viewport" aria-live={rotating ? "off" : "polite"} aria-atomic="true" onTouchStart={() => setPaused(true)}>
-        <article className="directory-community-profile" key={community.id}>
-          <div className="directory-profile-visual">
-            {community.bannerUrl ? (
-              <SafeImage loading="lazy" src={community.bannerUrl} alt="" />
-            ) : (
-              <span className="directory-profile-placeholder" aria-hidden="true" />
-            )}
-            <div className="directory-profile-identity">
-              <span className="directory-profile-avatar">
-                {community.logoUrl ? <SafeImage loading="lazy" src={community.logoUrl} alt="" /> : community.nome.slice(0, 1)}
-              </span>
-              <p><small>COMUNIDADE</small><strong>{community.nome}</strong></p>
-            </div>
-          </div>
-          <div className="directory-profile-content">
-            <p className="directory-profile-location"><PublicIcon name="pin" size={16} /> {community.cidade || "Localização não informada"}</p>
+    <section className="vkd-showcase" aria-label="Perfis das comunidades" aria-roledescription="carrossel"
+      onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+      onFocusCapture={() => setFocused(true)} onBlurCapture={(event) => {if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);}}>
+      <aside className="vkd-community-list" aria-label="Selecionar comunidade">
+        <p>Comunidades encontradas</p>
+        <div className="vkd-community-options">{communities.map((item,index)=><button type="button" key={item.id} onClick={()=>select(index)} aria-label={`Mostrar ${item.nome}`} aria-current={item.id===community.id?'true':undefined}>
+          <span className="vkd-list-avatar">{item.logoUrl?<SafeImage loading="lazy" src={item.logoUrl} alt="" fallbackName={item.nome} fallbackKind="avatar"/>:item.nome.slice(0,1)}</span><span><strong>{item.nome}</strong><small>{item.cidade||'Comunidade Vínkulo'}</small></span><PublicIcon name="arrow" size={16}/>
+        </button>)}</div>
+        {communities.length>1&&<div className="vkd-controls"><button type="button" onClick={()=>select(activeIndex-1)} aria-label="Comunidade anterior">←</button><span aria-label={`Comunidade ${activeIndex+1} de ${communities.length}`}>{activeIndex+1} / {communities.length}</span><button type="button" onClick={()=>select(activeIndex+1)} aria-label="Próxima comunidade">→</button>{!reducedMotion&&<button type="button" className="vkd-pause" aria-label={paused?'Continuar rotação automática':'Pausar rotação automática'} aria-pressed={paused} onClick={()=>setPaused(current=>!current)}>{paused?'Continuar':'Pausar'}</button>}</div>}
+      </aside>
+      <div className="vkd-profile-region" aria-live={rotating?'off':'polite'} aria-atomic="true" onTouchStart={()=>setPaused(true)}>
+        <article className="vkd-profile" key={community.id}>
+          <div className="vkd-cover">{community.bannerUrl?<SafeImage loading="lazy" src={community.bannerUrl} alt=""/>:<div className="vkd-cover-art" aria-hidden="true"><PublicIcon name="community" size={64}/></div>}<span className="vkd-cover-label"><PublicIcon name="users" size={14}/> Comunidade Vínkulo</span></div>
+          <div className="vkd-profile-body">
+            <span className="vkd-profile-avatar">{community.logoUrl?<SafeImage loading="lazy" src={community.logoUrl} alt="" fallbackName={community.nome} fallbackKind="avatar"/>:community.nome.slice(0,1)}</span>
+            <p className="vkd-location"><PublicIcon name="pin" size={14}/>{community.cidade||'Localização não informada'}</p>
             <h2>{community.nome}</h2>
-            <p className="directory-profile-description">{community.descricao}</p>
-            <dl className="directory-profile-facts">
-              <div><dt>Próximos eventos</dt><dd>{community.eventosPublicos}</dd></div>
-              <div><dt>Acesso</dt><dd>Protegido</dd></div>
-            </dl>
-            <Link className="directory-profile-action" href={`/comunidades/${community.slug}`}>
-              Conhecer a comunidade <PublicIcon name="arrow" size={17} />
-            </Link>
+            <p className="vkd-description">{community.descricao||'Conheça a página pública e descubra mais sobre esta comunidade.'}</p>
+            <footer><span className="vkd-event-count"><PublicIcon name="calendar" size={17}/>{community.eventosPublicos} {community.eventosPublicos===1?'próximo evento':'próximos eventos'}</span><Link className="vkd-profile-action" href={`/comunidades/${community.slug}`}>Conhecer a comunidade <PublicIcon name="arrow" size={17}/></Link></footer>
           </div>
         </article>
       </div>
-
-      {communities.length > 1 && (
-        <footer className="directory-carousel-controls">
-          <button type="button" onClick={() => select(activeIndex - 1)} aria-label="Comunidade anterior">←</button>
-          <div className="directory-carousel-progress" aria-label={`Comunidade ${activeIndex + 1} de ${communities.length}`}>
-            {communities.map((item, index) => (
-              <button
-                type="button"
-                key={item.id}
-                className={index === activeIndex ? "active" : ""}
-                onClick={() => select(index)}
-                aria-label={`Mostrar ${item.nome}`}
-                aria-current={index === activeIndex ? "true" : undefined}
-              />
-            ))}
-          </div>
-          <span>{activeIndex + 1} / {communities.length}</span>
-          <button type="button" onClick={() => select(activeIndex + 1)} aria-label="Próxima comunidade">→</button>
-          {!reducedMotion && (
-            <button type="button" className="directory-carousel-pause" aria-label={paused ? "Continuar rotação automática" : "Pausar rotação automática"} aria-pressed={paused} onClick={() => setPaused((current) => !current)}>
-              {paused ? "Continuar" : "Pausar"}
-            </button>
-          )}
-        </footer>
-      )}
     </section>
   );
 }
