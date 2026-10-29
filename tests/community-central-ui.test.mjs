@@ -1,0 +1,58 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {runInNewContext} from 'node:vm';
+import test from 'node:test';
+import ts from 'typescript';
+import * as jsx from 'react/jsx-runtime';
+
+function harness(path, props={}, exportName="default") {
+ const slots=[],effects=[],timers=new Map(),intervals=new Map(),requests=[];let cursor=0,timerId=0,now=Date.now(),reloads=0; class ClockDate extends Date { constructor(...args){super(...(args.length ? args : [now]))} static now(){return now} }
+ const same=(a,b)=>a&&b&&a.length===b.length&&a.every((v,i)=>Object.is(v,b[i]));
+ const memo=(fn,deps)=>{const i=cursor++;if(!slots[i]||!same(slots[i].deps,deps))slots[i]={value:fn(),deps};return slots[i].value;};
+ const hooks={useState(initial){const i=cursor++;if(!(i in slots))slots[i]=typeof initial==='function'?initial():initial;return[slots[i],value=>{slots[i]=typeof value==='function'?value(slots[i]):value}]},useRef(initial){const i=cursor++;return slots[i]??={current:initial}},useMemo:memo,useCallback:(fn,deps)=>memo(()=>fn,deps),useEffect(fn,deps){const i=cursor++;if(!slots[i]||!same(slots[i].deps,deps)){slots[i]?.cleanup?.();slots[i]={deps};effects.push(()=>{slots[i].cleanup=fn()})}}};
+ const clock={setTimeout(fn){timers.set(++timerId,fn);return timerId},clearTimeout(id){timers.delete(id)},setInterval(fn){intervals.set(++timerId,fn);return timerId},clearInterval(id){intervals.delete(id)}};
+ const central={}; runInNewContext(ts.transpileModule(readFileSync(new URL("../app/lib/community-central.ts",import.meta.url),"utf8"),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:central});
+ const exports={}; const directory={}; runInNewContext(ts.transpileModule(readFileSync(new URL("../app/lib/directory-search.ts",import.meta.url),"utf8"),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:directory});
+ runInNewContext(ts.transpileModule(readFileSync(new URL('../app/components/'+path,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,{exports,require:name=>name==='react'?hooks:name==='react/jsx-runtime'?jsx:name==='../lib/directory-search'?directory:name==='../lib/community-central'?central:name==='react-dom'?{createPortal:node=>node}:{default:'stub',RelacionamentoTools:'relationships'},Date:ClockDate,Error,AbortController,URL,URLSearchParams,Blob,document:{body:{style:{overflow:""}},activeElement:null,getElementById(){return null}},FormData:class extends FormData {constructor(form){super();if(form)for(const [key,value] of Object.entries(form))if(typeof value!=="function")this.set(key,value)}},navigator:{clipboard:{writeText:async()=>{throw Error('Negado')}}},window:{...clock,addEventListener(){},removeEventListener(){},requestAnimationFrame:fn=>fn(),location:{reload(){reloads++},origin:'https://example.invalid',href:'https://example.invalid/painel',search:''}},fetch:(url,options)=>new Promise(resolve=>requests.push({url,options,resolve}))});
+ return {requests,get reloads(){return reloads},tick(ms){now+=ms;for(const fn of intervals.values())fn()},render(){cursor=0;return expand(exports[exportName](props))},flush(){for(const effect of effects.splice(0))effect();const batch=[...timers.values()];timers.clear();for(const fn of batch)fn()}};
+}
+function nodes(node){if(Array.isArray(node))return node.flatMap(nodes);if(!node||typeof node!=='object')return[];return[node,...nodes(node.props?.children)]}
+function text(node){if(Array.isArray(node))return node.map(text).join('');return typeof node==='object'&&node?text(node.props?.children):node==null||typeof node==='boolean'?'':String(node)}
+const find=(tree,type,filter=()=>true)=>nodes(tree).find(n=>n.type===type&&filter(n));
+const button=(tree,label)=>find(tree,'button',n=>text(n)===label||n.props['aria-label']===label);
+const change=(node,value)=>node.props.onChange({target:{value}});
+const settle=()=>new Promise(resolve=>setImmediate(resolve));
+async function reply(request,data,status=200){request.resolve(Response.json(data,{status}));await settle()}
+
+
+function expand(node){if(Array.isArray(node))return node.map(expand);if(!node||typeof node!=="object")return node;if(typeof node.type==="function")return expand(node.type(node.props));return {...node,props:{...node.props,children:expand(node.props?.children)}}}
+
+const centralData={community:{id:7,name:'Demonstração'},generatedAt:'2026-10-09T12:00:00Z',period:{days:30,from:'2026-09-10T00:00:00Z',to:'2026-10-09T23:59:59Z'},scope:'leadership',scopeLabel:'Ministérios que você lidera',pastoralLocked:false,capabilities:{ministries:true,schedules:true,events:false,cellReports:false},areas:[],events:[],metrics:[],ministries:[{id:1,name:'Louvor',leader:'Líder de exemplo',volunteers:3,schedules:2,confirmed:3,absent:0,pending:1,replacements:0}],schedules:[],notices:[],unread:0,cellReports:[],limits:{ministries:false,schedules:false,notices:false,cellReports:false},errors:[]};
+async function ready(mode='reports'){const h=harness('CommunityCentral.tsx',{communityId:7,mode});h.render();h.flush();await reply(h.requests[0],centralData);h.render();return h;}
+test('Navegação de membro não oferece liderança, pessoas ou continuidade',()=>{const h=harness('CommunityCentral.tsx',{communityName:'Teste',roleLabel:'Membro',current:'membro',allowed:['comunidade','membro','relatorios','avisos','conta'],onNavigate(){}},'CentralNavigation');const t=text(h.render());assert.doesNotMatch(t,/Liderança|Pessoas|Continuidade|Configurações/);assert.match(t,/Minha participação/)});
+test('Central rejeita resposta de outra comunidade sem exibir dados',async()=>{const h=harness('CommunityCentral.tsx',{communityId:7});h.render();h.flush();await reply(h.requests[0],{...centralData,community:{id:8,name:'Outra'}});assert.match(text(h.render()),/dados incompletos/);assert.doesNotMatch(text(h.render()),/Louvor/)});
+test('Erro inicial oferece nova tentativa e não inventa números',async()=>{const h=harness('CommunityCentral.tsx',{communityId:7});h.render();h.flush();await reply(h.requests[0],{error:'Sem conexão'},503);assert.match(text(h.render()),/Sem conexão/);button(h.render(),'Tentar novamente').props.onClick();await reply(h.requests.at(-1),centralData);assert.match(text(h.render()),/Louvor/)});
+test('Troca de período ignora resposta anterior e não exporta dados da consulta antiga',async()=>{const h=await ready();const period=nodes(h.render()).find(n=>n.type==='select'&&n.props.value===30);change(period,'7');h.render();h.flush();const old=h.requests.at(-1);const next=nodes(h.render()).find(n=>n.type==='button'&&text(n)==='Atualizando…');assert.equal(next.props.disabled,true);await reply(old,{...centralData,period:{...centralData.period,days:7,from:'2026-10-03T00:00:00Z'}});assert.match(text(h.render()),/03\/10\/2026/);assert.doesNotMatch(text(h.render()),/02\/10\/2026/)});
+test('Relatório parcial bloqueia download em vez de parecer completo',async()=>{const h=harness('CommunityCentral.tsx',{communityId:7,mode:'reports'});h.render();h.flush();await reply(h.requests[0],{...centralData,errors:[{section:'ministries',message:'Falha nos ministérios'}]});assert.equal(button(h.render(),'Baixar CSV').props.disabled,true);assert.match(text(h.render()),/Falha nos ministérios/)});
+test('Filtro de ministério reduz as linhas sem alterar acesso',async()=>{const h=await ready();const select=nodes(h.render()).find(n=>n.type==='select'&&n.props.value==='');change(select,'999');assert.doesNotMatch(text(h.render()),/Líder de exemplo/);assert.match(text(h.render()),/Nenhum ministério corresponde/)});
+test('Busca de avisos e filtro não lidos operam nos avisos recebidos',async()=>{const h=harness('CommunityCentral.tsx',{communityId:7,mode:'notices'});h.render();h.flush();await reply(h.requests[0],{...centralData,notices:[{id:1,title:'Reunião da equipe',message:'Hoje',ministry:'Louvor',createdAt:'2026-10-09T12:00:00Z',read:false,destination:'/painel?view=ministerios'},{id:2,title:'Recado anterior',message:'Ontem',ministry:'',createdAt:'2026-10-08T12:00:00Z',read:true,destination:'/painel'}]});find(h.render(),'input',n=>n.props.type==='checkbox').props.onChange({target:{checked:true}});assert.match(text(h.render()),/Reunião da equipe/);assert.doesNotMatch(text(h.render()),/Recado anterior/);change(find(h.render(),'input',n=>n.props.type==='search'),'inexistente');assert.match(text(h.render()),/Nenhum aviso corresponde/)});
+const lifecycleData={community:{id:7,name:'Teste',status:'ATIVA'},requests:[],protection:{communityStatus:'ATIVA',recentRecords:10,activeLegalHolds:0},canRequest:true,canReview:false,mfa:{required:true,available:false}};
+test('Continuidade começa pelo acompanhamento, sem cancelamento pré-selecionado',async()=>{const h=harness('CommunityLifecycleWorkspace.tsx',{currentCommunityId:7});h.render();h.flush();await reply(h.requests[0],lifecycleData);assert.equal(find(h.render(),'form'),undefined);button(h.render(),'Nova solicitação').props.onClick();const radios=nodes(h.render()).filter(n=>n.type==='input'&&n.props.type==='radio');assert.equal(radios.length,3);assert.ok(radios.every(r=>!r.props.checked));assert.equal(button(h.render(),'Enviar solicitação ao suporte').props.disabled,true)});
+test('Continuidade bloqueia envio duplicado e mantém formulário quando falha',async()=>{const h=harness('CommunityLifecycleWorkspace.tsx',{currentCommunityId:7});h.render();h.flush();await reply(h.requests[0],lifecycleData);button(h.render(),'Nova solicitação').props.onClick();find(h.render(),'input',n=>n.props.value==='DESATIVACAO').props.onChange();const onSubmit=find(h.render(),'form').props.onSubmit;const event={preventDefault(){},currentTarget:{reason:'Teste',description:'Solicitação de demonstração',confirmation:'SOLICITAR',password:'ficticia',reset(){}}};onSubmit(event);onSubmit(event);assert.equal(h.requests.filter(r=>r.options?.method==='POST').length,1);await reply(h.requests.at(-1),{error:'Falha simulada'},503);assert.ok(find(h.render(),'form'));assert.match(text(h.render()),/preenchimento foi mantido/)});
+
+
+test('Título de oficial não acrescenta acesso e mantém navegação direta',()=>{
+ const visited=[];
+ const h=harness('CommunityCentral.tsx',{communityName:'Teste',roleLabel:'Oficial · Diácono',current:'relatorios',allowed:['comunidade','membro','relatorios','avisos','conta'],onNavigate:id=>visited.push(id)},'CentralNavigation');
+ const tree=h.render();assert.equal(find(tree,'select'),undefined);
+ assert.doesNotMatch(text(tree),/Liderança|Pessoas|Continuidade|Configurações/);
+ const selected=nodes(tree).find(n=>n.type==='button'&&n.props['aria-current']==='page');assert.match(text(selected),/Relatórios/);
+ nodes(tree).find(n=>n.type==='button'&&text(n).startsWith('Avisos')).props.onClick();assert.deepEqual(visited,['avisos']);
+});
+test('Consulta pessoal agrupa filtros e omite total de integrantes da equipe',async()=>{
+ const h=harness('CommunityCentral.tsx',{communityId:7,mode:'reports'});h.render();h.flush();
+ await reply(h.requests[0],{...centralData,scope:'personal',scopeLabel:'Sua participação',ministries:centralData.ministries.map(m=>({...m,volunteers:null}))});
+ const tree=h.render();assert.doesNotMatch(text(tree),/Integrantes/);assert.match(text(tree),/somente a você/);
+ const section=nodes(tree).find(n=>n.type==='section'&&n.props.className?.includes('central-report-section')&&text(n).includes('Meus ministérios'));
+ assert.ok(section);assert.ok(find(section,'select'));assert.ok(button(section,'Baixar CSV'));assert.match(text(section),/Louvor/);
+});

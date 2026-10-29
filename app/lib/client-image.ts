@@ -31,12 +31,21 @@ const COMPACT_ASSETS = new Set<ImagePurpose>([
 
 export async function prepareImageForUpload(file: File, purpose: ImagePurpose) {
   validateSourceImage(file);
-  const profile = LARGE_BACKGROUNDS.has(purpose)
+  // Fotos frequentes precisam caber no feed e no avatar sem carregar megapixels
+  // desnecessários. Papéis de parede, logos e evidências mantêm seu perfil.
+  const profile = purpose === "profile-photo"
+    ? { maximum: 512, targetBytes: 160 * 1024 }
+    : purpose === "post-image"
+      ? { maximum: 1920, targetBytes: 600 * 1024 }
+      : LARGE_BACKGROUNDS.has(purpose)
     ? { maximum: 4096, targetBytes: 7.8 * 1024 * 1024 }
     : COMPACT_ASSETS.has(purpose)
       ? { maximum: 2048, targetBytes: 3 * 1024 * 1024 }
       : { maximum: 3200, targetBytes: 6.4 * 1024 * 1024 };
-  const blob = await convertToWebp(file, profile.maximum, profile.targetBytes);
+  const qualities = purpose === "profile-photo" || purpose === "post-image"
+    ? [0.86, 0.8, 0.74, 0.68]
+    : [0.96, 0.9, 0.84, 0.76, 0.68];
+  const blob = await convertToWebp(file, profile.maximum, profile.targetBytes, qualities);
   return new File(
     [blob],
     `${file.name.replace(/\.[^.]+$/, "") || "imagem"}.webp`,
@@ -61,6 +70,7 @@ async function convertToWebp(
   file: File,
   maximumDimension: number,
   targetBytes: number,
+  qualities: number[],
 ) {
   let bitmap: ImageBitmap;
   try {
@@ -87,7 +97,7 @@ async function convertToWebp(
       context.imageSmoothingEnabled = true;
       context.imageSmoothingQuality = "high";
       context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-      for (const quality of [0.96, 0.9, 0.84, 0.76, 0.68]) {
+      for (const quality of qualities) {
         const candidate = await canvasToBlob(canvas, quality);
         if (!candidate) continue;
         if (!smallest || candidate.size < smallest.size) smallest = candidate;

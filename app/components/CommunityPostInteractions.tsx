@@ -1,4 +1,6 @@
 "use client";
+import SafeImage from "./SafeImage";
+
 
 import { FormEvent, KeyboardEvent, useCallback, useRef, useState } from "react";
 import VerifiedOwnerName from "./VerifiedOwnerName";
@@ -11,6 +13,7 @@ type Comment = {
   foto: string;
   papel: string;
   ownerVerified?: boolean;
+  officialTitle?: string | null;
   isOwner?: boolean;
 };
 
@@ -154,11 +157,11 @@ export default function CommunityPostInteractions({
                 {visible.map((comment) => (
                   <article key={comment.id} className="community-comment" data-pending={comment.pending ? "true" : undefined}>
                     {comment.foto
-                      ? <img loading="lazy" src={comment.foto} alt="" />
+                      ? <SafeImage loading="lazy" fallbackName={comment.autor} fallbackKind="avatar" src={comment.foto} alt="" />
                       : <span aria-hidden="true">{initials(comment.autor)}</span>}
                     <div className="community-comment-body">
                       <header>
-                        <VerifiedOwnerName className="community-comment-name" name={comment.autor} verified={Boolean(comment.ownerVerified)} />
+                        <VerifiedOwnerName className="community-comment-name" name={comment.autor} verified={Boolean(comment.ownerVerified)} officialTitle={comment.officialTitle} />
                         {comment.papel && (
                           <span className="community-comment-role" data-highlight={HIGHLIGHTED_ROLES.includes(comment.papel) ? "true" : undefined}>
                             {comment.papel}

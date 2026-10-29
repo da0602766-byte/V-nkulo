@@ -1,4 +1,7 @@
 "use client";
+import VinkuloMark from "./VinkuloMark";
+
+
 
 import { FormEvent, useEffect, useState } from "react";
 import type {
@@ -237,12 +240,7 @@ export default function LoginCustomizationWorkspace() {
               Texto de apoio
               <textarea value={config.subtitulo} maxLength={240} onChange={(event) => setConfig({ ...config, subtitulo: event.target.value })} required />
             </label>
-            <NativeImageUpload
-              label="Logo do portal"
-              value={config.logoUrl}
-              purpose="login-logo"
-              onChange={(logoUrl) => setConfig({ ...config, logoUrl })}
-            />
+            <div><VinkuloMark size={48}/><p>Logo oficial do Vínkulo, compartilhada por todas as áreas.</p></div>
             <NativeImageUpload
               label="Imagem de fundo"
               value={config.backgroundImageUrl}
@@ -350,7 +348,7 @@ export default function LoginCustomizationWorkspace() {
           } as React.CSSProperties}
         >
           <div>
-            {config.logoUrl ? <img loading="lazy" src={config.logoUrl} alt="" /> : <b>{config.siteName.slice(0, 1)}</b>}
+            <VinkuloMark size={40}/>
             <strong>{config.siteName}</strong>
           </div>
           <p>{config.kicker}</p>

@@ -1,4 +1,5 @@
 import { getD1 } from "../../../../db";
+import { rejectDisabledOffline } from "../../../lib/android-offline-policy";
 import { getCurrentSessionTokenHash } from "../../../lib/local-auth";
 import { requireTenantPermission } from "../../../lib/tenant";
 
@@ -9,6 +10,8 @@ const reply = (value: unknown, status = 200) => Response.json(value, {
 // This is an authenticated snapshot, not an API access token. Android obtains
 // it over HTTPS directly and seals it with Keystore. No signing secret is sent.
 export async function GET(request: Request) {
+  const blocked = await rejectDisabledOffline();
+  if (blocked) return blocked;
   const origin = new URL(request.url).origin;
   if (request.headers.get("origin") !== origin || request.headers.get("sec-fetch-site") === "cross-site") {
     return reply({ error: "Origem inválida." }, 403);

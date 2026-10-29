@@ -1,3 +1,4 @@
+import { deleteUserAccount } from "../../lib/delete-user-account";
 import { getD1 } from "../../../db";
 import { getRuntimeEnv } from "../../../db/runtime-env";
 import { deleteDriveFile, getDriveAccessToken, readStorageReference } from "../../lib/google-integration";
@@ -113,6 +114,15 @@ export async function GET(request?: Request) {
       .prepare(
         `SELECT u.id, u.nome, u.email, u.telefone, u.foto_perfil, u.perfil,
           u.titulo_eclesiastico, u.ativo, u.criado_em,
+          (SELECT json_group_array(json_object('nome',c.nome,'papel',uc.papel,'status',uc.status))
+            FROM usuario_comunidades uc JOIN comunidades c ON c.id=uc.comunidade_id
+            WHERE uc.usuario_id=u.id) AS vinculos_detalhes,
+          (SELECT json_group_array(json_object('nome',c.nome,'plano',p.nome,'status',s.status,'termina_em',s.termina_em,
+            'vigente',CASE WHEN s.status='ATIVA' AND (s.termina_em IS NULL OR datetime(s.termina_em)>datetime('now')) THEN 1 ELSE 0 END))
+            FROM assinaturas_comunidade s JOIN comunidades c ON c.id=s.comunidade_id
+            JOIN planos_plataforma p ON p.id=s.plano_id LEFT JOIN solicitacoes_log1 l ON l.id=s.solicitacao_id
+            WHERE c.proprietario_usuario_id=u.id OR l.usuario_id=u.id) AS assinaturas_detalhes,
+          (SELECT GROUP_CONCAT(c.nome, ' • ') FROM comunidades c WHERE c.proprietario_usuario_id=u.id) AS comunidades_responsavel,
           (SELECT COUNT(*) FROM usuario_comunidades uc
             WHERE uc.usuario_id = u.id AND uc.status = 'ATIVO') AS comunidades,
           COALESCE((SELECT GROUP_CONCAT(c.nome, ' • ')
@@ -429,63 +439,7 @@ export async function PATCH(request: Request) {
         { status: 409 },
       );
     }
-    const dependencies = await findUserDependencies(db, userId);
-    if (dependencies.length) {
-      await db
-        .prepare(
-          `INSERT INTO auditoria_piloto
-           (comunidade_id, usuario_id, evento, resultado, metadados)
-           VALUES (NULL, ?, 'EXCLUSAO_DEFINITIVA_DE_CONTA_BLOQUEADA', 'NEGADO', ?)`,
-        )
-        .bind(
-          access.user.id,
-          JSON.stringify({
-            usuarioId: userId,
-            dependencias: dependencies.slice(0, 12),
-          }),
-        )
-        .run();
-      return Response.json(
-        {
-          error:
-            "Esta conta possui vínculos ou históricos funcionais. Desative-a para preservar os dados.",
-          dependencies,
-        },
-        { status: 409 },
-      );
-    }
-    try {
-      await db.batch([
-        db.prepare("DELETE FROM notificacoes_lidas WHERE usuario_id = ?").bind(userId),
-        db
-          .prepare(
-            "DELETE FROM notificacoes_sistema WHERE usuario_id = ? OR remetente_usuario_id = ?",
-          )
-          .bind(userId, userId),
-        db.prepare("DELETE FROM sessoes WHERE usuario_id = ?").bind(userId),
-        db.prepare("DELETE FROM redefinicoes_senha WHERE usuario_id = ?").bind(userId),
-        db
-          .prepare(
-            `INSERT INTO auditoria_piloto
-             (comunidade_id, usuario_id, evento, resultado, metadados)
-             VALUES (NULL, ?, 'CONTA_DE_TESTE_EXCLUIDA_DEFINITIVAMENTE', 'SUCESSO', ?)`,
-          )
-          .bind(
-            access.user.id,
-            JSON.stringify({ usuarioId: userId, motivo: "conta_sem_vinculos_funcionais" }),
-          ),
-        db.prepare("DELETE FROM usuarios WHERE id = ?").bind(userId),
-      ]);
-    } catch {
-      return Response.json(
-        {
-          error:
-            "A exclusão foi bloqueada por um vínculo protegido não removível. Use a desativação.",
-        },
-        { status: 409 },
-      );
-    }
-    return Response.json({ ok: true, deleted: true });
+    return deleteUserAccount(db, access.user.id, userId);
   }
 
   const requestId = Number(payload.requestId || 0);
@@ -742,50 +696,6 @@ async function findOwnerUser(db: ReturnType<typeof getD1>, userId: number) {
     )
     .bind(userId)
     .first<OwnerUser>();
-}
-
-async function findUserDependencies(
-  db: ReturnType<typeof getD1>,
-  userId: number,
-) {
-  const ignored = new Set([
-    "auditoria_piloto",
-    "notificacoes_lidas",
-    "notificacoes_sistema",
-    "redefinicoes_senha",
-    "sessoes",
-  ]);
-  const tables = await db
-    .prepare(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
-    )
-    .all<{ name: string }>();
-  const dependencies: { table: string; column: string; total: number }[] = [];
-  for (const entry of tables.results) {
-    if (ignored.has(entry.name)) continue;
-    const table = entry.name.replaceAll('"', '""');
-    const foreignKeys = await db
-      .prepare(`PRAGMA foreign_key_list("${table}")`)
-      .all<{ table: string; from: string }>();
-    for (const foreignKey of foreignKeys.results) {
-      if (foreignKey.table !== "usuarios" || !foreignKey.from) continue;
-      const column = foreignKey.from.replaceAll('"', '""');
-      const count = await db
-        .prepare(
-          `SELECT COUNT(*) AS total FROM "${table}" WHERE "${column}" = ?`,
-        )
-        .bind(userId)
-        .first<{ total: number }>();
-      if (Number(count?.total || 0) > 0) {
-        dependencies.push({
-          table: entry.name,
-          column: foreignKey.from,
-          total: Number(count?.total || 0),
-        });
-      }
-    }
-  }
-  return dependencies;
 }
 
 function parseOwnerLayout(value: unknown) {

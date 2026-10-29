@@ -16,6 +16,7 @@ export async function saveImageOutsidePlatform(
     cache: "no-store",
   });
   const preference = (await preferenceResponse.json()) as {
+    userId?: number;
     preference?: { provider?: string };
     error?: string;
   };
@@ -31,7 +32,7 @@ export async function saveImageOutsidePlatform(
       );
     }
     return {
-      url: await storeLocalMedia(prepared),
+      url: await storeLocalMedia(prepared, preference.userId),
       storage: "LOCAL" as const,
     };
   }

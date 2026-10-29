@@ -54,7 +54,8 @@ test("a reserva mantém comprovante, QR e uma garagem reutilizável do próprio 
   assert.match(garage, /vinkulo:gestao:garagem:/);
   assert.match(memberPortal, /CPF\/CNPJ não será salvo/);
   assert.match(memberPortal, /Código copiado/);
-  assert.match(memberPortal, /ParkingReservationQr code=\{justCreated\.codigo\}/);
+  assert.doesNotMatch(memberPortal, /ParkingReservationQr code=\{justCreated\.codigo\}/);
+  assert.match(memberPortal, /Quando aprovada, o comprovante para entrada/);
   assert.match(memberPortal, /ParkingReservationQr code=\{reservation\.codigo\}/);
   assert.match(memberPortal, /Entrada já liberada/);
 });
@@ -68,7 +69,9 @@ test("quem tem acesso permanente à gestão não perde o console ao trocar de ap
   assert.match(orchestrator, /isPermanentLeader/);
   assert.match(orchestrator, /parking\.configure/);
   assert.match(orchestrator, /showOperatorMobile = isMobile && isOnDutyShift && !isPermanentLeader/);
-  assert.match(managementConsole, /gestao-reservation-details/);
+  assert.match(managementConsole, /ParkingReservationTable parking=\{parking\}/);
+  const table = await read("app/components/parking/ParkingReservationTable.tsx");
+  assert.match(table, /<summary>Detalhes<\/summary>/);
   assert.match(reservations, /"parking.entry", "parking.exit", "parking.edit", "parking.configure"/);
 });
 

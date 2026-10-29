@@ -1,0 +1,17 @@
+.community-admin-extra .community-settings-nav-v5{gap:8px}
+.community-admin-extra .community-settings-nav-v5 button{min-height:44px;padding:8px 14px;line-height:1.35;white-space:normal;text-align:left}
+.community-settings-section[hidden]{display:none}
+.community-request-filters{display:grid;grid-template-columns:minmax(0,2fr) minmax(160px,1fr) auto;gap:12px;align-items:end;margin:20px 0 12px}
+.community-request-filters label{display:grid;gap:6px;min-width:0;font-size:14px;font-weight:650;color:var(--pilot-text)}
+.community-request-filters :is(input,select){min-width:0;width:100%;min-height:44px;padding:10px 12px;border:1px solid var(--pilot-line);border-radius:12px;background:var(--pilot-surface);color:var(--pilot-text);font:inherit;font-size:16px;font-weight:400}
+.community-request-filters button,.community-settings-error button{min-height:44px;padding:8px 12px;border:1px solid var(--pilot-line);border-radius:12px;background:var(--pilot-surface);color:var(--pilot-text);font:inherit;font-weight:650;cursor:pointer}
+.community-request-count{color:var(--pilot-muted);font-size:14px;margin:0 0 16px}
+.community-settings-error{padding:16px;border:1px solid var(--pilot-line);border-radius:12px;background:var(--pilot-surface);color:var(--pilot-text)}
+.community-admin-extra .join-request-list button{min-height:44px;min-width:88px;padding:10px 14px}
+.community-admin-extra .join-request-list summary{padding:10px 0;min-height:44px;cursor:pointer}
+.community-admin-extra .join-request-list :is(strong,small){overflow-wrap:anywhere}
+.community-admin-extra .join-requests-panel>header{flex-wrap:wrap;gap:12px;align-items:flex-start}
+.community-admin-extra .join-requests-panel>header>span{white-space:nowrap}
+.community-admin-extra .parking-module-control>small{display:block;flex-basis:100%;color:var(--pilot-muted);font-size:14px;line-height:1.5}
+.community-admin-extra :is(button,input,select,summary):focus-visible{outline:3px solid var(--pilot-primary,var(--pilot-purple));outline-offset:3px}
+@media(max-width:680px){.community-admin-extra .community-settings-nav-v5{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.community-admin-extra .community-settings-nav-v5 button{border-radius:12px;justify-content:space-between;font-size:14px;padding:10px 12px}.community-request-filters{grid-template-columns:minmax(0,1fr)}.community-admin-extra .join-request-list article{min-width:0}.community-admin-extra .join-request-list article>div{min-width:0}}

@@ -7,6 +7,10 @@ if [[ "${SITES_ENV_READY:-}" != "1" ]]; then
   exec "${script_dir}/sites-env.sh" -- "$0" "$@"
 fi
 
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*) exec node "${script_dir}/install-portable.mjs" ;;
+esac
+
 command -v flock >/dev/null || {
   echo "install-ci.sh requires Linux flock." >&2
   exit 69

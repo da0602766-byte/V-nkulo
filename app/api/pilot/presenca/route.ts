@@ -7,6 +7,7 @@ type PresenceRow = {
   nome: string;
   foto_perfil: string | null;
   hierarquia: string;
+  titulo_oficial: string | null;
   ultima_atividade: string;
   exibir_ultima_atividade: number;
   online: number;
@@ -36,20 +37,19 @@ async function listPresence(
 ) {
   const result = await getD1()
     .prepare(
-      `SELECT p.usuario_id, u.nome, u.foto_perfil,
+      `SELECT p.usuario_id, u.nome, u.foto_perfil, oc.titulo AS titulo_oficial,
         u.email AS owner_email, u.criado_em AS owner_criado_em,
         COALESCE(json_extract(u.cadastro_dados, '$.biografia.value'), '') AS biografia,
         CASE
           WHEN c.proprietario_usuario_id = u.id THEN 'PROPRIETÁRIO'
           WHEN NULLIF(oc.titulo, '') IS NOT NULL THEN oc.titulo
-          WHEN uc.papel = 'ADMIN_COMUNIDADE' THEN 'ADMINISTRADOR'
+          WHEN uc.papel IN ('ADMIN_COMUNIDADE', 'SUPERADMIN') THEN 'ADMINISTRADOR'
           WHEN uc.papel = 'PASTOR' THEN 'PASTOR'
           WHEN uc.papel = 'LIDER' THEN 'LÍDER'
           ELSE 'MEMBRO'
         END AS hierarquia,
         CASE
-          WHEN u.perfil = 'ADMIN'
-            OR uc.papel IN ('ADMIN_COMUNIDADE', 'PASTOR', 'LIDER')
+          WHEN uc.papel IN ('ADMIN_COMUNIDADE', 'SUPERADMIN', 'PASTOR', 'LIDER')
             OR EXISTS (
               SELECT 1 FROM oficiais_comunidade oc2
               WHERE oc2.usuario_comunidade_id = uc.id
@@ -89,6 +89,7 @@ async function listPresence(
       name: item.nome,
       avatarUrl: item.foto_perfil,
       hierarchy: item.hierarquia,
+      officialTitle: item.titulo_oficial,
       online: Boolean(item.online),
       lastSeen:
         item.online ||

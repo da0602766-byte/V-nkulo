@@ -105,9 +105,12 @@ export async function migrateVisitorAgeCategories(
          FROM visitantes
          WHERE comunidade_id = ? AND ativo = 1 AND escopo_confirmado = 1
            AND data_nascimento IS NOT NULL
+           AND (categoria_id IS NULL OR categoria_id IN (
+             SELECT id FROM visitante_categorias WHERE comunidade_id = ? AND migracao_automatica = 1
+           ))
          LIMIT 5000`,
       )
-      .bind(communityId)
+      .bind(communityId, communityId)
       .all<{ id: number; data_nascimento: string; categoria_id: number | null }>(),
   ]);
   if (!categoryResult.results.length || !visitorResult.results.length) return 0;

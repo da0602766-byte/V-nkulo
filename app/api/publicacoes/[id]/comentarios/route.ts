@@ -22,7 +22,7 @@ export async function GET(_request: Request, context: Context) {
   }
   const viewer = await getSessionUser();
   const viewerIsSuperadmin = Boolean(
-    viewer?.ativo && (viewer.perfil === "ADMIN" || viewer.system_owner),
+    viewer?.ativo && viewer.system_owner === true,
   );
   const result = await db
     .prepare(
@@ -154,6 +154,7 @@ async function findPublicPost(db: ReturnType<typeof getD1>, id: number) {
       WHERE p.id = ?
         AND p.status = 'PUBLICADA'
         AND p.visibilidade = 'PLATAFORMA'
+        AND p.audiencia_tipo = 'PUBLICO'
         AND (
           (p.comunidade_id IS NULL AND p.origem = 'PLATAFORMA')
           OR (

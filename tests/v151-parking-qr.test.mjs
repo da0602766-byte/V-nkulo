@@ -107,14 +107,15 @@ test("QR confirmado é lido pelo responsável e ocupa a vaga uma única vez", as
   const managerCookie = await login(worker, env, "responsavel.qr@example.test", "ResponsavelQR123");
   const startsAt = new Date(Date.now() + 5 * 60_000).toISOString();
   const endsAt = new Date(Date.now() + 65 * 60_000).toISOString();
-  database.prepare(`INSERT INTO eventos_comunidade
+  const eventId = Number(database.prepare(`INSERT INTO eventos_comunidade
     (comunidade_id,titulo,inicia_em,termina_em,status,publico)
-    VALUES (1,'Culto com estacionamento',?,?, 'PUBLICADO',1)`).run(startsAt,endsAt);
+    VALUES (1,'Culto com estacionamento',?,?, 'PUBLICADO',1)`).run(startsAt,endsAt).lastInsertRowid);
   const createResponse = await worker.fetch(new Request("http://localhost/api/pilot/estacionamento/reservas", {
     method: "POST",
     headers: { cookie: memberCookie, "content-type": "application/json" },
     body: JSON.stringify({
       vagaId: Number(vaga.id),
+      eventoId: eventId,
       nomeCompleto: "Usuário da Reserva QR",
       email: "reserva.qr@example.test",
       telefone: "47999998888",

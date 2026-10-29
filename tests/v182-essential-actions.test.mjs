@@ -26,7 +26,7 @@ test("protected removal explains blockers and owner removal releases commitments
   const api = await read("app/api/pilot/pessoas/route.ts");
   assert.match(people, /people-removal-guidance/);
   assert.match(people, /Ir para o local/);
-  assert.match(api, /buildRemovalBlockers/);
+  assert.match(api, /deleteUserAccount/);
   assert.match(api, /Participante liberado da escala/);
   assert.match(api, /Integrante removido do ministério/);
   assert.match(api, /Funções e escalas foram liberadas/);

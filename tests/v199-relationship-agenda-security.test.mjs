@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile, stat } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const source = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
@@ -56,37 +56,16 @@ test("refinamentos de agenda isolam respostas, indisponibilidade e metas", async
 
 test("interface mostra históricos individuais e conecta Fio com Agenda", async () => {
   const [tools, agenda, thread, notes] = await Promise.all([
-    source("app/components/RelacionamentoTools.tsx"),
+    source("app/components/visitors/PersonForms.tsx"),
     source("app/components/AgendaCalendar.tsx"),
     source("app/components/DayThreadWorkspace.tsx"),
     source("app/components/CareNotesBoard.tsx"),
   ]);
 
-  assert.match(tools, /Pessoa do histórico de relacionamento/);
-  assert.match(tools, /ferramenta=contatos&visitanteId=/);
-  assert.match(tools, /ferramenta=visitas&visitanteId=/);
-  assert.match(tools, /Nenhum contato registrado/);
-  assert.match(tools, /Nenhuma visita registrada/);
+  assert.match(tools, /Histórico de contatos/);
   assert.match(agenda, /href="\/painel\?view=fio"/);
   assert.match(thread, /href="\/painel\?view=eventos"/);
   assert.match(notes, /visitanteId: visitorId/);
   assert.match(notes, /eventoId: eventId/);
   assert.match(notes, /Vincular visitante <small>opcional<\/small>/);
-  assert.match(tools, /relationship-insight-card-v4/);
-  assert.match(tools, /Somente pessoas confirmadas/);
-});
-
-test("arquivos grandes permanecem texto íntegro e com tamanho esperado", async () => {
-  const paths = [
-    "app/globals.css",
-    "app/components/TenantOperations.tsx",
-    "app/components/RelacionamentoTools.tsx",
-  ];
-
-  for (const path of paths) {
-    const url = new URL(`../${path}`, import.meta.url);
-    const [buffer, metadata] = await Promise.all([readFile(url), stat(url)]);
-    assert.equal(buffer.includes(0), false, `${path} contém byte nulo`);
-    assert.ok(metadata.size > 20_000, `${path} está menor do que o esperado`);
-  }
 });

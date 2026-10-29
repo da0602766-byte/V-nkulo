@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { runInNewContext } from "node:vm";
 import test from "node:test";
 import ts from "typescript";
-import { Miniflare } from "miniflare";
+import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import { createPilotD1, createPilotUser } from "./helpers/sqlite-d1.mjs";
 
 async function moduleAt(path, dependencies = {}) {
@@ -37,6 +37,7 @@ async function fixture(t) {
     "../../../lib/chat-retention": retention, "../../../lib/push-delivery-queue": { scheduleWebPushDelivery: db => wakeups.push(db) },
   });
   const queue = await moduleAt("app/lib/push-delivery-queue.ts", {
+    "./owner-notifications": await moduleAt("app/lib/owner-notifications.ts"),
     "./chat-push": authorize, "../../db/runtime-env": { getRuntimeEnv: () => ({}) },
     "./firebase-integration": { readFirebaseConfig: async () => ({}), nativeToken: endpoint => endpoint.startsWith("fcm:") ? endpoint.slice(4) : null,
       sendFcm: async (_config, endpoint, payload) => { sends.push({ endpoint, payload, native: true }); return new Response(null, { status: 200 }); } },
@@ -44,6 +45,8 @@ async function fixture(t) {
       sendWebPush: async (subscription, payload, _config, options) => { sends.push({ endpoint: subscription.endpoint, payload: JSON.parse(payload), options }); return new Response(null, { status: 201 }); } },
   });
   const resolve = await moduleAt("app/api/push-subscriptions/notification/route.ts", {
+    "../../../lib/owner-notifications": await moduleAt("app/lib/owner-notifications.ts"),
+    "../../../lib/device-notification-content": await moduleAt("app/lib/device-notification-content.ts"),
     "../../../../db": { getD1: () => d1 }, "../../../lib/chat-push": authorize,
     "../../../lib/local-auth": { getSessionUser: async () => currentUser ? { id: currentUser, ativo: true } : null, getCurrentSessionTokenHash: async () => `session-${sessionUser}` },
     "../../../lib/web-push": { safeDestination: value => value.startsWith("/painel?") ? value : "/painel" },
@@ -53,10 +56,11 @@ async function fixture(t) {
   const notification = () => database.prepare("SELECT * FROM notificacoes_sistema WHERE area='CHAT' ORDER BY id DESC LIMIT 1").get();
   const request = () => resolve.GET(new Request(`https://test.invalid/api/push-subscriptions/notification?id=${notification().id}&binding=${rows()[0].vinculo_id}`));
   return { database, d1, ids, sender, recipient, outsider, chat, queue, authorize, retention, sends, wakeups, post, rows, notification, request, batchStatements: () => batchStatements,
+    asChat: user => { access.user.id = user; },
     as: (user, session = user) => { currentUser = user; sessionUser = session; }, feedOnly: () => { access.context.communityAccess = "FEED_ONLY"; } };
 }
 
-test("chat: grava mensagem, aviso genérico e fila somente do destinatário; Web e APK recebem", async t => {
+test("chat: prévia específica só após autorização; Web/FCM recebem apenas metadados", async t => {
   const f = await fixture(t);
   f.database.prepare("INSERT INTO notificacoes_push_dispositivos(usuario_id,endpoint,p256dh,auth,sessao_token_hash,vinculo_id) VALUES (?,'fcm:native-recipient','key','auth',?,?)")
     .run(f.recipient, `session-${f.recipient}`, crypto.randomUUID());
@@ -67,8 +71,8 @@ test("chat: grava mensagem, aviso genérico e fila somente do destinatário; Web
   assert.ok(f.rows().every(row => row.usuario_id === f.recipient)); assert.equal(f.wakeups.length, 1);
   assert.doesNotMatch(JSON.stringify(f.notification()), /Conteúdo privado/);
   const display = await f.request(); assert.equal(display.status, 200);
-  const notice = await display.json(); assert.match(notice.body, /nova mensagem/); assert.equal(notice.url, "/painel?view=mensagens");
-  assert.doesNotMatch(JSON.stringify(notice), /Conteúdo privado|sender|recipient/);
+  const notice = await display.json(); assert.equal(notice.title, "Mensagem de sender"); assert.equal(notice.body, "Conteúdo privado de teste"); assert.equal(notice.url, "/painel?view=mensagens");
+  assert.equal(display.headers.get("cache-control"), "no-store");
   await f.queue.drainPushQueue(f.d1);
   assert.equal(f.sends.length, 2); assert.ok(f.rows().every(row => row.estado === "ACEITO"));
   assert.equal(f.sends.find(item => !item.native).options.urgent, true);
@@ -98,8 +102,9 @@ test("chat: não envia nem exibe depois de leitura, perda de vínculo, mudança 
     await f.post(); f.database.exec(mutate);
     assert.equal(await f.authorize.getAuthorizedChatPush(f.d1, f.notification().id, f.recipient), null);
     assert.equal((await f.request()).status, 404);
+    f.database.prepare("UPDATE notificacoes_push_fila SET proxima_tentativa_em=0 WHERE estado='PENDENTE'").run();
     await f.queue.drainPushQueue(f.d1);
-    assert.equal(f.rows().at(-1).estado, "CANCELADA"); f.database.exec(restore);
+    assert.equal(f.rows().at(-1).estado, "CANCELADA", mutate); f.database.exec(restore);
   }
   assert.equal(f.sends.length, 0);
 });
@@ -133,7 +138,7 @@ test("chat: retenção semanal apaga também metadados e fila, sem repetir hist�
 test("chat no D1 real: batch devolve RETURNING, isola envios concorrentes e reverte falha na fila", async t => {
   const f = await fixture(t);
   const created = await (await f.post()).json(), statements = f.batchStatements();
-  const mf = new Miniflare({ modules: true, compatibilityDate: "2026-05-15", cf: false, d1Databases: ["DB"], script: "export default { fetch(){ return new Response('test'); } };" });
+  const mf = new Miniflare(convertV4MiniflareOptions({ modules: true, compatibilityDate: "2026-05-15", cf: false, d1Databases: ["DB"], script: "export default { fetch(){ return new Response('test'); } };" }));
   t.after(() => mf.dispose());
   const db = await mf.getD1Database("DB");
   const definitions = [
@@ -161,4 +166,32 @@ test("chat no D1 real: batch devolve RETURNING, isola envios concorrentes e reve
   await assert.rejects(send(), /simulated-failure/);
   assert.equal((await db.prepare("SELECT COUNT(*) n FROM mensagens_privadas").first()).n, 2);
   assert.equal((await db.prepare("SELECT COUNT(*) n FROM notificacoes_sistema").first()).n, 2);
+});
+
+
+test('chat: perfil ADMIN legado não muda o grupo nem a autorização da prévia',async t=>{
+  const f=await fixture(t);
+  f.database.prepare("UPDATE usuarios SET perfil='ADMIN' WHERE id=?").run(f.sender);
+  assert.equal((await f.post()).status,201);
+  assert.ok(await f.authorize.getAuthorizedChatPush(f.d1,f.notification().id,f.recipient));
+  f.database.prepare("UPDATE usuario_comunidades SET papel='LIDER' WHERE usuario_id=?").run(f.recipient);
+  assert.equal(await f.authorize.getAuthorizedChatPush(f.d1,f.notification().id,f.recipient),null);
+});
+
+
+test("chat: aviso usa última recebida não lida, mesmo após resposta própria, e respeita preferência", async t => {
+  const f=await fixture(t);
+  const sent=await (await f.post("Mensagem recebida para a prévia")).json();
+  f.asChat(f.recipient);
+  await f.post("Minha resposta não deve virar aviso",f.sender);
+  const get=async()=>await (await f.chat.GET(new Request("https://test.invalid/api/pilot/chat"))).json();
+  let payload=await get();
+  assert.equal(payload.conversations[0].ultima_mensagem,"Minha resposta não deve virar aviso");
+  assert.equal(payload.conversations[0].ultima_recebida,"Mensagem recebida para a prévia");
+  assert.equal(payload.conversations[0].ultima_recebida_id,sent.message.id);
+  assert.equal(payload.messageNotificationsEnabled,true);
+  f.database.prepare("INSERT INTO configuracoes(chave,valor,atualizado_por) VALUES (?,?,'test')").run('notification_preferences:'+f.recipient,JSON.stringify({mensagens:false}));
+  assert.equal((await get()).messageNotificationsEnabled,false);
+  await f.chat.PATCH(new Request("https://test.invalid/api/pilot/chat",{method:"PATCH",body:JSON.stringify({conversationId:sent.conversationId})}));
+  payload=await get();assert.equal(payload.conversations[0].ultima_recebida_id,null);assert.equal(payload.conversations[0].ultima_recebida,null);
 });

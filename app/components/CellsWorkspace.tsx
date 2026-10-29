@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import "./cells/cells.css";
+import "./directory-controls.css";
 import CellManagementConsole from "./cells/CellManagementConsole";
 import CellMemberPortal from "./cells/CellMemberPortal";
 import { useCellsData } from "./cells/useCellsData";
@@ -34,11 +35,11 @@ export default function CellsWorkspace({
   const hasGestaoAccess =
     permissions.includes("cells.manage") || cells.cells.some((cell) => cell.can_operate);
 
-  if (memberMode || !hasGestaoAccess) {
-    return <CellMemberPortal communityName={communityName} cells={cells} />;
+  if (!cells.hasLoaded) {
+    return <section className="cells-load-state" aria-busy={cells.loading}><h1>Células</h1>{cells.loading ? <p role="status">Carregando células…</p> : <><p role="alert">Não foi possível carregar as células. {cells.loadError}</p><button type="button" onClick={() => void cells.retryLoad()}>Tentar novamente</button></>}</section>;
   }
 
-  return view === "participacao" ? (
+  const content = memberMode || !hasGestaoAccess ? <CellMemberPortal communityName={communityName} cells={cells} /> : view === "participacao" ? (
     <CellMemberPortal communityName={communityName} cells={cells} onBackToGestao={() => setView("gestao")} />
   ) : (
     <CellManagementConsole
@@ -47,4 +48,5 @@ export default function CellsWorkspace({
       onPreviewParticipacao={() => setView("participacao")}
     />
   );
+  return <>{cells.loadError && <div className="cells-load-state" role="alert"><p>Não foi possível atualizar as células. Os dados abaixo são da última atualização.</p><button type="button" disabled={cells.loading} onClick={() => void cells.retryLoad()}>Tentar novamente</button></div>}{content}</>;
 }

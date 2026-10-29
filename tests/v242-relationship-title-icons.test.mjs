@@ -5,15 +5,6 @@ import test from "node:test";
 const root = new URL("..", import.meta.url);
 const read = (path) => readFile(new URL(path, root), "utf8");
 
-test("Central de Relacionamento atualiza somente quando a aba está visível", async () => {
-  const source = await read("app/components/RelacionamentoTools.tsx");
-  assert.match(source, /window\.setInterval\(refreshWhenVisible, 5_000\)/);
-  assert.match(source, /document\.visibilityState === "visible"/);
-  assert.match(source, /window\.addEventListener\("focus", refreshWhenVisible\)/);
-  assert.match(source, /refreshInFlight/);
-  assert.match(source, /\[visitanteHistoricoId, refreshTick\]/);
-});
-
 test("título oficial usa categorias, contraste legível e remoção explícita", async () => {
   const [people, styles] = await Promise.all([
     read("app/components/PeopleWorkspace.tsx"),
@@ -29,12 +20,12 @@ test("título oficial usa categorias, contraste legível e remoção explícita"
 
 test("recepção usa ícones vetoriais nos pontos que antes exibiam emojis", async () => {
   const [experience, styles] = await Promise.all([
-    read("app/components/ReceptionExperience.tsx"),
-    read("app/recepcao.css"),
+    read("app/components/LandingPageExperience.tsx"),
+    read("app/landing-vinkulo.css"),
   ]);
-  assert.match(experience, /function ReceptionIcon/);
-  assert.match(experience, /<ReceptionIcon name=\{item\.icon\}/);
-  assert.match(experience, /<ReceptionIcon name=\{feature\.icone\}/);
+  assert.match(experience, /function FeatureIcon/);
+  assert.match(experience, /<FeatureIcon/);
+  assert.match(experience, /<svg viewBox="0 0 24 24" aria-hidden="true"/);
   assert.doesNotMatch(experience, /[👥🎚️💬📅✨🙋🧭🎉]/u);
-  assert.match(styles, /\.rc-icon/);
+  assert.match(styles, /\.lp-module/);
 });

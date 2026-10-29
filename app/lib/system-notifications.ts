@@ -57,6 +57,7 @@ function normalizeInternalDestination(value?: string) {
 function isSafeInternalDestination(value: string) {
   return (
     value.startsWith("/painel?") ||
+    value.startsWith("/painel/visitantes?") ||
     value.startsWith("/comunidades") ||
     value.startsWith("/proprietario")
   );

@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { needsAndroidPolicyUpdate } from "../lib/android-version";
+import "./android-update-notice.css";
 
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -31,9 +33,13 @@ export default function MobileAppInstall() {
   const [visible, setVisible] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [androidDevice, setAndroidDevice] = useState(false);
+  const [updateRequired, setUpdateRequired] = useState(false);
 
   useEffect(() => {
     const refreshVisibility = () => {
+      if (window.VinkuloAndroid && needsAndroidPolicyUpdate(window.VinkuloAndroid.version)) {
+        setUpdateRequired(true); setVisible(true); return false;
+      }
       if (isStandalone()) {
         setVisible(false);
         return false;
@@ -79,7 +85,13 @@ export default function MobileAppInstall() {
     };
   }, []);
 
-  if (!visible || pathname !== "/") return null;
+  if (!visible) return null;
+  if (updateRequired) return <aside className="android-update-notice" aria-label="Atualização do aplicativo Android">
+    <div><strong>Atualize o aplicativo Vínkulo</strong><p>A versão 1.23.0 corrige a conexão e recebe o controle global do modo offline.</p></div>
+    <a href="/downloads/VINKULO_ANDROID_1.23.0.apk" download>Baixar atualização</a>
+    <button type="button" aria-label="Fechar aviso de atualização" onClick={() => setVisible(false)}>×</button>
+  </aside>;
+  if (pathname !== "/") return null;
 
   const install = async () => {
     if (!installEvent) {
@@ -118,7 +130,7 @@ export default function MobileAppInstall() {
             : <>No Android, abra o menu do navegador e escolha <strong>Instalar aplicativo</strong> ou <strong>Adicionar à tela inicial</strong>.</>}
           {androidDevice && (
             <p>
-              <a href="/downloads/VINKULO_ANDROID_1.7.1.apk" download>Baixar APK Android 1.7.1</a>
+              <a href="/downloads/VINKULO_ANDROID_1.23.0.apk" download>Baixar APK Android 1.23.0</a>
               {" — Permita notificações ao abrir. Os avisos com o aplicativo fechado dependem da ativação do Firebase pelo proprietário."}
             </p>
           )}

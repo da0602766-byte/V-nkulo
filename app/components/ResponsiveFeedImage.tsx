@@ -1,7 +1,10 @@
 "use client";
+import SafeImage from "./SafeImage";
+
 
 import { useEffect, useState } from "react";
 import FeedImageLightbox from "./feed/FeedImageLightbox";
+import FeedImageActions from "./feed/FeedImageActions";
 
 export default function ResponsiveFeedImage({
   src,
@@ -41,9 +44,6 @@ export default function ResponsiveFeedImage({
   if (!src) return null;
   const optimizedSource = dataSaver && thumbnail ? thumbnail : src;
   const showImage = requestedLoad || (presentation === "photo" && preferenceReady && !dataSaver);
-  const downloadUrl = src.startsWith("/api/")
-    ? `${src}${src.includes("?") ? "&" : "?"}download=1`
-    : src;
 
   return (
     <figure
@@ -67,14 +67,14 @@ export default function ResponsiveFeedImage({
         </div>
       ) : failed ? (
         <p className="feed-image-attachment-error" role="alert">
-          A prévia não abriu. O arquivo ainda pode ser baixado.
+          A prévia não abriu. Use as opções da imagem para tentar novamente ou baixar.
         </p>
       ) : (
         <>
           <span className="feed-image-placeholder" aria-hidden="true" />
           <button type="button" className="feed-image-preview" onClick={() => setLightboxOpen(true)} aria-label={`Ampliar imagem: ${alt || "publicação"}`}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+
+          <SafeImage
             src={optimizedSource}
             srcSet={
               !dataSaver && thumbnail && thumbnail !== src
@@ -93,22 +93,12 @@ export default function ResponsiveFeedImage({
           </button>
         </>
       )}
-      <div className="feed-image-attachment-actions">
-        {presentation === "photo" && showImage && !failed ? <button type="button" onClick={() => setLightboxOpen(true)}>Ampliar imagem</button> : (
-        <button
-          type="button"
-          onClick={() => {
-            setFailed(false);
-            setRequestedLoad((current) => !current);
-          }}
-        >
-          {requestedLoad ? "Fechar imagem" : "Visualizar imagem"}
-        </button>
-        )}
-        <a href={downloadUrl} download>
-          Baixar imagem
-        </a>
-      </div>
+      <FeedImageActions source={src} overlay={showImage && !failed}
+        canEnlarge={showImage && !failed}
+        onView={() => {
+          if (showImage && !failed) setLightboxOpen(true);
+          else { setFailed(false); setLoaded(false); setRequestedLoad(true); }
+        }} />
       {lightboxOpen && <FeedImageLightbox src={src} alt={alt} onClose={() => setLightboxOpen(false)} />}
     </figure>
   );

@@ -1,0 +1,14 @@
+.people-directory .people-toolbar { align-items: end; gap: 12px; }
+.people-directory .people-toolbar > label { display: grid; gap: 6px; min-width: 0; color: var(--pilot-muted); font-size: 14px; }
+.people-directory :is(.people-tabs button, .people-toolbar input, .people-pagination button, .people-clear-filters) { min-height: 44px; }
+.people-clear-filters, .directory-load-error button { padding: 10px 14px; min-height: 44px; border: 1px solid var(--pilot-line); border-radius: 10px; background: var(--pilot-surface); color: var(--pilot-text); font: inherit; cursor: pointer; }
+.directory-load-error { padding: 16px; border: 1px solid var(--pilot-line); border-left: 4px solid var(--rose, #b42338); border-radius: 12px; background: var(--pilot-surface); color: var(--pilot-text); }
+.directory-load-error p { margin: 0 0 12px; }
+.people-pagination .people-more-error { flex-basis: 100%; margin: 0; color: var(--pilot-text); line-height: 1.5; }
+.people-directory :is(input, button, summary):focus-visible { outline: 3px solid var(--pilot-primary); outline-offset: 3px; }
+@media (max-width: 640px) {
+  .people-directory .people-toolbar { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .people-directory .people-toolbar input { font-size: 16px; width: 100%; }
+  .people-directory .people-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+  .people-directory .people-tabs button { flex: 1; }
+}

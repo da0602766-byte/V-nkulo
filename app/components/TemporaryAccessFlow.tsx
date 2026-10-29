@@ -1,4 +1,6 @@
 "use client";
+import SafeImage from "./SafeImage";
+
 
 import Link from "./StableLink";
 import { useEffect, useMemo, useState } from "react";
@@ -301,7 +303,7 @@ export default function TemporaryAccessFlow({
                           onChange={() => setReplacementVolunteerId(candidate.voluntarioId)}
                         />
                         {candidate.fotoPerfil ? (
-                          <img loading="lazy" src={candidate.fotoPerfil} alt="" />
+                          <SafeImage loading="lazy" fallbackName={candidate.nome} fallbackKind="avatar" src={candidate.fotoPerfil} alt="" />
                         ) : (
                           <span aria-hidden="true">{initials(candidate.nome)}</span>
                         )}

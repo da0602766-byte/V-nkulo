@@ -61,24 +61,22 @@ test("as seções do trilho são Dia, Comunidade e Gestão", async () => {
   assert.doesNotMatch(dashboard, /label: "Principal"/);
 });
 
-test("Mural e Escalas levam a destinos próprios em vez de repetir a view", async () => {
+test("navegação oferece Início e Ministérios sem duplicar Mural", async () => {
   const dashboard = await read("app/components/PilotDashboard.tsx");
-  assert.match(dashboard, /makeItem\("inicio", "Mural", "mural", \{ anchor: "mural" \}\)/);
-  assert.match(dashboard, /event: "vinkulo:open-schedules"/);
+  assert.match(dashboard, /makeItem\("inicio", "Início"/);
+  assert.match(dashboard, /makeItem\("ministerios", "Ministérios"/);
+  assert.doesNotMatch(dashboard, /makeItem\("inicio", "Mural"/);
   assert.match(dashboard, /openView\(item\.id, item\.focus\)/);
 
   const home = await read("app/components/CommunityHome.tsx");
   assert.match(home, /<header id="mural"[^>]*>/);
 
-  // O ouvinte que só revela a aba depende de poder ver escalas, nunca de ter
-  // ministério administrável — isso é requisito de criar.
-  const ministries = await read("app/components/MinistriesWorkspace.tsx");
-  const reveal = ministries.slice(ministries.indexOf('window.addEventListener("vinkulo:open-schedules"') - 320);
-  assert.match(reveal, /if \(!canViewSchedules\) return;/);
-  assert.doesNotMatch(
-    reveal.slice(0, reveal.indexOf('window.addEventListener("vinkulo:open-schedules"')),
-    /manageableMinistries\.length/,
-  );
+  // The active ministry workspace is loaded through the permission-gated tab.
+  assert.match(dashboard, /id: "ministerios", label: "Ministérios", permission: "ministries\.view"/);
+  assert.match(dashboard, /<SecretaryMinisterialWorkspace/);
+  const ministries = await read("app/components/SecretaryMinisterialWorkspace.tsx");
+  assert.match(ministries, /fetch\("\/api\/pilot\/escalas", \{ cache: "no-store" \}\)/);
+
 });
 
 test("o Fio do dia tem view, rota e item próprios no trilho", async () => {
@@ -169,47 +167,32 @@ test("o fio não lê o relógio durante a renderização nem escreve estado dire
   assert.doesNotMatch(render, /new Date\(\)/);
   // A busca cancela respostas antigas: trocar de dia rápido não pode deixar a
   // resposta anterior sobrescrever a mais nova.
-  assert.match(workspace, /let cancelado = false/);
-  assert.match(workspace, /if \(cancelado\) return;/);
-  assert.match(workspace, /cancelado = true;/);
+  assert.match(workspace, /new AbortController\(\)/);
+  assert.match(workspace, /controller\.signal\.aborted/);
+  assert.match(workspace, /controller\.abort\(\)/);
 });
 
 test("células ganham mapa de saúde calculado dos relatórios já carregados", async () => {
-  const operations = await read("app/components/TenantOperations.tsx");
+  const operations = await read("app/components/cells/format.ts");
   assert.match(operations, /function cellHealth\(cell: Cell, agora: number\): CellHealth/);
   for (const estado of ["SEM_RELATORIO", "ATENCAO", "MULTIPLICAR", "SAUDAVEL"]) {
     assert.ok(operations.includes(`"${estado}"`), `estado ${estado} ausente`);
   }
   // Nenhuma consulta nova: a saúde sai dos relatórios que a rota já devolve.
   assert.match(operations, /cell\.relatorios\.slice\(0, CELL_HEALTH_WEEKS\)/);
-  assert.match(operations, /cellHealthFilter/);
+  assert.match(await read("app/components/cells/CellManagementConsole.tsx"), /cellHealth\(cell, cells\.agora\)/);
   const styles = await read("app/globals.css");
   assert.match(styles, /\.cell-health-pill-v5\[data-saude="SEM_RELATORIO"\]/);
   assert.match(styles, /\.cell-health-weeks-v5/);
 });
 
 test("a saúde da célula não julga atraso antes do relógio acertar", async () => {
-  const operations = await read("app/components/TenantOperations.tsx");
+  const operations = await read("app/components/cells/format.ts");
   const inicio = operations.indexOf("function cellHealth");
   const corpo = operations.slice(inicio, inicio + 900);
   // Sem isso, uma célula em dia apareceria vermelha no primeiro quadro.
   assert.match(corpo, /if \(!agora\) \{/);
   assert.match(corpo, /id: "AGUARDANDO"/);
-});
-
-test("visitantes mostram o funil antes da tabela", async () => {
-  const operations = await read("app/components/TenantOperations.tsx");
-  assert.match(operations, /const funnelStages = /);
-  for (const etapa of ["NOVO", "EM_CONTATO", "EM_ACOMPANHAMENTO", "INTEGRADO"]) {
-    assert.ok(operations.includes(`["${etapa}"`) || operations.includes(`"${etapa}",`), etapa);
-  }
-  // O funil passou a ocupar o lugar do fluxo numerado de Ministérios: mesmo
-  // dispositivo, `secretary-flow` + `visitor-flow-v7`, e segue antes da tabela.
-  const funil = operations.indexOf('className="secretary-flow visitor-flow-v7"');
-  const tabela = operations.indexOf("visitor-bulkbar-v2");
-  assert.ok(funil > 0 && funil < tabela, "o funil não está antes da tabela");
-  const styles = await read("app/visitors.css");
-  assert.match(styles, /\.visitor-flow-v7 div\[data-etapa="INTEGRADO"\]/);
 });
 
 test("notificações agrupam por dia e separam o que precisa de resposta", async () => {
@@ -286,7 +269,9 @@ test("configurações têm navegação por assunto em vez de uma página só", a
     assert.ok(admin.includes(`"${secao}" as const`), `seção ${secao} ausente`);
   }
   // Cada bloco só aparece na sua seção.
-  assert.match(admin, /secaoAtiva === "aparencia" && canManageCommunity && <CommunityThemeEditor \/>/);
+  assert.match(admin, /visitedSections\.includes\("aparencia"\) && canManageCommunity/);
+  assert.match(admin, /hidden=\{secaoAtiva !== "aparencia"\}/);
+  assert.match(admin, /<CommunityThemeEditor active=\{secaoAtiva === "aparencia"\}/);
   assert.match(admin, /secaoAtiva === "solicitacoes" && canManageRequests/);
   const styles = await read("app/globals.css");
   assert.match(styles, /\.community-settings-nav-v5 button\.active/);
@@ -302,7 +287,7 @@ test("o convite mora na seção Acessos, não flutuando acima das abas", async (
     /invite-generator/,
   );
   assert.match(admin, /accessSlot\?: React\.ReactNode;/);
-  assert.match(admin, /secaoAtiva === "acessos" && \(/);
+  assert.match(admin, /hidden=\{secaoAtiva !== "acessos"\}/);
   // Acessos precisa existir quando só há convite, sem link de cadastro.
   assert.match(admin, /canManageRegistrationLinks \|\| Boolean\(accessSlot\)/);
 });
@@ -320,7 +305,7 @@ test("o fio devolve o resumo do dia e a página o exibe", async () => {
   const workspace = await read("app/components/DayThreadWorkspace.tsx");
   assert.match(workspace, /day-thread-stats-v5/);
   assert.match(workspace, /day-thread-aside-v5/);
-  assert.match(workspace, /setResumo\(resultado\.resumo \|\| null\)/);
+  assert.match(workspace, /setResultadoAtual\(\{ key: consultaKey, itens: resultado\.itens, resumo: resultado\.resumo \|\| null \}\)/);
   // Escala incompleta é a única marcada: é a única que pede ação.
   assert.match(workspace, /resumo\.escalas\.confirmadas < resumo\.escalas\.total/);
   const styles = await read("app/globals.css");
@@ -328,34 +313,35 @@ test("o fio devolve o resumo do dia e a página o exibe", async () => {
 });
 
 test("o diálogo de célula separa o que vai para a internet do que é interno", async () => {
-  const operations = await read("app/components/TenantOperations.tsx");
-  const dialogo = operations.slice(operations.indexOf("cell-create-dialog-v2"));
-  // Endereço e descrição públicos ficam num bloco avisado, não soltos na lista.
-  assert.match(dialogo, /form-public-block-v5/);
-  assert.match(dialogo, /aparece na internet/);
-  const bloco = dialogo.slice(dialogo.indexOf("form-public-block-v5"), dialogo.indexOf("</fieldset>", dialogo.indexOf("form-public-block-v5")));
-  assert.match(bloco, /name="enderecoPublico"/);
-  assert.match(bloco, /name="descricaoPublica"/);
-  // Observações internas ficam de fora do bloco público.
-  assert.doesNotMatch(bloco, /name="observacoes"/);
+  const operations = await read("app/components/cells/CellManagementConsole.tsx");
+  const start = operations.indexOf('<fieldset className="cgestao-public-block">');
+  assert.ok(start > 0);
+  const block = operations.slice(start, operations.indexOf('</fieldset>', start));
+  assert.match(block, /aparece na internet/);
+  assert.match(block, /name="enderecoPublico"/);
+  assert.match(block, /name="descricaoPublica"/);
+  assert.doesNotMatch(block, /name="observacoes"/);
+  assert.match(operations, /Observações internas/);
 });
 
-test("os diálogos dizem a consequência no rodapé", async () => {
-  const operations = await read("app/components/TenantOperations.tsx");
-  const rodapes = operations.match(/form-consequence-v5/g) || [];
-  assert.ok(rodapes.length >= 2, `esperava ao menos 2 rodapés, achei ${rodapes.length}`);
-  assert.match(operations, /Só o nome é obrigatório/);
-  const styles = await read("app/globals.css");
-  assert.match(styles, /\.form-consequence-v5/);
+test("cadastro sinaliza campos obrigatórios e exclusão de categoria explica consequência", async () => {
+  const form = await read("app/components/visitors/PersonForms.tsx");
+  const categories = await read("app/components/visitors/Categories.tsx");
+  assert.match(form, /Os campos com \* são obrigatórios/);
+  assert.match(form, /'Nome completo \*',120,'text',true/);
+  assert.match(form, /name="dataEntrada" required/);
+  assert.match(categories, /As pessoas continuam cadastradas e ficam sem esta categoria/);
+  assert.match(categories, /A regra automática desta categoria também será removida/);
 });
 
 test("a data de entrada do visitante usa o fuso local, não UTC", async () => {
-  const operations = await read("app/components/TenantOperations.tsx");
+  const operations = await read("app/components/visitors/PersonForms.tsx");
+  const data = await read("app/components/visitors/data.ts");
   // toISOString devolve UTC: no Brasil, das 21h em diante a data já virou e um
   // visitante do culto de domingo à noite era gravado como segunda.
-  assert.match(operations, /function hojeLocal\(\)/);
-  assert.doesNotMatch(operations, /new Date\(\)\.toISOString\(\)\.slice\(0, 10\)/);
-  assert.match(operations, /defaultValue=\{hojeLocal\(\)\}/);
+  assert.match(data, /timeZone:'America\/Sao_Paulo'/);
+  assert.doesNotMatch(data, /new Date\(\)\.toISOString\(\)\.slice\(0, 10\)/);
+  assert.match(operations, /defaultValue=\{String\(v.data_entrada\|\|today\(\)\)\}/);
 });
 
 test("o diálogo portalizado carrega os tokens que perde ao sair do escopo", async () => {
@@ -401,30 +387,23 @@ test("cada página pública tem o próprio título na aba", async () => {
   assert.match(perfil, /\$\{community\.nome\} \| VÍNKULO/);
 });
 
-test("o acento do login é configurável e o degradê respeita a cor escolhida", async () => {
-  const config = await read("app/lib/pilot-login-config.ts");
-  assert.match(config, /accentColor: "#b25a33"/);
-  const portal = await read("app/components/LoginPortal.tsx");
-  assert.match(portal, /"--login-accent": config\.accentColor \|\| "#b25a33"/);
-
-  const styles = await read("app/globals.css");
-  // A segunda parada era ciano fixo: quem escolhesse outro acento via um
-  // degradê que terminava sempre em ciano.
-  assert.doesNotMatch(styles, /linear-gradient\(145deg,var\(--login-accent\),#3fc9d0\)/);
-  assert.match(styles, /linear-gradient\(145deg,var\(--login-accent\),color-mix\(in srgb,var\(--login-accent\)/);
+test("o login atual usa seus tokens de cor e respeita o tema compartilhado", async () => {
+  const portal = await read("app/components/AccessPortal.tsx");
+  const styles = await read("app/access.css");
+  assert.match(portal, /useThemePreference/);
+  assert.match(portal, /updateTheme\(value\)/);
+  assert.match(styles, /--ac-accent:/);
+  assert.match(styles, /var\(--ac-accent\)/);
+  assert.match(styles, /data-theme=dark/);
 });
 
-test("a coluna do login diz o que a conta faz, não elogios", async () => {
-  const portal = await read("app/components/LoginPortal.tsx");
-  // Procura no texto renderizado, não no comentário que cita a versão antiga.
+test("o login explica como entrar, criar comunidade ou aceitar convite", async () => {
+  const portal = await read("app/components/AccessPortal.tsx");
+  assert.match(portal, /Entre com seu CPF e senha/);
+  assert.match(portal, /Quero criar uma comunidade/);
+  assert.match(portal, /href="\/log1"/);
+  assert.match(portal, /Abra o link enviado pela sua comunidade/);
   assert.doesNotMatch(portal, /<strong>Seguro por contexto<\/strong>/);
-  assert.doesNotMatch(portal, /<strong>Rotina conectada<\/strong>/);
-  assert.match(portal, /Ainda não tem acesso\?/);
-  assert.match(portal, /a liderança da comunidade aprova/);
-
-  const styles = await read("app/globals.css");
-  // Em três colunas de ~150px qualquer frase quebrava em cinco linhas.
-  assert.match(styles, /\.login-shell\[data-ui-version="v2"\] \.login-v2-benefits \{ grid-template-columns:1fr;/);
 });
 
 test("os pontos decorativos da recepção deixaram de imitar estado", async () => {

@@ -16,10 +16,11 @@ test("a carga inicial não expõe posts de outra comunidade, outro ministério o
     insert.run(1, "qa-private", "MINISTERIOS", "[]", 1);
     insert.run(1, "qa-sidebar", "PUBLICO", "[]", 0);
     insert.run(2, "qa-other-tenant", "PUBLICO", "[]", 1);
-    const member = database.prepare(sql).all(1, 0, 0).map((row) => row.titulo);
+    // SSR now carries the same author/global-owner action flags as the GET route.
+    const member = database.prepare(sql).all(0, 0, 0, 0, 0, 0, 1, 0, 0).map((row) => row.titulo);
     assert.ok(member.includes("qa-public"));
     for (const title of ["qa-private", "qa-sidebar", "qa-other-tenant"]) assert.ok(!member.includes(title), title);
-    const moderator = database.prepare(sql).all(1, 1, 0).map((row) => row.titulo);
+    const moderator = database.prepare(sql).all(0, 0, 1, 0, 0, 0, 1, 1, 0).map((row) => row.titulo);
     assert.ok(moderator.includes("qa-private"));
     assert.ok(!moderator.includes("qa-other-tenant"));
   } finally { database.close(); }
@@ -48,5 +49,10 @@ test("mídia fotográfica respeita economia de dados e mantém carregamento grad
   assert.match(image, /presentation === "photo" && preferenceReady && !dataSaver/);
   assert.match(image, /loading="lazy"/);
   assert.match(image, /decoding="async"/);
-  assert.match(image, /href=\{downloadUrl\} download/);
+  assert.match(image, /<FeedImageActions source=\{src\}/);
+  const menu = await read("app/components/feed/FeedImageActions.tsx");
+  assert.match(menu, /<FileSaveActions source=\{source\}/);
+  const actions = await read("app/components/FileSaveActions.tsx");
+  assert.match(actions, /run\("download"\)/);
+  assert.match(actions, /Baixar no aparelho/);
 });

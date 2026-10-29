@@ -43,12 +43,13 @@ test("publication comments and composer controls are compact and readable", asyn
 });
 
 test("parking exposes reserved spaces and reservations do not require an RSVP", async () => {
-  const availability = await read("app/api/pilot/estacionamento/disponibilidade/route.ts");
+  const availability = (await read("app/api/pilot/estacionamento/disponibilidade/route.ts")) + (await read("app/lib/parking-context.ts"));
   const reservations = await read("app/api/pilot/estacionamento/reservas/route.ts");
   const memberPortal = await read("app/components/parking/ParkingMemberPortal.tsx");
   const qr = await read("app/components/ParkingReservationQr.tsx");
-  assert.match(availability, /EXISTS\(SELECT 1 FROM estacionamento_reservas/);
-  assert.match(memberPortal, /Reservada/);
+  assert.match(availability, /FROM estacionamento_reservas r WHERE r\.comunidade_id=\?/);
+  assert.match(availability, /COALESCE\(r\.reservada,0\) AS reservada/);
+  assert.match(await read("app/components/parking/ParkingSpaceMap.tsx"), /Reservada/);
   assert.doesNotMatch(reservations, /confirmacoes_evento/);
   assert.match(reservations, /status\s*=\s*'PUBLICADO'/);
   assert.match(qr, /typeof accepted === "string"/);

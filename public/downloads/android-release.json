@@ -11,13 +11,13 @@
     "sha256": "901e1d4e73bdc990d7d5d500ef10a422636777155cb821b6980e0cd083da7e8e"
   },
   "homologation": {
-    "versionName": "1.19.0",
-    "versionCode": 22,
-    "file": "VINKULO_ANDROID_1.19.0_HOMOLOGACAO.apk",
-    "bytes": 633037,
-    "sha256": "5de256f4a31de275c7656ed05013e205a32d0c9907d44dcd2a1fa640c7154cc3",
-    "sourceCommit": "f299d2b70b20c939b0c030c31af3c9310c27b678",
-    "workflowRun": "https://github.com/da0602766-byte/V-nkulo/actions/runs/36596425395",
+    "versionName": "1.23.0",
+    "versionCode": 26,
+    "file": "VINKULO_ANDROID_1.23.0.apk",
+    "bytes": 644261,
+    "sha256": "ad7fd8571d80ccb28b6d666a50d308559a4bcf06c39e69b6270dfbd0200b5eb9",
+    "sourceCommit": "6a1efe33de3caf80c15e3f8119314c95b4ccedbf",
+    "workflowRun": "https://github.com/da0602766-byte/V-nkulo/actions/runs/38944001918",
     "physicalValidation": "pending"
   }
 }

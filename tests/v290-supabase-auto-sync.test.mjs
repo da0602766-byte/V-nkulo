@@ -61,6 +61,12 @@ test("conciliação automática é exclusiva do proprietário, ordenada, pausáv
   const nativeFetch = globalThis.fetch;
   globalThis.fetch = async (request, init = {}) => {
     const url = String(request);
+    if (url.includes('/rest/v1/vinkulo_profiles?') && init.method === 'DELETE') {
+      const id = Number(new URL(url).searchParams.get('legacy_d1_id').slice(3));
+      assert.equal(new URL(url).searchParams.get('auth_user_id'), 'is.null');
+      destination.profiles = destination.profiles.filter(item => item.legacy_d1_id !== id);
+      return Response.json([{ legacy_d1_id: id }]);
+    }
     if (url.endsWith("/rpc/vinkulo_tenant_foundation_health")) return Response.json([
       { table_key: "tenants", present: true, rls_enabled: true }, { table_key: "profiles", present: true, rls_enabled: true },
       { table_key: "memberships", present: true, rls_enabled: true }, { table_key: "migrationRuns", present: true, rls_enabled: true },
@@ -132,6 +138,11 @@ test("conciliação automática é exclusiva do proprietário, ordenada, pausáv
     const blocked = (await (await call("RECONCILE")).json()).status;
     assert.match(blocked.lastError, /perfis extras/);
     assert.equal(destination.profiles.some(item => item.legacy_d1_id === 999), true);
+    database.prepare("INSERT INTO auditoria_piloto(usuario_id,evento,resultado,metadados) VALUES (?,'CONTA_EXCLUIDA_DEFINITIVAMENTE','SUCESSO',?)")
+      .run(profiles[0].legacy_d1_id, JSON.stringify({ usuarioId: 999 }));
+    const recovered = (await (await call("RECONCILE")).json()).status;
+    assert.equal(recovered.lastError, null);
+    assert.equal(destination.profiles.some(item => item.legacy_d1_id === 999), false);
     const disabled = (await (await call("DISABLE")).json()).status;
     assert.equal(disabled.enabled, false);
     const writeCount = writes.length;

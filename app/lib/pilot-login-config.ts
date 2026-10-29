@@ -1,3 +1,4 @@
+import { VINKULO_LOGO } from "./brand-identity";
 import { getD1 } from "../../db";
 
 export const PILOT_LOGIN_CONFIG_KEY = "pilot_login_config";
@@ -100,7 +101,7 @@ export const DEFAULT_PILOT_LOGIN_CONFIG: PilotLoginConfig = {
   kicker: "PORTAL DA COMUNIDADE",
   titulo: "Bem-vindo ao Vínkulo",
   subtitulo: "Acesso individual e protegido à sua comunidade.",
-  logoUrl: "",
+  logoUrl: VINKULO_LOGO,
   backgroundImageUrl: "",
   backgroundColor: "#050817",
   // Padrão da plataforma, não dado de tenant: quem configurou uma cor própria
@@ -249,7 +250,7 @@ export function parsePilotLoginConfig(
       DEFAULT_PILOT_LOGIN_CONFIG.subtitulo,
       240,
     ),
-    logoUrl: cleanAssetUrl(source.logoUrl),
+    logoUrl: VINKULO_LOGO,
     backgroundImageUrl: cleanAssetUrl(source.backgroundImageUrl),
     backgroundColor: cleanColor(
       source.backgroundColor,

@@ -241,7 +241,7 @@ export async function POST(request: Request) {
     const managers = await db.prepare(
       `SELECT DISTINCT u.id FROM usuarios u JOIN usuario_comunidades uc ON uc.usuario_id = u.id
        WHERE uc.comunidade_id = ? AND uc.status = 'ATIVO' AND u.ativo = 1
-         AND (uc.papel IN ('PASTOR','ADMIN_COMUNIDADE') OR u.perfil = 'ADMIN')`,
+         AND uc.papel IN ('PASTOR','ADMIN_COMUNIDADE','SUPERADMIN')`,
     ).bind(comunidadeId).all<{ id: number }>();
     await Promise.all(managers.results.filter((item) => item.id !== userId).map((item) => notifyUser(db, {
       userId: item.id, title: "Compromisso aguardando aprovação", message: `${access.user.nome} solicitou publicação de “${titulo}” na agenda.`, entityId: criado.id,

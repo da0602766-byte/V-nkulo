@@ -1,7 +1,14 @@
 "use client";
+import { navigateDocument } from '../lib/document-navigation';
+import VinkuloMark from "./VinkuloMark";
+import SafeImage from "./SafeImage";
+import LabModuleNav from "./LabModuleNav";
+import CommunityHighlight from "./CommunityHighlight";
+
 import InviteRevocationList from './InviteRevocationList';
 
 import Link from "./StableLink";
+import VinkuloLoading from "./VinkuloLoading";
 import dynamic from "next/dynamic";
 import { type CSSProperties, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PilotFeatureState } from "../lib/pilot-data";
@@ -18,12 +25,16 @@ import GlobalVisualEditor from "./GlobalVisualEditorLazy";
 import PilotNotificationCenter, {
   type NotificationUnreadSummary,
 } from "./PilotNotificationCenter";
+import { initializeChatSounds, playChatSound } from "../lib/chat-sounds";
 import IncomingMessageToast, { type IncomingMessage } from "./IncomingMessageToast";
+import { incomingChatArrivals, type ChatArrivalConversation } from "../lib/chat-arrivals";
 import ThemeControl from "./ThemeControl";
+import OfflineModeEntry from "./OfflineModeEntry";
 import WorkspaceErrorBoundary from "./WorkspaceErrorBoundary";
 import VerifiedOwnerName from "./VerifiedOwnerName";
 import TemporaryAccessWatcher from "./TemporaryAccessWatcher";
 import CloseDetailsOnOutside from "./CloseDetailsOnOutside";
+import CommunityCentral, { CentralNavigation, CENTRAL_VIEWS } from "./CommunityCentral";
 
 const moduleLoading = () => <section className="workspace-module-loading" aria-busy="true" role="status"><span className="pilot-loading-spinner" aria-hidden="true" /><strong>Carregando esta área…</strong><small>Somente o necessário para esta tela está sendo preparado.</small></section>;
 const AccountProfileWorkspace = dynamic(() => import("./AccountProfileWorkspace"), { loading: moduleLoading });
@@ -36,11 +47,10 @@ const LeadershipWorkspace = dynamic(() => import("./LeadershipWorkspace"), { loa
 const NetworkWorkspace = dynamic(() => import("./NetworkWorkspace"), { loading: moduleLoading });
 const ParkingWorkspace = dynamic(() => import("./ParkingWorkspace"), { loading: moduleLoading });
 const PeopleWorkspace = dynamic(() => import("./PeopleWorkspace"), { loading: moduleLoading });
-const PrivateChatWorkspace = dynamic(() => import("./PrivateChatWorkspace"), { loading: moduleLoading });
+const PrivateChatDock = dynamic(() => import("./PrivateChatDock"), { loading: moduleLoading });
 const RequestsWorkspace = dynamic(() => import("./RequestsWorkspace"), { loading: moduleLoading });
 const SecretaryMinisterialWorkspace = dynamic(() => import("./SecretaryMinisterialWorkspace"), { loading: moduleLoading });
 const CellsWorkspace = dynamic(() => import("./CellsWorkspace"), { loading: moduleLoading });
-const VisitorsWorkspace = dynamic(() => import("./TenantOperations").then((module) => module.VisitorsWorkspace), { loading: moduleLoading });
 
 type FeedItem = {
   id: number;
@@ -77,7 +87,10 @@ type View =
   | "pessoas"
   | "solicitacoes"
   | "mensagens"
-  | "conta";
+  | "conta"
+  | "relatorios"
+  | "avisos"
+  | "configuracoes";
 type NavigationFocus = { anchor?: string; event?: string };
 const MENU: { id: View; label: string; permission: string }[] = [
   { id: "inicio", label: "Início", permission: "dashboard.view" },
@@ -87,12 +100,15 @@ const MENU: { id: View; label: string; permission: string }[] = [
   { id: "solicitacoes", label: "Pedidos", permission: "dashboard.view" },
   { id: "visitantes", label: "Visitantes", permission: "visitors.view" },
   { id: "celulas", label: "Células", permission: "cells.view" },
-  { id: "estacionamento", label: "Gestão", permission: "parking.view" },
+  { id: "estacionamento", label: "Estacionamento", permission: "parking.view" },
   { id: "redes", label: "Redes e unidades", permission: "networks.view" },
   { id: "membro", label: "Painel do membro", permission: "dashboard.view" },
   { id: "lider", label: "Painel de liderança", permission: "leadership.panel.view" },
   { id: "pessoas", label: "Pessoas", permission: "people.view" },
-  { id: "comunidade", label: "Configurações", permission: "dashboard.view" },
+  { id: "comunidade", label: "Central da Comunidade", permission: "dashboard.view" },
+  { id: "relatorios", label: "Relatórios", permission: "dashboard.view" },
+  { id: "avisos", label: "Avisos", permission: "dashboard.view" },
+  { id: "configuracoes", label: "Configurações", permission: "dashboard.view" },
   { id: "continuidade", label: "Continuidade", permission: "community.lifecycle.request" },
 ];
 const COMMUNITY_MANAGEMENT_VIEWS: CommunityManagementView[] = [
@@ -108,7 +124,7 @@ const COMMUNITY_MANAGEMENT_DESCRIPTIONS: Record<
   membro: "Seus dados, vínculos e participação na comunidade.",
   lider: "Acompanhamento e decisões permitidas à liderança.",
   pessoas: "Diretório, funções e oficiais da comunidade.",
-  continuidade: "Sucessão e continuidade da comunidade.",
+  continuidade: "Situação, solicitações administrativas e preservação do histórico.",
 };
 const VIEW_MODULE: Partial<Record<View, TenantContext["modules"][number]>> = {
   eventos: "events",
@@ -246,6 +262,12 @@ export default function PilotDashboard({
   const [quickActionSearch, setQuickActionSearch] = useState("");
   const [switching, setSwitching] = useState(false);
   const [viewLoading, setViewLoading] = useState(false);
+  const [openingVisitors, setOpeningVisitors] = useState(false);
+  useEffect(() => {
+    const reset = () => setOpeningVisitors(false);
+    window.addEventListener('pageshow', reset);
+    return () => window.removeEventListener('pageshow', reset);
+  }, []);
   const [fontScale, setFontScale] = useState(1);
   const [fontScaleHydrated, setFontScaleHydrated] = useState(false);
   const [inviteMessage, setInviteMessage] = useState("");
@@ -275,8 +297,13 @@ export default function PilotDashboard({
       mensagens: 0,
       sistema: 0,
     });
-  const [messageCenterOpen, setMessageCenterOpen] = useState(false);
+  const [messageCenterOpen, setMessageCenterOpen] = useState(view === "mensagens");
   const [chatTargetUserId, setChatTargetUserId] = useState<number | null>(null);
+  useEffect(() => initializeChatSounds(active.userId), [active.userId]);
+  const [chatOpenSequence, setChatOpenSequence] = useState(0);
+  const readingChatUserRef = useRef<number | null>(null);
+  const handleReadingChat = useCallback((id: number | null) => { readingChatUserRef.current = id; }, []);
+  useEffect(() => { if (view === "mensagens") setMessageCenterOpen(true); }, [view]);
 
   useEffect(() => {
     const initial = window.setTimeout(() => {
@@ -350,6 +377,7 @@ export default function PilotDashboard({
       MENU.filter(
         (item) =>
           (active.permissions.includes(item.permission) ||
+            (item.id === "visitantes" && active.visitorPersonalAccess) ||
             (item.id === "estacionamento" && active.permissions.includes("parking.reserve")) ||
             (active.isOwner && item.id === "pessoas")) &&
           (!VIEW_MODULE[item.id] ||
@@ -358,6 +386,7 @@ export default function PilotDashboard({
             ["inicio", "pessoas"].includes(
               item.id,
             )) &&
+          (item.id !== "configuracoes" || active.isCommunityOwner || active.permissions.some(permission => ["community.theme.manage", "invites.manage", "parking.configure", "membership.requests.manage"].includes(permission))) &&
           (item.id !== "estacionamento" || parkingEnabled) &&
           (item.id !== "redes" || features.networkModuleEnabled) &&
           (item.id !== "lider" ||
@@ -368,9 +397,11 @@ export default function PilotDashboard({
     [
       active.communityAccess,
       active.isOwner,
+      active.isCommunityOwner,
       active.modules,
       active.papel,
       active.permissions,
+      active.visitorPersonalAccess,
       features.networkModuleEnabled,
       parkingEnabled,
     ],
@@ -379,9 +410,9 @@ export default function PilotDashboard({
     () =>
       allowedMenu.filter(
         (item) =>
-          !COMMUNITY_MANAGEMENT_VIEWS.includes(
+          !["relatorios", "avisos", "configuracoes"].includes(item.id) && (item.id === "pessoas" || !COMMUNITY_MANAGEMENT_VIEWS.includes(
             item.id as CommunityManagementView,
-          ),
+          )),
       ),
     [allowedMenu],
   );
@@ -440,7 +471,6 @@ export default function PilotDashboard({
         items: [
           makeItem("fio", "Fio do dia"),
           makeItem("inicio", "Início"),
-          makeItem("inicio", "Mural", "mural", { anchor: "mural" }),
           makeItem("eventos", "Agenda"),
         ].filter(Boolean),
       },
@@ -449,19 +479,16 @@ export default function PilotDashboard({
         items: [
           makeItem("pessoas", "Pessoas"),
           makeItem("ministerios", "Ministérios"),
-          makeItem("ministerios", "Escalas", "escalas", {
-            event: "vinkulo:open-schedules",
-          }),
           makeItem("visitantes", "Visitantes"),
           makeItem("solicitacoes", "Pedidos"),
-          makeItem("estacionamento", "Gestão do estacionamento"),
+          makeItem("estacionamento"),
           makeItem("celulas"),
           makeItem("redes"),
         ].filter(Boolean),
       },
       {
         label: "Gestão",
-        items: [makeItem("comunidade", "Configurações")].filter(Boolean),
+        items: [makeItem("comunidade", "Central da Comunidade")].filter(Boolean),
       },
     ];
   }, [allowedMenu]);
@@ -469,7 +496,10 @@ export default function PilotDashboard({
     const term = navigationSearch.trim().toLocaleLowerCase("pt-BR");
     return sidebarGroups
       .flatMap((group) => group.items)
-      .filter((item) => !term || item!.label.toLocaleLowerCase("pt-BR").includes(term))
+      .filter((item) => {
+        const aliases = item?.id === "comunidade" ? " relatórios avisos conta perfil liderança configurações" : item?.id === "ministerios" ? " escalas equipes" : item?.id === "inicio" ? " mural publicações" : "";
+        return !term || `${item!.label}${aliases}`.toLocaleLowerCase("pt-BR").includes(term);
+      })
       .slice(0, 7);
   }, [navigationSearch, sidebarGroups]);
   const communityManagementItems = useMemo(
@@ -512,7 +542,7 @@ export default function PilotDashboard({
               : null,
             active.permissions.includes("parking.view")
               ? {
-                  label: "Gestão",
+                  label: "Estacionamento",
                   description: "Entrada, saída ou ocorrência",
                   icon: "estacionamento" as MenuIconId,
                   view: "estacionamento" as View,
@@ -582,6 +612,26 @@ export default function PilotDashboard({
   }, [communityInfoOpen, mobileMenu]);
 
   useEffect(() => {
+    if (!mobileMenu) return;
+    const sheet = document.getElementById("pilot-mobile-sheet");
+    const trigger = document.activeElement as HTMLElement | null;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const controls = () => [...(sheet?.querySelectorAll<HTMLElement>('button:not([disabled]),a[href],input:not([disabled]),select,textarea,[tabindex="0"]') || [])].filter(item => item.getClientRects().length);
+    controls()[0]?.focus();
+    const trapFocus = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const items = controls();
+      const first = items[0], last = items[items.length - 1];
+      if (!first) return;
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    sheet?.addEventListener("keydown", trapFocus);
+    return () => { sheet?.removeEventListener("keydown", trapFocus); document.body.style.overflow = originalOverflow; trigger?.focus(); };
+  }, [mobileMenu]);
+
+  useEffect(() => {
     const openSearch = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
@@ -626,20 +676,15 @@ export default function PilotDashboard({
   useEffect(() => {
     if (active.communityAccess === "FEED_ONLY") return;
     let cancelled = false;
+    let syncing = false;
+    setIncomingMessage(null);
     const syncUnread = async () => {
+      if (syncing || cancelled) return;
+      syncing = true;
       try {
         const response = await fetch("/api/pilot/chat", { cache: "no-store" });
         if (!response.ok) return;
-        const payload = (await response.json()) as {
-          conversations?: {
-            id?: number;
-            participante_id?: number;
-            participante_nome?: string;
-            participante_foto?: string | null;
-            ultima_mensagem?: string | null;
-            nao_lidas?: number;
-          }[];
-        };
+        const payload = (await response.json()) as { conversations?: ChatArrivalConversation[]; messageNotificationsEnabled?: boolean; };
         if (cancelled) return;
         const conversations = payload.conversations || [];
         const total = conversations.reduce(
@@ -657,7 +702,7 @@ export default function PilotDashboard({
         const snapshot = new Map(
           conversations.map((conversation) => [
             Number(conversation.id || 0),
-            Number(conversation.nao_lidas || 0),
+            Number(conversation.ultima_recebida_id || 0),
           ]),
         );
         // O retrato vale só para a comunidade em que foi tirado: ao trocar de
@@ -670,32 +715,27 @@ export default function PilotDashboard({
           comunidadeId: active.comunidadeId,
           porConversa: snapshot,
         };
-        if (!previous) return;
-        // Quem está lendo as mensagens não precisa de aviso flutuante: a
-        // própria lista já mostra a conversa subindo com o contador.
-        if (view === "mensagens" || messageCenterOpen) return;
-        const arrived = conversations.find(
-          (conversation) =>
-            Number(conversation.nao_lidas || 0) >
-            (previous.get(Number(conversation.id || 0)) ?? 0),
-        );
+        if (payload.messageNotificationsEnabled === false) setIncomingMessage(null);
+        const audible = incomingChatArrivals(conversations, previous, null, payload.messageNotificationsEnabled !== false)[0];
+        if (audible) playChatSound("received", Number(audible.ultima_recebida_id));
+        const arrived = incomingChatArrivals(conversations, previous, readingChatUserRef.current, payload.messageNotificationsEnabled !== false)[0];
         if (!arrived) return;
         setIncomingMessage({
-          key: Date.now(),
+          key: Number(arrived.ultima_recebida_id),
           userId: Number(arrived.participante_id || 0),
           name: String(arrived.participante_nome || "Alguém da comunidade"),
           photo: arrived.participante_foto || null,
-          preview: String(arrived.ultima_mensagem || ""),
+          preview: String(arrived.ultima_recebida || ""),
           count: Number(arrived.nao_lidas || 0),
         });
       } catch {
         // O atalho continua funcional mesmo quando a contagem não responde.
-      }
+      } finally { syncing = false; }
     };
     void syncUnread();
     const timer = window.setInterval(() => {
       if (document.visibilityState === "visible") void syncUnread();
-    }, 15_000);
+    }, 5_000);
     const refreshWhenVisible = () => {
       if (document.visibilityState === "visible") void syncUnread();
     };
@@ -705,7 +745,7 @@ export default function PilotDashboard({
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
-  }, [active.communityAccess, active.comunidadeId, view, messageCenterOpen]);
+  }, [active.communityAccess, active.comunidadeId]);
 
   function openCommunityInfo() {
     setCommunityInfoLoading(true);
@@ -744,47 +784,35 @@ export default function PilotDashboard({
     };
   }, [active.isOwner, allowedMenu]);
 
-  // O painel de presença ("Quem está online") pede a conversa por evento em vez
-  // de abrir uma segunda tela de chat: no celular vai para a aba Mensagens, no
-  // desktop abre o popover. Quem pode falar com quem continua sendo decidido em
-  // /api/pilot/chat.
-  useEffect(() => {
-    if (active.communityAccess === "FEED_ONLY") return;
-    const handleOpenChat = (event: Event) => {
-      const userId = Number(
-        (event as CustomEvent<{ userId?: number }>).detail?.userId || 0,
-      );
-      if (userId <= 0) return;
-      setChatTargetUserId(userId);
-      if (window.matchMedia("(max-width: 760px)").matches) openView("mensagens");
-      else setMessageCenterOpen(true);
-    };
-    window.addEventListener("vinkulo:open-chat", handleOpenChat);
-    return () => window.removeEventListener("vinkulo:open-chat", handleOpenChat);
-  }, [active.communityAccess]);
-
   const accessDeniedView =
     view !== "inicio" &&
     view !== "conta" &&
     !(view === "mensagens" && active.communityAccess !== "FEED_ONLY") &&
     !allowedMenu.some((item) => item.id === view);
-  const visibleView =
+  const visibleView = view === "mensagens" ? "inicio" :
     view === "conta" ||
-    (view === "mensagens" && active.communityAccess !== "FEED_ONLY") ||
     allowedMenu.some((item) => item.id === view)
       ? view
       : "inicio";
 
-  function openView(nextView: View, focus?: NavigationFocus) {
+  const openView = useCallback((nextView: View, focus?: NavigationFocus) => {
+    if (nextView === "mensagens") { setMessageCenterOpen(true); setMobileMenu(null); return; }
+    if (nextView === "visitantes") {
+      if (openingVisitors) return;
+      setOpeningVisitors(true);
+      setMobileMenu(null);
+      window.setTimeout(() => navigateDocument("/painel/visitantes" + (focus?.event === "vinkulo:new-visitor" ? "?novo=1" : "")), 60);
+      return;
+    }
+    if (nextView === "solicitacoes") {
+      window.setTimeout(() => window.dispatchEvent(new CustomEvent("vinkulo:requests-opened")), 320);
+    }
     if (nextView === "visual-editor") {
       setMobileMenu(null);
       window.dispatchEvent(new CustomEvent("vinkulo:open-visual-editor"));
       return;
     }
-    // "Mural" e "Escalas" apontam para a mesma view que "Início" e
-    // "Ministérios". Sem um destino próprio os quatro itens levavam ao mesmo
-    // lugar, e dois deles mentiam sobre onde iam parar. O foco resolve isso
-    // sem duplicar view: leva à seção certa depois que a tela monta.
+    // Ações contextuais podem focar uma seção depois que a área monta.
     if (focus) {
       window.setTimeout(() => {
         if (focus.event) {
@@ -802,6 +830,8 @@ export default function PilotDashboard({
     const address = new URL(window.location.href);
     address.searchParams.set("view", nextView);
     if (new URL(window.location.href).searchParams.get("view") !== nextView) {
+      address.hash = "";
+      for (const key of ["anotacao", "celula", "aba", "ministry"]) address.searchParams.delete(key);
       window.history.pushState(
         { ...window.history.state, view: nextView },
         "",
@@ -816,7 +846,27 @@ export default function PilotDashboard({
       }),
     );
     window.setTimeout(() => setViewLoading(false), 280);
-  }
+  }, [openingVisitors]);
+
+  // O painel de presença ("Quem está online") pede a conversa por evento em vez
+  // de abrir uma segunda tela de chat: no celular vai para a aba Mensagens, no
+  // desktop abre o popover. Quem pode falar com quem continua sendo decidido em
+  // /api/pilot/chat.
+  useEffect(() => {
+    if (active.communityAccess === "FEED_ONLY") return;
+    const handleOpenChat = (event: Event) => {
+      const userId = Number(
+        (event as CustomEvent<{ userId?: number }>).detail?.userId || 0,
+      );
+      if (userId <= 0) return;
+      setChatTargetUserId(userId);
+      setChatOpenSequence(sequence => sequence + 1);
+      if (window.matchMedia("(max-width: 760px)").matches) openView("mensagens");
+      else setMessageCenterOpen(true);
+    };
+    window.addEventListener("vinkulo:open-chat", handleOpenChat);
+    return () => window.removeEventListener("vinkulo:open-chat", handleOpenChat);
+  }, [active.communityAccess, openView]);
 
   function cancelMobileShortcutPress() {
     if (mobileShortcutPressTimer.current !== null) {
@@ -844,7 +894,7 @@ export default function PilotDashboard({
     );
   }
 
-  function openMobileShortcut(slot: number, item: (typeof MENU)[number]) {
+  function openMobileShortcut(item: (typeof MENU)[number]) {
     cancelMobileShortcutPress();
     if (mobileShortcutLongPress.current) {
       mobileShortcutLongPress.current = false;
@@ -896,7 +946,7 @@ export default function PilotDashboard({
       });
       const result = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(result.error || "Não foi possível trocar de comunidade.");
-      window.location.assign("/painel?view=inicio");
+      navigateDocument("/painel?view=inicio");
       return;
     } catch (error) {
       window.alert((error as Error).message);
@@ -949,6 +999,7 @@ export default function PilotDashboard({
       } as CSSProperties}
     >
       <CloseDetailsOnOutside />
+      {openingVisitors && <VinkuloLoading label="Abrindo Visitantes…" />}
       <header className="pilot-topbar" data-editor-key="cabecalho" data-smart-scroll-header>
         <button
           className="vinkulo-brand community-brand-trigger"
@@ -957,9 +1008,10 @@ export default function PilotDashboard({
           onClick={openCommunityInfo}
           aria-label={`Ver informações de ${active.comunidadeNome}`}
         >
+          <VinkuloMark size={36}/>
           <span className="adote-mark community-brand-mark" aria-hidden="true">
             {communityTheme.logoUrl ? (
-              <img loading="lazy" src={communityTheme.logoUrl} alt="" />
+              <SafeImage fallbackName={active.comunidadeNome} loading="lazy" src={communityTheme.logoUrl} alt="" />
             ) : (
               <b>{getInitials(active.comunidadeNome)}</b>
             )}
@@ -1015,21 +1067,21 @@ export default function PilotDashboard({
             >
               <span>
                 {userPhotoUrl ? (
-                  <img loading="lazy" src={userPhotoUrl} alt="" />
+                  <SafeImage fallbackName={userName} fallbackKind="avatar" loading="lazy" src={userPhotoUrl} alt="" />
                 ) : (
                   userInitials
                 )}
               </span>
               <div>
-                <VerifiedOwnerName name={userName} verified={active.isOwner} />
+                <VerifiedOwnerName name={userName} verified={active.isOwner} officialTitle={memberships.find(m=>m.comunidadeId===active.comunidadeId)?.tituloOficial} />
                 <small>{active.isOwner ? "Proprietário" : ROLE_LABELS[active.papel] || active.papel}</small>
               </div>
               <i aria-hidden="true">⌄</i>
             </summary>
             <div className="pilot-user-popover">
               <header className="pilot-user-popover-head-v3">
-                <span>{userPhotoUrl ? <img loading="lazy" src={userPhotoUrl} alt="" /> : userInitials}</span>
-                <div className="pilot-user-popover-identity"><VerifiedOwnerName name={userName} verified={active.isOwner} /><small>{userEmail}</small><em>{active.isOwner ? "Proprietário" : ROLE_LABELS[active.papel] || active.papel}</em></div>
+                <span>{userPhotoUrl ? <SafeImage fallbackName={userName} fallbackKind="avatar" loading="lazy" src={userPhotoUrl} alt="" /> : userInitials}</span>
+                <div className="pilot-user-popover-identity"><VerifiedOwnerName name={userName} verified={active.isOwner} officialTitle={memberships.find(m=>m.comunidadeId===active.comunidadeId)?.tituloOficial} /><small>{userEmail}</small><em>{active.isOwner ? "Proprietário" : ROLE_LABELS[active.papel] || active.papel}</em></div>
               </header>
               <dl>
                 <div><dt>Comunidade ativa</dt><dd>{active.comunidadeNome}</dd></div>
@@ -1070,25 +1122,28 @@ export default function PilotDashboard({
           onOpen={(userId) => {
             setIncomingMessage(null);
             setChatTargetUserId(userId);
+            setChatOpenSequence(sequence => sequence + 1);
             if (window.matchMedia("(max-width: 760px)").matches) openView("mensagens");
             else setMessageCenterOpen(true);
           }}
         />
       )}
-      {messageCenterOpen && (
-        <div className="pilot-message-popover-backdrop" role="presentation" onMouseDown={() => setMessageCenterOpen(false)}>
-          <section className="pilot-message-popover" role="dialog" aria-modal="false" aria-label="Conversas" onMouseDown={(event) => event.stopPropagation()}>
-            <header><div><p className="pilot-kicker">MENSAGENS</p><h2>Conversas</h2></div><button type="button" onClick={() => setMessageCenterOpen(false)} aria-label="Fechar mensagens">×</button></header>
-            <PrivateChatWorkspace initialTargetUserId={chatTargetUserId} />
-          </section>
-        </div>
+      {messageCenterOpen && active.communityAccess !== "FEED_ONLY" && (
+        <PrivateChatDock key={active.comunidadeId} initialTargetUserId={chatTargetUserId} openSequence={chatOpenSequence} onReadingChange={handleReadingChat} onClose={() => {
+          setMessageCenterOpen(false);
+          setChatTargetUserId(null);
+          const address = new URL(window.location.href);
+          address.searchParams.delete("conversation");
+          if (address.searchParams.get("view") === "mensagens") address.searchParams.set("view", visibleView);
+          window.history.replaceState(window.history.state, "", address);
+        }} />
       )}
       {navigationSearchOpen && (
         <div className="pilot-command-search-backdrop" role="presentation" onMouseDown={() => setNavigationSearchOpen(false)}>
           <section className="pilot-command-search" role="dialog" aria-modal="true" aria-label="Buscar uma área" onMouseDown={(event) => event.stopPropagation()}>
             <label>
               <span aria-hidden="true">⌕</span>
-              <input autoFocus type="search" value={navigationSearch} onChange={(event) => setNavigationSearch(event.target.value)} placeholder="Buscar pessoas, agenda, pedidos…" />
+              <input autoFocus type="search" aria-label="Buscar uma área da comunidade" value={navigationSearch} onChange={(event) => setNavigationSearch(event.target.value)} placeholder="Buscar pessoas, agenda, pedidos…" />
               <kbd>ESC</kbd>
             </label>
             <nav aria-label="Resultados da busca">
@@ -1147,7 +1202,7 @@ export default function PilotDashboard({
             <div className="community-info-identity">
               <span aria-hidden="true">
                 {communityTheme.logoUrl ? (
-                  <img loading="lazy" src={communityTheme.logoUrl} alt="" />
+                  <SafeImage fallbackName={active.comunidadeNome} loading="lazy" src={communityTheme.logoUrl} alt="" />
                 ) : (
                   getInitials(active.comunidadeNome)
                 )}
@@ -1197,7 +1252,7 @@ export default function PilotDashboard({
                   type="button"
                   onClick={() => {
                     setCommunityInfoOpen(false);
-                    openView("comunidade");
+                    openView("configuracoes");
                   }}
                 >
                   Editar comunidade
@@ -1222,21 +1277,8 @@ export default function PilotDashboard({
               <strong>{sidebarCollapsed ? "Expandir" : "Recolher"}</strong>
             </button>
           </div>
-          <div className="pilot-profile-card"><span>{userPhotoUrl ? <img loading="lazy" src={userPhotoUrl} alt="" /> : userInitials}</span><div><small><VerifiedOwnerName name={userName} verified={active.isOwner} /></small><strong>{active.communityAccess === "FEED_ONLY" ? "Proprietário · somente feed" : active.isOwner ? "Proprietário do sistema" : ROLE_LABELS[active.papel] || active.papel}</strong></div></div>
+          <div className="pilot-profile-card"><span>{userPhotoUrl ? <SafeImage fallbackName={userName} fallbackKind="avatar" loading="lazy" src={userPhotoUrl} alt="" /> : userInitials}</span><div><small><VerifiedOwnerName name={userName} verified={active.isOwner} officialTitle={memberships.find(m=>m.comunidadeId===active.comunidadeId)?.tituloOficial} /></small><strong>{active.communityAccess === "FEED_ONLY" ? "Proprietário · somente feed" : active.isOwner ? "Proprietário do sistema" : ROLE_LABELS[active.papel] || active.papel}</strong></div></div>
           <nav aria-label="Menu por perfil" data-editor-key="navegacao-principal">
-            {active.isOwner && (
-              <Link
-                className="pilot-owner-area-link"
-                href="/proprietario"
-                showLoading
-                loadingLabel="Abrindo a Área do proprietário…"
-                aria-label="Área do proprietário"
-                title="Área do proprietário"
-              >
-                <span className="pilot-sidebar-icon" aria-hidden="true">⌘</span>
-                <span className="pilot-sidebar-label">Área do proprietário</span>
-              </Link>
-            )}
             {sidebarGroups.map((group) => (
               <section className="pilot-sidebar-group" key={group.label} aria-label={group.label}>
                 <h2>{group.label}</h2>
@@ -1244,7 +1286,8 @@ export default function PilotDashboard({
                   <button
                     key={item.key}
                     data-editor-key={`menu-principal-${item.key}`}
-                    className={visibleView === item.id && (visibleView !== "inicio" || item.key === "mural") ? "active" : ""}
+                    className={visibleView === item.id ? "active" : ""}
+                    aria-current={visibleView === item.id ? "page" : undefined}
                     onClick={() => openView(item.id, item.focus)}
                     aria-label={item.label}
                     title={item.label}
@@ -1255,6 +1298,11 @@ export default function PilotDashboard({
                 ))}
               </section>
             ))}
+            <LabModuleNav communityId={active.comunidadeId}/>
+            <button type="button" aria-label="Ajuda" title="Ajuda" onClick={() => window.dispatchEvent(new CustomEvent("vinkulo:open-help"))}>
+              <span className="pilot-sidebar-icon" aria-hidden="true">?</span>
+              <span className="pilot-sidebar-label">Ajuda</span>
+            </button>
             <Link
               className="pilot-public-directory-link"
               href="/comunidades"
@@ -1265,20 +1313,19 @@ export default function PilotDashboard({
               <span className="pilot-sidebar-label">Explorar comunidades</span>
             </Link>
           </nav>
-          {(systemOwner || active.papel === "SUPERADMIN") && (
-            <EditorialSidebarSchedule onOpen={() => window.location.assign("/proprietario?tab=editorial")} />
+          {systemOwner && (
+            <EditorialSidebarSchedule onOpen={() => navigateDocument("/proprietario?tab=editorial")} />
           )}
           <div className="pilot-sidebar-note"><strong>{allowedMenu.length} áreas disponíveis</strong><p>As demais dependem das permissões do seu perfil.</p></div>
-          {visibleView === "inicio" && <div className="worship-sidebar-art"><small>MAIS QUE UM APP.</small><p>Pessoas reais.<br />Propósito<br /><em>eterno.</em></p><span aria-hidden="true" /><small>Onde a fé encontra<br />uma família.</small></div>}
+          {visibleView === "inicio" && <CommunityHighlight key={active.comunidadeId} communityId={active.comunidadeId} />}
         </aside>
         <section
-          className={`pilot-workspace${viewLoading ? " is-view-loading" : ""}${
+          className={`pilot-workspace${CENTRAL_VIEWS.includes(visibleView) ? " central-surface" : ""}${viewLoading ? " is-view-loading" : ""}${
             visibleView === "inicio" && communityTheme.wallpaperUrl
               ? " has-community-wallpaper"
               : ""
           }`}
           data-editor-key="conteudo-principal"
-          data-fullscreen-view={visibleView === "mensagens" ? "mensagens" : undefined}
         >
           {viewLoading && <div className="pilot-page-loading" role="status" aria-live="polite"><span className="pilot-loading-spinner" aria-hidden="true" />Carregando página…</div>}
           <WorkspaceErrorBoundary resetKey={`${active.comunidadeId}:${visibleView}`}>
@@ -1293,20 +1340,17 @@ export default function PilotDashboard({
               </div>
             </section>
           )}
-          {COMMUNITY_MANAGEMENT_VIEWS.includes(
-            visibleView as CommunityManagementView,
-          ) && (
-            <button
-              type="button"
-              className="community-management-back"
-              onClick={() => openView("comunidade")}
-            >
-              <span aria-hidden="true">←</span>
-              Gestão da comunidade
-            </button>
-          )}
+          {CENTRAL_VIEWS.includes(visibleView) && !accessDeniedView && <CentralNavigation
+            communityName={active.comunidadeNome} roleLabel={ROLE_LABELS[active.papel] || active.papel}
+            current={visibleView} allowed={[...allowedMenu.map(item => item.id), "conta"]}
+            onNavigate={next => openView(next as View)} />}
+          {["comunidade", "relatorios", "avisos"].includes(visibleView) && !accessDeniedView && <CommunityCentral
+            key={`${active.comunidadeId}:${visibleView}`} communityId={active.comunidadeId}
+            mode={visibleView === "relatorios" ? "reports" : visibleView === "avisos" ? "notices" : "overview"}
+            onNotifications={() => window.dispatchEvent(new CustomEvent("vinkulo:open-notifications"))} />}
           {visibleView === "inicio" && !accessDeniedView && (
             <CommunityHome
+              communityId={active.comunidadeId}
               key={active.comunidadeId}
               communityName={active.comunidadeNome}
               communitySlug={active.comunidadeSlug}
@@ -1316,19 +1360,14 @@ export default function PilotDashboard({
               userName={userName}
               userPhotoUrl={userPhotoUrl}
               eventsEnabled={allowedMenu.some((item) => item.id === "eventos")}
-              onNavigate={(next, create) => openView(next, create ? { event: next === "eventos" ? "vinkulo:new-event" : "vinkulo:new-request" } : undefined)}
+              onNavigate={(next, create) => openView(next === "escalas" ? "ministerios" : next, create ? { event: next === "eventos" ? "vinkulo:new-event" : next === "escalas" ? "vinkulo:new-schedule" : "vinkulo:new-request" } : undefined)}
               readOnlyFeed={active.communityAccess === "FEED_ONLY"}
             />
           )}
           {visibleView === "fio" && !accessDeniedView && (
             <DayThreadWorkspace permissions={active.permissions} />
           )}
-          {visibleView === "visitantes" && (
-            <VisitorsWorkspace
-              permissions={active.permissions}
-              communityName={active.comunidadeNome}
-            />
-          )}
+          {visibleView === "visitantes" && <a href="/painel/visitantes">Abrir Visitantes →</a>}
           {visibleView === "eventos" && (
             <EventsWorkspace
               permissions={active.permissions}
@@ -1338,14 +1377,15 @@ export default function PilotDashboard({
           )}
           {visibleView === "ministerios" && (
             <SecretaryMinisterialWorkspace
+              key={active.comunidadeId}
+              preferenceKey={`${active.comunidadeId}:${active.userId}`}
               permissions={active.permissions}
               communityName={active.comunidadeNome}
             />
           )}
           {visibleView === "solicitacoes" && (
-            <RequestsWorkspace communityName={active.comunidadeNome} />
+            <RequestsWorkspace key={active.comunidadeId} communityId={active.comunidadeId} communityName={active.comunidadeNome} />
           )}
-          {visibleView === "mensagens" && <PrivateChatWorkspace initialTargetUserId={chatTargetUserId} />}
           {visibleView === "celulas" && (
             <CellsWorkspace
               permissions={active.permissions}
@@ -1354,31 +1394,36 @@ export default function PilotDashboard({
             />
           )}
           {visibleView === "estacionamento" && (
-            <ParkingWorkspace communityName={active.comunidadeNome} memberMode={!active.permissions.includes("parking.view")} />
+            <ParkingWorkspace key={active.comunidadeId} communityName={active.comunidadeNome} memberMode={!active.permissions.includes("parking.view")} />
           )}
           {visibleView === "redes" && features.networkModuleEnabled && (
             <NetworkWorkspace />
           )}
-          {visibleView === "membro" && (
-            <PeopleWorkspace
-              communityName={active.comunidadeNome}
-              mode="self"
-            />
-          )}
-          {visibleView === "lider" && (
-            <LeadershipWorkspace
-              mode={active.permissions.includes("pastoral.panel.view") ? "pastoral" : "leader"}
-              communityName={active.comunidadeNome}
-            />
-          )}
+          {visibleView === "membro" && <>
+            <CommunityCentral key={`member:${active.comunidadeId}`} communityId={active.comunidadeId} mode="member" />
+            <details className="central-disclosure"><summary>Meus dados e vínculos</summary><p>Consulte seus vínculos e mantenha seus contatos atualizados.</p>
+              <PeopleWorkspace communityName={active.comunidadeNome} mode="self"
+                selfLinks={allowedMenu.filter(item => ["eventos", "ministerios", "celulas"].includes(item.id)).map(item => ({ label: item.label, href: `/painel?view=${item.id}` }))} />
+            </details>
+            <a className="member-account-action" href="/painel?view=conta"><span aria-hidden="true">⚙</span><span><strong>Meu perfil e conta</strong><small>Foto, dados pessoais e privacidade</small></span><b aria-hidden="true">→</b></a>
+          </>}
+          {visibleView === "lider" && <>
+            <CommunityCentral key={`leadership:${active.comunidadeId}`} communityId={active.comunidadeId} mode="leadership" />
+            <details className="central-disclosure"><summary>Equipe, funções e acesso pastoral</summary><p>Consulte os responsáveis, o histórico e as opções de gestão disponíveis para você.</p>
+              <LeadershipWorkspace mode={active.permissions.includes("pastoral.panel.view") ? "pastoral" : "leader"} communityName={active.comunidadeNome} />
+            </details>
+          </>}
           {visibleView === "pessoas" && (
             <PeopleWorkspace communityName={active.comunidadeNome} />
           )}
-          {visibleView === "conta" && <AccountProfileWorkspace />}
-          {visibleView === "comunidade" && (
-            <section className="community-central-workspace">
-              <header className="workspace-heading"><div><p className="pilot-kicker">GESTÃO DA COMUNIDADE</p><h1>Central da comunidade</h1><p>Pessoas, liderança, continuidade, solicitações e preferências reunidas no contexto da comunidade ativa.</p></div></header>
+          {visibleView === "conta" && <><OfflineModeEntry /><AccountProfileWorkspace /></>}
+          {visibleView === "configuracoes" && (
+            <section className="community-central-workspace settings-redesign">
+              <header className="settings-heading"><div><h1>Configurações</h1><p>Escolha um assunto. As alterações valem para {active.comunidadeNome}.</p></div><a href="/painel?view=conta">Meu perfil e conta →</a></header>
               <CommunityAdminWorkspace
+                deviceSlot={<OfflineModeEntry />}
+                contentSlot={active.permissions.includes("community.theme.manage") ? <CommunityHighlight key={`highlight:${active.comunidadeId}`} communityId={active.comunidadeId} editor /> : null}
+                hideManagementHub
                 accessSlot={
                   active.permissions.includes("invites.manage") ? (
                     <>
@@ -1411,6 +1456,7 @@ export default function PilotDashboard({
           )}
           {visibleView === "continuidade" && (
             <CommunityLifecycleWorkspace
+              key={active.comunidadeId}
               currentCommunityId={active.comunidadeId}
             />
           )}
@@ -1423,7 +1469,7 @@ export default function PilotDashboard({
             type="button"
             key={`${slot}:${item.id}`}
             className={visibleView === item.id && !mobileMenu ? "active" : ""}
-            onClick={() => openMobileShortcut(slot, item)}
+            onClick={() => openMobileShortcut(item)}
             onPointerDown={() => beginMobileShortcutPress(slot)}
             onPointerUp={cancelMobileShortcutPress}
             onPointerCancel={cancelMobileShortcutPress}
@@ -1433,7 +1479,7 @@ export default function PilotDashboard({
             title="Toque para abrir · segure para trocar"
           >
             <span className="pilot-mobile-nav-icon" aria-hidden="true"><MenuIcon id={item.id} /></span>
-            <small className="pilot-mobile-label">{item.label}</small>
+            <small className="pilot-mobile-label">{item.id === "estacionamento" ? "Vagas" : item.label}</small>
             {item.id === "eventos" && agendaAlerts > 0 && <b className="pilot-mobile-badge">{Math.min(agendaAlerts, 99)}</b>}
             {item.id === "solicitacoes" && unreadNotifications.pedidos > 0 && <b className="pilot-mobile-badge">{Math.min(unreadNotifications.pedidos, 99)}</b>}
           </button>
@@ -1460,7 +1506,7 @@ export default function PilotDashboard({
               type="button"
               key={`${slot}:${item.id}`}
               className={visibleView === item.id && !mobileMenu ? "active" : ""}
-              onClick={() => openMobileShortcut(slot, item)}
+              onClick={() => openMobileShortcut(item)}
               onPointerDown={() => beginMobileShortcutPress(slot)}
               onPointerUp={cancelMobileShortcutPress}
               onPointerCancel={cancelMobileShortcutPress}
@@ -1470,7 +1516,7 @@ export default function PilotDashboard({
               title="Toque para abrir · segure para trocar"
             >
               <span className="pilot-mobile-nav-icon" aria-hidden="true"><MenuIcon id={item.id} /></span>
-              <small className="pilot-mobile-label">{item.label}</small>
+              <small className="pilot-mobile-label">{item.id === "estacionamento" ? "Vagas" : item.label}</small>
               {item.id === "eventos" && agendaAlerts > 0 && <b className="pilot-mobile-badge">{Math.min(agendaAlerts, 99)}</b>}
               {item.id === "solicitacoes" && unreadNotifications.pedidos > 0 && <b className="pilot-mobile-badge">{Math.min(unreadNotifications.pedidos, 99)}</b>}
             </button>
@@ -1499,7 +1545,7 @@ export default function PilotDashboard({
         <div className="pilot-mobile-overlay" role="presentation" onMouseDown={() => setMobileMenu(null)}>
           <section
             id="pilot-mobile-sheet"
-            className="pilot-mobile-sheet"
+            className={`pilot-mobile-sheet${mobileMenu === "menu" ? " pilot-navigation-drawer" : ""}`}
             role="dialog"
             aria-modal="true"
             aria-label={
@@ -1544,8 +1590,7 @@ export default function PilotDashboard({
                     title="Perfil e configurações"
                   >
                     {userPhotoUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img loading="lazy" src={userPhotoUrl} alt="" />
+                      <SafeImage fallbackName={userName} fallbackKind="avatar" loading="lazy" src={userPhotoUrl} alt="" />
                     ) : userInitials}
                   </button>
                 )}
@@ -1581,12 +1626,12 @@ export default function PilotDashboard({
                     className="pilot-mobile-device-notifications"
                     onClick={() => {
                       setMobileMenu(null);
-                      window.dispatchEvent(new CustomEvent("vinkulo:enable-device-notifications"));
+                      window.dispatchEvent(new CustomEvent("vinkulo:open-notifications"));
                     }}
                   >
                     <span aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M10 5h4M10 18.5h4M18 8a4 4 0 0 1 3 3.8"/></svg></span>
-                    <strong>Avisar neste celular</strong>
-                    <b>ON</b>
+                    <strong>Avisos neste aparelho</strong>
+                    <b>Configurar</b>
                   </button>
                 </div>
                 <div className="pilot-mobile-menu-grid">
@@ -1618,6 +1663,13 @@ export default function PilotDashboard({
                   >
                     <span aria-hidden="true"><MenuIcon id="drive" /></span>
                     <strong>Google Drive</strong>
+                  </button>
+                  <button type="button" onClick={() => {
+                    setMobileMenu(null);
+                    requestAnimationFrame(() => window.dispatchEvent(new CustomEvent("vinkulo:open-help")));
+                  }}>
+                    <span aria-hidden="true">?</span>
+                    <strong>Ajuda</strong>
                   </button>
                 </div>
               </div>
@@ -1722,9 +1774,9 @@ export default function PilotDashboard({
             ) : (
               <div className="pilot-mobile-profile">
                 <div className="pilot-mobile-profile-card">
-                  <span>{userPhotoUrl ? <img loading="lazy" src={userPhotoUrl} alt="" /> : userInitials}</span>
+                  <span>{userPhotoUrl ? <SafeImage fallbackName={userName} fallbackKind="avatar" loading="lazy" src={userPhotoUrl} alt="" /> : userInitials}</span>
                   <div>
-                    <VerifiedOwnerName name={userName} verified={active.isOwner} />
+                    <VerifiedOwnerName name={userName} verified={active.isOwner} officialTitle={memberships.find(m=>m.comunidadeId===active.comunidadeId)?.tituloOficial} />
                     <small>{userEmail}</small>
                     <em>{active.communityAccess === "FEED_ONLY" ? "Proprietário · somente feed" : active.isOwner ? "Proprietário do sistema" : ROLE_LABELS[active.papel] || active.papel}</em>
                   </div>
@@ -1739,11 +1791,6 @@ export default function PilotDashboard({
                 >
                   Perfil e configurações
                 </button>
-                {active.isOwner && (
-                  <Link className="pilot-profile-manage" href="/proprietario" showLoading loadingLabel="Abrindo a Área do proprietário…">
-                    Abrir Área do Proprietário
-                  </Link>
-                )}
                 <details className="pilot-profile-community-switcher">
                   <summary>Trocar comunidade</summary>
                   <input

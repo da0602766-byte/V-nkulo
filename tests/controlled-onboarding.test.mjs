@@ -93,6 +93,22 @@ test('links de contratação expirados/revogados e versões antigas não concede
  link=await requestLink(f,31);await f.call('/api/proprietario/solicitacoes',{method:'PATCH',cookie:f.ownerCookie,body:{id:link.id,action:'REVOGAR'}});assert.equal((await f.call(`/api/public/contratacao/${link.token}`)).status,404);
  link=await requestLink(f,32);const invalid=await f.call(`/api/public/contratacao/${link.token}`,{method:'POST',body:{cpf:link.cpf,email:'check@test.invalid',senha:password,comunidadeNome:'Uma Comunidade',cidade:'Recife',planoId:'gratuito',versao:-1,aceite:true}});assert.equal(invalid.status,409);
 });
+test('catálogo e contratação usam o plano atual; alteração rejeita aceite antigo sem consumir o link',async()=>{
+ const f=await fixture();const old=await configure(f,{nome:'Oferta de auditoria',valor_centavos:12345,descricao:'Descrição conferida',condicoes:'Condição inicial'});const link=await requestLink(f,33);
+ const current=await configure(f,{nome:old.nome,valor_centavos:23456,descricao:old.descricao,condicoes:'Condição revisada',duracao_dias:60});
+ const html=await(await f.call('/planos')).text();assert.match(html,/Oferta de auditoria/);assert.match(html,/234,56/);assert.match(html,/href="\/log1"/);assert.doesNotMatch(html,/123,45/);
+ const home=await(await f.call('/')).text();assert.match(home,/href="\/planos"/);assert.doesNotMatch(home,/1\.200|180K|Quem usa,/);
+ const payload={cpf:link.cpf,email:'revised@test.invalid',senha:password,comunidadeNome:'Comunidade de Teste',cidade:'Recife',planoId:old.id,versao:old.versao,aceite:true};
+ assert.equal((await f.call(`/api/public/contratacao/${link.token}`,{method:'POST',body:payload})).status,409);
+ assert.equal((await f.call(`/api/public/contratacao/${link.token}`,{method:'POST',body:{...payload,versao:current.versao,aceite:false}})).status,400);
+ assert.equal(f.db.prepare('SELECT usado_em FROM links_contratacao WHERE solicitacao_id=?').get(link.id).usado_em,null);
+ assert.equal(f.db.prepare('SELECT status FROM solicitacoes_log1 WHERE id=?').get(link.id).status,'LINK_GERADO');
+ const viewed=await(await f.call(`/api/public/contratacao/${link.token}`)).json();assert.equal(viewed.plans[0].versao,current.versao);assert.equal(viewed.plans[0].condicoes,'Condição revisada');
+ await contract(f,link,current);
+ const snapshot=JSON.parse(f.db.prepare('SELECT contrato FROM solicitacoes_log1 WHERE id=?').get(link.id).contrato);assert.equal(snapshot.valor_centavos,23456);assert.equal(snapshot.duracao_dias,60);assert.equal(snapshot.condicoes,'Condição revisada');
+ assert.equal(f.db.prepare('SELECT COUNT(*) n FROM usuarios WHERE email=?').get(`request-${link.id}@test.invalid`).n,0);
+});
+
 test('planos pagos exigem fundamento legítimo; assinatura personalizada altera permissões e cotas reais',async()=>{
  const f=await fixture();const p=await configure(f,{valor_centavos:5000});const link=await requestLink(f,40);await contract(f,link,p);
  const denied=await f.call('/api/proprietario/solicitacoes',{method:'PATCH',cookie:f.ownerCookie,body:{id:link.id,action:'ATIVAR',fundamento:'GRATUITO'}});assert.equal(denied.status,409);
@@ -136,6 +152,37 @@ test('convite exige CPF, rejeita escopo do cliente, tem uso único e revogação
  assert.equal((await f.call('/api/pilot/convites/aceitar',{method:'POST',body:{...payload,token:revokedToken,email:'revoked@test.invalid',cpf:cpf(52)}})).status,404);
 });
 
+
+test('emissão concorrente de convites respeita a última vaga e mantém uma auditoria por emissão',async()=>{
+ const f=await fixture();const manager=await f.account(51,'concurrent-manager@test.invalid');const session=await f.login(manager);
+ for(let i=0;i<9;i++)f.db.prepare("INSERT INTO convites_comunidade(comunidade_id,email,papel,token_hash,status,expira_em,criado_por) VALUES(1,?,'MEMBRO',?,'PENDENTE','2099-01-01',?)").run(`seed-${i}@test.invalid`,`seed-${i}`,manager.id);
+ const responses=await Promise.all(['a','b'].map(n=>f.call('/api/pilot/convites',{method:'POST',cookie:session,body:{email:`concurrent-${n}@test.invalid`}})));
+ assert.deepEqual(responses.map(r=>r.status).sort(),[201,429]);
+ assert.equal(f.db.prepare("SELECT COUNT(*) n FROM convites_comunidade WHERE comunidade_id=1 AND status='PENDENTE'").get().n,10);
+ assert.equal(f.db.prepare("SELECT COUNT(*) n FROM auditoria_piloto WHERE evento='CONVITE_MEMBRO_CRIADO'").get().n,1);
+ const replacement=await f.call('/api/pilot/convites',{method:'POST',cookie:session,body:{email:'seed-0@test.invalid'}});
+ assert.equal(replacement.status,201,await replacement.clone().text());
+ assert.equal(f.db.prepare("SELECT COUNT(*) n FROM convites_comunidade WHERE comunidade_id=1 AND status='PENDENTE'").get().n,10);
+ assert.equal(f.db.prepare("SELECT status FROM convites_comunidade WHERE token_hash='seed-0'").get().status,'EXPIRADO');
+});
+
+test('emissões simultâneas para o mesmo e-mail deixam somente o último convite ativo',async()=>{
+ const f=await fixture();const manager=await f.account(52,'duplicate-manager@test.invalid');const session=await f.login(manager);
+ const responses=await Promise.all([1,2].map(()=>f.call('/api/pilot/convites',{method:'POST',cookie:session,body:{email:'same@test.invalid'}})));
+ assert.deepEqual(responses.map(r=>r.status),[201,201]);
+ assert.equal(f.db.prepare("SELECT COUNT(*) n FROM convites_comunidade WHERE email='same@test.invalid' AND status='PENDENTE'").get().n,1);
+ assert.equal(f.db.prepare("SELECT COUNT(*) n FROM auditoria_piloto WHERE evento='CONVITE_MEMBRO_CRIADO'").get().n,2);
+});
+
+test('falha de auditoria reverte a substituição do convite e entradas inválidas são recusadas',async()=>{
+ const f=await fixture();const manager=await f.account(53,'rollback-manager@test.invalid');const session=await f.login(manager);
+ for(const body of [null,{}, {email:[]},{email:'x'.repeat(255)+'@test.invalid'}])assert.equal((await f.call('/api/pilot/convites',{method:'POST',cookie:session,body})).status,400);
+ const first=await f.call('/api/pilot/convites',{method:'POST',cookie:session,body:{email:'rollback@test.invalid'}});assert.equal(first.status,201);
+ const before=f.db.prepare("SELECT * FROM convites_comunidade WHERE email='rollback@test.invalid'").all();
+ f.db.exec("CREATE TRIGGER fail_invite_audit BEFORE INSERT ON auditoria_piloto WHEN NEW.evento='CONVITE_MEMBRO_CRIADO' BEGIN SELECT RAISE(ABORT,'QA audit failure'); END");
+ const failed=await f.call('/api/pilot/convites',{method:'POST',cookie:session,body:{email:'rollback@test.invalid'}});assert.equal(failed.status,500);
+ assert.deepEqual(f.db.prepare("SELECT * FROM convites_comunidade WHERE email='rollback@test.invalid'").all(),before);
+});
 
 test('cadastro coletivo: prazo, revogação, CPF mascarado e limite atômico sob concorrência',async()=>{
  const f=await fixture();const manager=await f.account(70,'collective-manager@test.invalid');

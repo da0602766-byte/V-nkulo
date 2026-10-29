@@ -1,3 +1,4 @@
+import { loadFeedPrayers } from "../../../lib/feed-prayers";
 import { getD1 } from "../../../../db";
 import { notifyUser } from "../../../lib/pilot-notifications";
 import { recordTenantAudit } from "../../../lib/tenant-audit";
@@ -204,6 +205,9 @@ export async function GET(request: Request) {
   );
   const db = getD1();
   const requestAddress = new URL(request.url);
+  if(requestAddress.searchParams.get("feedPrayer")==="1") {
+    return Response.json(await loadFeedPrayers(db,access.context.comunidadeId,access.user.id),{headers:{"Cache-Control":"no-store"}});
+  }
 
   // O painel de Atendimento usa este mesmo endpoint em modo operacional: só
   // pedidos gerais, com busca e abas aplicadas no SQL — ver
@@ -398,9 +402,12 @@ export async function POST(request: Request) {
   }
   const body = await safeJson(request);
   if (!body) return Response.json({ error: "Dados inválidos." }, { status: 400 });
+  if(body.feedPrayer===true && (body.communityId!==access.context.comunidadeId || body.tipo!=="ORACAO")) return Response.json({error:"A comunidade ativa mudou. Reabra o pedido."},{status:409});
   const tipo = clean(body.tipo, 30).toUpperCase();
   const titulo = clean(body.titulo, 120);
-  const descricao = clean(body.descricao, 2000);
+  const descricaoOriginal = clean(body.descricao, 2000);
+  const localizacao = clean(body.localizacao, 400);
+  const descricao = descricaoOriginal + (localizacao ? `\n\nLocalização informada: ${localizacao}` : "");
   const visibilidade = clean(body.visibilidade, 30).toUpperCase() || "PRIVADA";
   const contactPreference = clean(body.preferenciaContato, 30).toUpperCase();
   const availability = clean(body.disponibilidade, 240);
@@ -416,7 +423,7 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  if (titulo.length < 3 || descricao.length < 10) {
+  if (titulo.length < 3 || descricaoOriginal.length < 10) {
     return Response.json(
       { error: "Informe um título e uma descrição clara." },
       { status: 400 },
@@ -546,7 +553,7 @@ export async function POST(request: Request) {
     { solicitacaoId: id, tipo, visibilidade, destinatarios: resolved.userIds.size },
   );
   return Response.json(
-    { id, recipients: resolved.userIds.size },
+    { id, recipients: resolved.userIds.size, ...(body.feedPrayer===true ? {prayer:(await loadFeedPrayers(db,access.context.comunidadeId,access.user.id)).items.find(item=>Number(item.id)===id)} : {}) },
     { status: 201 },
   );
 }

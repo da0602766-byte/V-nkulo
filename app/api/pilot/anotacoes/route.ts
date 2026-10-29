@@ -1,3 +1,4 @@
+import { normalizeReminder } from "../../../lib/care-note-reminders";
 import { getD1 } from "../../../../db";
 import { recordTenantAudit } from "../../../lib/tenant-audit";
 import { requireTenantPermission } from "../../../lib/tenant";
@@ -21,6 +22,8 @@ type CareNote = {
   eventoId: number | null;
   eventoTitulo: string;
   checklist: ChecklistItem[];
+  lembreteEm: string | null;
+  lembreteEnviadoEm: string | null;
   criadoEm: string;
   atualizadoEm: string;
 };
@@ -71,6 +74,8 @@ function normalizeNote(value: unknown, previous?: CareNote): CareNote | null {
   const titulo = cleanText(row.titulo, 100);
   const texto = cleanText(row.texto, 1200);
   if (!titulo && !texto) return null;
+  const lembreteEm = normalizeReminder(row.lembreteEm, previous?.lembreteEm);
+  if (lembreteEm === undefined) return null;
   const now = new Date().toISOString();
   const cor = cleanText(row.cor, 20);
   return {
@@ -83,6 +88,8 @@ function normalizeNote(value: unknown, previous?: CareNote): CareNote | null {
     eventoId: positiveId(row.eventoId),
     eventoTitulo: cleanText(row.eventoTitulo, 140),
     checklist: normalizeChecklist(row.checklist),
+    lembreteEm,
+    lembreteEnviadoEm: lembreteEm && lembreteEm === previous?.lembreteEm ? previous?.lembreteEnviadoEm || null : null,
     criadoEm: previous?.criadoEm || now,
     atualizadoEm: now,
   };
@@ -132,12 +139,12 @@ export async function GET() {
          AND datetime(inicia_em) >= datetime('now', '-1 day')
        ORDER BY datetime(inicia_em), id LIMIT 40`,
     ).bind(access.context.comunidadeId).all<{ id: number; titulo: string; inicia_em: string }>(),
-    db.prepare(
+    access.context.permissions.includes("visitors.view") ? db.prepare(
       `SELECT id, nome_completo
        FROM visitantes
        WHERE comunidade_id = ? AND ativo = 1 AND escopo_confirmado = 1
        ORDER BY nome_completo LIMIT 120`,
-    ).bind(access.context.comunidadeId).all<{ id: number; nome_completo: string }>(),
+    ).bind(access.context.comunidadeId).all<{ id: number; nome_completo: string }>() : Promise.resolve({ results: [] }),
   ]);
   return Response.json({
     anotacoes: stored.notes,
@@ -150,7 +157,7 @@ export async function POST(request: Request) {
   const access = await requireTenantPermission("dashboard.view");
   if ("error" in access) return access.error;
   const note = normalizeNote(await request.json().catch(() => null));
-  if (!note) return Response.json({ error: "Escreva um título ou uma anotação." }, { status: 400 });
+  if (!note) return Response.json({ error: "Escreva uma anotação e, se desejar um lembrete, escolha uma data e hora futuras." }, { status: 400 });
   const stored = await readNotes(access.context.comunidadeId, access.user.id);
   const notes = [note, ...stored.notes.filter((item) => item.id !== note.id)].slice(0, MAX_NOTES);
   if (!await saveNotes(access.context.comunidadeId, access.user.id, notes, stored.version)) return Response.json({ error: "As anotações mudaram. Atualize e tente novamente." }, { status: 409 });
@@ -168,7 +175,7 @@ export async function PATCH(request: Request) {
   const previous = stored.notes.find((item) => item.id === id);
   if (!previous) return Response.json({ error: "Anotação não encontrada." }, { status: 404 });
   const note = normalizeNote({ ...previous, ...body, id }, previous);
-  if (!note) return Response.json({ error: "A anotação não pode ficar vazia." }, { status: 400 });
+  if (!note) return Response.json({ error: "Confira o texto e a data do lembrete. Novos lembretes precisam estar no futuro." }, { status: 400 });
   const notes = stored.notes.map((item) => item.id === id ? note : item);
   if (!await saveNotes(access.context.comunidadeId, access.user.id, notes, stored.version)) return Response.json({ error: "As anotações mudaram. Atualize e tente novamente." }, { status: 409 });
   return Response.json({ anotacao: note });

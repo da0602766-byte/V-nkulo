@@ -39,6 +39,9 @@ export async function GET(request: Request) {
       p.imagem_thumbnail_url, p.imagem_alt, p.imagem_width, p.imagem_height,
       p.links_json, p.audiencia_tipo, p.ministerios_json,
       p.canal_feed, p.canal_lateral, p.aprovacao_status,
+      CASE WHEN EXISTS (SELECT 1 FROM configuracoes moment WHERE moment.chave = 'feed_moment:' || p.comunidade_id || ':' || p.id AND moment.valor = 'true')
+        THEN datetime(COALESCE(p.aprovado_em, p.criado_em), '+24 hours') ELSE NULL END AS momento_expira_em,
+      (SELECT oc.titulo FROM oficiais_comunidade oc JOIN usuario_comunidades membership ON membership.id=oc.usuario_comunidade_id WHERE membership.usuario_id=p.criado_por AND membership.comunidade_id=p.comunidade_id AND membership.status='ATIVO' LIMIT 1) AS autor_titulo_oficial,
       u.nome AS autor_nome, u.foto_perfil AS autor_foto,
       u.email AS autor_email, u.criado_em AS autor_criado_em,
       (SELECT uc.papel FROM usuario_comunidades uc
@@ -47,14 +50,15 @@ export async function GET(request: Request) {
       (SELECT COUNT(*) FROM comentarios_publicacao cp
        WHERE cp.publicacao_id = p.id AND cp.status = 'PUBLICADO') AS total_comentarios,
       COALESCE((SELECT json_group_object(tipo, total) FROM (
-        SELECT tipo, COUNT(*) AS total FROM reacoes_publicacao
-        WHERE publicacao_id = p.id GROUP BY tipo
+        SELECT tipo, COUNT(*) AS total FROM reacoes_publicacao r
+        WHERE publicacao_id = p.id AND r.id = (SELECT MAX(latest.id) FROM reacoes_publicacao latest
+          WHERE latest.publicacao_id = r.publicacao_id AND latest.usuario_id = r.usuario_id) GROUP BY tipo
       )), '{}') AS reacoes_json,
-      COALESCE((SELECT json_group_array(tipo) FROM reacoes_publicacao
-        WHERE publicacao_id = p.id AND usuario_id = ?), '[]') AS minhas_reacoes_json,
+      COALESCE((SELECT json_group_array(tipo) FROM (SELECT tipo FROM reacoes_publicacao
+        WHERE publicacao_id = p.id AND usuario_id = ? ORDER BY id DESC LIMIT 1)), '[]') AS minhas_reacoes_json,
       CASE WHEN p.criado_por = ? THEN 1 ELSE 0 END AS can_edit,
       CASE WHEN p.criado_por = ? OR ? = 1 THEN 1 ELSE 0 END AS can_hide,
-      CASE WHEN ? = 1 THEN 1 ELSE 0 END AS can_delete
+      CASE WHEN p.criado_por = ? OR ? = 1 THEN 1 ELSE 0 END AS can_delete
     FROM publicacoes_piloto p
     LEFT JOIN usuarios u ON u.id = p.criado_por
     WHERE p.comunidade_id = ?
@@ -78,6 +82,7 @@ export async function GET(request: Request) {
           access.user.id,
           access.user.id,
           canModerate ? 1 : 0,
+          access.user.id,
           canDelete ? 1 : 0,
           access.context.comunidadeId,
           canModerate ? 1 : 0,
@@ -96,6 +101,7 @@ export async function GET(request: Request) {
           access.user.id,
           access.user.id,
           canModerate ? 1 : 0,
+          access.user.id,
           canDelete ? 1 : 0,
           access.context.comunidadeId,
           canModerate ? 1 : 0,
@@ -160,6 +166,9 @@ export async function POST(request: Request) {
   }
   const canalFeed = payload.canalFeed !== false;
   const canalLateral = payload.canalLateral === true;
+  if (payload.mostrarMomento === true && !canalFeed) {
+    return Response.json({ error: "Para mostrar nos Momentos, selecione também o canal Feed." }, { status: 400 });
+  }
   if (!canalFeed && !canalLateral) {
     return Response.json({ error: "Escolha Feed, Lateral ou os dois." }, { status: 400 });
   }
@@ -230,6 +239,10 @@ export async function POST(request: Request) {
     )
     .run();
   const postId = Number(result.meta.last_row_id);
+  if (payload.mostrarMomento === true && canalFeed) {
+    await db.prepare("INSERT INTO configuracoes (chave, valor, atualizado_por, atualizado_em) VALUES (?, 'true', ?, CURRENT_TIMESTAMP) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor, atualizado_em = CURRENT_TIMESTAMP")
+      .bind(`feed_moment:${access.context.comunidadeId}:${postId}`, access.user.email).run();
+  }
   await recordTenantAudit(
     db,
     access.context,
@@ -249,7 +262,7 @@ export async function POST(request: Request) {
     const managers = await db.prepare(
       `SELECT DISTINCT u.id FROM usuarios u JOIN usuario_comunidades uc ON uc.usuario_id = u.id
        WHERE uc.comunidade_id = ? AND uc.status = 'ATIVO' AND u.ativo = 1
-         AND (uc.papel IN ('PASTOR','ADMIN_COMUNIDADE') OR u.perfil = 'ADMIN')`,
+         AND uc.papel IN ('PASTOR','ADMIN_COMUNIDADE','SUPERADMIN')`,
     ).bind(access.context.comunidadeId).all<{ id: number }>();
     await Promise.all(managers.results.filter((item) => item.id !== access.user.id).map((item) => notifyUser(db, {
       userId: item.id, title: "Publicação aguardando aprovação",

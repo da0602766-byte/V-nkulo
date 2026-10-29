@@ -62,9 +62,6 @@ export async function POST(request: Request) {
   }
 
   const hasImage = image instanceof File && image.size > 0;
-  if (tipo === "PROBLEMA" && !hasImage) {
-    return Response.json({ error: "Adicione uma foto mostrando o problema." }, { status: 400 });
-  }
   if (hasImage && (!IMAGE_TYPES.has(image.type) || image.size > MAX_IMAGE_BYTES)) {
     return Response.json({ error: "Use uma foto JPG, PNG ou WebP de até 8 MB." }, { status: 415 });
   }

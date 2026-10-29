@@ -4,12 +4,18 @@ import {
   FormEvent,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
 } from "react";
 import { createPortal } from "react-dom";
 import AgendaCalendar from "./AgendaCalendar";
+import AgendaDialog from "./AgendaDialog";
+import { readAgendaJson, AgendaRequestError, agendaErrorMessage } from "../lib/agenda-request";
+import TransientFeedback from "./TransientFeedback";
+import styles from "./EventsAgenda.module.css";
+import { filterEventDirectory, type EventPeriod } from "../lib/event-directory";
 
 type CommunityEvent = {
   id: number;
@@ -73,15 +79,20 @@ export default function EventsWorkspace({
   communityName: string;
   communitySlug: string;
 }) {
+  const introId = useId();
+  const [introOpen, setIntroOpen] = useState(false);
+
   const [eventSearch, setEventSearch] = useState("");
   const [eventStatus, setEventStatus] = useState("TODOS");
+  const [eventPeriod, setEventPeriod] = useState<EventPeriod>("PROXIMOS");
   const [events, setEvents] = useState<CommunityEvent[]>([]);
   const [agendaRevision, setAgendaRevision] = useState(0);
-  const [now] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Date.now());
   const [loading, setLoading] = useState(true);
   const [workingId, setWorkingId] = useState<number | "form" | null>(null);
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
   const [editing, setEditing] = useState<CommunityEvent | null>(null);
   const [newEventDay, setNewEventDay] = useState("");
   const [newEventDraft, setNewEventDraft] = useState(0);
@@ -91,10 +102,15 @@ export default function EventsWorkspace({
   const [registrantSearchEventId, setRegistrantSearchEventId] = useState<number | null>(null);
   const [registrantSearch, setRegistrantSearch] = useState("");
   const [actionMenuId, setActionMenuId] = useState<number | null>(null);
-  const detailsRef = useRef<HTMLDetailsElement>(null);
+  const [eventFormOpen, setEventFormOpen] = useState(false);
+  const eventsRequestRef = useRef<AbortController | null>(null);
+  const eventsSignatureRef = useRef("");
   const canManage = permissions.includes("events.manage");
   const canRsvp = permissions.includes("events.rsvp");
-  const displayedEvents = useMemo(() => events.filter(item => (eventStatus === "TODOS" || item.status === eventStatus) && `${item.titulo} ${item.local} ${item.descricao}`.toLocaleLowerCase("pt-BR").includes(eventSearch.trim().toLocaleLowerCase("pt-BR"))), [events,eventSearch,eventStatus]);
+  const displayedEvents = useMemo(() => filterEventDirectory(events, eventSearch, eventStatus, eventPeriod, now), [events, eventSearch, eventStatus, eventPeriod, now]);
+  const hasDirectoryFilters = Boolean(eventSearch.trim()) || eventStatus !== "TODOS" || eventPeriod !== "TODOS";
+  const requestedEventRef = useRef<number | null>(null);
+  const scrolledEventRef = useRef<number | null>(null);
   const registrantSearchEvent = useMemo(
     () => events.find((item) => item.id === registrantSearchEventId) || null,
     [events, registrantSearchEventId],
@@ -113,24 +129,31 @@ export default function EventsWorkspace({
   }, [registrantSearch, registrantSearchEvent]);
 
   const loadEvents = useCallback(async (quiet = false) => {
+    if (quiet && eventsRequestRef.current) return;
+    eventsRequestRef.current?.abort();
+    const request = new AbortController(); eventsRequestRef.current = request;
     if (!quiet) setLoading(true);
-    if (!quiet) setError("");
     try {
-      const response = await fetch("/api/pilot/eventos", {
-        cache: "no-store",
-      });
-      const result = (await response.json()) as ApiResult;
-      if (!response.ok) {
-        throw new Error(result.error || "Não foi possível carregar os eventos.");
-      }
-      setEvents(result.eventos || []);
-      setAgendaRevision((value) => value + 1);
-    } catch (loadError) {
-      if (!quiet) setError((loadError as Error).message);
+      const result = await readAgendaJson<ApiResult>("/api/pilot/eventos", request.signal);
+      if (request.signal.aborted) return;
+      const signature = JSON.stringify(result.eventos || []);
+      setEvents(result.eventos || []); setNow(Date.now()); setLoadError("");
+      if (!quiet || signature !== eventsSignatureRef.current) setAgendaRevision(value => value + 1);
+      eventsSignatureRef.current = signature;
+    } catch (error) {
+      if (request.signal.aborted) return;
+      if (error instanceof AgendaRequestError && [401, 403].includes(error.status)) setEvents([]);
+      setLoadError(agendaErrorMessage(error));
     } finally {
-      if (!quiet) setLoading(false);
+      if (eventsRequestRef.current === request) { eventsRequestRef.current = null; setLoading(false); }
     }
   }, []);
+  useEffect(() => () => eventsRequestRef.current?.abort(), []);
+  useEffect(() => {
+    const resume = () => { if (document.visibilityState === "visible") void loadEvents(true); };
+    window.addEventListener("online", resume); document.addEventListener("visibilitychange", resume);
+    return () => { window.removeEventListener("online", resume); document.removeEventListener("visibilitychange", resume); };
+  }, [loadEvents]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadEvents(), 0);
@@ -161,10 +184,21 @@ export default function EventsWorkspace({
   useEffect(() => {
     if (!events.length || typeof window === "undefined") return;
     const requestedId = Number(new URLSearchParams(window.location.search).get("evento"));
-    if (!requestedId) return;
+    if (!requestedId || scrolledEventRef.current === requestedId) return;
+    if (requestedEventRef.current !== requestedId) {
+      requestedEventRef.current = requestedId;
+      setEventPeriod("TODOS");
+      setEventSearch("");
+      setEventStatus("TODOS");
+    }
     const target = document.getElementById(`event-${requestedId}`);
-    if (target) window.setTimeout(() => target.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
-  }, [events]);
+    if (!target) return;
+    const timer = window.setTimeout(() => {
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      scrolledEventRef.current = requestedId;
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [events, eventPeriod]);
 
   useEffect(() => {
     if (!canManage) return;
@@ -174,11 +208,7 @@ export default function EventsWorkspace({
       setNewEventDraft((value) => value + 1);
       setPollEnabled(false);
       setPollOptions(["", ""]);
-      window.requestAnimationFrame(() => {
-        if (!detailsRef.current) return;
-        detailsRef.current.open = true;
-        detailsRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
+      setEventFormOpen(true);
     };
     window.addEventListener("vinkulo:new-event", open);
     return () => window.removeEventListener("vinkulo:new-event", open);
@@ -238,10 +268,10 @@ export default function EventsWorkspace({
       formElement.reset();
       setPollEnabled(false);
       setPollOptions(["", ""]);
-      if (detailsRef.current) detailsRef.current.open = false;
+      setEventFormOpen(false);
       await loadEvents();
     } catch (saveError) {
-      setError((saveError as Error).message);
+      setError(agendaErrorMessage(saveError, true));
     } finally {
       setWorkingId(null);
     }
@@ -391,30 +421,43 @@ export default function EventsWorkspace({
     setPollOptions(item.enquete?.opcoes.map((option) => option.label) || ["", ""]);
     setError("");
     setFeedback("");
-    window.requestAnimationFrame(() => {
-      if (!detailsRef.current) return;
-      detailsRef.current.open = true;
-      detailsRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
+      setEventFormOpen(true);
   }
 
   return (
-    <section className="events-workspace events-studio">
-      <header className="workspace-heading">
-        <div>
-          <p className="pilot-kicker">ENCONTROS QUE APROXIMAM</p>
-          <h1>Vamos nos encontrar.</h1>
-          <p>
-            A programação de {communityName}, suas escalas e seus compromissos em um só lugar.
-          </p>
+    <section className={`events-workspace events-studio ${styles.workspace}`}>
+      <div id={introId} className={styles.intro} data-open={introOpen} aria-hidden={!introOpen} inert={!introOpen}>
+        <div className={styles.introClip}>
+          <div className={styles.introContent}>
+            <div>
+              <p className="pilot-kicker">ENCONTROS QUE APROXIMAM</p>
+              <h2>Vamos nos encontrar.</h2>
+              <p>
+                A programação de {communityName}, suas escalas e seus compromissos em um só lugar.
+              </p>
+            </div>
+            <div className="events-studio-count"><strong>{events.filter(item => item.status === "PUBLICADO" && Date.parse(item.inicia_em) >= now).length}</strong><span>próximos eventos</span></div>
+          </div>
         </div>
-        <div className="events-studio-count"><strong>{events.filter(item => item.status === "PUBLICADO" && Date.parse(item.inicia_em) >= now).length}</strong><span>próximos eventos</span></div>
-      </header>
+      </div>
 
       {/* O calendário reúne, em camadas, o que já existe espalhado: eventos da
           comunidade, as escalas desta pessoa e os compromissos que ela mesma
           marcou. A lista de gestão de eventos continua abaixo. */}
       <AgendaCalendar
+        headingContent={<div className={styles.titlebar}>
+        <h1>Agenda</h1>
+        <button
+          type="button"
+          className={styles.introToggle}
+          aria-expanded={introOpen}
+          aria-controls={introId}
+          onClick={() => setIntroOpen((value) => !value)}
+        >
+          {introOpen ? "Fechar resumo" : "Sobre"}
+          <span aria-hidden="true">{introOpen ? "−" : "+"}</span>
+        </button>
+      </div>}
         atualizacao={agendaRevision}
         podeVerEventos={permissions.includes("events.view")}
         podeAprovar={canManage}
@@ -428,13 +471,7 @@ export default function EventsWorkspace({
                 setPollOptions(["", ""]);
                 setError("");
                 setFeedback("");
-                window.requestAnimationFrame(() => {
-                  const alvo = detailsRef.current;
-                  if (!alvo) return;
-                  alvo.open = true;
-                  alvo.scrollIntoView({ behavior: "smooth", block: "start" });
-                  alvo.querySelector<HTMLInputElement>('[name="titulo"]')?.focus({ preventScroll: true });
-                });
+                setEventFormOpen(true);
               }
             : undefined
         }
@@ -442,20 +479,16 @@ export default function EventsWorkspace({
 
 
 
-      {canManage && (
-        <details
-          className="operations-form-card event-form-card"
-          ref={detailsRef}
-          key={editing?.id || `new-${newEventDraft}`}
-        >
-          <summary className="event-form-summary">
-            <span aria-hidden="true">＋</span><div><strong>{editing ? `Editar: ${editing.titulo}` : "Novo evento"}</strong><small>Organize os detalhes, a participação e a divulgação.</small></div><i aria-hidden="true">⌄</i>
-          </summary>
-          <form className="pilot-form event-form" onSubmit={saveEvent}>
+      {canManage && eventFormOpen && (
+        <AgendaDialog title={editing ? `Editar: ${editing.titulo}` : "Novo evento"} wide busy={workingId === "form"} onClose={() => setEventFormOpen(false)} key={editing?.id || `new-${newEventDraft}`}>
+        <div className={styles.eventDialogForm}>
+          <form className="pilot-form event-form" onSubmit={saveEvent} onInvalidCapture={event=>{const parent=(event.target as HTMLElement).closest("details");if(parent)parent.open=true;}}>
+            <div className="event-form-section-title"><span>01</span><div><h3>Sobre o encontro</h3><p>Nome e categoria do evento.</p></div></div>
             <label className="event-wide-field">
               Título*
               <input
                 name="titulo"
+                placeholder="Ex.: Culto de celebração"
                 required
                 maxLength={140}
                 defaultValue={editing?.titulo || ""}
@@ -474,6 +507,7 @@ export default function EventsWorkspace({
                 ))}
               </select>
             </label>
+            <div className="event-form-section-title"><span>02</span><div><h3>Quando e onde</h3><p>Defina os horários e a capacidade.</p></div></div>
             <label>
               Início*
               <input
@@ -495,6 +529,7 @@ export default function EventsWorkspace({
               Local
               <input
                 name="local"
+                placeholder="Ex.: Templo principal"
                 maxLength={180}
                 defaultValue={editing?.local || ""}
               />
@@ -503,12 +538,14 @@ export default function EventsWorkspace({
               Capacidade
               <input
                 name="capacidade"
+                placeholder="Sem limite definido"
                 type="number"
                 min={1}
                 max={100000}
                 defaultValue={editing?.capacidade || ""}
               />
             </label>
+            <details className="event-advanced event-wide-field" open={Boolean(editing?.escalas_abrem_em || editing?.reservas_abrem_em)}><summary>Liberação de escalas e estacionamento <small>Opcional</small></summary><div>
             <label>
               Escalas disponíveis em
               <input
@@ -527,6 +564,8 @@ export default function EventsWorkspace({
               />
               <small>Somente pessoas confirmadas poderão reservar após este horário.</small>
             </label>
+            </div></details>
+            <div className="event-form-section-title"><span>03</span><div><h3>Publicação</h3><p>Escolha como o evento será apresentado.</p></div></div>
             <label>
               Status
               <select name="status" defaultValue={editing?.status || "RASCUNHO"}>
@@ -542,7 +581,7 @@ export default function EventsWorkspace({
               />
               Exibir na página pública
             </label>
-            <fieldset className={`event-poll-field event-wide-field ${pollEnabled ? "is-enabled" : ""}`}>
+            <details className="event-advanced event-wide-field" open={pollEnabled}><summary>Votação do evento <small>Opcional</small></summary><fieldset className={`event-poll-field event-wide-field ${pollEnabled ? "is-enabled" : ""}`}>
               <legend>Votação</legend>
               <button
                 type="button"
@@ -606,16 +645,18 @@ export default function EventsWorkspace({
                   </div>
                 </div>
               )}
-            </fieldset>
+            </fieldset></details>
             <label className="event-wide-field">
               Descrição
               <textarea
                 name="descricao"
+                placeholder="O que os participantes precisam saber?"
                 rows={4}
                 maxLength={2000}
                 defaultValue={editing?.descricao || ""}
               />
             </label>
+            {error && <p className={styles.formError} role="alert">{error}</p>}
             <div className="event-form-actions">
               {!editing && (
                 <button
@@ -624,7 +665,7 @@ export default function EventsWorkspace({
                   onClick={() => {
                     setPollEnabled(false);
                     setPollOptions(["", ""]);
-                    if (detailsRef.current) detailsRef.current.open = false;
+                    setEventFormOpen(false);
                   }}
                 >
                   Fechar
@@ -638,7 +679,7 @@ export default function EventsWorkspace({
                     setEditing(null);
                     setPollEnabled(false);
                     setPollOptions(["", ""]);
-                    if (detailsRef.current) detailsRef.current.open = false;
+                    setEventFormOpen(false);
                   }}
                 >
                   Sair da edição
@@ -653,18 +694,26 @@ export default function EventsWorkspace({
               </button>
             </div>
           </form>
-        </details>
+        </div></AgendaDialog>
       )}
 
       {feedback && (
-        <p className="operations-feedback" role="status">
+        <TransientFeedback className="operations-feedback" role="status">
           {feedback}
-        </p>
+        </TransientFeedback>
       )}
       {error && (
-        <div className="operations-feedback error" role="alert">
+        <TransientFeedback className="operations-feedback error" role="alert">
           <span>{error}</span>
           <button className="event-inline-action" onClick={() => void loadEvents()}>
+            Tentar novamente
+          </button>
+        </TransientFeedback>
+      )}
+      {loadError && (
+        <div className={styles.syncNotice} role="status">
+          <span>{loadError}</span>
+          <button type="button" className="event-inline-action" onClick={() => void loadEvents()}>
             Tentar novamente
           </button>
         </div>
@@ -677,8 +726,16 @@ export default function EventsWorkspace({
           <span />
         </div>
       ) : events.length ? (<>
-        <div className="events-studio-directory"><div><small>PROGRAMAÇÃO DA COMUNIDADE</small><h2>Encontros e eventos</h2></div><label><span className="sr-only">Buscar eventos</span><input type="search" value={eventSearch} onChange={event => setEventSearch(event.target.value)} placeholder="Buscar evento ou local…" /></label><label><span className="sr-only">Estado dos eventos</span><select value={eventStatus} onChange={event=>setEventStatus(event.target.value)}><option value="TODOS">Todos os estados</option><option value="PUBLICADO">Publicados</option>{canManage && <option value="RASCUNHO">Rascunhos</option>}<option value="CANCELADO">Cancelados</option></select></label></div>
-        {!displayedEvents.length && <p className="agenda-vazio">Nenhum evento corresponde à busca.</p>}
+        <section className={styles.directory} aria-label="Buscar na programação">
+          <div className={styles.directoryHeading}><small>PROGRAMAÇÃO DA COMUNIDADE</small><h2>Encontros e eventos</h2><p>Consulte os eventos por período. Esta busca não altera o calendário acima.</p></div>
+          <div className={styles.directoryFilters}>
+            <label>Buscar eventos<input type="search" value={eventSearch} onChange={event => setEventSearch(event.target.value)} placeholder="Título, local ou descrição" /></label>
+            <label>Período dos eventos<select value={eventPeriod} onChange={event => setEventPeriod(event.target.value as EventPeriod)}><option value="PROXIMOS">Em andamento e próximos</option><option value="ANTERIORES">Anteriores</option><option value="TODOS">Todos os períodos</option></select></label>
+            <label>Situação<select value={eventStatus} onChange={event=>setEventStatus(event.target.value)}><option value="TODOS">Todas as situações</option><option value="PUBLICADO">Publicados</option>{canManage && <option value="RASCUNHO">Rascunhos</option>}<option value="CANCELADO">Cancelados</option></select></label>
+          </div>
+          <div className={styles.directorySummary}><span role="status">{displayedEvents.length} {displayedEvents.length === 1 ? "evento encontrado" : "eventos encontrados"}</span>{hasDirectoryFilters && <button type="button" onClick={() => { setEventSearch(""); setEventStatus("TODOS"); setEventPeriod("TODOS"); }}>Limpar busca e filtros</button>}</div>
+        </section>
+        {!displayedEvents.length && <div className={styles.directoryEmpty}><strong>{loadError ? "Não foi possível confirmar os resultados." : eventPeriod === "PROXIMOS" && !eventSearch.trim() && eventStatus === "TODOS" ? "Nenhum evento em andamento ou futuro." : "Nenhum evento encontrado com esses filtros."}</strong><p>{loadError ? "Tente atualizar a programação novamente." : "Você pode consultar os eventos anteriores ou ajustar a busca."}</p><button type="button" onClick={() => { if (loadError) void loadEvents(); else { setEventSearch(""); setEventStatus("TODOS"); setEventPeriod("TODOS"); } }}>{loadError ? "Tentar novamente" : "Ver todos os eventos"}</button></div>}
         <div className="event-grid">
           {displayedEvents.map((item) => {
             const isPublished = item.status === "PUBLICADO";
@@ -719,6 +776,7 @@ export default function EventsWorkspace({
                     )}
                   </div>
                   <h2>{item.titulo}</h2>
+                  <div className={styles.eventSummary}><time dateTime={item.inicia_em}>{formatDateTimeRange(item.inicia_em, item.termina_em)}</time><span>{item.local || "Local a definir"}</span></div>
                   <details className="event-card-details">
                     <summary>
                       <span>
@@ -845,7 +903,13 @@ export default function EventsWorkspace({
             );
           })}
         </div>
-      </>) : (
+      </>) : loadError ? (
+        <div className="pilot-empty-state event-empty">
+          <strong>Eventos indisponíveis no momento</strong>
+          <p>Não foi possível consultar a programação da comunidade.</p>
+          <button type="button" className="event-inline-action" onClick={() => void loadEvents()}>Tentar novamente</button>
+        </div>
+      ) : (
         <div className="pilot-empty-state event-empty">
           <strong>Nenhum evento nesta comunidade</strong>
           <p>
@@ -904,7 +968,7 @@ export default function EventsWorkspace({
         </div>,
         document.body,
       )}
-      {shareFeedback && <p className="operations-feedback" role="status">{shareFeedback}</p>}
+      {shareFeedback && <TransientFeedback className="operations-feedback" role="status">{shareFeedback}</TransientFeedback>}
     </section>
   );
 }

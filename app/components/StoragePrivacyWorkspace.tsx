@@ -1,9 +1,14 @@
 "use client";
 
+import TransientFeedback from "./TransientFeedback";
+
 import { useEffect, useState } from "react";
 import GoogleStatusToast, { type GoogleToastState } from "./GoogleStatusToast";
+import SavedFilesWorkspace from "./SavedFilesWorkspace";
 
 type StorageData = {
+  userId: number;
+  profilePhoto: string;
   googleAvailable: boolean;
   google: null | { email: string; linked: boolean; connected: boolean; connectedAt: string; scopes: string };
   preference: {
@@ -25,11 +30,14 @@ export default function StoragePrivacyWorkspace() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [googleToast, setGoogleToast] = useState<GoogleToastState>(null);
+  const [loadError, setLoadError] = useState("");
+  const [revision, setRevision] = useState(0);
 
-  async function load() {
-    const response = await fetch("/api/storage/preferences", { cache: "no-store" });
+  async function load(signal?: AbortSignal) {
+    const response = await fetch("/api/storage/preferences", { cache: "no-store", signal });
     const result = await response.json() as StorageData;
     if (!response.ok) throw new Error(result.error || "Não foi possível carregar a privacidade.");
+    if (signal?.aborted) return;
     setData(result);
   }
 
@@ -49,12 +57,21 @@ export default function StoragePrivacyWorkspace() {
       } else if (failure) {
         setGoogleToast({ variant: "error", title: "Não foi possível conectar o Drive", detail: failure });
       }
-      void load().catch((error) =>
-        setGoogleToast({ variant: "error", title: "Não foi possível carregar", detail: (error as Error).message }),
-      );
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/storage/preferences", { cache: "no-store", signal: controller.signal }).then(async response => {
+      const result = await response.json() as StorageData;
+      if (!response.ok) throw new Error(result.error || "Não foi possível carregar a privacidade.");
+      if (!controller.signal.aborted) setData(result);
+    }).catch((error) => {
+      if (!controller.signal.aborted) setLoadError((error as Error).message);
+    });
+    return () => controller.abort();
+  }, [revision]);
 
   async function savePreference(next: Partial<{
     provider: "LOCAL" | "GOOGLE_DRIVE";
@@ -180,7 +197,7 @@ export default function StoragePrivacyWorkspace() {
     }
   }
 
-  if (!data) return <section className="storage-privacy-card" aria-busy="true"><p>Carregando privacidade e armazenamento…</p></section>;
+  if (!data) return <section className="storage-privacy-card storage-load-state" aria-busy={!loadError}>{loadError ? <><p role="alert">{loadError}</p><button type="button" onClick={() => { setLoadError(""); setRevision(value => value + 1); }}>Tentar novamente</button></> : <p role="status">Carregando privacidade e armazenamento…</p>}</section>;
   const driveConnected = Boolean(data.google?.connected);
   return (
     <section className="storage-privacy-card" aria-labelledby="storage-privacy-title">
@@ -188,8 +205,8 @@ export default function StoragePrivacyWorkspace() {
         <span aria-hidden="true">☁</span>
         <div>
           <p className="pilot-kicker">PRIVACIDADE E ARMAZENAMENTO</p>
-          <h2 id="storage-privacy-title">Seus conteúdos não ficam no Vínkulo</h2>
-          <p>Fotos e arquivos ficam no Google Drive autorizado ou somente neste aparelho — a plataforma guarda apenas referências técnicas, consentimentos e permissões. Mensagens privadas seguem outra regra: para responder na hora, ficam gravadas no próprio sistema, sem histórico permanente, e são apagadas por completo toda semana.</p>
+          <h2 id="storage-privacy-title">Escolha onde guardar seus arquivos</h2>
+          <p>Baixe fotos e documentos no aparelho ou guarde cópias no seu Google Drive. O conteúdo compartilhado segue disponível na comunidade. Sua escolha abaixo define o destino de novos arquivos pessoais.</p>
         </div>
       </header>
 
@@ -200,15 +217,17 @@ export default function StoragePrivacyWorkspace() {
           : <b className="is-unlinked">Não vinculada</b>}
       </div>
 
+      <SavedFilesWorkspace userId={data.userId} profile={data.profilePhoto} connected={driveConnected} />
+
       <div className="storage-destination-grid">
         <button type="button" className={data.preference.provider === "GOOGLE_DRIVE" ? "selected" : ""} disabled={busy || !driveConnected} onClick={() => void savePreference({ provider: "GOOGLE_DRIVE" })}>
           <strong>Google Drive</strong>
           <span>{driveConnected ? `Conectado como ${data.google?.email}` : "Conecte sua Conta Google para usar em outros aparelhos."}</span>
-          <small>Sincroniza conteúdos autorizados sem criar cópia no armazenamento do Vínkulo.</small>
+          <small>Guarda novos arquivos pessoais no Drive. Para copiar os anteriores, use Fotos e arquivos acima.</small>
         </button>
         <button type="button" className={data.preference.provider === "LOCAL" ? "selected" : ""} disabled={busy} onClick={() => void savePreference({ provider: "LOCAL" })}>
-          <strong>Somente neste aparelho</strong>
-          <span>Privado e sem sincronização.</span>
+          <strong>Guardar neste navegador</strong>
+          <span>Arquivos pessoais locais, sem precisar do Drive.</span>
           <small>Pode ser perdido ao limpar o navegador, desinstalar o aplicativo ou trocar de celular.</small>
         </button>
       </div>
@@ -245,10 +264,7 @@ export default function StoragePrivacyWorkspace() {
           <input type="checkbox" checked={Boolean(data.preference.auto_load_recent)} onChange={(event) => void savePreference({ autoLoadRecent: event.target.checked })} />
           <span><strong>Carregar os mais recentes automaticamente</strong><small>Mostra mensagens recentes e prévias leves quando você abre a área.</small></span>
         </label>
-        <label>
-          <input type="checkbox" checked={Boolean(data.preference.auto_download_files)} onChange={(event) => void savePreference({ autoDownloadFiles: event.target.checked })} />
-          <span><strong>Permitir baixar arquivos neste aparelho</strong><small>Desativado por padrão. Quando desligado, os botões de download ficam bloqueados.</small></span>
-        </label>
+        <p>O download manual está sempre disponível para os arquivos que você pode acessar, com ou sem Drive. No celular, toque em “Salvar arquivo” para escolher o destino.</p>
       </fieldset>
 
       {data.canConfigureCommunity && (
@@ -267,12 +283,12 @@ export default function StoragePrivacyWorkspace() {
       )}
 
       <ul className="storage-privacy-facts">
-        <li>O Vínkulo não guarda uma segunda cópia de fotos ou arquivos novos.</li>
+        <li>Salvar uma cópia pessoal não altera nem remove o arquivo original da comunidade.</li>
         <li>O usuário pode negar o Drive e manter conteúdo privado somente no aparelho.</li>
         <li>Conteúdo antigo de fotos e arquivos só será apagado da plataforma depois da migração confirmada.</li>
         <li>Mensagens privadas não entram nessa migração: ficam só no sistema e são apagadas por completo toda semana, sem exceção.</li>
       </ul>
-      {message && <p className="operations-feedback" role="status">{message}</p>}
+      {message && <TransientFeedback className="operations-feedback" role="status">{message}</TransientFeedback>}
 
       <GoogleStatusToast state={googleToast} onDismiss={() => setGoogleToast(null)} />
     </section>

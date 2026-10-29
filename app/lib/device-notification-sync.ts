@@ -3,6 +3,7 @@ import {
   showDeviceNotification,
 } from "./androidNativeBridge";
 import { isWebPushSupported } from "./web-push-client";
+import { deviceNotificationContent } from "./device-notification-content";
 
 const DEVICE_NOTIFICATION_STORAGE_KEY = "vinkulo-device-notifications-v1";
 
@@ -39,17 +40,17 @@ export async function showUnreadDeviceNotifications(items: DeviceNotificationRec
       ? item.destination
       : "/painel";
     const tag = `vinkulo-notification-${item.id}`;
+    const content = deviceNotificationContent(item.title, item.message);
     const shownNatively = nativeBridge && showDeviceNotification({
-      title: "Vínkulo",
-      body: "Você recebeu uma atualização. Abra o Vínkulo para consultar.",
+      ...content,
       tag,
       url: destination,
     });
     if (!shownNatively && registration) {
-      await registration.showNotification("Vínkulo", {
-        body: "Você recebeu uma atualização. Abra o Vínkulo para consultar.",
-        icon: "/vinkulo-app-icon-192.png",
-        badge: "/vinkulo-app-icon-192.png",
+      await registration.showNotification(content.title, {
+        body: content.body,
+        icon: "/vinkulo-logo.png",
+        badge: "/vinkulo-logo.png",
         tag,
         renotify: true,
         data: { notificationId: item.id, url: destination },
@@ -82,5 +83,5 @@ function persistShownNotificationIds(ids: Set<number>) {
 }
 
 function isSafeInternalDestination(value: string) {
-  return value.startsWith("/painel?") || value.startsWith("/comunidades") || value.startsWith("/proprietario");
+  return value.startsWith("/painel?") || value.startsWith("/painel/visitantes?") || value.startsWith("/comunidades") || value.startsWith("/proprietario");
 }

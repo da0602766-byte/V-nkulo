@@ -4,20 +4,19 @@ import test from "node:test";
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("capa fica na lista à direita com degradê sem remover dados do cartão", async () => {
+test("catálogo mantém capa, identificação, liderança e acesso ao ministério", async () => {
   const [css, workspace] = await Promise.all([
     read("app/secretary.css"),
     read("app/components/SecretaryMinisterialWorkspace.tsx"),
   ]);
-  assert.match(workspace, /secretary-ministry-tile-media \$\{ministry\.banner_url/);
-  assert.match(workspace, /ministry\.banner_url \? <img src=\{ministry\.banner_url\}/);
-  assert.match(css, /\.secretary-ministry-tile-media \{[\s\S]*inset: 0 0 0 auto/);
-  assert.match(css, /mask-image:\s*linear-gradient\(to right,transparent 0%/);
-  assert.match(css, /\.secretary-ministry-tile\.has-banner::before/);
+  assert.match(workspace, /className="ministry-design-cover"/);
+  assert.match(workspace, /ministry\.banner_url \? <SafeImage src=\{ministry\.banner_url\}/);
   assert.match(workspace, /CATEGORY_LABELS\[ministry\.categoria\]/);
-  assert.match(workspace, /ministry\.descricao && <span>\{ministry\.descricao\}/);
-  assert.match(workspace, /ministry\.responsavel_nome && <strong/);
-  assert.match(workspace, /ministry\.can_manage \? "Gerenciar →" : "Minhas escalas →"/);
+  assert.match(workspace, /<h2>\{ministry.nome\}<\/h2>/);
+  assert.match(workspace, /ministry\.descricao \|\| 'Conheça a equipe/);
+  assert.match(workspace, /<VerifiedOwnerName name=\{ministry.responsavel_nome\}/);
+  assert.match(workspace, /ministry.total_integrantes/);
+  assert.match(workspace, /aria-label=\{`Abrir ministério \$\{ministry.nome\}`\} onClick=\{\(\)=>openMinistry\(ministry\)\}/);
   assert.match(css, /\.secretary-hero\.has-banner\{grid-template-columns:1fr;padding:0\}/);
   assert.doesNotMatch(css, /\.secretary-hero\.has-banner\{min-height:520px/);
 });
@@ -44,7 +43,7 @@ test("líder do próprio ministério pode nomear co-líder sem ampliar o escopo"
   assert.match(route, /if \(!canManage\)/);
   assert.match(access, /own_leadership\.papel = 'LIDER'/);
   assert.match(workspace, /Líderes do ministério, pastores e proprietários podem nomear outro líder/);
-  assert.match(route, /Líderes só podem ser removidos pela gestão global/);
+  assert.match(route, /Somente o proprietário da comunidade pode remover líderes/);
 });
 
 test("gestão recebe líderes promovidos mesmo antes do primeiro ministério", async () => {
@@ -67,10 +66,11 @@ test("proprietário oferece desativação e exclusão definitiva protegida no ba
   assert.match(api, /action === "ALTERAR_STATUS_USUARIO"/);
   assert.match(api, /DELETE FROM sessoes WHERE usuario_id = \?/);
   assert.match(api, /action === "EXCLUIR_USUARIO_DEFINITIVO"/);
-  assert.match(api, /findUserDependencies/);
-  assert.match(api, /PRAGMA foreign_key_list/);
+  assert.match(api, /deleteUserAccount/);
+  const deletion = await read("app/lib/delete-user-account.ts");
+  assert.match(deletion, /PRAGMA foreign_key_list/);
   assert.match(api, /isSystemOwnerAccount/);
-  assert.match(api, /motivo: "conta_sem_vinculos_funcionais"/);
+  assert.match(deletion, /CONTA_EXCLUIDA_DEFINITIVAMENTE/);
   assert.doesNotMatch(api, /CONTA_DE_TESTE_EXCLUIDA_DEFINITIVAMENTE[\s\S]{0,500}target\.email/);
   assert.match(workspace, /Desativar conta/);
   assert.match(workspace, /Excluir definitivamente/);

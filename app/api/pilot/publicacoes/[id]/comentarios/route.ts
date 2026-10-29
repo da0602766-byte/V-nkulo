@@ -21,6 +21,7 @@ export async function GET(_request: Request, context: Context) {
     .prepare(
       `SELECT cp.id, cp.usuario_id, cp.autor_nome_snapshot, cp.texto,
         cp.perfil_visivel, cp.criado_em, u.nome, u.foto_perfil,
+        (SELECT oc.titulo FROM oficiais_comunidade oc JOIN usuario_comunidades membership ON membership.id=oc.usuario_comunidade_id JOIN publicacoes_piloto publication ON publication.id=cp.publicacao_id WHERE membership.usuario_id=cp.usuario_id AND membership.comunidade_id=publication.comunidade_id AND membership.status='ATIVO' LIMIT 1) AS titulo_oficial,
         u.email AS owner_email, u.criado_em AS owner_criado_em,
         (SELECT uc.papel FROM usuario_comunidades uc
          WHERE uc.usuario_id = cp.usuario_id AND uc.comunidade_id = ?
@@ -42,6 +43,7 @@ export async function GET(_request: Request, context: Context) {
       autor: String(item.nome || item.autor_nome_snapshot || "Usuário"),
       foto: String(item.foto_perfil || ""),
       papel: roleLabel(String(item.papel || "")),
+      officialTitle: item.titulo_oficial ? String(item.titulo_oficial) : null,
       ownerVerified: isSystemOwnerAccount({
         email: String(item.owner_email || ""),
         criado_em: String(item.owner_criado_em || ""),

@@ -61,5 +61,9 @@ export function useParkingGarage(ownerKey: string) {
     persist(vehicles.filter((item) => item.id !== id));
   }, [persist, vehicles]);
 
-  return { vehicles, addVehicle, removeVehicle };
+  const updateVehicle = useCallback((id: string, vehicle: Omit<SavedVehicle, "id">) => {
+    persist(vehicles.map(item => item.id === id ? { ...vehicle, id } : item));
+  }, [persist, vehicles]);
+
+  return { vehicles, addVehicle, updateVehicle, removeVehicle };
 }

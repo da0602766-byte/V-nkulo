@@ -41,8 +41,11 @@ export function isWebPushConfigured() {
 export function isTrustedPushEndpoint(value: string) {
   try {
     const url = new URL(value);
-    if (url.protocol !== "https:" || !url.pathname || url.username || url.password) return false;
+    if (url.protocol !== "https:" || !url.pathname || url.username || url.password || url.port) return false;
     const host = url.hostname.toLowerCase();
+    // Chromium's staging endpoint is also used by some embedded browsers.
+    // https://chromium.googlesource.com/chromium/src/+/refs/tags/148.0.7734.4/components/push_messaging/push_messaging_constants.cc
+    if (host === "jmt17.google.com") return /^\/fcm\/send\/[^/]+$/.test(url.pathname) && !url.search && !url.hash;
     return trustedPushHosts.has(host) || host.endsWith(".push.apple.com") || host.endsWith(".notify.windows.com");
   } catch {
     return false;
@@ -108,7 +111,7 @@ function isVapidSubject(value: string) {
 }
 
 export function safeDestination(value: string) {
-  return value.startsWith("/painel?") || value.startsWith("/comunidades") || value.startsWith("/proprietario")
+  return value.startsWith("/painel?") || value.startsWith("/painel/visitantes?") || value.startsWith("/comunidades") || value.startsWith("/proprietario")
     ? value.slice(0, 300)
     : "/painel";
 }

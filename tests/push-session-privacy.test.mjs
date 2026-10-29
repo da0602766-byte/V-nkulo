@@ -105,7 +105,9 @@ test("push: aviso atrasado exige destinatário, vínculo e sessão atuais", asyn
     assert.equal(response.status, 200);
     const body = await response.json();
     assert.equal(body.url, "/painel?view=eventos");
-    assert.doesNotMatch(JSON.stringify(body), /Título reservado|Conteúdo reservado/);
+    assert.equal(body.title, "Título reservado");
+    assert.equal(body.body, "Conteúdo reservado");
+    assert.equal(response.headers.get("cache-control"), "no-store");
     assert.equal((await f.request(path, b)).status, 404);
     assert.equal((await f.request(path)).status, 401);
     await f.save(b, sub);
@@ -163,6 +165,7 @@ test("push: entrega registra aceite e falha, sem enviar conteúdo privado ou ses
       return new Response(null, { status });
     } });
     const delivery = await loadModule("app/lib/push-delivery-queue.ts", {
+      "./owner-notifications": await loadModule("app/lib/owner-notifications.ts", {}),
       "./chat-push": { getAuthorizedChatPush: async () => null },
       "./firebase-integration": { readFirebaseConfig: async () => null, nativeToken: () => null },
       "../../db/runtime-env": { getRuntimeEnv: () => f.env }, "./web-push": transport,

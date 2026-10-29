@@ -35,6 +35,8 @@ export function useCellsData() {
   const [canManage, setCanManage] = useState(false);
   const [highlight, setHighlight] = useState<HighlightMessage>(DEFAULT_HIGHLIGHT);
   const [loading, setLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -44,7 +46,7 @@ export function useCellsData() {
 
   const loadCells = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
-    setError("");
+    setLoadError("");
     try {
       const result = await apiJson<{
         celulas: Cell[];
@@ -54,8 +56,9 @@ export function useCellsData() {
       setCells(result.celulas);
       setAvailableUsers(result.availableUsers || []);
       setCanManage(Boolean(result.canManage));
+      setHasLoaded(true);
     } catch (caught) {
-      setError((caught as Error).message);
+      setLoadError((caught as Error).message);
     } finally {
       if (!quiet) setLoading(false);
     }
@@ -165,6 +168,9 @@ export function useCellsData() {
     canManage,
     highlight,
     loading,
+    hasLoaded,
+    loadError,
+    retryLoad: () => loadCells(),
     saving,
     message,
     error,

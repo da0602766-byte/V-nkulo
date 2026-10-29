@@ -1,5 +1,5 @@
 import { getD1 } from "../../../../../db";
-import { recordTenantAudit } from "../../../../lib/tenant-audit";
+import { parkingAuditStatement } from "../../../../lib/parking-audit";
 import { requireTenantPermission } from "../../../../lib/tenant";
 
 type Context = { params: Promise<{ id: string }> };
@@ -23,7 +23,7 @@ export async function PATCH(_request: Request, context: Context) {
     return Response.json({ error: "Movimentação não encontrada." }, { status: 404 });
   }
   if (movement.status !== "NO_LOCAL") {
-    return Response.json({ error: "A saída já foi registrada." }, { status: 409 });
+    return Response.json({ ok: true, alreadyCompleted: true, message: "A saída já foi registrada." });
   }
   const statements = [
     db
@@ -34,6 +34,7 @@ export async function PATCH(_request: Request, context: Context) {
          WHERE id = ? AND comunidade_id = ? AND status = 'NO_LOCAL'`,
       )
       .bind(access.user.id, id, access.context.comunidadeId),
+    parkingAuditStatement(db,access.context.comunidadeId,access.user.id,"ESTACIONAMENTO_SAIDA_REGISTRADA",{movimentacaoId:id,vagaId:movement.vaga_id}),
   ];
   if (movement.vaga_id) {
     statements.push(
@@ -41,19 +42,13 @@ export async function PATCH(_request: Request, context: Context) {
         .prepare(
           `UPDATE estacionamento_vagas
            SET status = 'LIVRE', atualizado_em = CURRENT_TIMESTAMP
-           WHERE id = ? AND comunidade_id = ?`,
+           WHERE id = ? AND comunidade_id = ? AND status='OCUPADA' AND changes()=1
+             AND NOT EXISTS(SELECT 1 FROM estacionamento_movimentacoes m WHERE m.vaga_id=estacionamento_vagas.id AND m.comunidade_id=estacionamento_vagas.comunidade_id AND m.status='NO_LOCAL')`,
         )
         .bind(movement.vaga_id, access.context.comunidadeId),
     );
   }
-  await db.batch(statements);
-  await recordTenantAudit(
-    db,
-    access.context,
-    access.user.id,
-    "ESTACIONAMENTO_SAIDA_REGISTRADA",
-    "SUCESSO",
-    { movimentacaoId: id, vagaId: movement.vaga_id },
-  );
+  const [updated] = await db.batch(statements);
+  if (!updated.meta.changes) return Response.json({ ok: true, alreadyCompleted: true, message: "A saída já foi registrada." });
   return Response.json({ ok: true });
 }

@@ -31,12 +31,6 @@ const ROLES = [
   { icon: "member", role: "Membro", tone: "purple", items: ["Mural e fio do dia", "Ministérios e escalas", "Pedidos de oração", "Reserva de eventos"] },
 ] as const;
 
-const TESTIMONIALS = [
-  { name: "Pr. Rogério Almeida", role: "Pastor titular", church: "Igreja Videira Central, SP", text: "O Vínkulo transformou como nossa equipe se comunica. A visão do fio do dia mostrou o que acontece na comunidade de um jeito que nenhum outro sistema conseguiu.", avatar: "RA" },
-  { name: "Cristina Ferreira", role: "Líder de célula", church: "Comunidade Nova Aliança, MG", text: "Antes eu usava planilha e WhatsApp. Agora faço o relatório semanal pelo celular em menos de dois minutos. A célula ficou mais viva.", avatar: "CF" },
-  { name: "Diácono Samuel Costa", role: "Coordenador de ministérios", church: "Igreja Betânia, RJ", text: "As escalas automáticas com notificação salvaram horas de reunião toda semana. A equipe sabe onde estar e a que horas.", avatar: "SC" },
-] as const;
-
 export { DEFAULT_LANDING_PLANS };
 
 const FAQS = [
@@ -49,29 +43,8 @@ const FAQS = [
 
 export default function LandingPageExperience({ signedIn, panelHref, canEdit, plans, siteName = "Vínkulo", logoUrl = "" }: LandingPageExperienceProps) {
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
-  const [ownerAccessOpen, setOwnerAccessOpen] = useState(false);
-  const ownerAccess = useRef<HTMLDivElement>(null);
-  const ownerAccessButton = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (!ownerAccessOpen) return;
-    const outside = (event: PointerEvent) => {
-      if (!ownerAccess.current?.contains(event.target as Node)) setOwnerAccessOpen(false);
-    };
-    const escape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOwnerAccessOpen(false);
-        ownerAccessButton.current?.focus();
-      }
-    };
-    document.addEventListener("pointerdown", outside);
-    document.addEventListener("keydown", escape);
-    return () => {
-      document.removeEventListener("pointerdown", outside);
-      document.removeEventListener("keydown", escape);
-    };
-  }, [ownerAccessOpen]);
   const signupHref = signedIn ? panelHref : "/log1";
-  const loginHref = signedIn ? panelHref : "/login";
+
 
   return (
     <main className="vinkulo-site vinkulo-reception vinkulo-landing" data-visual-editor-root data-editor-key="landing-page" aria-label="VÍNKULO — gestão para igrejas e comunidades">
@@ -79,12 +52,12 @@ export default function LandingPageExperience({ signedIn, panelHref, canEdit, pl
         <div className="lp-shell lp-nav-inner">
           <Link className="lp-brand" href="/" aria-label={`${siteName} — início`}><VinkuloMark logoUrl={logoUrl} size={40} /><span>{siteName}</span></Link>
           <div className="lp-nav-links">
-            <a href="#recursos">Recursos</a><a href="#fio-do-dia">Fio do dia</a>{canEdit && <a href="#planos">Planos</a>}<a href="#duvidas">Dúvidas</a>
+            <a href="#recursos">Recursos</a><a href="#fio-do-dia">Fio do dia</a>{canEdit ? <a href="#planos">Planos</a> : <Link href="/planos">Planos</Link>}<a href="#duvidas">Dúvidas</a>
           </div>
           <div className="lp-nav-actions">
             <ThemeControl compact cycle />
             {canEdit && <span id="global-editor-toolbar-slot" className="global-editor-toolbar-slot" aria-label="Aparência" />}
-            {canEdit ? <div className="lp-owner-access" ref={ownerAccess} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setOwnerAccessOpen(false); }}><button ref={ownerAccessButton} type="button" className="lp-button lp-button-small" aria-expanded={ownerAccessOpen} aria-controls="landing-owner-links" onClick={() => setOwnerAccessOpen((open) => !open)}>Proprietário <span aria-hidden="true">⌄</span></button>{ownerAccessOpen && <div id="landing-owner-links" className="lp-owner-access-menu"><Link href="/proprietario" showLoading>Central do proprietário</Link><Link href="/painel" showLoading>Entrar na comunidade</Link></div>}</div> : <Link className="lp-button lp-button-small" href={loginHref} showLoading>{signedIn ? "Abrir painel" : "Entrar"} <span aria-hidden="true">→</span></Link>}
+            <Link className="lp-button lp-button-small" href={signedIn ? "/painel" : "/login"} showLoading>{signedIn ? "Abrir painel" : "Entrar"} <span aria-hidden="true">→</span></Link>
           </div>
         </div>
       </nav>
@@ -99,18 +72,11 @@ export default function LandingPageExperience({ signedIn, panelHref, canEdit, pl
             <Link className="lp-button" href={signupHref} showLoading>{signedIn ? "Abrir meu painel" : "Solicitar comunidade"}</Link>
             <a className="lp-button lp-button-secondary" href="#fio-do-dia">Ver demonstração</a>
           </div>
-          <div className="lp-social-proof">
-            <div className="lp-avatars" aria-hidden="true">{["RA", "CF", "SC", "MO"].map((avatar) => <span key={avatar}>{avatar}</span>)}</div>
-            <p><strong>+1.200 igrejas</strong> já usam o Vínkulo</p>
-          </div>
+
         </div>
       </section>
 
-      <section className="lp-numbers" aria-label="Vínkulo em números">
-        <Reveal className="lp-shell lp-number-grid">{[["1.200+", "Igrejas"], ["180K+", "Membros"], ["94%", "Retenção"], ["4.9★", "Avaliação"]].map(([number, label]) => <div key={label}><strong>{number}</strong><span>{label}</span></div>)}</Reveal>
-      </section>
-
-      <section className="lp-section lp-shell" id="recursos">
+<section className="lp-section lp-shell" id="recursos">
         <Reveal className="lp-section-heading"><SectionLabel>O que o vínkulo faz</SectionLabel><h2>Cada área da sua igreja, <em>organizada</em></h2><p>Módulos conectados entre si para que pastores, líderes e membros tenham sempre a informação certa.</p></Reveal>
         <div className="lp-module-grid">{MODULES.map((module, index) => <Reveal key={module.label} delay={index * 100}><article className={`lp-module lp-tone-${module.tone}`}><span><FeatureIcon name={module.icon} /></span><h3>{module.label}</h3><p>{module.desc}</p></article></Reveal>)}</div>
       </section>
@@ -127,13 +93,9 @@ export default function LandingPageExperience({ signedIn, panelHref, canEdit, pl
         <div className="lp-role-grid">{ROLES.map((role, index) => <Reveal key={role.role} delay={index * 150}><article className={`lp-role lp-tone-${role.tone}`}><header><span><FeatureIcon name={role.icon} /></span><h3>{role.role}</h3></header><ul>{role.items.map((item) => <li key={item}>{item}</li>)}</ul></article></Reveal>)}</div>
       </section>
 
-      <section className="lp-section lp-testimonials">
-        <div className="lp-shell"><Reveal className="lp-section-heading lp-centered"><SectionLabel>Depoimentos</SectionLabel><h2>Quem usa, <em>recomenda</em></h2></Reveal><div className="lp-testimonial-grid">{TESTIMONIALS.map((testimonial, index) => <Reveal key={testimonial.name} delay={index * 150}><article><blockquote>“{testimonial.text}”</blockquote><footer><span>{testimonial.avatar}</span><div><strong>{testimonial.name}</strong><small>{testimonial.role} · {testimonial.church}</small></div></footer></article></Reveal>)}</div></div>
-      </section>
-
-      {canEdit && <section className="lp-section lp-shell" id="planos" data-editor-key="landing-governanca">
+{canEdit && <section className="lp-section lp-shell" id="planos" data-editor-key="landing-governanca">
         <Reveal className="lp-section-heading lp-centered"><SectionLabel>Planos</SectionLabel><h2>Simples e <em>transparente</em></h2><p>Planos configurados para as necessidades da sua comunidade.</p></Reveal>
-        <div className="lp-plan-grid">{plans.map((plan, index) => <Reveal key={plan.name} delay={index * 150}><article className={plan.featured ? "featured" : ""}>{plan.featured && <span className="lp-popular">Mais popular</span>}<h3>{plan.name}</h3><div className="lp-price"><strong>{plan.price}</strong>{plan.period && <span>{plan.period}</span>}</div><p>{plan.description}</p><ul>{plan.items.map((item) => <li key={item}><CheckIcon />{item}</li>)}</ul><Link className={`lp-button ${plan.featured ? "" : "lp-button-secondary"}`} href="/proprietario?tab=plans" showLoading>{plan.cta}</Link></article></Reveal>)}</div>
+        <div className="lp-plan-grid">{plans.map((plan, index) => <Reveal key={plan.name} delay={index * 150}><article className={plan.featured ? "featured" : ""}>{plan.featured && <span className="lp-popular">Destaque</span>}<h3>{plan.name}</h3><div className="lp-price"><strong>{plan.price}</strong>{plan.period && <span>{plan.period}</span>}</div><p>{plan.description}</p><ul>{plan.items.map((item) => <li key={item}><CheckIcon />{item}</li>)}</ul><Link className={`lp-button ${plan.featured ? "" : "lp-button-secondary"}`} href="/log1" showLoading>{plan.cta}</Link></article></Reveal>)}</div>
         <p className="lp-owner-plan-note">Esta prévia é exclusiva do proprietário. <Link href="/proprietario?tab=plans">Configurar planos e chamadas →</Link></p>
       </section>}
 
@@ -144,7 +106,7 @@ export default function LandingPageExperience({ signedIn, panelHref, canEdit, pl
 
       <section className="lp-final"><Reveal className="lp-shell"><VinkuloMark light size={62} /><h2>Sua comunidade merece o melhor</h2><p>Encontre o plano adequado e solicite sua comunidade.</p><Link className="lp-button lp-button-white" href={signupHref} showLoading>{signedIn ? "Abrir meu painel →" : "Solicitar minha comunidade →"}</Link></Reveal></section>
 
-      <footer className="lp-footer"><div className="lp-shell"><div className="lp-footer-main"><div><Link className="lp-brand" href="/" aria-label={`${siteName} — início`}><VinkuloMark logoUrl={logoUrl} size={40} /><span>{siteName}</span></Link><p>Plataforma de gestão para igrejas e comunidades em português do Brasil.</p></div><nav aria-label="Links institucionais"><Link href="/termos">Termos de uso</Link><Link href="/privacidade">Privacidade</Link><Link href="/contato">Suporte</Link><Link href="/comunidades">Comunidades</Link></nav></div><div className="lp-footer-bottom"><span>© 2026 Vínkulo</span><span>Feito com cuidado para igrejas brasileiras</span></div></div></footer>
+      <footer className="lp-footer"><div className="lp-shell"><div className="lp-footer-main"><div><Link className="lp-brand" href="/" aria-label={`${siteName} — início`}><VinkuloMark logoUrl={logoUrl} size={40} /><span>{siteName}</span></Link><p>Plataforma de gestão para igrejas e comunidades em português do Brasil.</p></div><nav aria-label="Links institucionais"><Link href="/planos">Planos</Link><Link href="/termos">Termos de uso</Link><Link href="/privacidade">Privacidade</Link><Link href="/contato">Suporte</Link><Link href="/comunidades">Comunidades</Link></nav></div><div className="lp-footer-bottom"><span>© 2026 Vínkulo</span><span>Feito com cuidado para igrejas brasileiras</span></div></div></footer>
     </main>
   );
 }

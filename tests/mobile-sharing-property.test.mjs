@@ -37,7 +37,7 @@ test("compartilhamento e cartões do proprietário respeitam a largura do celula
   assert.match(secretaryCss, /\.secretary-whatsapp-avatar img \{[^}]*object-fit: cover/);
   assert.match(secretaryCss, /\.secretary-whatsapp-recipient-name > span:first-child/);
   assert.doesNotMatch(secretaryCss, /\.secretary-whatsapp-recipients a > span\s*\{/);
-  assert.match(workspace, /assignment\.foto_perfil[\s\S]{0,180}<img src=\{assignment\.foto_perfil\}/);
+  assert.match(workspace, /assignment\.foto_perfil[\s\S]{0,180}<SafeImage src=\{assignment\.foto_perfil\}/);
   assert.match(workspace, /Selecionar várias pessoas para enviar em um grupo/);
   assert.match(workspace, /designacaoIds: selectedDesignationIds/);
   assert.match(workspace, /aria-pressed=\{selected\}/);

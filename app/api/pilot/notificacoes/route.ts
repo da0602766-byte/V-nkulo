@@ -1,5 +1,8 @@
+import { notificationCategory, NOTIFICATION_CATEGORY_SQL, type NotificationCategory } from "../../../lib/notification-category";
+import { deliverCareNoteReminders } from "../../../lib/care-note-reminders";
 import { getD1 } from "../../../../db";
 import { getSessionUser } from "../../../lib/local-auth";
+import { notificationVisibilitySql } from "../../../lib/owner-notifications";
 
 type NotificationRow = {
   id: number;
@@ -49,6 +52,7 @@ export async function GET(request: Request) {
     return Response.json({ error: "Faça login para continuar." }, { status: 401 });
   }
   const db = getD1();
+  await deliverCareNoteReminders(db, user.id).catch(() => undefined);
   const address = new URL(request.url);
   const cursor = decodeNotificationCursor(address.searchParams.get("cursor"));
   const requestedSize = Number(address.searchParams.get("limite") || 0);
@@ -58,31 +62,35 @@ export async function GET(request: Request) {
       : NOTIFICATION_PAGE_SIZE;
   const result = await db
     .prepare(
-      `SELECT n.id, n.tipo, n.titulo, n.mensagem, n.area, n.entidade_id,
-        n.destino_rota, n.hierarquia, n.ministerio,
-        remetente.nome AS remetente_nome,
-        n.criado_em, CASE WHEN nl.id IS NULL THEN 0 ELSE 1 END AS lida
-      FROM notificacoes_sistema n
-      LEFT JOIN usuarios remetente ON remetente.id = n.remetente_usuario_id
-      LEFT JOIN notificacoes_lidas nl
-        ON nl.notificacao_id = n.id AND nl.usuario_id = ?
-      WHERE n.usuario_id = ? AND n.area <> 'CHAT'
+      `WITH page AS MATERIALIZED (
+        SELECT n.id FROM notificacoes_sistema n
+      WHERE n.usuario_id = ? AND n.area <> 'CHAT' AND ${notificationVisibilitySql(Boolean(user.system_owner))}
         AND (
           ? = 0
           OR n.criado_em < ?
           OR (n.criado_em = ? AND n.id < ?)
         )
       ORDER BY n.criado_em DESC, n.id DESC
-      LIMIT ?`,
+      LIMIT ?
+      )
+      SELECT n.id, n.tipo, n.titulo, n.mensagem, n.area, n.entidade_id,
+        n.destino_rota, n.hierarquia, n.ministerio,
+        remetente.nome AS remetente_nome,
+        n.criado_em, CASE WHEN nl.id IS NULL THEN 0 ELSE 1 END AS lida
+      FROM page JOIN notificacoes_sistema n ON n.id = page.id
+      LEFT JOIN usuarios remetente ON remetente.id = n.remetente_usuario_id
+      LEFT JOIN notificacoes_lidas nl
+        ON nl.notificacao_id = n.id AND nl.usuario_id = ?
+      ORDER BY n.criado_em DESC, n.id DESC`,
     )
     .bind(
-      user.id,
       user.id,
       cursor ? 1 : 0,
       cursor?.criadoEm ?? "",
       cursor?.criadoEm ?? "",
       cursor?.id ?? 0,
       pageSize + 1,
+      user.id,
     )
     .all<NotificationRow>();
 
@@ -97,24 +105,25 @@ export async function GET(request: Request) {
         })
       : null;
 
-  // O contador de não lidas era calculado sobre o lote carregado, então quem
-  // tivesse mais não lidas que o tamanho do lote via um número menor que o real.
-  // Esta consulta traz só as colunas que a regra de categoria usa, e a contagem
-  // reaproveita a mesma função, para não existirem duas versões da regra.
-  const unreadRows = await db
-    .prepare(
-      `SELECT n.id, n.tipo, n.area, n.titulo
-       FROM notificacoes_sistema n
-       LEFT JOIN notificacoes_lidas nl
-         ON nl.notificacao_id = n.id AND nl.usuario_id = ?
-       WHERE n.usuario_id = ? AND n.area <> 'CHAT' AND nl.id IS NULL`,
-    )
-    .bind(user.id, user.id)
-    .all<NotificationRow>();
   const owner = await db.prepare("SELECT id FROM comunidades WHERE proprietario_usuario_id = ? AND status = 'ATIVA' LIMIT 1").bind(user.id).first<{ id: number }>();
   const configKey = `notification_preferences:${user.id}`;
   const stored = await db.prepare("SELECT valor FROM configuracoes WHERE chave = ? LIMIT 1").bind(configKey).first<{ valor: string }>();
   const config = parseNotificationConfig(stored?.valor);
+  const countCategory = (Object.keys(DEFAULT_NOTIFICATION_CONFIG) as NotificationCategory[])
+    .every(category => config[category]) ? "'sistema'" : NOTIFICATION_CATEGORY_SQL;
+  // Conta no banco: no máximo cinco linhas atravessam a conexão. Quando todas
+  // as categorias estão ativas, basta o total, sem classificar cada título.
+  const unreadCounts = await db
+    .prepare(
+      `SELECT ${countCategory} AS category, COUNT(*) AS total
+       FROM notificacoes_sistema n
+       LEFT JOIN notificacoes_lidas nl
+         ON nl.notificacao_id = n.id AND nl.usuario_id = ?
+       WHERE n.usuario_id = ? AND n.area <> 'CHAT' AND nl.id IS NULL AND ${notificationVisibilitySql(Boolean(user.system_owner))}
+       GROUP BY category`,
+    )
+    .bind(user.id, user.id)
+    .all<{ category: NotificationCategory; total: number }>();
   const notifications = result.results.map((item) => ({
     id: Number(item.id),
     type: item.tipo,
@@ -133,16 +142,14 @@ export async function GET(request: Request) {
   return Response.json({
     notifications,
     nextCursor,
-    unread: unreadRows.results.filter(
-      (item) => config[notificationCategory(item)],
-    ).length,
+    unread: unreadCounts.results.reduce((total, item) => total + (config[item.category] ? Number(item.total) : 0), 0),
     canConfigure: Boolean(owner),
     config,
   });
 }
 
 const DEFAULT_NOTIFICATION_CONFIG = { escalas: true, eventos: true, pedidos: true, mensagens: true, sistema: true };
-type NotificationCategory = keyof typeof DEFAULT_NOTIFICATION_CONFIG;
+
 
 function parseNotificationConfig(value?: string) {
   try {
@@ -152,18 +159,10 @@ function parseNotificationConfig(value?: string) {
   }
 }
 
-function notificationCategory(item: NotificationRow): NotificationCategory {
-  const value = `${item.tipo} ${item.area} ${item.titulo}`.toLocaleLowerCase("pt-BR");
-  if (value.includes("escala") || value.includes("minister")) return "escalas";
-  if (value.includes("evento")) return "eventos";
-  if (value.includes("pedido") || value.includes("oração") || value.includes("solicita")) return "pedidos";
-  if (value.includes("mensagem") || value.includes("chat")) return "mensagens";
-  return "sistema";
-}
-
 function normalizeDestination(value: string) {
   const destination = String(value || "");
   return destination.startsWith("/painel?") ||
+    destination.startsWith("/painel/visitantes?") ||
     destination.startsWith("/comunidades") ||
     destination.startsWith("/proprietario")
     ? destination
@@ -192,8 +191,8 @@ export async function PATCH(request: Request) {
     await db
       .prepare(
         `INSERT OR IGNORE INTO notificacoes_lidas (notificacao_id, usuario_id)
-        SELECT id, ? FROM notificacoes_sistema
-        WHERE usuario_id = ? AND area <> 'CHAT'`,
+        SELECT n.id, ? FROM notificacoes_sistema n
+        WHERE n.usuario_id = ? AND n.area <> 'CHAT' AND ${notificationVisibilitySql(Boolean(user.system_owner))}`,
       )
       .bind(user.id, user.id)
       .run();
@@ -205,7 +204,7 @@ export async function PATCH(request: Request) {
   }
   const owned = await db
     .prepare(
-      "SELECT id FROM notificacoes_sistema WHERE id = ? AND usuario_id = ? AND area <> 'CHAT' LIMIT 1",
+      `SELECT n.id FROM notificacoes_sistema n WHERE n.id = ? AND n.usuario_id = ? AND n.area <> 'CHAT' AND ${notificationVisibilitySql(Boolean(user.system_owner))} LIMIT 1`,
     )
     .bind(id, user.id)
     .first<{ id: number }>();
@@ -230,7 +229,7 @@ export async function DELETE(request: Request) {
   const db = getD1();
   if (payload.lidas === true) {
     await db.prepare(`DELETE FROM notificacoes_sistema
-      WHERE usuario_id = ? AND area <> 'CHAT'
+      WHERE usuario_id = ? AND area <> 'CHAT' AND ${notificationVisibilitySql(Boolean(user.system_owner), "notificacoes_sistema")}
       AND EXISTS (
         SELECT 1 FROM notificacoes_lidas nl
         WHERE nl.notificacao_id = notificacoes_sistema.id AND nl.usuario_id = ?
@@ -244,7 +243,7 @@ export async function DELETE(request: Request) {
   const readNotification = await db.prepare(`SELECT n.id
     FROM notificacoes_sistema n
     JOIN notificacoes_lidas nl ON nl.notificacao_id = n.id AND nl.usuario_id = ?
-    WHERE n.id = ? AND n.usuario_id = ? AND n.area <> 'CHAT' LIMIT 1`)
+    WHERE n.id = ? AND n.usuario_id = ? AND n.area <> 'CHAT' AND ${notificationVisibilitySql(Boolean(user.system_owner))} LIMIT 1`)
     .bind(user.id, id, user.id).first<{ id: number }>();
   if (!readNotification) {
     return Response.json({ error: "Visualize a notificação antes de limpá-la." }, { status: 409 });

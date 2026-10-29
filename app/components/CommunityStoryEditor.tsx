@@ -1,4 +1,6 @@
 "use client";
+
+import TransientFeedback from "./TransientFeedback";
 import {useEffect, useState, type FormEvent} from 'react';
 import type {CommunityStory} from '../lib/community-story';
 
@@ -12,7 +14,7 @@ export default function CommunityStoryEditor() {
   async function save(event:FormEvent<HTMLFormElement>){event.preventDefault();setSaving(true);setMessage('');try{const response=await fetch('/api/pilot/community-story',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(story)});const data=await response.json();if(!response.ok)throw new Error(data.error||'Não foi possível salvar.');setStory(data.story);setMessage(data.story.published?'História publicada na página da comunidade.':'Rascunho salvo. A história permanece privada.');}catch(error){setMessage((error as Error).message);}finally{setSaving(false);}}
   return <section className="community-story-editor">
     <header><div><p className="pilot-kicker">PÁGINA PÚBLICA · PLANO PAGO</p><h2>A história que nos une</h2><p>Conte como a comunidade começou, os momentos importantes e o propósito que continua vivo.</p></div></header>
-    {message&&<p role="status" className="operations-feedback">{message}</p>}
+    {message&&<TransientFeedback role="status" className="operations-feedback">{message}</TransientFeedback>}
     {!loaded&&!message&&<p>Carregando história…</p>}
     {loaded&&!eligible&&<p className="community-story-locked">Disponível para comunidades com assinatura de plano pago ativa. A apresentação básica da comunidade continua disponível.</p>}
     {loaded&&eligible&&<form onSubmit={save}>

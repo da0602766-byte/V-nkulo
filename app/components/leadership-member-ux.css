@@ -1,0 +1,52 @@
+.leadership-workspace .leadership-hero { min-height: 0; padding: 24px; align-items: center; border-radius: 20px; }
+.leadership-workspace .leadership-hero h1 { font-size: clamp(28px, 3vw, 40px); line-height: 1.15; }
+.leadership-workspace .leadership-refresh { flex-shrink: 0; min-height: 44px; padding: 10px 16px; border: 1px solid var(--pilot-line); border-radius: 12px; background: var(--pilot-surface); color: var(--pilot-text); font: inherit; cursor: pointer; }
+.leadership-query-status { margin: 0; padding: 12px; color: var(--pilot-muted); }
+.leadership-query-error { grid-column: 1 / -1; margin: 0; padding: 16px; border: 1px solid var(--pilot-line); border-left: 4px solid var(--pilot-danger, #b42338); border-radius: 12px; background: var(--pilot-surface); color: var(--pilot-text); line-height: 1.5; }
+.leadership-query-error p { margin: 0 0 12px; }
+.leadership-query-error button { min-height: 44px; padding: 10px 14px; border: 1px solid var(--pilot-line); border-radius: 10px; color: var(--pilot-text); background: var(--pilot-surface-2); font: inherit; cursor: pointer; }
+.leadership-workspace .leadership-add-card { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.leadership-add-card > :is(div, p, button) { grid-column: 1 / -1; }
+.leadership-add-card input { width: 100%; min-width: 0; min-height: 48px; border: 1px solid var(--pilot-line); border-radius: 12px; background: var(--pilot-surface-2); color: var(--pilot-text); padding: 0 12px; font: inherit; }
+.leadership-add-card select { width: 100%; min-width: 0; }
+.leadership-workspace :is(.leadership-list-card, .leadership-history-card) article :is(strong, small) { white-space: normal; overflow-wrap: anywhere; line-height: 1.45; }
+.pastoral-chart-data { border: 1px solid var(--pilot-line); border-radius: 12px; padding: 12px 16px; background: var(--pilot-surface); }
+.pastoral-chart-data summary { min-height: 44px; padding-block: 10px; cursor: pointer; font-weight: 700; }
+.pastoral-chart-data table { width: 100%; min-width: 0; table-layout: fixed; border-collapse: collapse; font-size: 14px; }
+.pastoral-chart-data caption { padding: 12px 0; color: var(--pilot-muted); text-align: left; }
+.pastoral-chart-data :is(th, td) { padding: 10px 6px; border-bottom: 1px solid var(--pilot-line); color: var(--pilot-text); font-size: inherit; letter-spacing: normal; text-transform: none; line-height: 1.45; overflow-wrap: anywhere; text-align: right; }
+.pastoral-chart-data tr > :first-child { width: 22%; text-align: left; }
+.pastoral-chart-data tr > :nth-child(2) { width: 44%; }
+.leadership-workspace .pastoral-community-dashboard { min-width: 0; grid-template-columns: minmax(0, 1fr); }
+.leadership-workspace .pastoral-chart-bars :is(i, b) { min-height: 0; }
+.leadership-workspace .pastoral-activity-chart { --chart-posts: #3976be; --chart-events: #c2612d; }
+.leadership-workspace .pastoral-chart-bars i, .leadership-workspace .pastoral-activity-chart footer span:first-child i { background: var(--chart-posts); }
+.leadership-workspace .pastoral-chart-bars b, .leadership-workspace .pastoral-activity-chart footer span:last-child i { background: var(--chart-events); }
+:is([data-theme="dark"], [data-pilot-theme="escuro"]) .leadership-workspace .pastoral-activity-chart { --chart-posts: #7ebaff; --chart-events: #ffad75; }
+.leadership-workspace .pastoral-cell-reports-v2 > div { max-height: none; overflow: visible; }
+.self-profile-links { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.self-profile-links > strong { flex-basis: 100%; }
+.self-profile-links a { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 10px 16px; border: 1px solid var(--pilot-line); border-radius: 12px; color: var(--pilot-text); background: var(--pilot-surface); text-decoration: none; }
+.self-profile-section-title, .self-profile-memberships { grid-column: 1 / -1; }
+.self-profile-workspace .self-profile-section-title { margin: 0; font-size: 18px; }
+.self-profile-memberships { border-top: 1px solid var(--pilot-line); margin-top: 12px; padding-top: 20px; }
+.self-profile-memberships h2 { margin: 0 0 8px; font-size: 18px; }
+.self-profile-memberships p { margin: 0 0 16px; color: var(--pilot-muted); line-height: 1.5; }
+.self-profile-memberships dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 0; }
+.self-profile-memberships dt { color: var(--pilot-muted); font-size: 14px; }
+.self-profile-memberships dd { margin: 6px 0 0; color: var(--pilot-text); overflow-wrap: anywhere; line-height: 1.5; }
+.self-profile-save-error, .self-profile-save-success { grid-column: 1 / -1; margin: 0; padding: 14px; border: 1px solid var(--pilot-line); border-radius: 12px; color: var(--pilot-text); background: var(--pilot-surface-2); line-height: 1.5; }
+.self-profile-save-error { border-left: 4px solid var(--pilot-danger, #b42338); }
+.leadership-workspace :is(button, input, select, summary):focus-visible, .self-profile-workspace :is(a, button, input):focus-visible { outline: 3px solid var(--pilot-primary); outline-offset: 3px; }
+@media (max-width: 640px) {
+  .leadership-workspace .leadership-hero { display: grid; gap: 16px; padding: 20px; }
+  .leadership-workspace .leadership-hero h1 { font-size: 28px; }
+  .leadership-workspace .leadership-add-card { grid-template-columns: minmax(0, 1fr); }
+  .pastoral-chart-data { padding: 12px 8px; }
+  .pastoral-chart-data table { font-size: 13px; }
+  .leadership-workspace :is(input, select), .self-profile-workspace input { font-size: 16px; min-height: 44px; }
+  .self-profile-memberships dl { grid-template-columns: minmax(0, 1fr); }
+  .self-profile-links a { flex: 1; justify-content: center; }
+  .leadership-workspace .leadership-metrics { grid-template-columns: minmax(0, 1fr); }
+  .leadership-workspace .leadership-metrics article { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; }
+}

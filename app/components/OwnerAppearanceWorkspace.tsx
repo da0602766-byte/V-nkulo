@@ -1,5 +1,7 @@
 "use client";
 
+import TransientFeedback from "./TransientFeedback";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   COMMUNITY_PALETTES,
@@ -155,12 +157,12 @@ export default function OwnerAppearanceWorkspace() {
   }
 
   if (loadError && !communities.length) {
-    return <section className="community-theme-editor owner-appearance-workspace"><p className="operations-feedback error" role="alert">{loadError}</p><button type="button" onClick={() => void load()}>Tentar novamente</button></section>;
+    return <section className="community-theme-editor owner-appearance-workspace"><TransientFeedback className="operations-feedback error" role="alert">{loadError}</TransientFeedback><button type="button" onClick={() => void load()}>Tentar novamente</button></section>;
   }
 
   return (
     <section className="community-theme-editor owner-appearance-workspace">
-      {loadError && <p className="operations-feedback error" role="alert">{loadError}</p>}
+      {loadError && <TransientFeedback className="operations-feedback error" role="alert">{loadError}</TransientFeedback>}
       <header>
         <div>
           <p className="pilot-kicker">CENTRAL DE APARÊNCIA</p>
@@ -295,9 +297,9 @@ export default function OwnerAppearanceWorkspace() {
 
           <footer className="community-theme-footer">
             {message && (
-              <p className={`operations-feedback ${messageTone === "error" ? "error" : ""}`} role="status">
+              <TransientFeedback className={`operations-feedback ${messageTone === "error" ? "error" : ""}`} role="status">
                 {message}
-              </p>
+              </TransientFeedback>
             )}
             <button type="button" disabled={saving || !communityId} onClick={() => void saveUnica()}>
               {saving ? "Salvando…" : `Salvar aparência de "${selectedCommunity?.nome || "comunidade"}"`}
@@ -344,9 +346,9 @@ export default function OwnerAppearanceWorkspace() {
 
           <footer className="community-theme-footer">
             {message && (
-              <p className={`operations-feedback ${messageTone === "error" ? "error" : ""}`} role="status">
+              <TransientFeedback className={`operations-feedback ${messageTone === "error" ? "error" : ""}`} role="status">
                 {message}
-              </p>
+              </TransientFeedback>
             )}
             <button type="button" disabled={saving || !communities.length} onClick={() => void saveTodas()}>
               {saving ? "Aplicando…" : `Aplicar a todas as ${communities.length} comunidades`}

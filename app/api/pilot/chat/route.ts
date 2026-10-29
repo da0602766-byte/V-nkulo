@@ -22,8 +22,7 @@ type Message = {
 // ministérios ativos em que a pessoa atua, para dar contexto profissional à
 // conversa sem expor mais dados do que isso.
 const HIERARCHY_CASE = `CASE
-  WHEN u.perfil = 'ADMIN' THEN 'Proprietário do sistema'
-  WHEN uc.papel = 'ADMIN_COMUNIDADE' THEN 'Administrador da comunidade'
+  WHEN uc.papel IN ('ADMIN_COMUNIDADE', 'SUPERADMIN') THEN 'Administrador da comunidade'
   WHEN uc.papel = 'PASTOR' THEN 'Pastor'
   WHEN uc.papel = 'LIDER' THEN 'Líder'
   ELSE 'Membro'
@@ -36,8 +35,7 @@ const MINISTRY_SUBQUERY = (userColumn: string, communityColumn: string) => `COAL
     AND mv.ativo = 1 AND m.status = 'ATIVO'
 ), '')`;
 const COMMUNICATION_GROUP_CASE = `CASE
-  WHEN u.perfil = 'ADMIN'
-    OR uc.papel IN ('ADMIN_COMUNIDADE', 'PASTOR', 'LIDER')
+  WHEN uc.papel IN ('ADMIN_COMUNIDADE', 'SUPERADMIN', 'PASTOR', 'LIDER')
     OR EXISTS (SELECT 1 FROM oficiais_comunidade oc2 WHERE oc2.usuario_comunidade_id = uc.id)
   THEN 'OFICIAL' ELSE 'MEMBRO' END`;
 
@@ -59,7 +57,7 @@ export async function GET(request: Request) {
   }
 
   const communicationGroup = await communicationClass(access.user.id, access.context.comunidadeId);
-  const [people, conversations] = await Promise.all([
+  const [people, conversations, notificationPreference] = await Promise.all([
     getD1().prepare(
       `SELECT u.id, u.nome, u.foto_perfil,
         ${HIERARCHY_CASE} AS hierarquia,
@@ -99,6 +97,10 @@ export async function GET(request: Request) {
           WHERE mp.conversa_id = c.id ORDER BY mp.id DESC LIMIT 1) AS ultima_mensagem,
         (SELECT mp.remetente_id FROM mensagens_privadas mp
           WHERE mp.conversa_id = c.id ORDER BY mp.id DESC LIMIT 1) AS ultimo_remetente_id,
+        (SELECT mp.id FROM mensagens_privadas mp
+          WHERE mp.conversa_id = c.id AND mp.remetente_id <> ? AND mp.lida_em IS NULL ORDER BY mp.id DESC LIMIT 1) AS ultima_recebida_id,
+        (SELECT mp.mensagem FROM mensagens_privadas mp
+          WHERE mp.conversa_id = c.id AND mp.remetente_id <> ? AND mp.lida_em IS NULL ORDER BY mp.id DESC LIMIT 1) AS ultima_recebida,
         (SELECT COUNT(*) FROM mensagens_privadas mp
           WHERE mp.conversa_id = c.id AND mp.remetente_id <> ? AND mp.lida_em IS NULL) AS nao_lidas
        FROM conversas_privadas c
@@ -110,8 +112,13 @@ export async function GET(request: Request) {
          AND (? IN (c.usuario_menor_id, c.usuario_maior_id))
          AND (${COMMUNICATION_GROUP_CASE}) = ?
        ORDER BY c.atualizado_em DESC LIMIT 100`,
-    ).bind(access.user.id, access.user.id, access.context.comunidadeId, access.user.id, communicationGroup).all<Record<string, unknown>>(),
+    ).bind(access.user.id, access.user.id, access.user.id, access.user.id, access.context.comunidadeId, access.user.id, communicationGroup).all<Record<string, unknown>>(),
+    getD1().prepare("SELECT valor FROM configuracoes WHERE chave = ? LIMIT 1")
+      .bind(`notification_preferences:${access.user.id}`).first<{ valor: string }>(),
   ]);
+
+  let messageNotificationsEnabled = true;
+  try { messageNotificationsEnabled = JSON.parse(notificationPreference?.valor || "{}").mensagens !== false; } catch { /* Same default as notification settings. */ }
 
   let messages: Message[] = [];
   if (Number.isInteger(conversationId) && conversationId > 0) {
@@ -126,6 +133,7 @@ export async function GET(request: Request) {
     messages,
     currentUserId: access.user.id,
     communicationGroup,
+    messageNotificationsEnabled,
     retentionNotice: CHAT_RETENTION_NOTICE,
     nextPurgeAt: nextWeeklyPurgeAt().toISOString(),
   }, { headers: { "Cache-Control": "no-store" } });

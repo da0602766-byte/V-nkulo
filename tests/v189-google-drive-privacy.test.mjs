@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { parseFeedPostPayload } from "../app/lib/feed-validation.ts";
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
@@ -31,7 +32,7 @@ test("fotos pessoais ficam no Drive e anexos de publicação usam o bucket compa
     read("public/sw.js"),
     read("app/api/feedback/route.ts"),
     read("app/api/public/cadastro-membro/[token]/route.ts"),
-    read("app/lib/notice-image.ts"),
+    read("app/api/pilot/publicacoes/route.ts"),
   ]);
   assert.match(upload, /uploadDriveFile/);
   assert.match(upload, /purpose === "post-image"[\s\S]*bucket\.put/);
@@ -42,10 +43,12 @@ test("fotos pessoais ficam no Drive e anexos de publicação usam o bucket compa
   assert.match(feedback, /feedback-evidence/);
   assert.doesNotMatch(feedback, /bucket\.put/);
   assert.doesNotMatch(publicRegistration, /bucket\.put/);
-  assert.doesNotMatch(notice, /base64/);
-  // A recusa de imagem em base64 era conferida também em `/api/modulos`, rota
-  // legada removida em 08/09/2026. A garantia de que nada é gravado no banco
-  // continua coberta pelas asserções acima, sobre o caminho vivo de upload.
+  assert.match(notice, /parseFeedPostPayload/);
+  for (const imagemUrl of ["data:image/png;base64,AAAA", "javascript:alert(1)", "https://example.test/image.png"]) {
+    assert.equal(parseFeedPostPayload({ titulo: "Aviso", conteudo: "Conteúdo", imagemUrl }).imagemUrl, "");
+  }
+  const storedImage = "/api/storage/media/arquivo-123";
+  assert.equal(parseFeedPostPayload({ titulo: "Aviso", conteudo: "Conteúdo", imagemUrl: storedImage }).imagemUrl, storedImage);
 });
 
 // Mensagens privadas foram deliberadamente tiradas do Drive em 09/09/2026:
@@ -82,12 +85,19 @@ test("interface explica destino e deixa anexos de publicação sob demanda", asy
     read("app/components/ResponsiveFeedImage.tsx"),
   ]);
   assert.match(privacy, /não mantém cópia do conteúdo/i);
-  assert.match(storage, /Seus conteúdos não ficam no Vínkulo/);
+  assert.match(storage, /O conteúdo compartilhado segue disponível na comunidade/);
   assert.match(storage, /Carregar os mais recentes automaticamente/);
-  assert.match(storage, /Permitir baixar arquivos neste aparelho/);
-  assert.match(image, /Visualizar imagem/);
-  assert.match(image, /Baixar imagem/);
-  assert.match(image, /download=1/);
+  assert.match(storage, /O download manual está sempre disponível/);
+  // As opções foram extraídas para o componente compartilhado do feed.
+  assert.match(image, /<FeedImageActions source=\{src\}/);
+  assert.match(image, /setRequestedLoad/);
+  const imageActions = await read("app/components/feed/FeedImageActions.tsx");
+  assert.match(imageActions, /"Visualizar imagem"/);
+  assert.match(imageActions, /<FileSaveActions source=\{source\}/);
+  const actions = await read("app/components/FileSaveActions.tsx");
+  assert.match(actions, /run\("download"\)/);
+  assert.match(actions, /Baixar no aparelho/);
+  assert.match(await read("app/lib/device-files.ts"), /anchor\.download = file\.name/);
 });
 
 test("login Google entrega a sessão de volta ao APK sem compartilhar cookies com o Chrome", async () => {
@@ -95,7 +105,7 @@ test("login Google entrega a sessão de volta ao APK sem compartilhar cookies co
     read("app/api/auth/google/start/route.ts"),
     read("app/api/auth/google/callback/route.ts"),
     read("app/api/auth/google/native/complete/route.ts"),
-    read("app/components/LoginPortal.tsx"),
+    read("app/components/GoogleAppReturn.tsx"),
     read("drizzle/0061_google_android_handoff.sql"),
     read("app/components/GoogleAppReturn.tsx"),
   ]);
@@ -104,10 +114,9 @@ test("login Google entrega a sessão de volta ao APK sem compartilhar cookies co
   assert.match(callback, /finishGoogleNativeHandoff/);
   assert.match(completion, /attachSessionCookie/);
   assert.match(completion, /consumeGoogleNativeHandoff/);
-  assert.match(login, /window\.VinkuloAndroid/);
-  assert.match(login, /display-mode/);
-  assert.match(login, /android-app:\/\//);
-  assert.match(login, /vinkulo-google-pairing/);
+  assert.match(login, /intent:\/\/google-login-complete/);
+  assert.match(login, /if \(error \|\| !intentUrl\) return/);
+  assert.match(completion, /pairing/);
   assert.match(migration, /google_native_handoffs/);
   assert.match(returnPage, /package=com\.vinkulo\.app/);
   assert.match(returnPage, /Voltar ao aplicativo/);

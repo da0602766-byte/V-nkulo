@@ -1,5 +1,27 @@
 # ESTADO DO PROJETO — REFORMA OFICIAL DO VÍNKULO
 
+## Reservas — leitura de gestão publicada em 07/10/2026
+
+Publicado no Sites 360 em 07/10/2026 às 15h13 (Brasília), confirmado como succeeded. Fonte 5a3e0649079921b38b81a311507df065319e7a6f; deployment appgdep_6ac68bb486ac8191a7835f407e39df75; URL https://adote-gestao.da0602766.chatgpt.site. Sem migração ou alteração de API. Registro documental posterior ao deploy. Cartões responsivos com vaga/status/placa, período separado da movimentação, detalhes recolhíveis e filtros removíveis. Validação: 618 testes, tipos/build aprovados, lint sem erros; matriz visual, fluxos e 17 verificações dos cartões aprovados. Galeria local em outputs/reservas-redesign/avaliacao.html; relatório em docs/relatorios/RESERVAS_LAYOUT_2026-10-07.md.
+
+## Estacionamento — revisões publicadas em 06/10/2026
+
+Publicado Sites 359 em 06/10/2026 às 21h25 (Brasília), confirmado como succeeded pelo serviço. Fonte 34c878a7de39fa701b1e58d2d53c213b25063e2f; deployment appgdep_6ac59175acc08191948844b552e9fefc; URL https://adote-gestao.da0602766.chatgpt.site. Inclui as duas revisões de usabilidade aprovadas: orientação do membro, resumo de envio, próximo passo por reserva, navegação móvel, filtros e filas de gestão. Validação: 618/618 testes, TypeScript/build aprovados, lint 0 erros/1 aviso preexistente, matriz visual e nove interações adicionais aprovadas. Sem nova migração. Câmera/APK físicos permanecem pendentes.
+
+## Estacionamento — validação da segunda revisão
+
+Implementada a segunda avaliação de membro/gestor: próximo passo por reserva, guia breve, resumo antes de enviar, reservas pessoais de todas as atividades e filas de gestão por etapa. Galeria atual de 34 capturas em `outputs/parking-review-v2/avaliacao.html`; a galeria anterior foi preservada. Validação: 618 testes, TypeScript/build aprovados, lint sem erros (um aviso preexistente), matriz visual e nove interações adicionais aprovadas. O usuário confirmou a publicação posteriormente; entrega concluída no Sites 359.
+
+## Estacionamento — primeira revisão local em 06/10/2026
+
+Após a publicação 358, o usuário solicitou revisão como membro/gestor, melhorias de entendimento e layout, capturas e nova confirmação antes de publicar. Revisão implementada localmente: etapas da reserva, distinção entre solicitação e aprovação, navegação móvel, filtros, busca de saídas e orientações das oito áreas da gestão. Galeria de 26 telas em `outputs/parking-review/avaliacao.html`; dados fictícios. Suíte completa 618/618, TypeScript/build aprovados e lint sem erros (um aviso preexistente). A confirmação posterior foi recebida; esta revisão foi publicada junto à segunda no Sites 359. Detalhes no [relatório](../relatorios/ESTACIONAMENTO_REDESIGN_2026-10-06.md).
+
+## Estacionamento — publicado em 06/10/2026
+
+Publicado Sites 358 em 06/10/2026 às 13h38 (Brasília), confirmado como succeeded pelo serviço. Fonte 61fa3bf212e05bab5dc3b7716fa51d3566600a00; deployment appgdep_6ac523d06018819189b25b97ee588fd0; URL https://adote-gestao.da0602766.chatgpt.site. Pré-publicação: 618/618 testes, TypeScript limpo, lint 0 erros/1 aviso, build válido; 24 cenários visuais e seis interações extras aprovados. Sem nova migração. Câmera/APK físicos permanecem pendentes.
+
+Redesign integrado sobre Sites 357, mantendo as mudanças recentes e o CPF da conta. Cancelamento próprio antes da entrada e atividade publicada obrigatória autorizados; aprovação da gestão preservada. Pré-publicação aprovada: 618/618 testes, TypeScript limpo, lint sem erros e build válido. Matriz de 24 cenários visuais e seis interações extras repetida com sucesso. Publicação concluída, sem nova migração ou alteração direta de dados; homologação em aparelho/câmera físicos continua pendente. Detalhes no [relatório](../relatorios/ESTACIONAMENTO_REDESIGN_2026-10-06.md).
+
 ## Identificação
 
 - **Versão-base:** V4.9.0, com Conta Google, Google Drive/local e política de conteúdo sem cópia persistente na plataforma concluídos em 31/08/2026.

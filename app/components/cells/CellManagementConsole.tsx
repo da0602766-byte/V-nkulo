@@ -1,4 +1,10 @@
 "use client";
+import {useBrowserSearch} from "../useBrowserSearch";
+import { matchesDirectorySearch } from "../../lib/directory-search";
+import SafeImage from "../SafeImage";
+
+
+import TransientFeedback from "../TransientFeedback";
 
 import { type FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -20,7 +26,9 @@ export default function CellManagementConsole({
   cells: CellsData;
   onPreviewParticipacao?: () => void;
 }) {
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const search=useBrowserSearch();
+  const [selection, setSelectedId] = useState<number | null | undefined>(undefined);
+  const selectedId=selection===undefined?(Number(new URLSearchParams(search).get("celula"))||null):selection;
   const selected = cells.cells.find((cell) => cell.id === selectedId) || null;
 
   if (selected) {
@@ -45,9 +53,9 @@ export default function CellManagementConsole({
 function OperationFeedback({ message, error }: { message: string; error: string }) {
   if (!message && !error) return null;
   return (
-    <p className={`operations-feedback ${error ? "error" : ""}`} role="status">
+    <TransientFeedback className={`operations-feedback ${error ? "error" : ""}`} role="status">
       {error || message}
-    </p>
+    </TransientFeedback>
   );
 }
 
@@ -82,19 +90,15 @@ function CellGrid({
   const ready = healthCounts.MULTIPLICAR || 0;
   const noReport = healthCounts.SEM_RELATORIO || 0;
 
-  const term = search.trim().toLocaleLowerCase("pt-BR");
   const visible = list.filter((cell) => {
     if (status === "active" && !cell.ativo) return false;
     if (status === "archived" && cell.ativo) return false;
     if (healthFilter !== "all" && healthById.get(cell.id)!.id !== healthFilter) return false;
-    if (!term) return true;
-    return [cell.nome, cell.descricao_publica, cell.rede, cell.lider_nome, cell.responsavel]
-      .filter(Boolean)
-      .some((value) => String(value).toLocaleLowerCase("pt-BR").includes(term));
+    return matchesDirectorySearch(search, cell.nome, cell.descricao_publica, cell.rede, cell.lider_nome, cell.responsavel, cell.endereco_publico);
   });
 
   const healthPills: { key: "all" | CellHealthId; label: string; count: number }[] = [
-    { key: "all", label: "Saúde: todas", count: 0 },
+    { key: "all", label: "Todas", count: 0 },
     { key: "SEM_RELATORIO", label: "Sem relatório", count: noReport },
     { key: "ATENCAO", label: "Atenção", count: healthCounts.ATENCAO || 0 },
     { key: "MULTIPLICAR", label: "Prontas p/ multiplicar", count: ready },
@@ -102,12 +106,12 @@ function CellGrid({
   ];
 
   return (
-    <section className="cgestao-shell" aria-busy={cells.loading}>
+    <section className="cgestao-shell cgestao-directory" aria-busy={cells.loading}>
       <header className="cgestao-header">
         <div>
-          <p className="cgestao-kicker">CÉLULAS · {communityName}</p>
-          <h1>Grupos que aproximam pessoas</h1>
-          <p className="cgestao-subtitle">Acompanhe líderes, encontros e relatórios sem perder a visão de cada célula.</p>
+          <p className="cgestao-kicker">{communityName}</p>
+          <h1>Células</h1>
+          <p className="cgestao-subtitle">Escolha uma célula para acompanhar.</p>
         </div>
         <div className="cgestao-header-actions">
           {onPreviewParticipacao && (
@@ -115,58 +119,60 @@ function CellGrid({
               Ver como participante
             </button>
           )}
-          <button type="button" className="cgestao-btn-solid" onClick={() => setCreateOpen(true)}>
+          {cells.canManage && <button type="button" className="cgestao-btn-solid" onClick={() => setCreateOpen(true)}>
             <span aria-hidden="true">＋</span> Criar célula
-          </button>
+          </button>}
         </div>
       </header>
 
       <OperationFeedback message={cells.message} error={cells.error} />
 
-      <section className="cgestao-stats" aria-label="Resumo das células">
+      <details className="cgestao-overview">
+        <summary>
+          <span className="cgestao-overview-counts"><span><strong>{active.length}</strong> {active.length === 1 ? "ativa" : "ativas"}</span><span><strong>{people}</strong> pessoas</span>{pendingRequests > 0 && <span className="cgestao-pending"><strong>{pendingRequests}</strong> {pendingRequests === 1 ? "solicitação" : "solicitações"}</span>}</span>
+          <span className="cgestao-overview-toggle">Indicadores <span aria-hidden="true">⌄</span></span>
+        </summary>
+        <section className="cgestao-stats" aria-label="Resumo das células">
         <StatCard tom="acc" label="Total de células" value={list.length} sub={`${archived.length} arquivadas`} />
         <StatCard tom="info" label="Ativas" value={active.length} sub={`${meetings} próximos encontros`} />
         <StatCard tom="warn" label="Solicitações" value={pendingRequests} sub="aguardando decisão" />
-        <StatCard tom="bad" label="Sem relatório" value={noReport} sub="há mais de 3 semanas" alerta={noReport > 0} />
+        <StatCard tom="bad" label="Sem relatório" value={noReport} sub="nunca enviado ou há mais de 3 semanas" alerta={noReport > 0} />
         <StatCard tom="ok" label="Pessoas nas células" value={people} sub="membros e visitantes ativos" />
         <StatCard tom="teal" label="Prontas p/ multiplicar" value={ready} sub="média de 15+ presentes" />
-      </section>
+        </section>
+      </details>
 
       <div className="cgestao-filters">
         <label className="cgestao-search">
-          <span aria-hidden="true">⌕</span>
-          <input
+          <span>Buscar</span>
+          <input type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Buscar célula, líder ou bairro"
             aria-label="Buscar célula, líder ou bairro"
           />
         </label>
-        <div className="cgestao-status-toggle" role="group" aria-label="Filtrar por situação">
+        <label className="cgestao-filter-field">
+          <span>Situação</span>
+          <select value={status} onChange={(event) => setStatus(event.target.value as typeof status)}>
           {([["all", "Todas"], ["active", "Ativas"], ["archived", "Arquivadas"]] as const).map(([value, label]) => (
-            <button key={value} type="button" className={status === value ? "active" : ""} onClick={() => setStatus(value)}>
-              {label}
-            </button>
+            <option key={value} value={value}>{label}</option>
           ))}
-        </div>
-        <div className="cgestao-health-filter" role="group" aria-label="Filtrar por saúde">
+          </select>
+        </label>
+        <label className="cgestao-filter-field">
+          <span>Saúde</span>
+          <select value={healthFilter} onChange={(event) => setHealthFilter(event.target.value as typeof healthFilter)}>
           {healthPills.map((pill) => (
-            <button
-              key={pill.key}
-              type="button"
-              data-saude={pill.key}
-              className={healthFilter === pill.key ? "active" : ""}
-              onClick={() => setHealthFilter(pill.key)}
-            >
-              {pill.label}
-              {pill.key !== "all" && <span>{pill.count}</span>}
-            </button>
+            <option key={pill.key} value={pill.key}>{pill.label}</option>
           ))}
-        </div>
+          </select>
+        </label>
       </div>
 
+      <div className="cell-directory-results"><p role="status">{visible.length} de {list.length} {list.length === 1 ? "célula" : "células"}</p>{(search.trim() || status !== "all" || healthFilter !== "all") && <button type="button" onClick={() => { setSearch(""); setStatus("all"); setHealthFilter("all"); }}>Limpar filtros</button>}</div>
       {visible.length === 0 ? (
-        <p className="cgestao-empty">Nenhuma célula encontrada com os filtros aplicados.</p>
+        <p className="cgestao-empty">{list.length ? "Nenhuma célula corresponde à busca. Ajuste os filtros ou use Limpar filtros." : cells.canManage ? "Nenhuma célula cadastrada. Use Criar célula para começar." : "Nenhuma célula disponível. Consulte a liderança da comunidade."}</p>
       ) : (
         <div className="cgestao-grid">
           {visible.map((cell) => (
@@ -198,7 +204,6 @@ function StatCard({
 }) {
   return (
     <article className="cgestao-stat" data-tom={tom} data-alerta={alerta ? "1" : undefined}>
-      <span className="cgestao-stat-icon" aria-hidden="true" />
       <p className="cgestao-stat-label">{label}</p>
       <p className="cgestao-stat-value">{value}</p>
       <p className="cgestao-stat-sub">{sub}</p>
@@ -235,11 +240,12 @@ function CellCard({
           <p className="cgestao-card-status">{archived ? "Arquivada" : "Ativa"}</p>
           <p className="cgestao-card-name">{cell.nome}</p>
         </div>
-        {cell.solicitacoes.length > 0 && <span className="cgestao-card-badge">{cell.solicitacoes.length}</span>}
       </div>
-      <p className="cgestao-card-desc">{cell.descricao_publica || "Descrição pública ainda não informada."}</p>
+      <p className="cgestao-card-lead">Liderança · {cell.lider_nome || cell.responsavel || "A definir"}</p>
+      {cell.descricao_publica && <p className="cgestao-card-desc">{cell.descricao_publica}</p>}
       <div className="cgestao-card-health">
         <span className="cgestao-health-pill" data-saude={health.id}>{health.label}</span>
+        {cell.solicitacoes.length > 0 && <span className="cgestao-card-badge">{cell.solicitacoes.length} {cell.solicitacoes.length === 1 ? "solicitação" : "solicitações"}</span>}
         <span className="cgestao-card-weeks">
           <MiniBarChart weeks={health.weeks} />
           <small>{health.semanasEmDia}/8 rel.</small>
@@ -247,10 +253,10 @@ function CellCard({
       </div>
       <div className="cgestao-card-footer">
         <div>
-          <p><strong>{cell.dias_reuniao.map((day) => DAY_LABELS[day] || day).join(", ") || "A definir"}</strong> · {cell.membros_total + cell.visitantes_ativos} pessoas</p>
-          <p className="cgestao-card-lead">{cell.lider_nome || cell.responsavel || "Liderança a definir"}</p>
+          <p><strong>{cell.dias_reuniao.map((day) => DAY_LABELS[day] || day).join(", ") || "Dia a definir"}{cell.horario_texto ? ` · ${cell.horario_texto}` : ""}</strong></p>
+          <p>{cell.membros_total + cell.visitantes_ativos} pessoas</p>
         </div>
-        <span className="cgestao-card-cta">Gerenciar →</span>
+        <span className="cgestao-card-cta">{cell.can_operate ? "Gerenciar" : "Ver célula"} →</span>
       </div>
     </button>
   );
@@ -260,7 +266,9 @@ function CellCard({
 type DetailTab = "visao" | "integrantes" | "agenda" | "relatorio" | "solicitacoes" | "config" | "entrar";
 
 function CellDetailPage({ cell, cells, onBack }: { cell: Cell; cells: CellsData; onBack: () => void }) {
-  const [tab, setTab] = useState<DetailTab>("visao");
+  const search=useBrowserSearch();
+  const [selectedTab,setTab]=useState<DetailTab|null>(null);
+  const tab=selectedTab??(new URLSearchParams(search).get("aba")==="solicitacoes"?"solicitacoes":"visao");
   const [memberProfile, setMemberProfile] = useState<CellMember | null>(null);
   const health = cellHealth(cell, cells.agora);
 
@@ -278,7 +286,7 @@ function CellDetailPage({ cell, cells, onBack }: { cell: Cell; cells: CellsData;
     ["integrantes", "Integrantes"],
     ["agenda", "Agenda"],
     ["relatorio", "Relatório semanal"],
-    ["solicitacoes", `Solicitações ${cell.solicitacoes.length || ""}`.trim()],
+    ["solicitacoes", "Solicitações"],
     ["config", "Configurações"],
   ];
   const visitorTabs: [DetailTab, string][] = [
@@ -327,7 +335,7 @@ function CellDetailPage({ cell, cells, onBack }: { cell: Cell; cells: CellsData;
         <nav className="cgestao-tabs" aria-label="Seções da célula">
           {tabs.map(([id, label], index) => (
             <button key={id} type="button" className={tab === id ? "active" : ""} onClick={() => setTab(id)}>
-              <span>{String(index + 1).padStart(2, "0")}</span>{label}
+              <span aria-hidden="true">{id === "solicitacoes" ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg> : String(index + 1).padStart(2, "0")}</span>{label}{id === "solicitacoes" && cell.solicitacoes.length > 0 && <b className="cell-request-count" aria-label={`${cell.solicitacoes.length} pendentes`}>{cell.solicitacoes.length}</b>}
             </button>
           ))}
         </nav>
@@ -441,7 +449,7 @@ function IntegrantesTab({
         {!cell.membros.length && <p className="cgestao-empty">Nenhum integrante cadastrado ainda.</p>}
       </div>
       <div className="cgestao-add-members">
-        <form
+        <form className="cgestao-form"
           onSubmit={(event) => {
             event.preventDefault();
             const form = event.currentTarget;
@@ -457,7 +465,7 @@ function IntegrantesTab({
           </label>
           <button disabled={cells.saving}>Adicionar</button>
         </form>
-        <form
+        <form className="cgestao-form"
           onSubmit={(event) => {
             event.preventDefault();
             const form = event.currentTarget;
@@ -692,7 +700,7 @@ function MemberProfileDialog({ member, onClose }: { member: CellMember; onClose:
     <div className="cgestao-member-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <section className="cgestao-member-dialog" role="dialog" aria-modal="true" aria-label={`Perfil de ${member.name}`}>
         <header>
-          <span>{member.fotoPerfil ? <img loading="lazy" src={member.fotoPerfil} alt="" /> : initialsOf(member.name)}</span>
+          <span>{member.fotoPerfil ? <SafeImage loading="lazy" fallbackName={member.name} fallbackKind="avatar" src={member.fotoPerfil} alt="" /> : initialsOf(member.name)}</span>
           <div>
             <p className="cgestao-kicker">PERFIL DO MEMBRO</p>
             <h2>{member.name}</h2>

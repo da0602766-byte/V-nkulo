@@ -3,6 +3,7 @@ import { getVapidConfiguration, isTrustedPushEndpoint, isWebPushConfigured, send
 import type { PushQueueState, PushQueueStatus } from "./push-delivery-types";
 import { readFirebaseConfig, nativeToken, sendFcm, type FirebaseConfig } from "./firebase-integration";
 import { getAuthorizedChatPush } from "./chat-push";
+import { notificationVisibilitySql } from "./owner-notifications";
 
 const BATCH_SIZE = 8;
 const CONCURRENCY = 4;
@@ -93,6 +94,8 @@ async function deliverJob(db: D1Database, job: Job, token: string, configuration
   if (job.expira_em <= Date.now()) return finish(db, job, token, "EXPIRADA", null, "PRAZO_EXPIRADO");
   if (job.tentativas > MAX_ATTEMPTS) return finish(db, job, token, "FALHA", null, "LIMITE_TENTATIVAS");
   // Revalida a autorização e a leitura a cada envio, incluindo execuções recuperadas.
+  // Dispositivos não registram o escopo proprietário da sessão: avisos operacionais
+  // ficam na central autenticada, sem despertar aparelhos de sessões comuns.
   const subscription = await db.prepare(
     `SELECT p.id, p.endpoint, p.p256dh, p.auth, p.vinculo_id, n.tipo, n.area
      FROM notificacoes_push_fila q
@@ -103,6 +106,7 @@ async function deliverJob(db: D1Database, job: Job, token: string, configuration
      JOIN notificacoes_sistema n ON n.id = q.notificacao_id AND n.usuario_id = q.usuario_id
      WHERE q.id = ? AND q.lease_token = ? AND q.estado = 'PROCESSANDO' AND q.lease_ate > ?
        AND datetime(s.expira_em) > CURRENT_TIMESTAMP
+       AND ${notificationVisibilitySql(false)}
        AND (p.expiracao_em IS NULL OR datetime(p.expiracao_em) > CURRENT_TIMESTAMP)
        AND NOT EXISTS (SELECT 1 FROM notificacoes_lidas l WHERE l.notificacao_id = n.id AND l.usuario_id = q.usuario_id)`,
   ).bind(job.id, token, Date.now()).first<PushSubscriptionRow & { tipo: string; area: string }>();

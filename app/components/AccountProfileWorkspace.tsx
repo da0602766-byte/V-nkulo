@@ -1,8 +1,11 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import TransientFeedback from "./TransientFeedback";
+
+import { FormEvent, useEffect, useRef, useState } from "react";
 import NativeImageUpload from "./NativeImageUpload";
 import StoragePrivacyWorkspace from "./StoragePrivacyWorkspace";
+import "./account-profile-ux.css";
 
 type DynamicField = {
   id: string;
@@ -38,24 +41,40 @@ export default function AccountProfileWorkspace({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [saveError, setSaveError] = useState("");
+  const [revision, setRevision] = useState(0);
+  const savingRef = useRef(false);
   const [photoUrl, setPhotoUrl] = useState("");
 
   useEffect(() => {
-    fetch("/api/conta/perfil", { cache: "no-store" })
+    const controller = new AbortController();
+    fetch("/api/conta/perfil", { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
         const result = (await response.json()) as AccountResponse;
-        if (!response.ok) throw new Error(result.error || "Falha ao carregar.");
+        if (controller.signal.aborted) return;
+        if (!response.ok || !result.account) throw new Error(result.error || "Não foi possível carregar sua conta.");
         setData(result);
         setPhotoUrl(result.account?.fotoPerfil || "");
       })
-      .catch((error) => setMessage(error.message))
-      .finally(() => setLoading(false));
-  }, []);
+      .catch((error) => { if (!controller.signal.aborted) setLoadError(error.message); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [revision]);
+
+  function retry() {
+    setLoadError("");
+    setLoading(true);
+    setRevision(value => value + 1);
+  }
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
     setMessage("");
+    setSaveError("");
     const form = new FormData(event.currentTarget);
     const fields: Record<string, string> = {};
     const privacy: Record<string, boolean> = {};
@@ -80,32 +99,39 @@ export default function AccountProfileWorkspace({
       if (!response.ok) throw new Error(result.error || "Falha ao salvar.");
       setMessage("Informações da conta atualizadas.");
     } catch (error) {
-      setMessage((error as Error).message);
+      setSaveError((error as Error).message);
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
 
-  if (loading) return <p className="people-loading">Carregando sua conta…</p>;
-  if (!data.account) return <p className="operations-feedback error">{message}</p>;
+  if (loading) return <p className="people-loading" role="status">Carregando sua conta…</p>;
+  if (!data.account) return <section className="account-profile-load-error"><p role="alert">{loadError}</p><button type="button" onClick={retry}>Tentar novamente</button></section>;
   return (
     <section className={`account-profile-workspace ${neutral ? "neutral" : ""}`}>
       <header className="workspace-heading">
         <div>
           <p className="pilot-kicker">MINHA CONTA</p>
-          <h1>Informações e privacidade</h1>
+          <h1>Meu perfil e privacidade</h1>
           <p>
-            Os campos obrigatórios são definidos pelo proprietário da plataforma.
-            Você decide quais informações adicionais ficam privadas.
+            Atualize sua apresentação e escolha quais informações adicionais ficam privadas.
           </p>
         </div>
       </header>
-      <StoragePrivacyWorkspace />
-      <form className="account-profile-form" onSubmit={save}>
+      <nav className="account-profile-shortcuts" aria-label="Seções da minha conta">
+        <a href="#account-identity">Meu perfil</a>
+        <a href="#account-additional">Dados complementares</a>
+        <a href="#account-storage">Arquivos e Google Drive</a>
+      </nav>
+      <form id="account-identity" className="account-profile-form" onSubmit={save} aria-busy={saving}>
+        <p className="account-required-note">* Campo obrigatório. As opções de privacidade abaixo são salvas com seus dados.</p>
+        <fieldset className="account-profile-fields" disabled={saving}>
+          <legend className="sr-only">Dados do perfil</legend>
         <section className="account-profile-section">
           <header>
             <span>1</span>
-            <div><strong>Identidade da conta</strong><small>Foto, nome e dados essenciais.</small></div>
+            <div><h2>Identidade da conta</h2><small>Foto, nome e dados essenciais.</small></div>
           </header>
           <NativeImageUpload
             label="Foto de perfil"
@@ -116,12 +142,12 @@ export default function AccountProfileWorkspace({
           />
           <div className="account-profile-grid">
             <label>
-              Nome completo
+              Nome completo *
               <input name="nome" defaultValue={data.account.nome} required minLength={3} maxLength={120} pattern="[A-Za-zÀ-ÿ' -]{3,120}" autoComplete="name" title="Use apenas letras, espaços, apóstrofo ou hífen." />
             </label>
             <label>
               E-mail
-              <input value={data.account.email} disabled aria-describedby="email-note" />
+              <input type="email" value={data.account.email} readOnly aria-describedby="email-note" />
               <small id="email-note">O e-mail da conta não é alterado por este formulário.</small>
             </label>
             <label>
@@ -141,12 +167,11 @@ export default function AccountProfileWorkspace({
             </label>
           </div>
         </section>
-        <details className="account-profile-section account-profile-collapsible" open>
-          <summary>
+        <section id="account-additional" className="account-profile-section">
+          <header>
             <span>2</span>
-            <div><strong>Informações complementares</strong><small>Recolha esta seção para facilitar a leitura.</small></div>
-            <b aria-hidden="true">⌄</b>
-          </summary>
+            <div><h2>Informações complementares</h2><small>Revise seus dados e a privacidade de cada campo.</small></div>
+          </header>
           <div className="account-profile-grid">
             {(data.fields || []).length ? (data.fields || []).map((field) => (
               <div className="account-dynamic-field" key={field.id}>
@@ -177,6 +202,7 @@ export default function AccountProfileWorkspace({
                   <input
                     name={`private:${field.id}`}
                     type="checkbox"
+                    aria-label={`Manter ${field.label} privado`}
                     defaultChecked={field.private}
                   />
                   Manter privado
@@ -184,12 +210,15 @@ export default function AccountProfileWorkspace({
               </div>
             )) : <p className="account-profile-empty">Nenhum campo complementar foi solicitado.</p>}
           </div>
-        </details>
-        {message && <p className="operations-feedback" role="status">{message}</p>}
+        </section>
+        </fieldset>
+        {saveError && <p className="account-profile-save-error" role="alert">{saveError} Seus dados continuam no formulário. Tente salvar novamente.</p>}
+        {message && <TransientFeedback tone="success" role="status">{message}</TransientFeedback>}
         <button className="account-profile-submit" type="submit" disabled={saving}>
           {saving ? "Salvando…" : "Salvar minha conta"}
         </button>
       </form>
+      <div id="account-storage"><StoragePrivacyWorkspace /></div>
     </section>
   );
 }

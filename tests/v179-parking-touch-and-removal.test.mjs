@@ -18,22 +18,22 @@ test("parking editor supports pointer movement and saves without a full successf
   assert.match(styles, /\.gestao-position-canvas\s*\{[^}]*touch-action:\s*none/s);
 });
 
-// V2026 — a reserva do membro deixou de exigir um passo "ver vagas do
-// setor": o mapa do estacionamento já mostra a disponibilidade de cada vaga
-// de cada setor de uma vez. O posicionamento em pixels (posicao_x/posicao_y)
-// persistido pelo líder continua existindo e é usado no console de gestão.
-test("o mapa de reserva do membro mostra a disponibilidade de todos os setores de uma vez", () => {
-  assert.match(memberPortal, /aria-label="Vagas por setor"/);
-  assert.match(memberPortal, /gestao-lot-grid/);
+// Redesign de outubro/2026: membro e gestão usam as posições persistidas,
+// com seleção de setor e alternativa em lista para navegação acessível.
+test("o mapa do membro preserva posições reais e permite escolher setor e lista acessível", async () => {
+  assert.match(memberPortal, /selectedSector\?\.spaces/);
+  const map = await readFile(new URL("../app/components/parking/ParkingSpaceMap.tsx", import.meta.url), "utf8");
+  assert.match(map, /left:space.posicao_x,top:space.posicao_y/);
+  assert.match(map, /Lista de vagas/);
   assert.match(memberPortal, /isSpaceAvailable/);
   assert.match(format, /export function hasCustomParkingLayout/);
   assert.match(managementConsole, /space\.posicao_x, top: space\.posicao_y/);
 });
 
 test("parking selection remains reachable while reservations are gated", () => {
-  assert.match(memberPortal, /Mapa disponível para consulta/);
+  assert.match(memberPortal, /Escolha uma atividade para consultar a disponibilidade/);
   assert.match(memberPortal, /Tentar novamente/);
-  assert.match(availability, /vagas:spaces\.results/);
+  assert.match(availability, /readParkingContext/);
 });
 
 test("person removal is readable, guarded and updates the list without refetching it", () => {

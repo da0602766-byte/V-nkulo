@@ -11,16 +11,10 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/vinkulo-app-icon-192.png",
-      "sizes": "192x192",
+      "src": "/vinkulo-logo.png",
+      "sizes": "1254x1254",
       "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/vinkulo-app-icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }

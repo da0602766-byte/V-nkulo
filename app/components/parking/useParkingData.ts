@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { readJson } from "./format";
 import type {
   ParkingData,
@@ -22,109 +22,97 @@ export function useParkingData(memberMode: boolean) {
   const [canManageReservations, setCanManageReservations] = useState(false);
   const [canReviewReports, setCanReviewReports] = useState(false);
 
+  const [context, setContext] = useState({ eventId: "", start: "", end: "" });
+  const [reservationFilters, setReservationFilters] = useState({ q: "", setorId: "", tipo: "", status: "", page: 1 });
+  const [reservationTotal, setReservationTotal] = useState(0);
+  const [lastSync, setLastSync] = useState<string | null>(null);
+  const [stale, setStale] = useState(true);
+  const [online, setOnline] = useState(true);
+  const requestRef = useRef<AbortController | null>(null);
+  const sequenceRef = useRef(0);
+  const retryRef = useRef(0);
+  const mutationRef = useRef(false);
+  const reservationRequestRef = useRef({ payload: "", key: "" });
+
   const load = useCallback(async (quiet = false) => {
-    if (!quiet) setLoading(true);
-    setError("");
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
+    const sequence = ++sequenceRef.current;
+    if (!quiet) { setLoading(true); setStale(true); }
     try {
-      const response = await fetch(
-        memberMode ? "/api/pilot/estacionamento/disponibilidade" : "/api/pilot/estacionamento",
-        { cache: "no-store" },
-      );
-      const result = await readJson<ParkingData & { error?: string }>(response);
+      if (!navigator.onLine) throw new Error("Você está sem conexão. As vagas podem estar desatualizadas.");
+      const params = new URLSearchParams();
+      if (context.eventId) params.set("eventoId",context.eventId);
+      if (context.start && context.end) { params.set("inicioEm",context.start); params.set("fimEm",context.end); }
+      const filters = new URLSearchParams({ ...reservationFilters, page: String(reservationFilters.page), pageSize: "40" });
+      // Choosing an activity affects availability, while the personal list keeps every activity visible.
+      if (context.eventId && !memberMode) filters.set("eventoId",context.eventId);
+      if (memberMode) filters.set("scope","mine");
+      const options = { cache: "no-store" as const, signal: controller.signal };
+      const [response,reservationResponse,reportResponse] = await Promise.all([
+        fetch((memberMode ? "/api/pilot/estacionamento/disponibilidade" : "/api/pilot/estacionamento") + "?" + params,options),
+        fetch("/api/pilot/estacionamento/reservas?"+filters,options),
+        memberMode ? Promise.resolve(null) : fetch("/api/pilot/estacionamento/relatorios",options),
+      ]);
+      if ([response,reservationResponse,reportResponse].some(item=>item && [401,403,423].includes(item.status)) && sequence===sequenceRef.current) {
+        setData(null);setReservations([]);setReports([]);setEventOptions([]);setCanManageReservations(false);setCanReviewReports(false);
+      }
+      const result = await readJson<ParkingData & {error?:string}>(response);
       if (!response.ok) {
-        throw new Error(result.error || "Não foi possível carregar o estacionamento.");
+        if ([401,403,423].includes(response.status) && sequence === sequenceRef.current) {
+          setData(null); setReservations([]); setReports([]); setEventOptions([]); setCanManageReservations(false); setCanReviewReports(false);
+        }
+        throw new Error(result.error || "Não foi possível atualizar as vagas.");
       }
-      setData(result);
-      const [reservationResponse, reportResponse, eventResponse] = await Promise.all([
-        fetch(memberMode ? "/api/pilot/estacionamento/reservas?scope=mine" : "/api/pilot/estacionamento/reservas", { cache: "no-store" }),
-        memberMode ? Promise.resolve(null) : fetch("/api/pilot/estacionamento/relatorios", { cache: "no-store" }),
-        fetch("/api/pilot/eventos", { cache: "no-store" }),
-      ]);
-      if (reservationResponse.ok) {
-        const extras = await readJson<{ reservas: Reservation[]; canManage: boolean }>(reservationResponse);
-        setReservations(extras.reservas || []);
-        setCanManageReservations(Boolean(extras.canManage));
-      }
-      if (reportResponse?.ok) {
-        const extras = await readJson<{ relatorios: ParkingReport[]; canReview: boolean }>(reportResponse);
-        setReports(extras.relatorios || []);
-        setCanReviewReports(Boolean(extras.canReview));
-      }
-      if (eventResponse.ok) {
-        const extras = await readJson<{ eventos?: ParkingEventOption[] }>(eventResponse);
-        const minimumDate = Date.now() - 12 * 60 * 60 * 1000;
-        setEventOptions(
-          (extras.eventos || []).filter(
-            (item) => item.status === "PUBLICADO" && new Date(item.inicia_em).getTime() >= minimumDate,
-          ),
-        );
-      } else {
-        setEventOptions([]);
-      }
-    } catch (loadError) {
-      setError((loadError as Error).message);
+      if (!reservationResponse.ok) throw new Error("Não foi possível atualizar as reservas. Tente novamente.");
+      const extras = await readJson<{reservas:Reservation[];canManage:boolean;total:number}>(reservationResponse);
+      const reportData = reportResponse?.ok ? await readJson<{relatorios:ParkingReport[];canReview:boolean}>(reportResponse) : null;
+      if (reportResponse && !reportResponse.ok) throw new Error("Não foi possível atualizar os relatórios.");
+      if (!result.config || !result.operator || !Array.isArray(result.vagas) || !Array.isArray(result.permissions) || !result.stats || !Array.isArray(extras.reservas) || (reportResponse && !Array.isArray(reportData?.relatorios))) throw new Error("O servidor retornou dados incompletos. Tente atualizar novamente.");
+      if (sequence !== sequenceRef.current || controller.signal.aborted) return;
+      setData(result); setEventOptions(result.eventos || []);
+      setReservations(extras.reservas || []); setReservationTotal(extras.total || 0);
+      setCanManageReservations(Boolean(extras.canManage));
+      setReports(reportData?.relatorios || []); setCanReviewReports(Boolean(reportData?.canReview));
+      setLastSync(result.serverTime || new Date().toISOString()); setStale(false); setError(""); retryRef.current=0;
+    } catch (cause) {
+      if (controller.signal.aborted || sequence !== sequenceRef.current) return;
+      setError((cause as Error).message); setStale(true); retryRef.current = Math.min(4,retryRef.current+1);
     } finally {
-      if (!quiet) setLoading(false);
+      if (sequence === sequenceRef.current) { setLoading(false); requestRef.current=null; }
     }
-  }, [memberMode]);
+  }, [memberMode,context,reservationFilters]);
 
-  const refreshReservations = useCallback(async () => {
-    try {
-      const [response, availabilityResponse, reportResponse] = await Promise.all([
-        fetch(memberMode ? "/api/pilot/estacionamento/reservas?scope=mine" : "/api/pilot/estacionamento/reservas", { cache: "no-store" }),
-        memberMode ? fetch("/api/pilot/estacionamento/disponibilidade", { cache: "no-store" }) : Promise.resolve(null),
-        memberMode ? Promise.resolve(null) : fetch("/api/pilot/estacionamento/relatorios", { cache: "no-store" }),
-      ]);
-      if (response.ok) {
-        const extras = await readJson<{ reservas: Reservation[]; canManage: boolean }>(response);
-        setReservations(extras.reservas || []);
-        setCanManageReservations(Boolean(extras.canManage));
-      }
-      if (availabilityResponse?.ok) {
-        const availability = await readJson<ParkingData>(availabilityResponse);
-        setData(availability);
-      }
-      if (reportResponse?.ok) {
-        const extras = await readJson<{ relatorios: ParkingReport[]; canReview: boolean }>(reportResponse);
-        setReports(extras.relatorios || []);
-        setCanReviewReports(Boolean(extras.canReview));
-      }
-    } catch {
-      // A atualização silenciosa não interrompe o fluxo da operação.
-    }
-  }, [memberMode]);
-
+  const refreshReservations = useCallback(() => load(true),[load]);
   useEffect(() => {
-    const timer = window.setTimeout(() => void load(), 0);
-    return () => window.clearTimeout(timer);
-  }, [load]);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      if (document.visibilityState === "visible") void refreshReservations();
-    }, 12_000);
-    const onVisible = () => document.visibilityState === "visible" && void refreshReservations();
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", onVisible);
+    const initial = window.setTimeout(() => void load(),0);
+    let timer: ReturnType<typeof setTimeout>;
+    let disposed = false;
+    const poll = async () => {
+      if (document.visibilityState === "visible" && navigator.onLine && !requestRef.current && !mutationRef.current) await load(true);
+      if (!disposed) timer = setTimeout(poll,12_000 * 2 ** retryRef.current);
     };
-  }, [refreshReservations]);
+    timer=setTimeout(poll,12_000);
+    const resume = () => { setOnline(navigator.onLine); if (navigator.onLine && document.visibilityState === "visible") void load(true); };
+    const offline = () => { setOnline(false); setStale(true); setError("Você está sem conexão. As vagas podem estar desatualizadas."); };
+    document.addEventListener("visibilitychange",resume);
+    window.addEventListener("focus",resume); window.addEventListener("online",resume); window.addEventListener("offline",offline);
+    return () => { disposed=true; clearTimeout(initial); clearTimeout(timer); requestRef.current?.abort();
+      document.removeEventListener("visibilitychange",resume); window.removeEventListener("focus",resume); window.removeEventListener("online",resume); window.removeEventListener("offline",offline); };
+  },[load]);
 
   const sectors: ParkingSector[] = useMemo(() => {
-    const grouped = new Map<string, ParkingSector["spaces"]>();
-    for (const space of data?.vagas || []) {
-      const key = `${space.setor_id}:${space.setor_nome}`;
-      grouped.set(key, [...(grouped.get(key) || []), space]);
+    const grouped = new Map<number, ParkingSector>();
+    for (const sector of data?.setores || []) {
+      grouped.set(sector.id, { id: `${sector.id}:${sector.nome}`, name: sector.nome, color: sector.cor, order: Number(sector.ordem), spaces: [] });
     }
-    return [...grouped.entries()]
-      .map(([key, spaces]) => ({
-        id: key,
-        name: spaces[0]?.setor_nome || "Setor",
-        color: spaces[0]?.setor_cor || "#3b82f6",
-        order: Number(spaces[0]?.ordem || 0),
-        spaces,
-      }))
+    for (const space of data?.vagas || []) {
+      const sector: ParkingSector = grouped.get(space.setor_id) || { id: `${space.setor_id}:${space.setor_nome}`, name: space.setor_nome, color: space.setor_cor || "#3b82f6", order: Number(space.ordem || 0), spaces: [] };
+      sector.spaces.push(space);
+      grouped.set(space.setor_id, sector);
+    }
+    return [...grouped.values()]
       .sort((a, b) => a.order - b.order);
   }, [data]);
 
@@ -222,6 +210,10 @@ export function useParkingData(memberMode: boolean) {
   }
 
   async function createReservation(values: Record<string, FormDataEntryValue>) {
+    if (mutationRef.current || stale || !navigator.onLine) return null;
+    mutationRef.current = true;
+    const serialized = JSON.stringify(values);
+    if (reservationRequestRef.current.payload !== serialized) reservationRequestRef.current = { payload: serialized, key: crypto.randomUUID() };
     setWorking(true);
     setError("");
     setFeedback("");
@@ -229,9 +221,9 @@ export function useParkingData(memberMode: boolean) {
       const response = await fetch("/api/pilot/estacionamento/reservas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: JSON.stringify({ ...values, requestId: reservationRequestRef.current.key }),
       });
-      const result = await readJson<{ error?: string; message?: string; codigo?: string; id?: number; status?: string }>(response);
+      const result = await readJson<{ error?: string; message?: string; codigo?: string; id?: number; status?: string; notificationWarning?: boolean }>(response);
       if (!response.ok) {
         const fallback = response.status === 403
           ? "Sua conta não tem permissão para reservar uma vaga."
@@ -242,13 +234,19 @@ export function useParkingData(memberMode: boolean) {
               : `Não foi possível criar a reserva (erro ${response.status}). Tente novamente.`;
         throw new Error(result.error || result.message || fallback);
       }
-      setFeedback(`Reserva solicitada. Seu código é ${result.codigo}.`);
+      if (!result.id || !result.codigo) throw new Error("Não foi possível confirmar a resposta. Atualize Minhas reservas antes de tentar novamente.");
+      // An acknowledged request has finished. A later explicit reservation is a new intent,
+      // even if its fields match a reservation the member has since cancelled.
+      reservationRequestRef.current = {payload:"",key:""};
+      setFeedback(`Reserva solicitada. Seu código é ${result.codigo}.${result.notificationWarning ? " A reserva foi salva, mas houve falha no envio da notificação." : ""}`);
       await refreshReservations();
       return result;
     } catch (cause) {
+      await refreshReservations();
       setError((cause as Error).message);
       return null;
     } finally {
+      mutationRef.current = false;
       setWorking(false);
     }
   }
@@ -262,10 +260,11 @@ export function useParkingData(memberMode: boolean) {
       const response = await fetch("/api/pilot/estacionamento/reservas", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ ...body, ...(isCheckin && context.eventId ? {eventoId:context.eventId} : {}) }),
       });
       const result = await readJson<{
         error?: string;
+        notificationWarning?: boolean;
         reserva?: {
           nomeCompleto: string;
           documento: string;
@@ -280,9 +279,9 @@ export function useParkingData(memberMode: boolean) {
       }>(response);
       if (!response.ok) throw new Error(result.error || "Reserva não atualizada.");
       setFeedback(
-        result.reserva
+        (isCheckin && result.reserva
           ? `Check-in confirmado: ${result.reserva.nomeCompleto} · vaga ${result.reserva.vaga}.`
-          : "Reserva atualizada.",
+          : "Reserva atualizada.") + (result.notificationWarning ? " Alteração salva; falha no envio da notificação." : ""),
       );
       if (isCheckin) await load(true);
       else await refreshReservations();
@@ -376,12 +375,8 @@ export function useParkingData(memberMode: boolean) {
   }
 
   async function moveSpace(sourceId: number, posicaoX: number, posicaoY: number) {
-    setData((current) => current ? {
-      ...current,
-      vagas: current.vagas.map((space) => space.id === sourceId
-        ? { ...space, posicao_x: posicaoX, posicao_y: posicaoY }
-        : space),
-    } : current);
+    const previous = data?.vagas.find(space => space.id === sourceId);
+    if (!previous || working) return;
     setWorking(true);
     setFeedback("");
     setError("");
@@ -389,14 +384,15 @@ export function useParkingData(memberMode: boolean) {
       const response = await fetch("/api/pilot/estacionamento/mapa", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "ATUALIZAR_POSICAO", vagaId: sourceId, posicaoX, posicaoY }),
+        body: JSON.stringify({ action: "ATUALIZAR_POSICAO", vagaId: sourceId, posicaoX, posicaoY, previousX: previous.posicao_x, previousY: previous.posicao_y }),
       });
       const result = await readJson<{ error?: string }>(response);
       if (!response.ok) throw new Error(result.error || "Não foi possível salvar a posição da vaga.");
       setFeedback("Posição da vaga salva.");
-    } catch (cause) {
-      setError((cause as Error).message);
       await load(true);
+    } catch (cause) {
+      await load(true);
+      setError((cause as Error).message);
     } finally {
       setWorking(false);
     }
@@ -406,7 +402,8 @@ export function useParkingData(memberMode: boolean) {
     data,
     setData,
     loading,
-    working,
+    working: working || stale || !online,
+    stale, online, lastSync, context, setContext, reservationFilters, setReservationFilters, reservationTotal,
     feedback,
     error,
     reservations,

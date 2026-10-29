@@ -1,0 +1,16 @@
+.file-save-actions { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 8px; max-width: 100%; }
+.file-save-actions button, .saved-files-workspace button, .saved-files-workspace a { min-height: 40px; border: 1px solid var(--line, #ddd); border-radius: 9px; background: var(--surface); color: var(--ink); padding: 8px 12px; font: inherit; font-size: 12px; cursor: pointer; }
+.file-save-actions .file-save-ready { background: var(--violet); color: #fff; }
+.file-save-actions button:disabled { opacity: .6; cursor: progress; }
+.saved-files-workspace { margin: 20px 0; padding: 20px; border: 1px solid var(--line, #ddd); border-radius: 16px; }
+.saved-files-workspace h3 { margin: 0 0 6px; }
+.saved-files-workspace p, .saved-files-workspace small { color: var(--muted); font-size: 13px; }
+.saved-files-workspace > header, .saved-files-tabs { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.saved-files-tabs { justify-content: flex-start; margin: 16px 0; }
+.saved-files-tabs button[aria-pressed="true"] { color: var(--violet); border-color: var(--violet); background: var(--violet-soft); }
+.saved-file-row { padding: 14px 0; border-top: 1px solid var(--line, #ddd); display: grid; gap: 10px; }
+.saved-file-row strong { overflow-wrap: anywhere; }
+.saved-file-row small { display: block; margin-top: 4px; }
+.saved-file-upload { display: grid; gap: 10px; margin: 16px 0; }
+.saved-file-upload input { width: 100%; max-width: 100%; }
+@media (max-width: 760px) { .saved-files-workspace { padding: 14px; } .file-save-actions button { min-height: 44px; } }

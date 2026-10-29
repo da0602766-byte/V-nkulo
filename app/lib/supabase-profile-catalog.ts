@@ -8,6 +8,7 @@ type SyncResult = { run_id: string; source_count: number; inserted_count: number
 export type ProfilePreview = {
   sourceCount: number; destinationCount: number; matchedCount: number;
   pendingCount: number; extraDestinationCount: number; activeCount: number; ready: boolean;
+  extraDestinationIds: number[];
 };
 
 export class ProfileCatalogError extends Error {
@@ -87,6 +88,7 @@ export async function previewProfiles(sourceInput?: ProfileItem[]): Promise<Prof
   const extraDestinationCount = destination.filter(item => !sourceById.has(Number(item.legacy_d1_id))).length;
   return { sourceCount: source.length, destinationCount: destination.length, matchedCount,
     pendingCount: source.length - matchedCount, extraDestinationCount,
+    extraDestinationIds: destination.filter(item => !sourceById.has(Number(item.legacy_d1_id))).map(item => Number(item.legacy_d1_id)),
     activeCount: source.filter(item => item.active).length,
     ready: matchedCount === source.length && extraDestinationCount === 0 };
 }

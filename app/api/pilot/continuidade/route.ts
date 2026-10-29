@@ -1,5 +1,5 @@
 import { getD1 } from "../../../../db";
-import { verifyPassword } from "../../../lib/local-auth";
+import { verifyPassword, findSystemOwnerAccount } from "../../../lib/local-auth";
 import { recordTenantAudit } from "../../../lib/tenant-audit";
 import { requireTenantPermission } from "../../../lib/tenant";
 
@@ -494,17 +494,16 @@ async function notifySupport(
   type: string,
   requesterName: string,
 ) {
-  const admins = await db
-    .prepare("SELECT id FROM usuarios WHERE perfil = 'ADMIN' AND ativo = 1")
-    .all<{ id: number }>();
+  const owner = await findSystemOwnerAccount(db);
+  const admins = {results: owner ? [owner] : []};
   if (!admins.results.length) return;
   await db.batch(
     admins.results.map((admin) =>
       db
         .prepare(
           `INSERT INTO notificacoes_sistema
-           (tipo, titulo, mensagem, area, entidade_id, usuario_id, criado_por)
-           VALUES ('ALERTA', 'Nova solicitação de continuidade', ?, 'CONTINUIDADE', ?, ?, ?)`,
+           (tipo, titulo, mensagem, area, entidade_id, usuario_id, criado_por, destino_rota)
+           VALUES ('ALERTA', 'Nova solicitação de continuidade', ?, 'CONTINUIDADE', ?, ?, ?, '/proprietario')`,
         )
         .bind(
           `${requesterName} enviou uma solicitação de ${type.toLowerCase()} para ${communityName}.`,

@@ -1,3 +1,4 @@
+import { deliverCareNoteReminders } from "../../../lib/care-note-reminders";
 import { getD1 } from "../../../../db";
 import { runAutoSyncIfDue } from "../../../lib/supabase-auto-sync";
 import { recordScheduleHeartbeat, validWebhookToken } from "../../../lib/supabase-schedule";
@@ -12,14 +13,14 @@ export async function POST(request: Request) {
     await recordScheduleHeartbeat(db);
     // O job já instalado a cada cinco minutos também acorda a fila, sem depender
     // de uma tela aberta. Falha no catálogo não impede a tentativa das entregas.
-    const [sync, push] = await Promise.allSettled([
-      runAutoSyncIfDue(db, { force: true }), drainPushQueue(db, "scheduled"),
+    const [sync, push, reminders] = await Promise.allSettled([
+      runAutoSyncIfDue(db, { force: true }), drainPushQueue(db, "scheduled"), deliverCareNoteReminders(db),
     ]);
     if (sync.status === "rejected") throw new Error("Sincronização indisponível.");
     const status = sync.value;
     return Response.json({ enabled: status.enabled, running: status.running, lastSuccessAt: status.lastSuccessAt,
-      lastError: status.lastError, pushQueue: push.status === "fulfilled" ? push.value : { error: "Fila temporariamente indisponível." } },
-      { status: status.lastError || push.status === "rejected" ? 503 : 200, headers: { "Cache-Control": "no-store" } });
+      lastError: status.lastError, reminders: reminders.status === "fulfilled" ? reminders.value : { error: "Lembretes temporariamente indisponíveis." }, pushQueue: push.status === "fulfilled" ? push.value : { error: "Fila temporariamente indisponível." } },
+      { status: status.lastError || push.status === "rejected" || reminders.status === "rejected" ? 503 : 200, headers: { "Cache-Control": "no-store" } });
   } catch {
     return Response.json({ error: "Não foi possível executar a sincronização." }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }

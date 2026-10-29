@@ -7,7 +7,6 @@ import {
 import "./globals.css";
 import "./interface-fixes.css";
 import "./secretary.css";
-import "./visitors.css";
 import "./recepcao.css";
 import "./landing-vinkulo.css";
 import "./mobile-quick-actions.css";
@@ -20,11 +19,16 @@ import "./access.css";
 import "./commerce.css";
 import "./owner-reset.css";
 import "./experience-refinements.css";
+import "./workspace-layout.css";
+import "./workspace-density.css";
+import "./private-chat.css";
 import SmartScrollHeader from "./components/SmartScrollHeader";
 import MobileAppInstall from "./components/MobileAppInstall";
 import GlobalFeedbackLauncher from "./components/GlobalFeedbackLauncher";
 import SystemExperienceController from "./components/SystemExperienceController";
 import NativeNotificationSync from "./components/NativeNotificationSync";
+import { TransientFeedbackViewport } from "./components/TransientFeedback";
+import MediaConnectionFeedback from "./components/MediaConnectionFeedback";
 import { THEME_BOOTSTRAP_SCRIPT } from "./lib/theme-preference";
 
 const instrumentSans = Instrument_Sans({
@@ -52,13 +56,10 @@ export const metadata: Metadata = {
     index: false,
     follow: false,
   },
-  other: {
-    "codex-preview": "development",
-  },
   icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
-    apple: "/vinkulo-app-icon-192.png",
+    icon: "/vinkulo-logo.png",
+    shortcut: "/vinkulo-logo.png",
+    apple: "/vinkulo-logo.png",
   },
   manifest: "/manifest.webmanifest",
   appleWebApp: {
@@ -104,9 +105,13 @@ export default function RootLayout({
         <div id="main-content" tabIndex={-1}>{children}</div>
         <SystemExperienceController />
         <NativeNotificationSync />
+        <TransientFeedbackViewport />
+        <MediaConnectionFeedback />
         <GlobalFeedbackLauncher />
         <MobileAppInstall />
       </body>
     </html>
   );
 }
+
+

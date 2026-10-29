@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "./StableLink";
+import { Dialog } from "./visitors/Dialog";
 
 type ChecklistItem = { id: string; texto: string; concluido: boolean };
 type CareNote = {
@@ -14,6 +15,8 @@ type CareNote = {
   eventoId: number | null;
   eventoTitulo: string;
   checklist: ChecklistItem[];
+  lembreteEm?: string | null;
+  lembreteEnviadoEm?: string | null;
   criadoEm: string;
   atualizadoEm: string;
 };
@@ -22,9 +25,11 @@ type Option = { id: number; nome?: string; nome_completo?: string; titulo?: stri
 export default function CareNotesBoard({
   compact = false,
   side = false,
+  editorDialog = false,
 }: {
   compact?: boolean;
   side?: boolean;
+  editorDialog?: boolean;
 }) {
   const [notes, setNotes] = useState<CareNote[]>([]);
   const [events, setEvents] = useState<Option[]>([]);
@@ -32,6 +37,7 @@ export default function CareNotesBoard({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [editing, setEditing] = useState<CareNote | null>(null);
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
 
@@ -55,6 +61,12 @@ export default function CareNotesBoard({
     return () => window.clearTimeout(timer);
   }, [load]);
 
+  useEffect(() => {
+    if (loading) return;
+    const id = new URLSearchParams(window.location.search).get("anotacao");
+    if (id) document.getElementById(`care-note-${id}`)?.focus();
+  }, [loading]);
+
   const visibleNotes = useMemo(() => compact ? notes.slice(0, 3) : notes, [compact, notes]);
 
   async function createNote(event: FormEvent<HTMLFormElement>) {
@@ -67,12 +79,14 @@ export default function CareNotesBoard({
     const eventId = Number(data.get("eventoId")) || null;
     const visitor = visitors.find((item) => item.id === visitorId);
     const linkedEvent = events.find((item) => item.id === eventId);
-    const checklist = String(data.get("checklist") || "").split(/\r?\n/).map((texto) => texto.trim()).filter(Boolean).slice(0, 16).map((texto, index) => ({ id: `item-${Date.now()}-${index}`, texto, concluido: false }));
+    const checklist = String(data.get("checklist") || "").split(/\r?\n/).map((texto) => texto.trim()).filter(Boolean).slice(0, 16).map((texto, index) => ({ id: editing?.checklist.find(item => item.texto === texto)?.id || `item-${Date.now()}-${index}`, texto, concluido: editing?.checklist.find(item => item.texto === texto)?.concluido || false }));
     try {
       const response = await fetch("/api/pilot/anotacoes", {
-        method: "POST",
+        method: editing ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          id: editing?.id,
+          lembreteEm: data.get("lembreteEm") ? new Date(String(data.get("lembreteEm"))).toISOString() : null,
           titulo: data.get("titulo"), texto: data.get("texto"), cor: data.get("cor"),
           visitanteId: visitorId, visitanteNome: visitor?.nome_completo || "",
           eventoId: eventId, eventoTitulo: linkedEvent?.titulo || "", checklist,
@@ -80,8 +94,8 @@ export default function CareNotesBoard({
       });
       const payload = await response.json() as { anotacao?: CareNote; error?: string };
       if (!response.ok || !payload.anotacao) throw new Error(payload.error || "Não foi possível salvar a anotação.");
-      setNotes((current) => [payload.anotacao!, ...current]);
-      form.reset(); setComposerOpen(false); setFeedback("Post-it salvo. Ele também aparece no Fio do dia.");
+      setNotes((current) => editing ? current.map(note => note.id === editing.id ? payload.anotacao! : note) : [payload.anotacao!, ...current]);
+      form.reset(); setComposerOpen(false); setEditing(null); setFeedback("Post-it salvo. Ele também aparece no Fio do dia.");
     } catch (caught) { setError((caught as Error).message); }
     finally { setSaving(false); }
   }
@@ -109,36 +123,44 @@ export default function CareNotesBoard({
     finally { setSaving(false); }
   }
 
+  const composer = <form key={editing?.id || "new"} className="care-note-composer" onSubmit={createNote}>
+        <label>Título<input name="titulo" defaultValue={editing?.titulo || ""} maxLength={100} required placeholder="Ex.: Ligar para a família Oliveira" /></label>
+        <label>Cor<select name="cor" defaultValue={editing?.cor || "amarelo"}><option value="amarelo">Amarelo</option><option value="rosa">Rosa</option><option value="azul">Azul</option><option value="verde">Verde</option></select></label>
+        <label className="wide">Anotação<textarea name="texto" defaultValue={editing?.texto || ""} rows={3} maxLength={1200} placeholder="Contexto que você quer lembrar…" /></label>
+          <details className="care-note-options" data-keep-open-on-outside><summary>Vínculos e checklist <small>opcional</small></summary><div>
+        <label>Vincular visitante <small>opcional</small><select name="visitanteId" defaultValue={editing?.visitanteId || ""}><option value="">Sem vínculo</option>{visitors.map((item) => <option value={item.id} key={item.id}>{item.nome_completo}</option>)}</select></label>
+        <label>Vincular evento <small>opcional</small><select name="eventoId" defaultValue={editing?.eventoId || ""}><option value="">Sem vínculo</option>{events.map((item) => <option value={item.id} key={item.id}>{item.titulo}</option>)}</select></label>
+        <label className="wide">Checklist <small>uma tarefa por linha</small><textarea name="checklist" defaultValue={editing?.checklist.map(item => item.texto).join("\n") || ""} rows={2} maxLength={1800} placeholder={"Enviar mensagem\nConfirmar presença\nRegistrar retorno"} /></label>
+        </div></details>
+        <label className="wide">Lembrete <small>opcional · horário deste aparelho</small><input type="datetime-local" name="lembreteEm" defaultValue={editing?.lembreteEm ? localReminder(editing.lembreteEm) : ""} /><small>Aviso privado na central. No dispositivo, ative as notificações nas configurações. Pode levar alguns minutos.</small></label>
+        {editorDialog && error && <p className="wide vp-error" role="alert">{error}</p>}
+        <footer><span>{editing ? "Editar anotação" : "Nova anotação privada"}</span><button type="button" className="care-note-cancel" disabled={saving} onClick={() => { setComposerOpen(false); setEditing(null); }}>Cancelar</button><button disabled={saving}>{saving ? "Salvando…" : editing ? "Salvar alterações" : "Criar post-it"}</button></footer>
+      </form>;
+
   return (
     <section className={`care-notes-board ${compact ? "is-compact" : ""} ${side ? "is-side" : ""}`} aria-labelledby={compact ? "care-notes-title-compact" : "care-notes-title"}>
       <header>
         <div><span aria-hidden="true">▰</span><div><p className="pilot-kicker">POST-ITS</p><h2 id={compact ? "care-notes-title-compact" : "care-notes-title"}>Minhas anotações de cuidado</h2><small>Privadas para você · vínculos opcionais</small></div></div>
-        <button type="button" onClick={() => setComposerOpen((open) => !open)} aria-expanded={composerOpen}>{composerOpen ? "Fechar" : "＋ Novo post-it"}</button>
+        <button type="button" onClick={() => { setEditing(null); setComposerOpen((open) => !open); }} aria-expanded={composerOpen}>{composerOpen ? "Fechar" : "＋ Novo post-it"}</button>
       </header>
-      {composerOpen && <form className="care-note-composer" onSubmit={createNote}>
-        <label>Título<input name="titulo" maxLength={100} required placeholder="Ex.: Ligar para a família Oliveira" /></label>
-        <label>Cor<select name="cor" defaultValue="amarelo"><option value="amarelo">Amarelo</option><option value="rosa">Rosa</option><option value="azul">Azul</option><option value="verde">Verde</option></select></label>
-        <label className="wide">Anotação<textarea name="texto" rows={3} maxLength={1200} placeholder="Contexto que você quer lembrar…" /></label>
-        <label>Vincular visitante <small>opcional</small><select name="visitanteId" defaultValue=""><option value="">Sem vínculo</option>{visitors.map((item) => <option value={item.id} key={item.id}>{item.nome_completo}</option>)}</select></label>
-        <label>Vincular evento <small>opcional</small><select name="eventoId" defaultValue=""><option value="">Sem vínculo</option>{events.map((item) => <option value={item.id} key={item.id}>{item.titulo}</option>)}</select></label>
-        <label className="wide">Checklist <small>uma tarefa por linha</small><textarea name="checklist" rows={3} maxLength={1800} placeholder={"Enviar mensagem\nConfirmar presença\nRegistrar retorno"} /></label>
-        <footer><span>O post-it ficará disponível em Visitantes e no Fio do dia.</span><button disabled={saving}>{saving ? "Salvando…" : "Criar post-it"}</button></footer>
-      </form>}
+      {composerOpen && (editorDialog ? <Dialog title={editing ? "Editar anotação" : "Nova anotação"} onClose={() => { if (!saving) { setComposerOpen(false); setEditing(null); } }}>{composer}</Dialog> : composer)}
       {(feedback || error) && <p className={`care-note-feedback ${error ? "is-error" : ""}`} role="status">{error || feedback}</p>}
       <div className="care-notes-grid" aria-busy={loading}>
         {visibleNotes.map((note) => {
           const completed = note.checklist.filter((item) => item.concluido).length;
-          return <article className="care-note" data-color={note.cor} key={note.id}>
-            <header><span aria-hidden="true">●</span><small>{completed}/{note.checklist.length || 0} concluídos</small><button type="button" disabled={saving} onClick={() => void removeNote(note)} aria-label={`Excluir ${note.titulo}`}>×</button></header>
-            <h3>{note.titulo}</h3>{note.texto && <p>{note.texto}</p>}
-            {(note.visitanteNome || note.eventoTitulo) && <nav aria-label="Vínculos do post-it">{note.visitanteNome && <Link href={`/painel?view=visitantes&visitante=${note.visitanteId}`}>Pessoa · {note.visitanteNome}</Link>}{note.eventoTitulo && <Link href={`/painel?view=eventos&evento=${note.eventoId}`}>Evento · {note.eventoTitulo}</Link>}</nav>}
+          return <article id={`care-note-${note.id}`} className="care-note" tabIndex={-1} data-color={note.cor} key={note.id}>
+            <header><span aria-hidden="true">●</span><small>{note.checklist.length ? `${completed}/${note.checklist.length} concluídos` : "Anotação"}</small><button type="button" onClick={() => { setEditing(note); setComposerOpen(true); }} aria-label={`Editar ${note.titulo}`}>Editar</button><button type="button" disabled={saving} onClick={() => void removeNote(note)} aria-label={`Excluir ${note.titulo}`}>×</button></header>
+            <h3>{note.titulo}</h3>{note.lembreteEm && <time className="care-note-reminder" dateTime={note.lembreteEm}>{note.lembreteEnviadoEm ? "Lembrete enviado · " : "Lembrar · "}{new Date(note.lembreteEm).toLocaleString("pt-BR", {day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</time>}{note.texto && <p>{note.texto}</p>}
+            {(note.visitanteNome || note.eventoTitulo) && <nav aria-label="Vínculos do post-it">{note.visitanteNome && <Link href={`/painel/visitantes?visitante=${note.visitanteId}`}>Pessoa · {note.visitanteNome}</Link>}{note.eventoTitulo && <Link href={`/painel?view=eventos&evento=${note.eventoId}`}>Evento · {note.eventoTitulo}</Link>}</nav>}
             {note.checklist.length > 0 && <div className="care-note-checklist">{note.checklist.map((item) => <label className={item.concluido ? "done" : ""} key={item.id}><input type="checkbox" checked={item.concluido} onChange={() => void updateNote({ ...note, checklist: note.checklist.map((entry) => entry.id === item.id ? { ...entry, concluido: !entry.concluido } : entry) })} /><span>{item.texto}</span></label>)}</div>}
           </article>;
         })}
         {!loading && !notes.length && <div className="care-notes-empty"><span aria-hidden="true">▱</span><strong>Nenhum post-it ainda</strong><p>Crie uma lembrança livre ou, se desejar, relacione uma pessoa ou evento.</p></div>}
         {loading && <div className="care-notes-empty"><strong>Organizando suas anotações…</strong></div>}
       </div>
-      {compact && notes.length > visibleNotes.length && <Link className="care-notes-more" href="/painel?view=visitantes">Ver todos os {notes.length} post-its em Visitantes →</Link>}
+      {compact && notes.length > visibleNotes.length && <Link className="care-notes-more" href="/painel/visitantes?section=anotacoes">Ver todos os {notes.length} post-its em Visitantes →</Link>}
     </section>
   );
 }
+
+function localReminder(value: string) { const date = new Date(value); return new Date(date.getTime() - date.getTimezoneOffset()*60000).toISOString().slice(0,16); }

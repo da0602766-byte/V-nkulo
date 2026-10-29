@@ -5,16 +5,18 @@ import type { PilotFeatureState } from "../lib/pilot-data";
 import CommunityLifecycleWorkspace from "./CommunityLifecycleWorkspace";
 import LoginCustomizationWorkspace from "./LoginCustomizationWorkspace";
 import NetworkFeatureControl from "./NetworkFeatureControl";
+import AndroidOfflineControl from "./AndroidOfflineControl";
 import PlatformBrandingWorkspace from "./PlatformBrandingWorkspace";
 import CommunityCreationConfigWorkspace from "./CommunityCreationConfigWorkspace";
 
-type ControlTab = "overview" | "login" | "content" | "modules" | "security";
+type ControlTab = "overview" | "login" | "content" | "modules" | "security" | "android";
 
 const TABS: { id: ControlTab; label: string; symbol: string }[] = [
   { id: "overview", label: "Visão geral", symbol: "⌁" },
   { id: "login", label: "Portal de acesso", symbol: "◇" },
   { id: "content", label: "Conteúdo", symbol: "✎" },
   { id: "modules", label: "Módulos", symbol: "▦" },
+  { id: "android", label: "Aplicativo Android", symbol: "▯" },
   { id: "security", label: "Segurança", symbol: "◈" },
 ];
 
@@ -146,6 +148,7 @@ export default function PlatformControlsWorkspace({
           </section>
         </div>
       )}
+      {tab === "android" && <AndroidOfflineControl />}
       {tab === "security" && (
         <div className="platform-control-stack">
           {currentCommunityId > 0 ? (

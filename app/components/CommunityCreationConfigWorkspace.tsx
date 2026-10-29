@@ -1,5 +1,7 @@
 "use client";
 
+import TransientFeedback from "./TransientFeedback";
+
 import { useEffect, useState } from "react";
 import type {
   CommunityCreationField,
@@ -112,7 +114,7 @@ export default function CommunityCreationConfigWorkspace() {
             <p>Alterações valem para computador e celular na próxima abertura da ficha.</p>
             <button type="button" disabled={saving} onClick={() => void save()}>{saving ? "Salvando…" : "Salvar ficha de comunidade"}</button>
           </div>
-          {message && <p className="operations-feedback" role="status">{message}</p>}
+          {message && <TransientFeedback className="operations-feedback" role="status">{message}</TransientFeedback>}
         </div>
       )}
     </section>

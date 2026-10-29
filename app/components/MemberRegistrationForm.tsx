@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import "./member-registration-ux.css";
 import type { MemberRegistrationFormData } from "../lib/member-registration";
 
 const DAYS = [
@@ -44,6 +45,12 @@ export default function MemberRegistrationForm({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const sendingRef = useRef(false);
+  const [clockStart] = useState(() => Date.now());
+  const reloaded = useRef(false);
+  const reviewHeading = useRef<HTMLHeadingElement>(null);
+  const formHeading = useRef<HTMLHeadingElement>(null);
+  const reviewedOnce = useRef(false);
   const [remaining, setRemaining] = useState(() => Math.max(0, Date.parse(registration.state === "AGUARDANDO" ? registration.opensAt : registration.closesAt) - registration.serverNow));
 
   const community = useMemo(
@@ -58,12 +65,20 @@ export default function MemberRegistrationForm({
     if (registration.state !== "AGUARDANDO" && registration.state !== "ABERTO") return;
     const timer = window.setInterval(() => {
       const target = Date.parse(registration.state === "AGUARDANDO" ? registration.opensAt : registration.closesAt);
-      const next = Math.max(0, target - Date.now());
+      const next = Math.max(0, target - (registration.serverNow + Date.now() - clockStart));
       setRemaining(next);
-      if (!next) window.location.reload();
+      if (!next && registration.state === "AGUARDANDO" && !reloaded.current) {
+        reloaded.current = true;
+        window.location.reload();
+      }
     }, 1_000);
     return () => window.clearInterval(timer);
-  }, [registration]);
+  }, [registration, clockStart]);
+  useEffect(() => {
+    if (reviewing) { reviewedOnce.current = true; reviewHeading.current?.focus(); }
+    else if (reviewedOnce.current) formHeading.current?.focus();
+  }, [reviewing]);
+  const expired = remaining <= 0;
 
   function update<K extends keyof Values>(key: K, value: Values[K]) {
     setValues((current) => ({ ...current, [key]: value }));
@@ -80,6 +95,8 @@ export default function MemberRegistrationForm({
     }));
   }
   async function submit() {
+    if (sendingRef.current || expired || !values.acceptedTerms) return;
+    sendingRef.current = true;
     setSending(true);
     setError("");
     try {
@@ -97,6 +114,7 @@ export default function MemberRegistrationForm({
     } catch (submissionError) {
       setError((submissionError as Error).message);
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
   }
@@ -111,17 +129,19 @@ export default function MemberRegistrationForm({
   return (
     <main className="member-registration-public">
       <header className="member-registration-public-head"><span aria-hidden="true">V+</span><div><p>VÍNKULO · CADASTRO TEMPORÁRIO</p><h1>{registration.title}</h1><small>Aberto até {formatDate(registration.closesAt)} · {formatRemaining(remaining)}</small></div></header>
+      {expired && <p className="member-registration-feedback" role="alert">O prazo deste convite terminou. Seu preenchimento permanece nesta página, mas não pode mais ser enviado. Solicite um novo convite à comunidade.</p>}
       {!reviewing ? (
-        <form method="post" className="member-registration-public-form" onSubmit={(event) => { event.preventDefault(); setError(""); setReviewing(true); }}>
-          <section><header><b>01</b><div><h2>Seus dados e sua conta</h2><p>Preencha o cadastro e crie o acesso que você usará na comunidade.</p></div></header><div className="member-registration-fields">
+        <form method="post" className="member-registration-public-form" onSubmit={(event) => { event.preventDefault(); if (expired) return; setError(""); setReviewing(true); }}>
+          <p className="member-registration-required">Os campos com * são obrigatórios. Você poderá revisar tudo antes de enviar.</p>
+          <section><header><b>01</b><div><h2 ref={formHeading} tabIndex={-1}>Seus dados e sua conta</h2><p>Preencha o cadastro e crie o acesso que você usará na comunidade.</p></div></header><div className="member-registration-fields">
             <div className="member-registration-photo member-registration-photo-private"><span aria-hidden="true">☁</span><strong>Foto após o primeiro acesso <small>A imagem será salva no seu Google Drive ou somente no aparelho; nunca no Vínkulo.</small></strong></div>
             <label>Nome completo*<input required minLength={5} maxLength={120} value={values.fullName} onChange={(event) => update("fullName", event.target.value)} autoComplete="name" /></label>
             <label>E-mail*<input required type="email" maxLength={180} value={values.email} onChange={(event) => update("email", event.target.value)} autoComplete="email" /></label>
             <label>CPF*<input required inputMode="numeric" maxLength={14} value={values.cpf} onChange={(event) => update("cpf", event.target.value)} /></label>
-            <label>Crie sua senha*<input required type="password" minLength={8} maxLength={256} autoComplete="new-password" value={values.senha} onChange={event=>update('senha',event.target.value)}/><small>Use letras e números.</small></label>
+            <label>Crie sua senha*<input required type="password" minLength={8} maxLength={256} autoComplete="new-password" value={values.senha} onChange={event=>update('senha',event.target.value)}/><small>Use pelo menos 8 caracteres, incluindo letras e números.</small></label>
             <label>CEP*<input required inputMode="numeric" pattern="[0-9. -]{8,10}" maxLength={10} value={values.cep} onChange={(event) => update("cep", event.target.value)} autoComplete="postal-code" /></label>
             <label>Data de nascimento*<input required type="date" max={new Date().toISOString().slice(0, 10)} value={values.birthDate} onChange={(event) => update("birthDate", event.target.value)} /></label>
-            <label className="member-registration-consent member-registration-wide"><input required type="checkbox" checked={values.acceptedTerms} onChange={(event) => update("acceptedTerms", event.target.checked)} /><span>Concordo com os Termos de Uso e a Política de Privacidade.</span></label>
+            <label className="member-registration-consent member-registration-wide"><input required type="checkbox" checked={values.acceptedTerms} onChange={(event) => update("acceptedTerms", event.target.checked)} /><span>Concordo com os <a href="/termos" target="_blank" rel="noopener noreferrer">Termos de Uso</a> e a <a href="/privacidade" target="_blank" rel="noopener noreferrer">Política de Privacidade</a>. Os documentos abrem em outra aba.</span></label>
           </div></section>
           <section><header><b>02</b><div><h2>Comunidade e unção</h2><p>Cadastro vinculado à comunidade que emitiu o link.</p></div></header><div className="member-registration-fields">
             <label>Comunidade*<select required value={values.communityId} onChange={(event) => chooseCommunity(event.target.value)}>{registration.communities.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
@@ -136,10 +156,10 @@ export default function MemberRegistrationForm({
             {!community?.ministries.length && <p className="member-registration-empty">Esta comunidade ainda não possui ministérios disponíveis.</p>}
           </div></section>
           {error && <p className="member-registration-feedback" role="alert">{error}</p>}
-          <button className="member-registration-primary" disabled={!ministry || !values.acceptedTerms}>Revisar cadastro e conta <span aria-hidden="true">→</span></button>
+          <button className="member-registration-primary" disabled={!ministry || !values.acceptedTerms || expired}>Revisar cadastro e conta <span aria-hidden="true">→</span></button>
         </form>
       ) : (
-        <section className="member-registration-review"><header><p>REVISÃO FINAL</p><h2>Confira antes de criar sua conta</h2><span>Ao confirmar, sua conta será criada nesta comunidade. Use CPF e senha para entrar.</span></header><dl><div><dt>Nome</dt><dd>{values.fullName}</dd></div><div><dt>E-mail</dt><dd>{values.email}</dd></div><div><dt>CPF</dt><dd>{`***.***.***-${values.cpf.replace(/\D/g, "").slice(-2)}`}</dd></div><div><dt>CEP</dt><dd>{values.cep}</dd></div><div><dt>Nascimento</dt><dd>{formatSimpleDate(values.birthDate)}</dd></div><div><dt>Comunidade</dt><dd>{community?.name}</dd></div><div><dt>Unção</dt><dd>{community?.anointings.find((item) => item.id === values.anointing)?.name}</dd></div><div><dt>Ministério</dt><dd>{ministry?.name}</dd></div><div><dt>Dias disponíveis</dt><dd>{values.availableDays.length ? values.availableDays.map((day) => DAYS.find(([id]) => id === day)?.[1]).join(", ") : "A combinar"}</dd></div></dl>{error && <p className="member-registration-feedback" role="alert">{error}</p>}<footer><button type="button" onClick={() => setReviewing(false)}>← Editar informações</button><button type="button" disabled={sending} onClick={() => void submit()}>{sending ? "Criando cadastro…" : "Concluir meu cadastro"}</button></footer></section>
+        <section className="member-registration-review"><header><p>REVISÃO FINAL</p><h2 ref={reviewHeading} tabIndex={-1}>Confira antes de criar sua conta</h2><span>Ao confirmar, sua conta será criada nesta comunidade. Use CPF e senha para entrar.</span></header><dl><div><dt>Nome</dt><dd>{values.fullName}</dd></div><div><dt>E-mail</dt><dd>{values.email}</dd></div><div><dt>CPF</dt><dd>{`***.***.***-${values.cpf.replace(/\D/g, "").slice(-2)}`}</dd></div><div><dt>CEP</dt><dd>{values.cep}</dd></div><div><dt>Nascimento</dt><dd>{formatSimpleDate(values.birthDate)}</dd></div><div><dt>Comunidade</dt><dd>{community?.name}</dd></div><div><dt>Unção</dt><dd>{community?.anointings.find((item) => item.id === values.anointing)?.name}</dd></div><div><dt>Ministério</dt><dd>{ministry?.name}</dd></div><div><dt>Função de interesse</dt><dd>{ministry?.functions.find((item) => String(item.id) === values.functionId)?.name || "A definir com a liderança"}</dd></div><div><dt>Período preferido</dt><dd>{{ FLEXIVEL: "Flexível", MANHA: "Manhã", TARDE: "Tarde", NOITE: "Noite" }[values.period] || values.period}</dd></div>{ministry?.extraFields.map((field) => <div key={field.id}><dt>{field.label}</dt><dd>{values.extras[field.id] || "Não informado"}</dd></div>)}<div><dt>Dias disponíveis</dt><dd>{values.availableDays.length ? values.availableDays.map((day) => DAYS.find(([id]) => id === day)?.[1]).join(", ") : "A combinar"}</dd></div></dl>{error && <p className="member-registration-feedback" role="alert">{error}</p>}<footer><button type="button" disabled={sending} onClick={() => setReviewing(false)}>← Editar informações</button><button type="button" disabled={sending || expired} onClick={() => void submit()}>{sending ? "Criando cadastro…" : "Concluir meu cadastro"}</button></footer></section>
       )}
       <footer className="member-registration-privacy">As informações ficam restritas à gestão autorizada da comunidade.</footer>
     </main>

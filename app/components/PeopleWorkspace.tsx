@@ -1,9 +1,18 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import TransientFeedback from "./TransientFeedback";
+
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import VerifiedOwnerName from "./VerifiedOwnerName";
+import PersonRecord from "./PersonRecord";
+import SafeImage from "./SafeImage";
+import "./people-directory-ux.css";
+import "./leadership-member-ux.css";
+import "./people-role-editor.css";
 
 type Person = {
+  canEditHierarchy?: boolean;
+  canRemove?: boolean;
   membership_id: number;
   usuario_id: number;
   nome: string;
@@ -16,6 +25,8 @@ type Person = {
   permissoes: string;
   status: string;
   owner_verified?: number;
+  ministerios?: string;
+  proximas_escalas?: number;
 };
 
 type Me = {
@@ -62,7 +73,7 @@ type RemovalBlocker = {
 };
 
 const PERMISSION_LABELS: Record<string, string> = {
-  "visitors.view": "Consultar visitantes",
+  "visitors.view": "Abrir Visitantes (lista pessoal)",
   "visitors.create": "Cadastrar visitantes",
   "visitors.edit": "Editar visitantes",
   "followups.view": "Consultar acompanhamentos",
@@ -85,28 +96,10 @@ const PERMISSION_LABELS: Record<string, string> = {
   "requests.manage": "Atender pedidos da comunidade",
 };
 
-const TITLES = [
-  "LÍDER",
-  "DIÁCONO",
-  "DIACONISA",
-  "PRESBÍTERO",
-  "PRESBÍTERA",
-  "EVANGELISTA",
-  "MISSIONÁRIO",
-  "MISSIONÁRIA",
-  "PASTOR",
-  "PASTORA",
-  "SECRETÁRIO",
-  "SECRETÁRIA",
-  "COORDENADOR DE MINISTÉRIO",
-  "COORDENADORA DE MINISTÉRIO",
-  "SUPERVISOR DE CÉLULAS",
-  "SUPERVISORA DE CÉLULAS",
-  "GESTOR DE CUIDADO",
-  "GESTORA DE CUIDADO",
-];
+
 
 const TITLE_CATEGORIES = [
+  { label: "Formação", titles: ["ASPIRANTE"] },
   { label: "Liderança de células", titles: ["LÍDER", "SUPERVISOR DE CÉLULAS", "SUPERVISORA DE CÉLULAS"] },
   { label: "Cuidado e diaconia", titles: ["GESTOR DE CUIDADO", "GESTORA DE CUIDADO", "DIÁCONO", "DIACONISA"] },
   { label: "Ministérios", titles: ["COORDENADOR DE MINISTÉRIO", "COORDENADORA DE MINISTÉRIO", "EVANGELISTA", "MISSIONÁRIO", "MISSIONÁRIA"] },
@@ -115,6 +108,7 @@ const TITLE_CATEGORIES = [
 ] as const;
 
 const HIERARCHY_PERMISSION_PRESETS: Record<string, string[]> = {
+  "ASPIRANTE": [],
   "LÍDER": ["visitors.view", "visitors.create", "visitors.edit", "followups.view", "followups.manage", "cells.view", "events.view", "ministries.view", "schedules.view", "feed.publish"],
   "DIÁCONO": ["visitors.view", "followups.view", "events.view", "ministries.view", "schedules.view", "parking.view", "parking.report"],
   "DIACONISA": ["visitors.view", "followups.view", "events.view", "ministries.view", "schedules.view", "parking.view", "parking.report"],
@@ -146,8 +140,19 @@ const HIERARCHY_MODEL_COPY: Record<string, string> = {
   "GESTORA DE CUIDADO": "Centraliza visitantes, acompanhamentos e pedidos de cuidado.",
 };
 
+const ACTIVITY_MODELS = [
+  { title: "LÍDER", label: "Liderança local" },
+  { title: "SUPERVISOR DE CÉLULAS", label: "Supervisão de células" },
+  { title: "GESTOR DE CUIDADO", label: "Cuidado de pessoas" },
+  { title: "DIÁCONO", label: "Diaconia e apoio" },
+  { title: "COORDENADOR DE MINISTÉRIO", label: "Coordenação de ministério" },
+  { title: "PRESBÍTERO", label: "Presbitério" },
+  { title: "PASTOR", label: "Cuidado pastoral" },
+  { title: "SECRETÁRIO", label: "Apoio administrativo" },
+];
+
 const PERMISSION_GROUPS = [
-  { title: "Pessoas e cuidado", detail: "Visitantes, acompanhamentos e células.", permissions: ["visitors.view", "visitors.create", "visitors.edit", "visitor.categories.manage", "followups.view", "followups.manage", "cells.view", "requests.manage"] },
+  { title: "Pessoas e cuidado", detail: "A página Visitantes libera a lista pessoal do oficial. O acesso à sua lista exige “Compartilhar lista”.", permissions: ["visitors.view", "visitors.create", "visitors.edit", "visitor.categories.manage", "followups.view", "followups.manage", "cells.view", "requests.manage"] },
   { title: "Agenda e equipes", detail: "Eventos, ministérios e escalas.", permissions: ["events.view", "events.manage", "ministries.view", "schedules.view", "schedules.manage"] },
   { title: "Diaconia e apoio", detail: "Rotinas de serviço e relatórios.", permissions: ["diaconia.view", "diaconia.checklist.update", "diaconia.manage", "diaconia.report", "parking.view", "parking.reserve", "parking.report"] },
   { title: "Comunicação", detail: "Publicações no mural da comunidade.", permissions: ["feed.publish"] },
@@ -156,9 +161,11 @@ const PERMISSION_GROUPS = [
 export default function PeopleWorkspace({
   communityName,
   mode = "manage",
+  selfLinks = [],
 }: {
   communityName: string;
   mode?: "self" | "manage";
+  selfLinks?: Array<{ label: string; href: string }>;
 }) {
   const [data, setData] = useState<PeopleResponse>({
     me: null,
@@ -166,77 +173,124 @@ export default function PeopleWorkspace({
     canViewPeople: false,
     canManage: false,
   });
-  const [loading, setLoading] = useState(true);
+  const [pending, setPending] = useState(false);
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const [loadFailure, setLoadFailure] = useState<{key: string; cursor: string | null; message: string} | null>(null);
+  const requestRef = useRef<AbortController | null>(null);
+  const loadedQueryRef = useRef<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const profileSavingRef = useRef(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [tab, setTab] = useState<"membros" | "oficiais">("membros");
+  const [tab, setTab] = useState<"todos" | "membros" | "oficiais">("todos");
+  const [record, setRecord] = useState<Person | null>(null);
   const [search, setSearch] = useState("");
+  const [participation, setParticipation] = useState("");
   const [loadingMore, setLoadingMore] = useState(false);
   const [editing, setEditing] = useState<Person | null>(null);
   const [permissionDraft, setPermissionDraft] = useState<string[]>([]);
   const [presetTitle, setPresetTitle] = useState("LÍDER");
+  const [modelApplied, setModelApplied] = useState(false);
   const [officialTitle, setOfficialTitle] = useState("LÍDER");
   const [isOfficial, setIsOfficial] = useState(false);
   const [removing, setRemoving] = useState<Person | null>(null);
   const [removeConfirmation, setRemoveConfirmation] = useState("");
   const [removalIssue, setRemovalIssue] = useState<{ message: string; blockers: RemovalBlocker[] } | null>(null);
+  const queryKey = JSON.stringify([tab, search.trim(), participation]);
+  const currentFailure = loadFailure?.key === queryKey ? loadFailure : null;
+  const loading = pending || (loadedKey !== queryKey && !currentFailure);
+  const listError = currentFailure && !currentFailure.cursor ? currentFailure.message : "";
+
+  useEffect(() => {
+    if (!editing) return;
+    const dialog = document.querySelector<HTMLElement>('[data-role-editor="true"]');
+    if (!dialog) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    dialog.querySelector<HTMLButtonElement>('button[aria-label="Fechar"]')?.focus();
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); setEditing(null); }
+      if (event.key !== "Tab") return;
+      const focusable = [...dialog.querySelectorAll<HTMLElement>('button, input, select, summary, [tabindex="0"]')]
+        .filter(element => !element.hasAttribute("disabled") && element.getClientRects().length > 0);
+      const first = focusable[0], last = focusable.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    dialog.addEventListener("keydown", handleKey);
+    return () => { document.body.style.overflow = previousOverflow; dialog.removeEventListener("keydown", handleKey); previousFocus?.focus(); };
+  }, [editing]);
 
   // `cursor` vazio recomeça a lista (troca de aba, nova busca, recarga depois de
   // uma alteração); com cursor, o lote novo é anexado ao que já está na tela.
   const load = useCallback(
     async (options: { quiet?: boolean; cursor?: string | null } = {}) => {
       const { quiet = false, cursor = null } = options;
+      if (cursor && (requestRef.current || loadedQueryRef.current !== queryKey)) return;
+      requestRef.current?.abort();
+      const controller = new AbortController();
+      requestRef.current = controller;
       if (cursor) setLoadingMore(true);
-      else if (!quiet) setLoading(true);
-      setError("");
+      else if (!quiet) setPending(true);
+      setLoadFailure(null);
       try {
         const address = new URL("/api/pilot/pessoas", window.location.origin);
         address.searchParams.set("aba", tab);
+        if (participation) address.searchParams.set("vinculo", participation);
         const term = search.trim();
         if (term) address.searchParams.set("busca", term);
         if (cursor) address.searchParams.set("cursor", cursor);
-        const response = await fetch(address, { cache: "no-store" });
+        const response = await fetch(address, { cache: "no-store", signal: controller.signal });
         const result = (await response.json()) as PeopleResponse;
         if (!response.ok) {
           throw new Error(result.error || "Não foi possível carregar as pessoas.");
         }
+        if (controller.signal.aborted) return;
+        if (!Array.isArray(result.people)) throw new Error("Não foi possível ler a lista de pessoas.");
         setData((current) =>
           cursor
-            ? { ...result, people: [...current.people, ...result.people] }
+            ? { ...result, people: [...new Map([...current.people, ...result.people].map(person => [person.membership_id, person])).values()] }
             : result,
         );
+        setLoadedKey(queryKey);
+        loadedQueryRef.current = queryKey;
       } catch (loadError) {
-        setError((loadError as Error).message);
+        if (!controller.signal.aborted) setLoadFailure({key: queryKey, cursor, message: (loadError as Error).message});
       } finally {
-        setLoadingMore(false);
-        if (!quiet) setLoading(false);
+        if (requestRef.current === controller) {
+          requestRef.current = null;
+          setLoadingMore(false);
+          setPending(false);
+        }
       }
     },
-    [search, tab],
+    [search, tab, participation, queryKey],
   );
 
   // A busca agora roda no banco, então cada tecla viraria uma consulta; o
   // intervalo abaixo espera a digitação parar antes de recomeçar a lista.
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), search ? 300 : 0);
-    return () => window.clearTimeout(timer);
+    return () => { window.clearTimeout(timer); requestRef.current?.abort(); requestRef.current = null; };
   }, [load, search]);
 
   // A aba e a busca são resolvidas no servidor, então o que chega já é o
   // resultado filtrado: filtrar de novo aqui esconderia gente do lote seguinte.
-  const filtered = data.people;
+  const filtered = loadedKey === queryKey && !listError ? data.people : [];
   const pagedPeople = filtered;
 
   function applyHierarchyModel(title: string) {
     setPresetTitle(title);
-    setOfficialTitle(title);
+    setModelApplied(true);
     setPermissionDraft((HIERARCHY_PERMISSION_PRESETS[title] || ["events.view", "ministries.view", "schedules.view"])
       .filter((permission) => (data.permissionCatalog || []).includes(permission)));
   }
 
   async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (profileSavingRef.current) return;
+    profileSavingRef.current = true;
     setSaving(true);
     setError("");
     setMessage("");
@@ -256,6 +310,7 @@ export default function PeopleWorkspace({
     } catch (saveError) {
       setError((saveError as Error).message);
     } finally {
+      profileSavingRef.current = false;
       setSaving(false);
     }
   }
@@ -333,17 +388,18 @@ export default function PeopleWorkspace({
     }
   }
 
-  if (loading) {
+  if (loading && mode === "self" && !data.me) {
     return (
       <section className="people-workspace">
         <div className="people-loading" role="status">
-          Carregando pessoas da comunidade…
+          Carregando seu perfil…
         </div>
       </section>
     );
   }
 
   if (mode === "self") {
+    if (listError && !data.me) return <section className="directory-load-error"><p role="alert">{listError}</p><button type="button" onClick={() => void load()}>Tentar novamente</button></section>;
     return (
       <SelfProfile
         me={data.me}
@@ -351,6 +407,10 @@ export default function PeopleWorkspace({
         error={error}
         message={message}
         onSubmit={saveProfile}
+        refreshError={listError}
+        onRetry={() => void load({ quiet: true })}
+        refreshing={pending}
+        links={selfLinks}
       />
     );
   }
@@ -361,17 +421,16 @@ export default function PeopleWorkspace({
   const totals = data.counts || { membros: 0, oficiais: 0, oficiaisSemTitulo: 0 };
   const members = totals.membros;
   return (
-    <section className="people-workspace">
+    <section className="people-workspace people-directory">
       <header className="workspace-heading people-heading">
         <div>
-          <p className="pilot-kicker">PESSOAS, MEMBROS E PERMISSÕES</p>
-          <h1>Equipe de {communityName}</h1>
+          <p className="pilot-kicker">COMUNIDADE · {communityName}</p>
+          <h1>Encontre e acompanhe pessoas</h1>
           <p>
-            Membros ficam separados da lista de oficiais. Toda função e
-            permissão é verificada no servidor e registrada na auditoria.
+            Busque uma pessoa, consulte sua participação e abra a ficha para acompanhar os detalhes.
           </p>
         </div>
-        <span className="scope-badge">Escopo: comunidade ativa</span>
+        <a className="people-report-link" href="/painel?view=relatorios">Consultar relatórios →</a>
       </header>
 
       {data.canEditSelfHierarchy && (
@@ -388,10 +447,10 @@ export default function PeopleWorkspace({
         </div>
       )}
 
-      <div className="people-metrics">
+      {data.counts && <div className="people-metrics">
         <article>
           <span>◎</span>
-          <div><small>Pessoas vinculadas</small><strong>{data.people.length}</strong></div>
+          <div><small>Pessoas vinculadas</small><strong>{members + totals.oficiais}</strong></div>
         </article>
         <article>
           <span>○</span>
@@ -404,37 +463,40 @@ export default function PeopleWorkspace({
         <article>
           <span>◇</span>
           <div>
-            <small>Sem responsável</small>
+            <small>Oficiais sem título</small>
             <strong>{totals.oficiaisSemTitulo}</strong>
           </div>
         </article>
-      </div>
+      </div>}
 
       {(message || error) && (
-        <p className={`operations-feedback ${error ? "error" : ""}`} role="status">
+        <TransientFeedback className={`operations-feedback ${error ? "error" : ""}`} role="status">
           {error || message}
-        </p>
+        </TransientFeedback>
       )}
 
       <div className="people-toolbar">
-        <div className="people-tabs" role="tablist" aria-label="Tipo de pessoa">
+        <div className="people-tabs" aria-label="Tipo de pessoa">
+          <button type="button" className={tab === "todos" ? "active" : ""} aria-pressed={tab === "todos"} onClick={() => setTab("todos")}>Todas {data.counts && <span>{members + totals.oficiais}</span>}</button>
           <button
             type="button"
             className={tab === "membros" ? "active" : ""}
+            aria-pressed={tab === "membros"}
             onClick={() => setTab("membros")}
           >
-            Membros <span>{members}</span>
+            Membros {data.counts && <span>{members}</span>}
           </button>
           <button
             type="button"
             className={tab === "oficiais" ? "active" : ""}
+            aria-pressed={tab === "oficiais"}
             onClick={() => setTab("oficiais")}
           >
-            Oficiais <span>{totals.oficiais}</span>
+            Oficiais {data.counts && <span>{totals.oficiais}</span>}
           </button>
         </div>
         <label>
-          <span className="sr-only">Buscar pessoa</span>
+          <span>Buscar pessoa</span>
           <input
             type="search"
             value={search}
@@ -442,37 +504,37 @@ export default function PeopleWorkspace({
             placeholder="Buscar por nome, e-mail ou telefone"
           />
         </label>
+        <label><span>Acompanhamento</span><select value={participation} onChange={event => setParticipation(event.target.value)}><option value="">Todos os vínculos</option><option value="sem-ministerio">Sem ministério ativo</option><option value="com-escala">Com próximas escalas</option><option value="sem-titulo">Oficiais sem título</option></select></label>
+        {(search || participation || tab !== "todos") && <button type="button" className="people-clear-filters" onClick={() => { setSearch(""); setTab("todos"); setParticipation(""); }}>Limpar filtros</button>}
       </div>
 
-      <div className="people-list">
+      {loading && <p className="people-loading" role="status">Buscando pessoas…</p>}
+      {listError && <div className="directory-load-error"><p role="alert">{listError}</p><button type="button" onClick={() => void load()}>Tentar novamente</button></div>}
+      {!loading && !listError && <div className="people-list people-directory-list">
+        <div className="people-directory-columns" aria-hidden="true"><span>Pessoa / função</span><span>Ministérios</span><span>Contato</span><span>Próximas escalas</span><span>Ficha</span></div>
         {pagedPeople.map((person) => (
-          <article key={person.membership_id} className="people-card">
-            <span className="people-avatar">{getInitials(person.nome)}</span>
+          <article key={person.membership_id} className="people-card people-directory-row">
             <div className="people-card-main">
-              <div>
-                <VerifiedOwnerName name={person.nome} verified={Boolean(person.owner_verified)} />
-                <small>{person.email}</small>
-              </div>
-              <div className="people-badges">
-                <span>{roleLabel(person.papel)}</span>
-                {person.oficial ? (
-                  <em>{person.titulo_oficial || "Oficial"}</em>
-                ) : (
-                  <em className="member-badge">Membro</em>
-                )}
-              </div>
+              <button type="button" className="people-person-button" onClick={() => setRecord(person)} aria-label={`Abrir ficha de ${person.nome}`}>
+                <span className="people-avatar">{person.foto_perfil ? <SafeImage src={person.foto_perfil} alt="" fallbackName={person.nome} fallbackKind="avatar" /> : getInitials(person.nome)}</span>
+                <span><VerifiedOwnerName name={person.nome} verified={Boolean(person.owner_verified)} official={Boolean(person.oficial)} officialTitle={person.oficial?person.titulo_oficial:null} /><small>Unção: {person.oficial ? person.titulo_oficial || "Não informada" : "Não informada"} · Função: {roleLabel(person.papel)}</small></span>
+              </button>
             </div>
+            <div className="people-directory-ministry"><small className="people-mobile-label">Ministérios</small><span>{person.ministerios || "Sem vínculo ativo"}</span></div>
             <div className="people-card-contact">
-              <small>Contato</small>
+              <small>{person.email}</small>
               <span>{person.telefone || "Não informado"}</span>
             </div>
+            <div className="people-directory-schedules"><small className="people-mobile-label">Próximas escalas</small><span>{person.proximas_escalas || 0}</span></div>
             <div className="people-card-actions">
-              {data.canManage && (
-                <button type="button" onClick={() => { const title = person.titulo_oficial || "LÍDER"; setEditing(person); setPermissionDraft(person.permissoes.split(",").filter(Boolean)); setPresetTitle(title); setOfficialTitle(title); setIsOfficial(Boolean(person.oficial)); }}>
+              <button type="button" className="people-open-record" onClick={() => setRecord(person)} aria-label={`Ver ficha de ${person.nome}`}>Ver ficha</button>
+              {(person.canEditHierarchy || person.canRemove) && <details className="people-row-menu"><summary aria-label={`Mais ações para ${person.nome}`}>⋯</summary><div>
+              {person.canEditHierarchy && (
+                <button type="button" onClick={() => { const title = person.titulo_oficial || "LÍDER"; setEditing(person); setModelApplied(false); setPermissionDraft(person.permissoes.split(",").filter(Boolean)); setPresetTitle(title); setOfficialTitle(title); setIsOfficial(Boolean(person.oficial)); }}>
                   Editar função
                 </button>
               )}
-              {data.canRemoveCommunity && (
+              {person.canRemove && (
                 <button
                   type="button"
                   className="danger"
@@ -481,43 +543,47 @@ export default function PeopleWorkspace({
                   Remover pessoa
                 </button>
               )}
+              </div></details>}
             </div>
           </article>
         ))}
         {!filtered.length && (
           <div className="pilot-empty-state">
             <strong>Nenhuma pessoa encontrada</strong>
-            <p>A busca considera somente a comunidade ativa.</p>
+            <p>{search || participation || tab !== "todos" ? "Ajuste a busca ou limpe os filtros para ampliar os resultados." : "Os vínculos desta comunidade aparecerão aqui."}</p>
           </div>
         )}
-      </div>
+      </div>}
 
-      {(data.nextCursor || filtered.length > 0) && (
+      {!loading && !listError && (data.nextCursor || filtered.length > 0) && (
         <nav className="people-pagination" aria-label="Paginação de pessoas">
           <span>
             {filtered.length} {filtered.length === 1 ? "pessoa carregada" : "pessoas carregadas"}
             {" · "}
-            {tab === "oficiais" ? totals.oficiais : totals.membros} nesta aba
+            {participation ? "no filtro de acompanhamento" : search.trim() ? `na busca por “${search.trim()}”` : `${tab === "todos" ? members + totals.oficiais : tab === "oficiais" ? totals.oficiais : totals.membros} nesta aba`}
           </span>
+          {currentFailure?.cursor && <p className="people-more-error" role="alert">{currentFailure.message} As pessoas já carregadas continuam disponíveis.</p>}
           {data.nextCursor && (
             <button
               type="button"
               disabled={loadingMore}
               onClick={() => void load({ cursor: data.nextCursor, quiet: true })}
             >
-              {loadingMore ? "Carregando…" : "Carregar mais"}
+              {loadingMore ? "Carregando…" : currentFailure?.cursor ? "Tentar carregar mais" : "Carregar mais"}
             </button>
           )}
         </nav>
       )}
 
+      {record && <PersonRecord membershipId={record.membership_id} name={record.nome} permissionLabels={PERMISSION_LABELS} onClose={() => setRecord(null)} />}
       {editing && (
         <div className="people-modal-backdrop" onMouseDown={() => setEditing(null)}>
           <section
-            className="people-modal"
+            className="people-modal people-role-editor"
             role="dialog"
             aria-modal="true"
             aria-label={`Editar função de ${editing.nome}`}
+            data-role-editor="true"
             onMouseDown={(event) => event.stopPropagation()}
           >
             <header>
@@ -563,7 +629,7 @@ export default function PeopleWorkspace({
                   <select
                     name="titulo"
                     value={officialTitle}
-                    onChange={(event) => { setOfficialTitle(event.target.value); setPresetTitle(event.target.value); }}
+                    onChange={(event) => setOfficialTitle(event.target.value)}
                   >
                     {TITLE_CATEGORIES.map((category) => (
                       <optgroup key={category.label} label={category.label}>
@@ -573,13 +639,17 @@ export default function PeopleWorkspace({
                   </select>
                 </label>
               </div>
-              <section className="people-hierarchy-builder" aria-label="Modelo de permissões por hierarquia">
-                <div><strong>Modelo de atuação</strong><small>Escolha uma hierarquia pronta; ela só preenche permissões que você já pode conceder.</small></div>
-                <select value={presetTitle} onChange={(event) => setPresetTitle(event.target.value)} aria-label="Hierarquia usada como modelo">
-                  {TITLE_CATEGORIES.map((category) => <optgroup key={category.label} label={category.label}>{category.titles.map((title) => <option key={title} value={title}>{title}</option>)}</optgroup>)}
-                </select>
-                <button type="button" onClick={() => applyHierarchyModel(presetTitle)}>Aplicar modelo</button>
-                <p>{HIERARCHY_MODEL_COPY[presetTitle] || "Base inicial para organizar a atuação desta pessoa."}</p>
+              <section className="people-activity-model" aria-labelledby="activity-model-title">
+                <header><h3 id="activity-model-title">Modelo de atuação</h3><p>Comece com um conjunto de permissões e ajuste abaixo.</p></header>
+                <details>
+                  <summary><span><small>Modelo selecionado</small><strong>{ACTIVITY_MODELS.find(model => model.title === presetTitle)?.label || presetTitle}</strong></span><span className="people-model-change">Trocar <span aria-hidden="true">⌄</span></span></summary>
+                  <div className="people-model-options" role="group" aria-label="Modelos de atuação">
+                    {ACTIVITY_MODELS.map(model => <button type="button" key={model.title} aria-pressed={presetTitle === model.title} onClick={(event) => { setPresetTitle(model.title); setModelApplied(false); const chooser = event.currentTarget.closest("details"); if (chooser) { chooser.open = false; chooser.querySelector("summary")?.focus(); } }}><strong>{model.label}</strong><small>{HIERARCHY_MODEL_COPY[model.title] || "Consulta agenda, ministérios e escalas."}</small></button>)}
+                  </div>
+                </details>
+                <p>{HIERARCHY_MODEL_COPY[presetTitle] || "Consulta agenda, ministérios e escalas."}</p>
+                <footer><small>Altera apenas as permissões abaixo. O título e o papel são mantidos.</small><button type="button" onClick={() => applyHierarchyModel(presetTitle)}>Aplicar modelo</button></footer>
+                {modelApplied && <p className="people-model-feedback" role="status">Modelo aplicado ao formulário. Revise as permissões e salve para confirmar.</p>}
               </section>
               <fieldset>
                 <legend>Permissões concedidas</legend>
@@ -636,7 +706,7 @@ export default function PeopleWorkspace({
                 <select name="action" defaultValue="REMOVE_COMMUNITY">
                   <option value="REMOVE_COMMUNITY">Remover desta comunidade e liberar funções e escalas</option>
                   {data.canDeleteGlobal && <option value="DEACTIVATE_ACCOUNT">Desativar a conta inteira</option>}
-                  {data.canDeleteGlobal && <option value="DELETE_ACCOUNT">Excluir definitivamente se não houver histórico</option>}
+                  {data.canDeleteGlobal && <option value="DELETE_ACCOUNT">Excluir conta e vínculos definitivamente</option>}
                 </select>
                 {data.canDeleteGlobal && <small>O proprietário pode encerrar o vínculo mesmo com funções ou escalas ativas. O VÍNKULO libera os compromissos, preserva o histórico e avisa os responsáveis.</small>}
               </label>
@@ -691,12 +761,20 @@ function SelfProfile({
   error,
   message,
   onSubmit,
+  refreshError,
+  onRetry,
+  refreshing,
+  links,
 }: {
   me: Me | null;
   saving: boolean;
   error: string;
   message: string;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  refreshError: string;
+  onRetry: () => void;
+  refreshing: boolean;
+  links: Array<{ label: string; href: string }>;
 }) {
   if (!me) {
     return <div className="pilot-empty-state">Perfil indisponível.</div>;
@@ -706,27 +784,30 @@ function SelfProfile({
       <header className="workspace-heading people-heading">
         <div>
           <p className="pilot-kicker">MEU PERFIL</p>
-          <h1>Olá, <VerifiedOwnerName name={me.nome} verified={Boolean(me.owner_verified)} /></h1>
+          <h1>Olá, <VerifiedOwnerName name={me.nome} verified={Boolean(me.owner_verified)} official={Boolean(me.oficial)} officialTitle={me.oficial?me.titulo_oficial:null} /></h1>
           <p>
-            Você pode atualizar apenas seus próprios dados. Funções e
-            permissões são administradas pela comunidade.
+            Mantenha seus contatos atualizados e consulte seus vínculos nesta comunidade.
           </p>
         </div>
         <span className="scope-badge">{roleLabel(me.papel)}</span>
       </header>
+      {links.length > 0 && <nav className="self-profile-links" aria-label="Minha participação"><strong>Minha participação</strong>{links.map(link => <a key={link.href} href={link.href}>{link.label}<span aria-hidden="true"> →</span></a>)}</nav>}
+      {refreshError && <div className="directory-load-error" role="alert"><p>Não foi possível atualizar a consulta do perfil. Seu preenchimento continua abaixo. {refreshError}</p><button type="button" disabled={refreshing} onClick={onRetry}>Tentar novamente</button></div>}
       <div className="self-profile-card">
         <aside>
           <span className="self-profile-avatar" aria-hidden="true">{getInitials(me.nome)}</span>
-          <VerifiedOwnerName name={me.nome} verified={Boolean(me.owner_verified)} />
+          <VerifiedOwnerName name={me.nome} verified={Boolean(me.owner_verified)} official={Boolean(me.oficial)} officialTitle={me.oficial?me.titulo_oficial:null} />
           <small>{me.email}</small>
           <em>{me.oficial ? me.titulo_oficial || "Oficial" : "Membro"}</em>
         </aside>
         <form className="pilot-form" onSubmit={onSubmit}>
+          <h2 className="self-profile-section-title">Meus dados de contato</h2>
           <label>
             Telefone
             <input
               name="telefone"
               type="tel"
+              autoComplete="tel"
               maxLength={30}
               defaultValue={me.telefone || ""}
             />
@@ -736,6 +817,8 @@ function SelfProfile({
             <input
               name="dataNascimento"
               type="date"
+              autoComplete="bday"
+              max={new Date().toISOString().slice(0, 10)}
               defaultValue={me.data_nascimento || ""}
             />
           </label>
@@ -743,33 +826,18 @@ function SelfProfile({
             Endereço
             <input
               name="endereco"
+              autoComplete="street-address"
               maxLength={180}
               defaultValue={me.endereco || ""}
             />
           </label>
-          <label>
-            Célula
-            <span className="self-profile-readonly">
-              {me.celula_vinculada || "Você ainda não está em uma célula."}
-            </span>
-            <small>O vínculo é definido pelos responsáveis da célula.</small>
-          </label>
-          <label>
-            Ministério
-            <span className="self-profile-readonly">
-              {me.ministerio || "Você ainda não está vinculado a um ministério."}
-            </span>
-            <input type="hidden" name="ministerio" value={me.ministerio || ""} />
-            <small>Preenchido automaticamente conforme seus vínculos ativos.</small>
-          </label>
+          <input type="hidden" name="ministerio" value={me.ministerio || ""} />
           <button disabled={saving}>
             {saving ? "Salvando…" : "Salvar meus dados"}
           </button>
-          {(message || error) && (
-            <p className={`operations-feedback ${error ? "error" : ""}`} role="status">
-              {error || message}
-            </p>
-          )}
+          {error && <p className="self-profile-save-error" role="alert">{error} Seus dados preenchidos foram mantidos para tentar novamente.</p>}
+          {message && <p className="self-profile-save-success" role="status">{message}</p>}
+          <section className="self-profile-memberships" aria-labelledby="self-memberships-title"><h2 id="self-memberships-title">Meus vínculos na comunidade</h2><p>Estas informações são atualizadas pelos responsáveis de cada área.</p><dl><div><dt>Célula</dt><dd>{me.celula_vinculada || "Você ainda não está em uma célula."}</dd></div><div><dt>Ministérios</dt><dd>{me.ministerio || "Você ainda não está vinculado a um ministério."}</dd></div></dl></section>
         </form>
       </div>
     </section>

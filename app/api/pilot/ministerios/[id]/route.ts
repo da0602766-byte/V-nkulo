@@ -1,6 +1,7 @@
 import { getD1 } from "../../../../../db";
 import {
   canManageMinistry,
+  canRemoveMinistryMembers,
   hasGlobalMinistryManagement,
 } from "../../../../lib/ministry-access";
 import {
@@ -27,11 +28,11 @@ export async function PATCH(request: Request, context: Context) {
   const db = getD1();
   const ministry = await db
     .prepare(
-      `SELECT id, status, categoria FROM ministerios_comunidade
+      `SELECT id, status, categoria, responsavel_usuario_id FROM ministerios_comunidade
       WHERE id = ? AND comunidade_id = ?`,
     )
     .bind(id, access.context.comunidadeId)
-    .first<{ id: number; status: string; categoria: string }>();
+    .first<{ id: number; status: string; categoria: string; responsavel_usuario_id: number | null }>();
   if (!ministry) {
     return Response.json({ error: "Ministério não encontrado." }, { status: 404 });
   }
@@ -369,7 +370,13 @@ export async function PATCH(request: Request, context: Context) {
   }
 
   if (action === "REMOVER_VOLUNTARIO") {
+    if (!(await canRemoveMinistryMembers(db, access.context, access.user.id, id))) {
+      return Response.json({ error: "Somente o proprietário da comunidade e os líderes deste ministério podem remover integrantes." }, { status: 403 });
+    }
     const volunteerId = Number(payload.voluntarioId);
+    if (!Number.isInteger(volunteerId) || volunteerId <= 0) {
+      return Response.json({ error: "Integrante inválido." }, { status: 400 });
+    }
     const volunteer = await db
       .prepare(
         `SELECT id, usuario_id, papel
@@ -381,11 +388,14 @@ export async function PATCH(request: Request, context: Context) {
     if (!volunteer) {
       return Response.json({ error: "Voluntário não encontrado." }, { status: 404 });
     }
-    if (volunteer.papel === "LIDER" && !globalManager) {
+    if (volunteer.papel === "LIDER" && !access.context.isCommunityOwner) {
       return Response.json(
-        { error: "Líderes só podem ser removidos pela gestão global." },
+        { error: "Somente o proprietário da comunidade pode remover líderes." },
         { status: 403 },
       );
+    }
+    if (volunteer.usuario_id === ministry.responsavel_usuario_id) {
+      return Response.json({ error: "Defina outro líder responsável nas configurações do ministério antes de remover esta pessoa." }, { status: 409 });
     }
     const activeAssignment = await db
       .prepare(
@@ -395,24 +405,29 @@ export async function PATCH(request: Request, context: Context) {
           ON s.id = d.escala_id
          AND s.comunidade_id = d.comunidade_id
         WHERE d.voluntario_id = ? AND d.comunidade_id = ?
-          AND d.ativo = 1 AND s.status != 'CANCELADA'
+          AND s.ministerio_id = ? AND d.ativo = 1
+          AND s.status IN ('RASCUNHO','AGENDADA','PUBLICADA','AGUARDANDO_CHECKLIST')
+          AND datetime(s.termina_em) >= datetime('now')
         LIMIT 1`,
       )
-      .bind(volunteerId, access.context.comunidadeId)
+      .bind(volunteerId, access.context.comunidadeId, id)
       .first<{ id: number }>();
     if (activeAssignment) {
       return Response.json(
-        { error: "Remova as designações ativas antes de retirar esta pessoa." },
+        { error: "Retire ou substitua esta pessoa nas escalas futuras antes de removê-la do ministério." },
         { status: 409 },
       );
     }
-    await db
+    await db.batch([db
       .prepare(
-        `DELETE FROM ministerio_voluntarios
+        `UPDATE ministerio_voluntarios SET ativo = 0, atualizado_em = CURRENT_TIMESTAMP
         WHERE id = ? AND ministerio_id = ? AND comunidade_id = ?`,
       )
-      .bind(volunteerId, id, access.context.comunidadeId)
-      .run();
+      .bind(volunteerId, id, access.context.comunidadeId),
+      db.prepare(`DELETE FROM ministerio_equipe_membros
+        WHERE voluntario_id = ? AND ministerio_id = ? AND comunidade_id = ?`)
+        .bind(volunteerId, id, access.context.comunidadeId),
+    ]);
     await audit("VOLUNTARIO_V472_EXCLUIDO", {
       ministerioId: id,
       usuarioId: volunteer.usuario_id,

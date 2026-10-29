@@ -36,7 +36,7 @@ test("interface VÍNKULO oferece chat, públicos e gestão responsiva", async ()
     source("../app/components/PilotDashboard.tsx"),
     source("../app/components/PrivateChatWorkspace.tsx"),
     source("../app/components/RequestsWorkspace.tsx"),
-    source("../app/components/TenantOperations.tsx"),
+    source("../app/components/visitors/VisitorApp.tsx"),
     source("../app/components/SecretaryMinisterialWorkspace.tsx"),
     source("../app/globals.css"),
   ]);
@@ -47,11 +47,9 @@ test("interface VÍNKULO oferece chat, públicos e gestão responsiva", async ()
   assert.match(chat, /Online/);
   assert.match(requests, /visibilidade\s+escolhida/);
   assert.match(requests, /Todos os membros ativos/);
-  // O rótulo antigo vivia no painel escondido por `display:none`; o
-  // acompanhamento por categoria hoje é a legenda do panorama e a faixa de
-  // filtros, ambas visíveis.
-  assert.match(visitors, /Categorias em destaque/);
-  assert.match(visitors, /Categorias de visitantes/);
+  assert.match(visitors, /aria-label="Pessoas por categoria"/);
+  assert.match(visitors, /chooseCategory\(c.nome\)/);
+  assert.match(visitors, /<Categories categories=\{data.categories\}/);
   assert.match(secretary, /Criar equipe/);
   assert.match(secretary, /Máximo de 3 equipes por integrante/);
   assert.match(styles, /@media\s*\(max-width:\s*680px\)/);
@@ -82,7 +80,7 @@ test("proprietário controla identidade global, comunidades e organização dos 
 
   assert.match(branding, /siteName:\s*string/);
   assert.match(branding, /logoUrl:\s*string/);
-  assert.match(brandingPanel, /Logo global da plataforma/);
+  assert.match(brandingPanel, /Logo oficial do Vínkulo/);
   assert.match(uploads, /platform-logo/);
   assert.match(ownerPanel, /metricOrder/);
   assert.match(ownerPanel, /draggable/);
@@ -90,20 +88,17 @@ test("proprietário controla identidade global, comunidades e organização dos 
   assert.match(ownerApi, /normalizeMetricOrder/);
 });
 
-test("portal de acesso oferece tema moderno, redes oficiais e Conta Google real", async () => {
-  const [config, portal, customization] = await Promise.all([
-    source("../app/lib/pilot-login-config.ts"),
-    source("../app/components/LoginPortal.tsx"),
-    source("../app/components/LoginCustomizationWorkspace.tsx"),
+test("acesso atual mantém tema e conecta o Drive pela área da conta", async () => {
+  const [portal, storage, account] = await Promise.all([
+    source("../app/components/AccessPortal.tsx"),
+    source("../app/components/StoragePrivacyWorkspace.tsx"),
+    source("../app/components/AccountProfileWorkspace.tsx"),
   ]);
-
-  assert.match(config, /cleanHttpsUrl/);
-  assert.match(config, /instagramUrl/);
-  assert.match(portal, /login-v2-social/);
-  assert.match(portal, /data-login-theme/);
-  assert.match(customization, /Redes sociais oficiais/);
-  assert.match(portal, /Entrar com Google/);
-  assert.match(portal, /api\/auth\/google\/start/);
+  assert.match(portal, /useThemePreference/);
+  assert.match(portal, /aria-pressed/);
+  assert.match(account, /Arquivos e Google Drive/);
+  assert.match(storage, /api\/auth\/google\/start\?purpose=drive/);
+  assert.match(storage, /Conectar Google Drive/);
 });
 
 test("ajustes operacionais V4.7.4 conectam estacionamento, escalas, pessoas e eventos", async () => {

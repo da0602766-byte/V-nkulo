@@ -65,16 +65,17 @@ html[data-theme] .pilot-dashboard[data-ui-version="v2"] .feed-responsive-image .
 html[data-theme] .pilot-dashboard[data-ui-version="v2"] .worship-photo-pending { max-height: min(420px, 52dvh); }
 html[data-theme] .pilot-dashboard[data-ui-version="v2"] .worship-photo .feed-image-attachment-actions :is(button,a) { min-height: 44px; background: transparent !important; color: var(--community-link) !important; }
 .feed-image-lightbox[open] {
-  position: fixed; inset: 0; z-index: 10000; display: flex; flex-direction: column; align-items: center; gap: 12px;
-  box-sizing: border-box; width: 100%; max-width: 100%; height: 100dvh; max-height: 100dvh; margin: 0;
-  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
-  border: 0; border-radius: 0; background: #080b10f5; color: #fff; overflow: hidden; overscroll-behavior: contain;
+ position:fixed;inset:0;z-index:10000;display:grid;grid-template-rows:auto minmax(0,1fr);gap:12px;box-sizing:border-box;
+ width:min(1100px,calc(100vw - 32px));height:calc(100dvh - 32px);max-width:calc(100vw - 32px);max-height:calc(100dvh - 32px);margin:auto;
+ padding:16px;border:1px solid #ffffff30;border-radius:14px;background:#080b10;color:#fff;overflow:hidden;overscroll-behavior:contain;
 }
-.feed-image-lightbox::backdrop { background: #080b10e8; }
-.feed-image-lightbox[open] > header { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 0; background: none; border: 0; color: #fff; font-size: 14px; }
-.feed-image-lightbox[open] > header button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 44px; min-height: 44px; border: 1px solid #ffffff80; border-radius: 10px; padding: 8px 12px; background: #252830; color: #fff; font: inherit; cursor: pointer; }
-.feed-image-lightbox[open] > img { position: static !important; display: block; flex: 1 1 0; min-height: 0; width: 100% !important; max-width: 1400px !important; height: 0 !important; max-height: none !important; object-fit: contain !important; margin: 0 !important; border-radius: 0 !important; }
-.feed-image-lightbox button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+.feed-image-lightbox::backdrop{background:#080b10e8}
+.feed-image-lightbox[open]>header{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0;padding:0;background:none;border:0;color:#fff;font:14px/1.4 system-ui,sans-serif}
+.feed-image-lightbox[open]>header button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:44px;min-height:44px;border:1px solid #ffffff80;border-radius:10px;padding:8px 12px;background:#252830;color:#fff;font:inherit;cursor:pointer}
+.feed-image-lightbox-stage{display:flex;align-items:center;justify-content:center;min-width:0;min-height:0;width:100%;height:100%;overflow:hidden}
+.feed-image-lightbox-stage>img{position:static!important;display:block;width:auto!important;height:auto!important;min-width:0!important;min-height:0!important;max-width:100%!important;max-height:100%!important;object-fit:contain!important;margin:0!important;border-radius:0!important}
+.feed-image-lightbox button:focus-visible{outline:3px solid #fff;outline-offset:3px}
+@media(max-width:640px){.feed-image-lightbox[open]{width:calc(100vw - 16px);max-width:calc(100vw - 16px);height:calc(100dvh - 16px);max-height:calc(100dvh - 16px);padding:12px;gap:8px;border-radius:10px}}
 
 /* Reactions remain in the card's document flow, clear of navigation and help. */
 html[data-theme] .pilot-dashboard[data-ui-version="v2"] .worship-post > footer { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 0 8px; }

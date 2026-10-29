@@ -10,6 +10,8 @@ export type Space = {
   posicao_x: number;
   posicao_y: number;
   reservada?: boolean | number;
+  minha_reserva?: boolean | number;
+  atualizado_em?: string;
 };
 
 export type Reservation = {
@@ -30,6 +32,9 @@ export type Reservation = {
   codigo?: string;
   status: string;
   checkin_em: string | null;
+  saida_em?: string | null;
+  setor_id?: number;
+  vaga_tipo?: string;
   vaga_codigo: string;
   setor_nome: string;
 };
@@ -60,6 +65,7 @@ export type ParkingReport = {
 
 export type Movement = {
   id: number;
+  vaga_id?: number;
   placa: string;
   tipo_veiculo: string;
   responsavel: string;
@@ -86,10 +92,14 @@ export type AvailableUser = { id: number; nome: string; papel: string };
 export type MinistryMember = { id: number; nome: string; papel: string };
 
 export type ParkingData = {
+  reservasVagas?: Array<Pick<Reservation,"id"|"vaga_id"|"evento_titulo"|"nome_completo"|"placa_veiculo"|"tipo_veiculo"|"modelo_veiculo"|"cor_veiculo"|"inicio_em"|"fim_em"|"status"> & {total:number}>;
+  eventos?: ParkingEventOption[];
+  serverTime?: string;
+  context?: { eventoId: number | null; inicioEm: string; fimEm: string };
   reservationGate?: {
     unlocked: boolean;
     eventAvailable: boolean;
-    reason: "NO_EVENT" | "WAIT_OPENING";
+    reason: "NO_EVENT" | "WAIT_OPENING" | "SELECT_EVENT" | "OPEN";
     eventId: number | null;
     eventTitle: string;
     eventStartsAt: string | null;
@@ -106,16 +116,19 @@ export type ParkingData = {
     atualizado_por_nome: string | null;
     atualizado_em: string;
   };
-  stats: { total: number; ocupadas: number; livres: number; especiais: number };
+  stats: { total: number; ocupadas: number; livres: number; especiais: number; reservadas?: number; indisponiveis?: number };
   vagas: Space[];
+  setores?: { id: number; nome: string; cor: string; ordem: number }[];
   movimentacoes: Movement[];
   ocorrencias: Occurrence[];
   availableUsers: AvailableUser[];
   ministryMembers: MinistryMember[];
   operator: {
+    shiftStats?: { entradas: number; saidas: number; ocorrencias: number } | null;
     id: number;
     nome: string;
     email: string;
+    cpfFinal?: string | null;
     papel: string;
     origemAcesso: "ESCALA_ATIVA" | "PERFIL_GESTOR" | "MEMBRO";
     escala: {

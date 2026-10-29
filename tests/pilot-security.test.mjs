@@ -101,7 +101,7 @@ test("governança V4.7.2 mantém exclusões protegidas, conta neutra e temas iso
     readFile(new URL("../app/components/GlobalVisualEditor.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(peopleRoute, /access\.user\.system_owner/);
-  assert.match(peopleRoute, /EXCLUSAO_DEFINITIVA_DE_CONTA_BLOQUEADA/);
+  assert.match(peopleRoute, /deleteUserAccount\(db, access.user.id, target.usuario_id\)/);
   assert.match(peopleRoute, /UPDATE usuarios SET ativo = 0/);
   assert.match(scheduleRoute, /status = 'ARQUIVADA'/);
   assert.match(ministryRoute, /ARQUIVAR_DIACONIA/);
@@ -113,7 +113,9 @@ test("governança V4.7.2 mantém exclusões protegidas, conta neutra e temas iso
   assert.match(themeRoute, /community_theme:/);
   assert.match(themeRoute, /community\.theme\.manage/);
   assert.match(dashboard, /searchParams\.set\("view"/);
-  assert.match(editor, /Excluir deste layout/);
+  assert.match(editor, /Ocultar neste alcance/);
+  assert.match(editor, /updateRule\(selectedKey,\s*\{\s*hiddenDesktop:\s*true,\s*hiddenMobile:\s*true/);
+  assert.match(editor, /Oculta apenas a apresentação\. Dados e permissões do aplicativo permanecem iguais\./);
   assert.match(editor, /hiddenDesktop:\s*true/);
   assert.match(editor, /hiddenMobile:\s*true/);
 });
@@ -231,15 +233,15 @@ test("páginas, temas e responsividade do VÍNKULO permanecem explícitos", asyn
       "utf8",
     ),
     readFile(
-      new URL("../app/components/PublicMobileNav.tsx", import.meta.url),
+      new URL("../app/components/PublicHeader.tsx", import.meta.url),
       "utf8",
     ),
     readFile(
-      new URL("../app/components/MinistriesWorkspace.tsx", import.meta.url),
+      new URL("../app/components/SecretaryMinisterialWorkspace.tsx", import.meta.url),
       "utf8",
     ),
     readFile(
-      new URL("../app/components/TenantOperations.tsx", import.meta.url),
+      new URL("../app/components/visitors/PersonForms.tsx", import.meta.url),
       "utf8",
     ),
     readFile(
@@ -259,6 +261,7 @@ test("páginas, temas e responsividade do VÍNKULO permanecem explícitos", asyn
     readFile(new URL("../app/secretary.css", import.meta.url), "utf8"),
     readFile(new URL("../app/components/LoginCustomizationWorkspace.tsx", import.meta.url), "utf8"),
   ]);
+  assert.match(visitors, /Histórico de contatos/);
   assert.match(home, /LandingPageExperience/);
   assert.match(landing, /VÍNKULO/);
   assert.match(landing, /vinkulo-reception vinkulo-landing/);
@@ -294,17 +297,13 @@ test("páginas, temas e responsividade do VÍNKULO permanecem explícitos", asyn
     /async function openView/,
     "abrir o menu móvel não deve depender de rede",
   );
-  assert.match(mobileNav, /user \? "\/painel" : "\/login"/);
+  assert.match(mobileNav, /href="\/painel\?view=conta"/);
   assert.match(mobileNav, /Meu perfil/);
   assert.match(ministries, /Visão geral/);
-  assert.match(ministries, /Participantes/);
+  assert.match(ministries, /Integrantes/);
   assert.match(ministries, /Histórico/);
   assert.match(ministries, /Editar escala/);
-  assert.match(ministries, /Gerar convite/);
-  assert.match(visitors, /Dados pessoais/);
-  assert.match(visitors, /Conexão espiritual/);
-  assert.match(visitors, /Editar dados completos/);
-  assert.match(visitors, /vinkulo:new-visitor/);
+  assert.match(ministries, /Compartilhar/);
   assert.match(dashboard, /Novo visitante/);
   assert.match(dashboard, /O que deseja adicionar/);
   assert.match(dashboard, /Pesquisar comunidade/);
@@ -322,7 +321,11 @@ test("páginas, temas e responsividade do VÍNKULO permanecem explícitos", asyn
   assert.match(visualEditor, /setPointerCapture/);
   assert.match(visualEditor, /aria-label="Minimizar editor"/);
   assert.match(visualEditor, /aria-label="Restaurar editor"/);
-  assert.match(visualEditor, /Caixa de texto livre/);
+  assert.match(visualEditor, /Inserir blocos/);
+  assert.match(visualEditor, /onClick=\{\(\) => addTextBox\("text"\)\}[\s\S]*?<strong>Texto<\/strong>/);
+  assert.match(visualEditor, /onClick=\{\(\) => addTextBox\("callout"\)\}[\s\S]*?<strong>Aviso<\/strong>/);
+  assert.match(visualEditor, /onClick=\{\(\) => addTextBox\("link"\)\}[\s\S]*?<strong>Link<\/strong>/);
+  assert.match(visualEditor, /const textBox: VisualTextBox = \{[\s\S]*?screen: screenId/);
   assert.match(visualEditor, /event\.key !== "Delete"/);
   assert.match(visualEditor, /createPortal\(pencilButton/);
   assert.match(styles, /\.global-editor-panel\.is-minimized/);
@@ -332,7 +335,6 @@ test("páginas, temas e responsividade do VÍNKULO permanecem explícitos", asyn
   assert.match(landing, /data-editor-key="landing-governanca"/);
   assert.match(dashboard, /id="global-editor-toolbar-slot"/);
   assert.match(styles, /\.schedule-week/);
-  assert.match(styles, /\.visitor-registration/);
   assert.match(styles, /overflow-x:clip/);
   assert.match(communityTheme, /CLASSICO/);
   assert.match(communityTheme, /MODERNO/);
@@ -365,14 +367,14 @@ test("Ministérios, Diaconia, uploads e Aparência mantêm os novos bloqueios", 
     readFile(new URL("../app/api/pilot/ministerios/recursos/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/pilot/diaconia/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/components/SecretaryMinisterialWorkspace.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/components/DiaconiaWorkspace.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/SecretaryMinisterialWorkspace.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/components/GlobalVisualEditor.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/components/NativeImageUpload.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/components/parking/ParkingManagementConsole.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(ministryRoute, /export async function DELETE/);
   assert.match(ministryRoute, /canManageMinistry/);
-  assert.match(ministryRoute, /DELETE FROM ministerio_voluntarios/);
+  assert.match(ministryRoute, /UPDATE ministerio_voluntarios SET ativo = 0/);
   assert.match(resourcesRoute, /EXCLUIR_FUNCAO/);
   assert.match(resourcesRoute, /EXCLUIR_MODELO/);
   assert.match(diaconiaRoute, /EXCLUIR_ITEM/);
@@ -391,10 +393,14 @@ test("Ministérios, Diaconia, uploads e Aparência mantêm os novos bloqueios", 
   assert.match(secretary, /if \(created\)/);
   assert.match(parking, /const form = event\.currentTarget/);
   assert.match(parking, /form\.reset\(\)/);
-  assert.match(diaconia, /Somente leitura/);
+  assert.match(diaconia, /async function updateChecklist/);
   assert.doesNotMatch(diaconia, /function updateItem/);
   assert.match(editor, /navigationLocked/);
-  assert.match(editor, /Restaurar todas as cores/);
+  assert.match(editor, /onClick=\{resetAllColors\}\s*>\s*Restaurar paleta/);
+  assert.match(editor, /function resetAllColors\(\)\s*\{\s*updateAppearance\(\{ accentColor: DEFAULT_GLOBAL_VISUAL_CONFIG\.accentColor, surfaceColor: "" \}\)/);
+  assert.match(editor, /changeConfig\(target === "global" \? \{ \.\.\.current, \.\.\.patch \} : \{/);
+  assert.match(editor, /onClick=\{resetSelectedAppearance\}\s*>\s*Restaurar todos os ajustes do elemento/);
+  assert.match(editor, /setVisualRules\(configRef\.current, screen, \{ \.\.\.rules, \[selectedKey\]: \{\} \}\)/);
   assert.match(editor, /background-color:/);
   assert.match(upload, /saveImageOutsidePlatform/);
   const mediaUpload = await readFile(
@@ -409,14 +415,14 @@ test("comunidades novas exigem solicitação ao proprietário, ficha rígida e a
   const [communities, publicData, creation, creationConfig, seals, leadership, editorApi, editorUi, dashboard, mobileNav, peopleApi, accountUi, themes, styles] = await Promise.all([
     readFile(new URL("../app/api/pilot/comunidades/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/pilot-data.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/components/CreateCommunityShortcut.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/Log1Form.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/pilot/community-creation-config/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/pilot/community-pastoral-seals/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/components/LeadershipWorkspace.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/pilot/editorial/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/components/EditorialAutomationWorkspace.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/components/PilotDashboard.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/components/PublicMobileNav.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/PublicHeader.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/pilot/pessoas/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/components/LoginCustomizationWorkspace.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/community-theme.ts", import.meta.url), "utf8"),
@@ -430,13 +436,12 @@ test("comunidades novas exigem solicitação ao proprietário, ficha rígida e a
   assert.doesNotMatch(publicData, /c\.ambiente_demo = 1/);
   assert.doesNotMatch(publicData, /getPublicPlatformFeed/);
   assert.doesNotMatch(publicData, /getPublicCommunityFeed/);
-  assert.match(creation, /ficha institucional/i);
-  assert.match(creation, /ficha-criacao-comunidade-v2/);
-  assert.match(creation, /createPortal/);
-  assert.match(creation, /create-community-progress/);
-  assert.match(creation, /data-community-step/);
-  assert.match(creation, /document\.body\.style\.overflow = "hidden"/);
-  assert.match(creation, /event\.key === "Escape"/);
+  // Creation now starts with LOG1; activation remains an owner decision.
+  assert.match(creation, /action="\/api\/public\/log1"/);
+  assert.match(creation, /A solicitação não cria uma conta/);
+  assert.match(creation, /Solicitação/);
+  assert.match(creation, /Aprovação/);
+  assert.match(creation, /fieldset[^>]*disabled=\{busy\}/);
   assert.match(creationConfig, /system_owner/);
   assert.match(seals, /substituído pela aprovação exclusiva do proprietário/);
   assert.doesNotMatch(seals, /SELO_PASTORAL_APROVADO/);
@@ -452,8 +457,8 @@ test("comunidades novas exigem solicitação ao proprietário, ficha rígida e a
   assert.match(editorUi, /value="COMUNIDADE"/);
   assert.doesNotMatch(dashboard, /pilot-desktop-community-switcher/);
   assert.match(dashboard, /Trocar comunidade pelo menu da conta/);
-  assert.match(dashboard, /window\.location\.assign\("\/painel\?view=inicio"\)/);
-  assert.match(mobileNav, /CreateCommunityShortcut/);
+  assert.match(dashboard, /navigateDocument\("\/painel\?view=inicio"\)/);
+  assert.match(mobileNav, /href="\/login"/);
   assert.match(styles, /grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/);
   assert.match(styles, /create-community-shortcut\.compact \{ grid-column:3/);
   assert.match(peopleApi, /PASTOR_REMOVEU_MEMBRO_DA_COMUNIDADE/);
@@ -666,34 +671,17 @@ test("rota legada de menores não volta ao repositório", async () => {
 // projeto já tinha adotado o padrão certo em `DayThreadWorkspace`: a hora vem
 // de estado, acertada num efeito. Este teste estende a mesma exigência aos dois
 // componentes onde o padrão faltava.
-test("componentes com relógio tiram a hora de estado, não da renderização", async () => {
-  const [agenda, ministerios, precedente] = await Promise.all([
+test("relógios da agenda e do ministério atual são inicializados no cliente", async () => {
+  const [agenda, ministry, thread] = await Promise.all([
     readFile(new URL("../app/components/AgendaCalendar.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/components/MinistriesWorkspace.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/SecretaryMinisterialWorkspace.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/components/DayThreadWorkspace.tsx", import.meta.url), "utf8"),
   ]);
-
-  // O precedente precisa continuar existindo: é dele que a regra vem.
-  assert.match(precedente, /const \[agora, setAgora\] = useState\(0\)/);
-
-  // AgendaCalendar: "hoje" sai de estado, e o cálculo direto não volta.
+  assert.match(thread, /const \[agora, setAgora\] = useState\(0\)/);
   assert.match(agenda, /const \[hojeChave, setHojeChave\] = useState\(""\)/);
-  assert.doesNotMatch(
-    agenda,
-    /const hojeChave = chaveDia\(new Date\(\)\)/,
-    "calcular o dia de hoje durante a renderização quebra a hidratação na virada do dia",
-  );
-
-  // MinistriesWorkspace: a semana parte de uma âncora em estado e é memoizada,
-  // em vez de refazer sete varreduras da lista a cada renderização.
-  assert.match(ministerios, /const \[semanaAncora, setSemanaAncora\] = useState\(0\)/);
-  assert.match(ministerios, /const week = useMemo\(/);
-  assert.doesNotMatch(
-    ministerios,
-    /const week = Array\.from\(\{ length: 7 \}, \(_, index\) => \{\s*\n\s*const date = new Date\(\);/,
-    "montar a semana a partir de new Date() na renderização quebra a hidratação e refaz o cálculo a cada render",
-  );
-  // A faixa da semana precisa manter as sete células antes do relógio acertar,
-  // senão a altura vai a zero e o conteúdo abaixo salta.
-  assert.match(ministerios, /reserva-\$\{index\}/);
+  assert.doesNotMatch(agenda, /const hojeChave = chaveDia\(new Date\(\)\)/);
+  assert.match(ministry, /const \[agora, setAgora\] = useState\(0\)/);
+  assert.match(ministry, /setAgora\(Date.now\(\)\)/);
+  assert.match(ministry, /agora > 0/);
+  assert.match(ministry, /\[ministrySchedules, agora\]/);
 });

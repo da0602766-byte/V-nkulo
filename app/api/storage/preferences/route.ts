@@ -28,6 +28,9 @@ export async function GET() {
       : Promise.resolve(null),
   ]);
   return Response.json({
+    userId: user.id,
+    profilePhoto: user.foto_perfil || "",
+    needsOnboarding: Boolean(tenant.context && !preference?.consented_at),
     googleAvailable: googleIntegrationAvailable(),
     google: connection ? {
       email: connection.google_email,

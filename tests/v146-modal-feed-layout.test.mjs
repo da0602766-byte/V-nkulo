@@ -8,18 +8,11 @@ const read = (path) => readFileSync(new URL(path, root), "utf8");
 test("a criação de publicação usa editor direto com opções recolhíveis", () => {
   const source = read("app/components/CommunityHome.tsx");
   assert.match(source, /<FeedComposerBar[\s\S]{0,250}onOpen=\{openComposer\}/);
-  assert.match(source, /<form className="pilot-form community-composer-inline" aria-label="Criar publicação" onSubmit=\{createPost\}/);
-  assert.match(source, /<details className="composer-options composer-wide" open=\{composerOpen\}/);
+  assert.match(source, /<form id="community-publication-form" className="pilot-form community-composer-inline" aria-label="Criar publicação" onSubmit=\{createPost\}/);
+  assert.match(source, /<details className="composer-options composer-wide" open=\{composerOptionsOpen\}/);
   assert.doesNotMatch(source, /community-composer-overlay/);
   assert.match(source, /setComposerOpen\(true\)/);
   assert.match(source, /setComposerOpen\(false\)/);
-});
-
-test("a ficha do visitante tem fechamento e semântica de diálogo", () => {
-  const source = read("app/components/TenantOperations.tsx");
-  assert.match(source, /className="visitor-person-drawer-v2"/);
-  assert.match(source, /aria-label="Fechar ficha"/);
-  assert.match(source, /role="dialog" aria-modal="true"/);
 });
 
 // V147 trocou o campo de uma linha por um textarea que cresce com o texto:
@@ -35,7 +28,6 @@ test("o comentário usa campo que cresce com o texto e envio compacto", () => {
 test("os estilos preservam modal, feed compacto e largura estável", () => {
   const styles = read("app/globals.css");
   assert.match(styles, /\.community-composer-overlay/);
-  assert.match(styles, /\.visitor-workspace-redesign \.operations-list>details\[open\]::before/);
   assert.match(styles, /width:min\(1280px,calc\(100vw - 132px\)\)/);
   assert.match(styles, /\.feed-responsive-image \{ aspect-ratio:16 \/ 7\.4; max-height:360px; \}/);
 });

@@ -1,5 +1,5 @@
 import { getD1 } from "../../../../db";
-import { hasGlobalMinistryManagement } from "../../../lib/ministry-access";
+import { hasGlobalMinistryManagement, ministryMemberRemovalCondition } from "../../../lib/ministry-access";
 import { parseMinistryPayload } from "../../../lib/ministry-validation";
 import { recordPromotionNotice } from "../../../lib/recepcao";
 import { recordTenantAudit } from "../../../lib/tenant-audit";
@@ -20,9 +20,21 @@ export async function GET() {
     .prepare(
       `SELECT m.id, m.nome, m.descricao, m.categoria, m.status,
         m.youtube_url, m.spotify_url, m.banner_url,
+        (SELECT COUNT(*) FROM ministerio_voluntarios members
+         JOIN usuarios member_user ON member_user.id=members.usuario_id AND member_user.ativo=1
+         JOIN usuario_comunidades member_link ON member_link.usuario_id=members.usuario_id AND member_link.comunidade_id=members.comunidade_id AND member_link.status='ATIVO'
+         WHERE members.ministerio_id=m.id AND members.comunidade_id=m.comunidade_id AND members.ativo=1) AS total_integrantes,
+        (SELECT COUNT(*) FROM escala_designacoes pending
+         JOIN escalas_ministerio future ON future.id=pending.escala_id AND future.comunidade_id=pending.comunidade_id
+         WHERE future.ministerio_id=m.id AND future.comunidade_id=m.comunidade_id AND future.status='PUBLICADA'
+           AND datetime(future.termina_em)>=datetime('now') AND pending.ativo=1 AND pending.status='PENDENTE'
+           AND (?=1 OR m.responsavel_usuario_id=? OR EXISTS(SELECT 1 FROM ministerio_voluntarios lead WHERE lead.ministerio_id=m.id AND lead.comunidade_id=m.comunidade_id AND lead.usuario_id=? AND lead.ativo=1 AND lead.papel='LIDER') OR pending.usuario_id=?)) AS confirmacoes_pendentes,
+        (SELECT official.titulo FROM oficiais_comunidade official JOIN usuario_comunidades membership ON membership.id=official.usuario_comunidade_id WHERE membership.usuario_id=m.responsavel_usuario_id AND membership.comunidade_id=m.comunidade_id AND membership.status='ATIVO' LIMIT 1) AS responsavel_titulo_oficial,
         m.fio_habilitado, m.fio_etapas,
         m.responsavel_usuario_id, responsavel.nome AS responsavel_nome,
         m.criado_em, m.atualizado_em,
+        CASE WHEN ${ministryMemberRemovalCondition} THEN 1 ELSE 0 END AS can_remove_members,
+        ? AS can_remove_leaders,
         CASE WHEN m.status = 'ATIVO' AND (
           ? = 1
           OR m.responsavel_usuario_id = ?
@@ -84,6 +96,11 @@ export async function GET() {
       LIMIT 100`,
     )
     .bind(
+      globalManager ? 1 : 0, access.user.id, access.user.id, access.user.id,
+      access.context.isCommunityOwner ? 1 : 0,
+      access.user.id,
+      access.user.id,
+      access.context.isCommunityOwner ? 1 : 0,
       globalManager ? 1 : 0,
       access.user.id,
       access.user.id,
@@ -103,7 +120,8 @@ export async function GET() {
     .all<MinistryRow>();
   const volunteersResult = await db
     .prepare(
-      `SELECT mv.id, mv.ministerio_id, mv.usuario_id, u.nome,
+      `SELECT mv.id, mv.ministerio_id, mv.usuario_id, u.nome, u.foto_perfil,
+        (SELECT official.titulo FROM oficiais_comunidade official WHERE official.usuario_comunidade_id=uc.id LIMIT 1) AS titulo_oficial,
         mv.funcao, mv.papel, mv.dias_disponiveis,
         mv.periodo_preferido, mv.limite_escalas, mv.ativo,
         (

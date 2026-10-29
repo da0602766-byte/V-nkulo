@@ -30,7 +30,7 @@ test("economia respeita navegador e controles individuais removidos não retorna
   assert.match(layout, /skip-to-content/);
   assert.doesNotMatch(dashboard, /Intensidade do vidro|Economizar dados/);
   assert.match(dashboard, /root\.dataset\.dataSaver = [^\n]+connection\?\.saveData/);
-  assert.match(dashboard, /dynamic\(\(\) => import\("\.\/TenantOperations"\)/);
+  assert.match(dashboard, /dynamic\(\(\) => import\("\.\/CellsWorkspace"\)/);
   assert.match(dashboard, /vinkulo:recent-views/);
 });
 

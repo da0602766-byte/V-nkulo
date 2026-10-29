@@ -1,3 +1,4 @@
+import { findSystemOwnerAccount } from "./local-auth";
 import { createSystemNotification } from "./system-notifications";
 
 type Database = Parameters<typeof createSystemNotification>[0];
@@ -51,7 +52,7 @@ export async function notifyCommunityManagers(
             WHERE uc.usuario_id = u.id
               AND uc.comunidade_id = c.id
               AND uc.status = 'ATIVO'
-              AND (u.perfil = 'ADMIN' OR uc.papel IN ('PASTOR', 'ADMIN_COMUNIDADE'))
+              AND uc.papel IN ('PASTOR', 'ADMIN_COMUNIDADE', 'SUPERADMIN')
           )
         )`,
     )
@@ -65,7 +66,7 @@ export async function notifyCommunityManagers(
         message: `${input.applicantName} solicitou entrada em ${input.communityName}.`,
         entityId: input.requestId,
         area: "SOLICITACOES",
-        destination: "/painel?view=comunidade",
+        destination: "/painel?view=configuracoes",
         createdBy: input.createdBy,
       }),
     ),
@@ -81,13 +82,13 @@ export async function notifySuperadmins(
     createdBy: string;
   },
 ) {
-  const recipients = await db
-    .prepare("SELECT id FROM usuarios WHERE perfil = 'ADMIN' AND ativo = 1")
-    .all<{ id: number }>();
+  const owner = await findSystemOwnerAccount(db);
+  const recipients = {results: owner ? [owner] : []};
   await Promise.all(
     recipients.results.map((recipient) =>
       notifyUser(db, {
         userId: Number(recipient.id),
+        destination: "/proprietario",
         title: input.title,
         message: input.message,
         entityId: input.entityId,

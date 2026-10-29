@@ -1,11 +1,9 @@
 import { cpfLoginRequest } from './helpers/cpf-login.mjs';
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { createPilotD1, createPilotUser } from "./helpers/sqlite-d1.mjs";
 
 const context = { waitUntil() {}, passThroughOnException() {} };
-const source = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
 async function loadWorker() {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -22,26 +20,6 @@ function createEnv(d1) {
     ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) },
   };
 }
-
-test("acompanhamento fica dentro da pessoa em lista plana e responsiva", async () => {
-  const [workspace, styles] = await Promise.all([
-    source("app/components/TenantOperations.tsx"),
-    source("app/globals.css"),
-  ]);
-  // A ficha do visitante deixou de ser um <details> dentro da lista e virou a
-  // gaveta lateral montada em portal. As asserções abaixo miravam o cartão
-  // antigo, que desde então vivia atrás de `{false && …}` e nunca chegava à
-  // tela — passavam contra código inalcançável. Agora apontam para a superfície
-  // que realmente entrega a mesma garantia.
-  assert.match(workspace, /id="visitor-directory"/);
-  assert.match(workspace, /className="visitor-followup-details-v2"/);
-  assert.match(workspace, /className="visitor-timeline-v2"/);
-  assert.match(workspace, /Registre o cuidado sem sair da ficha\./);
-  assert.doesNotMatch(workspace, /<aside className="followup-panel">/);
-  assert.match(styles, /diretório plano: sem cartões aninhados/);
-  assert.match(styles, /\.visitor-inline-contact/);
-  assert.match(styles, /@media \(max-width:680px\)[\s\S]*\.visitor-inline-section \.pilot-form/);
-});
 
 test("faixas etárias classificam e migram visitantes no backend sem cruzar comunidades", async () => {
   const { database, d1 } = await createPilotD1();
@@ -148,7 +126,7 @@ function visitorPayload(nomeCompleto, dataNascimento, categoriaId) {
     email: "transicao.v118@example.test",
     batizado: "NAO_INFORMADO",
     status: "NOVO",
-    dataEntrada: new Date().toISOString().slice(0, 10),
+    dataEntrada: new Intl.DateTimeFormat("en-CA", {timeZone:"America/Sao_Paulo"}).format(new Date()),
     categoriaId,
   };
 }

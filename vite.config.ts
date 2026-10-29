@@ -2,6 +2,7 @@ import vinext from "vinext";
 import { defineConfig } from "vite";
 import hostingConfig from "./.openai/hosting.json";
 import { sites } from "./build/sites-vite-plugin";
+import { fontAssetUrls } from "./build/font-asset-urls";
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   "00000000-0000-4000-8000-000000000000";
@@ -52,7 +53,19 @@ export default defineConfig(async () => {
         : {}),
     },
     plugins: [
+      {
+        name: 'visitor-sql-worker-location',
+        enforce: 'pre' as const,
+        transform(code: string, id: string) {
+          if (!id.replaceAll('\\', '/').endsWith('/sql.js/dist/sql-asm.js')) return;
+          // Cloudflare exposes WorkerGlobalScope but no browser Location.
+          // The asm build is self-contained; it has no external assets to resolve.
+          if (!code.includes('self.location.href')) throw new Error('Review the sql.js Worker adapter after upgrading sql.js.');
+          return { code: code.replace('self.location.href', '(self.location?.href ?? "")'), map: null };
+        },
+      },
       vinext(),
+      fontAssetUrls(),
       sites(),
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
@@ -62,3 +75,4 @@ export default defineConfig(async () => {
     ],
   };
 });
+

@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ParkingQrCheckin, type ParkingQrValidationResult } from "../ParkingReservationQr";
-import { formatClock, formatCountdown, formatTime } from "./format";
+import { formatClock, formatCountdown, formatTime, parkingLabel } from "./format";
+import { ParkingEmpty, ParkingHeading, ParkingMetric, ParkingMovementCard } from "./ParkingUi";
 import type { ParkingController } from "./useParkingData";
 
 const WARNING_MS = 15 * 60 * 1000;
@@ -18,6 +19,7 @@ export default function ParkingOperatorMobile({
   const { data, reservations, reports, working, feedback, error, registerExit, reservationAction, reportAction } = parking;
   const escala = data?.operator.escala || null;
   const [now, setNow] = useState(() => Date.now());
+  const [search, setSearch] = useState("");
   const autoSentRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -42,6 +44,7 @@ export default function ParkingOperatorMobile({
     () => (data?.movimentacoes || []).filter((item) => item.status === "NO_LOCAL"),
     [data],
   );
+  const visibleOnSite = onSite.filter(item => `${item.placa} ${item.responsavel} ${item.vaga_codigo || ""}`.toLocaleLowerCase("pt-BR").includes(search.toLocaleLowerCase("pt-BR")));
   const recentCheckouts = useMemo(
     () => (data?.movimentacoes || [])
       .filter((item) => item.status === "ENCERRADA" && item.saida_em)
@@ -49,14 +52,7 @@ export default function ParkingOperatorMobile({
     [data],
   );
 
-  const shiftStats = useMemo(() => {
-    if (!escala) return { entradas: 0, saidas: 0, ocorrencias: 0 };
-    const from = startsAt;
-    const entradas = (data?.movimentacoes || []).filter((item) => Date.parse(item.entrada_em) >= from).length;
-    const saidas = (data?.movimentacoes || []).filter((item) => item.saida_em && Date.parse(item.saida_em) >= from).length;
-    const ocorrencias = (data?.ocorrencias || []).filter((item) => Date.parse(item.criado_em) >= from).length;
-    return { entradas, saidas, ocorrencias };
-  }, [data, escala, startsAt]);
+  const shiftStats = useMemo(()=>data?.operator.shiftStats || {entradas:0,saidas:0,ocorrencias:0},[data?.operator.shiftStats]);
 
   const myReport = useMemo(
     () => (escala ? reports.find((item) => item.escala_id === escala.escala_id) : null) || null,
@@ -95,26 +91,27 @@ export default function ParkingOperatorMobile({
   }
 
   return (
-    <section className={`gestao-operator urgency-${urgency}`} style={{ "--gestao-accent": data?.config.cor_destaque || "#d99a32" } as React.CSSProperties}>
+    <section className={`gestao-operator parking-redesign parking-shift-workspace urgency-${urgency}`} style={{ "--gestao-accent": data?.config.cor_destaque || "#d99a32" } as React.CSSProperties}>
       <header className="gestao-operator-header">
         <div>
           <p className="gestao-kicker">PLANTÃO · {communityName}</p>
           <h1>{escala.titulo}</h1>
           <p>{escala.funcao} · {formatClock(escala.inicia_em)} às {formatClock(escala.termina_em)}</p>
         </div>
-        <div className="gestao-countdown" role="timer" aria-live="polite">
+        <div className="gestao-countdown" role="timer" aria-live="off">
           <small>{shiftEnded ? "ENCERRADA" : phase === "pre" ? "COMEÇA EM BREVE" : "ENCERRA EM"}</small>
-          <strong>{shiftEnded ? "00:00" : formatCountdown(remaining)}</strong>
+          <strong>{shiftEnded ? "00:00" : formatCountdown(phase === "pre" ? Math.max(0, startsAt - now) : remaining)}</strong>
         </div>
       </header>
 
       {(feedback || error) && <p className={`gestao-feedback${error ? " is-error" : ""}`} role="status">{error || feedback}</p>}
+      <div className="parking-v2-sync"><span>{parking.stale ? "Informações desatualizadas" : parking.lastSync ? "Atualizado às "+new Date(parking.lastSync).toLocaleTimeString("pt-BR") : "Atualizando…"}</span><button type="button" onClick={()=>void parking.load(true)}>Atualizar</button></div>
 
       {shiftEnded ? (
         <section className="gestao-shift-summary">
           <span aria-hidden="true">✓</span>
           <h2>Escala encerrada</h2>
-          <p>O relatório foi enviado automaticamente para a liderança do estacionamento.</p>
+          <p>{myReport && ["AGUARDANDO_LIDER","ENVIADO_PASTOR"].includes(myReport.status) ? "Relatório registrado para a liderança." : "Consulte o estado do relatório após a sincronização. O encerramento do plantão não registra a saída dos veículos."}</p><p>{onSite.length} veículo(s) ainda no local.</p>
           <div className="gestao-shift-summary-grid">
             <div><strong>{shiftStats.entradas}</strong><small>Entradas</small></div>
             <div><strong>{shiftStats.saidas}</strong><small>Saídas</small></div>
@@ -123,56 +120,48 @@ export default function ParkingOperatorMobile({
         </section>
       ) : (
         <>
-          <section className="gestao-scan-hub">
+          <label>Buscar placa, pessoa ou vaga<input value={search} onChange={event=>{setSearch(event.target.value);parking.setReservationFilters(f=>({...f,q:event.target.value,page:1}));}} /></label>
+          <div className="parking-workspace-metrics parking-shift-metrics"><ParkingMetric label="Entradas no plantão" value={shiftStats.entradas} tone="green" icon="arrow"/><ParkingMetric label="Saídas no plantão" value={shiftStats.saidas} icon="logout"/><ParkingMetric label="Ocorrências" value={shiftStats.ocorrencias} tone="amber" icon="shield"/></div><section className="gestao-scan-hub">
             <div>
               <p className="gestao-kicker">PORTARIA DIGITAL</p>
               <h2>Ler QR Code da reserva</h2>
               <p>Aponte a câmera para o código do visitante para liberar a entrada.</p>
             </div>
-            <ParkingQrCheckin promptOnMount disabled={working} onDetected={handleDetected} />
+            <ParkingQrCheckin disabled={working} onDetected={handleDetected} />
           </section>
 
           <section className="gestao-card">
-            <header><p className="gestao-kicker">RESERVAS</p><h2>Quem reservou</h2></header>
+            <ParkingHeading icon="calendar" eyebrow="RESERVAS" title="Quem reservou">As aprovadas podem entrar após a validação do comprovante; as pendentes ainda aguardam aprovação.</ParkingHeading>
             <div className="gestao-simple-list">
               {pendingReservations.length ? pendingReservations.map((item) => (
                 <article key={item.id}>
                   <div>
                     <strong>{item.nome_completo}</strong>
+                    <small><b className="parking-plate">{item.placa_veiculo}</b> · {item.modelo_veiculo}</small>
                     <small>{item.vaga_codigo} · {item.setor_nome} · {formatTime(item.inicio_em)}</small>
                   </div>
-                  <span className={`gestao-badge status-${item.status.toLowerCase()}`}>{item.status === "PENDENTE" ? "Pendente" : "Confirmada"}</span>
+                  <span className={`gestao-badge status-${item.status.toLowerCase()}`}>{parkingLabel(item.status)}</span>
                 </article>
-              )) : <p className="gestao-empty">Ninguém reservou para este horário.</p>}
+              )) : <p className="gestao-empty">Nenhuma reserva pendente ou confirmada nesta página.</p>}
             </div>
+            <div className="parking-v2-pagination"><span>{parking.reservationTotal} reserva(s) na busca · página {parking.reservationFilters.page}</span><div><button type="button" disabled={parking.reservationFilters.page<=1} onClick={()=>parking.setReservationFilters(f=>({...f,page:f.page-1}))}>Anterior</button><button type="button" disabled={parking.reservationFilters.page*40>=parking.reservationTotal} onClick={()=>parking.setReservationFilters(f=>({...f,page:f.page+1}))}>Próxima</button></div></div>
           </section>
 
           <section className="gestao-card">
-            <header><p className="gestao-kicker">NO LOCAL</p><h2>Veículos estacionados</h2></header>
+            <ParkingHeading icon="pin" eyebrow="NO LOCAL" title="Veículos estacionados">Confira a placa e registre a saída para liberar a vaga.</ParkingHeading>
             <div className="gestao-simple-list">
-              {onSite.length ? onSite.map((item) => (
-                <article key={item.id}>
-                  <div>
-                    <strong>{item.placa}</strong>
-                    <small>{item.vaga_codigo || "Sem vaga"} · {item.responsavel}</small>
-                  </div>
-                  <button type="button" disabled={working} onClick={() => void registerExit(item.id)}>Check-out</button>
-                </article>
-              )) : <p className="gestao-empty">Nenhum veículo no local.</p>}
+              {visibleOnSite.length ? visibleOnSite.map((item) => (
+                <ParkingMovementCard key={item.id} movement={item}><button type="button" disabled={working} onClick={() => {if(window.confirm(`Registrar saída de ${item.placa}?`)) void registerExit(item.id);}}>Registrar saída</button></ParkingMovementCard>
+              )) : <p className="gestao-empty">{search ? "Nenhum veículo encontrado para esta busca." : "Nenhum veículo no local."}</p>}
             </div>
           </section>
 
           <section className="gestao-card">
-            <header><p className="gestao-kicker">SAÍRAM</p><h2>Check-outs feitos</h2></header>
+            <ParkingHeading icon="logout" eyebrow="CONCLUÍDAS" title="Últimas 12 saídas">Entradas e saídas efetivamente registradas na operação.</ParkingHeading>
             <div className="gestao-simple-list">
               {recentCheckouts.length ? recentCheckouts.map((item) => (
-                <article key={item.id}>
-                  <div>
-                    <strong>{item.placa}</strong>
-                    <small>{item.responsavel} · saiu {formatTime(item.saida_em as string)}</small>
-                  </div>
-                </article>
-              )) : <p className="gestao-empty">Ainda não houve check-out nesta escala.</p>}
+                <ParkingMovementCard key={item.id} movement={item}/>
+              )) : <ParkingEmpty icon="logout" title="Nenhuma saída registrada">Os veículos aparecerão aqui depois de uma saída confirmada.</ParkingEmpty>}
             </div>
           </section>
         </>

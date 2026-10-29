@@ -296,6 +296,16 @@ function memberSessionUser(user: AppUser): AppUser {
   return isSystemOwnerAccount(user) ? {...user,perfil:'ACOMPANHANTE',system_owner:false} : user;
 }
 
+// Destinatário de avisos globais: identidade protegida, nunca o perfil legado.
+export async function findSystemOwnerAccount(db: ReturnType<typeof getD1>) {
+  const email = normalizeEmail(getRuntimeEnv().SYSTEM_OWNER_EMAIL);
+  if (!email) return null;
+  const user = await db.prepare(
+    "SELECT id, email, criado_em FROM usuarios WHERE lower(trim(email)) = ? AND ativo = 1 LIMIT 1",
+  ).bind(email).first<{id: number; email: string; criado_em: string}>();
+  return user && isSystemOwnerAccount(user) ? user : null;
+}
+
 function applySystemOwnerRole(user: AppUser): AppUser {
   if (!isSystemOwnerAccount(user)) return user;
   return {

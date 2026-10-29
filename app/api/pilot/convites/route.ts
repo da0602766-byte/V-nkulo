@@ -35,10 +35,11 @@ export async function GET() {
 export async function POST(request: Request) {
   const access = await requireTenantPermission("invites.manage");
   if ("error" in access) return access.error;
-  const payload = (await request.json()) as { email?: string; papel?: string; horas?: number };
+  const payload = await request.json().catch(() => null) as { email?: string; papel?: string; horas?: number } | null;
+  if (!payload || typeof payload.email !== 'string') return Response.json({ error: 'Informe um e-mail válido.' }, { status: 400 });
   const email = normalizeEmail(payload.email);
   const papel = String(payload.papel || "MEMBRO").toUpperCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return Response.json({ error: "Informe um e-mail válido." }, { status: 400 });
   }
   if (!['MEMBRO','LIDER','ADMIN_COMUNIDADE'].includes(papel) || (papel !== 'MEMBRO' && !access.context.isCommunityOwner && !access.context.isOwner)) {
@@ -54,65 +55,37 @@ export async function POST(request: Request) {
   const db = getD1();
   const hours = payload.horas === undefined ? INVITE_DURATION_HOURS : Number(payload.horas);
   if (!Number.isInteger(hours) || hours < 1 || hours > 168) return Response.json({error:'Defina uma validade de 1 a 168 horas.'},{status:400});
-  const active = await db
-    .prepare(
-      `SELECT COUNT(*) AS total
-      FROM convites_comunidade
-      WHERE comunidade_id = ? AND status = 'PENDENTE'
-        AND datetime(expira_em) > CURRENT_TIMESTAMP`,
-    )
-    .bind(access.context.comunidadeId)
-    .first<{ total: number }>();
-  if (Number(active?.total || 0) >= MAX_ACTIVE_INVITES) {
-    return Response.json(
-      { error: "Limite temporário de convites pendentes atingido." },
-      { status: 429 },
-    );
-  }
-
-  await db
-    .prepare(
-      `UPDATE convites_comunidade
-      SET status = 'EXPIRADO'
-      WHERE comunidade_id = ? AND email = ? AND status = 'PENDENTE'`,
-    )
-    .bind(access.context.comunidadeId, email)
-    .run();
   const token = randomHex(32);
   const expiresAt = new Date(
     Date.now() + hours * 60 * 60 * 1000,
   ).toISOString();
-  const result = await db
-    .prepare(
-      `INSERT INTO convites_comunidade
-      (comunidade_id, email, papel, token_hash, status, expira_em, criado_por)
-      VALUES (?, ?, ?, ?, 'PENDENTE', ?, ?)`,
-    )
-    .bind(
-      access.context.comunidadeId,
-      email,
-      papel,
-      await sha256(token),
-      expiresAt,
-      access.user.id,
-    )
-    .run();
-  await db
-    .prepare(
-      `INSERT INTO auditoria_piloto
-      (comunidade_id, usuario_id, evento, resultado, metadados)
-      VALUES (?, ?, 'CONVITE_MEMBRO_CRIADO', 'SUCESSO', ?)`,
-    )
-    .bind(
-      access.context.comunidadeId,
-      access.user.id,
-      JSON.stringify({
-        conviteId: Number(result.meta.last_row_id),
-        emailHash: await sha256(email),
-        papel,
-      }),
-    )
-    .run();
+  const tokenHash = await sha256(token);
+  const emailHash = await sha256(email);
+  // D1 executes the batch atomically: concurrent requests cannot both consume
+  // the last slot or leave multiple active links for the same recipient.
+  const result = await db.batch([
+    db.prepare(`UPDATE convites_comunidade SET status='EXPIRADO'
+      WHERE comunidade_id=? AND status='PENDENTE'
+        AND (email=? OR datetime(expira_em)<=CURRENT_TIMESTAMP)`)
+      .bind(access.context.comunidadeId, email),
+    db.prepare(`INSERT INTO convites_comunidade
+      (comunidade_id,email,papel,token_hash,status,expira_em,criado_por)
+      SELECT ?,?,?,?,'PENDENTE',?,?
+      WHERE (SELECT COUNT(*) FROM convites_comunidade
+        WHERE comunidade_id=? AND status='PENDENTE'
+          AND datetime(expira_em)>CURRENT_TIMESTAMP) < ? RETURNING id`)
+      .bind(access.context.comunidadeId, email, papel, tokenHash, expiresAt,
+        access.user.id, access.context.comunidadeId, MAX_ACTIVE_INVITES),
+    db.prepare(`INSERT INTO auditoria_piloto
+      (comunidade_id,usuario_id,evento,resultado,metadados)
+      SELECT comunidade_id,?,'CONVITE_MEMBRO_CRIADO','SUCESSO',
+        json_object('conviteId',id,'emailHash',?,'papel',papel)
+      FROM convites_comunidade WHERE comunidade_id=? AND token_hash=?`)
+      .bind(access.user.id, emailHash, access.context.comunidadeId, tokenHash),
+  ]);
+  if (!result[1].results?.length) {
+    return Response.json({ error: 'Limite temporário de convites pendentes atingido.' }, { status: 429 });
+  }
   return Response.json(
     {
       ok: true,

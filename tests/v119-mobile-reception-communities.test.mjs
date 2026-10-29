@@ -12,18 +12,19 @@ test("landing móvel usa a identidade real e mantém a página sem overflow", as
   assert.match(landing, /className="lp-hero"/);
   assert.match(header, /<VinkuloMark logoUrl=\{branding\.logoUrl\}/);
   const mark = await source("app/components/VinkuloMark.tsx");
-  assert.match(mark, /if \(logoUrl\) return <img/);
-  assert.match(mark, /return <svg/);
+  assert.match(mark, /src=\{VINKULO_LOGO\}/);
+  assert.match(mark, /objectFit: "contain"/);
   assert.match(landingStyles, /overflow-x:clip/);
   assert.match(landingStyles, /@media \(max-width:620px\)/);
   assert.match(styles, /overflow-x:clip/);
 });
 
 test("configuração de categorias permanece rolável e não corta campos", async () => {
-  const styles = await source("app/globals.css");
-  assert.match(styles, /\.visitor-settings-panel \{[\s\S]*?overflow-y:auto!important/);
-  assert.match(styles, /\.visitor-settings \.visitor-category-create\[open\][\s\S]*?overflow:visible!important/);
-  assert.match(styles, /\.visitor-settings \.visitor-category-create>form \{[\s\S]*?max-height:none!important/);
+  const styles = await source("app/components/visitors/visitors-page.css");
+  const categories = await source("app/components/visitors/Categories.tsx");
+  assert.match(categories, /editing&&<Dialog/);
+  assert.match(styles, /\.vp-dialog\{[^}]*max-height:calc\(100dvh - 32px\)[^}]*overflow:auto/);
+  assert.match(styles, /\.vp-dialog,\.vp-dialog-wide\{[^}]*width:calc\(100% - 16px\)[^}]*max-height:calc\(100dvh - 16px\)/);
 });
 
 test("diretório mostra um perfil por vez com rotação acessível", async () => {

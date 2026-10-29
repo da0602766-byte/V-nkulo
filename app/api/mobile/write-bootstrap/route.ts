@@ -1,2 +1,5 @@
 import { prepareMobileWrite } from '../../../lib/mobile-write';
-export const POST = prepareMobileWrite;
+import { rejectDisabledOffline } from '../../../lib/android-offline-policy';
+export async function POST(request: Request) {
+  return await rejectDisabledOffline() || prepareMobileWrite(request);
+}

@@ -6,6 +6,9 @@ disso foi tocado por esta organização.
 
 ## `coordenacao/`
 
+- [Pendências por grau de necessidade](coordenacao/PENDENCIAS_PRIORIZADAS.md) — ordem de execução e estado verificado em 24/10/2026.
+- [Recuperação local verificável](guias/RECUPERACAO_LOCAL.md) — reconstrução em SQLite isolado, requisitos, exclusões e limitações.
+
 Estado vivo do projeto e o fluxo de publicação usado pelos agentes de IA
 (Claude/Codex) que trabalham neste repositório. Comece por aqui se for
 publicar algo ou entender o que já foi feito.

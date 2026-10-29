@@ -1,3 +1,4 @@
+import { deleteUserAccount } from "../../../lib/delete-user-account";
 import { getD1 } from "../../../../db";
 import { OFFICIAL_PERMISSION_CATALOG } from "../../../lib/tenant-policy.mjs";
 import { parseOfficialUpdate } from "../../../lib/people-validation";
@@ -5,7 +6,7 @@ import { isSystemOwnerAccount } from "../../../lib/local-auth";
 import { notifyUser } from "../../../lib/pilot-notifications";
 import { recordPromotionNotice } from "../../../lib/recepcao";
 import { recordTenantAudit } from "../../../lib/tenant-audit";
-import { requireTenantPermission } from "../../../lib/tenant";
+import { requireTenantPermission, type TenantContext } from "../../../lib/tenant";
 
 // Lote pedido a cada carregamento. A lista antes baixava até 2.000 pessoas de
 // uma vez e paginava no navegador; agora o corte é por cursor no servidor, e a
@@ -125,7 +126,10 @@ export async function GET(request: Request) {
   // junto, que é justamente o que a paginação evita.
   const address = new URL(request.url);
   const search = (address.searchParams.get("busca") || "").trim().slice(0, 80);
-  const officialsOnly = address.searchParams.get("aba") === "oficiais" ? 1 : 0;
+  const requestedTab = address.searchParams.get("aba");
+  const participation = address.searchParams.get("vinculo") || "";
+  if (!["", "sem-ministerio", "com-escala", "sem-titulo"].includes(participation)) return Response.json({ error: "Filtro de acompanhamento inválido." }, { status: 400 });
+  const officialsOnly = requestedTab === "todos" ? -1 : requestedTab === "oficiais" ? 1 : 0;
   const cursor = decodePeopleCursor(address.searchParams.get("cursor"));
   const requestedSize = Number(address.searchParams.get("limite") || 0);
   const pageSize =
@@ -137,20 +141,17 @@ export async function GET(request: Request) {
   const [rows, totals] = await Promise.all([
     db
       .prepare(
-        `SELECT uc.id AS membership_id, u.id AS usuario_id, u.nome, u.email,
-          u.criado_em AS owner_criado_em,
-          u.telefone, u.foto_perfil, uc.papel,
-          CASE WHEN oc.id IS NULL THEN 0 ELSE 1 END AS oficial,
-          COALESCE(oc.titulo, '') AS titulo_oficial,
-          COALESCE(oc.permissoes, '') AS permissoes,
-          uc.status, uc.criado_em,
-          COALESCE(oc.atualizado_em, uc.criado_em) AS atualizado_em
+        `WITH page AS MATERIALIZED (
+         SELECT uc.id
          FROM usuario_comunidades uc
          JOIN usuarios u ON u.id = uc.usuario_id
          LEFT JOIN oficiais_comunidade oc
            ON oc.usuario_comunidade_id = uc.id
-         WHERE uc.comunidade_id = ? AND u.ativo = 1
-           AND (CASE WHEN oc.id IS NULL THEN 0 ELSE 1 END) = ?
+         WHERE uc.comunidade_id = ? AND u.ativo = 1 AND uc.status = 'ATIVO'
+           AND (? <> 'sem-ministerio' OR NOT EXISTS (SELECT 1 FROM ministerio_voluntarios mv JOIN ministerios_comunidade m ON m.id=mv.ministerio_id AND m.comunidade_id=mv.comunidade_id WHERE mv.usuario_id=u.id AND mv.comunidade_id=uc.comunidade_id AND mv.ativo=1 AND m.status='ATIVO'))
+           AND (? <> 'com-escala' OR EXISTS (SELECT 1 FROM escala_designacoes d JOIN escalas_ministerio s ON s.id=d.escala_id AND s.comunidade_id=d.comunidade_id WHERE d.usuario_id=u.id AND d.comunidade_id=uc.comunidade_id AND d.ativo=1 AND d.status IN ('CONFIRMADA','PENDENTE') AND s.status IN ('PUBLICADA','AGUARDANDO_CHECKLIST') AND datetime(s.termina_em)>=datetime('now')))
+           AND (? <> 'sem-titulo' OR (oc.id IS NOT NULL AND COALESCE(oc.titulo,'')=''))
+           AND (? = -1 OR (CASE WHEN oc.id IS NULL THEN 0 ELSE 1 END) = ?)
            AND (
              ? = ''
              OR u.nome LIKE ?
@@ -163,10 +164,39 @@ export async function GET(request: Request) {
              OR (u.nome = ? AND uc.id > ?)
            )
          ORDER BY u.nome ASC, uc.id ASC
-         LIMIT ?`,
+         LIMIT ?
+        )
+        SELECT uc.id AS membership_id, u.id AS usuario_id, u.nome, u.email,
+          u.criado_em AS owner_criado_em,
+          (SELECT proprietario_usuario_id FROM comunidades WHERE id = uc.comunidade_id) AS community_owner_id,
+          u.telefone, u.foto_perfil, uc.papel,
+          COALESCE((SELECT group_concat(m.nome, ', ')
+            FROM ministerio_voluntarios mv JOIN ministerios_comunidade m
+              ON m.id = mv.ministerio_id AND m.comunidade_id = mv.comunidade_id
+            WHERE mv.usuario_id = u.id AND mv.comunidade_id = uc.comunidade_id AND mv.ativo = 1
+              AND m.status = 'ATIVO'), '') AS ministerios,
+          (SELECT COUNT(DISTINCT d.escala_id) FROM escala_designacoes d
+            JOIN escalas_ministerio s ON s.id = d.escala_id AND s.comunidade_id = d.comunidade_id
+            WHERE d.usuario_id = u.id AND d.comunidade_id = uc.comunidade_id AND d.ativo = 1
+              AND d.status IN ('CONFIRMADA', 'PENDENTE') AND s.status IN ('PUBLICADA', 'AGUARDANDO_CHECKLIST')
+              AND datetime(s.termina_em) >= datetime('now')) AS proximas_escalas,
+          CASE WHEN oc.id IS NULL THEN 0 ELSE 1 END AS oficial,
+          COALESCE(oc.titulo, '') AS titulo_oficial,
+          COALESCE(oc.permissoes, '') AS permissoes,
+          uc.status, uc.criado_em,
+          COALESCE(oc.atualizado_em, uc.criado_em) AS atualizado_em
+
+         FROM page
+         JOIN usuario_comunidades uc ON uc.id = page.id
+         JOIN usuarios u ON u.id = uc.usuario_id
+         LEFT JOIN oficiais_comunidade oc
+           ON oc.usuario_comunidade_id = uc.id
+         ORDER BY u.nome ASC, uc.id ASC`,
       )
       .bind(
         access.context.comunidadeId,
+        participation, participation, participation,
+        officialsOnly,
         officialsOnly,
         search,
         searchTerm,
@@ -193,7 +223,7 @@ export async function GET(request: Request) {
          JOIN usuarios u ON u.id = uc.usuario_id
          LEFT JOIN oficiais_comunidade oc
            ON oc.usuario_comunidade_id = uc.id
-         WHERE uc.comunidade_id = ? AND u.ativo = 1`,
+         WHERE uc.comunidade_id = ? AND u.ativo = 1 AND uc.status = 'ATIVO'`,
       )
       .bind(access.context.comunidadeId)
       .first<{ membros: number; oficiais: number; oficiais_sem_titulo: number }>(),
@@ -213,7 +243,11 @@ export async function GET(request: Request) {
   return Response.json(
     {
       me: verifiedMe,
-      people: people.map(withOwnerVerification),
+      people: people.map((person) => ({
+        ...withOwnerVerification(person),
+        canEditHierarchy: access.context.permissions.includes("officials.manage") && canManagePerson(access.context, person),
+        canRemove: canRemoveCommunity && Number(person.usuario_id) !== access.user.id && canManagePerson(access.context, person),
+      })),
       nextCursor,
       counts: {
         membros: Number(totals?.membros || 0),
@@ -235,7 +269,8 @@ export async function GET(request: Request) {
 
 function withOwnerVerification(row: Record<string, unknown> | null) {
   if (!row) return row;
-  const { owner_criado_em, ...safeRow } = row;
+  const { owner_criado_em, community_owner_id, ...safeRow } = row;
+  void community_owner_id;
   return {
     ...safeRow,
     owner_verified: isSystemOwnerAccount({
@@ -243,6 +278,19 @@ function withOwnerVerification(row: Record<string, unknown> | null) {
       criado_em: String(owner_criado_em || ""),
     }),
   };
+}
+
+// Verifica também o alvo: poder conceder um cargo menor não permite
+// rebaixar superiores, pares ou os proprietários cadastrados.
+function canManagePerson(context: TenantContext, target: Record<string, unknown>) {
+  if (context.isOwner) return true;
+  if (Number(target.usuario_id) === context.userId ||
+      Number(target.community_owner_id) === Number(target.usuario_id) ||
+      isSystemOwnerAccount({email: String(target.email || ""), criado_em: String(target.owner_criado_em || "")})) return false;
+  const rank: Record<string, number> = {MEMBRO: 0, LIDER: 1, PASTOR: 2, ADMIN_COMUNIDADE: 3, SUPERADMIN: 3, PROPRIETARIO_VISUALIZADOR: 3};
+  const actorRank = rank[context.papel] ?? -1;
+  const targetRank = rank[String(target.papel)] ?? Number.POSITIVE_INFINITY;
+  return actorRank > targetRank;
 }
 
 export async function DELETE(request: Request) {
@@ -274,7 +322,9 @@ export async function DELETE(request: Request) {
   const db = getD1();
   const target = await db
     .prepare(
-      `SELECT uc.id, uc.usuario_id, u.nome, u.email
+      `SELECT uc.id, uc.usuario_id, uc.papel, u.nome, u.email,
+         u.criado_em AS owner_criado_em,
+         (SELECT proprietario_usuario_id FROM comunidades WHERE id = uc.comunidade_id) AS community_owner_id
        FROM usuario_comunidades uc
        JOIN usuarios u ON u.id = uc.usuario_id
        WHERE uc.id = ? AND uc.comunidade_id = ? AND uc.status = 'ATIVO'
@@ -286,6 +336,9 @@ export async function DELETE(request: Request) {
       usuario_id: number;
       nome: string;
       email: string;
+      papel: string;
+      owner_criado_em: string;
+      community_owner_id: number | null;
     }>();
   if (!target) {
     return Response.json(
@@ -298,6 +351,10 @@ export async function DELETE(request: Request) {
       { error: "A conta proprietária não pode remover a si mesma." },
       { status: 409 },
     );
+  }
+
+  if (!canManagePerson(access.context, target)) {
+    return Response.json({error: "Seu perfil não pode remover esta pessoa da comunidade."}, {status: 403});
   }
 
   if (action === "REMOVE_COMMUNITY") {
@@ -421,81 +478,7 @@ export async function DELETE(request: Request) {
     return Response.json({ ok: true, action });
   }
 
-  const protectedRecords = await db
-    .prepare(
-      `SELECT
-        (SELECT COUNT(*) FROM comunidades WHERE proprietario_usuario_id = ?) AS comunidades,
-        (SELECT COUNT(*) FROM auditoria_piloto WHERE usuario_id = ?) AS auditoria,
-        (SELECT COUNT(*) FROM publicacoes_piloto WHERE criado_por = ?) AS publicacoes,
-        (SELECT COUNT(*) FROM comentarios_publicacao WHERE usuario_id = ?) AS comentarios,
-        (SELECT COUNT(*) FROM escalas_ministerio WHERE criado_por = ? OR atualizado_por = ?) AS escalas,
-        (SELECT COUNT(*) FROM ministerios_comunidade WHERE criado_por = ? OR atualizado_por = ?) AS ministerios,
-        (SELECT COUNT(*) FROM estacionamento_movimentacoes WHERE criado_por = ? OR atualizado_por = ?) AS estacionamento_movimentacoes,
-        (SELECT COUNT(*) FROM estacionamento_ocorrencias WHERE criado_por = ?) AS estacionamento_ocorrencias`,
-    )
-    .bind(
-      target.usuario_id,
-      target.usuario_id,
-      target.usuario_id,
-      target.usuario_id,
-      target.usuario_id,
-      target.usuario_id,
-      target.usuario_id,
-      target.usuario_id,
-      target.usuario_id,
-      target.usuario_id,
-      target.usuario_id,
-    )
-    .first<Record<string, number>>();
-  const blockers = buildRemovalBlockers(protectedRecords || {});
-  const protectedTotal = Object.values(protectedRecords || {}).reduce((total, value) => total + Number(value || 0), 0);
-  if (protectedTotal > 0) {
-    await recordTenantAudit(
-      db,
-      access.context,
-      access.user.id,
-      "EXCLUSAO_DEFINITIVA_DE_CONTA_BLOQUEADA",
-      "NEGADO",
-      { usuarioId: target.usuario_id, registrosProtegidos: protectedTotal },
-    );
-    return Response.json(
-      {
-        error:
-          "Existem vínculos ou históricos que precisam permanecer auditáveis. Abra um dos locais abaixo ou escolha remover da comunidade para o VÍNKULO liberar automaticamente funções e escalas.",
-        blockers,
-      },
-      { status: 409 },
-    );
-  }
-  await recordTenantAudit(
-    db,
-    access.context,
-    access.user.id,
-    "PROPRIETARIO_EXCLUIU_CONTA_SEM_HISTORICO",
-    "SUCESSO",
-    { usuarioId: target.usuario_id, membershipId },
-  );
-  await db.batch([
-    db.prepare("DELETE FROM usuario_comunidades WHERE usuario_id = ?").bind(target.usuario_id),
-    db.prepare("DELETE FROM sessoes WHERE usuario_id = ?").bind(target.usuario_id),
-    db.prepare("DELETE FROM redefinicoes_senha WHERE usuario_id = ?").bind(target.usuario_id),
-    db.prepare("DELETE FROM usuarios WHERE id = ?").bind(target.usuario_id),
-  ]);
-  return Response.json({ ok: true, action });
-}
-
-function buildRemovalBlockers(counts: Record<string, number>) {
-  const blockers: Array<{ label: string; detail: string; href: string }> = [];
-  const add = (count: number, label: string, href: string) => {
-    if (count > 0) blockers.push({ label, detail: `${count} registro${count === 1 ? "" : "s"} relacionado${count === 1 ? "" : "s"}`, href });
-  };
-  add(Number(counts.comunidades || 0), "Comunidades sob responsabilidade", "/proprietario");
-  add(Number(counts.auditoria || 0), "Histórico de auditoria", "/proprietario?view=auditoria");
-  add(Number(counts.publicacoes || 0) + Number(counts.comentarios || 0), "Publicações e comentários", "/painel?view=inicio#mural");
-  add(Number(counts.escalas || 0), "Escalas", "/painel?view=escalas");
-  add(Number(counts.ministerios || 0), "Ministérios", "/painel?view=ministerios");
-  add(Number(counts.estacionamento_movimentacoes || 0) + Number(counts.estacionamento_ocorrencias || 0), "Estacionamento", "/painel?view=estacionamento");
-  return blockers;
+  return deleteUserAccount(db, access.user.id, target.usuario_id);
 }
 
 export async function PATCH(request: Request) {
@@ -543,7 +526,8 @@ export async function PATCH(request: Request) {
   const db = getD1();
   const target = await db
     .prepare(
-      `SELECT uc.id, uc.usuario_id, uc.papel,
+      `SELECT uc.id, uc.usuario_id, uc.papel, u.email, u.criado_em AS owner_criado_em,
+        (SELECT proprietario_usuario_id FROM comunidades WHERE id = uc.comunidade_id) AS community_owner_id,
         CASE WHEN oc.id IS NULL THEN 0 ELSE 1 END AS oficial
        FROM usuario_comunidades uc
        JOIN usuarios u ON u.id = uc.usuario_id
@@ -559,12 +543,19 @@ export async function PATCH(request: Request) {
       usuario_id: number;
       papel: string;
       oficial: number;
+      email: string;
+      owner_criado_em: string;
+      community_owner_id: number | null;
     }>();
   if (!target) {
     return Response.json(
       { error: "Pessoa não encontrada nesta comunidade." },
       { status: 404 },
     );
+  }
+
+  if (!canManagePerson(access.context, target)) {
+    return Response.json({error: "Seu perfil não pode alterar a hierarquia desta pessoa."}, {status: 403});
   }
 
   const membershipUpdate = db

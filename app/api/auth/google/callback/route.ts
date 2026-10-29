@@ -1,5 +1,7 @@
 import { getD1 } from "../../../../../db";
 import { attachSessionCookie, createSession, getSessionUser, normalizeEmail } from "../../../../lib/local-auth";
+import { auditAccess } from "../../../../lib/access-security";
+import { AuthLinkError, linkAuthAfterVerifiedGoogleLogin } from "../../../../lib/supabase-auth-link";
 import {
   exchangeGoogleCode,
   readGoogleState,
@@ -34,7 +36,7 @@ export async function GET(request: Request) {
     }
     return redirectWithError(
       url.origin,
-      state.purpose === "drive" ? "/painel?view=conta" : "/login",
+      state.personalVisitors ? "/painel/visitantes?lista=pessoal" : state.visitorStorage ? "/painel/visitantes?section=armazenamento" : state.visitorSheets ? "/painel/visitantes?sheetSetup=error" : state.purpose === "drive" ? "/painel?view=conta" : "/login",
       message,
     );
   }
@@ -75,6 +77,11 @@ export async function GET(request: Request) {
       ).bind(identity.picture, userId).run();
     }
     if (state.purpose === "drive") {
+      if (state.visitorSheets || state.visitorStorage || state.personalVisitors) {
+        const target = new URL(state.returnTo || "/painel/visitantes", url.origin);
+        target.searchParams.set("google", "connected");
+        return clearStateCookie(mutableRedirect(target));
+      }
       await getD1().prepare(
         `INSERT INTO storage_preferences
           (usuario_id, provider, auto_load_recent, auto_download_files, consented_at, updated_at)
@@ -90,6 +97,15 @@ export async function GET(request: Request) {
       target.searchParams.set("google", "connected");
       return clearStateCookie(mutableRedirect(target));
     }
+    // Both browser and Android logins reach this point only after Google identity
+    // validation and the existing-account check. Drive-only consent returns above.
+    try {
+      const outcome = await linkAuthAfterVerifiedGoogleLogin(userId, identity);
+      if (outcome !== "SKIPPED") await auditAccess("SUPABASE_AUTH_LINK", userId, { outcome, source: "GOOGLE" });
+    } catch (error) {
+      await auditAccess("SUPABASE_AUTH_LINK", userId,
+        { reason: error instanceof AuthLinkError ? error.code : "UNAVAILABLE", source: "GOOGLE" }, null, "ERRO").catch(() => {});
+    }
     if (nativeHandoff) {
       await finishGoogleNativeHandoff(state.pairingHash!, userId);
       return clearStateCookie(nativeReturn(url.origin));
@@ -103,7 +119,7 @@ export async function GET(request: Request) {
     }
     return redirectWithError(
       url.origin,
-      state.purpose === "drive" ? "/painel?view=conta" : "/login",
+      state.personalVisitors ? "/painel/visitantes?lista=pessoal" : state.visitorStorage ? "/painel/visitantes?section=armazenamento" : state.visitorSheets ? "/painel/visitantes?sheetSetup=error" : state.purpose === "drive" ? "/painel?view=conta" : "/login",
       (error as Error).message,
     );
   }

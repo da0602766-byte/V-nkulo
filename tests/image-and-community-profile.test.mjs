@@ -14,7 +14,7 @@ test("imagens aceitam originais maiores e são convertidas automaticamente", () 
   const nativeUpload = source("app/components/NativeImageUpload.tsx");
   const mediaUpload = source("app/lib/media-upload-client.ts");
   const loginConfig = source("app/lib/pilot-login-config.ts");
-  const loginPortal = source("app/components/LoginPortal.tsx");
+  const loginPortal = source("app/components/AccessPortal.tsx");
 
   assert.match(clientImage, /50 \* 1024 \* 1024/);
   assert.match(clientImage, /maximum: 4096/);
@@ -24,32 +24,31 @@ test("imagens aceitam originais maiores e são convertidas automaticamente", () 
   assert.match(upload, /8 \* 1024 \* 1024/);
   assert.match(nativeUpload, /saveImageOutsidePlatform\(file, purpose, resourceId\)/);
   assert.match(mediaUpload, /prepareImageForUpload\(file, purpose\)/);
-  assert.match(mediaUpload, /storeLocalMedia\(prepared\)/);
+  assert.match(mediaUpload, /storeLocalMedia\(prepared, preference\.userId\)/);
   assert.match(nativeUpload, /accept="image\/\*"/);
   assert.match(loginConfig, /backgroundFit: "SMART" \| "COVER"/);
-  assert.match(loginPortal, /className="login-v2-top-banner"/);
-  assert.match(loginPortal, /src=\{config\.backgroundImageUrl\}/);
+  assert.match(loginPortal, /<VinkuloMark/);
+  assert.match(loginPortal, /className="access-form"/);
   assert.doesNotMatch(loginPortal, /has-login-background/);
   assert.doesNotMatch(loginPortal, /backgroundImage: `linear-gradient/);
   assert.match(source("app/components/LandingPageExperience.tsx"), /className="vinkulo-site vinkulo-reception vinkulo-landing"/);
   assert.match(source("app/landing-vinkulo.css"), /overflow-x:clip/);
 });
 
-test("login usa a composição aprovada e mantém o formulário prioritário em qualquer tela", () => {
-  const loginPortal = source("app/components/LoginPortal.tsx");
-  const css = source("app/globals.css");
-
-  assert.match(loginPortal, /className="login-v2-page-brand"/);
-  assert.match(loginPortal, /className="login-v2-stage" data-auth-mode=\{mode\}/);
-  assert.match(loginPortal, /className="login-v2-intro"/);
-  assert.match(loginPortal, /login-shell-last-layout/);
-  assert.match(loginPortal, /className="login-last-tabs"/);
-  assert.match(loginPortal, /Sua comunidade, <em>conectada<\/em> e organizada\./);
-  assert.match(css, /V108 — acesso equilibrado/);
-  assert.match(css, /Login — composição visual da landing aprovada/);
-  assert.match(css, /grid-template-columns: minmax\(0,1fr\) minmax\(390px,440px\)/);
-  assert.match(css, /\.login-shell-last-layout \.login-v2-top-banner \{ display: none !important/);
-  assert.match(css, /\.login-shell-last-layout \.login-submit[\s\S]*?background: var\(--login-last-primary\)/);
+test("login atual mantém formulário, recuperação e tema acessíveis", () => {
+  const portal = source("app/components/AccessPortal.tsx");
+  const page = source("app/login/page.tsx");
+  const css = source("app/access.css");
+  assert.match(page, /<AccessPortal/);
+  assert.match(portal, /className="access-form"/);
+  assert.match(portal, /<CpfField\//);
+  assert.match(portal, /<PasswordField\//);
+  assert.match(portal, /Esqueci minha senha/);
+  assert.match(portal, /role="alert"/);
+  assert.match(portal, /disabled=\{busy\}/);
+  assert.match(portal, /aria-pressed=\{theme===value\}/);
+  assert.match(css, /@media/);
+  assert.match(css, /\.access-form/);
 });
 
 test("criação de escala compacta etapas e sugere disponibilidade real da equipe", () => {

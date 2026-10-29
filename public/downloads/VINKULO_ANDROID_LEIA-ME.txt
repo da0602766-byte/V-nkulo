@@ -1,10 +1,58 @@
 VÍNKULO — ATUALIZAÇÃO ANDROID
 
+1.23.0: controle global do modo offline
+No Console do proprietário, abra Controles & módulos > Aplicativo Android.
+Use "Desativar para todos" para bloquear o modo offline em todas as comunidades.
+O APK atualizado consulta a configuração ao abrir, ao reconectar e a cada
+30 segundos enquanto está em primeiro plano. Aparelhos desconectados só
+recebem alterações quando reconectam. Uma autorização offline expira após
+24 horas sem confirmação; instalação nova começa sem autorização offline.
+
+Com o modo desativado, a perda de conexão mostra um aviso nativo animado
+com "Tentar novamente". A tela online é preservada quando possível e volta
+automaticamente ao reconectar. Rascunhos já salvos não são apagados;
+operações que já estavam na fila podem concluir a sincronização online.
+O aplicativo verifica o próprio servidor para evitar depender somente da
+validação de internet do Android. Com conexão confirmada, erros do servidor
+mostram uma tela própria de nova tentativa, sem ativar o modo offline.
+
+Todos precisam instalar o APK 1.23.0 para receber o controle nativo.
+Versões anteriores não consultam esta configuração; atualizar somente o site
+não pode substituir o código que já está instalado no aparelho.
+Validação em aparelho físico permanece pendente.
+
 Use somente o APK oficial do canal escolhido. HOMOLOGACAO indica uma versão
 em testes acompanhados. A versão estável continua disponível separadamente.
 
 Instale a atualização por cima do aplicativo existente. NÃO desinstale,
 limpe os dados ou faça downgrade se houver rascunhos/envios pendentes.
+
+Na versão 1.22.0, o painel online mostra "Abrir modo offline".
+Esse modo permanece aberto mesmo com internet e permite ativar as funções,
+cadastrar visitantes e registrar rascunhos no aparelho. Para voltar ao painel,
+toque em "Abrir sistema online". A ativação agora mostra progresso e permite
+tentar novamente se a resposta do aparelho não chegar.
+
+Se o painel mostrar "Atualizar para usar offline", instale o APK 1.22.0 por
+cima do atual, sem desinstalar. Depois entre na comunidade e abra o modo.
+
+Na versão 1.21.0, a tela offline começa pelas tarefas: cadastrar visitante,
+criar relatório de célula, fazer pedido, anotar, acompanhar, atualizar tarefa
+ou registrar ocorrência. Use "Ativar funções para usar sem internet" com
+conexão, selecione as funções e confira o resultado de cada ativação.
+
+Nos cadastros com envio disponível, "Salvar e enviar quando conectar" salva
+primeiro no aparelho e, após confirmação, coloca o registro na fila.
+"Guardar para terminar depois" mantém somente um rascunho local.
+Relatórios de célula ficam salvos apenas neste aparelho: o envio offline
+não está disponível; conclua no sistema online quando houver conexão.
+
+Na versão 1.20.0, cada notificação mostra seu título e sua mensagem:
+reservas, escalas, pedidos de entrada e outros avisos deixam de usar o
+mesmo texto genérico. Mensagens de conversa mostram remetente e prévia
+quando o acesso está válido. Toque no aviso para abrir o destino.
+Para receber a correção no Android, atualize o APK e abra o aplicativo.
+Notificações antigas que já estão na bandeja mantêm o texto anterior.
 
 Antes de usar sem internet: entre na conta, escolha a comunidade e prepare
 as consultas/módulos desejados. A preparação tem prazo e exige conexão
@@ -17,9 +65,7 @@ travado com internet ativa mostra uma tela própria para tentar novamente.
 Ao reconectar, o app oferece voltar ao sistema online e pede confirmação
 antes de descartar alterações não salvas nos formulários locais.
 
-Cada função offline abre sua própria tela. Para ativar, atualizar ou remover
-cópias, use Gerenciar offline. Visitantes e Mais funções
-mantêm preparação própria. Salvar rascunho não significa enviar ao servidor.
+Cada função offline abre sua própria tela. As consultas ficam em "Consultar mural, agenda e escalas". Cada função mantém autorização própria; confira quais foram ativadas. Salvar rascunho não significa enviar ao servidor.
 
 A Central de pendências reúne rascunhos, fila, revisão e confirmações dos
 módulos com acesso válido. Atualizar lista local não envia nada. Tentar

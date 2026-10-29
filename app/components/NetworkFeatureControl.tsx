@@ -1,5 +1,7 @@
 "use client";
 
+import TransientFeedback from "./TransientFeedback";
+
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 type Target = { id: number; nome: string };
@@ -218,8 +220,8 @@ export default function NetworkFeatureControl() {
             <button className="network-control-submit" disabled={working || (scopeType !== "GLOBAL" && !targets.length)}>
               {working ? "Validando…" : "Salvar configuração"}
             </button>
-            {feedback && <p className="operations-feedback" role="status">{feedback}</p>}
-            {error && <p className="operations-feedback error" role="alert">{error}</p>}
+            {feedback && <TransientFeedback className="operations-feedback" role="status">{feedback}</TransientFeedback>}
+            {error && <TransientFeedback className="operations-feedback error" role="alert">{error}</TransientFeedback>}
           </form>
 
           <aside className="network-control-preview" aria-label="Exemplo de hierarquia de rede">

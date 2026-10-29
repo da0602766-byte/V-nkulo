@@ -1,4 +1,5 @@
 import { getD1 } from '../../db';
+import { visitorDriveConfig } from './visitor-drive-store';
 import { getCurrentSessionTokenHash } from './local-auth';
 import { requireTenantPermission } from './tenant';
 import { privateHash, secureToken, rateLimit } from './access-security';
@@ -14,6 +15,7 @@ export async function moduleAccess(request: Request, module: MobileModule, write
   if (request.headers.get('origin') !== new URL(request.url).origin || request.headers.get('sec-fetch-site') === 'cross-site' || request.headers.get('x-vinkulo-client') !== 'android-modules-1') return {error:mobileReply({error:'Origem incompatível.'},403)} as const;
   const access = await requireTenantPermission((write ? WRITE : READ)[module], module === 'requests' ? 'requests' : undefined);
   if ('error' in access) return {error:mobileReply({error:'Entre novamente e confira sua permissão.'},access.error.status)} as const;
+  if(['notes','followups'].includes(module)&&await visitorDriveConfig(access.context.comunidadeId))return {error:mobileReply({error:'Abra Visitantes online para usar os dados no Drive. Os rascunhos locais ainda não foram enviados.',code:'DRIVE_ONLINE_REQUIRED'},409)} as const;
   if (!access.user.ativo || access.context.temporaryAccess || access.context.communityAccess === 'FEED_ONLY') return {error:mobileReply({error:'Este acesso exige o sistema online.'},403)} as const;
   const sessionHash = await getCurrentSessionTokenHash();
   const session = sessionHash ? await getD1().prepare('SELECT expira_em FROM sessoes WHERE usuario_id=? AND token_hash=? AND datetime(expira_em)>CURRENT_TIMESTAMP').bind(access.user.id,sessionHash).first<{expira_em:string}>() : null;

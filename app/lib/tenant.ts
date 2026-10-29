@@ -1,9 +1,12 @@
 import { cookies } from "next/headers";
+import { attachVisitorDrive, applyVisitorDriveAccess } from './visitor-drive-runtime';
+import { visitorSharePermissions, visitorShareRole } from './visitor-sharing';
 import { getD1 } from "../../db";
 import { getRuntimeEnv } from "../../db/runtime-env";
 import type { AppUser } from "./access";
 import {
   normalizeTenantRole,
+  effectiveTenantRole,
   normalizeOfficialPermissions,
   permissionsForTenantRole,
 } from "./tenant-policy.mjs";
@@ -48,6 +51,7 @@ export type TenantContext = {
   comunidadeSlug: string;
   papel: string;
   permissions: string[];
+  visitorPersonalAccess?: boolean;
   modules: CommunityModuleKey[];
   isSuperadmin: boolean;
   isOwner: boolean;
@@ -145,11 +149,7 @@ export async function listTenantMemberships(
     comunidadeId: Number(row.comunidade_id),
     comunidadeNome: row.comunidade_nome,
     comunidadeSlug: row.comunidade_slug,
-    papel: user.system_owner
-      ? normalizeTenantRole(row.papel)
-      : user.perfil === "ADMIN"
-        ? "SUPERADMIN"
-        : normalizeTenantRole(row.papel),
+    papel: effectiveTenantRole(row.papel, Boolean(user.system_owner)),
     status: row.status,
     ambienteDemo: Boolean(row.ambiente_demo),
     oficial: Boolean(row.oficial),
@@ -165,6 +165,7 @@ export async function listTenantMemberships(
 
 export async function getActiveTenantContext(
   user: Pick<AppUser, "id" | "perfil" | "system_owner">,
+  options: {communityId?:number; attachDrive?:boolean} = {},
 ): Promise<{ context: TenantContext | null; memberships: TenantMembership[] }> {
   const memberships = await listTenantMemberships(user);
   if (!memberships.length) return { context: null, memberships };
@@ -173,13 +174,11 @@ export async function getActiveTenantContext(
   const selected = await readCommunityCookie(
     jar.get(ACTIVE_COMMUNITY_COOKIE)?.value,
   );
-  const membership =
-    memberships.find((item) => item.membershipId === selected?.membershipId) ??
-    memberships[0];
-  const papel =
-    user.system_owner || user.perfil === "ADMIN"
-      ? "SUPERADMIN"
-      : normalizeTenantRole(membership.papel);
+  const membership = options.communityId !== undefined
+    ? memberships.find(item => item.comunidadeId === options.communityId)
+    : memberships.find((item) => item.membershipId === selected?.membershipId) ?? memberships[0];
+  if (!membership) return {context:null,memberships};
+  const papel = effectiveTenantRole(membership.papel, Boolean(user.system_owner));
   let permissions = permissionsForTenantRole(papel);
   const isCommunityOwner = membership.isCommunityOwner;
   const continuityPermissions = new Set([
@@ -190,19 +189,27 @@ export async function getActiveTenantContext(
     (permission) => !continuityPermissions.has(permission),
   );
   let temporaryAccess: TenantContext["temporaryAccess"] = null;
+  // Todas estas leituras dependem apenas da comunidade e do usuário atuais.
+  // Aguarde o mesmo lote antes de aplicar permissões, revogação e limites do plano.
+  // Não reutilize o resultado entre requisições: mudanças de acesso são imediatas.
+  const fullAccess = membership.communityAccess !== "FEED_ONLY";
+  const [diaconiaPermissions, networkPermissions, parkingAssignment, parkingLeaderPermissions,
+    subscription, configuredModules, visitorSharing] = await Promise.all([
+    fullAccess ? getDiaconiaPermissions(user.id, membership.comunidadeId) : Promise.resolve([]),
+    fullAccess ? getNetworkPermissions(user.id, membership.comunidadeId) : Promise.resolve([]),
+    fullAccess ? getActiveParkingAssignment(user.id, membership.comunidadeId) : Promise.resolve(null),
+    fullAccess ? getParkingLeaderPermissions(user.id, membership.comunidadeId) : Promise.resolve([]),
+    getSubscription(membership.comunidadeId),
+    getCommunityModules(membership.comunidadeId),
+    fullAccess ? visitorShareRole(membership.comunidadeId, user.id) : Promise.resolve(null),
+  ]);
   if (membership.communityAccess !== "FEED_ONLY") {
+    for (const permission of visitorSharePermissions(visitorSharing)) {
+      if (!permissions.includes(permission)) permissions.push(permission);
+    }
     for (const permission of membership.customPermissions) {
       if (!permissions.includes(permission)) permissions.push(permission);
     }
-    // As quatro consultas são somente leitura e dependem do mesmo par
-    // usuário/comunidade, nunca do resultado umas das outras. Mantemos a
-    // aplicação das permissões na ordem anterior depois da leitura paralela.
-    const [diaconiaPermissions, networkPermissions, parkingAssignment, parkingLeaderPermissions] = await Promise.all([
-      getDiaconiaPermissions(user.id, membership.comunidadeId),
-      getNetworkPermissions(user.id, membership.comunidadeId),
-      getActiveParkingAssignment(user.id, membership.comunidadeId),
-      getParkingLeaderPermissions(user.id, membership.comunidadeId),
-    ]);
     for (const permission of diaconiaPermissions) {
       if (!permissions.includes(permission)) permissions.push(permission);
     }
@@ -227,6 +234,7 @@ export async function getActiveTenantContext(
     for (const permission of parkingLeaderPermissions) {
       if (!permissions.includes(permission)) permissions.push(permission);
     }
+    // Esta consulta também pode persistir expiração/cancelamento; preserve sua ordem.
     const temporaryToken = jar.get(TEMPORARY_ACCESS_COOKIE)?.value;
     const cookieGrant = temporaryToken
       ? await getTemporaryAccessByToken(getD1(), temporaryToken)
@@ -273,6 +281,14 @@ export async function getActiveTenantContext(
     }
   }
 
+  // Privilégios da plataforma exigem a sessão exclusiva do proprietário,
+  // inclusive quando um vínculo legado carrega um papel global.
+  if (!user.system_owner) {
+    permissions = permissions.filter((permission) =>
+      !permission.startsWith("platform.") && !permission.startsWith("feature_flags."),
+    );
+  }
+
   // Permissões personalizadas, ministeriais ou temporárias nunca podem
   // transformar um cargo em dono da comunidade. Reaplicamos a política após
   // todas as extensões de escopo para que a autorização dependa somente do
@@ -290,15 +306,23 @@ export async function getActiveTenantContext(
     permissions.push("community.lifecycle.review");
   }
 
-  const subscription = await getSubscription(membership.comunidadeId);
-  const configuredModules = await getCommunityModules(membership.comunidadeId);
   const modules = subscription ? configuredModules.filter(key => subscription.active && subscription.plan.modulos.includes(key)) : configuredModules;
   permissions = filterPermissionsForCommunityModules(permissions, modules);
   permissions = filterPlanPermissions(permissions, subscription?.plan || null, subscription?.active ?? true);
 
-  return {
-    memberships,
-    context: {
+  // Opening an official's own workspace does not grant access to the existing
+  // community/owner list. Keep this capability before the Drive list ACL filter.
+  const visitorPersonalAccess = membership.oficial &&
+    membership.customPermissions.some(p => ['visitors.view', 'visitors.create', 'visitors.edit'].includes(p) && permissions.includes(p));
+  if (membership.oficial && !isCommunityOwner && !user.system_owner && !['PASTOR','ADMIN_COMUNIDADE'].includes(papel)) {
+    const shared = new Set(visitorSharePermissions(visitorSharing));
+    // Editing contacts alone does not grant category administration. Preserve
+    // that separate permission only while this list is explicitly shared EDIT.
+    const manageCategories = visitorSharing === 'EDIT' && permissions.includes('visitor.categories.manage');
+    permissions = permissions.filter(p => !/^(visitors\.|visitor\.categories\.|followups\.)/.test(p) || shared.has(p) || (p === 'visitor.categories.manage' && manageCategories));
+  }
+
+  const context: TenantContext = {
       userId: user.id,
       membershipId: membership.membershipId,
       comunidadeId: membership.comunidadeId,
@@ -306,16 +330,19 @@ export async function getActiveTenantContext(
       comunidadeSlug: membership.comunidadeSlug,
       papel,
       permissions,
+      visitorPersonalAccess,
       modules,
       isSuperadmin:
-        papel === "SUPERADMIN" || Boolean(user.system_owner),
+        Boolean(user.system_owner),
       isOwner: Boolean(user.system_owner),
       isCommunityOwner,
       communityAccess: membership.communityAccess,
       ambienteDemo: membership.ambienteDemo,
       temporaryAccess,
-    },
-  };
+    };
+  if(options.attachDrive === false) await applyVisitorDriveAccess(context);
+  else await attachVisitorDrive(context);
+  return { memberships, context };
 }
 
 async function getCommunityModules(
@@ -323,9 +350,9 @@ async function getCommunityModules(
 ): Promise<CommunityModuleKey[]> {
   const row = await getD1()
     .prepare(
-      "SELECT valor FROM configuracoes WHERE chave = 'community_modules:' || ? LIMIT 1",
+      "SELECT valor FROM configuracoes WHERE chave = ? LIMIT 1",
     )
-    .bind(comunidadeId)
+    .bind(`community_modules:${comunidadeId}`)
     .first<{ valor: string }>();
   if (!row?.valor) {
     return COMMUNITY_MODULES.map((module) => module.key);

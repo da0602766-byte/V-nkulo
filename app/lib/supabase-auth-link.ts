@@ -120,6 +120,28 @@ async function link(target: Project, userId: number, authId: string) {
 
 /** Chamado somente após o D1 validar CPF e senha; nunca altera a sessão atual. */
 export async function linkAuthAfterVerifiedLogin(userId: number, email: string, password: string): Promise<"SKIPPED" | "LINKED" | "UPDATED"> {
+  return linkVerifiedIdentity(userId, email, password);
+}
+
+/** Somente após verifyGoogleIdentity e saveGoogleConnection no callback de login.
+ * Prepara a conta Auth; não cria identidade OAuth, senha ou sessão Supabase. */
+export async function linkAuthAfterVerifiedGoogleLogin(userId: number,
+  identity: { sub: string; email: string; email_verified: boolean }): Promise<"SKIPPED" | "LINKED" | "UPDATED"> {
+  const db = getD1();
+  if (!(await getAuthLinkEnabled(db))) return "SKIPPED";
+  if (identity.email_verified !== true || !identity.sub || !identity.email) {
+    throw new AuthLinkError("A identidade Google não foi confirmada.", "REJECTED");
+  }
+  const user = await db.prepare(`SELECT u.email FROM usuarios u JOIN google_connections g ON g.usuario_id=u.id
+    WHERE u.id=? AND u.ativo=1 AND g.google_sub=? LIMIT 1`)
+    .bind(userId, identity.sub).first<{ email: string }>();
+  if (!user || user.email.toLowerCase() !== identity.email.toLowerCase()) {
+    throw new AuthLinkError("A identidade Google diverge do cadastro atual.", "CONFLICT");
+  }
+  return linkVerifiedIdentity(userId, user.email);
+}
+
+async function linkVerifiedIdentity(userId: number, email: string, password?: string): Promise<"SKIPPED" | "LINKED" | "UPDATED"> {
   const db = getD1();
   if (!(await getAuthLinkEnabled(db))) return "SKIPPED";
   const lease = `${LEASE_PREFIX}${crypto.randomUUID()}`;
@@ -136,7 +158,7 @@ export async function linkAuthAfterVerifiedLogin(userId: number, email: string, 
     let created = false;
     if (state.candidate_count === 0 && !state.linked_user_id) {
       try {
-        const response = await request(target, "/admin/users", { email, password, email_confirm: true,
+        const response = await request(target, "/admin/users", { email, ...(password !== undefined ? { password } : {}), email_confirm: true,
           app_metadata: { vinkulo_legacy_d1_id: String(userId) } }, true);
         const user = (response as { user?: { id?: unknown }; id?: unknown });
         authId = String(user.user?.id || user.id || "");
@@ -151,7 +173,9 @@ export async function linkAuthAfterVerifiedLogin(userId: number, email: string, 
     } else {
       authId = verifiedCandidate(state, userId, email);
     }
-    if (!created) await request(target, `/admin/users/${authId}`, { password, email_confirm: true }, true, "PUT");
+    // Google never replaces an existing password. A later verified CPF login or
+    // password reset can establish/synchronize it through the existing path.
+    if (!created && password !== undefined) await request(target, `/admin/users/${authId}`, { password, email_confirm: true }, true, "PUT");
     await link(target, userId, authId);
     return created ? "LINKED" : "UPDATED";
   } finally {

@@ -1,0 +1,8 @@
+.parking-history-workspace .parking-v2-filters{align-items:end;gap:12px}
+.parking-history-workspace .parking-v2-filters label{min-width:0}
+.parking-history-workspace :is(input,select,button){min-height:44px}
+.parking-history-workspace :is(input,select){font-size:16px;max-width:100%}
+.parking-history-error{padding:16px;border:1px solid var(--pilot-line);border-radius:12px;background:var(--pilot-surface);color:var(--pilot-text)}
+.parking-history-error button{padding:10px 14px;border:1px solid var(--pilot-line);border-radius:10px;background:var(--pilot-surface);color:var(--pilot-text);font:inherit;cursor:pointer}
+.parking-history-workspace :is(input,select,button):focus-visible{outline:3px solid var(--pilot-purple);outline-offset:3px}
+@media(max-width:680px){.parking-history-workspace .parking-v2-filters{display:grid;grid-template-columns:minmax(0,1fr)}.parking-history-workspace .parking-v2-filters>*{width:100%}.parking-history-workspace .parking-v2-pagination{flex-wrap:wrap;gap:12px}.parking-history-workspace .parking-v2-pagination>div{display:flex;gap:8px;flex-wrap:wrap}}

@@ -19,6 +19,9 @@ type GoogleIdentity = {
 
 type OAuthState = {
   purpose: "login" | "drive";
+  visitorSheets?: boolean;
+  visitorStorage?: boolean;
+  personalVisitors?: boolean;
   userId: number;
   returnTo: string;
   nonce: string;
@@ -48,7 +51,7 @@ export async function createGoogleAuthorization(
   url.searchParams.set("client_id", env.clientId);
   url.searchParams.set("redirect_uri", `${origin}/api/auth/google/callback`);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", [...BASE_SCOPES, ...(state.purpose === "drive" ? [DRIVE_SCOPE] : [])].join(" "));
+  url.searchParams.set("scope", [...BASE_SCOPES, ...(state.purpose === "drive" ? [DRIVE_SCOPE] : []), ...(state.visitorSheets ? ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive.metadata.readonly"] : [])].join(" "));
   url.searchParams.set("state", signedState);
   url.searchParams.set("include_granted_scopes", "true");
   if (state.purpose === "drive") {
@@ -215,6 +218,8 @@ export async function disconnectGoogleDrive(userId: number) {
   ).bind(userId).run();
 }
 
+export class DriveReconnectRequired extends Error {}
+
 export async function getDriveAccessToken(userId: number) {
   const connection = await getGoogleConnection(userId);
   if (
@@ -224,11 +229,12 @@ export async function getDriveAccessToken(userId: number) {
     !connection.refresh_token_ciphertext ||
     !connection.refresh_token_iv
   ) {
-    throw new Error("Conecte seu Google Drive antes de continuar.");
+    throw new DriveReconnectRequired("Conecte seu Google Drive antes de continuar.");
   }
   const env = requireGoogleConfig();
   const refreshToken = await decryptSecret(connection.refresh_token_ciphertext, connection.refresh_token_iv);
   const response = await fetch(GOOGLE_TOKEN_ENDPOINT, {
+    signal: AbortSignal.timeout(20000),
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
     body: new URLSearchParams({
@@ -254,7 +260,7 @@ export async function getDriveAccessToken(userId: number) {
              drive_enabled = 0, revoked_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
          WHERE usuario_id = ?`,
       ).bind(userId).run();
-      throw new Error("A autorização do Google Drive expirou ou foi revogada. Conecte o Drive novamente para continuar.");
+      throw new DriveReconnectRequired("A autorização do Google Drive expirou ou foi revogada. Conecte o Drive novamente para continuar.");
     }
     throw new Error(body.error_description || "A autorização do Google Drive expirou.");
   }
@@ -263,6 +269,7 @@ export async function getDriveAccessToken(userId: number) {
 
 export async function createDriveFolder(accessToken: string, name: string, parentId?: string) {
   const response = await fetch(`${DRIVE_API}/files?fields=id,name`, {
+    signal: AbortSignal.timeout(20000),
     method: "POST",
     headers: googleHeaders(accessToken, "application/json"),
     body: JSON.stringify({
@@ -312,6 +319,7 @@ export async function uploadDriveFile(
   body.set(file.bytes, prefix.length);
   body.set(suffix, prefix.length + file.bytes.length);
   const response = await fetch(`${DRIVE_UPLOAD_API}/files?uploadType=multipart&fields=id,name,mimeType,size,createdTime`, {
+    signal: AbortSignal.timeout(20000),
     method: "POST",
     headers: googleHeaders(accessToken, `multipart/related; boundary=${boundary}`),
     body,

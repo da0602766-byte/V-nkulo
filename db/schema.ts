@@ -9,6 +9,67 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
+// Only storage pointers/preferences live on the platform; personal contacts do not.
+export const visitantePessoalStorage = sqliteTable('visitante_pessoal_storage', {
+  usuarioId: integer('usuario_id').notNull().references(() => usuarios.id, {onDelete:'cascade'}),
+  comunidadeId: integer('comunidade_id').notNull().references(() => comunidades.id, {onDelete:'cascade'}),
+  provider: text('provider').notNull(),
+  revisao: integer('revisao').notNull().default(0),
+  pastaId: text('pasta_id'), arquivoId: text('arquivo_id'), hash: text('hash'),
+}, table => [primaryKey({columns:[table.usuarioId,table.comunidadeId]}),
+  check('visitor_personal_provider',sql`${table.provider} IN ('LOCAL','GOOGLE_DRIVE')`)]);
+
+export const visitanteAcessoHistorico = sqliteTable('visitante_acesso_historico', {
+  id: integer('id').primaryKey({autoIncrement:true}),
+  operacao: text('operacao').notNull().unique(),
+  comunidadeId: integer('comunidade_id').notNull().references(() => comunidades.id, {onDelete:'cascade'}),
+  autorId: integer('autor_id').references(() => usuarios.id, {onDelete:'set null'}),
+  membroId: integer('membro_id').references(() => usuarios.id, {onDelete:'set null'}),
+  acao: text('acao').notNull(), papelAnterior: text('papel_anterior'), papel: text('papel'),
+  criadoEm: text('criado_em').notNull().default(sql`CURRENT_TIMESTAMP`),
+}, table => [index('visitor_share_history_community').on(table.comunidadeId,table.id),
+  index('visitor_share_history_expiry').on(table.criadoEm),
+  check('visitor_share_history_action',sql`${table.acao} IN ('CONCEDIDO','ALTERADO','REMOVIDO')`),
+  check('visitor_share_history_role',sql`${table.papel} IS NULL OR ${table.papel} IN ('READ','EDIT')`),
+  check('visitor_share_history_previous',sql`${table.papelAnterior} IS NULL OR ${table.papelAnterior} IN ('READ','EDIT')`)]);
+
+export const visitanteAcessos = sqliteTable('visitante_acessos', {
+  concedidoPor: integer('concedido_por').references(() => usuarios.id, { onDelete: 'set null' }),
+  comunidadeId: integer('comunidade_id').notNull().references(() => comunidades.id, { onDelete: 'cascade' }),
+  usuarioId: integer('usuario_id').notNull().references(() => usuarios.id, { onDelete: 'cascade' }),
+  papel: text('papel').notNull(),
+}, table => [primaryKey({ columns: [table.comunidadeId, table.usuarioId] }),
+  check('visitante_acessos_papel', sql`${table.papel} IN ('READ','EDIT')`)]);
+
+// Metadata only: visitor contents live in the community owner's Google Drive.
+export const visitanteDrive = sqliteTable('visitante_drive', {
+  comunidadeId: integer('comunidade_id').primaryKey().references(() => comunidades.id),
+  usuarioId: integer('usuario_id').notNull().references(() => usuarios.id),
+  estado: text('estado').notNull(),
+  pastaId: text('pasta_id'), arquivoId: text('arquivo_id'), hash: text('hash'),
+  revisao: integer('revisao').notNull().default(0), verificadoEm: text('verificado_em'),
+}, table => [check('visitante_drive_estado', sql`${table.estado} IN ('LOCKED','REVIEW','PURGING','ACTIVE')`),
+  check('visitante_drive_revisao', sql`${table.revisao} >= 0`)]);
+export const visitanteDriveAcessos = sqliteTable('visitante_drive_acessos', {
+  comunidadeId: integer('comunidade_id').notNull().references(() => visitanteDrive.comunidadeId, { onDelete: 'cascade' }),
+  usuarioId: integer('usuario_id').notNull().references(() => usuarios.id, { onDelete: 'cascade' }),
+  papel: text('papel').notNull(),
+}, table => [primaryKey({ columns: [table.comunidadeId, table.usuarioId] }),
+  check('visitante_drive_papel', sql`${table.papel} IN ('READ','EDIT')`)]);
+
+// Stable Drive IDs make retries and simultaneous copies idempotent.
+export const userFileCopies = sqliteTable("user_file_copies", {
+  usuarioId: integer("usuario_id").notNull(),
+  googleAccount: text("google_account").notNull(),
+  contentHash: text("content_hash").notNull(),
+  driveId: text("drive_id").notNull(),
+  name: text("name").notNull(),
+  mimeType: text("mime_type").notNull(),
+  size: integer("size").notNull(),
+  status: text("status").notNull().default("PENDING"),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, table => [primaryKey({ columns: [table.usuarioId, table.googleAccount, table.contentHash] })]);
+
 export const usuarios = sqliteTable("usuarios", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   nome: text("nome").notNull(),
@@ -211,16 +272,39 @@ export const visitanteCategorias = sqliteTable(
   ],
 );
 
+export const visitanteCampos = sqliteTable("visitante_campos", {
+  id: integer("id").primaryKey({ autoIncrement:true }),
+  comunidadeId: integer("comunidade_id").notNull(),
+  nome: text("nome").notNull(),
+  chave: text("chave").notNull(),
+  tipo: text("tipo").notNull().default("TEXTO"),
+  criadoPor: integer("criado_por").notNull(),
+  criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, table => [uniqueIndex("visitante_campos_comunidade_chave_idx").on(table.comunidadeId, table.chave)]);
+
 export const visitantes = sqliteTable(
   "visitantes",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     comunidadeId: integer("comunidade_id").notNull(),
     nomeCompleto: text("nome_completo").notNull(),
+    camposPersonalizados: text("campos_personalizados").notNull().default("{}"),
     dataNascimento: text("data_nascimento"),
     telefone: text("telefone"),
     email: text("email"),
     batizado: text("batizado").notNull().default("NAO_INFORMADO"),
+    tipoPessoa: text("tipo_pessoa").notNull().default("VISITANTE"),
+    certificadoBatismo: text("certificado_batismo").notNull().default("NAO_INFORMADO"),
+    discipulado: text("discipulado").notNull().default("NAO_INFORMADO"),
+    discipulador: text("discipulador"),
+    doaADoa: text("doa_a_doa").notNull().default("NAO_INFORMADO"),
+    doaReceber: text("doa_receber").notNull().default("NAO_INFORMADO"),
+    doacoesRealizadas: text("doacoes_realizadas"),
+    oficial: text("oficial").notNull().default("NAO_INFORMADO"),
+    funcaoOficial: text("funcao_oficial"),
+    responsavelAcompanhamento: text("responsavel_acompanhamento"),
+    proximaAcao: text("proxima_acao"),
+    dataProximaAcao: text("data_proxima_acao"),
     status: text("status").notNull().default("NOVO"),
     endereco: text("endereco"),
     acompanhante: text("acompanhante"),
@@ -3200,3 +3284,20 @@ export const supabaseStorageCopies = sqliteTable('supabase_storage_copies', {
   sha256: text('sha256').notNull(),
   copiedAt: text('copied_at').notNull().default(sql`CURRENT_TIMESTAMP`),
 }, table => [index('supabase_storage_copies_project_idx').on(table.projectRef, table.bucket)]);
+
+// Dirty-version triggers and leases are defined in migration 0086.
+export const visitantePlanilha = sqliteTable("visitante_planilha", {
+  comunidadeId: integer("comunidade_id").primaryKey().references(() => comunidades.id, { onDelete: "cascade" }),
+  usuarioId: integer("usuario_id").notNull().references(() => usuarios.id, { onDelete: "cascade" }),
+  spreadsheetId: text("spreadsheet_id").notNull().unique(),
+  sheetId: integer("sheet_id").notNull(),
+  habilitada: integer("habilitada").notNull().default(0),
+  versao: integer("versao").notNull().default(1),
+  versaoSincronizada: integer("versao_sincronizada").notNull().default(0),
+  linhas: integer("linhas").notNull().default(0),
+  sincronizadoEm: text("sincronizado_em"),
+  ultimoErro: text("ultimo_erro"),
+  tentarApos: integer("tentar_apos").notNull().default(0),
+  lockToken: text("lock_token"),
+  lockAte: integer("lock_ate").notNull().default(0),
+});

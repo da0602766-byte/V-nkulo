@@ -75,8 +75,8 @@ test("menu móvel permite ativar notificações do aparelho", async () => {
     read("app/components/PilotDashboard.tsx"),
     read("app/components/PilotNotificationCenter.tsx"),
   ]);
-  assert.match(dashboard, /Avisar neste celular/);
-  assert.match(dashboard, /vinkulo:enable-device-notifications/);
-  assert.match(notifications, /addEventListener\("vinkulo:enable-device-notifications"/);
+  assert.match(dashboard, /Avisos neste aparelho/);
+  assert.match(dashboard, /vinkulo:open-notifications/);
+  assert.match(notifications, /addEventListener\("vinkulo:open-notifications"/);
   assert.match(notifications, /showNotification\("Notificações ativadas"/);
 });

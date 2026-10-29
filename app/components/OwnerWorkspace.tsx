@@ -1,4 +1,12 @@
 "use client";
+import { navigateDocument } from '../lib/document-navigation';
+import SafeImage from "./SafeImage";
+import ActionDialog from "./ActionDialog";
+import OwnerPersonIdentity, { ownerPersonKind } from "./OwnerPersonIdentity";
+import "./OwnerPeople.css";
+
+
+import TransientFeedback from "./TransientFeedback";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent } from "react";
@@ -12,7 +20,7 @@ const PlatformControlsWorkspace = dynamic(() => import("./PlatformControlsWorksp
 const EditorialAutomationWorkspace = dynamic(() => import("./EditorialAutomationWorkspace"), { loading: () => <p className="oc-loading" role="status">Carregando área…</p> });
 const StatisticsWorkspace = dynamic(() => import("./StatisticsWorkspace"), { loading: () => <p className="oc-loading" role="status">Carregando área…</p> });
 const PlatformOptimizerWorkspace = dynamic(() => import("./PlatformOptimizerWorkspace"), { loading: () => <p className="oc-loading" role="status">Carregando área…</p> });
-const OwnerLaboratoryWorkspace = dynamic(() => import("./OwnerLaboratoryWorkspace"), { loading: () => <p className="oc-loading" role="status">Carregando área…</p> });
+const OwnerLaboratoryWorkspace = dynamic(() => import("./LabStudio"), { loading: () => <p className="oc-loading" role="status">Carregando área…</p> });
 const OwnerAppearanceWorkspace = dynamic(() => import("./OwnerAppearanceWorkspace"), { loading: () => <p className="oc-loading" role="status">Carregando área…</p> });
 const PlatformPlansWorkspace = dynamic(() => import("./CommercialPlansWorkspace"), { loading: () => <p className="oc-loading" role="status">Carregando área…</p> });
 const OwnerOnboardingWorkspace = dynamic(() => import('./OwnerOnboardingWorkspace'));
@@ -185,7 +193,7 @@ export default function OwnerWorkspace({
       });
       const result = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(result.error || "Não foi possível abrir a comunidade.");
-      window.location.assign(`/painel?view=inicio${postId ? `#publicacao-${postId}` : ""}`);
+      navigateDocument(`/painel?view=inicio${postId ? `#publicacao-${postId}` : ""}`);
     } catch (error) {
       setMessage((error as Error).message);
       setWorking(null);
@@ -241,11 +249,14 @@ export default function OwnerWorkspace({
     }
   }
 
+  const [deleteTarget, setDeleteTarget] = useState<{id:number;name:string;person:Record<string,unknown>}|null>(null);
+  const [expandedPerson, setExpandedPerson] = useState<number|null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [deleteError, setDeleteError] = useState("");
+  const [deleteSuccess, setDeleteSuccess] = useState("");
   async function deleteUserPermanently(id: number, name: string) {
-    const confirmation = window.prompt(
-      `Exclusão definitiva de ${name}. Esta ação só funciona para contas sem vínculos. Digite EXCLUIR para confirmar.`,
-    );
-    if (confirmation !== "EXCLUIR") return;
+    if (deleteConfirmation.trim() !== "EXCLUIR" || working !== null) return;
+    setDeleteError("");
     setWorking(id);
     setMessage("");
     try {
@@ -257,12 +268,15 @@ export default function OwnerWorkspace({
           userId: id,
         }),
       });
-      const result = (await response.json()) as { error?: string };
+      const result = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) throw new Error(result.error || "Não foi possível excluir a conta.");
-      setMessage("Conta de teste excluída definitivamente.");
+      setDeleteTarget(null);
+      setDeleteSuccess(name);
+      setDeleteConfirmation("");
+      setMessage("Conta excluída definitivamente. Avisos registrados para os líderes vinculados.");
       await load(true);
     } catch (error) {
-      setMessage((error as Error).message);
+      setDeleteError((error as Error).message || "Não foi possível excluir. Tente novamente.");
     } finally {
       setWorking(null);
     }
@@ -363,7 +377,7 @@ export default function OwnerWorkspace({
 
   return (
     <main className="owner-area owner-area-v3 owner-console" data-ui-version="owner-console" data-visual-editor-root data-editor-key="area-proprietario">
-      <OwnerConsoleShell tab={tab} onSelect={selectTab} onSearchDirectory={(next, query) => { selectTab(next); setSearch(query); }} data={data} ownerName={ownerName} ownerPhoto={ownerPhoto} brandName={brandName} brandLogo={brandLogo}>
+      <>{deleteSuccess && <ActionDialog title="Conta excluída" onClose={() => setDeleteSuccess("")}><p role="status">A conta de <strong>{deleteSuccess}</strong> foi excluída definitivamente. Os avisos aos líderes vinculados foram registrados.</p><footer><button onClick={() => setDeleteSuccess("")}>Concluir</button></footer></ActionDialog>}{deleteTarget && <ActionDialog title="Excluir conta definitivamente?" busy={working !== null} onClose={() => setDeleteTarget(null)}><p><strong>{deleteTarget.name}</strong></p><OwnerPersonIdentity person={deleteTarget.person} /><p>A conta, os vínculos e os registros pessoais serão removidos. Comunidades e assinaturas permanecem; a exclusão da pessoa não cancela a assinatura. Revise os responsáveis depois. Os líderes vinculados serão avisados. Esta ação não pode ser desfeita.</p><label>Digite EXCLUIR para confirmar<input autoComplete="off" value={deleteConfirmation} disabled={working !== null} onChange={event => setDeleteConfirmation(event.target.value)} /></label>{deleteError && <p role="alert">{deleteError}</p>}{working !== null && <p role="status">Excluindo conta… Aguarde a confirmação.</p>}<footer><button disabled={working !== null} onClick={() => setDeleteTarget(null)}>Cancelar</button><button className="danger" disabled={working !== null || deleteConfirmation.trim() !== "EXCLUIR"} onClick={() => void deleteUserPermanently(deleteTarget.id,deleteTarget.name)}>{working !== null ? "Excluindo…" : "Excluir definitivamente"}</button></footer></ActionDialog>}<OwnerConsoleShell tab={tab} onSelect={selectTab} onSearchDirectory={(next, query) => { selectTab(next); setSearch(query); }} data={data} ownerName={ownerName} ownerPhoto={ownerPhoto} brandName={brandName} brandLogo={brandLogo}>
         <header className="oc-page-head">
           <div><p className="oc-eyebrow">Console do proprietário · Escopo global</p><h1>{tabLabel(tab)}</h1><p>{tabDescription(tab)}</p></div>
           <div className="oc-head-actions">{!["plans", "appearance", "editorial", "statistics", "optimization", "controls", "laboratory"].includes(tab) && <button type="button" className="oc-button" disabled={loading || working !== null} onClick={() => void load()}>Atualizar dados</button>}{tab === "overview" && <button type="button" className="oc-button primary" onClick={() => selectTab("decisions")}>Revisar pendências</button>}</div>
@@ -372,8 +386,8 @@ export default function OwnerWorkspace({
         {(["performance", "incidents", "realtime"] as OwnerTab[]).includes(tab) && <nav className="oc-subnav" aria-label="Confiabilidade">{(["performance", "incidents", "realtime"] as OwnerTab[]).map(id => <button type="button" key={id} aria-current={tab === id ? "page" : undefined} onClick={() => selectTab(id)}><OwnerTabIcon tab={id} />{tabLabel(id)}</button>)}</nav>}
         {(["decisions", "requests", "feedback"] as OwnerTab[]).includes(tab) && <nav className="oc-subnav" aria-label="Pendências e históricos">{(["decisions", "requests", "feedback"] as OwnerTab[]).map(id => <button type="button" key={id} aria-current={tab === id ? "page" : undefined} onClick={() => selectTab(id)}>{tabLabel(id)}</button>)}</nav>}
         {tab === "decisions" && data && <OwnerDecisionQueue data={data} onSelect={selectTab} />}
-          {message && <p className="operations-feedback" role="status">{message}</p>}
-          {loadError && <div className="owner-load-error"><p className="operations-feedback error" role="alert">{loadError}</p><button type="button" onClick={() => void load()}>Tentar novamente</button></div>}
+          {message && <TransientFeedback className="operations-feedback" role="status">{message}</TransientFeedback>}
+          {loadError && <div className="owner-load-error"><TransientFeedback className="operations-feedback error" role="alert">{loadError}</TransientFeedback><button type="button" onClick={() => void load()}>Tentar novamente</button></div>}
           {loading && !data ? <div className="owner-loading">Carregando controles globais…</div> : null}
 
           {tab === "overview" && data && <OwnerExecutiveOverview data={data} gridPreset={gridPreset} metricOrder={metricOrder} draggingMetric={draggingMetric} onSelectTab={selectTab} onOpenCommunity={openCommunity} onSaveLayout={saveOwnerLayout} onDragStart={setDraggingMetric} onDragEnd={() => setDraggingMetric(null)} onDropMetric={reorderMetric} onMoveMetric={moveMetric} />}
@@ -449,7 +463,12 @@ export default function OwnerWorkspace({
                         const id = Number(item.id);
                         const active = Number(item.ativo) === 1;
                         const name = String(item.nome);
-                        return <details key={id}><summary><OwnerAvatar image={String(item.foto_perfil || "")} name={name} /><div><h2>{name}</h2><small>{String(item.telefone || item.email || "Contato não informado")}</small></div><b className={active ? "active" : "inactive"}>{active ? "ATIVO" : "INATIVO"}</b><i aria-hidden="true">⌄</i></summary><div className="owner-user-details"><span><small>E-mail</small><strong>{String(item.email || "Não informado")}</strong></span><span><small>Telefone</small><strong>{String(item.telefone || "Não informado")}</strong></span><span><small>Comunidades</small><strong>{String(item.comunidades_nomes || "Sem vínculo")}</strong></span><span><small>Perfil global</small><strong>{String(item.perfil || "MEMBRO")}</strong></span><div className="owner-user-actions"><button type="button" disabled={working === id || id === data.owner.id || Number(item.system_owner) === 1} onClick={() => void changeUserStatus(id, name, !active)}>{active ? "Desativar conta" : "Reativar conta"}</button><button type="button" className="danger" disabled={working === id || id === data.owner.id || Number(item.system_owner) === 1} onClick={() => void deleteUserPermanently(id, name)}>Excluir definitivamente</button></div><p>{id === data.owner.id || Number(item.system_owner) === 1 ? "Conta do proprietário protegida: desativação e exclusão não são permitidas." : "A exclusão definitiva é aceita somente para contas sem vínculos. Contas com histórico devem ser desativadas."}</p></div></details>;
+                        const expanded = expandedPerson === id;
+                        const protectedAccount = id === data.owner.id || Number(item.system_owner) === 1;
+                        return <section className="owner-person-row" key={id}>
+                          <div className="owner-person-line"><OwnerAvatar image={String(item.foto_perfil || "")} name={name} /><div><h2>{name}</h2><small>{ownerPersonKind(item)}</small><small>{String(item.telefone || item.email || "Contato não informado")}</small></div><span className="owner-person-status">{active ? "Ativo" : "Inativo"}</span><button type="button" aria-label={`Opções de ${name}`} aria-expanded={expanded} aria-controls={`owner-person-${id}`} onClick={() => setExpandedPerson(expanded ? null : id)}>Opções</button></div>
+                          {expanded && <div className="owner-user-details" id={`owner-person-${id}`}><OwnerPersonIdentity person={item} /><div className="owner-user-actions"><button type="button" disabled={working !== null || protectedAccount} onClick={() => void changeUserStatus(id, name, !active)}>{active ? "Desativar conta" : "Reativar conta"}</button><button type="button" className="danger" disabled={working !== null || protectedAccount} onClick={() => { setDeleteTarget({id,name,person:item}); setDeleteConfirmation(""); setDeleteError(""); }}>Excluir definitivamente</button></div><p>{protectedAccount ? "Sua conta proprietária mantém o acesso à administração e não pode ser excluída por esta tela." : "Você pode excluir membros, líderes e assinantes, mesmo com vínculos ativos. Comunidades e assinaturas são preservadas."}</p></div>}
+                        </section>;
                       })}
                       {!visibleDirectoryRows.length && <Empty title="Nenhuma pessoa encontrada" text="Ajuste a pesquisa para ver outros resultados." />}
                     </div>
@@ -470,7 +489,7 @@ export default function OwnerWorkspace({
           {tab === 'onboarding' && <OwnerOnboardingWorkspace />}
           {tab === 'reset' && <OwnerResetWorkspace onReset={() => void load(true)} />}
           {tab === "controls" && <PlatformControlsWorkspace features={features} currentCommunityId={currentCommunityId} />}
-      </OwnerConsoleShell>
+      </OwnerConsoleShell></>
       <GlobalVisualEditor canEdit communityName="Área do Proprietário" screenId={`owner:${tab}`} rootSelector=".owner-console" />
     </main>
   );
@@ -638,7 +657,7 @@ function FeedbackRepository({
           <summary><span className={`owner-feedback-type type-${String(item.tipo).toLowerCase()}`}>{String(item.tipo) === "PROBLEMA" ? "!" : String(item.tipo) === "SUGESTAO" ? "✦" : String(item.tipo) === "MELHORIA" ? "↗" : "⚑"}</span><div><small>{humanize(String(item.tipo))} · {humanize(String(item.categoria))}</small><strong>{String(item.usuario_nome || "Usuário")}</strong><p>{String(item.mensagem || "")}</p></div><b>{humanize(currentStatus)}</b><i aria-hidden="true">⌄</i></summary>
           <div className="owner-feedback-detail">
             <dl><div><dt>Usuário</dt><dd>{String(item.usuario_nome || "—")}<small>{String(item.usuario_email || "")}</small></dd></div><div><dt>Origem</dt><dd>{String(item.comunidade_nome || "Plataforma")}<small>{String(item.pagina || "/")}</small></dd></div><div><dt>Enviado</dt><dd>{formatDate(String(item.criado_em || ""))}</dd></div>{Number(item.entidade_id || 0) > 0 ? <div><dt>Publicação denunciada</dt><dd><button type="button" className="owner-reported-post-link" onClick={() => void onOpenPost(Number(item.comunidade_id || 0), Number(item.entidade_id))}>Abrir somente a publicação #{Number(item.entidade_id)} →</button></dd></div> : null}</dl>
-            <article><h3>Mensagem</h3><p>{String(item.mensagem || "")}</p>{hasImage && <a href={`/api/feedback/${id}/imagem`} target="_blank" rel="noreferrer"><img loading="lazy" src={`/api/feedback/${id}/imagem`} alt={`Foto anexada por ${String(item.usuario_nome || "usuário")}`} /><span>Ampliar foto</span></a>}</article>
+            <article><h3>Mensagem</h3><p>{String(item.mensagem || "")}</p>{hasImage && <a href={`/api/feedback/${id}/imagem`} target="_blank" rel="noreferrer"><SafeImage loading="lazy" src={`/api/feedback/${id}/imagem`} alt={`Foto anexada por ${String(item.usuario_nome || "usuário")}`} /><span>Ampliar foto</span></a>}</article>
             {Boolean(item.resposta_proprietario) && <aside><strong>Resposta enviada</strong><p>{String(item.resposta_proprietario)}</p><small>{String(item.respondido_por_nome || "Proprietário")} · {formatDate(String(item.respondido_em || item.atualizado_em || ""))}</small></aside>}
             <form onSubmit={(event) => { event.preventDefault(); const resposta = String(new FormData(event.currentTarget).get("resposta") || ""); void onAction(id, "FEEDBACK_RESPONDER", resposta); }}><label>Responder ao usuário<textarea name="resposta" rows={3} maxLength={2000} required defaultValue={String(item.resposta_proprietario || "")} placeholder="Escreva a resposta que será enviada nas notificações" /></label><button disabled={working === id}>Responder</button></form>
             <footer>{currentStatus === "PENDENTE" && <button type="button" disabled={working === id} onClick={() => void onAction(id, "FEEDBACK_EM_ANALISE")}>Marcar em análise</button>}{currentStatus === "ARQUIVADO" ? <button type="button" disabled={working === id} onClick={() => void onAction(id, "FEEDBACK_REABRIR")}>Reabrir</button> : <button type="button" disabled={working === id} onClick={() => void onAction(id, "FEEDBACK_ARQUIVAR")}>Arquivar</button>}<button type="button" className="danger" disabled={working === id} onClick={() => void onAction(id, "FEEDBACK_EXCLUIR")}>Excluir</button></footer>
@@ -690,7 +709,7 @@ function Empty({ title, text }: { title: string; text: string }) { return <div c
 function OwnerImage({ src, fallback }: { src?: string | null; fallback: string }) {
   const [failed, setFailed] = useState(false);
   if (!src || failed) return <>{fallback}</>;
-  return <img loading="lazy" src={src} alt="" onError={() => setFailed(true)} />;
+  return <SafeImage loading="lazy" src={src} alt="" onError={() => setFailed(true)} />;
 }
 function OwnerAvatar({ image = "", name }: { image?: string; name: string }) {
   return <span className="owner-profile-avatar"><OwnerImage src={image} fallback={initials(name)} /></span>;
@@ -716,7 +735,7 @@ function tabDescription(tab: OwnerTab) {
     optimization: "Diagnostique e execute retenções seguras sem remover dados ativos.",
     appearance: "Aplique paleta, logotipo, banner e papel de parede a uma comunidade ou a todas de uma vez.",
     plans: 'Configure valores, recursos, limites e assinaturas das comunidades.',
-    laboratory: "Crie e valide protótipos isolados, sem modificar páginas ou dados reais.",
+    laboratory: "Crie abas, configure funções e publique para suas comunidades.",
     passwords: "Consulte os eventos de credenciais disponíveis na auditoria.",
     deleted: "Confira cadastros inativos e eventos de desativação disponíveis.",
     finance: "Confira a disponibilidade da integração financeira.",

@@ -13,7 +13,7 @@ async function fixture(t) {
   db.prepare("INSERT INTO sessoes(usuario_id,token_hash,expira_em) VALUES(?,'write-session',datetime('now','+1 day'))").run(id);
   let access={user:{id,email:'writer@example.test',ativo:true},context:{comunidadeId:1,comunidadeNome:'Teste',communityAccess:'MEMBER'}}, session='write-session',limited=false;
   const exports={};const deps={
-    '../../db':{getD1:()=>d1},'./local-auth':{getCurrentSessionTokenHash:async()=>session},
+    './visitor-drive-store':{visitorDriveConfig:async id=>db.prepare('SELECT * FROM visitante_drive WHERE comunidade_id=?').get(id)},'../../db':{getD1:()=>d1},'./local-auth':{getCurrentSessionTokenHash:async()=>session},
     './tenant':{requireTenantPermission:async permission=>{assert.equal(permission,'visitors.create');return access;}},
     './access-security':{secureToken:()=>createHash('sha256').update(randomUUID()).digest('hex'),privateHash:async(p,v)=>createHash('sha256').update(p+v).digest('hex'),rateLimit:async()=>!limited},
   };

@@ -4,19 +4,6 @@ import test from "node:test";
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("visitor registration is a continuous form with every section visible", async () => {
-  const operations = await read("app/components/TenantOperations.tsx");
-  const styles = await read("app/globals.css");
-  const registration = operations.slice(
-    operations.indexOf('<form className="pilot-form visitor-registration"'),
-    operations.indexOf('<section className="visitor-relations-v2"'),
-  );
-
-  assert.doesNotMatch(registration, /<details className="visitor-registration-section"/);
-  assert.equal((registration.match(/visitor-registration-form-section/g) || []).length, 4);
-  assert.match(styles, /\.visitor-registration-form-section>fieldset\s*\{\s*display:grid!important/);
-});
-
 test("the next ministry schedule displays its automatic publication countdown", async () => {
   const ministries = await read("app/components/SecretaryMinisterialWorkspace.tsx");
   const compact = ministries.slice(

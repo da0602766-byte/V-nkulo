@@ -1,7 +1,9 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
+import { CHAT_SOUND_EVENT, chatSoundsEnabled, setChatSoundsEnabled } from "../lib/chat-sounds";
+import "./notification-center.css";
 import {
   isNativeNotificationBridgeAvailable,
 } from "../lib/androidNativeBridge";
@@ -10,6 +12,7 @@ import {
   getWebPushSubscriptionState,
   isWebPushSupported,
   subscribeWebPushNotifications,
+  unsubscribeWebPushNotifications,
   type PushDeliveryStatus,
 } from "../lib/web-push-client";
 
@@ -43,15 +46,56 @@ export default function PilotNotificationCenter({
   // servidor e cliente na hidratação.
   const [agora, setAgora] = useState(0);
   const [open, setOpen] = useState(false);
+  const centerRef = useRef<HTMLDivElement>(null);
+  const [panelTheme, setPanelTheme] = useState<CSSProperties>({});
+  useEffect(() => {
+    if (!open || !centerRef.current) return;
+    // Portals leave the community container; carry its palette into the dialog.
+    const styles = getComputedStyle(centerRef.current);
+    const tokens = ["primary", "purple", "accent", "text", "muted", "line", "surface", "surface-2", "surface-opaque", "success"];
+    setPanelTheme(Object.fromEntries(tokens.map(token => [`--pilot-${token}`, styles.getPropertyValue(`--pilot-${token}`).trim()]).filter(([, value]) => value)) as CSSProperties);
+  }, [open]);
+  const panelRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const trigger = document.activeElement as HTMLElement | null;
+    const panel = panelRef.current;
+    const controls = () => [...(panel?.querySelectorAll<HTMLElement>('button:not([disabled]),a[href],input:not([disabled]),[tabindex="0"]') || [])].filter(item => item.getClientRects().length);
+    panel?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); setOpen(false); }
+      if (event.key !== "Tab") return;
+      const items = controls(), first = items[0], last = items[items.length - 1];
+      if (!first) return;
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === panel)) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    panel?.addEventListener("keydown", onKeyDown);
+    return () => { panel?.removeEventListener("keydown", onKeyDown); trigger?.focus({ preventScroll: true }); };
+  }, [open]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [canConfigure, setCanConfigure] = useState(false);
   const [configuring, setConfiguring] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [savingConfig, setSavingConfig] = useState(false);
+  useEffect(() => {
+    const sync = () => setSoundEnabled(chatSoundsEnabled());
+    sync(); window.addEventListener(CHAT_SOUND_EVENT, sync);
+    return () => window.removeEventListener(CHAT_SOUND_EVENT, sync);
+  }, []);
   const [config, setConfig] = useState<NotificationConfig>(DEFAULT_CONFIG);
   const [devicePermission, setDevicePermission] = useState<"unsupported" | NotificationPermission>("unsupported");
   const [webPushSubscribed, setWebPushSubscribed] = useState(false);
   const [pushDelivery, setPushDelivery] = useState<PushDeliveryStatus | null>(null);
   const [showDevicePermissionHelp, setShowDevicePermissionHelp] = useState(false);
+  const [deviceChecking, setDeviceChecking] = useState(true);
+  const [deviceCheckFailed, setDeviceCheckFailed] = useState(false);
+  const [deviceCheckRevision, setDeviceCheckRevision] = useState(0);
+  const [deviceMessage, setDeviceMessage] = useState("");
+  const [deviceActivating, setDeviceActivating] = useState(false);
+  const [nativePushAvailable, setNativePushAvailable] = useState(false);
+  const activatingRef = useRef(false);
 
   useEffect(() => {
     const acertar = () => setAgora(Date.now());
@@ -63,7 +107,6 @@ export default function PilotNotificationCenter({
     };
   }, []);
   const requestRef = useRef<AbortController | null>(null);
-  const permissionRef = useRef<"unsupported" | NotificationPermission>("unsupported");
   const unread = items.filter((item) => !item.read).length;
   const unreadSummary = useMemo<NotificationUnreadSummary>(() => {
     const summary: NotificationUnreadSummary = {
@@ -125,25 +168,48 @@ export default function PilotNotificationCenter({
   }, [showUnreadOnDevice]);
 
   useEffect(() => {
-    const initial = window.setTimeout(() => {
-      if (!isWebPushSupported()) {
-        permissionRef.current = "unsupported";
-        setDevicePermission("unsupported");
-        return;
+    let cancelled = false;
+    let revision = 0;
+    const refreshDeviceState = async () => {
+      if (activatingRef.current || document.visibilityState !== "visible") return;
+      const request = ++revision;
+      setDeviceChecking(true);
+      setDeviceCheckFailed(false);
+      setDeviceMessage("");
+      setWebPushSubscribed(false);
+      setPushDelivery(null);
+      const native = typeof window.VinkuloAndroid?.requestPushToken === "function";
+      setNativePushAvailable(native);
+      const permission = isWebPushSupported() ? Notification.permission : "unsupported";
+      setDevicePermission(permission);
+      try {
+        if (permission === "granted" && !native) {
+          const state = await getWebPushSubscriptionState();
+          if (cancelled || request !== revision) return;
+          setWebPushSubscribed(state.subscribed);
+          setPushDelivery(state.delivery || null);
+          if (state.error) { setDeviceMessage(state.error); setDeviceCheckFailed(true); }
+        }
+      } catch {
+        if (!cancelled && request === revision) {
+          setDeviceCheckFailed(true);
+          setDeviceMessage("Não foi possível conferir a ativação. Verifique sua conexão e tente novamente.");
+        }
+      } finally {
+        if (!cancelled && request === revision) setDeviceChecking(false);
       }
-      permissionRef.current = Notification.permission;
-      setDevicePermission(Notification.permission);
-      if (Notification.permission === "granted") {
-        void getWebPushSubscriptionState().then((state) => {
-          if (state.supported) {
-            setWebPushSubscribed(state.subscribed);
-            setPushDelivery(state.delivery || null);
-          }
-        }).catch(() => undefined);
-      }
-    }, 0);
-    return () => window.clearTimeout(initial);
-  }, [open]);
+    };
+    const refresh = () => { void refreshDeviceState(); };
+    const initial = window.setTimeout(refresh, 0);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(initial);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [open, deviceCheckRevision]);
 
   useEffect(() => {
     const initial = window.setTimeout(() => void load(), 0);
@@ -202,11 +268,15 @@ export default function PilotNotificationCenter({
   }
 
   async function saveConfig() {
+    if (savingConfig) return;
+    setSavingConfig(true);
+    try {
     const response = await fetch("/api/pilot/notificacoes", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ config }) });
     const result = (await response.json()) as { error?: string };
     if (!response.ok) { setMessage(result.error || "Não foi possível salvar."); return; }
     setConfiguring(false);
     await load();
+    } catch { setMessage("Não foi possível salvar. Verifique a conexão e tente novamente."); } finally { setSavingConfig(false); }
   }
 
   async function clearRead(id?: number) {
@@ -220,42 +290,59 @@ export default function PilotNotificationCenter({
   }
 
   const enableDeviceNotifications = useCallback(async () => {
-    if (window.VinkuloAndroid?.requestPushToken) {
-      window.VinkuloAndroid.requestPushToken();
-      setMessage("O registro Android será atualizado. Permita notificações nas configurações do aplicativo; o envio também depende da configuração Firebase do proprietário.");
-      return;
-    }
-    if (!isWebPushSupported()) {
-      setDevicePermission("unsupported");
-      setMessage(isNativeNotificationBridgeAvailable()
-        ? "Esta versão do APK não oferece push em segundo plano. Instale o Vínkulo pelo navegador para receber avisos mesmo fechado."
-        : "Este navegador não oferece notificações push.");
-      return;
-    }
+    if (activatingRef.current) return;
+    activatingRef.current = true;
+    setDeviceActivating(true);
+    setDeviceMessage("");
     try {
+      if (window.VinkuloAndroid?.requestPushToken) {
+        window.VinkuloAndroid.requestPushToken();
+        setDeviceMessage("Ativação solicitada ao aplicativo Android. Confira a permissão em Configurações › Aplicativos › Vínkulo › Notificações. A solicitação ainda não confirma o recebimento de avisos.");
+        return;
+      }
+      if (!isWebPushSupported()) {
+        setDevicePermission("unsupported");
+        setDeviceMessage(isNativeNotificationBridgeAvailable()
+          ? "Esta versão do APK não oferece push em segundo plano. Instale o Vínkulo pelo navegador para receber avisos mesmo fechado."
+          : "Este navegador não oferece notificações push.");
+        return;
+      }
       const { registration } = await subscribeWebPushNotifications();
-      permissionRef.current = "granted";
       setDevicePermission("granted");
       setWebPushSubscribed(true);
       setPushDelivery(null);
       await registration.showNotification("Notificações ativadas", {
         body: "Agora o Vínkulo poderá avisar você mesmo quando estiver fechado.",
-        icon: "/vinkulo-app-icon-192.png",
-        badge: "/vinkulo-app-icon-192.png",
+        icon: "/vinkulo-logo.png",
+        badge: "/vinkulo-logo.png",
         tag: "vinkulo-notifications-enabled",
         data: { url: "/painel" },
       });
       await load();
     } catch (error) {
       const permission = "Notification" in window ? Notification.permission : "unsupported";
-      permissionRef.current = permission;
       setDevicePermission(permission);
-      setMessage(error instanceof Error ? error.message : "Não foi possível ativar as notificações push.");
+      setDeviceMessage(error instanceof Error ? error.message : "Não foi possível ativar as notificações push.");
+    } finally {
+      activatingRef.current = false;
+      setDeviceActivating(false);
     }
   }, [load]);
 
+  async function disableDeviceNotifications() {
+    if (activatingRef.current) return;
+    activatingRef.current = true; setDeviceActivating(true); setDeviceMessage("");
+    try {
+      await unsubscribeWebPushNotifications();
+      setWebPushSubscribed(false); setPushDelivery(null);
+      setDeviceMessage("Avisos em segundo plano desativados neste aparelho.");
+    } catch (error) { setDeviceMessage(error instanceof Error ? error.message : "Não foi possível desativar. Tente novamente."); }
+    finally { activatingRef.current = false; setDeviceActivating(false); }
+  }
+
   function handleDeviceNotificationPermission() {
-    if (devicePermission === "denied") {
+    if (deviceCheckFailed) { setDeviceCheckRevision(value => value + 1); return; }
+    if (devicePermission === "denied" && !nativePushAvailable) {
       setShowDevicePermissionHelp((value) => !value);
       return;
     }
@@ -272,7 +359,7 @@ export default function PilotNotificationCenter({
   }, [enableDeviceNotifications]);
 
   return (
-    <div className="pilot-notification-center">
+    <div ref={centerRef} className="pilot-notification-center">
       <button
         className="pilot-notification-trigger"
         type="button"
@@ -302,18 +389,23 @@ export default function PilotNotificationCenter({
             aria-label="Fechar notificações"
             onClick={() => setOpen(false)}
           />
-          <section className="pilot-notification-panel" role="dialog" aria-label="Notificações">
+          <section ref={panelRef} style={panelTheme} tabIndex={-1} className="pilot-notification-panel notification-redesign" role="dialog" aria-modal="true" aria-label="Notificações">
             <header>
-              <div><p className="pilot-kicker">CENTRAL</p><h2>Notificações</h2></div>
+              <div className="notification-heading"><span className="notification-brand"><NotificationIcon id="system" /></span><div><h2>{configuring ? "Preferências" : "Notificações"}</h2><p>{configuring ? "Do seu jeito, no seu ritmo" : unread ? `${unread} ${unread === 1 ? "novidade para você" : "novidades para você"}` : "Você está em dia"}</p></div></div>
               <div className="notification-panel-actions">
-                {canConfigure && <button type="button" onClick={() => setConfiguring((value) => !value)} aria-label="Configurar notificações">⚙</button>}
+                <button type="button" onClick={() => setConfiguring(value => !value)} aria-pressed={configuring} aria-label={configuring ? "Voltar às notificações" : "Configurar notificações"}>{configuring ? <span aria-hidden="true">←</span> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M4 7h16M4 17h16M8 4v6m8 4v6"/></svg>}</button>
                 <button type="button" onClick={() => setOpen(false)} aria-label="Fechar">×</button>
               </div>
             </header>
-            <section className={`notification-device-permission status-${devicePermission}`} aria-label="Notificações neste celular">
-              <div><strong>Avisos neste celular</strong><small>{webPushSubscribed ? "Ativados — você recebe avisos mesmo com o Vínkulo fechado" : devicePermission === "denied" ? "Bloqueados nas configurações do navegador ou aplicativo" : devicePermission === "unsupported" ? "Instale pelo navegador para receber avisos mesmo com o aplicativo fechado" : devicePermission === "granted" ? "Permissão liberada; conclua a ativação para receber avisos em segundo plano" : "Receba escalas, eventos, pedidos e demais avisos"}</small></div>
-              {!webPushSubscribed && devicePermission !== "unsupported" && <button type="button" onClick={handleDeviceNotificationPermission}>{devicePermission === "denied" ? "Como liberar" : "Ativar"}</button>}
+            <div className="notification-scroll">
+            {configuring ? <>
+            <section className="notification-sound-settings"><div><strong>Sons do chat</strong><p>Melodias suaves ao enviar e receber mensagens com o Vínkulo aberto.</p></div><label className="notification-toggle"><input type="checkbox" role="switch" aria-label="Sons do chat" checked={soundEnabled} onChange={event => { setChatSoundsEnabled(event.target.checked); setSoundEnabled(event.target.checked); }} /><span aria-hidden="true" /></label></section>
+            <section className={`notification-device-permission status-${devicePermission}`} aria-label="Notificações neste aparelho" aria-busy={deviceChecking || deviceActivating}>
+              <div><strong>Notificações em segundo plano</strong><small>{deviceChecking ? "Conferindo a ativação neste aparelho…" : deviceCheckFailed ? "Não foi possível confirmar se os avisos estão ativados neste aparelho." : nativePushAvailable ? "A ativação é feita pelo aplicativo Android e depende da permissão de notificações do aparelho." : webPushSubscribed ? "Ativados para esta sessão, mesmo com o Vínkulo fechado" : devicePermission === "denied" ? "Bloqueados nas configurações do navegador ou aplicativo" : devicePermission === "unsupported" ? "Instale pelo navegador para receber avisos mesmo com o aplicativo fechado" : devicePermission === "granted" ? "Permissão liberada; conclua a ativação para receber avisos em segundo plano" : "Receba escalas, eventos, pedidos e demais avisos"}</small></div>
+              {!webPushSubscribed && (nativePushAvailable || devicePermission !== "unsupported") && <button type="button" disabled={deviceChecking || deviceActivating} onClick={handleDeviceNotificationPermission}>{deviceActivating ? "Ativando…" : deviceCheckFailed ? "Verificar novamente" : nativePushAvailable ? "Solicitar ativação" : devicePermission === "denied" ? "Como liberar" : "Ativar"}</button>}
+              {webPushSubscribed && <button type="button" disabled={deviceActivating || deviceChecking} onClick={() => void disableDeviceNotifications()}>{deviceActivating ? "Desativando…" : "Desativar neste aparelho"}</button>}
             </section>
+            {deviceMessage && <p className="notification-device-help" role="status">{deviceMessage}</p>}
             {webPushSubscribed && <section className="notification-device-help" aria-live="polite">
               <strong>{pushDelivery?.consecutiveFailures ? "O último envio encontrou uma dificuldade" : "Privacidade neste aparelho"}</strong>
               <p>{pushDelivery?.consecutiveFailures
@@ -328,21 +420,23 @@ export default function PilotNotificationCenter({
                 <p>No celular, abra Configurações › Aplicativos › Vínkulo › Notificações e ative Permitir notificações. Se estiver no navegador, use o cadeado ao lado do endereço.</p>
               </section>
             )}
-            {configuring && <section className="notification-config" aria-label="Configuração de notificações">
-              <div><strong>O que a comunidade envia</strong><small>Defina quais grupos aparecem nesta central.</small></div>
+            {canConfigure && <section className="notification-config" aria-label="Configuração de notificações">
+              <div><strong>O que você recebe</strong><small>Escolha os assuntos que aparecem na sua central.</small></div>
               {(Object.keys(DEFAULT_CONFIG) as Array<keyof NotificationConfig>).map((key) => <label key={key}><input type="checkbox" checked={config[key]} onChange={(event) => setConfig((current) => ({ ...current, [key]: event.target.checked }))} /><span>{key[0].toUpperCase() + key.slice(1)}</span></label>)}
-              <button type="button" onClick={() => void saveConfig()}>Salvar preferências</button>
+              <button type="button" disabled={savingConfig} onClick={() => void saveConfig()}>{savingConfig ? "Salvando…" : "Salvar preferências"}</button>
             </section>}
+            <a className="notification-credits" href="/creditos" target="_blank" rel="noreferrer">Créditos e licenças ↗</a>
+            </> : <>
+            {!deviceChecking && !webPushSubscribed && devicePermission !== "unsupported" && <button className="notification-activate-hint" type="button" onClick={() => setConfiguring(true)}><NotificationIcon id="system" /><span>Receba avisos mesmo com o Vínkulo fechado</span><span aria-hidden="true">›</span></button>}
             <div className="notification-bulk-actions">
               {unread > 0 && <button className="notification-read-all" type="button" onClick={() => markRead()}>Marcar todas como lidas</button>}
               {items.some((item) => item.read) && <button className="notification-clear-read" type="button" onClick={() => void clearRead()}>Limpar visualizadas</button>}
             </div>
+            {message && <p className="notification-device-help" role="status">{message}</p>}
             {loading ? (
-              <p className="notification-empty">Carregando…</p>
-            ) : message ? (
-              <p className="notification-empty">{message}</p>
+              <div className="notification-skeleton" role="status" aria-label="Carregando notificações"><i/><i/><i/></div>
             ) : items.length === 0 ? (
-              <p className="notification-empty">Nenhuma solicitação nova.</p>
+              <div className="notification-empty"><span className="notification-empty-art"><NotificationIcon id="system" /><i/></span><h3>Tudo em dia por aqui</h3><p>Novidades da comunidade chegam neste espaço.</p><small>Enquanto isso, siga conectado.</small></div>
             ) : (
               <>
               <div className="notification-scope-v5" role="group" aria-label="Filtrar notificações">
@@ -372,7 +466,7 @@ export default function PilotNotificationCenter({
                       <NotificationIcon id={notificationVisual(item).key} />
                     </span>
                     <div>
-                      <strong>{item.title}</strong>
+                      <strong>{item.title}{!item.read && <i className="notification-unread-dot" aria-label="Não lida" />}</strong>
                       <small className="notification-source-label">{notificationVisual(item).label}</small>
                       {(item.senderName || item.hierarchy || item.ministry) && (
                         <small className="notification-sender-meta">
@@ -382,13 +476,10 @@ export default function PilotNotificationCenter({
                       <p>{item.message}</p>
                       <time dateTime={item.createdAt}>{formatDate(item.createdAt)}</time>
                     </div>
-                    {item.read ? (
-                      <button type="button" className="notification-clear-one" onClick={() => void clearRead(item.id)}>Limpar</button>
-                    ) : item.destination ? (
-                      <button type="button" onClick={() => void openNotification(item)}>Abrir</button>
-                    ) : !item.read ? (
-                      <button type="button" onClick={() => markRead(item.id)}>Lida</button>
-                    ) : null}
+                    <div className="notification-item-actions">
+                      {isSafeInternalDestination(item.destination) && <button type="button" className="notification-open" aria-label={`Abrir: ${item.title}`} onClick={() => void openNotification(item)}>Abrir</button>}
+                      {item.read ? <button type="button" className="notification-clear-one" onClick={() => void clearRead(item.id)}>Limpar</button> : !isSafeInternalDestination(item.destination) ? <button type="button" onClick={() => markRead(item.id)}>Lida</button> : null}
+                    </div>
                   </article>
                   </Fragment>
                     );
@@ -397,9 +488,9 @@ export default function PilotNotificationCenter({
               </div>
               </>
             )}
-            <footer>
-              E-mail e WhatsApp serão conectados futuramente por provedores externos.
-            </footer>
+            </>}
+            {configuring && message && <p className="notification-device-help" role="status">{message}</p>}
+            </div>
           </section>
         </>,
         document.body,
@@ -411,6 +502,7 @@ export default function PilotNotificationCenter({
 function isSafeInternalDestination(value: string) {
   return (
     value.startsWith("/painel?") ||
+    value.startsWith("/painel/visitantes?") ||
     value.startsWith("/comunidades") ||
     value.startsWith("/proprietario")
   );

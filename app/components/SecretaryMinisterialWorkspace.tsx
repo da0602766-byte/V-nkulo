@@ -1,4 +1,11 @@
 "use client";
+import {useBrowserStorage} from "./useBrowserStorage";
+import "./directory-controls.css";
+import "./ministry-catalog.css";
+import { matchesDirectorySearch } from "../lib/directory-search";
+import SafeImage from "./SafeImage";
+import FileSaveActions from "./FileSaveActions";
+
 
 import {
   type CSSProperties,
@@ -9,7 +16,6 @@ import {
   useRef,
   useState,
 } from "react";
-import MinistriesWorkspace from "./MinistriesWorkspace";
 import MinistryScheduleWizard from "./MinistryScheduleWizard";
 import NativeImageUpload from "./NativeImageUpload";
 import VerifiedOwnerName from "./VerifiedOwnerName";
@@ -35,6 +41,8 @@ type Volunteer = {
   limite_escalas: number;
   escalas_ativas: number;
   is_mine: number;
+  foto_perfil?: string | null;
+  titulo_oficial?: string | null;
 };
 type Ministry = {
   id: number;
@@ -45,10 +53,15 @@ type Ministry = {
   youtube_url: string;
   spotify_url: string;
   banner_url: string;
+  total_integrantes: number;
+  confirmacoes_pendentes: number;
+  responsavel_titulo_oficial?: string | null;
   responsavel_usuario_id: number | null;
   responsavel_nome: string | null;
   criado_em: string;
   can_manage: number;
+  can_remove_members?: number;
+  can_remove_leaders?: number;
   can_archive?: number;
   can_delete: number;
   fio_habilitado: number;
@@ -77,6 +90,7 @@ type Assignment = {
   telefone?: string;
   foto_perfil?: string | null;
   owner_verified?: number;
+  titulo_oficial?: string | null;
 };
 type ScheduleTeam = {
   equipe_id: number;
@@ -233,14 +247,21 @@ const DAYS = [
   ["SAB", "Sáb"],
 ];
 
+function parseFavorites(raw:string|null):number[]{try{const saved=JSON.parse(raw||'[]');return Array.isArray(saved)?saved.filter(n=>Number.isSafeInteger(n)&&n>0):[];}catch{return [];}}
+
 export default function SecretaryMinisterialWorkspace({
-  permissions,
+
   communityName,
+  preferenceKey,
 }: {
+  preferenceKey: string;
   permissions: string[];
   communityName: string;
 }) {
   const [ministries, setMinistries] = useState<Ministry[]>([]);
+  const [favorites,setFavorites]=useBrowserStorage(`ministry-favorites:${preferenceKey}`,parseFavorites);
+  function toggleFavorite(id:number){setFavorites(current=>current.includes(id)?current.filter(n=>n!==id):[...current,id]);}
+
   const [availableUsers, setAvailableUsers] = useState<AvailableUser[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
@@ -249,7 +270,10 @@ export default function SecretaryMinisterialWorkspace({
   const [canCreate, setCanCreate] = useState(false);
   const [selectedMinistryId, setSelectedMinistryId] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>("painel");
+  const [memberOptionsId, setMemberOptionsId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const [catalogCategory, setCatalogCategory] = useState("");
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState("");
@@ -409,6 +433,23 @@ export default function SecretaryMinisterialWorkspace({
     window.addEventListener("vinkulo:new-schedule", openSchedule);
     return () => window.removeEventListener("vinkulo:new-schedule", openSchedule);
   }, [ministries]);
+
+  useEffect(() => {
+    if (loading) return;
+    const url = new URL(window.location.href);
+    const scheduleId = Number(url.searchParams.get("schedule"));
+    const selected = schedules.find((item) => item.id === scheduleId);
+    let scrollFrame = 0;
+    const frame = window.requestAnimationFrame(() => {
+      if (selected) {
+        setSelectedMinistryId(selected.ministerio_id);
+        setDesktopScheduleId(selected.id);
+        setTab("escalas");
+        scrollFrame = window.requestAnimationFrame(() => document.getElementById(`person-schedule-${selected.id}`)?.scrollIntoView({ block: "start" }));
+      } else if (url.searchParams.get("tab") === "escalas") setTab("escalas");
+    });
+    return () => { window.cancelAnimationFrame(frame); window.cancelAnimationFrame(scrollFrame); };
+  }, [loading, schedules]);
 
   useEffect(() => {
     const acertar = () => setAgora(Date.now());
@@ -657,6 +698,18 @@ export default function SecretaryMinisterialWorkspace({
         periodoPreferido: data.get("periodoPreferido"),
       },
       "Sua disponibilidade foi atualizada.",
+    );
+  }
+
+  async function removeVolunteer(volunteer: Volunteer) {
+    if (!selectedMinistry?.can_remove_members || busy) return;
+    if (!window.confirm(`Remover ${volunteer.nome} do ministério “${selectedMinistry.nome}”?\n\nA pessoa continuará cadastrada na comunidade e o histórico de escalas será preservado.`)) return;
+    await submit(
+      `remove-volunteer-${volunteer.id}`,
+      `/api/pilot/ministerios/${selectedMinistry.id}`,
+      "PATCH",
+      { acao: "REMOVER_VOLUNTARIO", voluntarioId: volunteer.id },
+      `${volunteer.nome} foi removido(a) do ministério.`,
     );
   }
 
@@ -1288,6 +1341,9 @@ export default function SecretaryMinisterialWorkspace({
     }
   }
 
+  const catalogCategories = [...new Set(ministries.map((item) => item.categoria))];
+  const visibleMinistries = ministries.filter((item) => (!catalogCategory || item.categoria === catalogCategory) && matchesDirectorySearch(catalogSearch, item.nome, item.descricao, item.responsavel_nome, CATEGORY_LABELS[item.categoria] || item.categoria));
+
   if (loading) {
     return (
       <section className="secretary-workspace ministry-project" aria-busy="true">
@@ -1329,38 +1385,44 @@ export default function SecretaryMinisterialWorkspace({
           )}
         </header>
 
-        {error && <div className="secretary-message error" role="alert">{error}</div>}
+        {error && <div className="secretary-message error" role="alert">{error} <button type="button" onClick={() => void loadData()}>Tentar novamente</button></div>}
         {feedback && <div className="secretary-message success" role="status">{feedback}</div>}
 
+        <section className="secretary-directory-controls" aria-label="Encontrar um ministério">
+          <div className="secretary-directory-fields">
+            <label>Buscar ministério ou liderança<input type="search" value={catalogSearch} onChange={(event) => setCatalogSearch(event.target.value)} placeholder="Nome, categoria ou responsável" /></label>
+            <label>Categoria<select value={catalogCategory} onChange={(event) => setCatalogCategory(event.target.value)}><option value="">Todas as categorias</option>{catalogCategories.map((category) => <option value={category} key={category}>{CATEGORY_LABELS[category] || category}</option>)}</select></label>
+          </div>
+          <div className="secretary-directory-results"><p role="status">{visibleMinistries.length} de {ministries.length} ministérios</p>{(catalogSearch.trim() || catalogCategory) && <button type="button" onClick={() => { setCatalogSearch(""); setCatalogCategory(""); }}>Limpar filtros</button>}</div>
+        </section>
         <div className="secretary-catalog-layout">
           <main className="secretary-ministry-catalog" aria-label="Ministérios disponíveis">
-            {ministries.map((ministry) => (
+            {visibleMinistries.map((ministry) => (
               <article
                 className="secretary-ministry-tile-wrap"
                 data-editor-key={`ministerios-catalogo-item-${ministry.id}`}
                 key={ministry.id}
               >
-                <button
-                  type="button"
-                  className={`secretary-ministry-tile ${ministry.banner_url ? "has-banner" : ""}`}
-                  onClick={() => openMinistry(ministry)}
-                >
-                  <span className={`secretary-ministry-tile-media ${ministry.banner_url ? "" : "is-placeholder"}`} aria-hidden="true">
-                    {ministry.banner_url ? <img src={ministry.banner_url} alt="" loading="lazy" /> : <span>{ministrySymbol(ministry.categoria)}</span>}
-                  </span>
-                  <span className="secretary-ministry-copy">
-                    {ministry.categoria !== "OUTRO" && (CATEGORY_LABELS[ministry.categoria] || ministry.categoria).toLocaleLowerCase("pt-BR") !== ministry.nome.toLocaleLowerCase("pt-BR") && <small>{CATEGORY_LABELS[ministry.categoria] || ministry.categoria}</small>}
-                    <strong>{ministry.nome}</strong>
-                    {ministry.descricao && <span>{ministry.descricao}</span>}
-                  </span>
-                  <span className="secretary-ministry-meta">
-                    {ministry.responsavel_nome && <strong title={`Liderança: ${ministry.responsavel_nome}`}>{ministry.responsavel_nome}</strong>}
-                    <span>{ministry.can_manage ? "Gerenciar →" : "Minhas escalas →"}</span>
-                  </span>
-                </button>
+                <div className="ministry-design-cover">
+                  {ministry.banner_url ? <SafeImage src={ministry.banner_url} alt="" loading="lazy" /> : <div className="ministry-design-placeholder" aria-hidden="true">{ministrySymbol(ministry.categoria)}</div>}
+                  <span className="ministry-design-category">{CATEGORY_LABELS[ministry.categoria] || ministry.categoria}</span>
+                  <button type="button" className="ministry-design-favorite" aria-pressed={favorites.includes(ministry.id)} aria-label={`${favorites.includes(ministry.id)?'Remover dos favoritos':'Favoritar'}: ${ministry.nome}`} title="Favoritos neste navegador" onClick={()=>toggleFavorite(ministry.id)}>
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill={favorites.includes(ministry.id)?'currentColor':'none'} stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></svg>
+                  </button>
+                </div>
+                <div className="ministry-design-body">
+                  <div className="ministry-design-title"><h2>{ministry.nome}</h2>{ministry.status==='INATIVO'&&<span>Inativo</span>}{ministry.confirmacoes_pendentes>0&&<span title={ministry.can_manage?'Confirmações pendentes nas próximas escalas':'Suas confirmações pendentes nas próximas escalas'}>{ministry.confirmacoes_pendentes} {ministry.confirmacoes_pendentes===1?'confirmação pendente':'confirmações pendentes'}</span>}</div>
+                  <p>{ministry.descricao || 'Conheça a equipe e acompanhe as atividades deste ministério.'}</p>
+                  <div className="ministry-design-meta">
+                    <div className="ministry-design-members"><div className="ministry-design-avatars" aria-hidden="true">{ministry.voluntarios.slice(0,2).map(v=><span key={v.id}>{v.foto_perfil?<SafeImage src={v.foto_perfil} alt="" loading="lazy"/>:v.nome.trim().split(/\s+/).slice(0,2).map(n=>n[0]).join('')}</span>)}</div><span>{ministry.total_integrantes} {ministry.total_integrantes===1?'integrante':'integrantes'}</span></div>
+                    <div className="ministry-design-leader"><small>Liderança</small>{ministry.responsavel_nome?<VerifiedOwnerName name={ministry.responsavel_nome} officialTitle={ministry.responsavel_titulo_oficial}/>:<span>A definir</span>}</div>
+                  </div>
+                  <button type="button" className="ministry-design-open" aria-label={`Abrir ministério ${ministry.nome}`} onClick={()=>openMinistry(ministry)}>Abrir ministério <span aria-hidden="true">→</span></button>
+                </div>
               </article>
             ))}
-            {!ministries.length && (
+            {!visibleMinistries.length && ministries.length > 0 && <div className="secretary-empty secretary-catalog-empty"><h2>Nenhum ministério encontrado</h2><p>Ajuste sua busca ou use Limpar filtros para ver os ministérios disponíveis.</p></div>}
+            {!ministries.length && !error && (
               <div className="secretary-empty secretary-catalog-empty">
                 <span aria-hidden="true">✣</span>
                 <h2>Nenhum ministério disponível</h2>
@@ -1389,7 +1451,7 @@ export default function SecretaryMinisterialWorkspace({
                     const ministry = ministries.find(
                       (item) => item.id === schedule.ministerio_id,
                     );
-                    if (ministry) openMinistry(ministry);
+                    if (ministry) { openMinistry(ministry); setTab("escalas"); }
                   }}
                   key={schedule.id}
                 >
@@ -1475,7 +1537,7 @@ export default function SecretaryMinisterialWorkspace({
       },
     ].filter((group) => group.team || group.assignments.length > 0);
     const card = (
-      <article className="secretary-schedule-card" key={schedule.id}>
+      <article className="secretary-schedule-card" id={`person-schedule-${schedule.id}`} key={schedule.id}>
         <header>
           <time dateTime={schedule.inicia_em}><strong>{formatDay(schedule.inicia_em)}</strong><span>{formatMonth(schedule.inicia_em)}</span></time>
           <div><span className={`secretary-status ${schedule.status.toLowerCase()}`}>{schedule.status.replaceAll("_", " ")}</span><h2>{schedule.titulo}</h2><p>{formatDate(schedule.inicia_em)} · {schedule.local || "Local não informado"}</p>{schedule.status === "AGENDADA" && schedule.publicar_em && <SchedulePublicationCountdown opensAt={schedule.publicar_em} />}</div>
@@ -1529,7 +1591,7 @@ export default function SecretaryMinisterialWorkspace({
             <article key={assignment.id} data-status={assignment.status.toLowerCase()}>
               <span className="secretary-avatar">{initials(assignment.nome)}</span>
               <div>
-                <VerifiedOwnerName name={assignment.nome} verified={Boolean(assignment.owner_verified)} />
+                <VerifiedOwnerName name={assignment.nome} verified={Boolean(assignment.owner_verified)} officialTitle={assignment.titulo_oficial} />
                 <small>{assignment.funcao} · {assignmentStatusLabel(assignment.status)}</small>
               </div>
               {Boolean(assignment.is_mine) && assignment.status === "PENDENTE" && schedule.status === "PUBLICADA" && (
@@ -1678,7 +1740,7 @@ export default function SecretaryMinisterialWorkspace({
       >
         {selectedMinistry.banner_url && (
           <div className="secretary-hero-media">
-            <img
+            <SafeImage
               src={selectedMinistry.banner_url}
               alt={`Capa do ministério ${selectedMinistry.nome}`}
               loading="eager"
@@ -1697,7 +1759,7 @@ export default function SecretaryMinisterialWorkspace({
         </div>
         <div className="secretary-community">
           <span>Líder responsável</span>
-          <strong>{selectedMinistry.responsavel_nome || "Não definido"}</strong>
+          <strong><VerifiedOwnerName name={selectedMinistry.responsavel_nome || "Não definido"} officialTitle={selectedMinistry.responsavel_titulo_oficial}/></strong>
           <small>{communityName} · acesso controlado</small>
           {selectedMinistry.categorias_visitantes?.length > 0 && (
             <small className="secretary-visitor-care">
@@ -1767,7 +1829,7 @@ export default function SecretaryMinisterialWorkspace({
             ] as [Tab, string][])
           : ([["escalas", "Minhas escalas"]] as [Tab, string][]))
           .map(([id, label]) => (
-          <button type="button" className={tab === id ? "active" : ""} onClick={() => setTab(id)} key={id}>{label}</button>
+          <button type="button" aria-pressed={tab === id} className={tab === id ? "active" : ""} onClick={() => setTab(id)} key={id}>{label}</button>
         ))}
       </nav>
 
@@ -1790,7 +1852,7 @@ export default function SecretaryMinisterialWorkspace({
                   <header><div><p className="pilot-kicker">MINISTÉRIO SELECIONADO</p><h2>{selectedMinistry.nome}</h2></div><span>{CATEGORY_LABELS[selectedMinistry.categoria] || selectedMinistry.categoria}</span></header>
                   <p>{selectedMinistry.descricao || "Adicione uma descrição nas configurações do ministério."}</p>
                   <dl>
-                    <div><dt>Responsável</dt><dd>{selectedMinistry.responsavel_nome || "Não definido"}</dd></div>
+                    <div><dt>Responsável</dt><dd><VerifiedOwnerName name={selectedMinistry.responsavel_nome || "Não definido"} officialTitle={selectedMinistry.responsavel_titulo_oficial}/></dd></div>
                     <div><dt>Categorias de visitantes</dt><dd>{selectedMinistry.categorias_visitantes?.length ? selectedMinistry.categorias_visitantes.map((item) => item.nome).join(", ") : "Nenhuma associada"}</dd></div>
                     <div><dt>Status</dt><dd>{selectedMinistry.status === "ATIVO" ? "Ativo" : "Inativo"}</dd></div>
                     <div><dt>Criado em</dt><dd>{formatDate(selectedMinistry.criado_em, false)}</dd></div>
@@ -1823,18 +1885,20 @@ export default function SecretaryMinisterialWorkspace({
             <div className="secretary-section-grid">
               {tab === "integrantes" && <section className="secretary-card secretary-wide-card">
                 <header><div><p className="pilot-kicker">EQUIPE DO MINISTÉRIO</p><h2>{selectedMinistry.voluntarios.length} integrantes</h2></div><span>Carregamento automático nas escalas</span></header>
-                <div className="secretary-members">
+                <div className="ministry-member-list">
                   {selectedMinistry.voluntarios.map((volunteer) => (
                     <article key={volunteer.id}>
                       <span className="secretary-avatar">{initials(volunteer.nome)}</span>
-                      <div><strong>{volunteer.nome}</strong><small>{volunteer.funcao}</small></div>
-                      <span className={`secretary-role ${volunteer.papel.toLowerCase()}`}>{volunteer.papel === "LIDER" ? "Líder" : "Integrante"}</span>
-                      <small>
-                        {volunteer.escalas_ativas} escala(s) futura(s) · {Math.max(0, volunteer.limite_escalas - volunteer.escalas_ativas)} restante(s)
-                      </small>
+                      <div className="ministry-member-copy"><strong><VerifiedOwnerName name={volunteer.nome} officialTitle={volunteer.titulo_oficial}/></strong><small>{volunteer.funcao || "Função não informada"} · {volunteer.papel === "LIDER" ? "Líder" : "Integrante"}</small>
+                        <small>{volunteer.escalas_ativas} escala(s) futura(s) · Limite {volunteer.limite_escalas} · {Math.max(0, volunteer.limite_escalas - volunteer.escalas_ativas)} restante(s)</small>
+                      </div>
                       {canManage && (
+                        <button type="button" className="ministry-member-options" aria-label={`Opções de ${volunteer.nome}`} aria-expanded={memberOptionsId === volunteer.id} aria-controls={`member-options-${volunteer.id}`} onClick={() => setMemberOptionsId(memberOptionsId === volunteer.id ? null : volunteer.id)}>Opções <span aria-hidden="true">⌄</span></button>
+                      )}
+                      {canManage && memberOptionsId === volunteer.id && (
                         <form
-                          className="secretary-capacity-form"
+                          id={`member-options-${volunteer.id}`}
+                          className="ministry-member-editor"
                           onSubmit={(event) => void updateScheduleLimit(volunteer, event)}
                         >
                           <label>
@@ -1848,6 +1912,11 @@ export default function SecretaryMinisterialWorkspace({
                             />
                           </label>
                           <button disabled={busy === `capacity-${volunteer.id}`}>Salvar</button>
+                          {Boolean(selectedMinistry.can_remove_members) && (volunteer.papel !== "LIDER" || Boolean(selectedMinistry.can_remove_leaders)) && (
+                            <button type="button" className="secretary-remove-member" disabled={Boolean(busy)} aria-label={`Remover ${volunteer.nome} do ministério`} onClick={() => void removeVolunteer(volunteer)}>
+                              {busy === `remove-volunteer-${volunteer.id}` ? "Removendo…" : "Remover do ministério"}
+                            </button>
+                          )}
                         </form>
                       )}
                     </article>
@@ -1902,7 +1971,7 @@ export default function SecretaryMinisterialWorkspace({
                               disabled={!canManage}
                             />
                             <span>{initials(volunteer.nome)}</span>
-                            <small>{volunteer.nome}</small>
+                            <small><VerifiedOwnerName name={volunteer.nome} officialTitle={volunteer.titulo_oficial}/></small>
                           </label>
                         ))}
                       </div>
@@ -2468,7 +2537,7 @@ export default function SecretaryMinisterialWorkspace({
                   {ministrySchedules.map((schedule) => (
                     <article key={schedule.id}>
                       <div><strong>{schedule.titulo}</strong><span>{formatDate(schedule.inicia_em)} · {schedule.status}</span></div>
-                      <button type="button" onClick={() => void downloadSchedulePdf(schedule)} disabled={busy === `pdf-${schedule.id}`}>{busy === `pdf-${schedule.id}` ? "Preparando…" : "Baixar PDF"}</button>
+                      <FileSaveActions source={`/api/pilot/escalas/${schedule.id}/pdf?download=1`} name={`escala-${schedule.titulo}.pdf`} />
                       <button type="button" onClick={() => downloadScheduleImage(schedule)}>Baixar imagem</button>
                       <button type="button" onClick={() => addScheduleToCalendar(schedule)}>Adicionar ao calendário</button>
                     </article>
@@ -2505,10 +2574,7 @@ export default function SecretaryMinisterialWorkspace({
                   </div>
                 </section>
               )}
-              <section className="secretary-advanced">
-                <header><div><p className="pilot-kicker">CONFIGURAÇÕES AVANÇADAS</p><h2>Recursos preservados</h2><p>Funções personalizadas, modelos, histórico e controles anteriores continuam disponíveis.</p></div></header>
-                <MinistriesWorkspace permissions={permissions} communityName={communityName} />
-              </section>
+
             </div>
           )}
         </>
@@ -3203,7 +3269,7 @@ function MinistryAccessHistory({ schedules }: { schedules: Schedule[] }) {
       <div className="secretary-access-history-text">
         {entries.map((entry) => (
           <article key={entry.id}>
-            <span className="secretary-whatsapp-avatar">{entry.beneficiarioFoto ? <img src={entry.beneficiarioFoto} alt="" loading="lazy" /> : initials(entry.beneficiarioNome)}</span>
+            <span className="secretary-whatsapp-avatar">{entry.beneficiarioFoto ? <SafeImage src={entry.beneficiarioFoto} alt="" loading="lazy" /> : initials(entry.beneficiarioNome)}</span>
             <p><strong>{entry.beneficiarioNome}</strong> recebeu acesso a <b>{entry.recursoLabel}</b> na escala “{entry.scheduleTitle}”, de {formatDate(entry.iniciaEm)} até {formatDate(entry.terminaEm)}.</p>
             <small data-status={entry.status.toLowerCase()}>{entry.status.replaceAll("_", " ")}</small>
             <div className="secretary-access-history-actions">
@@ -3450,11 +3516,11 @@ function ShareDialogV2({
               >
                 <span className="secretary-whatsapp-avatar">
                   {assignment.foto_perfil
-                    ? <img src={assignment.foto_perfil} alt="" loading="lazy" />
+                    ? <SafeImage src={assignment.foto_perfil} alt="" loading="lazy" />
                     : initials(assignment.nome)}
                 </span>
                 <div>
-                  <VerifiedOwnerName name={assignment.nome} verified={Boolean(assignment.owner_verified)} />
+                  <VerifiedOwnerName name={assignment.nome} verified={Boolean(assignment.owner_verified)} officialTitle={assignment.titulo_oficial} />
                   <small>{assignment.funcao}</small>
                 </div>
                 <i aria-hidden="true">{selected ? "✓" : ""}</i>
@@ -3515,7 +3581,7 @@ function ShareDialogV2({
               {directRecipient?.telefone && <button type="button" onClick={() => void shareGeneratedMessage(directRecipient.nome)}>Enviar para contato</button>}
               <a href={`https://t.me/share/url?url=${encodeURIComponent(generatedAccesses[0]?.url || "")}&text=${encodeURIComponent(safeMessage)}`} target="_blank" rel="noreferrer">Telegram</a>
               <a href={`mailto:?subject=${encodeURIComponent(`Acesso temporário — ${schedule.titulo}`)}&body=${encodeURIComponent(safeMessage)}`}>E-mail</a>
-              <button type="button" onClick={() => void downloadFileForDevice(`/api/pilot/escalas/${schedule.id}/pdf?download=1`, `escala-${schedule.titulo}.pdf`).catch((cause) => setShareStatus((cause as Error).message || "Não foi possível abrir o PDF."))}>Baixar PDF</button>
+              <FileSaveActions source={`/api/pilot/escalas/${schedule.id}/pdf?download=1`} name={`escala-${schedule.titulo}.pdf`} />
               <button type="button" onClick={() => downloadScheduleImage(schedule)}>Baixar imagem</button>
             </div>
             {shareStatus && <p className="secretary-share-status" role="status">{shareStatus}</p>}

@@ -2,6 +2,8 @@ declare global {
   interface Window {
     VinkuloFcmActive?: boolean;
     VinkuloAndroid?: {
+      offlineModeVersion?: number;
+      version?: string;
       requestPushToken?: () => void;
       setPushBinding?: (token: string, bindingId: string) => void;
       clearPushBinding?: () => void;
@@ -108,7 +110,7 @@ export function shareToWhatsAppApp(message: string) {
   const encoded = encodeURIComponent(message);
   const fallback = `https://api.whatsapp.com/send?text=${encoded}`;
   const isAndroid = /Android/i.test(window.navigator.userAgent);
-  window.location.href = isAndroid
+  window.location.href = isAndroid && !window.VinkuloAndroid
     ? `intent://send?text=${encoded}#Intent;scheme=whatsapp;package=com.whatsapp;S.browser_fallback_url=${encodeURIComponent(fallback)};end`
     : fallback;
   return true;
@@ -158,6 +160,13 @@ export function addCalendarEventForDevice(event: DeviceCalendarEvent) {
     calendarUrl.searchParams.set("details", calendarEvent.description);
   }
 
+  // APKs already installed only support external HTTPS reliably. Their generic
+  // intent handler adds CATEGORY_BROWSABLE, which calendar INSERT cannot resolve.
+  if (window.VinkuloAndroid) {
+    window.location.assign(calendarUrl.toString());
+    return true;
+  }
+
   if (/Android/i.test(window.navigator.userAgent)) {
     const fallbackUrl = calendarUrl.toString();
     const extras = [
@@ -180,8 +189,9 @@ export function addCalendarEventForDevice(event: DeviceCalendarEvent) {
     return true;
   }
 
-  const opened = window.open(calendarUrl.toString(), "_blank", "noopener,noreferrer");
-  if (!opened) window.location.assign(calendarUrl.toString());
+  // A noopener popup can return null even after opening successfully. Use one
+  // explicit navigation instead of opening twice or relying on WebView popups.
+  window.location.assign(calendarUrl.toString());
   return true;
 }
 

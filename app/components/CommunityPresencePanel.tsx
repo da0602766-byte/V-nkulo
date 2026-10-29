@@ -1,7 +1,12 @@
 "use client";
+import SafeImage from "./SafeImage";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import VerifiedOwnerName from "./VerifiedOwnerName";
+import FeedPresencePopover from "./feed/FeedPresencePopover";
+import TransientFeedback from "./TransientFeedback";
+import "./feed/feed-interactions.css";
 
 type PresencePerson = {
   userId: number;
@@ -15,6 +20,7 @@ type PresencePerson = {
   canMessage: boolean;
   communicationGroup: "MEMBRO" | "OFICIAL";
   ownerVerified?: boolean;
+  officialTitle?: string | null;
 };
 
 type PresenceResponse = {
@@ -31,12 +37,23 @@ export default function CommunityPresencePanel() {
   const [updatingPrivacy, setUpdatingPrivacy] = useState(false);
   const [shareLastSeen, setShareLastSeen] = useState(true);
   const [error, setError] = useState("");
-  const [selectedPerson, setSelectedPerson] = useState<PresencePerson | null>(null);
+  const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
   const [showBiography, setShowBiography] = useState(false);
   const [currentUserId, setCurrentUserId] = useState(0);
+  const profileId = useId();
+  const selectedRowRef = useRef<HTMLDivElement>(null);
+  const selectedTriggerRef = useRef<HTMLButtonElement>(null);
+
+  function closeProfile() {
+    setSelectedPersonId(null);
+    selectedTriggerRef.current?.focus({ preventScroll: true });
+  }
 
   const applyResult = useCallback((result: PresenceResponse) => {
-    setPeople(result.people || []);
+    setPeople((result.people || []).map((person) => ({
+      ...person,
+      name: person.name.trim().toLocaleLowerCase("pt-BR").replace(/^\p{L}/u, (letter) => letter.toLocaleUpperCase("pt-BR")),
+    })));
     setShareLastSeen(result.currentUserSharesLastSeen !== false);
     setCurrentUserId(Number(result.currentUserId || 0));
   }, []);
@@ -104,7 +121,7 @@ export default function CommunityPresencePanel() {
     window.dispatchEvent(
       new CustomEvent("vinkulo:open-chat", { detail: { userId: person.userId } }),
     );
-    setSelectedPerson(null);
+    setSelectedPersonId(null);
   }
 
   const visiblePeople = useMemo(
@@ -133,29 +150,36 @@ export default function CommunityPresencePanel() {
       ) : visiblePeople.length ? (
         <div className="presence-list">
           {visiblePeople.map((person) => (
+            <div key={person.userId} className="feed-presence-row" data-selected={selectedPersonId === person.userId} ref={selectedPersonId === person.userId ? selectedRowRef : undefined} onKeyDown={(event) => {
+              if (event.key === "Escape" && selectedPersonId === person.userId) {
+                event.preventDefault();
+                event.stopPropagation();
+                closeProfile();
+              }
+            }}>
             <button
-              key={person.userId}
               type="button"
               className="presence-person"
-              onClick={() => {
-                setSelectedPerson(person);
+              onClick={(event) => {
+                selectedTriggerRef.current = event.currentTarget;
+                setSelectedPersonId((current) => current === person.userId ? null : person.userId);
                 setShowBiography(false);
               }}
+              aria-expanded={selectedPersonId === person.userId}
+              aria-controls={selectedPersonId === person.userId ? `${profileId}-${person.userId}` : undefined}
               aria-label={`Abrir perfil de ${person.name}`}
             >
               <span className="presence-avatar" aria-hidden="true">
                 {person.avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img loading="lazy" src={person.avatarUrl} alt="" />
+                  <SafeImage loading="lazy" fallbackName={person.name} fallbackKind="avatar" src={person.avatarUrl} alt="" />
                 ) : (
                   initials(person.name)
                 )}
                 <i className={person.online ? "online" : ""} />
               </span>
-              <div>
-                <VerifiedOwnerName name={person.name} verified={Boolean(person.ownerVerified)} />
+              <div className="presence-person-copy" title={person.name}>
+                <VerifiedOwnerName name={person.name} verified={Boolean(person.ownerVerified)} officialTitle={person.officialTitle} />
                 <small>{formatHierarchy(person.hierarchy)}</small>
-              </div>
               <em className={person.online ? "online" : ""}>
                 {person.online
                   ? "Online"
@@ -163,7 +187,34 @@ export default function CommunityPresencePanel() {
                     ? formatRelativeTime(person.lastSeen)
                     : "Atividade oculta"}
               </em>
+              </div>
             </button>
+            {selectedPersonId === person.userId && (
+              <FeedPresencePopover id={`${profileId}-${person.userId}`} label={`Perfil de ${person.name}`} anchorRef={selectedRowRef} triggerRef={selectedTriggerRef} onClose={closeProfile} onDismiss={() => setSelectedPersonId(null)}>
+                <header>
+                  <div>
+                    <VerifiedOwnerName name={person.name} verified={Boolean(person.ownerVerified)} officialTitle={person.officialTitle} />
+                    <small>{formatHierarchy(person.hierarchy)}</small>
+                  </div>
+                  <button type="button" onClick={closeProfile} aria-label="Fechar perfil">×</button>
+                </header>
+                <div className="presence-profile-actions">
+                  <button type="button" disabled={!person.canMessage} onClick={() => openChatWith(person)}>Mensagem</button>
+                  <button type="button" onClick={() => setShowBiography((value) => !value)} aria-expanded={showBiography} aria-controls={`${profileId}-${person.userId}-biography`}>Biografia</button>
+                </div>
+                {!person.canMessage && (
+                  <small className="presence-message-rule">
+                    {person.userId === currentUserId
+                      ? "Este é o seu perfil. Edite a biografia em Minha conta."
+                      : "Conversas são permitidas apenas entre membros ou entre oficiais."}
+                  </small>
+                )}
+                <p id={`${profileId}-${person.userId}-biography`} className="presence-biography" hidden={!showBiography}>
+                  {person.biography || "Esta pessoa ainda não adicionou uma biografia."}
+                </p>
+              </FeedPresencePopover>
+            )}
+            </div>
           ))}
         </div>
       ) : (
@@ -174,7 +225,7 @@ export default function CommunityPresencePanel() {
         <button
           className="presence-expand"
           type="button"
-          onClick={() => setExpanded((current) => !current)}
+          onClick={() => { setExpanded((current) => !current); setSelectedPersonId(null); }}
           aria-expanded={expanded}
         >
           {expanded ? "Mostrar menos" : `Ver todos (${people.length})`}
@@ -190,42 +241,7 @@ export default function CommunityPresencePanel() {
         />
         <span>Permitir que vejam minha última atividade</span>
       </label>
-      {error && <small className="presence-error" role="alert">{error}</small>}
-      {selectedPerson && (
-        <div className="presence-profile-popover" role="dialog" aria-label={`Perfil de ${selectedPerson.name}`}>
-          <header>
-            <div>
-              <VerifiedOwnerName name={selectedPerson.name} verified={Boolean(selectedPerson.ownerVerified)} />
-              <small>{formatHierarchy(selectedPerson.hierarchy)}</small>
-            </div>
-            <button type="button" onClick={() => setSelectedPerson(null)} aria-label="Fechar perfil">×</button>
-          </header>
-          <div className="presence-profile-actions">
-            <button
-              type="button"
-              disabled={!selectedPerson.canMessage}
-              onClick={() => openChatWith(selectedPerson)}
-            >
-              Mensagem
-            </button>
-            <button type="button" onClick={() => setShowBiography((value) => !value)} aria-expanded={showBiography}>
-              Biografia
-            </button>
-          </div>
-          {!selectedPerson.canMessage && (
-            <small className="presence-message-rule">
-              {selectedPerson.userId === currentUserId
-                ? "Este é o seu perfil. Edite a biografia em Minha conta."
-                : "Conversas são permitidas apenas entre membros ou entre oficiais."}
-            </small>
-          )}
-          {showBiography && (
-            <p className="presence-biography">
-              {selectedPerson.biography || "Esta pessoa ainda não adicionou uma biografia."}
-            </p>
-          )}
-        </div>
-      )}
+      {error && <TransientFeedback className="presence-error" role="alert">{error}</TransientFeedback>}
     </section>
   );
 }

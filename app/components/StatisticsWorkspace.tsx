@@ -1,5 +1,7 @@
 "use client";
 
+import TransientFeedback from "./TransientFeedback";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 type Statistics = {
@@ -65,9 +67,9 @@ export default function StatisticsWorkspace() {
         </button>
       </header>
       {error && (
-        <p className="operations-feedback error" role="alert">
+        <TransientFeedback className="operations-feedback error" role="alert">
           {error}
-        </p>
+        </TransientFeedback>
       )}
       {!data ? (
         <div className="statistics-loading">

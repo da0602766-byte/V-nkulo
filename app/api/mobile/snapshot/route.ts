@@ -1,4 +1,5 @@
 import { getD1 } from "../../../../db";
+import { rejectDisabledOffline } from "../../../lib/android-offline-policy";
 import { getCurrentSessionTokenHash } from "../../../lib/local-auth";
 import { requireTenantPermission } from "../../../lib/tenant";
 import { communityThemeStyle, parseCommunityTheme } from "../../../lib/community-theme";
@@ -13,6 +14,8 @@ const LIMIT = 100;
 // Only the native HTTPS client can install it in encrypted storage. It is not
 // an API token. Protocol 1 remains unchanged for the previous APK.
 export async function GET(request: Request) {
+  const blocked = await rejectDisabledOffline();
+  if (blocked) return blocked;
   if (request.headers.get("origin") !== new URL(request.url).origin || request.headers.get("sec-fetch-site") === "cross-site") {
     return reply({ error: "Origem inválida." }, 403);
   }

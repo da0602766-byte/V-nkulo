@@ -1,4 +1,6 @@
 "use client";
+import VinkuloMark from "./VinkuloMark";
+
 
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
@@ -6,13 +8,13 @@ import VinkuloLoading from './VinkuloLoading';
 import Link from './StableLink';
 import { useThemePreference } from '../lib/use-theme-preference';
 
-export function AccessShell({children,owner=false,logoUrl='',siteName='Vínkulo'}:{children:ReactNode;owner?:boolean;logoUrl?:string;siteName?:string}) {
+export function AccessShell({children,owner=false,siteName='Vínkulo'}:{children:ReactNode;owner?:boolean;logoUrl?:string;siteName?:string}) {
   const {theme,updateTheme}=useThemePreference();
   return <main className="access-shell" data-owner={owner}>
     <aside className="access-story">
-      <Link href="/" className="access-brand"><img src={logoUrl||'/vinkulo-app-icon-192.png'} alt="" width={42} height={42}/><span>{siteName.toLowerCase()}<small>{owner?'ADMINISTRAÇÃO DA PLATAFORMA':'PESSOAS. FÉ. COMUNIDADE.'}</small></span></Link>
+      <Link href="/" className="access-brand"><VinkuloMark size={42}/><span>{siteName.toLowerCase()}<small>{owner?'ADMINISTRAÇÃO DA PLATAFORMA':'PESSOAS. FÉ. COMUNIDADE.'}</small></span></Link>
       <div className="access-story-copy"><span className="access-eyebrow">{owner?'ACESSO DO PROPRIETÁRIO':'PERTENCER NOS CONECTA'}</span><h2>{owner?<>Uma visão completa.<br/><em>Cuidado em cada decisão.</em></>:<>Mais perto das pessoas.<br/><em>Mais presente na comunidade.</em></>}</h2><p>{owner?'Solicitações, comunidades e planos em um único lugar. Cada operação respeita as permissões da sua conta.':'Um espaço para acompanhar sua comunidade, participar e cuidar do que importa.'}</p>
-      <div className="access-orbits" aria-hidden="true"><i/><i/><i/><span>v</span><b className="orbit-one">Comunidade</b><b className="orbit-two">Participação</b><b className="orbit-three">Cuidado</b></div></div>
+      <div className="access-orbits" aria-hidden="true"><i/><i/><i/><span><VinkuloMark size={80}/></span><b className="orbit-one">Comunidade</b><b className="orbit-two">Participação</b><b className="orbit-three">Cuidado</b></div></div>
       <small className="access-story-foot">{owner?'Administração com acesso individual e auditável.':'Sua comunidade, conectada.'}</small>
     </aside>
     <section className="access-content"><nav className="access-toolbar" aria-label="Preferências de exibição"><Link href="/">Conheça o Vínkulo ↗</Link><div className="access-theme">{(['CLARO','AUTO','ESCURO'] as const).map((value,i)=><button type="button" key={value} aria-label={`Tema ${['claro','automático','escuro'][i]}`} aria-pressed={theme===value} onClick={()=>updateTheme(value)}>{['☀','◐','☾'][i]}</button>)}</div></nav><div className="access-form-area">{children}</div><footer className="access-footer"><Link href="/termos">Termos de Uso</Link><span>·</span><Link href="/privacidade">Privacidade</Link><small>© {new Date().getFullYear()} {siteName}</small></footer></section>
@@ -46,6 +48,6 @@ export default function AccessPortal({owner=false,returnTo='',initialMessage='',
     {recovery?<button className="access-text-button" onClick={()=>{setRecovery(false);setMessage('');}}>← Voltar para entrar</button>:<p className="access-migration">Já tinha uma conta? <Link href="/vincular-cpf">Vincule seu CPF</Link></p>}
     {!owner&&!recovery&&<div className="access-paths"><Link className="access-community-link" href="/log1"><span><strong>Quero criar uma comunidade</strong><small>Conheça os planos e solicite seu acesso</small></span><b aria-hidden="true">↗</b></Link><p><strong>Recebeu um convite?</strong> Abra o link enviado pela sua comunidade para criar sua conta.</p></div>}
     {owner&&<p className="access-private-note">Acesso exclusivo para contas autorizadas. Sua sessão administrativa expira em uma hora.</p>}
-    {busy&&!recovery&&typeof document!=='undefined'&&createPortal(<VinkuloLoading label="Entrando na sua comunidade…"/>,document.body)}
+    {busy&&!recovery&&typeof document!=='undefined'&&createPortal(<VinkuloLoading label={owner?"Abrindo painel do proprietário…":"Entrando na sua comunidade…"}/>,document.body)}
   </AccessShell>;
 }

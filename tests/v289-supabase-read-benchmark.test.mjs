@@ -88,8 +88,7 @@ test("comparação de leitura é exclusiva do proprietário e não devolve vínc
 test("consultas independentes do contexto de acesso rodam juntas sem mudar a ordem das permissões", async () => {
   const source = await readFile(new URL("../app/lib/tenant.ts", import.meta.url), "utf8");
   const block = source.slice(source.indexOf("export async function getActiveTenantContext"), source.indexOf("async function getCommunityModules"));
-  assert.match(block, /Promise\.all\(\[\s*getDiaconiaPermissions[\s\S]*getNetworkPermissions[\s\S]*getActiveParkingAssignment[\s\S]*getParkingLeaderPermissions/);
+  assert.match(block, /Promise\.all\(\[\s*fullAccess \? getDiaconiaPermissions[\s\S]*getNetworkPermissions[\s\S]*getActiveParkingAssignment[\s\S]*getParkingLeaderPermissions[\s\S]*getSubscription[\s\S]*getCommunityModules/);
   assert.match(block, /for \(const permission of diaconiaPermissions\)[\s\S]*for \(const permission of networkPermissions\)[\s\S]*if \(parkingAssignment\)[\s\S]*for \(const permission of parkingLeaderPermissions\)/);
-  assert.match(block, /const temporaryGrant[\s\S]*const configuredModules = await getCommunityModules/);
   assert.match(block, /filterPlanPermissions/);
 });

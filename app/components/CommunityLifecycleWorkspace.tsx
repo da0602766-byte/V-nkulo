@@ -1,7 +1,6 @@
 "use client";
-
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import "./community-central.css";
 type LifecycleRequest = {
   id: number;
   communityId: number;
@@ -60,386 +59,77 @@ const CATEGORY_OPTIONS = [
   ["RETENCAO_LEGAL", "Questão legal — evidência obrigatória"],
 ] as const;
 
-export default function CommunityLifecycleWorkspace({
-  mode = "community",
-  currentCommunityId,
-}: {
-  mode?: "community" | "support";
-  currentCommunityId: number;
-}) {
+export default function CommunityLifecycleWorkspace({ mode = "community", currentCommunityId }: { mode?: "community" | "support"; currentCommunityId: number }) {
   const [data, setData] = useState<LifecycleData | null>(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState("");
-  const [requestType, setRequestType] = useState("CANCELAMENTO");
+  const [requestType, setRequestType] = useState("");
   const [category, setCategory] = useState("SEM_USO");
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const response = await fetch("/api/pilot/continuidade", {
-        cache: "no-store",
-      });
-      const result = (await response.json()) as LifecycleData & { error?: string };
-      if (!response.ok) throw new Error(result.error || "Não foi possível carregar o fluxo.");
-      setData(result);
-    } catch (loadError) {
-      setError((loadError as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => void load(), 0);
-    return () => window.clearTimeout(timer);
-  }, [load]);
-
-  const visibleRequests = useMemo(() => {
-    if (!data) return [];
-    return mode === "support"
-      ? data.requests
-      : data.requests.filter((item) => item.communityId === currentCommunityId);
-  }, [currentCommunityId, data, mode]);
-  const evidenceRequired = ["SEGURANCA", "DENUNCIA", "RETENCAO_LEGAL"].includes(
-    category,
-  );
+  const [formOpen, setFormOpen] = useState(false);
+  const requestRef = useRef<AbortController | null>(null);
+  const mutationRef = useRef(false);
+  const fetchData = useCallback(async () => {
+    requestRef.current?.abort(); const controller = new AbortController(); requestRef.current = controller;
+    return fetch("/api/pilot/continuidade", { cache: "no-store", signal: controller.signal }).then(async response=>{
+      const result = await response.json();
+      if (!response.ok || !result.protection || !Array.isArray(result.requests)) throw new Error(result.error || "Não foi possível consultar a continuidade.");
+      if (!controller.signal.aborted) setData(result);
+    }).catch(cause=>{ if (!controller.signal.aborted) setLoadError((cause as Error).message); }).finally(()=>{ if (!controller.signal.aborted) setLoading(false); });},[]);
+  const load=useCallback(()=>{setLoading(true); setLoadError("");return fetchData();},[fetchData]);
+ useEffect(() => { void fetchData(); return () => requestRef.current?.abort(); }, [fetchData]);
+  const visibleRequests = useMemo(() => data?.requests.filter(r => mode === "support" || r.communityId === currentCommunityId) || [], [data, currentCommunityId, mode]);
+  const evidenceRequired = ["SEGURANCA", "DENUNCIA", "RETENCAO_LEGAL"].includes(category);
 
   async function createRequest(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setWorking(true);
-    setError("");
-    setFeedback("");
-    const form = new FormData(event.currentTarget);
+    if (mutationRef.current || !data?.canRequest || !requestType) return;
+    const formElement = event.currentTarget; const form = new FormData(formElement);
+    mutationRef.current = true; setWorking(true); setError(""); setFeedback("");
     try {
-      const response = await fetch("/api/pilot/continuidade", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "CRIAR_SOLICITACAO",
-          type: requestType,
-          category,
-          reason: form.get("reason"),
-          description: form.get("description"),
-          evidence: form.get("evidence"),
-          confirmation: form.get("confirmation"),
-          password: form.get("password"),
-        }),
-      });
-      const result = (await response.json()) as { error?: string; message?: string };
-      if (!response.ok) throw new Error(result.error || "Não foi possível enviar.");
-      setFeedback(result.message || "Solicitação enviada para análise.");
-      event.currentTarget.reset();
-      setRequestType("CANCELAMENTO");
-      setCategory("SEM_USO");
-      await load();
-    } catch (submitError) {
-      setError((submitError as Error).message);
-    } finally {
-      setWorking(false);
-    }
+      const response = await fetch("/api/pilot/continuidade", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "CRIAR_SOLICITACAO", type: requestType, category, reason: form.get("reason"), description: form.get("description"), evidence: form.get("evidence"), confirmation: form.get("confirmation"), password: form.get("password") }) });
+      const result = await response.json(); if (!response.ok) throw new Error(result.error || "Não foi possível enviar a solicitação.");
+      formElement.reset(); setRequestType(""); setCategory("SEM_USO"); setFormOpen(false);
+      setFeedback(result.message || "Solicitação enviada. Acompanhe a análise abaixo."); await load();
+    } catch (cause) { setError((cause as Error).message); }
+    finally { mutationRef.current = false; setWorking(false); }
   }
-
-  async function review(
-    requestId: number,
-    action: "INICIAR_ANALISE" | "RECUSAR" | "APROVAR",
-  ) {
-    const prompt =
-      action === "RECUSAR"
-        ? "Explique por que a solicitação será recusada:"
-        : action === "APROVAR"
-          ? "Informe a justificativa da aprovação:"
-          : "Informe a observação inicial da análise:";
-    const reviewReason = window.prompt(prompt);
-    if (!reviewReason) return;
-    setWorking(true);
-    setError("");
-    setFeedback("");
+  async function review(requestId: number, action: "INICIAR_ANALISE" | "RECUSAR" | "APROVAR") {
+    if (mutationRef.current || !data?.canReview) return;
+    const reviewReason = window.prompt("Informe a justificativa desta análise:"); if (!reviewReason?.trim()) return;
+    mutationRef.current = true; setWorking(true); setError(""); setFeedback("");
     try {
-      const response = await fetch("/api/pilot/continuidade", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, requestId, reviewReason }),
-      });
-      const result = (await response.json()) as { error?: string; status?: string };
-      if (!response.ok) throw new Error(result.error || "A análise não foi atualizada.");
-      setFeedback(
-        action === "INICIAR_ANALISE"
-          ? "Solicitação movida para análise."
-          : "Solicitação recusada e solicitante notificado.",
-      );
-      await load();
-    } catch (reviewError) {
-      setError((reviewError as Error).message);
-    } finally {
-      setWorking(false);
-    }
+      const response = await fetch("/api/pilot/continuidade", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, requestId, reviewReason }) });
+      const result = await response.json(); if (!response.ok) throw new Error(result.error || "Não foi possível atualizar a análise.");
+      setFeedback(action === "INICIAR_ANALISE" ? "Análise iniciada." : action === "APROVAR" ? "Solicitação aprovada." : "Solicitação recusada."); await load();
+    } catch (cause) { setError((cause as Error).message); }
+    finally { mutationRef.current = false; setWorking(false); }
   }
-
-  if (loading) {
-    return (
-      <section className="lifecycle-workspace lifecycle-loading">
-        <span className="pilot-loader" />
-        <p>Carregando proteções e solicitações…</p>
+  return <section className="central-dashboard central-continuity" aria-busy={loading}>
+    <header className="central-page-heading"><div><h2>{mode === "support" ? "Análise das solicitações" : "Situação e continuidade"}</h2><p>Acompanhe solicitações de pausa, reativação ou encerramento do uso.</p></div><button type="button" disabled={loading || working} onClick={() => void load()}>Atualizar</button></header>
+    {loading && !data && <p className="central-empty" role="status">Consultando a situação da comunidade…</p>}
+    {loadError && <div className="central-error" role="alert"><p>{loadError}</p><button type="button" onClick={() => void load()}>Tentar novamente</button></div>}
+    {feedback && <p className="central-status" role="status">{feedback}</p>}
+    {error && !formOpen && <p className="central-error" role="alert">{error}</p>}
+    {data && <>
+      <dl className="central-metric-line"><div><dt>Situação atual</dt><dd className="central-text-value">{STATUS_LABELS[data.protection.communityStatus] || data.protection.communityStatus}</dd><small>Comunidade ativa selecionada</small></div><div><dt>Solicitações em acompanhamento</dt><dd>{visibleRequests.filter(r => r.decision === "PENDENTE").length}</dd><small>Pedidos que aguardam conclusão</small></div><div><dt>Preservação do histórico</dt><dd className="central-text-value">Protegido</dd><small>{data.protection.recentRecords} registros nos últimos 12 meses</small></div></dl>
+      <section className="central-section"><div className="central-section-heading"><div><h3>Acompanhamento das solicitações</h3><p>Consulte o andamento antes de abrir um novo pedido.</p></div>{mode === "community" && data.canRequest && <button type="button" onClick={() => setFormOpen(value => !value)} aria-expanded={formOpen}>{formOpen ? "Fechar nova solicitação" : "Nova solicitação"}</button>}</div>
+        {!visibleRequests.length && <p className="central-empty">Nenhuma solicitação registrada. A comunidade continua com a situação indicada acima.</p>}
+        {visibleRequests.map(item => <details className="central-cell-report" key={item.id}><summary><span><strong>{TYPE_LABELS[item.type] || item.type} · #{item.id}</strong><small>{formatDate(item.requestedAt)} · {item.requesterName}</small></span><span>{DECISION_LABELS[item.decision] || STATUS_LABELS[item.status] || item.status}</span></summary><p><strong>{item.reason}</strong></p><p>{item.description}</p>{item.reviewReason && <p>Retorno da análise: {item.reviewReason}</p>}{item.blockers.length > 0 && <ul>{item.blockers.map(b => <li key={b}>{b}</li>)}</ul>}{mode === "support" && data.canReview && item.decision === "PENDENTE" && <div className="central-export-actions">{item.status !== "EM_ANALISE" && <button disabled={working} onClick={() => void review(item.id, "INICIAR_ANALISE")}>Iniciar análise</button>}<button disabled={working} onClick={() => void review(item.id, "RECUSAR")}>Recusar</button><button disabled={working || !data.mfa.available} onClick={() => void review(item.id, "APROVAR")}>Aprovar com verificação</button></div>}</details>)}
       </section>
-    );
-  }
-  if (!data) {
-    return <p className="operations-feedback error">{error || "Fluxo indisponível."}</p>;
-  }
-
-  return (
-    <section className={`lifecycle-workspace lifecycle-${mode}`}>
-      <header className="lifecycle-hero">
-        <div>
-          <p className="pilot-kicker">
-            {mode === "support" ? "CENTRAL DE CONTINUIDADE" : "CONTINUIDADE DA COMUNIDADE"}
-          </p>
-          <h2>
-            {mode === "support"
-              ? "Solicitações com análise protegida"
-              : "Cancelar não significa apagar"}
-          </h2>
-          <p>
-            {mode === "support"
-              ? "Acompanhe cada etapa sem permitir autoaprovação ou exclusão direta."
-              : "Envie uma solicitação ao suporte. Configurações e histórico permanecem preservados."}
-          </p>
-        </div>
-        <span className={`lifecycle-status status-${data.protection.communityStatus.toLowerCase()}`}>
-          <i />
-          {STATUS_LABELS[data.protection.communityStatus] || data.protection.communityStatus}
-        </span>
-      </header>
-
-      <div className="lifecycle-flow" aria-label="Etapas do processo">
-        {[
-          ["01", "Solicitação", "Motivo, descrição e senha"],
-          ["02", "Análise", "Equipe diferente do solicitante"],
-          ["03", "MFA", "Validação crítica externa"],
-          ["04", "Preservação", "Sem exclusão automática"],
-        ].map(([number, title, detail]) => (
-          <article key={number}>
-            <span>{number}</span>
-            <div><strong>{title}</strong><small>{detail}</small></div>
-          </article>
-        ))}
-      </div>
-
-      <div className="lifecycle-protection-grid">
-        <article>
-          <span className="lifecycle-icon shield">✓</span>
-          <div>
-            <small>Últimos 12 meses</small>
-            <strong>{data.protection.recentRecords} registros protegidos</strong>
-            <p>Esse período bloqueia exclusão definitiva.</p>
-          </div>
-        </article>
-        <article>
-          <span className="lifecycle-icon lock">⌁</span>
-          <div>
-            <small>Retenção legal</small>
-            <strong>{data.protection.activeLegalHolds} retenções ativas</strong>
-            <p>Denúncias, evidências e auditorias são preservadas.</p>
-          </div>
-        </article>
-        <article>
-          <span className="lifecycle-icon archive">□</span>
-          <div>
-            <small>Exclusão definitiva</small>
-            <strong>Indisponível</strong>
-            <p>Comunidade sem uso é desativada, nunca apagada aqui.</p>
-          </div>
-        </article>
-      </div>
-
-      {mode === "community" && data.canRequest && (
-        <div className="lifecycle-request-layout">
-          <form className="lifecycle-request-form" onSubmit={createRequest}>
-            <div className="lifecycle-section-title">
-              <span>1</span>
-              <div>
-                <h3>Nova solicitação</h3>
-                <p>Somente o suporte pode concluir a ação.</p>
-              </div>
-            </div>
-            <fieldset className="lifecycle-type-selector">
-              <legend>O que você precisa?</legend>
-              {[
-                ["CANCELAMENTO", "Cancelar", "Encerrar o uso da plataforma"],
-                ["DESATIVACAO", "Desativar", "Pausar uma comunidade sem uso"],
-                ["REATIVACAO", "Reativar", "Pedir restauração do estado anterior"],
-              ].map(([value, label, detail]) => (
-                <label key={value}>
-                  <input
-                    type="radio"
-                    name="type"
-                    value={value}
-                    checked={requestType === value}
-                    onChange={() => setRequestType(value)}
-                  />
-                  <span><strong>{label}</strong><small>{detail}</small></span>
-                </label>
-              ))}
-            </fieldset>
-            <div className="lifecycle-form-grid">
-              <label>
-                Categoria
-                <select
-                  value={category}
-                  onChange={(event) => setCategory(event.target.value)}
-                >
-                  {CATEGORY_OPTIONS.map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Motivo resumido
-                <input name="reason" required minLength={5} maxLength={160} />
-              </label>
-              <label className="lifecycle-wide">
-                Descrição completa
-                <textarea
-                  name="description"
-                  required
-                  minLength={20}
-                  maxLength={1600}
-                  rows={4}
-                  placeholder="Explique o contexto e o resultado esperado."
-                />
-              </label>
-              <label className="lifecycle-wide">
-                Referência de evidência {evidenceRequired ? "(obrigatória)" : "(opcional)"}
-                <textarea
-                  name="evidence"
-                  required={evidenceRequired}
-                  rows={2}
-                  maxLength={900}
-                  placeholder="Informe uma referência ou protocolo. Arquivos privados exigem armazenamento externo."
-                />
-              </label>
-            </div>
-            <div className="lifecycle-critical-confirmation">
-              <div>
-                <strong>Confirmação protegida</strong>
-                <small>Isso cria uma solicitação; não desativa nem apaga a comunidade.</small>
-              </div>
-              <label>Digite SOLICITAR<input name="confirmation" required autoComplete="off" /></label>
-              <label>Senha atual<input name="password" type="password" required autoComplete="current-password" /></label>
-            </div>
-            <button className="lifecycle-primary" disabled={working}>
-              {working ? "Validando…" : "Enviar para o suporte"}
-            </button>
-          </form>
-          <aside className="lifecycle-side-note">
-            <span>!</span>
-            <h3>O pastor não exclui comunidades</h3>
-            <p>Não existe botão nem rota de exclusão para o perfil pastoral.</p>
-            <ul>
-              <li>Senha reconfirmada no servidor</li>
-              <li>Solicitante não aprova o próprio pedido</li>
-              <li>MFA obrigatório antes da decisão crítica</li>
-              <li>Configuração anterior preservada</li>
-            </ul>
-          </aside>
-        </div>
-      )}
-
-      <div className="lifecycle-requests">
-        <div className="lifecycle-section-title">
-          <span>{mode === "support" ? "S" : "2"}</span>
-          <div>
-            <h3>{mode === "support" ? "Fila do suporte" : "Acompanhamento"}</h3>
-            <p>{visibleRequests.length} solicitação(ões) visível(is).</p>
-          </div>
-        </div>
-        {!visibleRequests.length ? (
-          <div className="lifecycle-empty">
-            <span>✓</span>
-            <strong>Nenhuma solicitação pendente</strong>
-            <p>Quando houver uma solicitação, a linha do tempo aparecerá aqui.</p>
-          </div>
-        ) : (
-          <div className="lifecycle-request-list">
-            {visibleRequests.map((item) => (
-              <article key={item.id}>
-                <header>
-                  <div>
-                    <small>#{item.id} · {item.communityName}</small>
-                    <h4>{STATUS_LABELS[item.status] || item.status}</h4>
-                  </div>
-                  <span className={`lifecycle-decision decision-${item.decision.toLowerCase()}`}>
-                    {item.decision}
-                  </span>
-                </header>
-                <dl>
-                  <div><dt>Tipo</dt><dd>{item.type}</dd></div>
-                  <div><dt>Solicitante</dt><dd>{item.requesterName}</dd></div>
-                  <div><dt>Motivo</dt><dd>{item.reason}</dd></div>
-                  <div><dt>Data</dt><dd>{formatDate(item.requestedAt)}</dd></div>
-                </dl>
-                <p>{item.description}</p>
-                {item.blockers.length > 0 && (
-                  <ul className="lifecycle-blockers">
-                    {item.blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}
-                  </ul>
-                )}
-                <footer>
-                  <span>
-                    MFA: <strong>{item.mfaStatus === "PENDENTE_EXTERNO" ? "dependência externa" : item.mfaStatus}</strong>
-                  </span>
-                  {mode === "support" && item.decision === "PENDENTE" && (
-                    <div>
-                      {item.status !== "EM_ANALISE" && (
-                        <button
-                          disabled={working}
-                          onClick={() => review(item.id, "INICIAR_ANALISE")}
-                        >
-                          Iniciar análise
-                        </button>
-                      )}
-                      <button
-                        disabled={working}
-                        onClick={() => review(item.id, "RECUSAR")}
-                      >
-                        Recusar
-                      </button>
-                      <button
-                        className="lifecycle-approval"
-                        disabled={working}
-                        onClick={() => review(item.id, "APROVAR")}
-                        title="A aprovação será bloqueada até a integração de MFA."
-                      >
-                        Aprovar com MFA
-                      </button>
-                    </div>
-                  )}
-                </footer>
-              </article>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="lifecycle-external-note">
-        <span>EXTERNO</span>
-        <div>
-          <strong>MFA e arquivos de evidência</strong>
-          <p>{data.mfa.dependency} A aprovação final permanece bloqueada até essa integração.</p>
-        </div>
-      </div>
-      {feedback && <p className="operations-feedback" role="status">{feedback}</p>}
-      {error && <p className="operations-feedback error" role="alert">{error}</p>}
-    </section>
-  );
+      {formOpen && mode === "community" && data.canRequest && <form className="central-lifecycle-form" onSubmit={createRequest}>
+        <h3>Nova solicitação administrativa</h3><p>O envio abre uma análise pelo suporte. Nenhuma mudança de situação acontece imediatamente.</p>
+        <fieldset disabled={working}><legend>O que você precisa?</legend><div className="central-lifecycle-options">{[["DESATIVACAO","Pausar a comunidade","Interromper temporariamente o uso"],["REATIVACAO","Reativar a comunidade","Solicitar a retomada do uso"],["CANCELAMENTO","Encerrar o uso","Solicitar cancelamento ao suporte"]].map(([value,label,detail]) => <label key={value}><input type="radio" name="type" required checked={requestType === value} value={value} onChange={() => setRequestType(value)} /><span><strong>{label}</strong><small>{detail}</small></span></label>)}</div>
+        <div className="central-lifecycle-fields"><label>Categoria<select value={category} onChange={e => setCategory(e.target.value)}>{CATEGORY_OPTIONS.map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></label><label>Motivo resumido<input name="reason" required minLength={5} maxLength={160} /></label><label className="wide">Descrição completa<textarea name="description" required minLength={20} maxLength={1600} rows={4} placeholder="Explique o contexto e o resultado esperado." /></label><label className="wide">Referência de evidência {evidenceRequired ? "(obrigatória)" : "(opcional)"}<textarea name="evidence" required={evidenceRequired} rows={2} maxLength={900} placeholder="Referência ou protocolo para o suporte." /></label><label>Digite SOLICITAR<input name="confirmation" required autoComplete="off" /></label><label>Senha atual<input type="password" name="password" required autoComplete="current-password" /></label></div>
+        <p className="central-note">A senha confirma sua identidade. O histórico da comunidade permanece preservado.</p><button disabled={working || !requestType}>{working ? "Enviando…" : "Enviar solicitação ao suporte"}</button></fieldset>
+        {error && <p className="central-error" role="alert">{error} O preenchimento foi mantido.</p>}
+      </form>}
+      <details className="central-disclosure"><summary>Como funciona a preservação dos dados</summary><p>O solicitante não aprova o próprio pedido. A exclusão definitiva não está disponível nesta tela.</p><p>{data.protection.activeLegalHolds} retenção(ões) ativa(s). Registros, evidências e auditorias seguem preservados.</p>{data.mfa.required && !data.mfa.available && <p>A decisão final depende de verificação adicional pelo suporte, ainda indisponível nesta integração. Você pode enviar e acompanhar uma solicitação.</p>}</details>
+    </>}
+  </section>;
 }
-
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
+const TYPE_LABELS: Record<string,string> = { CANCELAMENTO:"Encerramento do uso", DESATIVACAO:"Pausa da comunidade", REATIVACAO:"Reativação" };
+const DECISION_LABELS: Record<string,string> = { PENDENTE:"Aguardando análise", APROVADA:"Aprovada", RECUSADA:"Recusada", APROVADO:"Aprovado", RECUSADO:"Recusado" };
+function formatDate(value: string) { return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value.includes("T") ? value : value.replace(" ", "T") + "Z")); }

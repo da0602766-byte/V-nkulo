@@ -15,7 +15,11 @@ A primeira opção remove os dados operacionais e guarda uma cópia AES-256-GCM
 no D1, em blocos de 128 KiB. A chave deriva de `AUTH_SECRET` e o identificador
 da operação autentica cada arquivo. O Proprietário pode exportar o JSON após
 informar novamente a senha. **Não existe restauração automática:** o JSON é
-um arquivo para recuperação técnica manual. A exportação contém dados pessoais
+um arquivo para recuperação técnica. Desde 24/10/2026, o
+[procedimento local verificável](guias/RECUPERACAO_LOCAL.md) permite reconstruí-lo
+em outro SQLite, preservando a identidade atual do proprietário e sem reativar
+sessões, convites ou integrações antigas. Isso não restaura produção nem substitui
+backup periódico. A exportação contém dados pessoais
 e credenciais antigas; deve ser mantida em local privado. Não trocar ou perder
 `AUTH_SECRET` enquanto houver arquivos que precisem ser recuperados.
 

@@ -237,6 +237,14 @@ export function normalizeTenantRole(value) {
   return TENANT_ROLES.includes(role) ? role : "MEMBRO";
 }
 
+// O cargo global só existe na sessão exclusiva do proprietário. Vínculos
+// antigos de superadmin continuam administrando apenas sua comunidade.
+export function effectiveTenantRole(value, systemOwner = false) {
+  if (systemOwner) return "SUPERADMIN";
+  const role = normalizeTenantRole(value);
+  return role === "SUPERADMIN" ? "ADMIN_COMUNIDADE" : role;
+}
+
 export function permissionsForTenantRole(value) {
   return [...(ROLE_PERMISSIONS[normalizeTenantRole(value)] || [])];
 }

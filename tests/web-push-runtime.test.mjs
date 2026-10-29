@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import ts from "typescript";
-import { Miniflare } from "miniflare";
+import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 
 test("Web Push no Workers: cifra real, Request nativa e redirecionamentos sem seguir destino", async () => {
   const compile = async path => ts.transpileModule(await readFile(new URL(`../${path}`, import.meta.url), "utf8"), {
@@ -10,7 +10,7 @@ test("Web Push no Workers: cifra real, Request nativa e redirecionamentos sem se
   }).outputText;
   const cryptoCode = await compile("app/lib/web-push-crypto.ts");
   const transportCode = await compile("app/lib/web-push.ts");
-  const mf = new Miniflare({ modules: true, compatibilityDate: "2026-05-15", compatibilityFlags: ["nodejs_compat"], cf: false,
+  const mf = new Miniflare(convertV4MiniflareOptions({ modules: true, compatibilityDate: "2026-05-15", compatibilityFlags: ["nodejs_compat"], cf: false,
     script: `
     const cryptography = (() => { const exports = {}; ${cryptoCode}; return exports; })();
     let mode, calls;
@@ -42,7 +42,7 @@ test("Web Push no Workers: cifra real, Request nativa e redirecionamentos sem se
         const result = await transport.sendWebPush(subscription, 'test-private-content', config, { ttl:60, topic:'n-1', urgent:true });
         return Response.json({ status: result.status, calls });
       } catch (error) { return Response.json({ error: error.message, calls }); }
-    }};` });
+    }};` }));
   try {
     const normal = await (await mf.dispatchFetch("https://runtime.test/")).json();
     assert.equal(normal.status, 201, normal.error);

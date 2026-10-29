@@ -45,10 +45,6 @@ export async function GET() {
       `SELECT v.categoria_id, substr(v.criado_em, 1, 7) AS mes,
         COUNT(*) AS novos
        FROM visitantes v
-       JOIN visitante_categorias vc
-         ON vc.id = v.categoria_id
-        AND vc.comunidade_id = v.comunidade_id
-        AND vc.ativa = 1
        WHERE v.comunidade_id = ?
          AND v.ativo = 1 AND v.escopo_confirmado = 1
          AND date(v.criado_em) >= date(?)

@@ -400,6 +400,55 @@
       "when": 1788600000000,
       "tag": "0067_request_care_operations",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "6",
+      "when": 1791034372048,
+      "tag": "0084_user_file_copies",
+      "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "6",
+      "when": 1792277207680,
+      "tag": "0087_visitante_campos",
+      "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "6",
+      "when": 1792688024055,
+      "tag": "0088_visitor_drive",
+      "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "6",
+      "when": 1792964611505,
+      "tag": "0089_visitor_sharing",
+      "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "6",
+      "when": 1792965693667,
+      "tag": "0090_visitor_sharing_history",
+      "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "6",
+      "when": 1792968327016,
+      "tag": "0091_personal_visitors",
+      "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "6",
+      "when": 1792970641002,
+      "tag": "0092_visitor_list_directory",
+      "breakpoints": true
     }
   ]
 }

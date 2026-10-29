@@ -1,4 +1,6 @@
 "use client";
+import SafeImage from "./SafeImage";
+
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import NativeImageUpload from "./NativeImageUpload";
@@ -704,7 +706,7 @@ export default function EditorialAutomationWorkspace() {
               {scheduleData?.queue.map((item) => (
                 <article key={item.id} className={`status-${item.status.toLowerCase()}`}>
                   {item.imagem_url && (
-                    <img src={item.imagem_url} alt={item.imagem_alt || ""} loading="lazy" />
+                    <SafeImage src={item.imagem_url} alt={item.imagem_alt || ""} loading="lazy" />
                   )}
                   <div className="editorial-schedule-card-head">
                     <span>{scheduleStatusLabel(item.status)}</span>

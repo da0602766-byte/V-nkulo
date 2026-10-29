@@ -1,0 +1,50 @@
+VÍNKULO — CONTROLE GLOBAL DO MODO OFFLINE
+Data: 16/10/2026
+
+Entrega
+- Proprietário > Controles & módulos > Aplicativo Android.
+- Botão único para ativar/desativar em todas as comunidades, com auditoria.
+- Apenas sessão específica de proprietário ativo pode alterar a configuração.
+- Nenhum escopo de comunidade pode sobrescrever a decisão global.
+- O menu e a entrada offline desaparecem quando a configuração é desativada.
+- Novas preparações de consultas e módulos são bloqueadas no servidor.
+- Rascunhos já salvos não são apagados; operações previamente enfileiradas
+  continuam autorizadas a sincronizar, sujeitas às permissões de cada operação.
+
+APK 1.23.0 (código 26)
+- Consulta pública mínima, HTTPS e sem cache, com challenge por solicitação.
+- Consulta ao abrir, ao mudar de rede e a cada 30 segundos em primeiro plano.
+- Configuração persistida no aparelho; instalação nova começa bloqueada até
+  receber a configuração. Autorização de uso offline expira após 24 horas.
+- Verificação positiva com o servidor evita depender somente da validação de
+  conectividade do Android.
+- Com offline desativado, ausência de conexão exibe aviso nativo animado e
+  botão Tentar novamente. Respeita animações desativadas no Android.
+- Ao reconectar, remove o aviso e recupera o painel online. Abertura manual,
+  restauração de tela e mensagens das pontes também respeitam a configuração.
+- Usuários em versões antigas veem um aviso de atualização no sistema online.
+
+Validação web
+- TypeScript e compilação de produção validados.
+- 34 testes direcionados passaram: controle global, permissões, origem,
+  auditoria, reativação, bloqueio de preparação, versões, consultas e filas.
+- Interface inspecionada em 390, 768 e 1864 px, temas claro e escuro.
+- Controle limitado a 640 px; sem rolagem horizontal da página e ações de 44 px.
+- Ativar/desativar testado em banco local fictício pela interface real.
+- Aviso de atualização testado com ponte nativa fictícia em prévia local.
+
+Limites de distribuição
+- Todos os aparelhos precisam atualizar o APK para obedecer ao controle nativo.
+- APKs antigos não podem receber substituição do código nativo via site.
+- Um aparelho sem internet recebe uma nova decisão somente ao reconectar.
+- A configuração existente é mantida até o proprietário usar o botão.
+- Instalar por cima do aplicativo existente; não desinstalar para atualizar.
+- A validação física continua pendente; o manifesto mantém o canal de
+  homologação e o canal estável anterior separados.
+
+Fonte Android
+Repositório: https://github.com/da0602766-byte/V-nkulo
+Branch: fix/android-global-offline-policy
+Commit: 6a1efe33de3caf80c15e3f8119314c95b4ccedbf
+Validação final: https://github.com/da0602766-byte/V-nkulo/actions/runs/38944001918
+O manifesto public/downloads/android-release.json registra o APK, hash e origem.

@@ -14,9 +14,12 @@ import type {
   GlobalVisualConfig,
   VisualRule,
   VisualTextBox,
+  VisualAppearance,
 } from "../lib/global-visual-editor";
-import { DEFAULT_GLOBAL_VISUAL_CONFIG } from "../lib/global-visual-editor";
+import { DEFAULT_GLOBAL_VISUAL_CONFIG, parseGlobalVisualConfig, resolveVisualConfig, setVisualRules, safeVisualHref } from "../lib/global-visual-editor";
 import NativeImageUpload from "./NativeImageUpload";
+import TransientFeedback from "./TransientFeedback";
+import "./GlobalVisualEditor.css";
 
 type SaveScope = "PERSONAL" | "COMMUNITY" | "PLATFORM";
 type PanelPosition = { x: number; y: number };
@@ -44,6 +47,17 @@ const SAFE_COLORS = [
   ["#d6a44a", "Dourado"],
   ["#2ab7a9", "Turquesa"],
 ] as const;
+
+const SCREEN_LABELS: Record<string, string> = {
+  inicio: "Início", eventos: "Agenda e eventos", agenda: "Agenda", mural: "Mural",
+  fio: "Fio do dia", ministerios: "Ministérios", solicitacoes: "Pedidos",
+  visitantes: "Visitantes", celulas: "Células", estacionamento: "Gestão",
+  redes: "Redes e unidades", membro: "Painel do membro", lider: "Liderança",
+  pessoas: "Pessoas", comunidade: "Configurações da comunidade", continuidade: "Continuidade",
+  landing: "Página inicial pública", geral: "Área pública", feed: "Mural",
+  perfil: "Perfil", planos: "Planos", aparencia: "Aparência", comunidades: "Comunidades",
+  usuarios: "Usuários", laboratorio: "Laboratório", estatisticas: "Estatísticas",
+};
 
 const CANDIDATES = [
   "[data-editor-key]",
@@ -99,6 +113,7 @@ export default function GlobalVisualEditor({
   rootSelector?: string;
   toolbarTargetId?: string;
 }) {
+  const screenLabel = SCREEN_LABELS[screenId.split(":").slice(1).join(":")] || "Tela atual";
   const [config, setConfig] = useState<GlobalVisualConfig>(
     DEFAULT_GLOBAL_VISUAL_CONFIG,
   );
@@ -115,17 +130,30 @@ export default function GlobalVisualEditor({
   const [uiReady, setUiReady] = useState(false);
   const [selectedKey, setSelectedKey] = useState("");
   const [selectedLabel, setSelectedLabel] = useState("Tela atual");
-  const [tab, setTab] = useState<"object" | "screen">("object");
+  const [tab, setTab] = useState<"object" | "screen" | "insert">("screen");
+  const [target, setTarget] = useState<"screen" | "global">("screen");
+  const [preview, setPreview] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [canSave, setCanSave] = useState(false);
   const [scope, setScope] = useState<SaveScope>(
     surface === "public" ? "PLATFORM" : "PERSONAL",
   );
   const [canSavePlatform, setCanSavePlatform] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
-  const [message, setMessage] = useState("");
+  const [canRedo, setCanRedo] = useState(false);
+  const [message, setMessageText] = useState("");
+  const [messageTone, setMessageTone] = useState<"info" | "success" | "error">("info");
+  const setMessage = useCallback((text: string, tone: "info" | "success" | "error" = "info") => {
+    setMessageText(text);
+    setMessageTone(tone);
+  }, []);
   const [rootElement, setRootElement] = useState<HTMLElement | null>(null);
   const [toolbarElement, setToolbarElement] = useState<HTMLElement | null>(null);
   const history = useRef<GlobalVisualConfig[]>([]);
+  const future = useRef<GlobalVisualConfig[]>([]);
   const styleElement = useRef<HTMLStyleElement | null>(null);
   const dragKey = useRef("");
   const panelRef = useRef<HTMLElement | null>(null);
@@ -223,7 +251,8 @@ export default function GlobalVisualEditor({
     configRef.current = config;
   }, [config]);
 
-  const applyConfig = useCallback((nextConfig: GlobalVisualConfig) => {
+  const applyConfig = useCallback((sourceConfig: GlobalVisualConfig) => {
+    const nextConfig = resolveVisualConfig(sourceConfig, screenId);
     const root = document.querySelector<HTMLElement>(rootSelector);
     if (!root) return;
     root.style.setProperty("--ve-accent", nextConfig.accentColor);
@@ -265,7 +294,7 @@ export default function GlobalVisualEditor({
 
     const css: string[] = [];
     for (const [key, rule] of Object.entries(nextConfig.rules)) {
-      const selector = `[data-ve-key="${key}"]`;
+      const selector = `${rootSelector} [data-ve-key="${key}"]`;
       const declarations: string[] = [];
       if (rule.color) declarations.push(`color:${rule.color}!important`);
       if (rule.background) {
@@ -322,7 +351,7 @@ export default function GlobalVisualEditor({
         element.childElementCount === 0 &&
         !["INPUT", "SELECT", "TEXTAREA", "IMG"].includes(element.tagName)
       ) {
-        if (!element.dataset.veOriginalText) {
+        if (element.dataset.veOriginalText === undefined) {
           element.dataset.veOriginalText = element.textContent || "";
         }
         if (element.textContent !== rule.text) element.textContent = rule.text;
@@ -340,7 +369,7 @@ export default function GlobalVisualEditor({
       document.head.appendChild(styleElement.current);
     }
     styleElement.current.textContent = css.join("\n");
-  }, [rootSelector]);
+  }, [rootSelector, screenId]);
 
   const scanElements = useCallback(() => {
     const root = document.querySelector<HTMLElement>(rootSelector);
@@ -350,6 +379,7 @@ export default function GlobalVisualEditor({
     ).filter(
       (element) =>
         !element.closest(".global-visual-editor-ui") &&
+        !element.closest(".global-editor-text-layer") &&
         !element.closest(".pilot-mobile-overlay") &&
         element !== root,
     );
@@ -360,41 +390,48 @@ export default function GlobalVisualEditor({
       }
       element.draggable =
         canEdit &&
-        active &&
+        active && !preview && !loading && !saving &&
         !element.classList.contains("global-editor-free-text") &&
         !["INPUT", "SELECT", "TEXTAREA"].includes(element.tagName);
     }
     applyConfig(configRef.current);
-  }, [active, applyConfig, canEdit, rootSelector]);
+  }, [active, applyConfig, canEdit, rootSelector, preview, loading, saving]);
 
   useEffect(() => {
     let cancelled = false;
     fetch(
-      `/api/pilot/editor-visual${
-        surface === "public" ? "?surface=public" : ""
-      }`,
+      `/api/pilot/editor-visual?audience=${scope}&surface=${surface}`,
       { cache: "no-store" },
     )
       .then(async (response) => {
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || "Falha ao carregar.");
         if (cancelled) return;
-        setConfig(result.config);
-        setSavedConfig(result.config);
+        const loaded = parseGlobalVisualConfig(result.config);
+        configRef.current = loaded;
+        setConfig(loaded);
+        setSavedConfig(loaded);
+        setCanSave(Boolean(result.canEdit));
+        setLoading(false);
+        setLoadFailed(false);
+        setDirty(false);
+        history.current = [];
+        future.current = [];
+        setCanUndo(false);
+        setCanRedo(false);
         setCanSavePlatform(Boolean(result.canSavePlatform));
-        window.requestAnimationFrame(() => applyConfig(result.config));
       })
-      .catch((error) => setMessage(error.message));
+      .catch((error) => { if (!cancelled) { setMessage(error.message, "error"); setLoading(false); setLoadFailed(true); } });
     return () => {
       cancelled = true;
     };
-  }, [applyConfig, communityName, surface]);
+  }, [communityName, surface, scope, setMessage]); // Screen changes must preserve the in-progress draft.
 
   useEffect(() => {
     const root = document.querySelector<HTMLElement>(rootSelector);
     if (!root) return;
     root.dataset.visualEditorActive =
-      canEdit && active ? "true" : "false";
+      canEdit && active && !preview ? "true" : "false";
     scanElements();
     let scheduled = false;
     const observer = new MutationObserver(() => {
@@ -407,7 +444,21 @@ export default function GlobalVisualEditor({
     });
     observer.observe(root, { childList: true, subtree: true });
     return () => observer.disconnect();
-  }, [active, canEdit, rootSelector, scanElements]);
+  }, [active, canEdit, rootSelector, scanElements, preview]);
+
+  useEffect(() => () => { styleElement.current?.remove(); }, []);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setSelectedKey(""));
+    return () => cancelAnimationFrame(frame);
+  }, [screenId]);
+
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
 
   useEffect(() => {
     const open = () => {
@@ -423,34 +474,35 @@ export default function GlobalVisualEditor({
 
   const changeConfig = useCallback(
     (next: GlobalVisualConfig) => {
+      if (loading || saving || loadFailed) return;
+      if (JSON.stringify(next) === JSON.stringify(configRef.current)) return;
       history.current.push(configRef.current);
       if (history.current.length > 30) history.current.shift();
       setCanUndo(true);
+      future.current = [];
+      setCanRedo(false);
       setConfig(next);
       configRef.current = next;
-      setDirty(true);
+      setDirty(JSON.stringify(next) !== JSON.stringify(savedConfig));
       applyConfig(next);
     },
-    [applyConfig],
+    [applyConfig, savedConfig, loading, saving, loadFailed],
   );
 
   const updateRule = useCallback(
     (key: string, patch: Partial<VisualRule>) => {
       if (!key) return;
-      const currentRule = configRef.current.rules[key] || {};
-      changeConfig({
-        ...configRef.current,
-        rules: {
-          ...configRef.current.rules,
-          [key]: { ...currentRule, ...patch },
-        },
-      });
+      const screen = target === "screen" ? screenId : null;
+      const rules = screen ? configRef.current.screens[screen]?.rules || {} : configRef.current.rules;
+      const currentRule = rules[key] || configRef.current.rules[key] || {};
+      changeConfig(setVisualRules(configRef.current, screen, { ...rules, [key]: { ...currentRule, ...patch } }));
     },
-    [changeConfig],
+    [changeConfig, target, screenId],
   );
 
   useEffect(() => {
-    if (!active || !canEdit) return;
+    if (!active || !canEdit || preview || loading || saving || loadFailed) return;
+    const targetScope = target;
     const root = document.querySelector<HTMLElement>(rootSelector);
     if (!root) return;
     let longPressTimer: number | null = null;
@@ -467,7 +519,7 @@ export default function GlobalVisualEditor({
     };
     const click = (event: Event) => {
       const target = event.target as HTMLElement;
-      if (target.closest(".global-visual-editor-ui")) return;
+      if (target.closest(".global-visual-editor-ui, .global-editor-text-layer")) return;
       const editable = target.closest<HTMLElement>("[data-ve-key]");
       if (!editable || !root.contains(editable)) return;
       if (suppressNextClick) {
@@ -543,16 +595,22 @@ export default function GlobalVisualEditor({
         dragKey.current = "";
         return;
       }
+      if (!target.parentElement || !["flex", "inline-flex", "grid", "inline-grid"].includes(getComputedStyle(target.parentElement).display)) {
+        dragKey.current = "";
+        setMessage("Este contêiner não oferece reorganização visual por arraste.");
+        return;
+      }
       const reordered = siblings.filter((item) => item !== source);
       const targetIndex = Math.max(0, reordered.indexOf(target));
       reordered.splice(targetIndex, 0, source);
-      const nextRules = { ...configRef.current.rules };
+      const screen = targetScope === "screen" ? screenId : null;
+      const nextRules = { ...(screen ? configRef.current.screens[screen]?.rules : configRef.current.rules) };
       reordered.forEach((item, index) => {
         const key = item.dataset.veKey || "";
         if (!key) return;
-        nextRules[key] = { ...(nextRules[key] || {}), order: index };
+        nextRules[key] = { ...(nextRules[key] || configRef.current.rules[key] || {}), order: index };
       });
-      changeConfig({ ...configRef.current, rules: nextRules });
+      changeConfig(setVisualRules(configRef.current, screen, nextRules));
       dragKey.current = "";
     };
     root.addEventListener("click", click, true);
@@ -571,16 +629,30 @@ export default function GlobalVisualEditor({
       root.removeEventListener("dragover", dragOver, true);
       root.removeEventListener("drop", drop, true);
     };
-  }, [active, canEdit, changeConfig, navigationLocked, rootSelector]);
+  }, [active, canEdit, changeConfig, navigationLocked, rootSelector, preview, loading, saving, loadFailed, target, screenId, setMessage]);
 
   function undo() {
     const previous = history.current.pop();
     if (!previous) return;
+    future.current.push(configRef.current);
+    setCanRedo(true);
     setCanUndo(history.current.length > 0);
     setConfig(previous);
     configRef.current = previous;
-    setDirty(true);
+    setDirty(JSON.stringify(previous) !== JSON.stringify(savedConfig));
     applyConfig(previous);
+  }
+
+  function redo() {
+    const next = future.current.pop();
+    if (!next) return;
+    history.current.push(configRef.current);
+    setCanUndo(true);
+    setCanRedo(future.current.length > 0);
+    setConfig(next);
+    configRef.current = next;
+    setDirty(JSON.stringify(next) !== JSON.stringify(savedConfig));
+    applyConfig(next);
   }
 
   function cancel() {
@@ -588,6 +660,8 @@ export default function GlobalVisualEditor({
     configRef.current = savedConfig;
     setDirty(false);
     history.current = [];
+    future.current = [];
+    setCanRedo(false);
     setCanUndo(false);
     setSelectedKey("");
     applyConfig(savedConfig);
@@ -595,19 +669,22 @@ export default function GlobalVisualEditor({
   }
 
   function closeEditor() {
-    setConfig(savedConfig);
-    configRef.current = savedConfig;
-    setDirty(false);
-    history.current = [];
-    setCanUndo(false);
+    // Closing the inspector keeps its draft; only Discard explicitly destroys it.
     setActive(false);
     setMinimized(false);
     setSelectedKey("");
-    applyConfig(savedConfig);
+    setPreview(false);
   }
 
   async function save() {
+    if (saving || loading || loadFailed || !canSave) return;
+    if (configRef.current.textBoxes.some((box) => box.kind === "link" && !safeVisualHref(box.href))) {
+      setMessage("Informe um destino HTTPS ou caminho interno válido para cada bloco de link.", "error");
+      return;
+    }
+    setSaving(true);
     setMessage("Salvando...");
+    try {
     const response = await fetch("/api/pilot/editor-visual", {
       method: "PATCH",
       headers: { "content-type": "application/json" },
@@ -615,38 +692,49 @@ export default function GlobalVisualEditor({
     });
     const result = await response.json();
     if (!response.ok) {
-      setMessage(result.error || "Não foi possível salvar.");
+      setMessage(result.error || "Não foi possível salvar.", "error");
       return;
     }
-    setSavedConfig(result.config);
-    setConfig(result.config);
+    const saved = parseGlobalVisualConfig(result.config);
+    configRef.current = saved;
+    setSavedConfig(saved);
+    setConfig(saved);
+    applyConfig(saved);
     setDirty(false);
     history.current = [];
     setCanUndo(false);
-    setMessage("Visual salvo. O editor continua aberto.");
+    future.current = [];
+    setCanRedo(false);
+    setMessage("Visual salvo. O editor continua aberto.", "success");
+    } catch {
+      setMessage("Falha de conexão. Seu rascunho foi mantido; tente salvar novamente.", "error");
+    } finally { setSaving(false); }
   }
 
-  function addTextBox() {
+  function addTextBox(kind: "text" | "callout" | "link" = "text") {
+    if (configRef.current.textBoxes.length >= 80) { setMessage("Limite de 80 blocos atingido."); return; }
     const root = rootElement;
     if (!root) {
-      setMessage("Não foi possível localizar esta tela para inserir o texto.");
+      setMessage("Não foi possível localizar esta tela para inserir o texto.", "error");
       return;
     }
     const rect = root.getBoundingClientRect();
     const rootHeight = Math.max(root.scrollHeight, rect.height, 1);
     const viewportCenter = window.scrollY + window.innerHeight / 2;
     const rootTop = window.scrollY + rect.top;
-    const id = `text-${Date.now().toString(36)}`;
+    const id = `text-${crypto.randomUUID()}`;
     const textBox: VisualTextBox = {
       id,
       screen: screenId,
-      text: "Novo texto",
+      kind,
+      text: kind === "callout" ? "Informação importante para a comunidade." : kind === "link" ? "Acessar conteúdo" : "Escreva seu texto aqui.",
+      ...(kind === "link" ? { href: "/" } : {}),
       x: 12,
       y: clamp(((viewportCenter - rootTop) / rootHeight) * 100, 2, 92),
       width: 32,
       fontSize: 18,
       color: "#172033",
-      background: "#ffffff",
+      background: kind === "callout" ? "#f5f3ed" : "#ffffff",
     };
     changeConfig({
       ...configRef.current,
@@ -674,6 +762,7 @@ export default function GlobalVisualEditor({
     (id: string) => {
       changeConfig({
         ...configRef.current,
+        removedTextBoxIds: [...configRef.current.removedTextBoxIds, id],
         textBoxes: configRef.current.textBoxes.filter(
           (item) => item.id !== id,
         ),
@@ -682,43 +771,34 @@ export default function GlobalVisualEditor({
       setSelectedLabel("Tela atual");
       setMessage("Caixa de texto removida. Salve para confirmar.");
     },
-    [changeConfig],
+    [changeConfig, setMessage],
   );
 
   function resetSelectedAppearance() {
     if (!selectedKey || selectedTextBox) return;
-    changeConfig({
-      ...configRef.current,
-      rules: {
-        ...configRef.current.rules,
-        [selectedKey]: stripRuleAppearance(
-          configRef.current.rules[selectedKey] || {},
-        ),
-      },
-    });
-    setMessage("Cores e efeitos deste objeto foram restaurados.");
+    const screen = target === "screen" ? screenId : null;
+    const rules = screen ? configRef.current.screens[screen]?.rules || {} : configRef.current.rules;
+    changeConfig(setVisualRules(configRef.current, screen, { ...rules, [selectedKey]: {} }));
+    setMessage("Ajustes do objeto restaurados neste alcance de edição.");
   }
 
   function resetAllColors() {
-    changeConfig({
-      ...configRef.current,
-      accentColor: DEFAULT_GLOBAL_VISUAL_CONFIG.accentColor,
-      surfaceColor: DEFAULT_GLOBAL_VISUAL_CONFIG.surfaceColor,
-      rules: Object.fromEntries(
-        Object.entries(configRef.current.rules).map(([key, currentRule]) => [
-          key,
-          stripRuleAppearance(currentRule),
-        ]),
-      ),
+    updateAppearance({ accentColor: DEFAULT_GLOBAL_VISUAL_CONFIG.accentColor, surfaceColor: "" });
+    setMessage("Paleta restaurada no alcance selecionado.");
+  }
+
+  function updateAppearance(patch: Partial<VisualAppearance>) {
+    const current = configRef.current;
+    changeConfig(target === "global" ? { ...current, ...patch } : {
+      ...current, screens: { ...current.screens, [screenId]: { rules: current.screens[screenId]?.rules || {}, appearance: { ...current.screens[screenId]?.appearance, ...patch } } },
     });
-    setMessage("Cores globais e alterações de aparência foram restauradas.");
   }
 
   function beginTextBoxDrag(
     event: ReactPointerEvent<HTMLDivElement>,
     textBox: VisualTextBox,
   ) {
-    if (!canEdit || !active || event.button !== 0) return;
+    if (!canEdit || !active || preview || saving || loading || loadFailed || event.button !== 0) return;
     const root = rootElement;
     if (!root) return;
     event.preventDefault();
@@ -728,6 +808,8 @@ export default function GlobalVisualEditor({
     history.current.push(configRef.current);
     if (history.current.length > 30) history.current.shift();
     setCanUndo(true);
+    future.current = [];
+    setCanRedo(false);
     setDirty(true);
     setSelectedKey(`textbox:${textBox.id}`);
     setSelectedLabel("Caixa de texto");
@@ -770,6 +852,11 @@ export default function GlobalVisualEditor({
   function finishTextBoxDrag(event: ReactPointerEvent<HTMLDivElement>) {
     if (textBoxDrag.current?.pointerId !== event.pointerId) return;
     textBoxDrag.current = null;
+    if (JSON.stringify(history.current.at(-1)) === JSON.stringify(configRef.current)) {
+      history.current.pop();
+      setCanUndo(history.current.length > 0);
+    }
+    setDirty(JSON.stringify(configRef.current) !== JSON.stringify(savedConfig));
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
@@ -812,9 +899,11 @@ export default function GlobalVisualEditor({
     }
   }
 
+  const effectiveConfig = useMemo(() => resolveVisualConfig(config, screenId), [config, screenId]);
+  const appearance = target === "global" ? config : effectiveConfig;
   const rule = useMemo(
-    () => (selectedKey ? config.rules[selectedKey] || {} : {}),
-    [config.rules, selectedKey],
+    () => (selectedKey ? (target === "global" ? config : effectiveConfig).rules[selectedKey] || {} : {}),
+    [config, effectiveConfig, selectedKey, target],
   );
   const selectedTextBox = selectedKey.startsWith("textbox:")
     ? config.textBoxes.find(
@@ -825,7 +914,7 @@ export default function GlobalVisualEditor({
     typeof document === "undefined" || !selectedKey
       ? null
       : document.querySelector<HTMLElement>(
-          `[data-ve-key="${selectedKey}"]`,
+          `[data-ve-key="${CSS.escape(selectedKey)}"]`,
         );
   const selectedParent = selectedElement?.parentElement?.closest<HTMLElement>(
     "[data-ve-key]",
@@ -878,7 +967,7 @@ export default function GlobalVisualEditor({
   );
 
   useEffect(() => {
-    if (!active || !selectedTextBox) return;
+    if (!active || preview || saving || !selectedTextBox) return;
     const keyDown = (event: KeyboardEvent) => {
       if (event.key !== "Delete" && event.key !== "Backspace") return;
       const target = event.target as HTMLElement | null;
@@ -894,7 +983,7 @@ export default function GlobalVisualEditor({
     };
     window.addEventListener("keydown", keyDown);
     return () => window.removeEventListener("keydown", keyDown);
-  }, [active, deleteTextBox, selectedTextBox]);
+  }, [active, deleteTextBox, selectedTextBox, preview, saving]);
 
   const pencilButton = (
     <button
@@ -924,12 +1013,12 @@ export default function GlobalVisualEditor({
         createPortal(pencilButton, toolbarElement)}
       {rootElement &&
         createPortal(
-          <div className="global-editor-text-layer" aria-label="Textos personalizados">
+          <div className="global-editor-text-layer ve-block-layer" aria-label="Blocos personalizados">
             {visibleTextBoxes.map((textBox) => (
               <div
                 key={textBox.id}
-                className={`global-editor-free-text ${
-                  selectedKey === `textbox:${textBox.id}` ? "selected" : ""
+                className={`global-editor-free-text ve-block ve-block-${textBox.kind || "text"} ${
+                  active && !preview && selectedKey === `textbox:${textBox.id}` ? "selected" : ""
                 }`}
                 data-ve-key={`textbox:${textBox.id}`}
                 data-editor-key={`textbox:${textBox.id}`}
@@ -937,7 +1026,7 @@ export default function GlobalVisualEditor({
                   {
                     left: `${textBox.x}%`,
                     top: `${textBox.y}%`,
-                    width: `${textBox.width}%`,
+                    width: `${Math.min(textBox.width, 100 - textBox.x)}%`,
                     color: textBox.color,
                     background: textBox.background,
                     fontSize: `${textBox.fontSize}px`,
@@ -948,13 +1037,13 @@ export default function GlobalVisualEditor({
                 onPointerUp={finishTextBoxDrag}
                 onPointerCancel={finishTextBoxDrag}
               >
-                {textBox.text}
+                {textBox.kind === "link" && safeVisualHref(textBox.href) ? <a href={safeVisualHref(textBox.href)} onClick={(event) => { if (active && !preview) { event.preventDefault(); setSelectedKey(`textbox:${textBox.id}`); setTab("object"); } }}>{textBox.text} <span aria-hidden="true">↗</span></a> : textBox.text}
               </div>
             ))}
           </div>,
           rootElement,
         )}
-      <div className="global-visual-editor-ui">
+      <div className="global-visual-editor-ui ve-studio">
 
       {canEdit && active && (
         <aside
@@ -978,7 +1067,7 @@ export default function GlobalVisualEditor({
             <div>
               <span aria-hidden="true">✎</span>
               <div>
-                <strong>Aparência</strong>
+                <strong>Estúdio visual</strong>
                 {!minimized && <small>{communityName}</small>}
               </div>
             </div>
@@ -1005,23 +1094,40 @@ export default function GlobalVisualEditor({
               <button
                 type="button"
                 onClick={closeEditor}
-                aria-label="Fechar editor"
-                title="Fechar"
+                aria-label="Fechar editor e manter rascunho"
+                title="Fechar e manter rascunho"
               >
                 ×
               </button>
             </div>
           </header>
+          {!minimized && <>
+            <div className="ve-context">
+              <div className="ve-eyebrow">01 · Onde editar</div>
+              <div className="ve-segmented" aria-label="Alcance da edição">
+                <button type="button" aria-pressed={target === "screen"} onClick={() => setTarget("screen")}>Tela atual</button>
+                <button type="button" aria-pressed={target === "global"} onClick={() => setTarget("global")}>Global</button>
+              </div>
+              <p>{target === "screen" ? "Ajustes exclusivos desta tela; têm prioridade sobre o visual global." : "Base visual compartilhada entre telas. Ajustes locais têm prioridade."}</p>
+              <span className="ve-screen-label">{target === "screen" ? screenLabel : "Todas as telas"}</span>
+            </div>
+            <div className="ve-command-bar">
+              <button type="button" onClick={undo} disabled={!canUndo || saving || loading} title="Desfazer última alteração">↶ Desfazer</button>
+              <button type="button" onClick={redo} disabled={!canRedo || saving || loading} title="Refazer alteração">↷ Refazer</button>
+              <button type="button" aria-pressed={preview} onClick={() => setPreview(!preview)}>{preview ? "Voltar a editar" : "Ver prévia"}</button>
+            </div>
+          </>}
           {!minimized && (
             <button
               type="button"
               className={`global-editor-navigation-lock ${navigationLocked ? "locked" : ""}`}
               onClick={() => setNavigationLocked((current) => !current)}
               aria-pressed={navigationLocked}
+              disabled={preview}
             >
               {navigationLocked
-                ? "🔒 Navegação bloqueada — clique para editar"
-                : "🔓 Navegação liberada"}
+                ? "Seleção ativa · clique em um elemento da página"
+                : "Navegação livre · Alt + clique para selecionar"}
             </button>
           )}
           {!minimized && <div className="global-editor-tabs">
@@ -1030,18 +1136,21 @@ export default function GlobalVisualEditor({
               className={tab === "object" ? "active" : ""}
               onClick={() => setTab("object")}
             >
-              Objeto
+              Elemento
             </button>
             <button
               type="button"
               className={tab === "screen" ? "active" : ""}
               onClick={() => setTab("screen")}
             >
-              Tela
+              Aparência
             </button>
+            <button type="button" className={tab === "insert" ? "active" : ""} onClick={() => setTab("insert")}>Inserir blocos</button>
           </div>}
 
-          {!minimized && <div className="global-editor-body">
+          {!minimized && <fieldset className="global-editor-body" disabled={saving || loading || loadFailed || preview || !canSave}>
+            {preview && <p className="ve-notice">Prévia interativa do rascunho. Volte a editar para ajustar; salve para persistir.</p>}
+            {loading && <p role="status">Carregando o visual deste público…</p>}
             {tab === "object" ? (
               selectedKey ? (
                 <>
@@ -1049,8 +1158,7 @@ export default function GlobalVisualEditor({
                     <span>Objeto selecionado</span>
                     <strong>{selectedLabel}</strong>
                     <small>
-                      Clique, segure e arraste cartões para reorganizar. Use os
-                      controles abaixo para navegar entre níveis.
+                      {selectedTextBox ? "Bloco exclusivo desta tela." : target === "screen" ? "Você está alterando este elemento somente nesta tela." : "A regra vale para elementos com a mesma identificação nas telas."}
                     </small>
                     {selectedParent && (
                       <button
@@ -1099,6 +1207,10 @@ export default function GlobalVisualEditor({
                             }
                           />
                         </label>
+                        {selectedTextBox.kind === "link" && <label>Destino do link
+                          <input type="url" value={selectedTextBox.href || ""} maxLength={600} placeholder="https://… ou /caminho" onChange={(event) => updateTextBox(selectedTextBox.id, { href: event.target.value })} aria-invalid={!safeVisualHref(selectedTextBox.href)} />
+                          <small>{safeVisualHref(selectedTextBox.href) ? "Destino válido. O link funciona fora do modo de seleção." : "Use HTTPS ou um caminho interno iniciado por /."}</small>
+                        </label>}
                         <small>
                           Arraste a caixa diretamente pela tela para posicionar.
                         </small>
@@ -1143,6 +1255,10 @@ export default function GlobalVisualEditor({
                             }
                           />
                         </label>
+                        <div className="global-editor-color-grid">{(["x", "y"] as const).map((axis) => <label key={axis}>{axis === "x" ? "Posição horizontal" : "Posição vertical"}: {Math.round(selectedTextBox[axis])}%
+                          <input type="range" min="0" max="96" value={selectedTextBox[axis]} onChange={(event) => updateTextBox(selectedTextBox.id, { [axis]: Number(event.target.value) })} />
+                        </label>)}</div>
+                        <button type="button" className="global-editor-reset" onClick={() => updateTextBox(selectedTextBox.id, { color: "#172033", background: "#ffffff", width: 32, fontSize: 18 })}>Restaurar aparência do bloco</button>
                         <label>
                           Largura: {Math.round(selectedTextBox.width)}%
                           <input
@@ -1303,12 +1419,12 @@ export default function GlobalVisualEditor({
                       className="global-editor-reset"
                       onClick={resetSelectedAppearance}
                     >
-                      Restaurar cores e efeitos deste objeto
+                      Restaurar todos os ajustes do elemento
                     </button>
                   </section>}
                   {!selectedTextBox && <section>
-                    <h3>Campos e colunas</h3>
-                    <label>
+                    <h3>Dimensões e organização</h3>
+                    {selectedElement && getComputedStyle(selectedElement).display.includes("grid") && <label>
                       Quantidade de colunas
                       <select
                         value={rule.columns || 1}
@@ -1324,7 +1440,7 @@ export default function GlobalVisualEditor({
                           </option>
                         ))}
                       </select>
-                    </label>
+                    </label>}
                     <label>
                       Largura: {rule.width || 100}%
                       <input
@@ -1340,7 +1456,7 @@ export default function GlobalVisualEditor({
                       />
                     </label>
                   </section>}
-                  {selectedElement instanceof HTMLImageElement && (
+                  {typeof HTMLImageElement !== "undefined" && selectedElement instanceof HTMLImageElement && (
                     <section>
                       <h3>Imagem</h3>
                       <NativeImageUpload
@@ -1388,22 +1504,21 @@ export default function GlobalVisualEditor({
                           hiddenMobile: true,
                         });
                         setMessage(
-                          "Objeto excluído deste layout. Escolha o escopo e salve para confirmar.",
+                          "Elemento oculto neste alcance. Restaure os ajustes para mostrá-lo novamente.",
                         );
                       }}
                     >
-                      Excluir deste layout
+                      Ocultar neste alcance
                     </button>
                     <small>
-                      A exclusão é visual e respeita o escopo pessoal,
-                      comunidade ou plataforma selecionado ao salvar.
+                      Oculta apenas a apresentação. Dados e permissões do aplicativo permanecem iguais.
                     </small>
                   </section>}
                 </>
               ) : (
                 <section className="global-editor-empty">
                   <span>✦</span>
-                  <h3>Selecione qualquer objeto</h3>
+                  <h3>Selecione um elemento da página</h3>
                   <p>
                     Clique no computador ou mantenha pressionado no celular
                     sobre menus, textos, botões, imagens, formulários ou áreas
@@ -1416,76 +1531,76 @@ export default function GlobalVisualEditor({
                   </small>
                 </section>
               )
+            ) : tab === "insert" ? (
+              <>
+                <section>
+                  <span className="ve-eyebrow">Biblioteca de blocos</span>
+                  <h3>Um novo espaço para sua mensagem</h3>
+                  <p>Os blocos são inseridos somente em <strong>{screenLabel}</strong>, inclusive quando o alcance global está selecionado.</p>
+                  <div className="ve-template-grid">
+                    <button type="button" onClick={() => addTextBox("text")}><b aria-hidden="true">Tt</b><strong>Texto</strong><small>Título, legenda ou orientação.</small></button>
+                    <button type="button" onClick={() => addTextBox("callout")}><b aria-hidden="true">!</b><strong>Aviso</strong><small>Uma mensagem em destaque.</small></button>
+                    <button type="button" onClick={() => addTextBox("link")}><b aria-hidden="true">↗</b><strong>Link</strong><small>Acesso a uma página ou recurso.</small></button>
+                  </div>
+                  <small>Blocos visuais posicionáveis. Não criam formulários, automações ou funções do aplicativo.</small>
+                </section>
+                <section>
+                  <h3>Blocos nesta tela · {visibleTextBoxes.length}</h3>
+                  {visibleTextBoxes.length ? visibleTextBoxes.map((box) => <button className="ve-layer-row" type="button" key={box.id} onClick={() => { setSelectedKey(`textbox:${box.id}`); setSelectedLabel(box.text.slice(0, 56)); setTab("object"); }}>{box.kind === "link" ? "↗" : box.kind === "callout" ? "!" : "Tt"} · {box.text || "Bloco sem texto"}</button>) : <p>Nenhum bloco adicionado nesta tela.</p>}
+                </section>
+              </>
             ) : (
               <>
                 <section>
-                  <h3>Adicionar conteúdo</h3>
-                  <button
-                    type="button"
-                    className="global-editor-add-text"
-                    onClick={addTextBox}
-                  >
-                    + Caixa de texto livre
-                  </button>
-                  <small>
-                    A caixa será inserida nesta tela e poderá ser arrastada para
-                    qualquer posição.
-                  </small>
-                </section>
-                <section>
-                  <h3>Aparência global</h3>
+                  <h3>{target === "global" ? "Identidade global" : "Identidade desta tela"}</h3>
                   <div className="global-editor-color-grid">
                     <label>
                       Destaque
                       <ColorPresetSelect
-                        value={config.accentColor}
+                        value={appearance.accentColor}
                         onChange={(value) =>
-                          changeConfig({
-                            ...config,
+                          updateAppearance({
                             accentColor: value,
                           })
                         }
                       />
                     </label>
-                    <label>
+                    {!rootElement?.classList.contains("pilot-dashboard") && <label>
                       Superfície
                       <ColorPresetSelect
-                        value={config.surfaceColor || "#ffffff"}
+                        value={appearance.surfaceColor || "#ffffff"}
                         onChange={(value) =>
-                          changeConfig({
-                            ...config,
+                          updateAppearance({
                             surfaceColor: value,
                           })
                         }
                       />
-                    </label>
+                    </label>}
                   </div>
                   <label>
-                    Escala dos textos
+                    Escala dos textos · {Math.round(appearance.textScale * 100)}%
                     <input
                       type="range"
                       min="0.8"
                       max="1.3"
                       step="0.05"
-                      value={config.textScale}
+                      value={appearance.textScale}
                       onChange={(event) =>
-                        changeConfig({
-                          ...config,
+                        updateAppearance({
                           textScale: Number(event.target.value),
                         })
                       }
                     />
                   </label>
                   <label>
-                    Arredondamento global
+                    Arredondamento · {appearance.radius}px
                     <input
                       type="range"
                       min="0"
                       max="28"
-                      value={config.radius}
+                      value={appearance.radius}
                       onChange={(event) =>
-                        changeConfig({
-                          ...config,
+                        updateAppearance({
                           radius: Number(event.target.value),
                         })
                       }
@@ -1496,7 +1611,7 @@ export default function GlobalVisualEditor({
                     className="global-editor-reset"
                     onClick={resetAllColors}
                   >
-                    Restaurar todas as cores
+                    Restaurar paleta
                   </button>
                 </section>
                 <section>
@@ -1508,10 +1623,10 @@ export default function GlobalVisualEditor({
                           type="button"
                           key={density}
                           className={
-                            config.density === density ? "active" : ""
+                            appearance.density === density ? "active" : ""
                           }
                           onClick={() =>
-                            changeConfig({ ...config, density })
+                            updateAppearance({ density })
                           }
                         >
                           {density === "compact"
@@ -1525,58 +1640,55 @@ export default function GlobalVisualEditor({
                   </div>
                 </section>
                 <section>
-                  <h3>Prévia</h3>
-                  <div className="global-editor-preview-grid">
-                    <span>Computador</span>
-                    <span>Celular</span>
-                  </div>
+                  <h3>Ajustes do elemento</h3>
+                  <p>Selecione um elemento da página para editar texto, imagem, cores, dimensões e visibilidade.</p>
+                  <small>A reorganização por arraste funciona entre irmãos em contêineres flex ou grid. Textos com conteúdo interno e campos de dados não são substituídos.</small>
+                  <small>Este editor altera conteúdo e apresentação. Permissões, dados de negócio e regras do aplicativo não são alterados.</small>
                 </section>
               </>
             )}
-          </div>}
+          </fieldset>}
 
           {!minimized && <footer>
             <label>
-              Aplicar em
+              <span className="ve-eyebrow">02 · Quem verá ao salvar</span>
               <select
                 value={scope}
-                disabled={surface === "public"}
+                disabled={surface === "public" || dirty || loading || saving}
                 onChange={(event) =>
-                  setScope(event.target.value as SaveScope)
+                  { setLoading(true); setMessage(""); setSelectedKey(""); setScope(event.target.value as SaveScope); }
                 }
               >
                 {surface !== "public" && (
-                  <option value="PERSONAL">Meu layout</option>
+                  <option value="PERSONAL">Somente eu · pessoal</option>
                 )}
                 {surface !== "public" && (
-                  <option value="COMMUNITY">Comunidade</option>
+                  <option value="COMMUNITY">Membros desta comunidade</option>
                 )}
                 {(canSavePlatform || surface === "public") && (
-                  <option value="PLATFORM">Plataforma</option>
+                  <option value="PLATFORM">Toda a plataforma</option>
                 )}
               </select>
             </label>
+            <small className="ve-save-context">{dirty ? "Rascunho não salvo · salve ou descarte antes de trocar o público." : "Sem alterações pendentes. O público é independente da tela escolhida."}</small>
             <div>
-              <button type="button" onClick={undo} disabled={!canUndo}>
-                Desfazer
-              </button>
-              <button type="button" onClick={cancel}>
-                Cancelar
+              <button type="button" onClick={cancel} disabled={!dirty || saving || loading}>
+                Descartar
               </button>
               <button
                 type="button"
                 className="global-editor-save"
                 onClick={() => void save()}
-                disabled={!dirty}
+                disabled={!dirty || saving || loading || loadFailed || !canSave || (scope === "PLATFORM" && !canSavePlatform)}
               >
-                Salvar
+                {saving ? "Salvando…" : "Salvar alterações"}
               </button>
             </div>
-            {message && <small role="status">{message}</small>}
           </footer>}
         </aside>
       )}
       </div>
+      {message && <TransientFeedback className={`operations-feedback ${messageTone === "error" ? "error" : ""}`} tone={messageTone} role={messageTone === "error" ? "alert" : "status"}>{message}</TransientFeedback>}
     </>
   );
 }
@@ -1604,22 +1716,12 @@ function ColorPresetSelect({
 function defaultPanelPosition(): PanelPosition {
   if (typeof window === "undefined") return { x: 16, y: 16 };
   const width = window.innerWidth <= 760
-    ? Math.min(390, window.innerWidth - 16)
-    : 390;
+    ? Math.min(420, window.innerWidth - 16)
+    : 420;
   return {
     x: Math.max(8, window.innerWidth - width - 16),
     y: window.innerWidth <= 760 ? 88 : 16,
   };
-}
-
-function stripRuleAppearance(rule: VisualRule): VisualRule {
-  const next = { ...rule };
-  delete next.color;
-  delete next.background;
-  delete next.gradient;
-  delete next.shadow;
-  delete next.hoverEffect;
-  return next;
 }
 
 function clampPanelPosition(
@@ -1628,7 +1730,7 @@ function clampPanelPosition(
   panel?: HTMLElement | null,
 ): PanelPosition {
   if (typeof window === "undefined") return position;
-  const fallbackWidth = minimized ? 250 : Math.min(390, window.innerWidth - 16);
+  const fallbackWidth = minimized ? 270 : Math.min(420, window.innerWidth - 16);
   const fallbackHeight = minimized
     ? 66
     : Math.min(720, window.innerHeight - 32);

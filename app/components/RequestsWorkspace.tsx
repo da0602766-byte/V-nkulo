@@ -1,4 +1,9 @@
 "use client";
+import PrayerWelcomeArt from "./PrayerWelcomeArt";
+import SafeImage from "./SafeImage";
+
+
+import TransientFeedback from "./TransientFeedback";
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -90,7 +95,7 @@ function buildOperationalAddress(path: string, filters: Record<string, string>, 
   return address;
 }
 
-export default function RequestsWorkspace({ communityName }: { communityName: string }) {
+export default function RequestsWorkspace({ communityId }: { communityName: string; communityId?:number }) {
   const [items, setItems] = useState<CommunityRequest[]>([]);
   // Alimenta só "Meus pedidos" (todos os tipos, sem filtro) — o painel de
   // Atendimento usa a fila à parte abaixo (opsGeneralItems), já filtrada
@@ -117,10 +122,12 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
   const [loadingOperationalRows, setLoadingOperationalRows] = useState(false);
   const [lastOperationalRefresh, setLastOperationalRefresh] = useState<Date | null>(null);
   const [central, setCentral] = useState<CentralData>(EMPTY_CENTRAL);
+  const [centralLoaded, setCentralLoaded] = useState(false);
   const [canManage, setCanManage] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [feedback, setFeedback] = useState("");
+  const [entryNotice, setEntryNotice] = useState(0);
   const [error, setError] = useState("");
   const [mode, setMode] = useState<"member" | "operations">("member");
   const [formOpen, setFormOpen] = useState(false);
@@ -155,7 +162,17 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
   const [targetUser, setTargetUser] = useState("");
   const [repositoryMinistries, setRepositoryMinistries] = useState<Record<number, string>>({});
   const formRef = useRef<(HTMLFormElement & { open: boolean })>(null);
-  const operationalRefreshInFlight = useRef(false);
+  const operationalRequestRef = useRef<AbortController | null>(null);
+  const operationalGeneration = useRef(0);
+  const operationalPagesInFlight = useRef(0);
+  const [loadedFilterKey, setLoadedFilterKey] = useState<string | null>(null);
+  const [operationalError, setOperationalError] = useState("");
+
+  useEffect(() => {
+    const showEntryNotice = () => setEntryNotice((count) => count + 1);
+    window.addEventListener("vinkulo:requests-opened", showEntryNotice);
+    return () => window.removeEventListener("vinkulo:requests-opened", showEntryNotice);
+  }, []);
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -190,6 +207,7 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
           return next;
         });
       } catch (caught) { setError((caught as Error).message); }
+      finally { setCentralLoaded(true); }
     })();
     await Promise.all([requestsTask, centralTask]);
   }, []);
@@ -230,21 +248,41 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
     if (onlyUnassigned) params.semResponsavel = "1";
     return params;
   }, [advancedOwner, advancedPeriod, advancedStatus, debouncedSearch, onlyUnassigned, quickFilter]);
+  const operationalFilterKey = JSON.stringify(operationalFilters);
+  const searchPending = search.trim() !== debouncedSearch;
+  const resultsReady = loadedFilterKey === operationalFilterKey && !searchPending;
+  const advancedFilterCount = [advancedStatus, advancedOwner, advancedPeriod, onlyUnassigned].filter(Boolean).length;
+  const hasActiveFilters = Boolean(search.trim()) || quickFilter !== "TODOS" || advancedFilterCount > 0;
+  function clearOperationalFilters() {
+    setSearch(""); setDebouncedSearch(""); setQuickFilter("TODOS");
+    setAdvancedStatus(""); setAdvancedOwner(""); setAdvancedPeriod(""); setOnlyUnassigned(false);
+  }
 
   // Busca todo o primeiro lote (Central + pedidos gerais) sob os filtros
   // atuais e substitui o que estava carregado — chamado ao entrar no painel
   // de Atendimento e sempre que busca/aba/filtro avançado mudar.
   const applyOperationalFilters = useCallback(async (quiet = false) => {
-    if (operationalRefreshInFlight.current) return;
-    operationalRefreshInFlight.current = true;
+    if (quiet && (operationalRequestRef.current || operationalPagesInFlight.current > 0)) return;
+    operationalRequestRef.current?.abort();
+    const request = new AbortController();
+    operationalRequestRef.current = request;
+    operationalGeneration.current += 1;
     if (!quiet) setLoadingOperationalRows(true);
+    setOperationalError("");
     try {
       const [centralResponse, generalResponse] = await Promise.all([
-        fetch(buildOperationalAddress("/api/pilot/solicitacoes/central", operationalFilters), { cache: "no-store" }),
-        fetch(buildOperationalAddress("/api/pilot/solicitacoes", operationalFilters), { cache: "no-store" }),
+        fetch(buildOperationalAddress("/api/pilot/solicitacoes/central", operationalFilters), { cache: "no-store", signal: request.signal }),
+        fetch(buildOperationalAddress("/api/pilot/solicitacoes", operationalFilters), { cache: "no-store", signal: request.signal }),
       ]);
       const centralPayload = await centralResponse.json() as { items?: RepositoryItem[]; nextCursor?: string | null; error?: string };
       const generalPayload = await generalResponse.json() as { solicitacoes?: CommunityRequest[]; nextCursor?: string | null; error?: string };
+      if (request.signal.aborted) return;
+      if ([centralResponse.status, generalResponse.status].some((status) => status === 401 || status === 403)) {
+        setLoadedFilterKey(null);
+        setCentral((current) => ({ ...current, repositories: current.repositories.map((repository) => ({ ...repository, items: [] })) }));
+        setOpsGeneralItems([]);
+        setCentralItemsCursor(null); setOpsGeneralCursor(null);
+      }
       if (!centralResponse.ok) throw new Error(centralPayload.error || "Não foi possível carregar os atendimentos.");
       if (!generalResponse.ok) throw new Error(generalPayload.error || "Não foi possível carregar os pedidos.");
       const centralItems = centralPayload.items || [];
@@ -258,17 +296,25 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
       setOpsGeneralItems(generalPayload.solicitacoes || []);
       setOpsGeneralCursor(generalPayload.nextCursor || null);
       setLastOperationalRefresh(new Date());
+      setLoadedFilterKey(operationalFilterKey);
     } catch (caught) {
-      if (!quiet) setError((caught as Error).message);
+      if (!request.signal.aborted) setOperationalError((caught as Error).message);
     } finally {
-      operationalRefreshInFlight.current = false;
-      if (!quiet) setLoadingOperationalRows(false);
+      if (operationalRequestRef.current === request) {
+        operationalRequestRef.current = null;
+        setLoadingOperationalRows(false);
+      }
     }
-  }, [operationalFilters]);
+  }, [operationalFilters, operationalFilterKey]);
   useEffect(() => {
     if (mode !== "operations") return;
     const timer = window.setTimeout(() => void applyOperationalFilters(), 0);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      operationalRequestRef.current?.abort();
+      operationalRequestRef.current = null;
+      operationalGeneration.current += 1;
+    };
   }, [mode, applyOperationalFilters]);
 
   // A fila pode mudar porque outro oficial assumiu, concluiu ou registrou um
@@ -291,11 +337,14 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
 
   const loadMoreCentral = useCallback(async () => {
     if (!centralItemsCursor) return;
+    const generation = operationalGeneration.current;
+    operationalPagesInFlight.current += 1;
     setLoadingMoreCentral(true);
     try {
       const address = buildOperationalAddress("/api/pilot/solicitacoes/central", operationalFilters, centralItemsCursor);
       const response = await fetch(address, { cache: "no-store" });
       const payload = await response.json() as { items?: RepositoryItem[]; nextCursor?: string | null; error?: string };
+      if (generation !== operationalGeneration.current) return;
       if (!response.ok) throw new Error(payload.error || "Não foi possível carregar mais atendimentos.");
       const newItems = payload.items || [];
       setCentral((current) => ({
@@ -306,22 +355,25 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
         }),
       }));
       setCentralItemsCursor(payload.nextCursor || null);
-    } catch (caught) { setError((caught as Error).message); }
-    finally { setLoadingMoreCentral(false); }
+    } catch (caught) { if (generation === operationalGeneration.current) setError((caught as Error).message); }
+    finally { operationalPagesInFlight.current -= 1; setLoadingMoreCentral(false); }
   }, [centralItemsCursor, operationalFilters]);
 
   const loadMoreOpsGeneral = useCallback(async () => {
     if (!opsGeneralCursor) return;
+    const generation = operationalGeneration.current;
+    operationalPagesInFlight.current += 1;
     setLoadingMoreOpsGeneral(true);
     try {
       const address = buildOperationalAddress("/api/pilot/solicitacoes", operationalFilters, opsGeneralCursor);
       const response = await fetch(address, { cache: "no-store" });
       const payload = await response.json() as { solicitacoes?: CommunityRequest[]; nextCursor?: string | null; error?: string };
+      if (generation !== operationalGeneration.current) return;
       if (!response.ok) throw new Error(payload.error || "Não foi possível carregar mais pedidos.");
       setOpsGeneralItems((current) => [...current, ...(payload.solicitacoes || [])]);
       setOpsGeneralCursor(payload.nextCursor || null);
-    } catch (caught) { setError((caught as Error).message); }
-    finally { setLoadingMoreOpsGeneral(false); }
+    } catch (caught) { if (generation === operationalGeneration.current) setError((caught as Error).message); }
+    finally { operationalPagesInFlight.current -= 1; setLoadingMoreOpsGeneral(false); }
   }, [opsGeneralCursor, operationalFilters]);
   useEffect(() => {
     const open = () => { setMode("member"); openCreate("ORACAO"); };
@@ -486,19 +538,24 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
   return <section className="requests-workspace request-care-v213">
     <header className="request-care-heading">
       <div className="request-heading-icon" aria-hidden="true"><RequestIcon type="heart" /></div>
-      <div><p className="pilot-kicker">CUIDADO E COMUNHÃO · {communityName}</p><h1>Pedidos</h1><p>Compartilhe o que está no seu coração. Estamos aqui para caminhar com você.</p></div>
+      <div><h1>Pedidos</h1><p>{mode === "operations" ? "Painel de atendimento" : "Oração, visitas e acompanhamento"}</p></div>
       {central.canOperate && <nav className="request-mode-switch" aria-label="Escolher visão">
-        <button type="button" className={mode === "member" ? "active" : ""} onClick={() => setMode("member")}>Meu espaço</button>
-        <button type="button" className={mode === "operations" ? "active" : ""} onClick={() => setMode("operations")}>Atendimento</button>
+        <button type="button" className={mode === "member" ? "active" : ""} aria-pressed={mode === "member"} onClick={() => setMode("member")}>Meu espaço</button>
+        <button type="button" className={mode === "operations" ? "active" : ""} aria-pressed={mode === "operations"} onClick={() => setMode("operations")}>Atendimento</button>
       </nav>}
     </header>
 
-    {(feedback || error) && <p className={`operations-feedback request-global-feedback ${error ? "error" : ""}`} role="status">{error || feedback}</p>}
+    {(feedback || error) && <TransientFeedback className={`operations-feedback request-global-feedback ${error ? "error" : ""}`} role="status">{error || feedback}</TransientFeedback>}
+    {entryNotice > 0 && centralLoaded && <TransientFeedback noticeKey={`requests-entry-${entryNotice}`} role="status" durationMs={8000}>
+      {central.canOperate && metrics.open > 0
+        ? <span>Há {metrics.open} {metrics.open === 1 ? "pedido" : "pedidos"} para revisar. <button type="button" onClick={() => setMode("operations")}>Ver atendimento</button></span>
+        : <span>Precisa de oração ou acompanhamento? <button type="button" onClick={() => { setMode("member"); openCreate("ORACAO"); }}>Fazer um pedido</button></span>}
+    </TransientFeedback>}
 
     {mode === "member" ? <div className="request-member-view">
       <section className="request-welcome" data-guide="request-start-guide" aria-labelledby="request-welcome-title">
         <div><span className="request-welcome-mark" aria-hidden="true"><RequestIcon type="heart" /></span><p className="pilot-kicker">Comece por aqui · UM ESPAÇO SEGURO</p><h2 id="request-welcome-title">Estamos com você</h2><p>Sua vida importa. Aqui você encontra uma comunidade que ora, acolhe e caminha junto com você.</p></div>
-        <div className="request-welcome-art" aria-hidden="true"><span /><i>Juntos em oração</i></div>
+        <PrayerWelcomeArt communityId={communityId}/>
       </section>
       <section className="request-primary-actions" aria-label="Criar um pedido">
         <button type="button" onClick={() => openCreate("ORACAO")}><span><RequestIcon type="prayer" /></span><div><strong>Pedido de oração</strong><small>Compartilhe sua intenção. Vamos orar por você.</small></div><b aria-hidden="true">›</b></button>
@@ -512,6 +569,7 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
         <input type="hidden" name="tipo" value={requestCategory} />
         <label>Título*<input name="titulo" required minLength={3} maxLength={120} placeholder={requestCategory === "ORACAO" ? "Ex.: Oração pela minha família" : "Resuma seu pedido"} /></label>
         <label className="request-member-wide">Conte o que está em seu coração*<textarea name="descricao" required minLength={10} maxLength={2000} rows={5} placeholder="Conte aqui o que está em seu coração…" /></label>
+        <label className="request-member-wide request-location">Localização <small>opcional</small><input name="localizacao" maxLength={400} placeholder="Bairro, rua e ponto de referência" /><small>{requestCategory === "VISITA" ? "Para facilitar a visita, sugerimos informar onde você gostaria de receber a equipe. Você pode combinar depois." : "Se o local ajudar no atendimento, informe aqui. Pode deixar em branco."}</small></label>
         {requestCategory === "VISITA" && <>
           <label>Preferência de contato<select name="preferenciaContato" defaultValue="SISTEMA"><option value="SISTEMA">Pelo Vínkulo</option><option value="WHATSAPP">WhatsApp</option><option value="TELEFONE">Telefone</option></select></label>
           <label>Data preferencial<input name="dataPreferencial" type="datetime-local" /></label>
@@ -534,23 +592,33 @@ export default function RequestsWorkspace({ communityName }: { communityName: st
         )}
       </section>
 
-      {(central.pastoresContato.length > 0 || central.whatsappPreference.canConfigure) && <section className="request-contact-panel"><div><p className="pilot-kicker">CONTATO PASTORAL</p><h2>Fale com um pastor</h2><p>O WhatsApp só abre depois da sua confirmação.</p></div>{central.pastoresContato.length > 0 && <div className="request-contact-strip">{central.pastoresContato.map((pastor) => <button key={pastor.id} type="button" onClick={() => setPendingPastor(pastor)}><Avatar name={pastor.nome} photo={pastor.foto} /><span>{pastor.nome}</span><small>WhatsApp</small></button>)}</div>}{central.whatsappPreference.canConfigure && <label className="request-whatsapp-toggle"><input type="checkbox" checked={central.whatsappPreference.enabled} disabled={busy === "whatsapp" || !central.whatsappPreference.hasPhone} onChange={(event) => void requestAction("whatsapp", "/api/pilot/solicitacoes/central", { action: "TOGGLE_WHATSAPP", enabled: event.target.checked }, event.target.checked ? "Seu WhatsApp agora está disponível aos membros ativos." : "Seu WhatsApp deixou de aparecer aos membros.")} /><span>Disponibilizar meu WhatsApp<small>{central.whatsappPreference.hasPhone ? "Você pode desativar quando quiser." : "Cadastre um telefone válido no perfil para ativar."}</small></span></label>}</section>}
+      {(central.pastoresContato.length > 0 || central.whatsappPreference.canConfigure) && <section className="request-contact-panel"><div><h2>Converse com um pastor</h2><p>Escolha quem você deseja contatar.</p></div>{central.pastoresContato.length > 0 && <div className="request-contact-strip">{central.pastoresContato.map((pastor) => <button key={pastor.id} type="button" onClick={() => setPendingPastor(pastor)}><Avatar name={pastor.nome} photo={pastor.foto} /><span><strong>{pastor.nome}</strong><small>Conversar pelo WhatsApp</small></span><b aria-hidden="true">↗</b></button>)}</div>}{central.whatsappPreference.canConfigure && <label className="request-whatsapp-toggle"><input type="checkbox" checked={central.whatsappPreference.enabled} disabled={busy === "whatsapp" || !central.whatsappPreference.hasPhone} onChange={(event) => void requestAction("whatsapp", "/api/pilot/solicitacoes/central", { action: "TOGGLE_WHATSAPP", enabled: event.target.checked }, event.target.checked ? "Seu WhatsApp agora está disponível aos membros ativos." : "Seu WhatsApp deixou de aparecer aos membros.")} /><span>Disponibilizar meu WhatsApp<small>{central.whatsappPreference.hasPhone ? "Você pode desativar quando quiser." : "Cadastre um telefone válido no perfil para ativar."}</small></span></label>}</section>}
     </div> : <div className="request-operations-view">
-      <header className="request-operations-heading"><div><p className="pilot-kicker">PAINEL DOS OFICIAIS</p><h2>Painel de atendimento</h2><p>Organize, acompanhe e cuide de cada solicitação.</p></div><span>Acesso validado no servidor</span></header>
       <section className="request-dashboard" aria-label="Resumo operacional"><Metric icon="inbox" label="Total em aberto" value={metrics.open} tone="violet" /><Metric icon="alert" label="Urgentes" value={metrics.urgent} tone="rose" /><Metric icon="calendar" label="Visitas pendentes" value={metrics.visits} tone="blue" /><Metric icon="check" label="Atendidos hoje" value={metrics.today} tone="green" /></section>
       <nav className="request-category-tabs" aria-label="Filtros rápidos">{[
         ["TODOS", "Todos", tabCounts.TODOS], ["ORACAO", "Orações", tabCounts.ORACAO],
         ["VISITA", "Visitas", tabCounts.VISITA], ["URGENTES", "Urgentes", tabCounts.URGENTES],
         ["PENDENTES", "Pendentes", tabCounts.PENDENTES], ["ACOMPANHAMENTO", "Em acompanhamento", tabCounts.ACOMPANHAMENTO],
         ["RETORNO", "Aguardando retorno", tabCounts.RETORNO], ["CONCLUIDOS", "Já atendidos", tabCounts.CONCLUIDOS],
-      ].map(([value, label, count]) => <button key={String(value)} type="button" className={quickFilter === value ? "active" : ""} onClick={() => setQuickFilter(String(value))}>{label} <span>{count}</span></button>)}</nav>
-      <div className="request-operations-toolbar"><label><RequestIcon type="search" /><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nome, pedido ou observação…" /></label><button type="button" aria-expanded={advancedOpen} onClick={() => setAdvancedOpen((value) => !value)}><RequestIcon type="filter" />Filtros</button></div>
-      {loadingOperationalRows && <small className="request-operations-loading" role="status">Atualizando…</small>}
-      {advancedOpen && <section className="request-advanced-filters" aria-label="Filtros avançados"><label>Status<select value={advancedStatus} onChange={(event) => setAdvancedStatus(event.target.value)}><option value="">Todos</option>{allOperationalStatuses.map((status) => <option key={status} value={status}>{statusLabel({ status } as OperationalRow)}</option>)}</select></label><label>Responsável<select value={advancedOwner} onChange={(event) => setAdvancedOwner(event.target.value)}><option value="">Todos</option>{central.assignees.map((person) => <option key={person.id} value={person.id}>{person.nome}</option>)}</select></label><label>Recebidos desde<input type="date" value={advancedPeriod} onChange={(event) => setAdvancedPeriod(event.target.value)} /></label><label className="request-filter-check"><input type="checkbox" checked={onlyUnassigned} onChange={(event) => setOnlyUnassigned(event.target.checked)} />Sem responsável</label><button type="button" onClick={() => { setAdvancedStatus(""); setAdvancedOwner(""); setAdvancedPeriod(""); setOnlyUnassigned(false); }}>Limpar filtros</button></section>}
+      ].map(([value, label, count]) => <button key={String(value)} type="button" className={quickFilter === value ? "active" : ""} aria-pressed={quickFilter === value} onClick={() => setQuickFilter(String(value))}>{label} <span>{count}</span></button>)}</nav>
+      <p className="request-filter-hint">Os números acima representam a fila inteira. A busca e os filtros abaixo refinam a lista.</p>
+      <label className="request-search-label" htmlFor="request-operations-search">Buscar pedidos</label>
+      <div className="request-operations-toolbar"><div className="request-search-field"><RequestIcon type="search" /><input id="request-operations-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nome, pedido ou observação" /></div><button type="button" aria-expanded={advancedOpen} aria-controls="request-advanced-filters" onClick={() => setAdvancedOpen((value) => !value)}><RequestIcon type="filter" />Filtros{advancedFilterCount > 0 && <span className="request-filter-count">{advancedFilterCount}</span>}</button></div>
+      {hasActiveFilters && <div className="request-active-filters" aria-label="Filtros aplicados">
+        {search.trim() && <span>Busca: {search.trim()}</span>}
+        {quickFilter !== "TODOS" && <span>{({ ORACAO: "Orações", VISITA: "Visitas", URGENTES: "Urgentes", PENDENTES: "Pendentes", ACOMPANHAMENTO: "Em acompanhamento", RETORNO: "Aguardando retorno", CONCLUIDOS: "Já atendidos" } as Record<string, string>)[quickFilter]}</span>}
+        {advancedStatus && <span>Situação: {statusLabel({ status: advancedStatus } as OperationalRow)}</span>}
+        {advancedOwner && <span>Responsável: {central.assignees.find((person) => String(person.id) === advancedOwner)?.nome || "Selecionado"}</span>}
+        {advancedPeriod && <span>Desde: {new Date(`${advancedPeriod}T12:00:00`).toLocaleDateString("pt-BR")}</span>}
+        {onlyUnassigned && <span>Sem responsável</span>}
+        <button type="button" onClick={clearOperationalFilters}>Limpar busca e filtros</button>
+      </div>}
+      {advancedOpen && <section id="request-advanced-filters" className="request-advanced-filters" aria-label="Filtros avançados"><label>Status<select value={advancedStatus} onChange={(event) => setAdvancedStatus(event.target.value)}><option value="">Todos</option>{allOperationalStatuses.map((status) => <option key={status} value={status}>{statusLabel({ status } as OperationalRow)}</option>)}</select></label><label>Responsável<select value={advancedOwner} onChange={(event) => setAdvancedOwner(event.target.value)}><option value="">Todos</option>{central.assignees.map((person) => <option key={person.id} value={person.id}>{person.nome}</option>)}</select></label><label>Recebidos desde<input type="date" value={advancedPeriod} onChange={(event) => setAdvancedPeriod(event.target.value)} /></label><label className="request-filter-check"><input type="checkbox" checked={onlyUnassigned} onChange={(event) => setOnlyUnassigned(event.target.checked)} />Sem responsável</label><button type="button" onClick={() => { setAdvancedStatus(""); setAdvancedOwner(""); setAdvancedPeriod(""); setOnlyUnassigned(false); }}>Limpar filtros</button></section>}
 
-      <div className="request-live-status" role="status"><i aria-hidden="true" />Atualização automática ativa{lastOperationalRefresh && <span>· atualizada às {lastOperationalRefresh.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>}</div>
-      {operationalRows.length ? <><div className="request-operations-table" role="region" aria-label="Pedidos para atendimento"><table><thead><tr><th>Pessoa</th><th>Categoria</th><th>Responsável</th><th>Data</th><th>Status</th><th>Observação</th><th><span className="sr-only">Ações</span></th></tr></thead><tbody>{operationalRows.map((row) => <tr key={row.key} className={row.priority === "URGENTE" ? "urgent" : ""} onClick={() => openOperationalDetail(row)}><td><Avatar name={row.person} photo={row.photo} /><span><strong>{row.person}</strong><small>{roleLabel(row.role)}</small></span></td><td>{requestType(row.category)}</td><td>{row.owner || <em>Sem responsável</em>}</td><td>{formatDate(row.date)}</td><td><StatusChip label={statusLabel(row)} tone={statusTone(row.status, row.priority, row.overdue)} />{row.overdue && <small className="request-overdue">Retorno atrasado</small>}</td><td>{row.note || row.description}</td><td><button type="button" aria-label={`Abrir pedido de ${row.person}`} onClick={(event) => { event.stopPropagation(); openOperationalDetail(row); }}>•••</button></td></tr>)}</tbody></table></div><div className="request-mobile-list">{operationalRows.map((row) => <button type="button" key={row.key} onClick={() => openOperationalDetail(row)}><Avatar name={row.person} photo={row.photo} /><div><strong>{row.person}</strong><small>{requestType(row.category)} · {row.owner || "Sem responsável"}</small><p>{row.title}</p></div><StatusChip label={row.overdue ? "Retorno atrasado" : statusLabel(row)} tone={statusTone(row.status, row.priority, row.overdue)} /><time>{shortDate(row.date)}</time></button>)}</div></> : <div className="request-empty-operations"><RequestIcon type="search" /><strong>Nenhuma solicitação encontrada com esses filtros.</strong><button type="button" onClick={() => { setSearch(""); setDebouncedSearch(""); setQuickFilter("TODOS"); setAdvancedStatus(""); setAdvancedOwner(""); setAdvancedPeriod(""); setOnlyUnassigned(false); }}>Limpar busca e filtros</button></div>}
-      {(centralItemsCursor || opsGeneralCursor) && (
+      {operationalError && <div className="request-load-error" role="alert"><strong>Não foi possível atualizar os pedidos.</strong><span>{operationalError}</span>{resultsReady && <small>Exibindo a última consulta concluída.</small>}<button type="button" onClick={() => void applyOperationalFilters()}>Tentar novamente</button></div>}
+      <div className="request-live-status" role="status">{searchPending || loadingOperationalRows || (!resultsReady && !operationalError) ? "Buscando pedidos…" : operationalError ? "Atualização indisponível" : <><span>{operationalRows.length} {operationalRows.length === 1 ? "pedido carregado" : "pedidos carregados"}{centralItemsCursor || opsGeneralCursor ? " · há mais resultados" : ""}</span><span>Atualização automática ativa{lastOperationalRefresh && ` · ${lastOperationalRefresh.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`}</span></>}</div>
+      {resultsReady && (operationalRows.length ? <><div className="request-operations-table" role="region" aria-label="Pedidos para atendimento"><table><thead><tr><th>Pessoa</th><th>Categoria</th><th>Responsável</th><th>Data</th><th>Status</th><th>Observação</th><th><span className="sr-only">Ações</span></th></tr></thead><tbody>{operationalRows.map((row) => <tr key={row.key} className={row.priority === "URGENTE" ? "urgent" : ""} onClick={() => openOperationalDetail(row)}><td><button type="button" className="request-person-cell" onClick={(event) => { event.stopPropagation(); openOperationalDetail(row); }}><Avatar name={row.person} photo={row.photo} /><span><strong>{row.person}</strong><small>{roleLabel(row.role)}</small></span></button></td><td>{requestType(row.category)}</td><td>{row.owner || <em>Sem responsável</em>}</td><td>{formatDate(row.date)}</td><td><StatusChip label={statusLabel(row)} tone={statusTone(row.status, row.priority, row.overdue)} />{row.overdue && <small className="request-overdue">Retorno atrasado</small>}</td><td>{row.note || row.description}</td><td><button type="button" aria-label={`Abrir pedido de ${row.person}`} onClick={(event) => { event.stopPropagation(); openOperationalDetail(row); }}>•••</button></td></tr>)}</tbody></table></div><div className="request-mobile-list">{operationalRows.map((row) => <button type="button" key={row.key} onClick={() => openOperationalDetail(row)}><Avatar name={row.person} photo={row.photo} /><div><strong>{row.person}</strong><small>{requestType(row.category)} · {row.owner || "Sem responsável"}</small><p>{row.title}</p></div><StatusChip label={row.overdue ? "Retorno atrasado" : statusLabel(row)} tone={statusTone(row.status, row.priority, row.overdue)} /><time>{shortDate(row.date)}</time></button>)}</div></> : !operationalError && <div className="request-empty-operations"><RequestIcon type="search" /><strong>{hasActiveFilters ? "Nenhum pedido encontrado com esses filtros." : "Nenhum pedido para atendimento no momento."}</strong>{hasActiveFilters && <p>Altere ou limpe os filtros acima para consultar outros pedidos.</p>}</div>)}
+      {resultsReady && !loadingOperationalRows && !operationalError && (centralItemsCursor || opsGeneralCursor) && (
         <div className="request-load-more">
           {centralItemsCursor && (
             <button type="button" disabled={loadingMoreCentral} onClick={() => void loadMoreCentral()}>
@@ -588,7 +656,7 @@ function MemberRequestDialog({ item, busy, onClose, onConfirm }: { item: Communi
 
 function Metric({ icon, label, value, tone }: { icon: IconType; label: string; value: number; tone: string }) { return <article className={`request-metric tone-${tone}`}><span><RequestIcon type={icon} /></span><div><small>{label}</small><strong>{value}</strong></div></article>; }
 function StatusChip({ label, tone }: { label: string; tone: string }) { return <span className={`request-care-status tone-${tone}`}>{label}</span>; }
-function Avatar({ name, photo }: { name: string; photo: string }) { return photo ? <img loading="lazy" src={photo} alt="" /> : <span className="request-avatar-fallback">{name.slice(0, 1).toUpperCase()}</span>; }
+function Avatar({ name, photo }: { name: string; photo: string }) { return photo ? <SafeImage loading="lazy" fallbackName={name} fallbackKind="avatar" src={photo} alt="" /> : <span className="request-avatar-fallback">{name.slice(0, 1).toUpperCase()}</span>; }
 function AudienceGroup({ title, items, selected, onChange }: { title: string; items: Array<{ key: string; label: string; detail?: string }>; selected: string[]; onChange: (value: string[]) => void }) { if (!items.length) return null; return <section><strong>{title}</strong><div>{items.map((item) => <label key={item.key}><input type="checkbox" checked={selected.includes(item.key)} onChange={() => onChange(selected.includes(item.key) ? selected.filter((key) => key !== item.key) : [...selected, item.key])} /><span>{item.label}{item.detail ? <small>{item.detail}</small> : null}</span></label>)}</div></section>; }
 function parseAudienceKey(key: string) { const [type, raw] = key.split(":"); return type === "USUARIO" || type === "MINISTERIO" ? { type, id: Number(raw) } : { type, value: raw }; }
 function normalize(value: string) { return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").trim(); }

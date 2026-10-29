@@ -63,6 +63,6 @@ export default function FirebaseIntegrationForm() {
       <button className="oc-button" disabled={busy || !status.myDevices} onClick={() => void action("POST", { action: "test-device" })}>Enviar teste ao meu APK</button>
       <button className="oc-button" disabled={busy} onClick={() => setRemoving(value => !value)}>Desconectar Firebase</button></div>}
     {removing && <div role="alert"><p>A desconexão interrompe novos envios pelo Firebase. Ela não remove seu projeto nem revoga a chave no Google.</p><button className="oc-button" disabled={busy} onClick={() => void action("DELETE", { confirm: "REMOVER_FIREBASE" })}>Confirmar desconexão</button></div>}
-    <p>Após cadastrar a credencial, <a href="/downloads/VINKULO_ANDROID_1.7.1.apk" download>baixe e instale o APK 1.7.1</a>, permita notificações e entre na sua conta. Abra esta configuração dentro do APK e use o botão de teste para confirmar o recebimento no aparelho.</p>
+    <p>Após cadastrar a credencial, <a href="/downloads/VINKULO_ANDROID_1.23.0.apk" download>baixe e instale o APK 1.23.0</a>, permita notificações e entre na sua conta. Abra esta configuração dentro do APK e use o botão de teste para confirmar o recebimento no aparelho.</p>
   </section>;
 }
