@@ -1,4 +1,9 @@
 "use client";
+import useFeedDialog from "./feed/useFeedDialog";
+import PersonalRepertoire from "./PersonalRepertoire";
+import ChecklistTemplates from "./ChecklistTemplates";
+import TransientFeedback from "./TransientFeedback";
+import "./ministry-management.css";
 import {useBrowserStorage} from "./useBrowserStorage";
 import "./directory-controls.css";
 import "./ministry-catalog.css";
@@ -217,6 +222,7 @@ type ChecklistItem = {
 };
 type ChecklistDraft = { id: string; tarefa: string; voluntarioId: string };
 type Tab =
+  | "repertorio"
   | "painel"
   | "integrantes"
   | "equipes"
@@ -880,7 +886,7 @@ export default function SecretaryMinisterialWorkspace({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ acao: "FIO_ETAPA", etapaId: step.id, feito }),
       });
-      const result = await readJson<{ error?: string }>(response);
+      const result = await readJson<{ error?: string; fioEtapas?: FioStep[] }>(response);
       if (response.status === 404) {
         setSchedules((current) => current.map((item) => item.id === schedule.id ? { ...item, fio_etapas: item.fio_etapas.filter((candidate) => candidate.id !== step.id) } : item));
         await loadData(true);
@@ -888,8 +894,7 @@ export default function SecretaryMinisterialWorkspace({
         return;
       }
       if (!response.ok) throw new Error(result.error || "Não foi possível atualizar esta etapa.");
-      setFeedback(feito ? "Etapa concluída no fio." : "Etapa reaberta no fio.");
-      await loadData(true);
+      if (result.fioEtapas) setSchedules(current => current.map(item => item.id === schedule.id ? { ...item, fio_etapas: result.fioEtapas! } : item));
     } catch (cause) {
       applyStepState(step.feito);
       const message = (cause as Error).message;
@@ -930,6 +935,7 @@ export default function SecretaryMinisterialWorkspace({
     selectedScheduleTeams: SelectedScheduleTeam[],
   ) {
     event.preventDefault();
+    const publish = (event.nativeEvent as SubmitEvent).submitter?.getAttribute("value") === "publish";
     const body = formBody(event.currentTarget);
     const repertorio = String(body.repertorio || "")
       .split("\n")
@@ -959,7 +965,12 @@ export default function SecretaryMinisterialWorkspace({
       },
       "Escala atualizada com segurança.",
     );
-    if (updated) setEditingSchedule(null);
+    if (!updated) return;
+    if (publish) {
+      const published = await submit(`editing-schedule-${schedule.id}`, `/api/pilot/escalas/${schedule.id}`, "PATCH", { acao: "PUBLICAR" }, "Escala publicada e integrantes notificados.");
+      if (!published) return;
+    }
+    setEditingSchedule(null);
   }
 
   async function createTeam(event: FormEvent<HTMLFormElement>) {
@@ -1386,7 +1397,7 @@ export default function SecretaryMinisterialWorkspace({
         </header>
 
         {error && <div className="secretary-message error" role="alert">{error} <button type="button" onClick={() => void loadData()}>Tentar novamente</button></div>}
-        {feedback && <div className="secretary-message success" role="status">{feedback}</div>}
+        {feedback && <TransientFeedback tone="success">{feedback}</TransientFeedback>}
 
         <section className="secretary-directory-controls" aria-label="Encontrar um ministério">
           <div className="secretary-directory-fields">
@@ -1703,7 +1714,7 @@ export default function SecretaryMinisterialWorkspace({
           <button type="button" onClick={() => addScheduleToCalendar(schedule)}>Adicionar ao calendário</button>
           <button type="button" className="share" onClick={() => setShareSchedule(schedule)} disabled={!schedule.can_manage || schedule.status !== "PUBLICADA" || busy === `share-${schedule.id}`}>Compartilhar</button>
           {Boolean(schedule.can_manage) && ["RASCUNHO", "AGENDADA", "PUBLICADA"].includes(schedule.status) && (
-            <button type="button" className="edit" onClick={() => setEditingSchedule(schedule)}>
+            <button type="button" className="edit" onClick={() => {setError("");setFeedback("");setEditingSchedule(schedule);}}>
               Editar escala
             </button>
           )}
@@ -1828,16 +1839,18 @@ export default function SecretaryMinisterialWorkspace({
               ["configuracoes", "Configurações"],
             ] as [Tab, string][])
           : ([["escalas", "Minhas escalas"]] as [Tab, string][]))
+          .concat(selectedMinistry?.categoria === "LOUVOR" ? [["repertorio", "Repertórios"] as [Tab, string]] : [])
           .map(([id, label]) => (
           <button type="button" aria-pressed={tab === id} className={tab === id ? "active" : ""} onClick={() => setTab(id)} key={id}>{label}</button>
         ))}
       </nav>
 
-      {error && <div className="secretary-message error" role="alert">{error}</div>}
-      {feedback && <div className="secretary-message success" role="status">{feedback}</div>}
+      {error && !editingSchedule && !fioActionError && <TransientFeedback role="alert">{error}</TransientFeedback>}
+      {feedback && <TransientFeedback tone="success">{feedback}</TransientFeedback>}
 
       {(
         <>
+          {tab === "repertorio" && selectedMinistry?.categoria === "LOUVOR" && <PersonalRepertoire ministryId={selectedMinistry.id} canManage={canManage} onLibraryChanged={() => loadData(true)} />}
           {tab === "painel" && selectedMinistry && (
             <div className="secretary-panel">
               <div className="secretary-summary-grid">
@@ -2175,6 +2188,7 @@ export default function SecretaryMinisterialWorkspace({
                         </div>
                       </div><h3>Checklist de responsabilidades</h3>
                       <div className="secretary-fold-content secretary-checklist-builder">
+                        <ChecklistTemplates ministryId={selectedMinistry.id} draft={checklistDraft} onApply={items => {setChecklistDraft(items.map(item => ({...item,voluntarioId:scheduleCandidates.some(person => String(person.id) === item.voluntarioId) ? item.voluntarioId : ""})));}} />
                         <div className="secretary-checklist-tools">
                           <p>Comece do zero ou reaproveite as tarefas da escala mais recente.</p>
                           <button
@@ -2380,6 +2394,7 @@ export default function SecretaryMinisterialWorkspace({
                     <details className="secretary-fold-section">
                       <summary><span>4</span><div><h3>Checklist de responsabilidades</h3><p>Defina a tarefa e a pessoa responsável.</p></div><i aria-hidden="true">⌄</i></summary>
                       <div className="secretary-fold-content secretary-checklist-builder">
+                        <ChecklistTemplates ministryId={selectedMinistry.id} draft={checklistDraft} onApply={items => {setChecklistDraft(items.map(item => ({...item,voluntarioId:scheduleCandidates.some(person => String(person.id) === item.voluntarioId) ? item.voluntarioId : ""})));}} />
                         <div className="secretary-checklist-tools">
                           <p>Comece do zero ou reaproveite as tarefas da escala mais recente.</p>
                           <button
@@ -2514,11 +2529,12 @@ export default function SecretaryMinisterialWorkspace({
 
           {editingSchedule && (
             <EditScheduleDialog
+              error={error}
               schedule={editingSchedule}
               ministry={selectedMinistry}
               teams={teams}
               busy={busy === `editing-schedule-${editingSchedule.id}`}
-              onClose={() => setEditingSchedule(null)}
+              onClose={() => {setEditingSchedule(null);setError("");}}
               onSubmit={updateSchedule}
             />
           )}
@@ -2893,6 +2909,7 @@ function ScheduleRepertoire({ schedule }: { schedule: Schedule }) {
 }
 
 function EditScheduleDialog({
+  error,
   schedule,
   ministry,
   teams,
@@ -2900,6 +2917,7 @@ function EditScheduleDialog({
   onClose,
   onSubmit,
 }: {
+  error: string;
   schedule: Schedule;
   ministry: Ministry;
   teams: MinistryTeam[];
@@ -2936,16 +2954,13 @@ function EditScheduleDialog({
         : [],
   );
 
-  useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, []);
+  const closeEditorRef = useRef({busy,onClose});
+  closeEditorRef.current = {busy,onClose};
+  const closeEditor = useCallback(() => { if (!closeEditorRef.current.busy) closeEditorRef.current.onClose(); }, []);
+  useFeedDialog(String(schedule.id), closeEditor, ".secretary-edit-schedule-dialog");
 
   return (
-    <div className="secretary-dialog-backdrop" role="presentation" onMouseDown={onClose}>
+    <div className="secretary-dialog-backdrop" role="presentation" onMouseDown={closeEditor}>
       <section
         className="secretary-share-dialog secretary-edit-schedule-dialog"
         role="dialog"
@@ -2956,20 +2971,12 @@ function EditScheduleDialog({
         <header>
           <div>
             <p className="pilot-kicker">GERENCIAR ESCALA</p>
-            <h2 id="edit-schedule-title">Editar escala</h2>
+            <h2 id="edit-schedule-title">{schedule.titulo}</h2><small>{schedule.status === "RASCUNHO" ? "Rascunho · pronto para revisar" : "Editar escala"}</small>
           </div>
-          <button type="button" aria-label="Fechar editor" onClick={onClose}>×</button>
+          <button type="button" aria-label="Fechar editor" disabled={busy} onClick={closeEditor}>×</button>
         </header>
         <p>Atualize as informações principais e revise o repertório sem alterar as confirmações dos integrantes.</p>
         <form className="secretary-form secretary-edit-schedule-form" onSubmit={(event) => onSubmit(schedule, event, selectedScheduleTeams)}>
-          <div className="secretary-edit-repertoire-preview">
-            <div>
-              <strong>Repertório atual</strong>
-              <small>A prévia muda enquanto você ajusta os itens abaixo.</small>
-            </div>
-            <ScheduleRepertoire schedule={{ ...schedule, repertorio: repertoirePreview }} />
-            {!repertoirePreview.length && <p>Nenhum item no repertório.</p>}
-          </div>
           <div className="secretary-form-grid">
             <label className="span-2">Título<input name="titulo" required maxLength={140} defaultValue={schedule.titulo} /></label>
             <fieldset className="span-2 secretary-schedule-teams">
@@ -3012,9 +3019,19 @@ function EditScheduleDialog({
             <label className="span-2">Ajustar repertório<textarea name="repertorio" rows={5} maxLength={8000} value={repertoireValue} onChange={(event) => setRepertoireValue(event.target.value)} placeholder={"Uma música ou conteúdo por linha"} /></label>
             <label className="span-2">Observações<textarea name="observacoes" rows={4} maxLength={1200} defaultValue={schedule.observacoes} /></label>
           </div>
+          <details className="secretary-edit-repertoire-preview"><summary>Conferir repertório</summary>
+            <div>
+              <strong>Repertório atual</strong>
+              <small>A prévia muda enquanto você ajusta os itens abaixo.</small>
+            </div>
+            <ScheduleRepertoire schedule={{ ...schedule, repertorio: repertoirePreview }} />
+            {!repertoirePreview.length && <p>Nenhum item no repertório.</p>}
+          </details>
+          {error && <p className="secretary-message error" role="alert">{error}</p>}
           <footer className="secretary-edit-schedule-footer">
             <button type="button" className="secondary" onClick={onClose}>Cancelar</button>
-            <button type="submit" disabled={busy}>{busy ? "Salvando…" : "Salvar alterações"}</button>
+            <button type="submit" name="intent" value="save" disabled={busy}>{busy ? "Salvando…" : "Salvar alterações"}</button>
+            {schedule.status === "RASCUNHO" && <button type="submit" name="intent" value="publish" disabled={busy}>Salvar e publicar</button>}
           </footer>
         </form>
       </section>

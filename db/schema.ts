@@ -1,4 +1,23 @@
 import { sql } from "drizzle-orm";
+// One personal repertoire follows its owner; access is granted within a community.
+export const louvorMusicasPessoais = sqliteTable('louvor_musicas_pessoais', {
+  id: integer('id').primaryKey({autoIncrement:true}),
+  usuarioId: integer('usuario_id').notNull().references(() => usuarios.id,{onDelete:'cascade'}),
+  titulo: text('titulo').notNull(), chave: text('chave').notNull(),
+  links: text('links').notNull().default('[]'), versao: integer('versao').notNull().default(1),
+}, t => [uniqueIndex('louvor_song_owner_key').on(t.usuarioId,t.chave)]);
+export const louvorCompartilhamentos = sqliteTable('louvor_compartilhamentos', {
+  comunidadeId: integer('comunidade_id').notNull().references(() => comunidades.id,{onDelete:'cascade'}),
+  donoId: integer('dono_id').notNull().references(() => usuarios.id,{onDelete:'cascade'}),
+  destinatarioId: integer('destinatario_id').notNull().references(() => usuarios.id,{onDelete:'cascade'}),
+  status: text('status').notNull().default('PENDENTE'),
+}, t => [primaryKey({columns:[t.comunidadeId,t.donoId,t.destinatarioId]}), check('louvor_share_status',sql`${t.status} IN ('PENDENTE','APROVADO','RECUSADO','REVOGADO')`)]);
+export const ministerioChecklistModelos = sqliteTable('ministerio_checklist_modelos', {
+  id: integer('id').primaryKey({autoIncrement:true}),
+  comunidadeId: integer('comunidade_id').notNull().references(() => comunidades.id,{onDelete:'cascade'}),
+  ministerioId: integer('ministerio_id').notNull().references(() => ministeriosComunidade.id,{onDelete:'cascade'}),
+  nome: text('nome').notNull(), itens: text('itens').notNull(), versao: integer('versao').notNull().default(1),
+}, t => [index('checklist_models_ministry').on(t.comunidadeId,t.ministerioId)]);
 import {
   check,
   index,

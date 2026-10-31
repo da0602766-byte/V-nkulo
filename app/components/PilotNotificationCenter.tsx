@@ -467,19 +467,17 @@ export default function PilotNotificationCenter({
                     </span>
                     <div>
                       <strong>{item.title}{!item.read && <i className="notification-unread-dot" aria-label="Não lida" />}</strong>
-                      <small className="notification-source-label">{notificationVisual(item).label}</small>
                       {(item.senderName || item.hierarchy || item.ministry) && (
                         <small className="notification-sender-meta">
                           {[item.senderName, item.hierarchy, item.ministry].filter(Boolean).join(" · ")}
                         </small>
                       )}
                       <p>{item.message}</p>
-                      <time dateTime={item.createdAt}>{formatDate(item.createdAt)}</time>
                     </div>
-                    <div className="notification-item-actions">
+                    <div className="notification-item-actions"><div className="notification-item-meta"><small className="notification-source-label">{notificationVisual(item).label}</small><time dateTime={item.createdAt}>{formatDate(item.createdAt)}</time></div><span>
                       {isSafeInternalDestination(item.destination) && <button type="button" className="notification-open" aria-label={`Abrir: ${item.title}`} onClick={() => void openNotification(item)}>Abrir</button>}
                       {item.read ? <button type="button" className="notification-clear-one" onClick={() => void clearRead(item.id)}>Limpar</button> : !isSafeInternalDestination(item.destination) ? <button type="button" onClick={() => markRead(item.id)}>Lida</button> : null}
-                    </div>
+                    </span></div>
                   </article>
                   </Fragment>
                     );

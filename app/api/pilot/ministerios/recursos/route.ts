@@ -216,7 +216,7 @@ export async function POST(request: Request) {
   if (action === "SALVAR_LINKS_REUTILIZAVEIS") {
     const ministryId = positiveInteger(payload.ministerioId);
     const parsed = parseSecretaryLinks(payload.links);
-    if (!ministryId || "error" in parsed || !parsed.value.length) {
+    if (!ministryId || "error" in parsed || (!parsed.value.length && !cleanLibraryTitle(payload.item))) {
       return Response.json(
         {
           error: !ministryId

@@ -24,17 +24,17 @@ html body .notification-redesign .notification-scroll { min-height:0; overflow-y
 .notification-redesign .notification-scope-v5 button span { margin-left:4px; font-size:11px; }
 html body .notification-redesign .pilot-notification-list { padding:0; overflow:visible; }
 .notification-redesign .notification-day-v5 { margin:16px 4px 8px; font-size:11px; font-weight:650; letter-spacing:.06em; text-transform:uppercase; color:var(--pilot-muted); }
-html body .notification-redesign .pilot-notification-list article { position:relative; display:grid; grid-template-columns:36px minmax(0,1fr)!important; gap:10px; padding:13px 10px!important; margin:4px 0; border:0; border-radius:16px; background:transparent; animation:notification-row-in .26s ease both; }
+html body .notification-redesign .pilot-notification-list article { position:relative; display:grid; grid-template-columns:36px minmax(0,1fr)!important; gap:8px; padding:10px 6px!important; margin:0; border:0; border-bottom:1px solid var(--pilot-line); border-radius:0; background:transparent; animation:notification-row-in .26s ease both; }
 html body .notification-redesign .pilot-notification-list article.unread { background:color-mix(in srgb,var(--pilot-primary) 6%,var(--pilot-surface)); }
 .notification-redesign .notification-source-icon { width:36px!important; height:36px!important; display:grid; place-items:center; border-radius:12px!important; background:color-mix(in srgb,var(--pilot-primary) 10%,var(--pilot-surface)); color:var(--pilot-primary)!important; }
 .notification-redesign .notification-source-icon svg { width:19px; height:19px; }
 .notification-redesign .pilot-notification-list strong { font-size:13px!important; line-height:1.45; font-weight:700; overflow-wrap:anywhere; }
 .notification-redesign .notification-source-label { display:inline-block; margin-top:4px; font-size:10px; font-weight:600; color:var(--pilot-primary); }
 .notification-redesign .notification-sender-meta { display:block; font-size:11px; color:var(--pilot-muted); overflow-wrap:anywhere; margin-top:4px; }
-.notification-redesign .pilot-notification-list p { font-size:12px!important; line-height:1.6; margin:6px 0; overflow-wrap:anywhere; }
+.notification-redesign .pilot-notification-list p { font-size:12px!important; line-height:1.45; margin:3px 0; overflow-wrap:anywhere; }
 .notification-redesign .pilot-notification-list time { display:block; font-size:10px; font-variant-numeric:tabular-nums; }
 html body .notification-redesign .notification-item-actions { grid-column:2; display:flex; flex-direction:row; align-items:center; gap:8px; justify-content:flex-start; padding:0; }
-html body .notification-redesign .notification-item-actions button { width:auto!important; flex:0 0 auto; min-height:44px; padding:8px 12px; border:1px solid var(--pilot-line); border-radius:10px; background:var(--pilot-surface); color:var(--pilot-primary); font-size:12px; }
+html body .notification-redesign .notification-item-actions button { width:auto!important; flex:0 0 auto; min-height:44px; padding:4px 8px; border:0; border-radius:10px; background:var(--pilot-surface); color:var(--pilot-primary); font-size:12px; }
 .notification-redesign .notification-unread-dot { display:inline-block; vertical-align:middle; margin-left:7px; width:6px; height:6px; border-radius:50%; background:var(--pilot-primary); box-shadow:0 0 0 3px color-mix(in srgb,var(--pilot-primary) 12%,transparent); }
 .notification-redesign .notification-empty { padding:38px 12px 34px; display:flex; flex-direction:column; align-items:center; color:var(--pilot-muted); }
 .notification-redesign .notification-empty-art { position:relative; display:grid; place-items:center; width:72px; height:72px; border-radius:26px; background:linear-gradient(135deg,color-mix(in srgb,var(--pilot-primary) 12%,var(--pilot-surface)),var(--pilot-surface)); margin-bottom:18px; color:var(--pilot-primary); }
@@ -73,7 +73,9 @@ html body .notification-redesign .notification-device-permission { margin:0; pad
 @keyframes notification-row-in { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
 @keyframes notification-bell-in { 25% { transform:rotate(12deg); } 50% { transform:rotate(-10deg); } 75% { transform:rotate(5deg); } }
 @keyframes notification-loading { to { background-position:-200% 0; } }
-@media(max-width:760px) { html:root body .pilot-notification-panel.notification-redesign { inset:auto 8px max(8px,env(safe-area-inset-bottom))!important; width:calc(100vw - 16px)!important; max-height:calc(100dvh - 32px)!important; border-radius:24px!important; } .notification-redesign .notification-heading h2 { font-size:18px; } }
+@media(max-width:760px) { html:root body .pilot-notification-panel.notification-redesign { inset:0!important; width:calc(100vw * var(--vinkulo-ui-scale-inverse,1))!important; height:calc(100dvh * var(--vinkulo-ui-scale-inverse,1))!important; max-height:none!important; max-width:none!important; border-radius:0!important; border:0; padding-top:env(safe-area-inset-top); padding-bottom:env(safe-area-inset-bottom); animation:none; } .notification-redesign .notification-heading h2 { font-size:18px; } }
 @media(prefers-reduced-motion:reduce) { .notification-redesign,.notification-redesign *, .notification-redesign *::after { animation:none!important; transition:none!important; } }
 
 
+
+html body .notification-redesign .notification-item-actions{gap:6px;justify-content:space-between}.notification-item-meta{display:flex;align-items:center;flex-wrap:wrap;gap:5px;min-width:0}.notification-redesign .notification-item-meta .notification-source-label{margin:0;font-size:10px}.notification-redesign .notification-item-actions>span{display:flex;gap:4px}@media(max-width:760px){html:has(.notification-redesign),body:has(.notification-redesign){overflow:hidden;scrollbar-gutter:auto}.notification-redesign>header{padding-top:max(16px,env(safe-area-inset-top))!important}}

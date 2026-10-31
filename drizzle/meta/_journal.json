@@ -449,6 +449,13 @@
       "when": 1792970641002,
       "tag": "0092_visitor_list_directory",
       "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "6",
+      "when": 1793413003364,
+      "tag": "0093_louvor_personal_checklists",
+      "breakpoints": true
     }
   ]
 }

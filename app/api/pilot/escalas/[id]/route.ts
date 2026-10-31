@@ -564,6 +564,7 @@ export async function PATCH(request: Request, context: Context) {
     if ("error" in parsed) {
       return Response.json({ error: parsed.error }, { status: 400 });
     }
+    if (parsed.status !== schedule.status) return Response.json({error:"A situação da escala mudou. Reabra o editor; para publicar um rascunho use Salvar e publicar."},{status:409});
     if (parsed.ministerioId !== Number(schedule.ministerio_id)) {
       return Response.json(
         { error: "Uma escala não pode ser movida para outro ministério." },
@@ -594,7 +595,7 @@ export async function PATCH(request: Request, context: Context) {
       const team = await db
         .prepare(
           `SELECT id FROM ministerio_equipes
-           WHERE id = ? AND ministerio_id = ? AND comunidade_id = ? AND ativo = 1`,
+           WHERE id = ? AND ministerio_id = ? AND comunidade_id = ? AND ativa = 1`,
         )
         .bind(
           selectedTeam.equipeId,
@@ -928,39 +929,20 @@ export async function PATCH(request: Request, context: Context) {
         { status: 403 },
       );
     }
-    const steps = parseFioSteps(parseStoredArray(schedule.fio_etapas));
-    if ("error" in steps) {
-      return Response.json({ error: steps.error }, { status: 400 });
+    for (let attempt=0;attempt<4;attempt++) {
+      const current=await db.prepare('SELECT fio_etapas FROM escalas_ministerio WHERE id=? AND comunidade_id=?').bind(id,access.context.comunidadeId).first<{fio_etapas:string|null}>();
+      if(!current)return Response.json({error:'Escala não encontrada.'},{status:404});
+      const steps=parseFioSteps(parseStoredArray(current.fio_etapas || '[]'));
+      if('error' in steps)return Response.json({error:steps.error},{status:400});
+      const target=steps.value.find(step=>step.id===stepId);
+      if(!target)return Response.json({error:'Esta etapa não existe nesta escala.'},{status:404});
+      target.feito=done;target.feitoEm=done?new Date().toISOString():null;target.feitoPor=done?access.user.id:null;
+      const changed=await db.prepare('UPDATE escalas_ministerio SET fio_etapas=?,atualizado_por=?,atualizado_em=CURRENT_TIMESTAMP WHERE id=? AND comunidade_id=? AND fio_etapas IS ?').bind(JSON.stringify(steps.value),access.user.id,id,access.context.comunidadeId,current.fio_etapas).run();
+      if(!changed.meta.changes)continue;
+      await audit('FIO_MINISTERIO_ETAPA_ATUALIZADA',{escalaId:id,etapaId:stepId,feito:done});
+      return Response.json({ok:true,fioEtapas:steps.value});
     }
-    const target = steps.value.find((step) => step.id === stepId);
-    if (!target) {
-      return Response.json(
-        { error: "Esta etapa não existe nesta escala." },
-        { status: 404 },
-      );
-    }
-    target.feito = done;
-    target.feitoEm = done ? new Date().toISOString() : null;
-    target.feitoPor = done ? access.user.id : null;
-    await db
-      .prepare(
-        `UPDATE escalas_ministerio
-         SET fio_etapas = ?, atualizado_por = ?, atualizado_em = CURRENT_TIMESTAMP
-         WHERE id = ? AND comunidade_id = ?`,
-      )
-      .bind(
-        JSON.stringify(steps.value),
-        access.user.id,
-        id,
-        access.context.comunidadeId,
-      )
-      .run();
-    await audit("FIO_MINISTERIO_ETAPA_ATUALIZADA", {
-      escalaId: id,
-      etapaId: stepId,
-      feito: done,
-    });
-    return Response.json({ ok: true, fioEtapas: steps.value });
+    return Response.json({error:'Outras etapas estão sendo atualizadas. Tente novamente.'},{status:409});
   }
 
   // Redefinir as etapas é da liderança, e preserva o que já foi marcado nas
