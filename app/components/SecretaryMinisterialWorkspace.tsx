@@ -1676,7 +1676,7 @@ export default function SecretaryMinisterialWorkspace({
             onSubmit={(event) => void addReplacement(schedule, event)}
           >
             <strong>Adicionar substituto</strong>
-            <select name="voluntarioId" required defaultValue="">
+            <label>Integrante<select name="voluntarioId" required defaultValue="">
               <option value="" disabled>Selecione um integrante</option>
               {scheduleCandidates
                 .filter((candidate) =>
@@ -1689,18 +1689,18 @@ export default function SecretaryMinisterialWorkspace({
                     {candidate.nome} · {candidate.funcao}
                   </option>
                 ))}
-            </select>
+            </select></label>
             {schedule.equipes.length > 0 && (
-              <select name="equipeId" required defaultValue="">
+              <label>Equipe de origem<select name="equipeId" required defaultValue="">
                 <option value="" disabled>Equipe de origem</option>
                 {schedule.equipes.map((team) => (
                   <option key={team.equipe_id} value={team.equipe_id}>
                     {team.equipe_nome}{team.funcao ? ` · ${team.funcao}` : ""}
                   </option>
                 ))}
-              </select>
+              </select></label>
             )}
-            <input name="funcao" required maxLength={100} placeholder="Função na escala" />
+            <label>Função na escala<input name="funcao" required maxLength={100} placeholder="Ex.: Vocal" /></label>
             <button disabled={busy === `replacement-${schedule.id}`}>Adicionar</button>
           </form>
         )}
@@ -1906,7 +1906,7 @@ export default function SecretaryMinisterialWorkspace({
                         <small>{volunteer.escalas_ativas} escala(s) futura(s) · Limite {volunteer.limite_escalas} · {Math.max(0, volunteer.limite_escalas - volunteer.escalas_ativas)} restante(s)</small>
                       </div>
                       {canManage && (
-                        <button type="button" className="ministry-member-options" aria-label={`Opções de ${volunteer.nome}`} aria-expanded={memberOptionsId === volunteer.id} aria-controls={`member-options-${volunteer.id}`} onClick={() => setMemberOptionsId(memberOptionsId === volunteer.id ? null : volunteer.id)}>Opções <span aria-hidden="true">⌄</span></button>
+                        <button type="button" className="ministry-member-options" aria-label={`Opções de ${volunteer.nome}`} aria-expanded={memberOptionsId === volunteer.id} aria-controls={`member-options-${volunteer.id}`} onClick={() => setMemberOptionsId(memberOptionsId === volunteer.id ? null : volunteer.id)}><span aria-hidden="true">…</span></button>
                       )}
                       {canManage && memberOptionsId === volunteer.id && (
                         <form
