@@ -18,7 +18,7 @@ async function callback({feature,native=true,error='',email='owner@test.com',ses
   const calls=[];
   const state={purpose:'drive',userId:7,nonce:'nonce',returnTo:'/painel/visitantes?lista=pessoal',
     ...(feature?{[feature]:true}:{}),...(native?{channel:'android',pairingHash:'hash'}:{})};
-  const module=await load('app/api/auth/google/callback/route.ts',{
+  const loadedModule=await load('app/api/auth/google/callback/route.ts',{
     '../../../../../db':{getD1:()=>({prepare:()=>({bind:()=>({first:async()=>({email:'owner@test.com',ativo:1}),run:async()=>calls.push('preference')})})})},
     '../../../../lib/local-auth':{getSessionUser:async()=>session?{id:7,email:'owner@test.com'}:null,normalizeEmail:s=>s.toLowerCase(),createSession:async()=>{throw Error('must preserve app session');},attachSessionCookie:()=>{throw Error('no browser login');}},
     '../../../../lib/access-security':{auditAccess:async()=>{}},
@@ -26,7 +26,7 @@ async function callback({feature,native=true,error='',email='owner@test.com',ses
     '../../../../lib/google-integration':{readGoogleState:async()=>state,exchangeGoogleCode:async()=>({id_token:'token'}),verifyGoogleIdentity:async()=>({sub:'google-id',email}),saveGoogleConnection:async()=>calls.push('saved')},
     '../../../../lib/google-native-handoff':{readGoogleNativeHandoff:async()=>({purpose:'drive',requested_user_id:requested,expires_at:new Date(Date.now()+60000).toISOString(),completed_at:completed?'done':null}),finishGoogleNativeHandoff:async()=>calls.push('completed'),failGoogleNativeHandoff:async()=>calls.push('failed')},
   });
-  const response=await module.GET(new Request('https://app.test/api/auth/google/callback?state=state&'+(error?'error='+error:'code=code'),{headers:native?{}:{cookie:'__Host-vinkulo_google_state=nonce'}}));
+  const response=await loadedModule.GET(new Request('https://app.test/api/auth/google/callback?state=state&'+(error?'error='+error:'code=code'),{headers:native?{}:{cookie:'__Host-vinkulo_google_state=nonce'}}));
   return {calls,response,target:new URL(response.headers.get('location'))};
 }
 
@@ -57,18 +57,18 @@ test('web callback still requires the original application session',async()=>{
 
 test('visitor authorization binds native pairing to the authorized user and preserves web nonce',async()=>{
   const prepared=[],states=[];
-  const module=await load('app/lib/google-authorization-response.ts',{
+  const loadedModule=await load('app/lib/google-authorization-response.ts',{
     './google-integration':{createGoogleAuthorization:async(origin,state)=>{states.push(state);return {url:'https://accounts.google.com/auth',nonce:'nonce'};}},
     './google-native-handoff':{validGooglePairingSecret:v=>/^[a-f0-9]{64}$/.test(v),googlePairingHash:async()=> 'hash',prepareGoogleNativeHandoff:async input=>prepared.push(input)},
   });
   const request=new Request('https://app.test/api/pilot/visitantes/pessoal');
   const state={purpose:'drive',userId:7,personalVisitors:true,returnTo:'/painel/visitantes?lista=pessoal'};
-  assert.equal((await module.googleAuthorizationResponse(request,state,{channel:'android',pairing:'bad'})).status,400);
+  assert.equal((await loadedModule.googleAuthorizationResponse(request,state,{channel:'android',pairing:'bad'})).status,400);
   assert.equal(prepared.length,0);
-  const native=await module.googleAuthorizationResponse(request,state,{channel:'android',pairing:'a'.repeat(64)});
+  const native=await loadedModule.googleAuthorizationResponse(request,state,{channel:'android',pairing:'a'.repeat(64)});
   assert.equal(native.headers.get('set-cookie'),null);assert.equal(states[0].channel,'android');assert.equal(states[0].personalVisitors,true);
   assert.equal(prepared[0].requestedUserId,7);assert.equal(prepared[0].returnTo,state.returnTo);
-  const web=await module.googleAuthorizationResponse(request,state,{});assert.match(web.headers.get('set-cookie'),/__Host-vinkulo_google_state=nonce/);assert.equal(states[1].channel,undefined);
+  const web=await loadedModule.googleAuthorizationResponse(request,state,{});assert.match(web.headers.get('set-cookie'),/__Host-vinkulo_google_state=nonce/);assert.equal(states[1].channel,undefined);
 });
 
 async function clientFixture(native=true) {
@@ -117,11 +117,11 @@ test('expired native authorization is cleared and reported',async()=>{
 });
 test('handoff completion rejects a different app session without consuming authorization',async()=>{
   let consumed=0;let userId=8;
-  const module=await load('app/api/auth/google/native/complete/route.ts',{
+  const loadedModule=await load('app/api/auth/google/native/complete/route.ts',{
     '../../../../../lib/local-auth':{getSessionUser:async()=>({id:userId}),createSession:async()=>{throw Error('Drive cannot create login');}},
     '../../../../../lib/google-native-handoff':{validGooglePairingSecret:()=>true,googlePairingHash:async()=> 'hash',readGoogleNativeHandoff:async()=>({purpose:'drive',completed_at:'done',completed_user_id:7,expires_at:new Date(Date.now()+60000).toISOString(),return_to:'/painel'}),consumeGoogleNativeHandoff:async()=>consumed++},
   });
   const request=()=>new Request('https://app.test/api/auth/google/native/complete',{method:'POST',body:JSON.stringify({pairing:'secret'})});
-  assert.equal((await module.POST(request())).status,401);assert.equal(consumed,0);userId=7;
-  assert.equal((await module.POST(request())).status,200);assert.equal(consumed,1);
+  assert.equal((await loadedModule.POST(request())).status,401);assert.equal(consumed,0);userId=7;
+  assert.equal((await loadedModule.POST(request())).status,200);assert.equal(consumed,1);
 });

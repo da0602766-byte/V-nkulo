@@ -338,14 +338,6 @@ export async function createResetToken(userId: number) {
   return token;
 }
 
-export function generateTemporaryPassword() {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
-  const bytes = crypto.getRandomValues(new Uint8Array(10));
-  let suffix = "";
-  for (const byte of bytes) suffix += alphabet[byte % alphabet.length];
-  return `V7${suffix}`;
-}
-
 export async function createFirstAccessToken(userId: number) {
   const token = `fa_${randomHex(32)}`;
   const expiresAt = new Date(Date.now() + 7 * 86400000).toISOString();

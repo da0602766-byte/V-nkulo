@@ -38,6 +38,12 @@
   ],
   "exclude": [
     "node_modules",
-    ".task-tools"
+    ".task-tools",
+    "outputs",
+    "work",
+    "dist",
+    ".sites-runtime",
+    ".site-tools",
+    ".site-stage-*"
   ]
 }

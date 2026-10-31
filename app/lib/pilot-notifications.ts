@@ -1,4 +1,3 @@
-import { findSystemOwnerAccount } from "./local-auth";
 import { createSystemNotification } from "./system-notifications";
 
 type Database = Parameters<typeof createSystemNotification>[0];
@@ -67,31 +66,6 @@ export async function notifyCommunityManagers(
         entityId: input.requestId,
         area: "SOLICITACOES",
         destination: "/painel?view=configuracoes",
-        createdBy: input.createdBy,
-      }),
-    ),
-  );
-}
-
-export async function notifySuperadmins(
-  db: Database,
-  input: {
-    title: string;
-    message: string;
-    entityId?: number;
-    createdBy: string;
-  },
-) {
-  const owner = await findSystemOwnerAccount(db);
-  const recipients = {results: owner ? [owner] : []};
-  await Promise.all(
-    recipients.results.map((recipient) =>
-      notifyUser(db, {
-        userId: Number(recipient.id),
-        destination: "/proprietario",
-        title: input.title,
-        message: input.message,
-        entityId: input.entityId,
         createdBy: input.createdBy,
       }),
     ),

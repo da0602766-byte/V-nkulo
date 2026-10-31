@@ -12,7 +12,12 @@ export default function PersonalRepertoire({ministryId,canManage,onLibraryChange
   const [selected,setSelected]=useState<number[]>([]),[confirmLibrary,setConfirmLibrary]=useState(false),[view,setView]=useState<'songs'|'people'|'sharing'>('songs');
   const generation=useRef(0);
   const load=useCallback(async()=>{const seq=++generation.current;const response=await fetch(`/api/pilot/ministerios/repertorios?ministerioId=${ministryId}${owner?`&donoId=${owner}`:''}`);const result=await response.json();if(seq!==generation.current)return;if(!response.ok){setData(null);throw new Error(result.error);}setData(result);},[ministryId,owner]);
-  useEffect(()=>{setData(null);setSelected([]);setError('');void load().catch(cause=>setError(cause.message));return()=>{generation.current++;};},[load]);
+  useEffect(()=>{
+    let cancelled=false;
+    const requests=generation;
+    const timer=window.setTimeout(()=>{setData(null);setSelected([]);setError('');void load().catch(cause=>{if(!cancelled)setError(cause.message);});},0);
+    return()=>{cancelled=true;window.clearTimeout(timer);requests.current++;};
+  },[load]);
   async function act(body:Record<string,unknown>,success:string){if(busy)return false;setBusy(true);setError('');setMessage('');try{const response=await fetch('/api/pilot/ministerios/repertorios',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ministerioId: ministryId,...body})});const result=await response.json();if(!response.ok)throw new Error(result.error);await load();setMessage(body.action==='COPY'?`${result.copied} música(s) adicionada(s). Títulos já existentes foram preservados; o limite é de 500 músicas.`:success);return true;}catch(cause){setError((cause as Error).message);return false;}finally{setBusy(false);}}
   function edit(song:Song|null){setEditing(song);setTitle(song?.titulo||'');setLinks(song?.links.map(link=>({...link}))||[]);setError('');}
   async function save(event:FormEvent){event.preventDefault();if(await act({action:'SAVE',id:editing?.id,versao:editing?.versao,titulo:title,links},'Música salva na sua lista.'))setEditing(undefined);}

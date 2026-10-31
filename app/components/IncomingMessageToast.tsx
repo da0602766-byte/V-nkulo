@@ -23,7 +23,7 @@ export default function IncomingMessageToast({ message, onOpen, onDismiss }: {
   const [leaving, setLeaving] = useState(false);
   const remaining = useRef(6000);
   const dismissRef = useRef(onDismiss);
-  dismissRef.current = onDismiss;
+  useEffect(() => { dismissRef.current = onDismiss; }, [onDismiss]);
   const paused = hovered || focused;
   useEffect(() => {
     if (paused || leaving) return;

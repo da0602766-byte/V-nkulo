@@ -44,6 +44,26 @@ function harness(file,initialProps={},exportName='default'){
     async reply(request,value){request.resolve(value);await settle();}};
 }
 
+test('checklist templates discard responses from a previous ministry and after unmount',async()=>{
+  const props={ministryId:1,draft:[],onApply(){}};
+  const h=harness('ChecklistTemplates',props);h.render();h.flush();h.timers();
+  const old=h.requests[0];
+  h.render({...props,ministryId:2});h.flush();h.timers();
+  const current=h.requests[1];
+  await h.reply(current,Response.json({modelos:[{id:2,nome:'Current',itens:[],versao:1}]}));
+  await h.reply(old,Response.json({modelos:[{id:1,nome:'Stale',itens:[],versao:1}]}));
+  assert.match(text(h.render()),/Current/);assert.doesNotMatch(text(h.render()),/Stale/);
+  h.render({...props,ministryId:3});h.flush();h.timers();h.close();
+  await h.reply(h.requests.at(-1),Response.json({error:'Late error'},{status:500}));
+  assert.equal(h.lateUpdates,0);
+});
+
+test('personal repertoire cancels deferred loading when unmounted',()=>{
+  const h=harness('PersonalRepertoire',{ministryId:1,canManage:false,onLibraryChanged:async()=>{}});
+  h.render();h.flush();h.close();h.timers();
+  assert.equal(h.requests.length,0);assert.equal(h.lateUpdates,0);
+});
+
 test('document navigation preserves local paths, query and fragment on the current origin',()=>{
   const exports={},visited=[],origin='https://vinkulo.test';
   runInNewContext(compile('lib/document-navigation.ts'),{exports,URL,window:{location:{origin,assign:url=>visited.push(url)}}});

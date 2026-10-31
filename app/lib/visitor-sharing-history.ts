@@ -1,8 +1,6 @@
 import { platformDB, type VisitorDriveConfig, VisitorDriveError } from './visitor-drive-store';
 import { scheduleWebPushDelivery } from './push-delivery-queue';
 import type { VisitorShareRole } from './visitor-sharing';
-
-export const SHARING_RETENTION_DAYS = 30;
 export function sharingCleanupStatements(db: D1Database) {
   return [
     db.prepare("DELETE FROM visitante_acesso_historico WHERE criado_em <= datetime('now','-30 days')"),

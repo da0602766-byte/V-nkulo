@@ -158,28 +158,6 @@ function isUninitializedPreviewDatabase(error: unknown) {
   return /no such table:\s*comunidades/i.test(message);
 }
 
-export async function getPublicPlatformEvents(
-  limit = 4,
-): Promise<PublicCommunityEvent[]> {
-  const result = await getD1()
-    .prepare(
-      `SELECT e.id, e.titulo, e.descricao, e.categoria, e.inicia_em,
-        e.termina_em, e.local, c.nome AS comunidade_nome,
-        c.slug AS comunidade_slug
-      FROM eventos_comunidade e
-      JOIN comunidades c ON c.id = e.comunidade_id
-      WHERE e.publico = 1
-        AND e.status = 'PUBLICADO'
-        AND c.status = 'ATIVA'
-        AND julianday(e.inicia_em) >= julianday('now', '-1 day')
-      ORDER BY e.inicia_em ASC, e.id ASC
-      LIMIT ?`,
-    )
-    .bind(Math.max(1, Math.min(limit, 12)))
-    .all<Record<string, unknown>>();
-  return result.results.map(mapEvent);
-}
-
 export async function getPublicCommunityEvents(
   comunidadeId: number,
 ): Promise<PublicCommunityEvent[]> {

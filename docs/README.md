@@ -1,5 +1,7 @@
 # Documentação
 
+- [Comparação GitHub/Sites e limpeza de 31/10/2026](relatorios/LIMPEZA_E_PARIDADE_2026-10-31.md) — versão publicada, sincronização, remoções, correções e limites verificados.
+
 Índice da documentação do projeto, organizada por assunto. O código-fonte
 continua em `app/`, `worker/`, `db/`, `drizzle/`, `scripts/`, etc. — nada
 disso foi tocado por esta organização.

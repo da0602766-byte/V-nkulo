@@ -284,7 +284,12 @@ export default function PilotDashboard({
   const [unreadMessages, setUnreadMessages] = useState(0);
   // Aviso animado de mensagem nova: guarda o retrato das não lidas por
   // conversa para saber *quem* escreveu, não só que o total subiu.
-  const [incomingMessage, setIncomingMessage] = useState<IncomingMessage | null>(null);
+  const [incomingMessage, setIncomingMessage] = useState<(IncomingMessage & { communityId: number }) | null>(null);
+  const [arrivalScope, setArrivalScope] = useState({ communityId: active.comunidadeId, access: active.communityAccess });
+  if (arrivalScope.communityId !== active.comunidadeId || arrivalScope.access !== active.communityAccess) {
+    setArrivalScope({ communityId: active.comunidadeId, access: active.communityAccess });
+    setIncomingMessage(null);
+  }
   const [messagePulse, setMessagePulse] = useState(0);
   const unreadTotalRef = useRef(0);
   const unreadByConversationRef = useRef<{ comunidadeId: number; porConversa: Map<number, number> } | null>(null);
@@ -303,7 +308,11 @@ export default function PilotDashboard({
   const [chatOpenSequence, setChatOpenSequence] = useState(0);
   const readingChatUserRef = useRef<number | null>(null);
   const handleReadingChat = useCallback((id: number | null) => { readingChatUserRef.current = id; }, []);
-  useEffect(() => { if (view === "mensagens") setMessageCenterOpen(true); }, [view]);
+  const [previousView, setPreviousView] = useState(view);
+  if (previousView !== view) {
+    setPreviousView(view);
+    if (view === "mensagens") setMessageCenterOpen(true);
+  }
 
   useEffect(() => {
     const initial = window.setTimeout(() => {
@@ -677,7 +686,6 @@ export default function PilotDashboard({
     if (active.communityAccess === "FEED_ONLY") return;
     let cancelled = false;
     let syncing = false;
-    setIncomingMessage(null);
     const syncUnread = async () => {
       if (syncing || cancelled) return;
       syncing = true;
@@ -721,6 +729,7 @@ export default function PilotDashboard({
         const arrived = incomingChatArrivals(conversations, previous, readingChatUserRef.current, payload.messageNotificationsEnabled !== false)[0];
         if (!arrived) return;
         setIncomingMessage({
+          communityId: active.comunidadeId,
           key: Number(arrived.ultima_recebida_id),
           userId: Number(arrived.participante_id || 0),
           name: String(arrived.participante_nome || "Alguém da comunidade"),
@@ -1114,7 +1123,7 @@ export default function PilotDashboard({
           </details>
         </div>
       </header>
-      {incomingMessage && (
+      {incomingMessage && incomingMessage.communityId === active.comunidadeId && active.communityAccess !== "FEED_ONLY" && (
         <IncomingMessageToast
           key={incomingMessage.key}
           message={incomingMessage}

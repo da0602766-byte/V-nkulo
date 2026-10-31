@@ -123,7 +123,7 @@ export default function PrivateChatWorkspace({
   const pendingIdRef = useRef(0);
   const shellRef = useRef<HTMLElement>(null);
   const visibleRef = useRef(visible);
-  visibleRef.current = visible;
+  useEffect(() => { visibleRef.current = visible; }, [visible]);
   const [now, setNow] = useState(() => Date.now());
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
@@ -135,22 +135,25 @@ export default function PrivateChatWorkspace({
 
   useEffect(() => {
     if (!visible) return;
-    setNow(Date.now());
+    const initial = window.setTimeout(() => setNow(Date.now()), 0);
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
+    return () => { window.clearTimeout(initial); window.clearInterval(timer); };
   }, [visible]);
 
   useEffect(() => {
     const id = workspace?.currentUserId;
     if (!id) return;
-    setWallpaper("brisa");
-    setCustomColor("#e8edf5");
-    try {
-      const saved = JSON.parse(window.localStorage.getItem(`vinkulo:chat-appearance:${id}`) || "null");
-      if (saved && [...CHAT_THEMES.map(theme => theme[0]), "custom"].includes(saved.wallpaper)) setWallpaper(saved.wallpaper);
-      if (/^#[0-9a-f]{6}$/i.test(saved?.color)) setCustomColor(saved.color);
-    } catch { /* Preferences are optional when browser storage is unavailable. */ }
-    setPreferenceUser(id);
+    const timer = window.setTimeout(() => {
+      setWallpaper("brisa");
+      setCustomColor("#e8edf5");
+      try {
+        const saved = JSON.parse(window.localStorage.getItem(`vinkulo:chat-appearance:${id}`) || "null");
+        if (saved && [...CHAT_THEMES.map(theme => theme[0]), "custom"].includes(saved.wallpaper)) setWallpaper(saved.wallpaper);
+        if (/^#[0-9a-f]{6}$/i.test(saved?.color)) setCustomColor(saved.color);
+      } catch { /* Preferences are optional when browser storage is unavailable. */ }
+      setPreferenceUser(id);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [workspace?.currentUserId]);
 
   useEffect(() => {
@@ -411,7 +414,7 @@ export default function PrivateChatWorkspace({
       setPulseIds([]);
     }, 600);
     return () => window.clearTimeout(timer);
-  }, [confirmed, workspace?.currentUserId]);
+  }, [confirmed, workspace?.currentUserId, visible]);
 
   useEffect(() => {
     const el = messagesRef.current;
@@ -570,6 +573,7 @@ export default function PrivateChatWorkspace({
     );
   }, [workspace?.conversations, search]);
   const activeConversation = workspace?.conversations.find((item) => Number(item.id) === activeId);
+  const hasActiveConversation = Boolean(activeConversation);
   const readingUserId = visible && activeConversation ? Number(activeConversation.participante_id) : null;
   useEffect(() => {
     onReadingChange?.(readingUserId);
@@ -584,7 +588,7 @@ export default function PrivateChatWorkspace({
     const observer = new ResizeObserver(update);
     observer.observe(form);
     return () => observer.disconnect();
-  }, [activeId, Boolean(activeConversation)]);
+  }, [activeId, hasActiveConversation]);
   const threadItems = useMemo(
     () => buildThreadItems(confirmed, pending, workspace?.currentUserId || 0, freshIds, pulseIds),
     [confirmed, pending, workspace?.currentUserId, freshIds, pulseIds],
@@ -595,8 +599,11 @@ export default function PrivateChatWorkspace({
 
   useEffect(() => {
     if (!visible || activeId <= 0) return;
-    void refreshMessages(activeId);
-    void markRead(activeId);
+    const timer = window.setTimeout(() => {
+      void refreshMessages(activeId);
+      void markRead(activeId);
+    }, 0);
+    return () => window.clearTimeout(timer);
     // Resume immediately after restoring the dock; never read while minimized.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);

@@ -280,26 +280,6 @@ function parseDatabaseTimestamp(value: string) {
   return Date.parse(normalized);
 }
 
-export async function getActiveTemporaryAccessForUser(
-  db: D1Database,
-  token: string | undefined,
-  userId: number,
-  communityId: number,
-) {
-  if (!token) return null;
-  const row = await getTemporaryAccessByToken(db, token);
-  if (
-    !row ||
-    row.status !== "ATIVO" ||
-    row.designacao_status !== "CONFIRMADA" ||
-    Number(row.beneficiario_usuario_id) !== Number(userId) ||
-    Number(row.comunidade_id) !== Number(communityId)
-  ) {
-    return null;
-  }
-  return row;
-}
-
 export async function markTemporaryAccessActivated(
   db: D1Database,
   row: TemporaryAccessRecord,

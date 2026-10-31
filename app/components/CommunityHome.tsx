@@ -430,7 +430,10 @@ export default function CommunityHome({
     document.addEventListener("visibilitychange", sync);
     return () => { window.removeEventListener("storage", sync); document.removeEventListener("visibilitychange", sync); };
   }, [seenKey]);
-  useEffect(() => { setMomentNow(Date.now()); }, [posts]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setMomentNow(Date.now()), 0);
+    return () => window.clearTimeout(timer);
+  }, [posts]);
   useEffect(() => {
     const now = Date.now();
     const expirations = posts.filter(post => momentIsActive(post, now)).map(post => Date.parse(post.momento_expira_em!.replace(" ", "T") + (/Z$|[+-]\d{2}:\d{2}$/.test(post.momento_expira_em!) ? "" : "Z")));

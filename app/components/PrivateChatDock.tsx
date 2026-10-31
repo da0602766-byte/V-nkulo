@@ -18,7 +18,11 @@ export default function PrivateChatDock({ initialTargetUserId, onClose, onReadin
     minimizeRef.current?.focus();
     return () => { if (previous?.isConnected) previous.focus(); };
   }, []);
-  useEffect(() => { setMinimized(false); }, [initialTargetUserId, openSequence]);
+  const [openedFor, setOpenedFor] = useState({ initialTargetUserId, openSequence });
+  if (openedFor.initialTargetUserId !== initialTargetUserId || openedFor.openSequence !== openSequence) {
+    setOpenedFor({ initialTargetUserId, openSequence });
+    setMinimized(false);
+  }
   useEffect(() => {
     if (minimized) restoreRef.current?.focus();
     else (dockRef.current?.querySelector<HTMLButtonElement>('.private-chat-thread button[aria-label="Minimizar conversas"]') || minimizeRef.current)?.focus();

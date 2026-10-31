@@ -5,17 +5,18 @@ import test from "node:test";
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
 test("acesso temporário bloqueia qualquer botão até a revalidação atual do servidor", async () => {
-  const [flow, page, helper] = await Promise.all([
+  const [flow, page, route] = await Promise.all([
     read("app/components/TemporaryAccessFlow.tsx"),
     read("app/acesso/[token]/page.tsx"),
-    read("app/lib/temporary-access.ts"),
+    read("app/api/acesso-temporario/[token]/route.ts"),
   ]);
   assert.match(flow, /useState<[^>]*"checking" \| "verified" \| "failed"/s);
   assert.match(flow, /verificationState === "verified" &&\s*snapshot\.status === "ATIVO"/s);
   assert.match(flow, /O acesso só será liberado após a confirmação do servidor/);
   assert.match(flow, /setVerificationState\("failed"\)/);
   assert.match(page, /grant\.designacao_status !== "CONFIRMADA"/);
-  assert.match(helper, /row\.designacao_status !== "CONFIRMADA"/);
+  assert.match(route, /grant\.designacao_status !== "CONFIRMADA"/);
+  assert.match(route, /Number\(user\.id\) !== Number\(grant\.beneficiario_usuario_id\)/);
 });
 
 test("não posso exige e valida substituto real do mesmo ministério", async () => {

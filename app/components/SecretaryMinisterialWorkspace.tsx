@@ -2955,7 +2955,7 @@ function EditScheduleDialog({
   );
 
   const closeEditorRef = useRef({busy,onClose});
-  closeEditorRef.current = {busy,onClose};
+  useEffect(() => { closeEditorRef.current = {busy,onClose}; }, [busy,onClose]);
   const closeEditor = useCallback(() => { if (!closeEditorRef.current.busy) closeEditorRef.current.onClose(); }, []);
   useFeedDialog(String(schedule.id), closeEditor, ".secretary-edit-schedule-dialog");
 

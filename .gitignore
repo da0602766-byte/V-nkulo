@@ -45,6 +45,7 @@ next-env.d.ts
 /.site-tools/
 /.xlsx-install/
 /site-v*.tgz
+/site-*.tar.gz
 /test-output-*.txt
 /outputs/
 /work/

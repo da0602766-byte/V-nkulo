@@ -43,9 +43,25 @@ O estado técnico e as limitações atuais estão em `docs/coordenacao/ESTADO_DO
 ## Desenvolvimento local
 
 ```bash
-npm install
+npm run install:ci
 npm run dev
 ```
+
+Requer Node.js 22.13 ou superior. Os comandos funcionam em PowerShell/Windows
+sem Bash; o instalador e build Linux continuam disponíveis para CI.
+
+Antes de enviar alterações:
+
+```bash
+npm run typecheck
+npm run lint
+npm test
+```
+
+`npm test` compila e valida o artefato antes de executar a suíte. Para conferir
+imports sem uso, execute `npm run audit:source`: os candidatos precisam de
+revisão humana antes de excluir arquivos. `outputs/`, `dist/` e diretórios de
+ferramentas são locais e não entram na análise de fontes.
 
 O ambiente hospedado aplica as migrações presentes em `drizzle/` e fornece o banco conectado.
 

@@ -22,18 +22,6 @@ const SAFE_COLOR = /^(#[0-9a-f]{3,8}|var\(--[a-z0-9-]+\))$/i;
 
 export const EMPTY_LAB_DOCUMENT: LaboratoryDocument = { schema: 1, nodes: [], css: "", profile: "PROPRIETARIO", state: "NORMAL" };
 
-export const LAB_TEMPLATES = [
-  ["Dashboard", "Indicadores, atalhos e atividade recente."],
-  ["Página administrativa", "Cabeçalho, filtros, lista e ações."],
-  ["Lista", "Busca, filtros e resultados operacionais."],
-  ["Tabela", "Dados estruturados para desktop e mobile."],
-  ["Página de membro", "Experiência simples, acolhedora e responsiva."],
-  ["Formulário", "Coleta de dados com validação visual."],
-  ["Relatório", "Indicadores e observações em uma visualização."],
-  ["Página de configurações", "Preferências organizadas por seção."],
-  ["Painel operacional", "Fila de atendimento e próximos passos."],
-] as const;
-
 function text(value: unknown, maximum = 1000) { return String(value ?? "").trim().slice(0, maximum); }
 function number(value: unknown, min: number, max: number, fallback: number) { const parsed = Number(value); return Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : fallback; }
 

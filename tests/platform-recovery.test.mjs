@@ -23,6 +23,10 @@ async function fixture(t) {
   db.prepare('INSERT INTO sessoes(usuario_id,token_hash,expira_em) VALUES(?,?,?)').run(memberId, 'expired-session', '2099-01-01');
   db.prepare("INSERT INTO configuracoes(chave,valor,atualizado_por) VALUES('secret-integration',?,'test')").run('do-not-restore');
   db.prepare("INSERT INTO visitante_pessoal_storage(usuario_id,comunidade_id,provider,pasta_id,arquivo_id,hash) VALUES(?,1,'GOOGLE_DRIVE','private-folder','private-document','private-hash')").run(memberId);
+  const ministryId=Number(db.prepare("INSERT INTO ministerios_comunidade(comunidade_id,nome,categoria,status,responsavel_usuario_id) VALUES(1,'Louvor recuperação','LOUVOR','ATIVO',?)").run(memberId).lastInsertRowid);
+  db.prepare("INSERT INTO louvor_musicas_pessoais(usuario_id,titulo,chave,links) VALUES(?,'Canção preservada','cancao-preservada','[]')").run(memberId);
+  db.prepare("INSERT INTO ministerio_checklist_modelos(comunidade_id,ministerio_id,nome,itens) VALUES(1,?,'Modelo preservado','[]')").run(ministryId);
+  db.prepare("INSERT INTO louvor_compartilhamentos(comunidade_id,dono_id,destinatario_id,status) VALUES(1,?,?,'APROVADO')").run(memberId,ownerId);
   const list = db.prepare("SELECT name,sql FROM sqlite_master WHERE type='table' ORDER BY name").all().filter(row => !/^(sqlite_|_cf_|__drizzle|platform_reset_)|^d1_migrations$/.test(row.name) && !['planos_plataforma','planos_rede','controlled_auth_rate_limits','auth_rate_limits','supabase_storage_copies'].includes(row.name));
   const tables = list.map(table => ({ name: table.name, schema: table.sql, rows: db.prepare(`SELECT * FROM "${table.name}"`).all().filter(row => table.name === 'usuarios' ? row.id !== ownerId : ['identidades_cpf','sessoes'].includes(table.name) ? row.usuario_id !== ownerId : table.name === 'configuracoes' ? row.chave !== 'supabase_integration' : true) }));
   const archive = { format: 'vinkulo-reset-v1', ownerId, createdAt: new Date().toISOString(), tables, files: ['images/test.jpg'], summary: { rows: tables.reduce((n, table) => n + table.rows.length, 0), users: tables.find(table => table.name === 'usuarios').rows.length, communities: tables.find(table => table.name === 'comunidades').rows.length, files: 1, tables: tables.map(table => ({ name: table.name, rows: table.rows.length })) } };
@@ -54,6 +58,10 @@ test('recupera dados reais em outro SQLite, preserva proprietário e não reabre
   assert.equal(restored.prepare('SELECT COUNT(*) n FROM configuracoes').get().n, 0);
   assert.equal(restored.prepare('SELECT COUNT(*) n FROM visitante_pessoal_storage').get().n, 0);
   assert.equal(report.tables.find(table=>table.name==='visitante_pessoal_storage').action, 'excluded');
+  assert.equal(restored.prepare('SELECT titulo FROM louvor_musicas_pessoais WHERE usuario_id=?').get(f.memberId).titulo,'Canção preservada');
+  assert.equal(restored.prepare('SELECT nome FROM ministerio_checklist_modelos').get().nome,'Modelo preservado');
+  assert.equal(restored.prepare('SELECT COUNT(*) n FROM louvor_compartilhamentos').get().n,0);
+  assert.equal(report.tables.find(table=>table.name==='louvor_compartilhamentos').action,'excluded');
   assert.equal(restored.prepare('SELECT COUNT(*) n FROM usuario_comunidades WHERE usuario_id=?').get(f.memberId).n, 1);
   assert.deepEqual(restored.prepare('PRAGMA foreign_key_check').all(), []);
   assert.deepEqual(restored.prepare("SELECT name,sql FROM sqlite_master WHERE type='trigger' ORDER BY name").all(), f.db.prepare("SELECT name,sql FROM sqlite_master WHERE type='trigger' ORDER BY name").all());

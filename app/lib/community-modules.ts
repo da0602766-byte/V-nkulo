@@ -164,7 +164,3 @@ export function filterPermissionsForCommunityModules(
   );
   return permissions.filter((permission) => !disabledPermissions.has(permission));
 }
-
-export function communityModuleLabel(key: CommunityModuleKey) {
-  return COMMUNITY_MODULES.find((item) => item.key === key)?.label || key;
-}

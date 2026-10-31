@@ -7,14 +7,16 @@
   },
   "scripts": {
     "recovery:local": "node scripts/recovery/restore.mjs",
-    "install:ci": "bash scripts/install-ci.sh",
-    "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vite",
-    "build": "bash scripts/build-verified.sh",
-    "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
+    "install:ci": "node scripts/run.mjs install:ci",
+    "dev": "node scripts/run.mjs dev",
+    "build": "node scripts/run.mjs build",
+    "start": "node scripts/run.mjs start",
     "test": "npm run build && node --test tests/*.test.mjs",
-    "validate:artifact": "bash scripts/validate-artifact.sh",
-    "lint": "bash scripts/sites-env.sh -- eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:generate": "bash scripts/sites-env.sh -- drizzle-kit generate"
+    "validate:artifact": "node scripts/validate-artifact.mjs",
+    "lint": "node scripts/run.mjs lint",
+    "typecheck": "tsc --noEmit --noUnusedLocals --noUnusedParameters",
+    "audit:source": "node scripts/audit/source-inventory.mjs",
+    "db:generate": "node scripts/run.mjs db:generate"
   },
   "dependencies": {
     "@types/qrcode": "^1.5.6",

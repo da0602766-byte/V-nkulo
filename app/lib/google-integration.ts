@@ -347,19 +347,6 @@ export async function deleteDriveFile(accessToken: string, fileId: string) {
   }
 }
 
-export async function listDriveFiles(accessToken: string, parentId: string, pageSize = 100) {
-  const query = `'${parentId.replaceAll("'", "\\'")}' in parents and trashed = false`;
-  const url = new URL(`${DRIVE_API}/files`);
-  url.searchParams.set("q", query);
-  url.searchParams.set("orderBy", "createdTime desc");
-  url.searchParams.set("pageSize", String(Math.min(100, Math.max(1, pageSize))));
-  url.searchParams.set("fields", "files(id,name,mimeType,createdTime,modifiedTime,appProperties,size)");
-  const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" } });
-  const body = await response.json() as { files?: Array<Record<string, unknown>>; error?: { message?: string } };
-  if (!response.ok) throw new Error(body.error?.message || "Não foi possível listar os arquivos do Google Drive.");
-  return body.files || [];
-}
-
 export async function encryptDrivePayload(value: unknown) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const clear = new TextEncoder().encode(JSON.stringify(value));
