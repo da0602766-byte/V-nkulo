@@ -1,5 +1,6 @@
 "use client";
 import {useCallback,useEffect,useRef,useState} from 'react';
+import {authorizeGoogle} from '../../lib/google-authorization-client';
 import {MAX_VISITOR_ARCHIVE_BYTES,validateVisitorArchive,type VisitorArchive} from '../../lib/visitor-drive-format';
 import {btnPri,btnSec} from './Views';
 
@@ -16,6 +17,7 @@ export default function VisitorDriveSettings({onChanged}:{onChanged:(state:strin
   async function act(action:string,label:string,extra:Record<string,unknown>={}) {
     if(working.current)return;working.current=true;setBusy(label);setError('');setMessage('');
     try {
+      if(action==='authorize'){await authorizeGoogle(endpoint,{action});return;}
       const r=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,...extra})});const body=await r.json();
       if(!r.ok)throw new Error(body.error||'Não foi possível concluir. Confira o estado antes de tentar novamente.');
       if(body.url){window.location.assign(body.url);return;}

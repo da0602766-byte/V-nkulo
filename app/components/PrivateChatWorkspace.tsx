@@ -621,11 +621,12 @@ export default function PrivateChatWorkspace({
           <p>Só você e a outra pessoa têm acesso a cada conversa.</p>
         </div>
       </header>
-      <div className="chat-retention" title={Number.isFinite(purgeTime) ? `Limpeza semanal: ${new Date(purgeTime).toLocaleString("pt-BR")}` : undefined}>
+      {!activeId && <div className="chat-retention" title={Number.isFinite(purgeTime) ? `Limpeza semanal: ${new Date(purgeTime).toLocaleString("pt-BR")}` : undefined}>
         <ChatIcon name="clock" />
         <p>{remaining === null ? "As mensagens são apagadas semanalmente." : remaining === 0 ? "O prazo expirou; atualizando as conversas." : <>As mensagens serão apagadas em <strong>{formatRemaining(remaining)}</strong>.</>}</p>
         <div className="chat-retention-track" role="progressbar" aria-label="Tempo decorrido até a exclusão semanal" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.floor(retentionProgress)} aria-valuetext={remaining === null ? "Consultando prazo" : `${formatRemaining(remaining)} restantes`}><span style={{ width: `${retentionProgress}%` }} /></div>
       </div>
+      }
       {error && <p className="pilot-form-message" role="alert">{error}</p>}
       <div className={`private-chat-layout ${activeId ? "has-thread" : ""}`}>
         <aside className="private-chat-sidebar">

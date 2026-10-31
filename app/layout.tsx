@@ -27,6 +27,7 @@ import MobileAppInstall from "./components/MobileAppInstall";
 import GlobalFeedbackLauncher from "./components/GlobalFeedbackLauncher";
 import SystemExperienceController from "./components/SystemExperienceController";
 import NativeNotificationSync from "./components/NativeNotificationSync";
+import GoogleNativeAuth from "./components/GoogleNativeAuth";
 import { TransientFeedbackViewport } from "./components/TransientFeedback";
 import MediaConnectionFeedback from "./components/MediaConnectionFeedback";
 import { THEME_BOOTSTRAP_SCRIPT } from "./lib/theme-preference";
@@ -90,6 +91,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <head>
+        <meta name="google-site-verification" content="u8fLno7h4JnKtsGZ8_9SKZfMKNjfU5ikqf_CRcnU230" />
         <script
           dangerouslySetInnerHTML={{
             __html:
@@ -105,6 +107,7 @@ export default function RootLayout({
         <div id="main-content" tabIndex={-1}>{children}</div>
         <SystemExperienceController />
         <NativeNotificationSync />
+        <GoogleNativeAuth />
         <TransientFeedbackViewport />
         <MediaConnectionFeedback />
         <GlobalFeedbackLauncher />

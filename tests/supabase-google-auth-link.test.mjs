@@ -127,7 +127,7 @@ async function callbackFixture(options = {}) {
     ...(options.native ? { channel: "android", pairingHash: "pairing" } : {}) };
   const route = await load("app/api/auth/google/callback/route.ts", {
     "../../../../../db": { getD1: () => ({ prepare: () => ({ bind: () => ({
-      first: async () => options.missing ? null : { id: 1, ativo: options.inactive ? 0 : 1 }, run: async () => {},
+      first: async () => options.missing ? null : { id: 1, email, ativo: options.inactive ? 0 : 1 }, run: async () => {},
     }) }) }) },
     "../../../../lib/local-auth": { normalizeEmail: value => value.toLowerCase(), getSessionUser: async () => ({ id: 1, email }),
       createSession: async () => { order.push("session"); return {}; }, attachSessionCookie: response => { response.headers.set("set-cookie", "test-session=1"); return response; } },

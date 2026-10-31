@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     return redirectWithError(url.origin, "/login", "A autorização do Google expirou. Tente novamente.");
   }
   const handoff = nativeHandoff ? await readGoogleNativeHandoff(state.pairingHash!) : null;
-  if (nativeHandoff && (!handoff || handoff.purpose !== state.purpose || Date.parse(handoff.expires_at) <= Date.now())) {
+  if (nativeHandoff && (!handoff || handoff.completed_at || handoff.purpose !== state.purpose || Date.parse(handoff.expires_at) <= Date.now())) {
     return nativeReturn(url.origin, "A autorização do aplicativo expirou. Tente novamente.");
   }
   const code = String(url.searchParams.get("code") || "");
@@ -63,6 +63,11 @@ export async function GET(request: Request) {
       if (Number(handoff!.requested_user_id) !== state.userId) {
         throw new Error("A Conta Google não corresponde à solicitação iniciada no aplicativo.");
       }
+      const account = await getD1().prepare("SELECT email, ativo FROM usuarios WHERE id = ? LIMIT 1")
+        .bind(state.userId).first<{ email: string; ativo: number }>();
+      if (!account?.ativo || normalizeEmail(account.email) !== normalizeEmail(identity.email)) {
+        throw new Error("Conecte ao Drive a mesma Conta Google usada no e-mail do seu cadastro.");
+      }
     } else {
       const sessionUser = await getSessionUser();
       if (!sessionUser || Number(sessionUser.id) !== state.userId) throw new Error("Sua sessão mudou durante a autorização. Entre novamente.");
@@ -78,6 +83,10 @@ export async function GET(request: Request) {
     }
     if (state.purpose === "drive") {
       if (state.visitorSheets || state.visitorStorage || state.personalVisitors) {
+        if (nativeHandoff) {
+          await finishGoogleNativeHandoff(state.pairingHash!, userId);
+          return clearStateCookie(nativeReturn(url.origin));
+        }
         const target = new URL(state.returnTo || "/painel/visitantes", url.origin);
         target.searchParams.set("google", "connected");
         return clearStateCookie(mutableRedirect(target));

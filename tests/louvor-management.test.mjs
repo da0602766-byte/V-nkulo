@@ -1,0 +1,82 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {createPilotD1,createPilotUser} from './helpers/sqlite-d1.mjs';
+import {cpfLoginRequest} from './helpers/cpf-login.mjs';
+
+test('Louvor: privacidade, aprovação, cópia, revogação, modelos e exclusão de pedidos',async()=>{
+ const {database:db,d1}=await createPilotD1();const tasks=[];
+ const worker=(await import('../dist/server/index.js')).default;
+ const env={DB:d1,AUTH_SECRET:'louvor-test-only',ASSETS:{fetch:async()=>new Response('',{status:404})}},ctx={waitUntil(p){tasks.push(p)},passThroughOnException(){}};
+ const users={};const cookies={};
+ for(const [name,role,community] of [['Ana','ADMIN_COMUNIDADE',1],['Bruno','MEMBRO',1],['Carla','MEMBRO',1],['Outro','ADMIN_COMUNIDADE',2]]){
+  users[name]=await createPilotUser(db,{nome:name,email:name+'@louvor.test',senha:'Teste123!',memberships:[{comunidadeId:community,papel:role}]});
+  const response=await worker.fetch(await cpfLoginRequest(env,new Request('http://localhost/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:name+'@louvor.test',senha:'Teste123!'})})),env,ctx);
+  assert.equal(response.status,200,await response.clone().text());cookies[name]=response.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ');
+ }
+ const ministry=Number(db.prepare("INSERT INTO ministerios_comunidade(comunidade_id,nome,categoria,status,responsavel_usuario_id) VALUES(1,'Louvor teste','LOUVOR','ATIVO',?)").run(users.Ana).lastInsertRowid);
+ const otherMinistry=Number(db.prepare("INSERT INTO ministerios_comunidade(comunidade_id,nome,categoria,status,responsavel_usuario_id) VALUES(1,'Acolhimento','RECEPCAO','ATIVO',?)").run(users.Ana).lastInsertRowid);
+ const volunteers={};for(const name of ['Ana','Bruno'])volunteers[name]=Number(db.prepare("INSERT INTO ministerio_voluntarios(comunidade_id,ministerio_id,usuario_id,papel,funcao,ativo) VALUES(1,?,?,?,'Vocal',1)").run(ministry,users[name],name==='Ana'?'LIDER':'VOLUNTARIO').lastInsertRowid);
+ const call=(path,method='GET',body,name='Ana')=>worker.fetch(new Request('http://localhost'+path,{method,headers:{cookie:cookies[name]||'','content-type':'application/json'},...(body?{body:JSON.stringify(body)}:{})}),env,ctx);
+ const good=async response=>{assert.equal(response.status,200,await response.clone().text());return response.json();};
+ const url='/api/pilot/ministerios/repertorios',get=(name='Ana',owner)=>call(`${url}?ministerioId=${ministry}${owner?`&donoId=${owner}`:''}`,'GET',null,name),post=(body,name='Ana')=>call(url,'POST',{ministerioId:ministry,...body},name);
+ try{
+  assert.equal((await get('missing')).status,401);assert.equal((await get('Outro')).status,403);assert.equal((await get('Carla')).status,403);
+  assert.equal((await call(`${url}?ministerioId=${otherMinistry}`)).status,403);
+  await good(await post({action:'SAVE',titulo:'Mil graus',links:[{id:'yt',tipo:'YOUTUBE',titulo:'Vídeo',url:'https://youtube.com/watch?v=test'}]}));
+  await good(await post({action:'SAVE',titulo:'Sou livre',links:[]}));
+  assert.equal((await post({action:'SAVE',titulo:'Mil graus',links:[]})).status,409);
+  assert.equal((await post({action:'SAVE',titulo:'Inválida',links:[{tipo:'YOUTUBE',titulo:'Teste',url:'javascript:alert(1)'}]})).status,400);
+  const own=await good(await get());assert.equal(own.songs.length,2);const song=own.songs[0];
+  const directory=await good(await get('Bruno'));assert.equal(directory.songs.length,0);assert.equal(directory.members.find(member=>member.id===users.Ana).total,2);assert.doesNotMatch(JSON.stringify(directory),/Mil graus|youtube.com/);
+  assert.equal((await get('Bruno',users.Ana)).status,403);
+  assert.equal((await post({action:'COPY',userId:users.Ana},'Bruno')).status,403);
+  await good(await post({action:'REQUEST',userId:users.Ana},'Bruno'));
+  assert.equal((await get('Bruno',users.Ana)).status,403);
+  assert.equal((await post({action:'APPROVE',userId:users.Ana},'Bruno')).status,404);
+  await good(await post({action:'APPROVE',userId:users.Bruno}));
+  assert.equal((await good(await get('Bruno',users.Ana))).songs.length,2);
+  assert.equal((await good(await post({action:'COPY',userId:users.Ana},'Bruno'))).copied,2);
+  assert.equal((await good(await post({action:'COPY',userId:users.Ana},'Bruno'))).copied,0);
+  assert.equal((await post({action:'SAVE',id:song.id,versao:song.versao,titulo:'Roubar',links:[]},'Bruno')).status,409);
+  assert.equal((await post({action:'DELETE',id:song.id,versao:song.versao},'Bruno')).status,409);
+  await good(await post({action:'REVOKE',userId:users.Bruno}));
+  assert.equal((await get('Bruno',users.Ana)).status,403);assert.equal((await good(await get('Bruno'))).songs.length,2);
+  await good(await post({action:'SHARE',userId:users.Bruno}));
+  db.prepare('UPDATE ministerio_voluntarios SET ativo=0 WHERE id=?').run(volunteers.Bruno);
+  assert.equal((await get('Bruno',users.Ana)).status,403);
+  db.prepare('UPDATE ministerio_voluntarios SET ativo=1 WHERE id=?').run(volunteers.Bruno);
+  const lib=await good(await call('/api/pilot/ministerios/recursos','POST',{acao:'SALVAR_LINKS_REUTILIZAVEIS',ministerioId:ministry,item:'Música sem link',links:[]}));assert.ok(lib.itemId);
+  const models='/api/pilot/ministerios/checklist-modelos';
+  const modelBody={ministerioId:ministry,nome:'Domingo',itens:[{tarefa:'Testar som',voluntarioId:String(volunteers.Bruno)}]};
+  assert.equal((await call(models,'POST',modelBody,'Bruno')).status,403);
+  assert.equal((await call(models,'POST',modelBody,'Outro')).status,403);
+  await good(await call(models,'POST',modelBody));const model=(await good(await call(`${models}?ministerioId=${ministry}`))).modelos[0];assert.equal(model.itens[0].voluntarioId,String(volunteers.Bruno));
+  await good(await call(models,'POST',{...modelBody,id:model.id,versao:model.versao,itens:[{tarefa:'Conferir cabos',voluntarioId:'999999'}]}));
+  assert.equal((await call(models,'POST',{...modelBody,id:model.id,versao:model.versao})).status,409);
+  assert.equal((await good(await call(`${models}?ministerioId=${ministry}`))).modelos[0].itens[0].voluntarioId,'');
+  const team=Number(db.prepare("INSERT INTO ministerio_equipes(comunidade_id,ministerio_id,nome) VALUES(1,?,'Equipe A')").run(ministry).lastInsertRowid);
+  db.prepare('INSERT INTO ministerio_equipe_membros(comunidade_id,ministerio_id,equipe_id,voluntario_id) VALUES(1,?,?,?)').run(ministry,team,volunteers.Bruno);
+  const starts=new Date(Date.now()+86400000*2).toISOString(),ends=new Date(Date.now()+86400000*2+3600000).toISOString();
+  const schedule=Number(db.prepare("INSERT INTO escalas_ministerio(comunidade_id,ministerio_id,titulo,inicia_em,termina_em,status,criado_por,fio_etapas) VALUES(1,?,'Culto',?,?,'RASCUNHO',?,?)").run(ministry,starts,ends,users.Ana,JSON.stringify([{id:'som',titulo:'Som',feito:false},{id:'vocal',titulo:'Vocal',feito:false}])).lastInsertRowid);
+  db.prepare("INSERT INTO escala_designacoes(comunidade_id,escala_id,voluntario_id,usuario_id,equipe_id,funcao) VALUES(1,?,?,?,?,'Vocal')").run(schedule,volunteers.Bruno,users.Bruno,team);
+  const scheduleUrl=`/api/pilot/escalas/${schedule}`;
+  const fields={acao:'ATUALIZAR',ministerioId:ministry,equipes:[{equipeId:team,funcao:'Vocal'}],titulo:'Culto atualizado',iniciaEm:starts,terminaEm:ends,status:'RASCUNHO',responsavelUsuarioId:null,repertorio:[],links:[],designacoes:[],checklist:[]};
+  await good(await call(scheduleUrl,'PATCH',fields));
+  assert.equal((await call(scheduleUrl,'PATCH',{acao:'PUBLICAR'})).status,400);
+  assert.equal((await call(scheduleUrl,'PATCH',{...fields,status:'PUBLICADA'})).status,409);
+  await good(await call(scheduleUrl,'PATCH',{...fields,responsavelUsuarioId:users.Ana}));
+  await good(await call(scheduleUrl,'PATCH',{acao:'PUBLICAR'}));
+  assert.equal(db.prepare('SELECT status FROM escalas_ministerio WHERE id=?').get(schedule).status,'PUBLICADA');
+  assert.equal(db.prepare('SELECT COUNT(*) total FROM escala_designacoes WHERE escala_id=?').get(schedule).total,1);
+  const concurrent=await Promise.all(['som','vocal'].map(etapaId=>call(scheduleUrl,'PATCH',{acao:'FIO_ETAPA',etapaId,feito:true},'Bruno')));for(const response of concurrent)await good(response);
+  assert.ok(JSON.parse(db.prepare('SELECT fio_etapas FROM escalas_ministerio WHERE id=?').get(schedule).fio_etapas).every(step=>step.feito));
+  const request=Number(db.prepare("INSERT INTO solicitacoes_comunidade(comunidade_id,solicitante_id,tipo,titulo,descricao,visibilidade,status) VALUES(1,?,'ORACAO','Oração teste','Texto reservado','PRIVADA','ABERTA')").run(users.Bruno).lastInsertRowid);
+  db.prepare("INSERT INTO solicitacao_destinatarios(comunidade_id,solicitacao_id,usuario_id) VALUES(1,?,?)").run(request,users.Bruno);
+  const remove=(id,name)=>call('/api/pilot/solicitacoes/excluir','DELETE',{id},name);
+  assert.equal((await remove(request,'Outro')).status,404);assert.equal((await remove(request,'Carla')).status,404);assert.equal((await remove(request,'Ana')).status,404);
+  await good(await remove(request,'Bruno'));assert.equal(db.prepare('SELECT id FROM solicitacoes_comunidade WHERE id=?').get(request),undefined);assert.equal(db.prepare('SELECT id FROM solicitacao_destinatarios WHERE solicitacao_id=?').get(request),undefined);
+  assert.ok(db.prepare("SELECT id FROM auditoria_piloto WHERE evento='SOLICITACAO_EXCLUIDA'").get());
+  await good(await post({action:'DELETE',id:song.id,versao:song.versao}));assert.equal((await good(await get())).songs.length,1);
+ }finally{await Promise.allSettled(tasks);db.close();}
+});
+

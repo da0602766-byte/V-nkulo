@@ -1,8 +1,9 @@
+import { googleAuthorizationResponse } from '../../../../lib/google-authorization-response';
 import { getD1 } from "../../../../../db";
 import { visitorDriveConfig } from '../../../../lib/visitor-drive-store';
 import { requireTenantPermission } from "../../../../lib/tenant";
 import { recordTenantAudit } from "../../../../lib/tenant-audit";
-import { createGoogleAuthorization, googleIntegrationAvailable } from "../../../../lib/google-integration";
+import { googleIntegrationAvailable } from "../../../../lib/google-integration";
 import { assertSheetPrivate, ensureVisitorSheet, hasVisitorSheetAuthorization, spreadsheetIdFromUrl, syncVisitorSheet, visitorSheetToken, VisitorSheetError, type VisitorSheetConfig } from "../../../../lib/visitor-sheets";
 
 async function accessForSheets() {
@@ -24,15 +25,14 @@ export async function POST(request: Request) {
   const access = await accessForSheets();
   if ("error" in access) return access.error;
   if(await visitorDriveConfig(access.context.comunidadeId))return Response.json({error:'Os cadastros agora usam o armazenamento Drive. A antiga cópia em Planilhas está desativada.'},{status:409});
-  const body = await request.json() as { action?: string; url?: string };
+  const body = await request.json() as { action?: string; url?: string; channel?: string; pairing?: string };
   const db = getD1();
   const communityId = access.context.comunidadeId;
   const current = await db.prepare("SELECT * FROM visitante_planilha WHERE comunidade_id = ?").bind(communityId).first<VisitorSheetConfig>();
   if (current && current.lock_ate > Date.now()) return Response.json({ error: "Uma sincronização está em andamento. Aguarde alguns segundos." }, { status: 409 });
   try {
     if (body.action === "authorize") {
-      const authorization = await createGoogleAuthorization(new URL(request.url).origin, { purpose: "drive", visitorSheets: true, userId: access.user.id, returnTo: "/painel/visitantes?sheetSetup=authorized" });
-      return Response.json({ url: authorization.url }, { headers: { "Set-Cookie": `__Host-vinkulo_google_state=${authorization.nonce}; Path=/; Max-Age=600; HttpOnly; Secure; SameSite=Lax`, "Cache-Control": "no-store" } });
+      return googleAuthorizationResponse(request, { purpose: "drive", visitorSheets: true, userId: access.user.id, returnTo: "/painel/visitantes?sheetSetup=authorized" }, body);
     }
     if (body.action === "pause") {
       await db.prepare("UPDATE visitante_planilha SET habilitada = 0 WHERE comunidade_id = ? AND lock_ate < ?").bind(communityId, Date.now()).run();

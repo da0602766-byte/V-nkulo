@@ -4,6 +4,7 @@ declare global {
     VinkuloAndroid?: {
       offlineModeVersion?: number;
       version?: string;
+      openGoogleAuth?: (url: string) => void;
       requestPushToken?: () => void;
       setPushBinding?: (token: string, bindingId: string) => void;
       clearPushBinding?: () => void;

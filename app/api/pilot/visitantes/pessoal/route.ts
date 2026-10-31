@@ -1,5 +1,6 @@
+import { googleAuthorizationResponse } from '../../../../lib/google-authorization-response';
 import {requireTenantPermission} from '../../../../lib/tenant';
-import {createGoogleAuthorization,getGoogleConnection,googleIntegrationAvailable} from '../../../../lib/google-integration';
+import {getGoogleConnection,googleIntegrationAvailable} from '../../../../lib/google-integration';
 import {platformDB,VisitorDriveError} from '../../../../lib/visitor-drive-store';
 import {boundedText,personalStorage,personalToken,readPersonalDrive,writePersonalDrive,type PersonalStorage} from '../../../../lib/personal-visitors-drive';
 import {emptyPersonalVisitors,validatePersonalVisitors} from '../../../../lib/personal-visitors';
@@ -32,8 +33,7 @@ async function mutate(request:Request,update:boolean){
     if(!body||typeof body!=='object')throw new VisitorDriveError('Solicitação inválida.',400);
     const userId=a.user.id,communityId=a.context.comunidadeId,db=platformDB();
     if(!update&&body.action==='authorize'){
-      const auth=await createGoogleAuthorization(new URL(request.url).origin,{purpose:'drive',personalVisitors:true,userId,returnTo:'/painel/visitantes?lista=pessoal'});
-      return Response.json({url:auth.url},{headers:{'Cache-Control':'no-store','Set-Cookie':`__Host-vinkulo_google_state=${auth.nonce}; Path=/; Max-Age=600; HttpOnly; Secure; SameSite=Lax`}});
+      return googleAuthorizationResponse(request,{purpose:'drive',personalVisitors:true,userId,returnTo:'/painel/visitantes?lista=pessoal'},body);
     }
     const c=await personalStorage(userId,communityId);
     if(!update&&body.action==='local'){
