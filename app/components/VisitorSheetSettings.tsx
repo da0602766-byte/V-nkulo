@@ -1,6 +1,7 @@
 "use client";
 import {useBrowserSearch} from "./useBrowserSearch";
 import { useEffect, useRef, useState } from "react";
+import { authorizeGoogle } from "../lib/google-authorization-client";
 
 type Config = { spreadsheet_id: string; sheet_id: number; habilitada: number; versao: number; versao_sincronizada: number; linhas: number; sincronizado_em: string | null; ultimo_erro: string | null };
 type Snapshot = { config: Config | null; google: { authorized: boolean; available: boolean; email: string | null }; communityId: number; userId: number };
@@ -62,11 +63,10 @@ export function VisitorSheetSettings({ canManage }: { canManage: boolean }) {
       return result;
     };
     try {
-      const result = await request(action);
+      const result = action === "authorize" ? {} : await request(action);
       if (action === "authorize" || result.authorizationRequired) {
-        const authorization = action === "authorize" ? result : await request("authorize");
         sessionStorage.setItem(pendingKey(snapshot), JSON.stringify({ url: selectedUrl, at: Date.now() }));
-        window.location.assign(authorization.url); return;
+        await authorizeGoogle(endpoint, { action: "authorize" }); return;
       }
       if (action === "pause") {
         setData(current => current ? { ...current, config: current.config ? { ...current.config, habilitada: 0 } : null } : current);

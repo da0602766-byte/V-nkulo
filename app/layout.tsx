@@ -27,6 +27,7 @@ import MobileAppInstall from "./components/MobileAppInstall";
 import GlobalFeedbackLauncher from "./components/GlobalFeedbackLauncher";
 import SystemExperienceController from "./components/SystemExperienceController";
 import NativeNotificationSync from "./components/NativeNotificationSync";
+import GoogleNativeAuth from "./components/GoogleNativeAuth";
 import { TransientFeedbackViewport } from "./components/TransientFeedback";
 import MediaConnectionFeedback from "./components/MediaConnectionFeedback";
 import { THEME_BOOTSTRAP_SCRIPT } from "./lib/theme-preference";
@@ -106,6 +107,7 @@ export default function RootLayout({
         <div id="main-content" tabIndex={-1}>{children}</div>
         <SystemExperienceController />
         <NativeNotificationSync />
+        <GoogleNativeAuth />
         <TransientFeedbackViewport />
         <MediaConnectionFeedback />
         <GlobalFeedbackLauncher />

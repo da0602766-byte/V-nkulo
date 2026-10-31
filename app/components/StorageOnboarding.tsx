@@ -1,5 +1,5 @@
 "use client";
-import { navigateDocument } from '../lib/document-navigation';
+import { authorizeGoogle } from '../lib/google-authorization-client';
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -53,7 +53,9 @@ function StorageChoice({ status, onComplete }: { status: StorageStatus; onComple
     setError("");
     if (provider === "GOOGLE_DRIVE" && !status.google?.connected) {
       // Consent is recorded by the OAuth callback only after successful authorization.
-      navigateDocument("/api/auth/google/start?purpose=drive&returnTo=%2Fpainel%3Fview%3Dconta");
+      try { await authorizeGoogle("/api/auth/google/start?purpose=drive&returnTo=%2Fpainel%3Fview%3Dconta"); }
+      catch (error) { setError((error as Error).message); }
+      finally { setBusy(false); }
       return;
     }
     try {

@@ -12,6 +12,9 @@ export async function GET(request: Request) {
   const purpose = url.searchParams.get("purpose") === "drive" ? "drive" : "login";
   const user = await getSessionUser();
   if (purpose === "drive" && !user) {
+    if (url.searchParams.get("channel") === "android" && url.searchParams.get("format") === "json") {
+      return Response.json({ error: "Sua sessão do aplicativo expirou. Entre no Vínkulo antes de conectar o Drive." }, { status: 401, headers: { "Cache-Control": "no-store" } });
+    }
     return Response.redirect(new URL("/login?erro=Entre antes de conectar o Google Drive.", url.origin), 303);
   }
   const returnTo = safeRelativeReturnPath(

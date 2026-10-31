@@ -1,6 +1,7 @@
+import { googleAuthorizationResponse } from '../../../../lib/google-authorization-response';
 import { changeVisitorSharing } from '../../../../lib/visitor-sharing-history';
 import { requireTenantPermission } from '../../../../lib/tenant';
-import { createGoogleAuthorization, getGoogleConnection, googleIntegrationAvailable } from '../../../../lib/google-integration';
+import { getGoogleConnection, googleIntegrationAvailable } from '../../../../lib/google-integration';
 import { archiveCounts, validateVisitorArchive, MAX_VISITOR_ARCHIVE_BYTES } from '../../../../lib/visitor-drive-format';
 import { assertSameSource, captureVisitorArchive, verifyArchiveSchema } from '../../../../lib/visitor-drive-migration';
 import { driveAccess, newVisitorFolder, ownerToken, platformDB, readArchive, visitorDriveConfig, VisitorDriveError, writeArchive } from '../../../../lib/visitor-drive-store';
@@ -31,8 +32,7 @@ export async function POST(request:Request) {
   if(c&&c.usuario_id!==a.user.id)return reply({error:'A configuração pertence ao gestor responsável pela conta Drive.'},403);
   try {
     if(body.action==='authorize') {
-      const result=await createGoogleAuthorization(new URL(request.url).origin,{purpose:'drive',visitorStorage:true,userId:a.user.id,returnTo:'/painel/visitantes?section=armazenamento'});
-      return Response.json({url:result.url},{headers:{'Set-Cookie':`__Host-vinkulo_google_state=${result.nonce}; Path=/; Max-Age=600; HttpOnly; Secure; SameSite=Lax`,'Cache-Control':'no-store'}});
+      return googleAuthorizationResponse(request,{purpose:'drive',visitorStorage:true,userId:a.user.id,returnTo:'/painel/visitantes?section=armazenamento'},body);
     }
     if(body.action==='prepare') {
       if(c&&c.estado!=='LOCKED')throw new VisitorDriveError('Uma migração já foi preparada. Revise o destino antes de continuar.');
