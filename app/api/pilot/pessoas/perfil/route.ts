@@ -34,5 +34,12 @@ export async function PATCH(request: Request) {
     "SUCESSO",
     { usuarioId: access.user.id },
   );
-  return Response.json({ updated: true });
+  // Return only the normalized fields this authenticated write committed.
+  return Response.json({ updated: true, profile: {
+    id: access.user.id,
+    telefone: parsed.data.telefone || null,
+    data_nascimento: parsed.data.dataNascimento || null,
+    endereco: parsed.data.endereco || null,
+    ministerio: parsed.data.ministerio || null,
+  } }, { headers: { "Cache-Control": "no-store" } });
 }

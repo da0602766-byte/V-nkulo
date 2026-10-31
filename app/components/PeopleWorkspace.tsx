@@ -301,12 +301,22 @@ export default function PeopleWorkspace({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(Object.fromEntries(form.entries())),
       });
-      const result = (await response.json()) as { error?: string };
+      const result = (await response.json()) as { error?: string; profile?: Pick<Me, "id" | "telefone" | "data_nascimento" | "endereco" | "ministerio"> };
       if (!response.ok) {
         throw new Error(result.error || "Não foi possível atualizar o perfil.");
       }
       setMessage("Seu perfil foi atualizado.");
-      await load({ quiet: true });
+      if (result.profile) {
+        const profile = result.profile;
+        requestRef.current?.abort();
+        requestRef.current = null;
+        setPending(false);
+        setLoadingMore(false);
+        setData(current => ({ ...current,
+          me: current.me?.id === profile.id ? { ...current.me, ...profile } : current.me,
+          people: current.people.map(person => person.usuario_id === profile.id ? { ...person, telefone: profile.telefone } : person),
+        }));
+      } else await load({ quiet: true });
     } catch (saveError) {
       setError((saveError as Error).message);
     } finally {

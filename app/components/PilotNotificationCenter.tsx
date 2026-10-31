@@ -134,7 +134,10 @@ export default function PilotNotificationCenter({
     [],
   );
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
+    // Focus, visibility and navigation can fire together. Keep the active
+    // request instead of cancelling and starting the same read again.
+    if (requestRef.current && !force) return;
     requestRef.current?.abort();
     const controller = new AbortController();
     requestRef.current = controller;
@@ -149,6 +152,7 @@ export default function PilotNotificationCenter({
         config?: NotificationConfig;
         error?: string;
       };
+      if (controller.signal.aborted) return;
       if (!response.ok) throw new Error(result.error || "Falha ao carregar.");
       const nextItems = result.notifications || [];
       void showUnreadOnDevice(nextItems);
@@ -157,7 +161,7 @@ export default function PilotNotificationCenter({
       setConfig(result.config || DEFAULT_CONFIG);
       setMessage("");
     } catch (error) {
-      if ((error as Error).name === "AbortError") return;
+      if (controller.signal.aborted || (error as Error).name === "AbortError") return;
       setMessage((error as Error).message);
     } finally {
       if (requestRef.current === controller) {
@@ -219,7 +223,7 @@ export default function PilotNotificationCenter({
     const refreshWhenVisible = () => {
       if (document.visibilityState === "visible") void load();
     };
-    const refreshAfterAppAction = () => void load();
+    const refreshAfterAppAction = () => void load(true);
     const openFromNavigation = () => {
       setOpen(true);
       void load();
@@ -242,6 +246,7 @@ export default function PilotNotificationCenter({
       window.removeEventListener("vinkulo:open-notifications", openFromNavigation);
       window.removeEventListener("vinkulo:notification-open", openFromDeviceNotification);
       requestRef.current?.abort();
+      requestRef.current = null;
     };
   }, [load]);
 
@@ -252,6 +257,10 @@ export default function PilotNotificationCenter({
       body: JSON.stringify(id ? { id } : { todas: true }),
     });
     if (!response.ok) return;
+    // A read started before this PATCH must not restore the old unread flag.
+    requestRef.current?.abort();
+    requestRef.current = null;
+    setLoading(false);
     setItems((current) =>
       current.map((item) =>
         !id || item.id === id ? { ...item, read: true } : item,
@@ -275,7 +284,7 @@ export default function PilotNotificationCenter({
     const result = (await response.json()) as { error?: string };
     if (!response.ok) { setMessage(result.error || "Não foi possível salvar."); return; }
     setConfiguring(false);
-    await load();
+    await load(true);
     } catch { setMessage("Não foi possível salvar. Verifique a conexão e tente novamente."); } finally { setSavingConfig(false); }
   }
 

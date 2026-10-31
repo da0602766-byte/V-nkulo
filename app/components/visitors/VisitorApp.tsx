@@ -48,8 +48,11 @@ export default function VisitorApp({communityName,userName,permissions,isOwner,p
     }).catch(e=>{if(id===requestId.current){setError((e as Error).message);if([401,403].includes((e as Error&{status?:number}).status||0)){setData(null);setOpened(null);setForm(null);setContact(null);setConfirm(null);}}}).finally(()=>{if(id===requestId.current){setLoading(false);setRefreshing(false);}});
   },[]);
   const load=useCallback((silent=false)=>{if(!silent)setRefreshing(true);return fetchData();},[fetchData]);
-  useEffect(()=>{if(section==='listas'||directoryOnly)return;const controller=new AbortController();fetch('/api/pilot/visitantes/armazenamento',{cache:'no-store',signal:controller.signal}).then(r=>r.ok?r.json():null).then(v=>{if(v)setDriveState(v.state);}).catch(()=>undefined);return()=>controller.abort();},[section,directoryOnly]);
-  useEffect(()=>{if(section!=='listas'&&!directoryOnly)void fetchData();return()=>{requestId.current += 1;clearTimeout(toastTimer.current);};},[fetchData,section,directoryOnly]);
+  // Subtabs share this mounted, private snapshot. Entering/leaving the list
+  // directory still revalidates access; ordinary subtab navigation does not.
+  const listActive=section!=='listas'&&!directoryOnly;
+  useEffect(()=>{if(!listActive)return;const controller=new AbortController();fetch('/api/pilot/visitantes/armazenamento',{cache:'no-store',signal:controller.signal}).then(r=>r.ok?r.json():null).then(v=>{if(v&&!controller.signal.aborted)setDriveState(v.state);}).catch(()=>undefined);return()=>controller.abort();},[listActive]);
+  useEffect(()=>{if(listActive)void fetchData();return()=>{requestId.current += 1;clearTimeout(toastTimer.current);};},[fetchData,listActive]);
   useEffect(()=>{const sync=()=>{const q=new URLSearchParams(location.search);const v=q.get('section')||q.get('aba');setSelectedCategory(q.get('categoria')||'');setSection(directoryOnly||v==='listas'?'listas':q.has('sheetSetup')?'planilha':sections.some(s=>s.id===v)?v as Section:q.has('anotacao')?'anotacoes':'pessoas');const id=q.get('visitante')||q.get('id');if(id&&/^\d+$/.test(id))setOpened(id);if(q.get('novo')==='1'&&permissions.includes('visitors.create'))setForm('new');};sync();window.addEventListener('popstate',sync);return()=>window.removeEventListener('popstate',sync);},[directoryOnly,permissions]);
   useEffect(()=>{const timer=setInterval(()=>{if(section!=='listas'&&!directoryOnly&&document.visibilityState==='visible'&&!mutation.current)void load(true);},60000);return()=>clearInterval(timer);},[load,form,opened,contact,confirm,section,directoryOnly]);
   function navigate(s:Section) {setSection(s);setMenu(false);const u=new URL(location.href);u.searchParams.set('section',s);u.hash='';history.pushState(null,'',u);}

@@ -75,7 +75,7 @@ test("navegação oferece Início e Ministérios sem duplicar Mural", async () =
   assert.match(dashboard, /id: "ministerios", label: "Ministérios", permission: "ministries\.view"/);
   assert.match(dashboard, /<SecretaryMinisterialWorkspace/);
   const ministries = await read("app/components/SecretaryMinisterialWorkspace.tsx");
-  assert.match(ministries, /fetch\("\/api\/pilot\/escalas", \{ cache: "no-store" \}\)/);
+  assert.match(ministries, /fetch\("\/api\/pilot\/escalas", \{ cache: "no-store", signal: controller.signal \}\)/);
 
 });
 

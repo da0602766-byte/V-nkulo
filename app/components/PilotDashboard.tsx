@@ -1,5 +1,6 @@
 "use client";
 import { navigateDocument } from '../lib/document-navigation';
+import { preloadWorkspace } from '../lib/workspace-preload';
 import VinkuloMark from "./VinkuloMark";
 import SafeImage from "./SafeImage";
 import LabModuleNav from "./LabModuleNav";
@@ -261,7 +262,6 @@ export default function PilotDashboard({
   const [navigationSearchOpen, setNavigationSearchOpen] = useState(false);
   const [quickActionSearch, setQuickActionSearch] = useState("");
   const [switching, setSwitching] = useState(false);
-  const [viewLoading, setViewLoading] = useState(false);
   const [openingVisitors, setOpeningVisitors] = useState(false);
   useEffect(() => {
     const reset = () => setOpeningVisitors(false);
@@ -833,7 +833,6 @@ export default function PilotDashboard({
           ?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 220);
     }
-    setViewLoading(true);
     setView(nextView);
     rememberRecentView(nextView);
     const address = new URL(window.location.href);
@@ -854,7 +853,6 @@ export default function PilotDashboard({
         block: "start",
       }),
     );
-    window.setTimeout(() => setViewLoading(false), 280);
   }, [openingVisitors]);
 
   // O painel de presença ("Quem está online") pede a conversa por evento em vez
@@ -1297,6 +1295,8 @@ export default function PilotDashboard({
                     data-editor-key={`menu-principal-${item.key}`}
                     className={visibleView === item.id ? "active" : ""}
                     aria-current={visibleView === item.id ? "page" : undefined}
+                    onPointerEnter={() => preloadWorkspace(item.id)}
+                    onFocus={() => preloadWorkspace(item.id)}
                     onClick={() => openView(item.id, item.focus)}
                     aria-label={item.label}
                     title={item.label}
@@ -1329,14 +1329,13 @@ export default function PilotDashboard({
           {visibleView === "inicio" && <CommunityHighlight key={active.comunidadeId} communityId={active.comunidadeId} />}
         </aside>
         <section
-          className={`pilot-workspace${CENTRAL_VIEWS.includes(visibleView) ? " central-surface" : ""}${viewLoading ? " is-view-loading" : ""}${
+          className={`pilot-workspace${CENTRAL_VIEWS.includes(visibleView) ? " central-surface" : ""}${
             visibleView === "inicio" && communityTheme.wallpaperUrl
               ? " has-community-wallpaper"
               : ""
           }`}
           data-editor-key="conteudo-principal"
         >
-          {viewLoading && <div className="pilot-page-loading" role="status" aria-live="polite"><span className="pilot-loading-spinner" aria-hidden="true" />Carregando página…</div>}
           <WorkspaceErrorBoundary resetKey={`${active.comunidadeId}:${visibleView}`}>
           {accessDeniedView && (
             <section className="pilot-access-denied-inline" role="alert">
@@ -1658,6 +1657,8 @@ export default function PilotDashboard({
                           ? "active"
                           : ""
                       }
+                      onPointerEnter={() => preloadWorkspace(item.id)}
+                      onFocus={() => preloadWorkspace(item.id)}
                       onClick={() => openView(item.id)}
                     >
                       <span aria-hidden="true"><MenuIcon id={item.id} /></span>

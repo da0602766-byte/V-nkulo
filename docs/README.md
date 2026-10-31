@@ -78,6 +78,8 @@ Relatórios fechados de entregas já publicadas — histórico, não fluxo ativo
 
 ## Fora de `docs/`
 
+Relatório recente: [Otimização de navegação, formulários e carregamento — 31/10/2026](relatorios/OTIMIZACAO_NAVEGACAO_2026-10-31.md).
+
 - `README.md` (raiz) — continua na raiz por convenção (é o que o GitHub
   mostra na página do repositório).
 - `drizzle/README.md` — convenção de migrações, fica junto do código que

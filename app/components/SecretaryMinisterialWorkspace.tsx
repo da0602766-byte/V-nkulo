@@ -1,7 +1,7 @@
 "use client";
 import useFeedDialog from "./feed/useFeedDialog";
-import PersonalRepertoire from "./PersonalRepertoire";
-import ChecklistTemplates from "./ChecklistTemplates";
+import { ALL_MINISTRY_DATA, ministryRefreshTargets, type MinistryDataset } from "../lib/ministry-refresh";
+import dynamic from "next/dynamic";
 import TransientFeedback from "./TransientFeedback";
 import "./ministry-management.css";
 import {useBrowserStorage} from "./useBrowserStorage";
@@ -21,7 +21,6 @@ import {
   useRef,
   useState,
 } from "react";
-import MinistryScheduleWizard from "./MinistryScheduleWizard";
 import NativeImageUpload from "./NativeImageUpload";
 import VerifiedOwnerName from "./VerifiedOwnerName";
 import {
@@ -33,6 +32,11 @@ import {
   downloadFileForDevice,
   shareToWhatsAppApp,
 } from "../lib/androidNativeBridge";
+
+const detailLoading = () => <p role="status">Carregando esta seção…</p>;
+const PersonalRepertoire = dynamic(() => import("./PersonalRepertoire"), { loading: detailLoading });
+const ChecklistTemplates = dynamic(() => import("./ChecklistTemplates"), { loading: detailLoading });
+const MinistryScheduleWizard = dynamic(() => import("./MinistryScheduleWizard"), { loading: detailLoading });
 
 type Volunteer = {
   id: number;
@@ -278,6 +282,7 @@ export default function SecretaryMinisterialWorkspace({
   const [tab, setTab] = useState<Tab>("painel");
   const [memberOptionsId, setMemberOptionsId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [resourcesLoaded, setResourcesLoaded] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState("");
   const [catalogCategory, setCatalogCategory] = useState("");
   const [busy, setBusy] = useState("");
@@ -323,72 +328,101 @@ export default function SecretaryMinisterialWorkspace({
   const [replacementVolunteerId, setReplacementVolunteerId] = useState(0);
   const [renderedAt] = useState(() => Date.now());
   const scheduleDetails = useRef<HTMLDetailsElement>(null);
-  const loadData = useCallback(async (quiet = false) => {
+  const loadRequest = useRef<AbortController | null>(null);
+  const teamsRequest = useRef<AbortController | null>(null);
+  const loadData = useCallback(async (quiet = false, targets: MinistryDataset[] = ALL_MINISTRY_DATA) => {
+    loadRequest.current?.abort();
+    const controller = new AbortController();
+    loadRequest.current = controller;
     if (!quiet) setLoading(true);
     setError("");
     try {
       const [ministriesResponse, schedulesResponse, resourcesResponse] =
         await Promise.all([
-          fetch("/api/pilot/ministerios", { cache: "no-store" }),
-          fetch("/api/pilot/escalas", { cache: "no-store" }),
-          fetch("/api/pilot/ministerios/recursos", { cache: "no-store" }),
+          targets.includes("ministries") ? fetch("/api/pilot/ministerios", { cache: "no-store", signal: controller.signal }) : null,
+          targets.includes("schedules") ? fetch("/api/pilot/escalas", { cache: "no-store", signal: controller.signal }) : null,
+          targets.includes("resources") ? fetch("/api/pilot/ministerios/recursos", { cache: "no-store", signal: controller.signal }) : null,
         ]);
-      const ministriesPayload = await readJson<{
+      const ministriesPayload = ministriesResponse ? await readJson<{
         ministerios?: Ministry[];
         availableUsers?: AvailableUser[];
         canCreate?: boolean;
         error?: string;
-      }>(ministriesResponse);
-      const schedulesPayload = await readJson<{
+      }>(ministriesResponse) : null;
+      const schedulesPayload = schedulesResponse ? await readJson<{
         escalas?: Schedule[];
         error?: string;
-      }>(schedulesResponse);
-      const resourcesPayload = await readJson<{
+      }>(schedulesResponse) : null;
+      const resourcesPayload = resourcesResponse ? await readJson<{
         checklist?: ChecklistItem[];
         bibliotecaItens?: SecretaryLibraryItem[];
         error?: string;
-      }>(resourcesResponse);
-      if (!ministriesResponse.ok) throw new Error(ministriesPayload.error || "Não foi possível carregar os ministérios.");
-      if (!schedulesResponse.ok) throw new Error(schedulesPayload.error || "Não foi possível carregar as escalas.");
-      if (!resourcesResponse.ok) throw new Error(resourcesPayload.error || "Não foi possível carregar os checklists.");
-      const nextMinistries = ministriesPayload.ministerios || [];
-      setMinistries(nextMinistries);
-      setAvailableUsers(ministriesPayload.availableUsers || []);
-      setCanCreate(Boolean(ministriesPayload.canCreate));
-      setSchedules(schedulesPayload.escalas || []);
-      setChecklist(resourcesPayload.checklist || []);
-      setLibraryItems(resourcesPayload.bibliotecaItens || []);
-      setSelectedMinistryId((current) =>
-        current && nextMinistries.some((item) => item.id === current)
-          ? current
-          : null,
-      );
+      }>(resourcesResponse) : null;
+      if (controller.signal.aborted) return;
+      if (ministriesResponse && !ministriesResponse.ok) throw new Error(ministriesPayload?.error || "Não foi possível carregar os ministérios.");
+      if (schedulesResponse && !schedulesResponse.ok) throw new Error(schedulesPayload?.error || "Não foi possível carregar as escalas.");
+      if (resourcesResponse && !resourcesResponse.ok) throw new Error(resourcesPayload?.error || "Não foi possível carregar os checklists.");
+      if (ministriesPayload) {
+        const nextMinistries = ministriesPayload.ministerios || [];
+        setMinistries(nextMinistries);
+        setAvailableUsers(ministriesPayload.availableUsers || []);
+        setCanCreate(Boolean(ministriesPayload.canCreate));
+        setSelectedMinistryId((current) =>
+          current && nextMinistries.some((item) => item.id === current)
+            ? current
+            : null,
+        );
+      }
+      if (schedulesPayload) setSchedules(schedulesPayload.escalas || []);
+      if (resourcesPayload) {
+        setChecklist(resourcesPayload.checklist || []);
+        setLibraryItems(resourcesPayload.bibliotecaItens || []);
+        setResourcesLoaded(true);
+      }
     } catch (cause) {
-      setError((cause as Error).message);
+      if (!controller.signal.aborted) setError((cause as Error).message);
     } finally {
-      if (!quiet) setLoading(false);
+      if (loadRequest.current === controller) {
+        loadRequest.current = null;
+        setLoading(false);
+      }
     }
   }, []);
 
   const loadTeams = useCallback(async (ministryId: number) => {
-    const response = await fetch(
-      `/api/pilot/ministerios/equipes?ministerioId=${ministryId}`,
-      { cache: "no-store" },
-    );
-    const payload = await readJson<{ equipes?: MinistryTeam[]; error?: string }>(
-      response,
-    );
-    if (!response.ok) {
-      throw new Error(payload.error || "Não foi possível carregar as equipes.");
+    teamsRequest.current?.abort();
+    const controller = new AbortController();
+    teamsRequest.current = controller;
+    try {
+      const response = await fetch(
+        `/api/pilot/ministerios/equipes?ministerioId=${ministryId}`,
+        { cache: "no-store", signal: controller.signal },
+      );
+      const payload = await readJson<{ equipes?: MinistryTeam[]; error?: string }>(response);
+      if (controller.signal.aborted) return;
+      if (!response.ok) {
+        throw new Error(payload.error || "Não foi possível carregar as equipes.");
+      }
+      setTeams(payload.equipes || []);
+    } catch (cause) {
+      if (!controller.signal.aborted) throw cause;
+    } finally {
+      if (teamsRequest.current === controller) teamsRequest.current = null;
     }
-    setTeams(payload.equipes || []);
   }, []);
 
   useEffect(() => {
     // Initial synchronization with the tenant-scoped APIs.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void loadData();
+    void loadData(false, ["ministries", "schedules"]);
+    return () => { loadRequest.current?.abort(); loadRequest.current = null; };
   }, [loadData]);
+
+  useEffect(() => {
+    if (!selectedMinistryId || resourcesLoaded) return;
+    const timer = window.setTimeout(() => void loadData(true, ["resources"]), 0);
+    return () => window.clearTimeout(timer);
+  }, [selectedMinistryId, resourcesLoaded, loadData]);
 
   useEffect(() => {
     if (!selectedMinistryId) return;
@@ -397,6 +431,7 @@ export default function SecretaryMinisterialWorkspace({
     void loadTeams(selectedMinistryId).catch((cause) =>
       setError((cause as Error).message),
     );
+    return () => { teamsRequest.current?.abort(); teamsRequest.current = null; };
   }, [loadTeams, selectedMinistryId]);
 
   useEffect(() => {
@@ -666,7 +701,7 @@ export default function SecretaryMinisterialWorkspace({
     setCreateDialogOpen(true);
     setRefreshingLeaders(true);
     try {
-      await loadData(true);
+      await loadData(true, ["ministries"]);
     } finally {
       setRefreshingLeaders(false);
     }
@@ -1068,7 +1103,6 @@ export default function SecretaryMinisterialWorkspace({
     if (saved) {
       setReplacementScheduleId(null);
       setReplacementVolunteerId(0);
-      await loadData(true);
     }
   }
 
@@ -1342,7 +1376,7 @@ export default function SecretaryMinisterialWorkspace({
       if (!response.ok) throw new Error(result.error || "Não foi possível concluir.");
       form?.reset();
       setFeedback(success);
-      await loadData(true);
+      await loadData(true, ministryRefreshTargets(url, body.acao));
       return true;
     } catch (cause) {
       setError((cause as Error).message);
@@ -1354,6 +1388,13 @@ export default function SecretaryMinisterialWorkspace({
 
   const catalogCategories = [...new Set(ministries.map((item) => item.categoria))];
   const visibleMinistries = ministries.filter((item) => (!catalogCategory || item.categoria === catalogCategory) && matchesDirectorySearch(catalogSearch, item.nome, item.descricao, item.responsavel_nome, CATEGORY_LABELS[item.categoria] || item.categoria));
+
+  if (selectedMinistry && !resourcesLoaded) {
+    return <section className="secretary-workspace ministry-project" aria-busy={!error}>
+      <button type="button" className="secretary-secondary-action" onClick={closeMinistry}>Voltar aos ministérios</button>
+      {error ? <div className="secretary-message error" role="alert">{error} <button type="button" onClick={() => void loadData(true, ["resources"])}>Tentar novamente</button></div> : detailLoading()}
+    </section>;
+  }
 
   if (loading) {
     return (
