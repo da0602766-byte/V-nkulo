@@ -1,4 +1,6 @@
 'use client';
+import WorkspaceOrientation from "../WorkspaceOrientation";
+import "../workspace-experience.css";
 import {useCallback,useEffect,useMemo,useRef,useState,type ChangeEvent} from 'react';
 import {authorizeGoogle} from '../../lib/google-authorization-client';
 import {api,person,category,today,type Pessoa,type PerfilConfig} from './data';
@@ -114,7 +116,7 @@ export default function PersonalVisitorApp({userId,communityId,userName,communit
     <header className="vp-mobile-header"><button aria-label="Abrir menu de Visitantes" aria-expanded={menu} onClick={()=>setMenu(!menu)}><Icon d={I.menu}/></button><a href="/painel"><VinkuloMark size={32}/>Vínkulo</a><span>Visitantes</span></header>
     {menu&&<button className="vp-nav-backdrop" aria-label="Fechar menu" onClick={()=>setMenu(false)}/>}
     <aside className={`vp-sidebar ${menu?'is-open':''}`}><a className="vp-brand" href="/painel"><VinkuloMark size={43}/><div><strong>Vínkulo</strong><small>Visitantes</small></div></a><p className="vp-community">{communityName}</p><nav aria-label="Áreas de Visitantes"><button aria-current={section==='pessoas'?'page':undefined} onClick={()=>navigate('pessoas')}><Icon d={I.users}/>Pessoas</button><div className="vp-people-subnav"><button aria-current={section==='listas'?'page':undefined} onClick={()=>navigate('listas')}>Listas disponíveis</button></div><button aria-current={section==='relacionamento'?'page':undefined} onClick={()=>navigate('relacionamento')}><Icon d={I.bell}/>Relacionamento</button><button aria-current={section==='aniversarios'?'page':undefined} onClick={()=>navigate('aniversarios')}><Icon d={I.cake}/>Aniversários</button><a className="vp-back" href="/painel">← Voltar ao painel</a></nav><footer><span className="vp-avatar">{userName.slice(0,1)}</span><div><strong>{userName}</strong><small>Minha lista pessoal</small></div></footer></aside>
-    <main className="vp-personal-main" aria-label="Meus visitantes" aria-busy={(section!=='listas'&&loading)||busy}>
+    <main className="vp-personal-main" aria-label="Meus visitantes" aria-busy={(section!=='listas'&&loading)||busy}><div className="workspace-experience"><WorkspaceOrientation area="visitantes" community={communityName}/></div>
     {section==='listas'?<VisitorListDirectory/>:<><header className="vp-personal-heading"><div><a href="/painel">← Voltar ao painel</a><h1>Meus visitantes</h1><p>{userName} · {communityName}</p></div><div className="vp-actions"><button className={btnSec} onClick={()=>navigate('listas')}>{canOpenShared?'Trocar de lista':'Listas disponíveis'}</button><button className={btnSec} disabled={busy||loading} onClick={()=>void refresh()}><Icon d={I.refresh}/>Atualizar</button>{doc&&<button className={btnSec} disabled={busy} onClick={()=>setSettings(true)}><Icon d={I.shield}/>Armazenamento</button>}</div></header>
     {error&&<div role="alert" className="vp-error">{error} <button disabled={busy||loading} onClick={()=>void refresh()}>Tentar novamente</button></div>}
     <div className="vp-personal-notice" role="status" aria-live="polite">{busy?'Salvando… Aguarde a confirmação.':notice}</div>

@@ -1,4 +1,5 @@
 "use client";
+import PublicationPreview from "./feed/PublicationPreview";
 import CommunitySignature from "./CommunitySignature";
 import FeedPrayer from "./FeedPrayer";
 import SafeImage from "./SafeImage";
@@ -817,6 +818,7 @@ export default function CommunityHome({
             </div></details>
             <label className="composer-share composer-moment-option"><input type="checkbox" name="mostrarMomento" /><span><strong>Mostrar nos Momentos por 24 horas</strong><small>Opcional · começa após a publicação ser aprovada; o post continua no feed.</small></span></label>
             {error && <TransientFeedback className="operations-feedback error composer-wide" role="alert">{error}</TransientFeedback>}
+            <PublicationPreview image={composerImageUrl} audience={audienceType === "PUBLICO" ? "Toda a comunidade" : ministries.filter(item => selectedMinistries.includes(item.id)).map(item => item.nome).join(", ") || "Nenhum ministério selecionado"} />
             <button disabled={working}>
               {working ? "Salvando…" : "Salvar publicação"}
             </button>
@@ -853,7 +855,7 @@ export default function CommunityHome({
                 <article
                   key={post.id}
                   id={`publicacao-${post.id}`}
-                  className="worship-post"
+                  className="worship-post" data-post-category={post.categoria}
                   tabIndex={-1}
                 >
                   <header>

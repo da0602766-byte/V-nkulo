@@ -40,6 +40,7 @@ export default function AccountProfileWorkspace({
   const [data, setData] = useState<AccountResponse>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const [message, setMessage] = useState("");
   const [loadError, setLoadError] = useState("");
   const [saveError, setSaveError] = useState("");
@@ -98,6 +99,7 @@ export default function AccountProfileWorkspace({
       const result = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(result.error || "Falha ao salvar.");
       setMessage("Informações da conta atualizadas.");
+      setDirty(false);
     } catch (error) {
       setSaveError((error as Error).message);
     } finally {
@@ -124,7 +126,8 @@ export default function AccountProfileWorkspace({
         <a href="#account-additional">Dados complementares</a>
         <a href="#account-storage">Arquivos e Google Drive</a>
       </nav>
-      <form id="account-identity" className="account-profile-form" onSubmit={save} aria-busy={saving}>
+      <form id="account-identity" className="account-profile-form" onSubmit={save} onChange={() => setDirty(true)} aria-busy={saving}>
+        <p className="workspace-form-state" data-dirty={dirty} role="status">{saving ? "Salvando suas alterações…" : dirty ? "Você tem alterações não salvas. Use Salvar ao concluir." : message || "Seus dados só mudam quando você salva."}</p>
         <p className="account-required-note">* Campo obrigatório. As opções de privacidade abaixo são salvas com seus dados.</p>
         <fieldset className="account-profile-fields" disabled={saving}>
           <legend className="sr-only">Dados do perfil</legend>
@@ -137,7 +140,7 @@ export default function AccountProfileWorkspace({
             label="Foto de perfil"
             value={photoUrl}
             purpose="profile-photo"
-            onChange={setPhotoUrl}
+            onChange={value => { setPhotoUrl(value); setDirty(true); }}
             help="Sua foto aparece no cabeçalho e no seu perfil. Imagens de até 50 MB são convertidas automaticamente para WebP."
           />
           <div className="account-profile-grid">

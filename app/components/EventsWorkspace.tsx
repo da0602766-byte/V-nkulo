@@ -108,6 +108,7 @@ export default function EventsWorkspace({
   const canManage = permissions.includes("events.manage");
   const canRsvp = permissions.includes("events.rsvp");
   const displayedEvents = useMemo(() => filterEventDirectory(events, eventSearch, eventStatus, eventPeriod, now), [events, eventSearch, eventStatus, eventPeriod, now]);
+  const nextEvent = events.filter(item => item.status === "PUBLICADO" && Date.parse(item.inicia_em) >= now).sort((a,b) => Date.parse(a.inicia_em)-Date.parse(b.inicia_em))[0];
   const hasDirectoryFilters = Boolean(eventSearch.trim()) || eventStatus !== "TODOS" || eventPeriod !== "TODOS";
   const requestedEventRef = useRef<number | null>(null);
   const scrolledEventRef = useRef<number | null>(null);
@@ -444,6 +445,7 @@ export default function EventsWorkspace({
       {/* O calendário reúne, em camadas, o que já existe espalhado: eventos da
           comunidade, as escalas desta pessoa e os compromissos que ela mesma
           marcou. A lista de gestão de eventos continua abaixo. */}
+      {nextEvent && <div className="workspace-next-step"><div><small>PRÓXIMO ENCONTRO</small><strong>{nextEvent.titulo}</strong><p>{new Date(nextEvent.inicia_em).toLocaleString("pt-BR", {dateStyle:"short",timeStyle:"short"})}{nextEvent.local && ` · ${nextEvent.local}`}</p></div><button type="button" onClick={() => { setEventSearch(""); setEventStatus("TODOS"); setEventPeriod("PROXIMOS"); requestAnimationFrame(() => document.getElementById(`event-${nextEvent.id}`)?.scrollIntoView({block:"center",behavior:"smooth"})); }}>Ver detalhes do encontro →</button></div>}
       <AgendaCalendar
         headingContent={<div className={styles.titlebar}>
         <h1>Agenda</h1>

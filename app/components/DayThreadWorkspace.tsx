@@ -237,7 +237,7 @@ export default function DayThreadWorkspace({
     <section className="day-thread-workspace" aria-labelledby="day-thread-title">
       <header className="day-thread-head">
         <div>
-          <p className="pilot-kicker">FIO DO DIA</p>
+          <p className="pilot-kicker">FIO DO DIA{dia === hoje ? " · HOJE" : " · HISTÓRICO"}</p>
           <h2 id="day-thread-title">{formatarDiaLongo(dia)}</h2>
           <p className="day-thread-count">
             {carregando
@@ -283,6 +283,7 @@ export default function DayThreadWorkspace({
         </div>
       </header>
 
+      {dia === hoje && visiveis.some(item => Date.parse(item.ocorreEm) > agora) && <div className="workspace-next-step"><div><small>A SEGUIR NO SEU DIA</small><strong>{visiveis.find(item => Date.parse(item.ocorreEm) > agora)?.titulo}</strong><p>Consulte os horários e os detalhes na linha do tempo abaixo.</p></div><a href="/painel?view=eventos">Abrir agenda →</a></div>}
       {resumo && (
         <div className="day-thread-stats-v5">
           <article>

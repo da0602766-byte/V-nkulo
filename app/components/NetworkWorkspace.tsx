@@ -277,6 +277,7 @@ export default function NetworkWorkspace() {
             </div>
           )}
 
+          <div className="workspace-next-step"><div><small>CONTEXTO DA CONSULTA</small><strong>{selectedNetwork?.nome}</strong><p>Sede: {selectedNetwork?.comunidade_mae_nome} · {selectedUnits.length} unidade(s). As permissões continuam separadas por unidade.</p></div></div>
           <div className="network-dashboard-grid">
             <section className="network-hierarchy">
               <header>

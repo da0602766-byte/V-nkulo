@@ -32,6 +32,8 @@ import { incomingChatArrivals, type ChatArrivalConversation } from "../lib/chat-
 import ThemeControl from "./ThemeControl";
 import OfflineModeEntry from "./OfflineModeEntry";
 import WorkspaceErrorBoundary from "./WorkspaceErrorBoundary";
+import WorkspaceDeck from "./WorkspaceDeck";
+import WorkspaceOrientation from "./WorkspaceOrientation";
 import VerifiedOwnerName from "./VerifiedOwnerName";
 import TemporaryAccessWatcher from "./TemporaryAccessWatcher";
 import CloseDetailsOnOutside from "./CloseDetailsOnOutside";
@@ -847,12 +849,7 @@ export default function PilotDashboard({
       );
     }
     setMobileMenu(null);
-    window.requestAnimationFrame(() =>
-      document.querySelector(".pilot-workspace")?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      }),
-    );
+    // WorkspaceDeck restores the position of each visited area.
   }, [openingVisitors]);
 
   // O painel de presença ("Quem está online") pede a conversa por evento em vez
@@ -1336,7 +1333,9 @@ export default function PilotDashboard({
           }`}
           data-editor-key="conteudo-principal"
         >
-          <WorkspaceErrorBoundary resetKey={`${active.comunidadeId}:${visibleView}`}>
+          <WorkspaceDeck<View> key={`${active.comunidadeId}:${active.userId}:${active.permissions.join(",")}`} active={visibleView} onNavigate={openView} allowed={[...allowedMenu.map(item => item.id), "conta", "inicio"]}>
+          {(visibleView) => <WorkspaceErrorBoundary resetKey={`${active.comunidadeId}:${visibleView}`}>
+          {!accessDeniedView && <WorkspaceOrientation area={visibleView} community={active.comunidadeNome} />}
           {accessDeniedView && (
             <section className="pilot-access-denied-inline" role="alert">
               <span aria-hidden="true">⊘</span>
@@ -1468,7 +1467,8 @@ export default function PilotDashboard({
               currentCommunityId={active.comunidadeId}
             />
           )}
-          </WorkspaceErrorBoundary>
+          </WorkspaceErrorBoundary>}
+          </WorkspaceDeck>
         </section>
       </div>
       <nav className="pilot-mobile-nav" data-editor-key="barra-movel" aria-label="Navegação móvel do painel">

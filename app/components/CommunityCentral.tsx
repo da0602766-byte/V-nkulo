@@ -49,11 +49,11 @@ export default function CommunityCentral({ mode = "overview", communityId, onNot
     requestRef.current?.abort(); const controller = new AbortController(); requestRef.current = controller;
     return fetch(`/api/pilot/central?days=${days}${personal ? "&scope=me" : ""}`, { cache: "no-store", signal: controller.signal }).then(async response=>{
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Não foi possível consultar a Central.");
+      if (!response.ok) { if ([401,403].includes(response.status) && !controller.signal.aborted) setData(null); throw new Error(result.error || "Não foi possível consultar a Central."); }
       if (result.community?.id !== communityId || !Array.isArray(result.ministries) || !Array.isArray(result.metrics) || !Array.isArray(result.errors) || !Array.isArray(result.notices) || !Array.isArray(result.schedules) || !result.capabilities || !Array.isArray(result.areas) || !Array.isArray(result.events) || !Array.isArray(result.cellReports)) throw new Error("A consulta retornou dados incompletos. Tente novamente.");
       if (!controller.signal.aborted) { setData(result); setMinistryId(current => result.ministries.some((m: { id: number }) => String(m.id) === current) ? current : ""); }
     }).catch(cause=>{ if (!controller.signal.aborted) setError((cause as Error).message); }).finally(()=>{ if (!controller.signal.aborted) setLoading(false); });},[communityId, days, personal]);
-  const load=useCallback(()=>{setLoading(true); setError(""); setData(null);return fetchData();},[fetchData]);
+  const load=useCallback(()=>{setLoading(true); setError("");return fetchData();},[fetchData]);
  useEffect(() => { void fetchData(); return () => requestRef.current?.abort(); }, [fetchData]);
 const queryKey=JSON.stringify([communityId,days,personal]);
  const [previousQueryKey,setPreviousQueryKey]=useState(queryKey);
@@ -83,13 +83,14 @@ const queryKey=JSON.stringify([communityId,days,personal]);
   return <section className={`central-dashboard central-mode-${mode}`} aria-busy={loading}>
     <header className="central-page-heading"><div><span className="central-eyebrow">{noticesMode ? "COMUNICAÇÃO" : reportMode ? "CONSULTAS E EXPORTAÇÃO" : personalScope ? "SEU DIA A DIA" : "ACOMPANHAMENTO"}</span><h2>{title}</h2><p>{data?.scopeLabel || (personal ? "Sua participação" : "Carregando seu contexto…")}{data && <> · Atualizado {dateTime(data.generatedAt)}</>}</p></div><div className="central-heading-actions">{!reportMode && !noticesMode && <a className="central-primary-action" href={personalScope ? "/painel?view=conta" : "/painel?view=relatorios"}>{personalScope ? "Meu perfil" : "Ver relatórios"}<CentralIcon name="arrow"/></a>}<button type="button" onClick={() => void load()} disabled={loading}>{loading ? "Atualizando…" : "Atualizar"}</button></div></header>
     {error && <div className="central-error" role="alert"><p>{error}</p><button type="button" onClick={() => void load()}>Tentar novamente</button></div>}
-    {loading && <p className="central-empty" role="status">Consultando as informações disponíveis para você…</p>}
-    {!loading && data && <>
+    {loading && <p className="central-empty" role="status">{data ? "Atualizando informações…" : "Consultando as informações disponíveis para você…"}</p>}
+    {data && <>
       {data.errors.length > 0 && <div className="central-error" role="alert"><strong>Parte da consulta está indisponível</strong>{data.errors.map(e => <p key={e.section}>{e.message}</p>)}<button type="button" onClick={() => void load()}>Tentar novamente</button></div>}
       {!noticesMode && !reportMode && <dl className="central-metric-line">{data.metrics.map(m => <div key={m.label} className={m.value > 0 && /pendentes|Substituições/.test(m.label) ? "needs-attention" : undefined}><dt><CentralIcon name={m.label.includes("Pessoas") ? "pessoas" : m.label.includes("ministérios") || m.label.includes("Ministérios") ? "lider" : m.label.includes("Avisos") ? "avisos" : "clock"}/>{m.label}</dt><dd>{m.href ? <a href={m.href}>{m.value}<span className="sr-only"> — abrir {m.label}</span></a> : m.value}</dd><small>{m.detail}</small></div>)}</dl>}
 
       {noticesMode ? <>
         <div className="central-toolbar"><label>Buscar aviso<input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Assunto ou ministério" /></label><label className="central-check"><input type="checkbox" checked={onlyUnread} onChange={e => setOnlyUnread(e.target.checked)} />Somente não lidos</label>{onNotifications && <button type="button" onClick={onNotifications}>Abrir central de notificações</button>}</div>
+        <div className="workspace-filter-summary" role="status"><span>{notices.length} aviso(s) nesta consulta{onlyUnread ? " · Somente não lidos" : ""}</span>{(query || onlyUnread) && <button type="button" onClick={() => { setQuery(""); setOnlyUnread(false); }}>Limpar filtros</button>}</div>
         <NoticeList notices={notices} empty={query || onlyUnread ? "Nenhum aviso corresponde aos filtros." : "Você ainda não recebeu avisos nesta comunidade."} />
         {data.limits.notices && <p className="central-note">Exibindo os 30 avisos mais recentes. A central de notificações permite consultar os anteriores e marcar como lidos.</p>}
       </> : <>

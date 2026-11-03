@@ -6,7 +6,8 @@ import {createPilotD1,createPilotUser} from '../../tests/helpers/sqlite-d1.mjs';
 import {cpfLoginRequest} from '../../tests/helpers/cpf-login.mjs';
 import worker from '../../dist/server/index.js';
 const {database:db,d1}=await createPilotD1();
-const base='http://localhost:4178';
+const port=Number(process.env.QA_PORT || 4178);
+const base='http://localhost:'+port;
 const root=path.resolve('dist/client');
 const mime={'.js':'text/javascript','.css':'text/css','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.ico':'image/x-icon','.webp':'image/webp','.woff2':'font/woff2','.html':'text/html'};
 async function asset(request){
@@ -77,15 +78,19 @@ const loginResponse=await worker.fetch(await cpfLoginRequest(env,new Request(bas
 const seedCookie=loginResponse.headers.getSetCookie().map(v=>v.split(';')[0]).join('; ');
 for(const tipo of ['VISITA','ORACAO']) await worker.fetch(new Request(base+'/api/pilot/solicitacoes',{method:'POST',headers:{cookie:seedCookie,'content-type':'application/json'},body:JSON.stringify({tipo,titulo:'Pedido de exemplo',descricao:'Gostaria de receber acompanhamento da comunidade.',visibilidade:'PRIVADA',localizacao:tipo==='VISITA'?'Bairro de exemplo':''})}),env,ctx);
 
+const review=process.env.WORKSPACE_REVIEW === '1' ? await import('./workspace-review-catalog.mjs') : null;
+if(review) review.seedReview(db,manager,member);
 http.createServer(async(req,res)=>{
  try {
   const url=new URL(req.url,base);
   let response;
-  if(['/qa-login/member','/qa-login/manager','/qa-login/operator'].includes(url.pathname)){
+  if(review && /^\/review\/proofs\/\d{1,2}-(desktop|mobile)\.png$/.test(url.pathname)){const file=path.join('outputs/ux-review',path.basename(url.pathname));response=await fs.readFile(file).then(bytes=>new Response(bytes,{headers:{'content-type':'image/png'}})).catch(()=>new Response('Captura indisponível',{status:404}));}
+  else if(review && url.pathname==='/review'){response=new Response(review.reviewPage(),{headers:{'content-type':'text/html;charset=utf-8'}});}
+  else if(['/qa-login/member','/qa-login/manager','/qa-login/operator'].includes(url.pathname)){
     const email=url.pathname.endsWith('member')?'membro.qa@example.invalid':url.pathname.endsWith('operator')?'operador.qa@example.invalid':'gestor.qa@example.invalid';
     const login=await cpfLoginRequest(env,new Request(base+'/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email,senha:'TesteLocal123!'})}));
     const result=await worker.fetch(login,env,ctx);
-    response=new Response(null,{status:302,headers:{location:'/painel?view=estacionamento'}});
+    response=new Response(null,{status:302,headers:{location:review?'/review':'/painel?view=estacionamento'}});
     for(const cookie of result.headers.getSetCookie())response.headers.append('set-cookie',cookie);
   }else{
     const chunks=[];for await(const chunk of req)chunks.push(chunk);
@@ -94,4 +99,4 @@ http.createServer(async(req,res)=>{
   }
   res.writeHead(response.status,{...Object.fromEntries(response.headers),...(response.headers.getSetCookie().length ? {'set-cookie':response.headers.getSetCookie()} : {})});res.end(Buffer.from(await response.arrayBuffer()));
  }catch(error){console.error(error.message);res.writeHead(500);res.end('Falha na prévia local.');}
-}).listen(4178,'127.0.0.1',()=>console.log('Prévia local: '+base+'/qa-login/member · '+base+'/qa-login/manager'));
+}).listen(port,'127.0.0.1',()=>console.log('Prévia local: '+base+'/qa-login/member · '+base+'/qa-login/manager'));
