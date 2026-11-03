@@ -84,7 +84,7 @@ http.createServer(async(req,res)=>{
  try {
   const url=new URL(req.url,base);
   let response;
-  if(review && /^\/review\/proofs\/\d{1,2}-(desktop|mobile)\.png$/.test(url.pathname)){const file=path.join('outputs/ux-review',path.basename(url.pathname));response=await fs.readFile(file).then(bytes=>new Response(bytes,{headers:{'content-type':'image/png'}})).catch(()=>new Response('Captura indisponível',{status:404}));}
+  if(review && /^\/review\/proofs\/(?:\d{1,2}|draft-confirmation)-(desktop|mobile)\.png$/.test(url.pathname)){const file=path.join('outputs/ux-review',path.basename(url.pathname));response=await fs.readFile(file).then(bytes=>new Response(bytes,{headers:{'content-type':'image/png'}})).catch(()=>new Response('Captura indisponível',{status:404}));}
   else if(review && url.pathname==='/review'){response=new Response(review.reviewPage(),{headers:{'content-type':'text/html;charset=utf-8'}});}
   else if(['/qa-login/member','/qa-login/manager','/qa-login/operator'].includes(url.pathname)){
     const email=url.pathname.endsWith('member')?'membro.qa@example.invalid':url.pathname.endsWith('operator')?'operador.qa@example.invalid':'gestor.qa@example.invalid';
