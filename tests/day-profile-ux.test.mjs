@@ -9,11 +9,11 @@ function harness(path, props={}) {
  const slots=[],effects=[],timers=new Map(),requests=[];let cursor=0,timerId=0;
  const same=(a,b)=>a&&b&&a.length===b.length&&a.every((v,i)=>Object.is(v,b[i]));
  const memo=(fn,deps)=>{const i=cursor++;if(!slots[i]||!same(slots[i].deps,deps))slots[i]={value:fn(),deps};return slots[i].value;};
- const hooks={useState(initial){const i=cursor++;if(!(i in slots))slots[i]=typeof initial==='function'?initial():initial;return[slots[i],value=>{slots[i]=typeof value==='function'?value(slots[i]):value}]},useRef(initial){const i=cursor++;return slots[i]??={current:initial}},useMemo:memo,useCallback:(fn,deps)=>memo(()=>fn,deps),useEffect(fn,deps){const i=cursor++;if(!slots[i]||!same(slots[i].deps,deps)){slots[i]?.cleanup?.();slots[i]={deps};effects.push(()=>{slots[i].cleanup=fn()})}}};
+ const hooks={useState(initial){const i=cursor++;if(!(i in slots))slots[i]=typeof initial==='function'?initial():initial;return[slots[i],value=>{slots[i]=typeof value==='function'?value(slots[i]):value}]},useRef(initial){const i=cursor++;return slots[i]??={current:initial}},useMemo:memo,useCallback:(fn,deps)=>memo(()=>fn,deps),useEffect(fn,deps){const i=cursor++;if(!slots[i]||!same(slots[i].deps,deps)){slots[i]?.cleanup?.();slots[i]={deps,effect:fn};effects.push(()=>{slots[i].cleanup=fn()})}}};
  const clock={setTimeout(fn){timers.set(++timerId,fn);return timerId},clearTimeout(id){timers.delete(id)},setInterval(){return ++timerId},clearInterval(){}};
  const exports={};
- runInNewContext(ts.transpileModule(readFileSync(new URL('../app/components/'+path,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,{exports,require:name=>name==='react'?hooks:name==='react/jsx-runtime'?jsx:{default:'stub'},Date,Error,AbortController,URL,FormData:class{constructor(form){this.form=form}get(key){return this.form[key]??null}},window:{...clock,location:{href:'https://example.invalid/painel?view=conta'}},fetch:(url,options)=>new Promise(resolve=>requests.push({url,options,resolve}))});
- return {requests,render(){cursor=0;return exports.default(props)},flush(){for(const effect of effects.splice(0))effect();const batch=[...timers.values()];timers.clear();for(const fn of batch)fn()}};
+ runInNewContext(ts.transpileModule(readFileSync(new URL('../app/components/'+path,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,{exports,require:name=>name==='react'?hooks:name==='react/jsx-runtime'?jsx:name==='./WorkspaceDrafts'?{useWorkspaceDraft(){}}:{default:'stub'},Date,Error,AbortController,URL,FormData:class{constructor(form){this.form=form}get(key){return this.form[key]??null}},window:{...clock,location:{href:'https://example.invalid/painel?view=conta'}},fetch:(url,options)=>new Promise(resolve=>requests.push({url,options,resolve}))});
+ return {requests,resume(){for(const slot of slots){if(slot?.effect){slot.cleanup?.();slot.cleanup=slot.effect();}}},render(){cursor=0;return exports.default(props)},flush(){for(const effect of effects.splice(0))effect();const batch=[...timers.values()];timers.clear();for(const fn of batch)fn()}};
 }
 function nodes(node){if(Array.isArray(node))return node.flatMap(nodes);if(!node||typeof node!=='object')return[];return[node,...nodes(node.props?.children)]}
 function text(node){if(Array.isArray(node))return node.map(text).join('');return typeof node==='object'&&node?text(node.props?.children):node==null||typeof node==='boolean'?'':String(node)}
@@ -61,3 +61,12 @@ test('Perfil identifica cada privacidade e mantém dados pessoais antes do armaz
 test('Armazenamento encerra o carregamento em falha e permite recuperação',async()=>{
  const f=harness('StoragePrivacyWorkspace.tsx');f.render();f.flush();await reply(f.requests[0],{error:'Armazenamento indisponível'},503);assert.match(text(f.render()),/Armazenamento indisponível/);assert.equal(f.render().props['aria-busy'],false);button(f.render(),'Tentar novamente').props.onClick();f.render();f.flush();await reply(f.requests.at(-1),{userId:1,profilePhoto:'',googleAvailable:false,google:null,preference:{provider:'LOCAL',auto_load_recent:0},communityStorage:null,canConfigureCommunity:false});assert.match(text(f.render()),/Escolha onde guardar seus arquivos/);
 });
+
+ test('Perfil preserva foto não salva ao retomar os efeitos da aba',async()=>{
+ const f=account();await reply(f.requests[0],accountData);
+ const upload=nodes(f.render()).find(n=>n.props?.purpose==='profile-photo');
+ upload.props.onChange('/foto-rascunho.webp');f.render();f.resume();
+ await reply(f.requests.at(-1),{...accountData,account:{...accountData.account,fotoPerfil:'/foto-antiga.webp'}});
+ const tree=f.render();assert.equal(nodes(tree).find(n=>n.props?.purpose==='profile-photo').props.value,'/foto-rascunho.webp');
+ assert.match(text(tree),/alterações não salvas/);
+ });

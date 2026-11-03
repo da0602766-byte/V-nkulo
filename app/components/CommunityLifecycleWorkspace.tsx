@@ -1,4 +1,5 @@
 "use client";
+import { useWorkspaceDraft } from "./WorkspaceDrafts";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./community-central.css";
 type LifecycleRequest = {
@@ -70,6 +71,8 @@ export default function CommunityLifecycleWorkspace({ mode = "community", curren
   const [category, setCategory] = useState("SEM_USO");
   const [formOpen, setFormOpen] = useState(false);
   const [draftChanged, setDraftChanged] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  useWorkspaceDraft(draftChanged, "Solicitação de continuidade");
   const requestRef = useRef<AbortController | null>(null);
   const mutationRef = useRef(false);
   const fetchData = useCallback(async () => {
@@ -84,6 +87,19 @@ export default function CommunityLifecycleWorkspace({ mode = "community", curren
   const visibleRequests = useMemo(() => data?.requests.filter(r => mode === "support" || r.communityId === currentCommunityId) || [], [data, currentCommunityId, mode]);
   const evidenceRequired = ["SEGURANCA", "DENUNCIA", "RETENCAO_LEGAL"].includes(category);
 
+  function toggleRequestForm() {
+    if (formOpen && draftChanged) { setConfirmDiscard(true); return; }
+    resetRequestForm(!formOpen);
+  }
+
+  function resetRequestForm(open: boolean) {
+    setConfirmDiscard(false);
+    setDraftChanged(false);
+    setRequestType("");
+    setCategory("SEM_USO");
+    setFormOpen(open);
+  }
+
   async function createRequest(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (mutationRef.current || !data?.canRequest || !requestType) return;
@@ -92,7 +108,7 @@ export default function CommunityLifecycleWorkspace({ mode = "community", curren
     try {
       const response = await fetch("/api/pilot/continuidade", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "CRIAR_SOLICITACAO", type: requestType, category, reason: form.get("reason"), description: form.get("description"), evidence: form.get("evidence"), confirmation: form.get("confirmation"), password: form.get("password") }) });
       const result = await response.json(); if (!response.ok) throw new Error(result.error || "Não foi possível enviar a solicitação.");
-      formElement.reset(); setRequestType(""); setCategory("SEM_USO"); setFormOpen(false); setDraftChanged(false);
+      formElement.reset(); resetRequestForm(false);
       setFeedback(result.message || "Solicitação enviada. Acompanhe a análise abaixo."); await load();
     } catch (cause) { setError((cause as Error).message); }
     finally { mutationRef.current = false; setWorking(false); }
@@ -122,7 +138,14 @@ export default function CommunityLifecycleWorkspace({ mode = "community", curren
         <li><strong>4. Conclusão</strong><small>Consulte o resultado e a justificativa no histórico abaixo.</small></li>
       </ol>
       <dl className="central-metric-line"><div><dt>Situação atual</dt><dd className="central-text-value">{STATUS_LABELS[data.protection.communityStatus] || data.protection.communityStatus}</dd><small>Comunidade ativa selecionada</small></div><div><dt>Solicitações em acompanhamento</dt><dd>{visibleRequests.filter(r => r.decision === "PENDENTE").length}</dd><small>Pedidos que aguardam conclusão</small></div><div><dt>Preservação do histórico</dt><dd className="central-text-value">Protegido</dd><small>{data.protection.recentRecords} registros nos últimos 12 meses</small></div></dl>
-      <section className="central-section"><div className="central-section-heading"><div><h3>Acompanhamento das solicitações</h3><p>Consulte o andamento antes de abrir um novo pedido.</p></div>{mode === "community" && data.canRequest && <button type="button" onClick={() => setFormOpen(value => !value)} aria-expanded={formOpen}>{formOpen ? "Fechar nova solicitação" : "Nova solicitação"}</button>}</div>
+      <section className="central-section"><div className="central-section-heading"><div><h3>Acompanhamento das solicitações</h3><p>Consulte o andamento antes de abrir um novo pedido.</p></div>{mode === "community" && data.canRequest && <button type="button" disabled={working} onClick={toggleRequestForm} aria-expanded={formOpen}>{formOpen ? "Fechar nova solicitação" : "Nova solicitação"}</button>}</div>
+        {confirmDiscard && <div className="central-status" role="alert">
+          <p>Descartar o preenchimento desta solicitação? Nada foi enviado.</p>
+          <div className="central-export-actions">
+            <button type="button" onClick={() => setConfirmDiscard(false)}>Continuar preenchendo</button>
+            <button type="button" disabled={working} onClick={() => resetRequestForm(false)}>Descartar rascunho</button>
+          </div>
+        </div>}
         {!visibleRequests.length && <p className="central-empty">Nenhuma solicitação registrada. A comunidade continua com a situação indicada acima.</p>}
         {visibleRequests.map(item => <details className="central-cell-report" key={item.id}><summary><span><strong>{TYPE_LABELS[item.type] || item.type} · #{item.id}</strong><small>{formatDate(item.requestedAt)} · {item.requesterName}</small></span><span>{DECISION_LABELS[item.decision] || STATUS_LABELS[item.status] || item.status}</span></summary><p className="workspace-form-state">Responsável: {item.analystName || "Aguardando atribuição pelo suporte"} · {item.decision === "PENDENTE" ? "Próximo passo: análise do suporte" : "Análise concluída — consulte o retorno abaixo"}</p><p><strong>{item.reason}</strong></p><p>{item.description}</p>{item.reviewReason && <p>Retorno da análise: {item.reviewReason}</p>}{item.blockers.length > 0 && <ul>{item.blockers.map(b => <li key={b}>{b}</li>)}</ul>}{mode === "support" && data.canReview && item.decision === "PENDENTE" && <div className="central-export-actions">{item.status !== "EM_ANALISE" && <button disabled={working} onClick={() => void review(item.id, "INICIAR_ANALISE")}>Iniciar análise</button>}<button disabled={working} onClick={() => void review(item.id, "RECUSAR")}>Recusar</button><button disabled={working || !data.mfa.available} onClick={() => void review(item.id, "APROVAR")}>Aprovar com verificação</button></div>}</details>)}
       </section>

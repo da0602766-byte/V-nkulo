@@ -1,4 +1,5 @@
 "use client";
+import { useWorkspaceDraft } from "./WorkspaceDrafts";
 
 import TransientFeedback from "./TransientFeedback";
 
@@ -41,6 +42,9 @@ export default function AccountProfileWorkspace({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const hasDraft = useRef(false);
+  function markDirty() { hasDraft.current = true; setDirty(true); }
+  useWorkspaceDraft(dirty, "Perfil e conta");
   const [message, setMessage] = useState("");
   const [loadError, setLoadError] = useState("");
   const [saveError, setSaveError] = useState("");
@@ -54,7 +58,11 @@ export default function AccountProfileWorkspace({
       .then(async (response) => {
         const result = (await response.json()) as AccountResponse;
         if (controller.signal.aborted) return;
-        if (!response.ok || !result.account) throw new Error(result.error || "Não foi possível carregar sua conta.");
+        if (!response.ok || !result.account) {
+          if ([401, 403].includes(response.status)) setData({});
+          throw new Error(result.error || "Não foi possível carregar sua conta.");
+        }
+        if (hasDraft.current) return;
         setData(result);
         setPhotoUrl(result.account?.fotoPerfil || "");
       })
@@ -99,6 +107,7 @@ export default function AccountProfileWorkspace({
       const result = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(result.error || "Falha ao salvar.");
       setMessage("Informações da conta atualizadas.");
+      hasDraft.current = false;
       setDirty(false);
     } catch (error) {
       setSaveError((error as Error).message);
@@ -126,7 +135,7 @@ export default function AccountProfileWorkspace({
         <a href="#account-additional">Dados complementares</a>
         <a href="#account-storage">Arquivos e Google Drive</a>
       </nav>
-      <form id="account-identity" className="account-profile-form" onSubmit={save} onChange={() => setDirty(true)} aria-busy={saving}>
+      <form id="account-identity" className="account-profile-form" onSubmit={save} onChange={markDirty} aria-busy={saving}>
         <p className="workspace-form-state" data-dirty={dirty} role="status">{saving ? "Salvando suas alterações…" : dirty ? "Você tem alterações não salvas. Use Salvar ao concluir." : message || "Seus dados só mudam quando você salva."}</p>
         <p className="account-required-note">* Campo obrigatório. As opções de privacidade abaixo são salvas com seus dados.</p>
         <fieldset className="account-profile-fields" disabled={saving}>
@@ -140,7 +149,7 @@ export default function AccountProfileWorkspace({
             label="Foto de perfil"
             value={photoUrl}
             purpose="profile-photo"
-            onChange={value => { setPhotoUrl(value); setDirty(true); }}
+            onChange={value => { setPhotoUrl(value); markDirty(); }}
             help="Sua foto aparece no cabeçalho e no seu perfil. Imagens de até 50 MB são convertidas automaticamente para WebP."
           />
           <div className="account-profile-grid">

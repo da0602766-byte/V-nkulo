@@ -2,6 +2,7 @@
 
 import { Activity, type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import "./workspace-experience.css";
+import { WorkspaceDrafts } from "./WorkspaceDrafts";
 
 /** Keep only visited, authorized areas in memory. Activity suspends hidden effects.
  * The parent key changes with user, community and permissions, clearing all drafts. */
@@ -10,7 +11,7 @@ export default function WorkspaceDeck<T extends string>({ active, allowed, child
 }) {
   const [visited, setVisited] = useState<T[]>([active]);
   if (!visited.includes(active)) setVisited([...visited, active]);
-  return <div className="workspace-experience" onClickCapture={event => {
+  return <WorkspaceDrafts><div className="workspace-experience" onClickCapture={event => {
     if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
     const anchor = (event.target as HTMLElement).closest<HTMLAnchorElement>("a[href]");
     if (!anchor || anchor.target || anchor.hasAttribute("download")) return;
@@ -23,7 +24,7 @@ export default function WorkspaceDeck<T extends string>({ active, allowed, child
     <Activity key={view} mode={view === active ? "visible" : "hidden"}>
       <WorkspacePosition><div data-workspace-area={view}>{children(view)}</div></WorkspacePosition>
     </Activity>
-  )}</div>;
+  )}</div></WorkspaceDrafts>;
 }
 
 function WorkspacePosition({ children }: { children: ReactNode }) {
@@ -36,6 +37,7 @@ function WorkspacePosition({ children }: { children: ReactNode }) {
     return () => {
       position.current = window.scrollY; cancelAnimationFrame(frame);
       root.current?.querySelectorAll<HTMLMediaElement>("video,audio").forEach(media => media.pause());
+      root.current?.querySelectorAll<HTMLInputElement>('input[type="password"]').forEach(field => { field.value = ""; });
     };
   }, []);
   return <div ref={root}>{children}</div>;
