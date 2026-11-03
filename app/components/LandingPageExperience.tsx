@@ -45,6 +45,16 @@ export default function LandingPageExperience({ signedIn, panelHref, canEdit, pl
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
   const signupHref = signedIn ? panelHref : "/log1";
 
+  useEffect(() => {
+    // Streaming can finish after the browser's initial fragment navigation.
+    const frame = requestAnimationFrame(() => {
+      const section = window.location.hash.slice(1);
+      if (["recursos", "como-funciona", "fio-do-dia", "planos", "duvidas"].includes(section)) {
+        document.getElementById(section)?.scrollIntoView({ block: "start", behavior: "instant" });
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   return (
     <main className="vinkulo-site vinkulo-reception vinkulo-landing" data-visual-editor-root data-editor-key="landing-page" aria-label="VÍNKULO — gestão para igrejas e comunidades">
