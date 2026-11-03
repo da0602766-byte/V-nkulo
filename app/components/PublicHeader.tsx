@@ -40,9 +40,9 @@ export default async function PublicHeader({
           </span>
         </Link>
         <nav className="reception-primary-nav" aria-label="Navegação principal">
-          <Link href="/#recursos">Recursos</Link>
+          <Link href="/?apresentacao=1#recursos">Recursos</Link>
           <Link href="/comunidades">Comunidades</Link>
-          <Link href="/#seguranca">Como funciona</Link>
+          <Link href="/?apresentacao=1#como-funciona">Como funciona</Link>
         </nav>
         <div className="public-header-actions reception-header-actions">
           <details className="public-search-menu">

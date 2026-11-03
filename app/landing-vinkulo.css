@@ -57,6 +57,13 @@ html[data-pilot-theme="escuro"] .vinkulo-landing {
 .lp-section-heading>p:last-child,.lp-thread-layout>div>p { margin:18px 0 0; color:var(--lp-subtle); font-size:1.06rem; line-height:1.7; }
 .lp-section h2 em { color:var(--lp-blue); }
 .lp-module-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:20px; }
+.lp-joining-steps { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),340px)); align-items:start; gap:24px; list-style:none; margin:0; padding:0; }
+.lp-joining-steps > li { min-width:0; padding:20px 0 0; border-top:1px solid var(--lp-line); }
+.lp-joining-steps > li > span { color:var(--lp-blue); font-size:14px; font-weight:750; }
+.lp-joining-steps h3 { color:var(--lp-text); margin:12px 0 8px; font-size:20px; line-height:1.3; }
+.lp-joining-steps p { color:var(--lp-subtle); font-size:16px; line-height:1.6; margin:0; overflow-wrap:anywhere; }
+.lp-joining-steps a { display:inline-flex; align-items:center; min-height:44px; margin-top:12px; color:var(--lp-blue); font-weight:650; }
+.lp-joining-steps a:focus-visible { outline:2px solid currentColor; outline-offset:4px; border-radius:4px; }
 .lp-module { height:100%; min-height:246px; border:1px solid var(--lp-line); border-radius:22px; background:var(--lp-surface); padding:28px; transition:transform .28s ease,border-color .28s ease,box-shadow .28s ease; }
 .lp-module:hover { transform:translateY(-5px); border-color:color-mix(in srgb,var(--tone) 45%,var(--lp-line)); box-shadow:0 22px 45px -30px color-mix(in srgb,var(--tone) 45%,transparent); }
 .lp-module>span,.lp-role header>span { width:52px; height:52px; display:grid; place-items:center; border-radius:15px; background:color-mix(in srgb,var(--tone) 14%,transparent); color:var(--tone); }

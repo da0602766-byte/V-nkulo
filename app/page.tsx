@@ -8,9 +8,12 @@ import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-export default async function Home() {
+export default async function Home({ searchParams }: {
+  searchParams?: Promise<{ apresentacao?: string }>;
+} = {}) {
   const user = await getSessionUser();
-  if (user && !user.system_owner) {
+  const params = await searchParams;
+  if (user && !user.system_owner && params?.apresentacao !== "1") {
     redirect("/comunidades");
   }
   const panelHref = user?.system_owner

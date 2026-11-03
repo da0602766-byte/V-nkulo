@@ -6,27 +6,35 @@ import { useEffect, useState } from "react";
 import FeedImageLightbox from "./feed/FeedImageLightbox";
 import FeedImageActions from "./feed/FeedImageActions";
 
-export default function ResponsiveFeedImage({
-  src,
-  thumbnail,
-  alt,
-  width,
-  height,
-  presentation = "attachment",
-}: {
+type FeedImageProps = {
   src: string;
   thumbnail?: string;
   alt: string;
   width?: number;
   height?: number;
   presentation?: "attachment" | "photo";
-}) {
+};
+
+export default function ResponsiveFeedImage(props: FeedImageProps) {
+  // Changing the publication image resets dimensions, errors and its dialog.
+  return <FeedImage key={`${props.src}:${props.thumbnail || ""}`} {...props} />;
+}
+
+function FeedImage({
+  src,
+  thumbnail,
+  alt,
+  width,
+  height,
+  presentation = "attachment",
+}: FeedImageProps) {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
   const [dataSaver, setDataSaver] = useState(false);
   const [requestedLoad, setRequestedLoad] = useState(false);
   const [preferenceReady, setPreferenceReady] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [naturalSize, setNaturalSize] = useState<{ width: number; height: number } | null>(null);
 
   useEffect(() => {
     const sync = () => {
@@ -44,11 +52,14 @@ export default function ResponsiveFeedImage({
   if (!src) return null;
   const optimizedSource = dataSaver && thumbnail ? thumbnail : src;
   const showImage = requestedLoad || (presentation === "photo" && preferenceReady && !dataSaver);
+  const imageWidth = naturalSize?.width || (Number.isFinite(width) && Number(width) > 0 ? width! : 1280);
+  const imageHeight = naturalSize?.height || (Number.isFinite(height) && Number(height) > 0 ? height! : 720);
+  const ratio = imageWidth / imageHeight;
 
   return (
     <figure
-      className={`feed-responsive-image feed-image-attachment ${presentation === "photo" ? "worship-photo" : ""} ${loaded ? "is-loaded" : ""}`}
-      style={presentation === "photo" ? { aspectRatio: "auto", "--photo-ratio": `${width || 1280} / ${height || 720}` } as React.CSSProperties : undefined}
+      className={`feed-responsive-image feed-image-attachment ${presentation === "photo" ? "worship-photo" : ""} ${showImage && !failed ? "feed-photo-fit" : ""} ${loaded ? "is-loaded" : ""}`}
+      style={{ aspectRatio: "auto", "--photo-ratio": ratio, "--feed-media-ratio": ratio } as React.CSSProperties}
       aria-busy={showImage && !loaded && !failed}
     >
       {presentation === "photo" && !preferenceReady ? (
@@ -83,11 +94,17 @@ export default function ResponsiveFeedImage({
             }
             sizes="(max-width: 680px) 100vw, (max-width: 1100px) 75vw, 720px"
             alt={alt || "Imagem da publicação"}
-            width={width || 1280}
-            height={height || 720}
+            width={imageWidth}
+            height={imageHeight}
             loading="lazy"
             decoding="async"
-            onLoad={() => setLoaded(true)}
+            onLoad={event => {
+              const image = event.currentTarget;
+              if (image.naturalWidth > 0 && image.naturalHeight > 0) {
+                setNaturalSize({ width: image.naturalWidth, height: image.naturalHeight });
+              }
+              setLoaded(true);
+            }}
             onError={() => setFailed(true)}
           />
           </button>

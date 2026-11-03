@@ -81,6 +81,15 @@ export default function LandingPageExperience({ signedIn, panelHref, canEdit, pl
         <div className="lp-module-grid">{MODULES.map((module, index) => <Reveal key={module.label} delay={index * 100}><article className={`lp-module lp-tone-${module.tone}`}><span><FeatureIcon name={module.icon} /></span><h3>{module.label}</h3><p>{module.desc}</p></article></Reveal>)}</div>
       </section>
 
+      <section className="lp-section lp-shell" id="como-funciona" aria-labelledby="como-funciona-titulo">
+        <div className="lp-section-heading"><SectionLabel>Como funciona</SectionLabel><h2 id="como-funciona-titulo">Seu lugar na comunidade, <em>passo a passo</em></h2><p>Conheça a comunidade, solicite seu vínculo e acompanhe o que acontece por lá.</p></div>
+        <ol className="lp-joining-steps">
+          <li><span aria-hidden="true">01</span><h3>Encontre sua comunidade</h3><p>Busque pelo nome ou pela cidade e conheça a página da comunidade.</p><Link href="/comunidades">Explorar comunidades →</Link></li>
+          <li><span aria-hidden="true">02</span><h3>Solicite sua entrada</h3><p>Entre na sua conta e envie a solicitação na página da comunidade. A equipe responsável analisa seu vínculo.</p><Link href={signedIn ? "/comunidades" : "/login"}>{signedIn ? "Encontrar minha comunidade →" : "Entrar na minha conta →"}</Link></li>
+          <li><span aria-hidden="true">03</span><h3>Participe do dia a dia</h3><p>Após a aprovação, acompanhe o mural, a agenda e as áreas disponíveis para o seu perfil.</p><Link href={panelHref}>Abrir meu painel →</Link></li>
+        </ol>
+      </section>
+
       <section className="lp-section lp-thread-section" id="fio-do-dia">
         <div className="lp-shell lp-thread-layout">
           <Reveal direction="right"><SectionLabel>O fio do dia</SectionLabel><h2>A linha do tempo da <em>sua comunidade</em></h2><p>Passado sólido, futuro tracejado, o momento presente marcado entre os dois. O fio não é enfeite — ele mostra a direção do tempo da sua igreja.</p><ul className="lp-thread-benefits"><li><i className="blue" />Uma fonte única de verdade</li><li><i className="green" />Atualizações em tempo real</li><li><i className="yellow" />Visão clara do que importa</li></ul></Reveal>

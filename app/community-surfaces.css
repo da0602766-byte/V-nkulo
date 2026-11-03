@@ -50,18 +50,30 @@ html[data-theme] .social-public-community[data-ui-version="v2"][data-community-p
 html[data-theme] .pilot-dashboard[data-ui-version="v2"][data-community-palette] .pilot-sidebar nav button.active,
 html[data-theme] .pilot-dashboard[data-ui-version="v2"][data-community-palette] .worship-publish { background: var(--community-primary) !important; color: var(--community-on-primary) !important; }
 
-/* Preview height is bounded independently of the uploaded photo's orientation. */
+/* The frame follows the real photo: portraits stay complete without side bands.
+   Limit its width by both the column and viewport height, never crop text/art. */
+.feed-responsive-image.feed-image-attachment.feed-photo-fit,
+html[data-theme] :is(.pilot-dashboard[data-ui-version="v2"],.social-public-community[data-ui-version="v2"]) .feed-responsive-image.feed-image-attachment.feed-photo-fit {
+  --feed-photo-height: min(560px, 68svh);
+  width: min(100%, calc(var(--feed-photo-height) * var(--feed-media-ratio))) !important;
+  max-width: 100%; height: auto !important; min-height: 0; max-height: none !important;
+  aspect-ratio: auto !important; margin: 0 auto !important; padding: 0 !important;
+  background: transparent !important; border: 0; border-radius: 12px; overflow: hidden;
+}
+.feed-photo-fit .feed-image-preview,
 html[data-theme] .pilot-dashboard[data-ui-version="v2"] .feed-responsive-image .feed-image-preview {
   position: relative; display: block; width: 100%; max-width: 100%; min-width: 0; min-height: 0;
-  height: auto; max-height: min(420px, 52dvh); padding: 0 !important; margin: 0;
-  border: 0 !important; border-radius: 10px; overflow: hidden; background: var(--pilot-surface-2) !important;
+  height: auto; max-height: none; padding: 0 !important; margin: 0;
+  border: 0 !important; border-radius: 12px; overflow: hidden; background: transparent !important;
   cursor: zoom-in; aspect-ratio: var(--photo-ratio, 16 / 9);
 }
+.feed-photo-fit .feed-image-preview > img,
 html[data-theme] .pilot-dashboard[data-ui-version="v2"] .feed-responsive-image .feed-image-preview > img {
   position: static !important; display: block !important; width: 100% !important; max-width: 100% !important;
-  height: 100% !important; max-height: min(420px, 52dvh) !important; object-fit: contain !important;
+  height: auto !important; max-height: none !important; object-fit: contain !important;
   border-radius: 0 !important; margin: 0 !important;
 }
+.feed-photo-fit .feed-image-preview:focus-visible { outline: 3px solid var(--community-link, #12679b); outline-offset: -3px; }
 html[data-theme] .pilot-dashboard[data-ui-version="v2"] .worship-photo-pending { max-height: min(420px, 52dvh); }
 html[data-theme] .pilot-dashboard[data-ui-version="v2"] .worship-photo .feed-image-attachment-actions :is(button,a) { min-height: 44px; background: transparent !important; color: var(--community-link) !important; }
 .feed-image-lightbox[open] {
@@ -139,8 +151,8 @@ html[data-theme] .pilot-dashboard[data-ui-version="v2"] .community-info-identity
 html[data-theme] .pilot-dashboard[data-ui-version="v2"] .community-info-identity > span img { width: 100%; height: 100%; object-fit: contain; }
 html[data-theme] .pilot-dashboard[data-ui-version="v2"] .community-info-identity h2 { font-size: clamp(20px,4vw,26px); line-height: 1.2; overflow-wrap: anywhere; }
 @media (max-width: 680px) {
-  html[data-theme] .pilot-dashboard[data-ui-version="v2"] .feed-responsive-image .feed-image-preview,
-  html[data-theme] .pilot-dashboard[data-ui-version="v2"] .feed-responsive-image .feed-image-preview > img,
+  .feed-responsive-image.feed-image-attachment.feed-photo-fit,
+  html[data-theme] :is(.pilot-dashboard[data-ui-version="v2"],.social-public-community[data-ui-version="v2"]) .feed-responsive-image.feed-image-attachment.feed-photo-fit { --feed-photo-height: min(520px, 68svh); }
   html[data-theme] .pilot-dashboard[data-ui-version="v2"] .worship-photo-pending { max-height: min(300px, 42dvh) !important; }
   html[data-theme] .social-public-community[data-ui-version="v2"] .vinkulo-header { width: 100%; min-height: 64px; padding: 8px 12px; margin: 0; gap: 8px; }
   html[data-theme] .social-public-community[data-ui-version="v2"] .vinkulo-header .vinkulo-brand { flex: 1 1 auto; min-width: 36px; }
