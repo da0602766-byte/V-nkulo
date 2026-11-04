@@ -11,8 +11,7 @@ const styles = await readFile(new URL("../app/globals.css", import.meta.url), "u
 // "Criar setores e vagas" dentro da aba "Mapa e vagas" do novo console.
 test("gestão organiza responsável, setores e vagas em blocos dedicados", () => {
   assert.match(console_, /Responsável e instruções/);
-  assert.match(console_, /Novo setor/);
-  assert.match(console_, /Adicionar vagas/);
+  assert.match(console_, /ParkingSceneEditor/);
   assert.match(styles, /\.gestao-settings-grid\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(240px,\s*1fr\)\)/s);
   assert.match(styles, /\.gestao-tabs button\.is-active/);
 });

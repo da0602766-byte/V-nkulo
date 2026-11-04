@@ -89,7 +89,7 @@ export class VisitorDriveRuntime {
       const s=this.base.prepare(sql).bind(...bindings);
       if(kind==='first'){const row=await s.first<Record<string,unknown>>();return column?(row?.[column]??null):row;}
       if(kind==='raw'){const r=await s.all<Record<string,unknown>>();const keys=Object.keys(r.results[0]||{}),values=r.results.map(row=>keys.map(k=>row[k]));return rawColumns?[keys,...values]:values;}
-      return s[kind]();
+      return kind==='all' ? s.all() : s.run();
     }
     await this.initialize();
     const target=sql.match(/^\s*(?:INSERT(?:\s+OR\s+\w+)?\s+INTO|REPLACE\s+INTO|UPDATE|DELETE\s+FROM)\s+[`"\[]?(\w+)/i)?.[1];

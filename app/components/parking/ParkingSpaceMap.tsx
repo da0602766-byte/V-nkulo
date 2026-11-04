@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import ParkingPublishedScene from "./ParkingPublishedScene";
 import { hasCustomParkingLayout, isSpaceAvailable, parkingLabel } from "./format";
 import PublicIcon from "../PublicIcon";
 import type { Space } from "./types";
@@ -12,7 +13,7 @@ export function spaceState(space: Space) {
   return { label: "Disponível", className: "available", mark: "○" };
 }
 
-export default function ParkingSpaceMap({ spaces, selectedId, onSelect, busy = false }: {
+function LegacyParkingSpaceMap({ spaces, selectedId, onSelect, busy = false }: {
   spaces: Space[]; selectedId: number | null; onSelect: (space: Space) => void; busy?: boolean;
 }) {
   const [mode, setMode] = useState<"map" | "list">("map");
@@ -78,4 +79,8 @@ export default function ParkingSpaceMap({ spaces, selectedId, onSelect, busy = f
       {!spaces.length && <p className="gestao-empty">O mapa deste estacionamento ainda não foi configurado.</p>}
     </div>
   </section>;
+}
+
+export default function ParkingSpaceMap(props: {spaces:Space[];selectedId:number|null;onSelect:(space:Space)=>void;busy?:boolean}) {
+ return <ParkingPublishedScene {...props} onSelect={space=>{if(!props.busy && (isSpaceAvailable(space)||space.minha_reserva))props.onSelect(space);}} fallback={<LegacyParkingSpaceMap {...props}/>}/>;
 }

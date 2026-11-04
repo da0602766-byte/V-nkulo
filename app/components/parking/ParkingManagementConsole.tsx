@@ -1,6 +1,8 @@
 "use client";
 
-import { DragEvent, FormEvent, useRef, useState } from "react";
+import { FormEvent, useState } from "react";
+import ParkingSceneEditor from "./ParkingSceneEditor";
+import ParkingPublishedScene from "./ParkingPublishedScene";
 import PublicIcon, { type PublicIconName } from "../PublicIcon";
 import { ParkingEmpty, ParkingHeading, ParkingMetric, ParkingMovementCard } from "./ParkingUi";
 import ParkingReservationTable from "./ParkingReservationTable";
@@ -10,12 +12,8 @@ import { ParkingQrCheckin, type ParkingQrValidationResult } from "../ParkingRese
 import {
   formatTime,
   parkingLabel,
-  getParkingCanvasHeight,
-  getParkingCanvasWidth,
-  hasCustomParkingLayout,
 } from "./format";
 import type { ParkingController } from "./useParkingData";
-import type { Space } from "./types";
 
 type Tab = "historico" | "visao" | "entradas" | "reservas" | "ocorrencias" | "relatorios" | "mapa" | "equipe";
 
@@ -41,17 +39,13 @@ export default function ParkingManagementConsole({
     reservationAction,
     clearMovementHistory,
     reportAction,
-    moveSpace,
-  } = parking;
+    } = parking;
 
   const [tab, updateTab] = useState<Tab>("visao");
-  const setTab = (next: Tab) => { if (next !== tab) parking.setReservationFilters(f => ({...f,status:"",page:1})); updateTab(next); };
+  const [sceneDirty, setSceneDirty] = useState(false);
+  const setTab = (next: Tab) => { if (tab === "mapa" && sceneDirty && next !== tab && !window.confirm("Sair sem salvar o rascunho?")) return; setSceneDirty(false); if (next !== tab) parking.setReservationFilters(f => ({...f,status:"",page:1})); updateTab(next); };
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [exitSearch, setExitSearch] = useState("");
-  const [mapEditing, setMapEditing] = useState(false);
-  const [draggedSpace, setDraggedSpace] = useState<number | null>(null);
-  const [coordinateSector, setCoordinateSector] = useState("");
-  const pointerDragRef = useRef<{ spaceId: number; offsetX: number; offsetY: number } | null>(null);
 
   if (!data) {
     return (
@@ -100,47 +94,6 @@ export default function ParkingManagementConsole({
     return Boolean(result);
   }
 
-  function startPointerMove(event: React.PointerEvent<HTMLButtonElement>, spaceId: number) {
-    if (!mapEditing) return;
-    event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    const rect = event.currentTarget.getBoundingClientRect();
-    pointerDragRef.current = { spaceId, offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top };
-    setDraggedSpace(spaceId);
-  }
-
-  function continuePointerMove(event: React.PointerEvent<HTMLButtonElement>) {
-    const drag = pointerDragRef.current;
-    const canvas = event.currentTarget.parentElement;
-    if (!mapEditing || !drag || drag.spaceId !== Number(event.currentTarget.dataset.spaceId) || !canvas) return;
-    event.preventDefault();
-    const rect = canvas.getBoundingClientRect();
-    const x = Math.max(0, Math.round((event.clientX - rect.left - drag.offsetX) * canvas.offsetWidth / rect.width + canvas.scrollLeft));
-    const y = Math.max(0, Math.round((event.clientY - rect.top - drag.offsetY) * canvas.offsetHeight / rect.height + canvas.scrollTop));
-    event.currentTarget.style.left = `${x}px`;
-    event.currentTarget.style.top = `${y}px`;
-  }
-
-  function finishPointerMove(event: React.PointerEvent<HTMLButtonElement>) {
-    const drag = pointerDragRef.current;
-    if (!drag || drag.spaceId !== Number(event.currentTarget.dataset.spaceId)) return;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-    pointerDragRef.current = null;
-    setDraggedSpace(null);
-    const x = Number(event.currentTarget.style.left.replace("px", "")) || 0;
-    const y = Number(event.currentTarget.style.top.replace("px", "")) || 0;
-    void moveSpace(drag.spaceId, x, y);
-  }
-
-  function dropSpace(event: DragEvent<HTMLDivElement>) {
-    event.preventDefault();
-    if (!mapEditing || !draggedSpace) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    const x = Math.max(0, Math.round((event.clientX - rect.left) * event.currentTarget.offsetWidth / rect.width - 32));
-    const y = Math.max(0, Math.round((event.clientY - rect.top) * event.currentTarget.offsetHeight / rect.height - 28));
-    setDraggedSpace(null);
-    void moveSpace(draggedSpace, x, y);
-  }
 
   return (
     <section className="gestao-console parking-redesign parking-management">
@@ -291,128 +244,9 @@ export default function ParkingManagementConsole({
         </section>
       )}
 
-      {tab === "mapa" && (
-        <section className="gestao-card">
-          <header>
-            <div><p className="gestao-kicker">MAPA</p><h2>Organização dos setores</h2></div>
-            <div className="gestao-row-actions">
-              <span>{data.stats.livres} livres</span>
-              {canConfigure && <button type="button" className="gestao-ghost" onClick={() => setMapEditing((value) => !value)}>{mapEditing ? "Concluir edição" : "Reorganizar vagas"}</button>}
-            </div>
-          </header>
-          <div className="parking-map-mode"><span className="parking-state tone-violet">{mapEditing ? "Modo de edição" : "Visualização do mapa"}</span><p>{mapEditing ? "Arraste uma vaga para reposicioná-la. A posição é salva ao soltar." : "Este mapa mostra a ocupação física atual. Ative a edição para reorganizar."}</p></div><div className="parking-v2-legend" aria-label="Legenda do mapa de gestão"><span>○ Livre</span><span>● Ocupada</span><span>× Indisponível</span></div>
-          {mapEditing && <p className="gestao-hint">Ao soltar uma vaga, a nova posição é salva. Para usar o teclado, abra Editar posições por campos e pressione Salvar posição.</p>}
-          <div className="gestao-map">
-            {sectors.map((sector) => {
-              const positioned = hasCustomParkingLayout(sector.spaces);
-              const usesCanvas = mapEditing || positioned;
-              return (
-                <section key={sector.id} className={usesCanvas ? "is-positioned" : ""} style={{ "--sector-color": sector.color } as React.CSSProperties}>
-                  <header>
-                    <strong>{sector.name}</strong>
-                    <small>{sector.spaces.length} vagas</small>
-                    {canConfigure && (
-                      <details className="gestao-sector-editor">
-                        <summary>Editar setor</summary>
-                        <form
-                          onSubmit={(event) => {
-                            event.preventDefault();
-                            const editor = event.currentTarget.closest("details");
-                            const values = Object.fromEntries(new FormData(event.currentTarget).entries());
-                            void submitJson(
-                              "/api/pilot/estacionamento/mapa",
-                              { action: "ATUALIZAR_SETOR", setorId: Number(sector.id.split(":")[0]), previousNome: sector.name, previousCor: sector.color, previousOrdem: sector.order, ...values },
-                              `Setor “${sector.name}” atualizado.`,
-                              "PATCH",
-                            ).then((saved) => {
-                              if (saved && editor) editor.open = false;
-                            });
-                          }}
-                        >
-                          <label>Nome<input name="nome" defaultValue={sector.name} required maxLength={80} /></label>
-                          <label>Cor<input name="cor" type="color" defaultValue={sector.color} /></label>
-                          <label>Ordem do setor<input name="ordem" type="number" min="0" max="99" defaultValue={sector.order} /></label>
-                          <button className="gestao-primary" disabled={working}>Salvar setor</button>
-                        </form>
-                      </details>
-                    )}
-                  </header>
-                  <div
-                    className={usesCanvas ? "gestao-position-canvas" : "gestao-flow-canvas"}
-                    onDragOver={(event) => mapEditing && event.preventDefault()}
-                    onDrop={dropSpace}
-                    style={usesCanvas ? { width: getParkingCanvasWidth(sector.spaces), height: getParkingCanvasHeight(sector.spaces) } : undefined}
-                  >
-                    {sector.spaces.map((space: Space) => (
-                      <button
-                        type="button"
-                        key={space.id}
-                        draggable={mapEditing}
-                        data-space-id={space.id}
-                        onDragStart={() => setDraggedSpace(space.id)}
-                        onDragEnd={() => setDraggedSpace(null)}
-                        onPointerDown={(event) => startPointerMove(event, space.id)}
-                        onPointerMove={continuePointerMove}
-                        onPointerUp={finishPointerMove}
-                        onPointerCancel={() => {pointerDragRef.current=null;setDraggedSpace(null);void parking.load(true);}}
-                        style={usesCanvas ? { left: space.posicao_x, top: space.posicao_y } : undefined}
-                        className={`gestao-slot small status-${space.status.toLowerCase()}${mapEditing ? " is-editing" : ""}`}
-                        title={`${space.codigo} · ${parkingLabel(space.tipo)} · ${spaceState({...space,reservada:0}).label}`}
-                       aria-label={`${space.codigo}, ${spaceState({...space,reservada:0}).label}`}><strong>{space.codigo}</strong><small>{space.status === "LIVRE" ? "○ Livre" : space.status === "OCUPADA" ? "● Ocupada" : "× Bloqueada"}</small></button>
-                    ))}
-                  </div>
-                </section>
-              );
-            })}
-            {!sectors.length && <p className="gestao-empty">Nenhum setor cadastrado ainda.</p>}
-          </div>
-          {canConfigure && <details className="parking-v2-coordinate-editor"><summary>Editar posições por campos</summary><p>A posição horizontal cresce para a direita e a vertical, para baixo. Deixe pelo menos 72 pixels entre colunas e 64 entre linhas.</p><label>Setor para editar posições<select value={coordinateSector} onChange={event=>setCoordinateSector(event.target.value)}><option value="">Todos os setores</option>{sectors.map(sector=><option key={sector.id} value={sector.id.split(":")[0]}>{sector.name}</option>)}</select></label>{data.vagas.filter(space=>!coordinateSector || String(space.setor_id)===coordinateSector).map(space=><form key={space.id+'-'+space.posicao_x+'-'+space.posicao_y} onSubmit={event=>{event.preventDefault();const values=new FormData(event.currentTarget);void moveSpace(space.id,Number(values.get('x')),Number(values.get('y')));}}><strong>{space.codigo} · {space.setor_nome}</strong><label>Horizontal (px)<input name="x" type="number" min="0" max="10000" defaultValue={space.posicao_x} required /></label><label>Vertical (px)<input name="y" type="number" min="0" max="10000" defaultValue={space.posicao_y} required /></label><button disabled={working}>Salvar posição</button></form>)}</details>}
-          {canConfigure && (
-            <details className="gestao-settings-block">
-              <summary>Criar setores e vagas</summary>
-              <div className="gestao-settings-grid">
-                <form
-                  className="gestao-form"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    const values = Object.fromEntries(new FormData(event.currentTarget).entries());
-                    void submitJson("/api/pilot/estacionamento/mapa", { action: "CRIAR_SETOR", ...values }, "Setor criado.");
-                  }}
-                >
-                  <fieldset>
-                    <legend>Novo setor</legend>
-                    <label>Nome<input name="nome" required placeholder="Ex.: Visitantes" /></label>
-                    <label>Cor<input name="cor" type="color" defaultValue="#3b82f6" /></label>
-                    <input type="hidden" name="ordem" value={sectors.length + 1} />
-                  </fieldset>
-                  <button className="gestao-primary" disabled={working}>Adicionar setor</button>
-                </form>
-                <form
-                  className="gestao-form"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    const values = Object.fromEntries(new FormData(event.currentTarget).entries());
-                    void submitJson("/api/pilot/estacionamento/mapa", { action: "CRIAR_VAGAS", tipo: "COMUM", ...values }, "Vagas adicionadas.");
-                  }}
-                >
-                  <fieldset>
-                    <legend>Adicionar vagas</legend>
-                    <label>Setor
-                      <select name="setorId" required defaultValue="">
-                        <option value="" disabled>Selecione</option>
-                        {sectors.map((sector) => <option key={sector.id} value={sector.id.split(":")[0]}>{sector.name}</option>)}
-                      </select>
-                    </label>
-                    <label>Prefixo<input name="prefixo" required maxLength={5} placeholder="Ex.: A" /></label>
-                    <label>Quantidade<input name="quantidade" type="number" min="1" max="40" defaultValue="4" /></label>
-                  </fieldset>
-                  <button className="gestao-primary" disabled={working}>Criar vagas</button>
-                </form>
-              </div>
-            </details>
-          )}
-        </section>
-      )}
+      {tab === "mapa" && (canConfigure
+        ? <ParkingSceneEditor spaces={data.vagas} onPublished={()=>void parking.load(true)} onDirtyChange={setSceneDirty}/>
+        : <ParkingPublishedScene spaces={data.vagas} selectedId={null} onSelect={()=>{}} fallback={<p>O cenário ainda não foi publicado pela Gestão.</p>} />)}
 
       {tab === "equipe" && (
         <section className="gestao-card gestao-two-col parking-team-workspace">

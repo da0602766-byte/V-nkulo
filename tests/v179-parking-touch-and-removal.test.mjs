@@ -3,19 +3,19 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const managementConsole = await readFile(new URL("../app/components/parking/ParkingManagementConsole.tsx", import.meta.url), "utf8");
-const parkingData = await readFile(new URL("../app/components/parking/useParkingData.ts", import.meta.url), "utf8");
+const sceneView = await readFile(new URL("../app/components/parking/ParkingSceneView.tsx", import.meta.url), "utf8");
 const memberPortal = await readFile(new URL("../app/components/parking/ParkingMemberPortal.tsx", import.meta.url), "utf8");
 const format = await readFile(new URL("../app/components/parking/format.ts", import.meta.url), "utf8");
 const availability = await readFile(new URL("../app/api/pilot/estacionamento/disponibilidade/route.ts", import.meta.url), "utf8");
 const people = await readFile(new URL("../app/components/PeopleWorkspace.tsx", import.meta.url), "utf8");
 const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 
-test("parking editor supports pointer movement and saves without a full successful reload", () => {
-  assert.match(managementConsole, /onPointerDown=\{\(event\) => startPointerMove\(event, space\.id\)\}/);
-  assert.match(managementConsole, /setPointerCapture/);
-  assert.match(parkingData, /ATUALIZAR_POSICAO/);
-  assert.match(parkingData, /setFeedback\("Posição da vaga salva\."\)/);
-  assert.match(styles, /\.gestao-position-canvas\s*\{[^}]*touch-action:\s*none/s);
+// Runtime persistence/concurrency coverage lives in parking-scene.test.mjs;
+// browser gestures, undo/redo and publication in parking-scene-qa.mjs.
+test("parking editor exposes pointer capture and a separate publication workflow", () => {
+  assert.match(sceneView, /setPointerCapture/);
+  assert.match(sceneView, /onPointerCancel/);
+  assert.match(managementConsole, /ParkingSceneEditor/);
 });
 
 // Redesign de outubro/2026: membro e gestão usam as posições persistidas,
@@ -27,7 +27,7 @@ test("o mapa do membro preserva posições reais e permite escolher setor e list
   assert.match(map, /Lista de vagas/);
   assert.match(memberPortal, /isSpaceAvailable/);
   assert.match(format, /export function hasCustomParkingLayout/);
-  assert.match(managementConsole, /space\.posicao_x, top: space\.posicao_y/);
+  assert.match(map, /ParkingPublishedScene/);
 });
 
 test("parking selection remains reachable while reservations are gated", () => {

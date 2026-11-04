@@ -138,7 +138,7 @@ test("ajustes operacionais V4.7.4 conectam estacionamento, escalas, pessoas e ev
 
   assert.match(parkingApi, /ATUALIZAR_SETOR/);
   assert.match(parkingApi, /parking\.configure/);
-  assert.match(parkingUi, /gestao-sector-editor/);
+  assert.match(parkingUi, /<ParkingSceneEditor/);
   assert.match(scheduleApi, /DEFINIR_STATUS_DESIGNACAO/);
   assert.match(scheduleCreateApi, /ministerio_equipes[\s\S]*ativa = 1/);
   assert.match(scheduleApi, /schedule_share_access/);

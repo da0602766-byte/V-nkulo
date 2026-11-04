@@ -33,13 +33,14 @@ test("Agenda mantém ações juntas e editor sem faixa duplicada", async () => {
   assert.match(events, />\s*Fechar\s*<\/button>/);
 });
 
-test("Gestão oferece edição de setor junto de cada bloco do mapa", async () => {
+test("Gestão oferece edição de setores no editor de cenário", async () => {
   const managementConsole = await read("app/components/parking/ParkingManagementConsole.tsx");
 
-  assert.match(managementConsole, /className="gestao-sector-editor"/);
-  assert.match(managementConsole, /<summary>Editar setor<\/summary>/);
-  assert.match(managementConsole, /action: "ATUALIZAR_SETOR"/);
-  assert.match(managementConsole, /mapEditing \? "Concluir edição" : "Reorganizar vagas"/);
+  assert.match(managementConsole, /<ParkingSceneEditor/);
+  const editor = await read("app/components/parking/ParkingSceneEditor.tsx");
+  assert.match(editor, /Nome do setor/);
+  assert.match(editor, /Excluir setor/);
+  assert.match(editor, /Transfira ou remova as vagas deste setor antes de excluí-lo/);
 });
 
 test("CSS final remove cartões e estabiliza o detalhe móvel de Células", async () => {

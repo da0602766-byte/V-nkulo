@@ -6,7 +6,8 @@ import {createPilotD1,createPilotUser} from '../../tests/helpers/sqlite-d1.mjs';
 import {cpfLoginRequest} from '../../tests/helpers/cpf-login.mjs';
 import worker from '../../dist/server/index.js';
 const {database:db,d1}=await createPilotD1();
-const base='http://localhost:4178';
+const port=Number(process.env.PARKING_QA_PORT || 4178);
+const base='http://localhost:'+port;
 const root=path.resolve('dist/client');
 const mime={'.js':'text/javascript','.css':'text/css','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.ico':'image/x-icon','.webp':'image/webp','.woff2':'font/woff2','.html':'text/html'};
 async function asset(request){
@@ -81,4 +82,4 @@ http.createServer(async(req,res)=>{
   }
   res.writeHead(response.status,{...Object.fromEntries(response.headers),...(response.headers.getSetCookie().length ? {'set-cookie':response.headers.getSetCookie()} : {})});res.end(Buffer.from(await response.arrayBuffer()));
  }catch(error){console.error(error.message);res.writeHead(500);res.end('Falha na prévia local.');}
-}).listen(4178,'127.0.0.1',()=>console.log('Prévia local: '+base+'/qa-login/member · '+base+'/qa-login/manager'));
+}).listen(port,'127.0.0.1',()=>console.log('Prévia local: '+base+'/qa-login/member · '+base+'/qa-login/manager'));

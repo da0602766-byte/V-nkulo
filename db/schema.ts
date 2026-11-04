@@ -2768,6 +2768,7 @@ export const estacionamentoSetores = sqliteTable(
       .notNull()
       .references(() => comunidades.id, { onDelete: "cascade" }),
     nome: text("nome").notNull(),
+    sceneKey: text("scene_key"),
     cor: text("cor").notNull().default("#3b82f6"),
     ordem: integer("ordem").notNull().default(0),
     ativo: integer("ativo", { mode: "boolean" }).notNull().default(true),
@@ -2776,6 +2777,7 @@ export const estacionamentoSetores = sqliteTable(
       .default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [
+    uniqueIndex("estacionamento_setor_scene_key").on(table.comunidadeId, table.sceneKey),
     uniqueIndex("estacionamento_setor_nome_unique").on(
       table.comunidadeId,
       table.nome,
@@ -2799,6 +2801,7 @@ export const estacionamentoVagas = sqliteTable(
       .notNull()
       .references(() => estacionamentoSetores.id, { onDelete: "cascade" }),
     codigo: text("codigo").notNull(),
+    sceneKey: text("scene_key"),
     tipo: text("tipo").notNull().default("COMUM"),
       status: text("status").notNull().default("LIVRE"),
       posicaoX: integer("posicao_x").notNull().default(0),
@@ -2812,6 +2815,7 @@ export const estacionamentoVagas = sqliteTable(
       .default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [
+    uniqueIndex("estacionamento_vaga_scene_key").on(table.comunidadeId, table.sceneKey),
     uniqueIndex("estacionamento_vaga_codigo_unique").on(
       table.comunidadeId,
       table.codigo,
@@ -3320,3 +3324,13 @@ export const visitantePlanilha = sqliteTable("visitante_planilha", {
   lockToken: text("lock_token"),
   lockAte: integer("lock_ate").notNull().default(0),
 });
+
+export const estacionamentoCenas = sqliteTable('estacionamento_cenas', {
+ comunidadeId: integer('comunidade_id').primaryKey().references(()=>comunidades.id,{onDelete:'cascade'}),
+ revisao: integer('revisao').notNull().default(0), rascunho:text('rascunho'), publicada:text('publicada'), token:text('token'),
+ atualizadoPor:integer('atualizado_por').references(()=>usuarios.id,{onDelete:'set null'}), atualizadoEm:text('atualizado_em').notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+export const estacionamentoCenasHistorico = sqliteTable('estacionamento_cenas_historico', {
+ id:integer('id').primaryKey({autoIncrement:true}), comunidadeId:integer('comunidade_id').notNull().references(()=>comunidades.id,{onDelete:'cascade'}),
+ revisao:integer('revisao').notNull(), cena:text('cena').notNull(), criadoPor:integer('criado_por').references(()=>usuarios.id,{onDelete:'set null'}), criadoEm:text('criado_em').notNull().default(sql`CURRENT_TIMESTAMP`),
+},t=>[index('estacionamento_cenas_historico_comunidade').on(t.comunidadeId,t.id)]);

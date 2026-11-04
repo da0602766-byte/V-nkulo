@@ -12,6 +12,8 @@ export async function POST(request: Request) {
   const payload = (await request.json()) as Record<string, unknown>;
   const action = String(payload.action || "").toUpperCase();
   const db = getD1();
+  const scene = await db.prepare('SELECT revisao FROM estacionamento_cenas WHERE comunidade_id=?').bind(access.context.comunidadeId).first<{revisao:number}>();
+  if (scene?.revisao) return Response.json({error:'Use o editor de cenário e publique as alterações para atualizar este mapa.'},{status:409});
 
   if (action === "CRIAR_SETOR") {
     const parsed = parseParkingSector(payload);
@@ -118,6 +120,8 @@ export async function PATCH(request: Request) {
   const payload = (await request.json()) as Record<string, unknown>;
   const action = String(payload.action || "").toUpperCase();
   const db = getD1();
+  const scene = await db.prepare('SELECT revisao FROM estacionamento_cenas WHERE comunidade_id=?').bind(access.context.comunidadeId).first<{revisao:number}>();
+  if (scene?.revisao) return Response.json({error:'Use o editor de cenário e publique as alterações para atualizar este mapa.'},{status:409});
   if (action === "ATUALIZAR_POSICOES" || action === "ATUALIZAR_POSICAO") {
     const source = action === "ATUALIZAR_POSICAO" ? [payload] : Array.isArray(payload.positions) ? payload.positions : [];
     const positions = source.map(item => {
