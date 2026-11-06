@@ -1,5 +1,6 @@
 "use client";
 import VinkuloMark from "./VinkuloMark";
+import LoginExperience from "./LoginExperience";
 
 
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
@@ -43,11 +44,12 @@ export default function AccessPortal({owner=false,returnTo='',initialMessage='',
       if(result.redirect) {window.location.assign(result.redirect);return;}else setMessage(result.message||'Solicitação enviada.');
     }catch(error){setMessage((error as Error).message);}setBusy(false);
   }
-  return <AccessShell owner={owner} logoUrl={logoUrl} siteName={siteName}><header className="access-heading"><span className="access-eyebrow">{recovery?'RECUPERAÇÃO DE ACESSO':owner?'ÁREA RESTRITA':'BEM-VINDO AO VÍNKULO'}</span><h1>{recovery?'Vamos recuperar seu acesso.':owner?'Acesso do Proprietário.':'Sua comunidade está aqui.'}</h1><p>{recovery?'Informe seu CPF. A liderança responsável receberá a solicitação para ajudar na recuperação.':owner?'Entre com as credenciais da sua conta administrativa.':'Entre com seu CPF e senha para continuar.'}</p></header>
+  const Shell = owner ? AccessShell : LoginExperience;
+  return <Shell owner={owner} logoUrl={logoUrl} siteName={siteName}><header className="access-heading"><span className="access-eyebrow">{recovery?'RECUPERAÇÃO DE ACESSO':owner?'ÁREA RESTRITA':'SEU LUGAR É AQUI'}</span><h1>{recovery?'Vamos recuperar seu acesso.':owner?'Acesso do Proprietário.':'Bom ter você de volta.'}</h1><p>{recovery?'Informe seu CPF. A liderança responsável receberá a solicitação para ajudar na recuperação.':owner?'Entre com as credenciais da sua conta administrativa.':'Entre para se conectar à sua comunidade.'}</p></header>
     <form className="access-form" method="post" action={recovery?'/api/auth/esqueci-senha':owner?'/api/auth/proprietario':'/api/auth/login'} onSubmit={submit}><input type="hidden" name="returnTo" value={returnTo}/><CpfField/>{!recovery&&<><PasswordField/><button type="button" className="access-text-button access-recover" onClick={()=>{setRecovery(true);setMessage('');}}>Esqueci minha senha</button></>}{message&&<p className="access-feedback" role="alert">{message}</p>}<button className="access-primary" disabled={busy}>{busy?'Aguarde…':recovery?'Solicitar recuperação':owner?'Entrar na administração':'Entrar'}<span aria-hidden="true">→</span></button></form>
     {recovery?<button className="access-text-button" onClick={()=>{setRecovery(false);setMessage('');}}>← Voltar para entrar</button>:<p className="access-migration">Já tinha uma conta? <Link href="/vincular-cpf">Vincule seu CPF</Link></p>}
     {!owner&&!recovery&&<div className="access-paths"><Link className="access-community-link" href="/log1"><span><strong>Quero criar uma comunidade</strong><small>Conheça os planos e solicite seu acesso</small></span><b aria-hidden="true">↗</b></Link><p><strong>Recebeu um convite?</strong> Abra o link enviado pela sua comunidade para criar sua conta.</p></div>}
     {owner&&<p className="access-private-note">Acesso exclusivo para contas autorizadas. Sua sessão administrativa expira em uma hora.</p>}
     {busy&&!recovery&&typeof document!=='undefined'&&createPortal(<VinkuloLoading label={owner?"Abrindo painel do proprietário…":"Entrando na sua comunidade…"}/>,document.body)}
-  </AccessShell>;
+  </Shell>;
 }
