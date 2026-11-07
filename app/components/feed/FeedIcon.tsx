@@ -1,6 +1,8 @@
-export type FeedIconName = "plus" | "text" | "image" | "calendar" | "heart" | "search" | "arrow" | "people" | "expand" | "download" | "drive" | "browser" | "close";
+export type FeedIconName = "plus" | "text" | "image" | "calendar" | "heart" | "search" | "arrow" | "people" | "expand" | "download" | "drive" | "browser" | "close" | "cloud" | "shield";
 
 const paths: Record<FeedIconName, string> = {
+  cloud: "M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z",
+  shield: "M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11ZM9 12l2 2 4-4",
   expand: "M8 3H3v5M16 3h5v5M21 16v5h-5M8 21H3v-5",
   download: "M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5",
   drive: "M9 3h6l7 12-3 6H5l-3-6L9 3Zm0 0 10 18M15 3 5 21M2 15h20",

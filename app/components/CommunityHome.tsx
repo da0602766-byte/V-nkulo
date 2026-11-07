@@ -2,6 +2,7 @@
 import PublicationPreview from "./feed/PublicationPreview";
 import CommunitySignature from "./CommunitySignature";
 import FeedPrayer from "./FeedPrayer";
+import FeedDriveStorageNotice from "./FeedDriveStorageNotice";
 import SafeImage from "./SafeImage";
 
 
@@ -670,6 +671,7 @@ export default function CommunityHome({
           {introOpen ? "Recolher apresentação" : "Sobre a comunidade"}<span aria-hidden="true">{introOpen ? "−" : "+"}</span>
         </button>
       </div>
+      <FeedDriveStorageNotice key={`${currentUserId}:${communityId}`} currentUserId={currentUserId} communityId={communityId}/>
       <div id={introId} className={introStyles.intro} data-open={introOpen} aria-hidden={!introOpen} inert={!introOpen}>
       <div className={introStyles.introClip}>
       <header className="worship-welcome">
