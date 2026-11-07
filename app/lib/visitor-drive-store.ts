@@ -2,9 +2,16 @@ import { getRuntimeEnv } from '../../db/runtime-env';
 import { visitorShareRole } from './visitor-sharing';
 import { getDriveAccessToken, createDriveFolder, uploadDriveFile, encryptDrivePayload, decryptDrivePayload } from './google-integration';
 import { archiveHash, validateVisitorArchive, MAX_VISITOR_ARCHIVE_BYTES, type VisitorArchive } from './visitor-drive-format';
+import { GoogleDriveWriteError } from './google-drive-errors';
 
 export type VisitorDriveConfig = { comunidade_id: number; usuario_id: number; estado: 'LOCKED'|'REVIEW'|'ACTIVE'|'PURGING'; pasta_id: string|null; arquivo_id: string|null; hash: string|null; revisao: number; verificado_em: string|null };
 export class VisitorDriveError extends Error { constructor(message: string, public status = 409) { super(message); } }
+export function visitorDriveWriteError(error: unknown) {
+  if (error instanceof VisitorDriveError) return error;
+  return error instanceof GoogleDriveWriteError
+    ? new VisitorDriveError(error.message, error.status)
+    : new VisitorDriveError('O Drive não confirmou o envio. A versão anterior foi preservada; confira a conexão e tente novamente.',503);
+}
 export function platformDB() { const db = getRuntimeEnv().DB; if (!db) throw new Error('Banco indisponível.'); return db; }
 export async function visitorDriveConfig(communityId: number) {
   try{return await platformDB().prepare('SELECT * FROM visitante_drive WHERE comunidade_id=?').bind(communityId).first<VisitorDriveConfig>();}
@@ -51,11 +58,11 @@ export async function writeArchive(config: VisitorDriveConfig, token: string, ar
   if(!config.pasta_id)throw new VisitorDriveError('Pasta do Drive não configurada.');
   await assertPrivateDrive(token,config.pasta_id);
   let file:{id:string};
-  try{file=await uploadDriveFile(token,{name:`Visitantes — versão ${config.revisao+1}.json`,type:'application/json',bytes,parentId:config.pasta_id,properties:{visitorCommunity:String(config.comunidade_id)}});}catch{throw new VisitorDriveError('O Drive não confirmou o envio. A versão anterior foi preservada; confira a conexão e tente novamente.',503);}
+  try{file=await uploadDriveFile(token,{name:`Visitantes — versão ${config.revisao+1}.json`,type:'application/json',bytes,parentId:config.pasta_id,properties:{visitorCommunity:String(config.comunidade_id)}});}catch(error){throw visitorDriveWriteError(error);}
   const candidate={...config,arquivo_id:file.id,hash:await archiveHash(text)};
   await readArchive(candidate,token); // Re-read remote bytes, not merely the upload response.
   return candidate;
 }
-export async function newVisitorFolder(token: string) {return createDriveFolder(token,'Vínkulo — Visitantes (acesso pelo aplicativo)');}
+export async function newVisitorFolder(token: string) {try{return await createDriveFolder(token,'Vínkulo — Visitantes (acesso pelo aplicativo)');}catch(error){throw visitorDriveWriteError(error);}}
 export async function sealNotes(notes: unknown) {return Buffer.from(await encryptDrivePayload(notes)).toString('base64');}
 export async function openNotes(value: string) {return value ? decryptDrivePayload<Record<string,unknown>[]>(new Uint8Array(Buffer.from(value,'base64'))) : [];}

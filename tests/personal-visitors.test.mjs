@@ -70,12 +70,13 @@ test('oficial abre aba pessoal sem receber lista do dono; storage e Drive são i
       const iv=crypto.getRandomValues(new Uint8Array(12)),cipher=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode('refresh-'+id));
       db.prepare('INSERT INTO google_connections(usuario_id,google_sub,google_email,refresh_token_ciphertext,refresh_token_iv,scopes,drive_enabled) VALUES(?,?,?,?,?,?,1)').run(id,'personal-sub-'+id,email,Buffer.from(cipher).toString('base64url'),Buffer.from(iv).toString('base64url'),'https://www.googleapis.com/auth/drive.file');
     }
-    const files=new Map();let seq=0,failRead=false,failUpload=false,beforeUpload;
+    const files=new Map();let seq=0,failRead=false,failUpload=false,quotaFull=false,beforeUpload;
     globalThis.fetch=async(input,options={})=>{
       const url=String(input);
       if(url==='https://oauth2.googleapis.com/token'){const refresh=new URLSearchParams(options.body).get('refresh_token');assert.ok(refresh===`refresh-${official}`||refresh===`refresh-${other}`);return Response.json({access_token:refresh});}
       const token=options.headers?.Authorization;
       if(url.startsWith('https://www.googleapis.com/upload/drive/v3/files')){
+        if(quotaFull)return Response.json({error:{errors:[{reason:'storageQuotaExceeded'}]}},{status:403});
         if(failUpload)return new Response('',{status:503});if(beforeUpload){const f=beforeUpload;beforeUpload=null;await f();}
         const text=new TextDecoder().decode(options.body),boundary=String(options.headers['Content-Type']).split('boundary=')[1];
         const parts=text.split('--'+boundary),payload=parts[2].split('\r\n\r\n').slice(1).join('\r\n\r\n').replace(/\r\n$/,'');
@@ -103,6 +104,10 @@ test('oficial abre aba pessoal sem receber lista do dono; storage e Drive são i
     const foreign=structuredClone(result.document);foreign.userId=other;
     assert.equal((await call(endpoint(official),'PATCH',{revision:result.document.revision,document:foreign})).status,400);
     const stale=structuredClone(result.document),updated=structuredClone(stale);savePersonalPerson(updated,{nomeCompleto:'Atualização pessoal'},1);
+    const beforeQuota=db.prepare('SELECT * FROM visitante_pessoal_storage WHERE usuario_id=? AND comunidade_id=1').get(official);
+    quotaFull=true;const quotaResponse=await call(endpoint(official),'PATCH',{revision:stale.revision,document:updated});
+    assert.equal(quotaResponse.status,507,await quotaResponse.clone().text());assert.match((await quotaResponse.json()).error,/armazenamento.*cheio/);quotaFull=false;
+    assert.deepEqual(db.prepare('SELECT * FROM visitante_pessoal_storage WHERE usuario_id=? AND comunidade_id=1').get(official),beforeQuota);
     failUpload=true;assert.equal((await call(endpoint(official),'PATCH',{revision:stale.revision,document:updated})).status,503);failUpload=false;
     assert.equal((await ok(await call(endpoint(official)+'&dados=1'))).document.people[0].nome_completo,'Pessoa exclusiva do oficial');
     result=await ok(await call(endpoint(official),'PATCH',{revision:stale.revision,document:updated}));

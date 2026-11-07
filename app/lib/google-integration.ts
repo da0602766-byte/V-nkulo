@@ -1,5 +1,6 @@
 import { getD1 } from "../../db";
 import { getRuntimeEnv } from "../../db/runtime-env";
+import { googleDriveWriteError } from "./google-drive-errors";
 
 const GOOGLE_AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
@@ -279,8 +280,9 @@ export async function createDriveFolder(accessToken: string, name: string, paren
       appProperties: { vinkuloManaged: "true" },
     }),
   });
-  const body = await response.json() as { id?: string; error?: { message?: string } };
-  if (!response.ok || !body.id) throw new Error(body.error?.message || "Não foi possível criar a pasta no Drive.");
+  if (!response.ok) throw await googleDriveWriteError(response);
+  const body = await response.json() as { id?: string };
+  if (!body.id) throw new Error("Não foi possível criar a pasta no Drive.");
   return body.id;
 }
 
@@ -324,8 +326,9 @@ export async function uploadDriveFile(
     headers: googleHeaders(accessToken, `multipart/related; boundary=${boundary}`),
     body,
   });
-  const result = await response.json() as { id?: string; name?: string; mimeType?: string; size?: string; createdTime?: string; error?: { message?: string } };
-  if (!response.ok || !result.id) throw new Error(result.error?.message || "Não foi possível guardar o arquivo no Google Drive.");
+  if (!response.ok) throw await googleDriveWriteError(response);
+  const result = await response.json() as { id?: string; name?: string; mimeType?: string; size?: string; createdTime?: string };
+  if (!result.id) throw new Error("Não foi possível guardar o arquivo no Google Drive.");
   return result as { id: string; name: string; mimeType: string; size: string; createdTime: string };
 }
 

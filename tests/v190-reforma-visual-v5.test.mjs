@@ -399,7 +399,9 @@ test("o login atual usa seus tokens de cor e respeita o tema compartilhado", asy
 
 test("o login explica como entrar, criar comunidade ou aceitar convite", async () => {
   const portal = await read("app/components/AccessPortal.tsx");
-  assert.match(portal, /Entre com seu CPF e senha/);
+  assert.match(portal, /Use o CPF vinculado à sua conta/);
+  assert.match(portal, /<CpfField\/>/);
+  assert.match(portal, /<PasswordField\/>/);
   assert.match(portal, /Quero criar uma comunidade/);
   assert.match(portal, /href="\/log1"/);
   assert.match(portal, /Abra o link enviado pela sua comunidade/);

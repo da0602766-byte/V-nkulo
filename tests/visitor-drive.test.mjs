@@ -22,18 +22,22 @@ test('Drive: migração verificada, fonte externa, isolamento, concessão/revoga
     const key=await crypto.subtle.importKey('raw',await crypto.subtle.digest('SHA-256',new TextEncoder().encode('vinkulo-google:'+env.AUTH_SECRET)),'AES-GCM',false,['encrypt']);
     const iv=crypto.getRandomValues(new Uint8Array(12)),cipher=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode('refresh-test'));
     db.prepare('INSERT INTO google_connections(usuario_id,google_sub,google_email,refresh_token_ciphertext,refresh_token_iv,scopes,drive_enabled) VALUES(?,?,?,?,?,?,1)').run(owner,'drive-test-sub','drive-owner@example.test',Buffer.from(cipher).toString('base64url'),Buffer.from(iv).toString('base64url'),'https://www.googleapis.com/auth/drive.file');
-    const files=new Map();let seq=0,failRead=false,failUpload=false,publicAccess=false,beforeUpload;
+    const files=new Map();let seq=0,failRead=false,failUpload=false,quotaFull=false,publicAccess=false,beforeUpload;
     globalThis.fetch=async(input,options={})=>{
       const url=String(input);
       if(url==='https://oauth2.googleapis.com/token')return Response.json({access_token:'access-test'});
       if(url.startsWith('https://www.googleapis.com/upload/drive/v3/files')){
+        if(quotaFull)return Response.json({error:{errors:[{reason:'storageQuotaExceeded'}]}},{status:403});
         if(failUpload)return new Response('Unavailable',{status:503});
         if(beforeUpload){const f=beforeUpload;beforeUpload=null;await f();}
         const text=new TextDecoder().decode(options.body),boundary=String(options.headers['Content-Type']).split('boundary=')[1];
         const parts=text.split('--'+boundary);const payload=parts[2].split('\r\n\r\n').slice(1).join('\r\n\r\n').replace(/\r\n$/,'');
         const id='file-'+(++seq);files.set(id,payload);return Response.json({id});
       }
-      if(url.startsWith('https://www.googleapis.com/drive/v3/files?')&&options.method==='POST'){const id='folder-'+(++seq);files.set(id,null);return Response.json({id});}
+      if(url.startsWith('https://www.googleapis.com/drive/v3/files?')&&options.method==='POST'){
+        if(quotaFull)return Response.json({error:{errors:[{reason:'storageQuotaExceeded'}]}},{status:403});
+        const id='folder-'+(++seq);files.set(id,null);return Response.json({id});
+      }
       if(url.startsWith('https://www.googleapis.com/drive/v3/files/')){
         const u=new URL(url),id=u.pathname.split('/').at(-1);
         if(!files.has(id))return new Response('',{status:404});
@@ -52,6 +56,10 @@ test('Drive: migração verificada, fonte externa, isolamento, concessão/revoga
     const callback=await worker.fetch(new Request('https://localhost/api/auth/google/callback?error=access_denied&state='+encodeURIComponent(authUrl.searchParams.get('state')),{headers:{cookie:authResponse.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ')}}),env,ctx);
     assert.match(callback.headers.get('location'),/visitantes\?section=armazenamento/);
     // Refuse a corrupted upload/read; preserve the source and resumable lock.
+    quotaFull=true;
+    const fullPreparation=await storage('prepare');assert.equal(fullPreparation.status,507,await fullPreparation.clone().text());
+    assert.match((await fullPreparation.json()).error,/armazenamento.*cheio/);
+    assert.equal(db.prepare('SELECT count(*) n FROM visitantes WHERE comunidade_id=1').get().n,1);quotaFull=false;
     failRead=true;assert.equal((await storage('prepare')).status,503);assert.equal(db.prepare('SELECT count(*) n FROM visitantes WHERE comunidade_id=1').get().n,1);
     assert.throws(()=>db.prepare("UPDATE visitantes SET nome_completo='Perda' WHERE id=?").run(id),/VISITOR_DRIVE_REQUIRED/);
     failRead=false;let prepared=await ok(await storage('prepare'));assert.equal(prepared.counts.visitantes,1);
@@ -100,7 +108,23 @@ test('Drive: migração verificada, fonte externa, isolamento, concessão/revoga
     await ok(await storage('restore',{archive:backupBefore,revision:state.revision,confirmation:'RESTAURAR BACKUP'}));
     page=await ok(await call('/api/pilot/visitantes/pagina'));assert.equal(page.visitantes[0].nome_completo,'Pessoa com histórico');
     const history=await ok(await call(`/api/pilot/acompanhamentos?visitanteId=${id}`));assert.equal(history.acompanhamentos[0].resultado,'Contato preservado');
-    const category=await call('/api/pilot/visitante-categorias','POST',{nome:'Categoria Drive',icone:'◎',cor:'#7357e8'});assert.equal(category.status,201,await category.clone().text());const categoryId=(await category.json()).id;
+    const categoryBody={nome:'Categoria Drive',descricao:'Descrição com acentos',responsavelUsuarioId:owner,icone:'◎',cor:'#7357e8'};
+    const beforeQuota=db.prepare('SELECT arquivo_id,hash,revisao FROM visitante_drive WHERE comunidade_id=1').get();
+    const filesBefore=files.size;
+    quotaFull=true;
+    const rejected=await call('/api/pilot/visitante-categorias','POST',categoryBody);
+    assert.equal(rejected.status,507,await rejected.clone().text());assert.match((await rejected.json()).error,/armazenamento.*cheio/);
+    assert.deepEqual(db.prepare('SELECT arquivo_id,hash,revisao FROM visitante_drive WHERE comunidade_id=1').get(),beforeQuota);
+    assert.equal(files.size,filesBefore);assert.equal((await ok(await call('/api/pilot/visitante-categorias'))).categorias.some(c=>c.nome===categoryBody.nome),false);
+    quotaFull=false;
+    const category=await call('/api/pilot/visitante-categorias','POST',categoryBody);assert.equal(category.status,201,await category.clone().text());const categoryId=(await category.json()).id;
+    quotaFull=true;
+    for(const [method,body] of [['PATCH',{nome:'Renomeada',icone:'◎',cor:'#7357e8'}],['DELETE',undefined]]){
+      const r=await call(`/api/pilot/visitante-categorias/${categoryId}`,method,body);
+      assert.equal(r.status,507,await r.clone().text());assert.match((await r.json()).error,/armazenamento.*cheio/);
+    }
+    assert.equal((await ok(await call('/api/pilot/visitante-categorias'))).categorias.find(c=>c.id===categoryId).nome,categoryBody.nome);
+    quotaFull=false;
     const custom=await call('/api/pilot/visitantes/campos','POST',{campos:[{nome:'Observação adicional',tipo:'TEXTO'}]});assert.equal(custom.status,201,await custom.clone().text());const fieldId=(await custom.json()).campos[0].id;
     const imported=await call('/api/pilot/visitantes','POST',{nomeCompleto:'Importação de planilha',dataEntrada:'2026-10-01',categoriaId:categoryId,camposPersonalizados:{[fieldId]:'Zeros 001 e acentos ç ã'}});assert.equal(imported.status,201,await imported.clone().text());
     const exported=await ok(await call('/api/pilot/visitantes/exportar'));assert.ok(exported.rows.some(r=>r['Observação adicional']==='Zeros 001 e acentos ç ã'));

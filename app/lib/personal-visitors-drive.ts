@@ -1,5 +1,5 @@
 import {createDriveFolder,getDriveAccessToken,uploadDriveFile} from './google-integration';
-import {assertPrivateDrive,platformDB,VisitorDriveError} from './visitor-drive-store';
+import {assertPrivateDrive,platformDB,VisitorDriveError,visitorDriveWriteError} from './visitor-drive-store';
 import {archiveHash} from './visitor-drive-format';
 import {PERSONAL_MAX_BYTES,validatePersonalVisitors,type PersonalVisitors} from './personal-visitors';
 export type PersonalStorage={usuario_id:number;comunidade_id:number;provider:'LOCAL'|'GOOGLE_DRIVE';revisao:number;pasta_id:string|null;arquivo_id:string|null;hash:string|null};
@@ -27,10 +27,12 @@ export async function readPersonalDrive(c:PersonalStorage,token:string){
 }
 export async function writePersonalDrive(c:PersonalStorage,doc:PersonalVisitors,token:string){
   validatePersonalVisitors(doc,c.usuario_id,c.comunidade_id);
-  const folder=c.pasta_id||await createDriveFolder(token,'Vínkulo — Meus visitantes');
-  await privateFile(token,folder);
-  const text=JSON.stringify(doc),file=await uploadDriveFile(token,{name:`Meus visitantes — versão ${doc.revision}.json`,type:'application/json',bytes:new TextEncoder().encode(text),parentId:folder,properties:{personalVisitorOwner:String(c.usuario_id),personalVisitorCommunity:String(c.comunidade_id)}});
-  const candidate={...c,pasta_id:folder,arquivo_id:file.id,hash:await archiveHash(text),revisao:doc.revision};
-  await readPersonalDrive(candidate,token);
-  return candidate;
+  try {
+    const folder=c.pasta_id||await createDriveFolder(token,'Vínkulo — Meus visitantes');
+    await privateFile(token,folder);
+    const text=JSON.stringify(doc),file=await uploadDriveFile(token,{name:`Meus visitantes — versão ${doc.revision}.json`,type:'application/json',bytes:new TextEncoder().encode(text),parentId:folder,properties:{personalVisitorOwner:String(c.usuario_id),personalVisitorCommunity:String(c.comunidade_id)}});
+    const candidate={...c,pasta_id:folder,arquivo_id:file.id,hash:await archiveHash(text),revisao:doc.revision};
+    await readPersonalDrive(candidate,token);
+    return candidate;
+  } catch(error) {throw visitorDriveWriteError(error);}
 }
