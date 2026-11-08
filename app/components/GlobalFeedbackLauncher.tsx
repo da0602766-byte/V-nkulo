@@ -44,7 +44,7 @@ const REPORT_CATEGORIES = [
 
 export default function GlobalFeedbackLauncher() {
   const pathname = usePathname();
-  const helpLivesInMenu = pathname === "/painel" || pathname.startsWith("/painel/");
+  const helpLivesInMenu = pathname === "/login" || pathname === "/painel" || pathname.startsWith("/painel/");
   const [menuOpen, setMenuOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [type, setType] = useState<FeedbackType | null>(null);

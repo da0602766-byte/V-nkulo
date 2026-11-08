@@ -6,7 +6,7 @@ migração nova, leia isto.
 
 ## Próximo número livre
 
-**`0095`**. Use o próximo inteiro disponível a partir daí — não reaproveite
+**`0096`**. Use o próximo inteiro disponível a partir daí — não reaproveite
 um número já usado, mesmo que o arquivo tenha sido escrito à mão.
 
 `0094_parking_scene.sql`: cenários 3D com rascunho/publicação, histórico e vínculo estável com vagas e setores. Aditiva; não altera reservas nem publica desenhos automaticamente.

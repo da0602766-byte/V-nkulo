@@ -1,6 +1,6 @@
 // Closed inventory: new tables require a recovery review, even when empty.
 export const DATA_TABLES = new Set(`
-acessos_painel_pastoral acompanhamentos agenda_compromissos assinaturas_comunidade
+acessos_painel_pastoral acompanhamentos agenda_compromissos agenda_tarefas assinaturas_comunidade
 auditoria_piloto aviso_comentarios aviso_reacoes avisos avisos_promocao blocos_texto
 celula_agenda celula_relatorios celula_solicitacoes celulas comentarios_publicacao
 comunidades confirmacoes_evento conversas_privadas culto_lancamentos culto_rotinas

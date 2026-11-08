@@ -679,8 +679,8 @@ test("relógios da agenda e do ministério atual são inicializados no cliente",
     readFile(new URL("../app/components/DayThreadWorkspace.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(thread, /const \[agora, setAgora\] = useState\(0\)/);
-  assert.match(agenda, /const \[hojeChave, setHojeChave\] = useState\(""\)/);
-  assert.doesNotMatch(agenda, /const hojeChave = chaveDia\(new Date\(\)\)/);
+  assert.match(agenda, /const \[today,setToday\]=useState\(''\)/);
+  assert.match(agenda, /setNow\(Date.now\(\)\);setToday\(calendarDay\(new Date\(\)\)\)/);
   assert.match(ministry, /const \[agora, setAgora\] = useState\(0\)/);
   assert.match(ministry, /setAgora\(Date.now\(\)\)/);
   assert.match(ministry, /agora > 0/);

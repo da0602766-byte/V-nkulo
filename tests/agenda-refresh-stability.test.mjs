@@ -26,11 +26,11 @@ function harness() {
   const exports = {};
   const source = readFileSync(new URL('../app/components/AgendaCalendar.tsx', import.meta.url), 'utf8');
   runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
-    exports, Date, Map, AbortController, Error,
+    exports, Date, Map, Set, Intl, AbortController, Error,
     document: { visibilityState: "visible", addEventListener() {}, removeEventListener() {} },
-    window: { addEventListener() {}, removeEventListener() {}, setTimeout(fn) { timers.push(fn); return timers.length; }, clearTimeout() {}, setInterval() { return 1; }, clearInterval() {} },
+    window: { matchMedia(){return {matches:false};}, addEventListener() {}, removeEventListener() {}, setTimeout(fn) { timers.push(fn); return timers.length; }, clearTimeout() {}, setInterval() { return 1; }, clearInterval() {} },
     fetch: (url, options) => new Promise((resolve, reject) => requests.push({ url, options, resolve, reject })),
-    require(name) { if (name === '../lib/agenda-request') return requestModule; if (name === './AgendaDialog') return {default: function AgendaDialog() {}}; if (name === 'react') return hooks; if (name === 'react/jsx-runtime') return jsx; if (name.endsWith('.css')) return { default: {} }; if (name === './TransientFeedback') return { default: () => null }; throw new Error(name); },
+    require(name) { if (name === '../lib/calendar-management') {const helpers={};runInNewContext(ts.transpileModule(readFileSync(new URL('../app/lib/calendar-management.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:helpers,Date,Set});return helpers;} if (name === '../lib/agenda-request') return requestModule; if (name === './AgendaDialog') return {default: function AgendaDialog() {}}; if (name === 'react') return hooks; if (name === 'react/jsx-runtime') return jsx; if (name.endsWith('.css')) return { default: {} }; if (name === './TransientFeedback') return { default: () => null }; throw new Error(name); },
   });
   return { requests, render(revision = 0) { cursor = 0; return exports.default({ podeVerEventos: true, podeAprovar: false, atualizacao: revision }); }, flush() { for (const fn of effects.splice(0)) fn(); for (const fn of timers.splice(0)) fn(); } };
 }
@@ -39,68 +39,41 @@ function nodes(node) {
   if (!node || typeof node !== 'object') return [];
   return [node, ...nodes(node.props?.children)];
 }
-const panel = tree => nodes(tree).find(n => n.props?.['aria-label'] === 'Planejar dia selecionado');
-const grid = tree => nodes(tree).find(n => n.props?.className === 'agenda-grade');
-const settle = () => new Promise(resolve => setImmediate(resolve));
-const respond = async (request, status = 200) => {
-  request.resolve(Response.json(status === 200 ? { itens: [] } : { error: 'Falha de consulta' }, { status }));
-  await settle();
-};
 
-test('agenda: repeated background refreshes keep the selected-day panel mounted and the grid ready', async () => {
-  const f = harness();
-  f.render(); f.flush();
-  await respond(f.requests.at(-1));
-  let tree = f.render();
-  nodes(tree).find(n => n.type === 'button' && n.props?.className?.startsWith('agenda-dia')).props.onClick();
-  tree = f.render();
-  const title = nodes(panel(tree)).find(n => n.type === 'strong').props.children;
-  for (let revision = 1; revision <= 4; revision++) {
-    f.render(revision); f.flush();
-    tree = f.render(revision);
-    assert.ok(panel(tree), 'the panel must remain during a pending refresh');
-    assert.equal(grid(tree).props['aria-busy'], false);
-    assert.equal(nodes(panel(tree)).find(n => n.type === 'strong').props.children, title);
-    await respond(f.requests.at(-1));
-    assert.ok(panel(f.render(revision)));
+const panel=tree=>nodes(tree).find(n=>n.props?.className==='vp-side-form');
+const grid=tree=>nodes(tree).find(n=>n.props?.className==='vp-calendar-main');
+const task={id:'tarefa-1',camada:'TAREFA',origemId:1,titulo:'Pendência particular',descricao:'Texto preservado',iniciaEm:null,terminaEm:null,status:'PLANEJADO',prioridade:'P2',responsavelId:7,responsavel:'Pessoa de teste',versao:1,podeEditar:true,local:'',diaInteiro:false};
+const settle=()=>new Promise(resolve=>setImmediate(resolve));
+async function respond(f,status=200){
+  for(let turn=0;turn<4;turn++){
+    const pending=f.requests.filter(request=>!request.answered);if(!pending.length)break;
+    for(const request of pending){request.answered=true;request.resolve(Response.json(status===200?(request.url.includes('/tarefas')?{itens:[task],responsaveis:[{id:7,nome:'Pessoa de teste'}],usuarioId:7,limitado:false}:{itens:[]}):{error:'Falha de consulta'},{status}));}
+    await settle();
   }
-  nodes(tree).find(n => n.type?.name === 'AgendaDialog').props.onClose();
-  assert.equal(panel(f.render(4)), undefined, 'explicit close still works');
+}
+const click=(tree,label)=>nodes(tree).find(n=>n.props?.['aria-label']===label).props.onClick();
+test('calendar refresh keeps an unsaved editor and its data mounted across background requests',async()=>{
+ const f=harness();f.render();f.flush();await respond(f);let tree=f.render();
+ nodes(tree).find(n=>n.props?.className==='vp-backlog-title').props.onClick();tree=f.render();
+ const title=nodes(panel(tree)).find(n=>n.props?.name==='titulo');title.props.onChange({target:{value:'Edição não salva'}});
+ for(let revision=1;revision<=4;revision++){f.render(revision);f.flush();tree=f.render(revision);assert.ok(panel(tree));assert.equal(grid(tree).props['aria-busy'],false);assert.equal(nodes(panel(tree)).find(n=>n.props?.name==='titulo').props.value,'Edição não salva');await respond(f);}
+ click(f.render(4),'Fechar detalhes');assert.equal(panel(f.render(4)),undefined);
 });
-
-test('agenda: transient refresh failure preserves the calendar; revoked access clears it without hiding selection', async () => {
-  const f = harness();
-  f.render(); f.flush(); await respond(f.requests.at(-1));
-  let tree = f.render();
-  nodes(tree).find(n => n.type === 'button' && n.props?.className?.startsWith('agenda-dia')).props.onClick();
-  f.render(1); f.flush(); await respond(f.requests.at(-1), 503); await respond(f.requests.at(-1), 503);
-  tree = f.render(1);
-  assert.ok(panel(tree)); assert.ok(grid(tree));
-  assert.ok(nodes(panel(tree)).some(n => n.props?.children === 'Última consulta exibida; não foi possível atualizar.'));
-  f.render(2); f.flush(); await respond(f.requests.at(-1), 401);
-  tree = f.render(2);
-  assert.ok(panel(tree)); assert.equal(grid(tree), undefined);
+test('calendar temporary refresh errors preserve data; revoked access clears private items and editor',async()=>{
+ const f=harness();f.render();f.flush();await respond(f);let tree=f.render();nodes(tree).find(n=>n.props?.className==='vp-backlog-title').props.onClick();
+ f.render(1);f.flush();await respond(f,503);tree=f.render(1);assert.ok(panel(tree));assert.ok(nodes(tree).some(n=>n.props?.role==='alert'));assert.equal(grid(tree).props['aria-busy'],false);
+ f.render(2);f.flush();await respond(f,401);tree=f.render(2);assert.equal(panel(tree),undefined);assert.equal(nodes(tree).some(n=>n.props?.className==='vp-backlog-title'),false);
 });
-
-test('agenda: changing period still loads fresh data and ignores an aborted response', async () => {
-  const f = harness(); f.render(); f.flush(); await respond(f.requests.at(-1));
-  let tree = f.render(1); f.flush(); const previous = f.requests.at(-1);
-  nodes(tree).find(n => n.props?.['aria-label'] === 'Próximo período').props.onClick();
-  f.render(1); f.flush(); tree = f.render(1);
-  assert.equal(previous.options.signal.aborted, true);
-  assert.equal(grid(tree).props['aria-busy'], true);
-  await respond(previous); assert.equal(grid(f.render(1)).props['aria-busy'], true);
-  await respond(f.requests.at(-1)); assert.equal(grid(f.render(1)).props['aria-busy'], false);
+test('calendar range changes abort previous requests and ignore their late responses',async()=>{
+ const f=harness();f.render();f.flush();await respond(f);f.render(1);f.flush();const previous=f.requests.slice(-2);
+ click(f.render(1),'Próximo período');f.render(1);f.flush();assert.ok(previous.every(request=>request.options.signal.aborted));assert.equal(grid(f.render(1)).props['aria-busy'],true);
+ for(const request of previous){request.answered=true;request.resolve(Response.json({itens:[]}));}await settle();assert.equal(grid(f.render(1)).props['aria-busy'],true);
+ await respond(f);assert.equal(grid(f.render(1)).props['aria-busy'],false);
 });
-
- test('agenda: selecting a date opens the card and prefills the appointment without top create buttons', async () => {
-  const f=harness(); f.render(); f.flush(); await respond(f.requests.at(-1)); let tree=f.render();
-  assert.equal(nodes(tree).some(n=>n.props?.className==='agenda-novo'),false);
-  const day=nodes(tree).find(n=>n.type==='button'&&n.props?.className?.startsWith('agenda-dia'));
-  day.props.onClick(); tree=f.render(); assert.ok(nodes(tree).some(n=>n.type?.name==='AgendaDialog'));
-  const action=nodes(tree).find(n=>n.type==='button'&&nodes(n).some(c=>c.type==='b'&&c.props.children==='＋ Novo compromisso'));
-  action.props.onClick(); tree=f.render(); const input=nodes(tree).find(n=>n.props?.name==='iniciaEm');
-  assert.ok(input.props.defaultValue.endsWith('T09:00'));
-  assert.equal(input.props.defaultValue.slice(0,10),day.key);
-  assert.equal(nodes(tree).some(n=>n.props?.children==='＋ Criar evento'),false,'members cannot create community events');
+test('calendar offers four modes, keyboard scheduling and a real unscheduled task form',async()=>{
+ const f=harness();f.render();f.flush();await respond(f);let tree=f.render();
+ assert.deepEqual(nodes(tree).filter(n=>n.type==='button'&&['Mês','Semana','Dia','Agenda'].includes(n.props.children)).map(n=>n.props.children),['Mês','Semana','Dia','Agenda']);
+ nodes(tree).find(n=>n.props?.className==='vp-button vp-primary vp-new').props.onClick();tree=f.render();assert.ok(panel(tree));assert.equal(nodes(tree).find(n=>n.props?.name==='iniciaEm').props.value,'');assert.equal(nodes(tree).find(n=>n.props?.name==='iniciaEm').props.required,false);
+ assert.equal(nodes(tree).some(n=>n.props?.children==='Criar evento da comunidade ↗'),false);
+ click(tree,'Fechar detalhes');tree=f.render();nodes(tree).find(n=>n.props?.children==='Agendar →').props.onClick();tree=f.render();assert.match(nodes(tree).find(n=>n.props?.name==='iniciaEm').props.value,/T09:00$/);
 });

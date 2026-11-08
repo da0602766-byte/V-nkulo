@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const AREAS: Record<string, [string, string, string]> = {
   inicio: ["Dia a dia", "Mural", "Acompanhe publicações, comunicados e encontros da sua comunidade."],
@@ -25,11 +25,18 @@ const AREAS: Record<string, [string, string, string]> = {
 
 export default function WorkspaceOrientation({ area, community }: { area: string; community: string }) {
   const [help, setHelp] = useState(false);
+  const [introOpen, setIntroOpen] = useState(true);
+  useEffect(() => {
+    const sync = (event: Event) => setIntroOpen((event as CustomEvent<{open:boolean}>).detail.open);
+    window.addEventListener("vinkulo:mural-intro-state", sync);
+    return () => window.removeEventListener("vinkulo:mural-intro-state", sync);
+  }, []);
   const info = AREAS[area];
   if (!info) return null;
   return <div className="workspace-orientation">
     <div className="workspace-breadcrumb" aria-label="Localização atual"><span title={community}>{community}</span><span aria-hidden="true">/</span><span>{info[0]}</span><span aria-hidden="true">/</span><strong>{info[1]}</strong></div>
-    <button type="button" aria-expanded={help} aria-controls={`workspace-guide-${area}`} onClick={() => setHelp(!help)}>Sobre esta área <span aria-hidden="true">{help ? "−" : "+"}</span></button>
+    <div style={{display:"flex",alignItems:"center",gap:4,marginLeft:"auto"}}><button type="button" aria-expanded={help} aria-controls={`workspace-guide-${area}`} onClick={() => setHelp(!help)}>Sobre esta área <span aria-hidden="true">{help ? "−" : "+"}</span></button>
+    {area === "inicio" && <button type="button" style={{minWidth:44,minHeight:44,fontSize:20}} aria-label={introOpen ? "Recolher apresentação da comunidade" : "Mostrar apresentação da comunidade"} aria-expanded={introOpen} aria-controls="community-mural-intro" onClick={() => window.dispatchEvent(new Event("vinkulo:toggle-mural-intro"))}>−</button>}</div>
     {help && <p id={`workspace-guide-${area}`} className="workspace-area-help">{info[2]}</p>}
   </div>;
 }

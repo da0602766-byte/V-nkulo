@@ -1,6 +1,7 @@
 import { getD1 } from "../../../../db";
 import { requireTenantPermission } from "../../../lib/tenant";
 import { notifyUser } from "../../../lib/pilot-notifications";
+import { hasCalendarConflict } from "../../../lib/calendar-conflict";
 
 // A agenda é uma leitura só: várias fontes que já existem no banco viram
 // camadas de um mesmo calendário. Só os compromissos pessoais nascem aqui.
@@ -31,6 +32,10 @@ type ItemAgenda = {
   visibilidade?: "PRIVADO" | "PUBLICO";
   meu?: boolean;
   aprovacaoStatus?: "PENDENTE" | "APROVADA";
+  responsavelId?: number;
+  responsavel?: string;
+  versao?: number;
+  podeEditar?: boolean;
 };
 
 function janela(url: URL) {
@@ -66,11 +71,11 @@ export async function GET(request: Request) {
         `SELECT id, titulo, descricao, categoria, inicia_em, termina_em, local, status
          FROM eventos_comunidade
          WHERE comunidade_id = ?
-           AND datetime(inicia_em) BETWEEN datetime(?) AND datetime(?)
+           AND (datetime(inicia_em) BETWEEN datetime(?) AND datetime(?) OR (datetime(inicia_em)<datetime(?) AND datetime(termina_em)>datetime(?)))
          ORDER BY datetime(inicia_em) ASC
          LIMIT ?`,
       )
-      .bind(comunidadeId, de, ate, MAX_COMPROMISSOS)
+      .bind(comunidadeId, de, ate, de, de, MAX_COMPROMISSOS)
       .all<{
         id: number; titulo: string; descricao: string; categoria: string;
         inicia_em: string; termina_em: string | null; local: string; status: string;
@@ -98,15 +103,15 @@ export async function GET(request: Request) {
       `SELECT e.id, e.titulo, e.inicia_em, e.termina_em, e.local,
         d.funcao, d.status AS resposta
        FROM escala_designacoes d
-       JOIN escalas_ministerio e ON e.id = d.escala_id
+       JOIN escalas_ministerio e ON e.id = d.escala_id AND e.comunidade_id = d.comunidade_id
        WHERE d.comunidade_id = ?
          AND d.usuario_id = ?
          AND d.ativo = 1
-         AND datetime(e.inicia_em) BETWEEN datetime(?) AND datetime(?)
+         AND (datetime(e.inicia_em) BETWEEN datetime(?) AND datetime(?) OR (datetime(e.inicia_em)<datetime(?) AND datetime(e.termina_em)>datetime(?)))
        ORDER BY datetime(e.inicia_em) ASC
        LIMIT ?`,
     )
-    .bind(comunidadeId, userId, de, ate, MAX_COMPROMISSOS)
+    .bind(comunidadeId, userId, de, ate, de, de, MAX_COMPROMISSOS)
     .all<{
       id: number; titulo: string; inicia_em: string; termina_em: string | null;
       local: string; funcao: string; resposta: string;
@@ -124,6 +129,8 @@ export async function GET(request: Request) {
       diaInteiro: false,
       status: linha.resposta,
       origemId: linha.id,
+      responsavelId: userId,
+      responsavel: access.user.nome,
     });
   }
 
@@ -133,23 +140,24 @@ export async function GET(request: Request) {
     .prepare(
       `SELECT c.id, c.titulo, c.descricao, c.categoria, c.inicia_em, c.termina_em,
         c.local, c.dia_inteiro, c.concluido, c.visibilidade, c.usuario_id,
-        c.aprovacao_status,
+        c.aprovacao_status, c.versao,
         u.nome AS autor
        FROM agenda_compromissos c
        JOIN usuarios u ON u.id = c.usuario_id
        WHERE c.comunidade_id = ?
-         AND (c.usuario_id = ? OR (c.visibilidade = 'PUBLICO' AND c.aprovacao_status = 'APROVADA') OR ? = 1)
-         AND datetime(c.inicia_em) BETWEEN datetime(?) AND datetime(?)
+         AND (c.usuario_id = ? OR (c.visibilidade = 'PUBLICO' AND (c.aprovacao_status = 'APROVADA' OR ? = 1)))
+         AND (datetime(c.inicia_em) BETWEEN datetime(?) AND datetime(?) OR (datetime(c.inicia_em)<datetime(?) AND datetime(c.termina_em)>datetime(?)))
        ORDER BY datetime(c.inicia_em) ASC
        LIMIT ?`,
     )
-    .bind(comunidadeId, userId, permissions.includes("events.manage") ? 1 : 0, de, ate, MAX_COMPROMISSOS)
+    .bind(comunidadeId, userId, permissions.includes("events.manage") ? 1 : 0, de, ate, de, de, MAX_COMPROMISSOS)
     .all<{
       id: number; titulo: string; descricao: string; categoria: string;
       inicia_em: string; termina_em: string | null; local: string;
       dia_inteiro: number; concluido: number; visibilidade: string;
       usuario_id: number; autor: string;
       aprovacao_status: string;
+      versao: number;
     }>();
   for (const linha of pessoais.results || []) {
     const meu = linha.usuario_id === userId;
@@ -168,6 +176,10 @@ export async function GET(request: Request) {
       status: linha.concluido ? "CONCLUIDO" : "ABERTO",
       origemId: linha.id,
       visibilidade: linha.visibilidade === "PUBLICO" ? "PUBLICO" : "PRIVADO",
+      responsavelId: linha.usuario_id,
+      responsavel: linha.autor,
+      versao: linha.versao,
+      podeEditar: meu,
       meu,
       aprovacaoStatus: linha.aprovacao_status === "PENDENTE" ? "PENDENTE" : "APROVADA",
     });
@@ -189,6 +201,8 @@ export async function POST(request: Request) {
     return Response.json({ error: "Envio inválido." }, { status: 400 });
   }
 
+  if (!corpo || typeof corpo !== 'object' || Array.isArray(corpo)) return Response.json({error:"Envio inválido."},{status:400});
+
   const titulo = String(corpo.titulo || "").trim().slice(0, 140);
   const iniciaEm = String(corpo.iniciaEm || "").trim();
   if (!titulo) {
@@ -208,6 +222,7 @@ export async function POST(request: Request) {
 
   const db = getD1();
   const publico = corpo.visibilidade === "PUBLICO";
+  if (corpo.aceitarConflito !== true && await hasCalendarConflict(db,comunidadeId,userId,iniciaEm,terminaEmBruto||null,'PESSOAL')) return Response.json({error:"Você já tem um compromisso nesse horário. Confirme a sobreposição para continuar.",conflito:true},{status:409});
   const canApprove = access.context.permissions.includes("events.manage") || access.user.system_owner === true;
   const approvalStatus = publico && !canApprove ? "PENDENTE" : "APROVADA";
   const criado = await db
@@ -254,10 +269,28 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   const access = await requireTenantPermission("dashboard.view");
   if ("error" in access) return access.error;
+  let body: Record<string, unknown>;
+  try { body = await request.json() as Record<string, unknown>; }
+  catch { return Response.json({ error: "Envio inválido." }, { status: 400 }); }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return Response.json({error:"Envio inválido."},{status:400});
+  if (body.acao === "EDITAR") {
+    const id = Number(body.id), versao = Number(body.versao);
+    if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(versao) || versao < 1) return Response.json({ error: "Registro ou versão inválida." }, { status: 400 });
+    const db = getD1();
+    const item = await db.prepare("SELECT id, versao, visibilidade, aprovacao_status FROM agenda_compromissos WHERE id=? AND comunidade_id=? AND usuario_id=?").bind(id, access.context.comunidadeId, access.context.userId).first<{id:number;versao:number;visibilidade:string;aprovacao_status:string}>();
+    if (!item) return Response.json({ error: "Compromisso não encontrado." }, { status: 404 });
+    const titulo=String(body.titulo||'').trim(), inicio=String(body.iniciaEm||''), fim=String(body.terminaEm||'');
+    if (!titulo || titulo.length>140 || !Number.isFinite(Date.parse(inicio)) || (fim && (!Number.isFinite(Date.parse(fim)) || Date.parse(fim)<=Date.parse(inicio)))) return Response.json({error:"Revise o título e as datas."},{status:400});
+    if (item.versao!==versao) return Response.json({error:"Este compromisso mudou em outra sessão. Atualize antes de salvar."},{status:409});
+    if (body.status !== 'CONCLUIDO' && body.aceitarConflito !== true && await hasCalendarConflict(db,access.context.comunidadeId,access.context.userId,inicio,fim||null,'PESSOAL',id)) return Response.json({error:"Você já tem um compromisso nesse horário. Confirme a sobreposição para continuar.",conflito:true},{status:409});
+    const canPublish=access.context.permissions.includes("events.manage") || access.user.system_owner===true;
+    const result=await db.prepare("UPDATE agenda_compromissos SET titulo=?,descricao=?,inicia_em=?,termina_em=?,local=?,concluido=?,aprovacao_status=CASE WHEN visibilidade=\'PUBLICO\' AND ?=0 THEN \'PENDENTE\' ELSE aprovacao_status END,aprovado_por=CASE WHEN visibilidade=\'PUBLICO\' AND ?=0 THEN NULL ELSE aprovado_por END,aprovado_em=CASE WHEN visibilidade=\'PUBLICO\' AND ?=0 THEN NULL ELSE aprovado_em END,versao=versao+1,atualizado_em=CURRENT_TIMESTAMP WHERE id=? AND comunidade_id=? AND usuario_id=? AND versao=? RETURNING versao").bind(titulo,String(body.descricao||'').trim().slice(0,1000),new Date(inicio).toISOString(),fim?new Date(fim).toISOString():null,String(body.local||'').trim().slice(0,180),body.status==='CONCLUIDO'?1:0,canPublish?1:0,canPublish?1:0,canPublish?1:0,id,access.context.comunidadeId,access.context.userId,versao).first<{versao:number}>();
+    if(!result)return Response.json({error:"Este compromisso mudou. Atualize antes de salvar."},{status:409});
+    return Response.json({...result,message:"Compromisso salvo."});
+  }
   if (!access.context.permissions.includes("events.manage") && access.user.system_owner !== true) {
     return Response.json({ error: "Somente o responsável da comunidade pode aprovar." }, { status: 403 });
   }
-  const body = await request.json() as Record<string, unknown>;
   const id = Number(body.id || 0);
   if (!Number.isInteger(id) || id <= 0 || String(body.acao || "").toUpperCase() !== "APROVAR") {
     return Response.json({ error: "Ação inválida." }, { status: 400 });
@@ -265,7 +298,7 @@ export async function PATCH(request: Request) {
   const db = getD1();
   const item = await db.prepare("SELECT usuario_id, titulo FROM agenda_compromissos WHERE id = ? AND comunidade_id = ? AND aprovacao_status = 'PENDENTE'").bind(id, access.context.comunidadeId).first<{ usuario_id:number; titulo:string }>();
   if (!item) return Response.json({ error: "Solicitação não encontrada." }, { status: 404 });
-  await db.prepare("UPDATE agenda_compromissos SET aprovacao_status = 'APROVADA', aprovado_por = ?, aprovado_em = CURRENT_TIMESTAMP, atualizado_em = CURRENT_TIMESTAMP WHERE id = ? AND comunidade_id = ?").bind(access.user.id, id, access.context.comunidadeId).run();
+  await db.prepare("UPDATE agenda_compromissos SET aprovacao_status = 'APROVADA', aprovado_por = ?, aprovado_em = CURRENT_TIMESTAMP, versao = versao+1, atualizado_em = CURRENT_TIMESTAMP WHERE id = ? AND comunidade_id = ?").bind(access.user.id, id, access.context.comunidadeId).run();
   if (item.usuario_id !== access.user.id) await notifyUser(db, { userId:item.usuario_id, title:"Compromisso aprovado", message:`“${item.titulo}” foi liberado na agenda da comunidade.`, entityId:id, destination:"/painel?view=eventos", createdBy:"VÍNKULO" });
   return Response.json({ ok:true });
 }

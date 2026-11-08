@@ -1,556 +1,188 @@
 "use client";
+import {useCallback,useEffect,useMemo,useRef,useState,type CSSProperties,type FormEvent,type ReactNode} from 'react';
+import {readAgendaJson,AgendaRequestError,agendaErrorMessage} from '../lib/agenda-request';
+import {calendarDay,calendarLocalInput,calendarEnd,calendarConflicts,calendarNormalize,TASK_STATUSES,SOURCE_LABELS,type CalendarItem,type CalendarTaskStatus} from '../lib/calendar-management';
+import './management-calendar.css';
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import styles from "./EventsAgenda.module.css";
-import TransientFeedback from "./TransientFeedback";
-import AgendaDialog from "./AgendaDialog";
-import { readAgendaJson, AgendaRequestError, agendaErrorMessage } from "../lib/agenda-request";
-
-type Camada = "EVENTO" | "ESCALA" | "PESSOAL";
-
-type ItemAgenda = {
-  id: string;
-  camada: Camada;
-  titulo: string;
-  descricao: string;
-  categoria: string;
-  iniciaEm: string;
-  terminaEm: string | null;
-  local: string;
-  diaInteiro: boolean;
-  status: string;
-  origemId: number;
-  visibilidade?: "PRIVADO" | "PUBLICO";
-  meu?: boolean;
-  aprovacaoStatus?: "PENDENTE" | "APROVADA";
-};
-
-type Visao = "dia" | "semana" | "mes";
-
-const CAMADAS: { id: Camada; rotulo: string; ajuda: string }[] = [
-  { id: "EVENTO", rotulo: "Cultos e eventos", ajuda: "Programação publicada pela comunidade" },
-  { id: "ESCALA", rotulo: "Minhas escalas", ajuda: "Onde você foi designado para servir" },
-  { id: "PESSOAL", rotulo: "Meus compromissos", ajuda: "O que você mesmo marcou" },
-];
-
-const CATEGORIAS_PESSOAIS = [
-  { valor: "PESSOAL", rotulo: "Pessoal" },
-  { valor: "VISITA", rotulo: "Visita" },
-  { valor: "PREPARO", rotulo: "Preparo" },
-  { valor: "REUNIAO", rotulo: "Reunião" },
-  { valor: "META", rotulo: "Meta" },
-];
-
-const DIAS_CURTOS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
-
-function inicioDoDia(data: Date) {
-  return new Date(data.getFullYear(), data.getMonth(), data.getDate());
+type Mode='mes'|'semana'|'dia'|'agenda';
+type Owner={id:number;nome:string};
+type Draft={kind:'TAREFA'|'PESSOAL';titulo:string;descricao:string;iniciaEm:string;terminaEm:string;prazoEm:string;prioridade:string;status:string;responsavelId:string;visibilidade:string;motivoBloqueio:string;local:string};
+const days=['dom','seg','ter','qua','qui','sex','sáb'];
+const formatDay=(date:Date)=>date.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
+const time=(value:string)=>new Date(value).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+const dayStart=(date:Date)=>new Date(date.getFullYear(),date.getMonth(),date.getDate());
+const nextDay=(date:Date,delta=1)=>new Date(date.getFullYear(),date.getMonth(),date.getDate()+delta);
+function period(date:Date,mode:Mode){
+  if(mode==='dia')return [dayStart(date)];
+  if(mode==='semana'){const first=nextDay(date,-date.getDay());return Array.from({length:7},(_,i)=>nextDay(first,i));}
+  const first=new Date(date.getFullYear(),date.getMonth(),1);
+  const start=mode==='mes'?nextDay(first,-first.getDay()):first;
+  const total=mode==='mes'?42:new Date(date.getFullYear(),date.getMonth()+1,0).getDate();
+  return Array.from({length:total},(_,i)=>nextDay(start,i));
 }
+function toDraft(item:CalendarItem,userId:number):Draft{return {kind:item.camada==='PESSOAL'?'PESSOAL':'TAREFA',titulo:item.titulo,descricao:item.descricao,iniciaEm:calendarLocalInput(item.iniciaEm),terminaEm:calendarLocalInput(item.terminaEm),prazoEm:calendarLocalInput(item.prazoEm),prioridade:item.prioridade||'P2',status:item.camada==='PESSOAL'?(item.status==='CONCLUIDO'?'CONCLUIDO':'ABERTO'):item.status,responsavelId:String(item.responsavelId||userId),visibilidade:item.visibilidade||'PRIVADO',motivoBloqueio:item.motivoBloqueio||'',local:item.local};}
+function blank(userId:number,start=''):Draft{return {kind:'TAREFA',titulo:'',descricao:'',iniciaEm:start,terminaEm:'',prazoEm:'',prioridade:'P2',status:'PLANEJADO',responsavelId:String(userId),visibilidade:'PRIVADO',motivoBloqueio:'',local:''};}
+function statusText(item:CalendarItem){return item.camada==='TAREFA'?TASK_STATUSES[item.status as CalendarTaskStatus]:({'ABERTO':'Planejado','CONCLUIDO':'Concluído','PUBLICADO':'Publicado','RASCUNHO':'Rascunho','CANCELADO':'Cancelado','PENDENTE':'Pendente','CONFIRMADA':'Confirmada','INDISPONIVEL':'Indisponível','AUSENTE':'Ausente'}[item.status]||item.status);}
+function overlapsDay(item:CalendarItem,date:Date){return !!item.iniciaEm&&Date.parse(item.iniciaEm)<nextDay(date).getTime()&&calendarEnd(item)>date.getTime();}
+function payload(draft:Draft){return {...draft,responsavelId:Number(draft.responsavelId),iniciaEm:draft.iniciaEm?new Date(draft.iniciaEm).toISOString():null,terminaEm:draft.terminaEm?new Date(draft.terminaEm).toISOString():null,prazoEm:draft.prazoEm?new Date(draft.prazoEm).toISOString():null};}
 
-function chaveDia(data: Date) {
-  return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}-${String(data.getDate()).padStart(2, "0")}`;
-}
-
-function gradeDoMes(referencia: Date) {
-  const primeiro = new Date(referencia.getFullYear(), referencia.getMonth(), 1);
-  const inicio = new Date(primeiro);
-  inicio.setDate(1 - primeiro.getDay());
-  const total = Math.ceil((primeiro.getDay() + new Date(referencia.getFullYear(), referencia.getMonth() + 1, 0).getDate()) / 7) * 7;
-  return Array.from({ length: total }, (_, i) => {
-    const dia = new Date(inicio);
-    dia.setDate(inicio.getDate() + i);
-    return dia;
-  });
-}
-
-function gradeDaSemana(referencia: Date) {
-  const inicio = new Date(referencia);
-  inicio.setDate(referencia.getDate() - referencia.getDay());
-  return Array.from({ length: 7 }, (_, i) => {
-    const dia = new Date(inicio);
-    dia.setDate(inicio.getDate() + i);
-    return dia;
-  });
-}
-
-function hora(iso: string) {
-  const data = new Date(iso);
-  const m = data.getMinutes();
-  return `${String(data.getHours()).padStart(2, "0")}${m ? `:${String(m).padStart(2, "0")}` : "h"}`;
-}
-
-function duracaoMin(item: ItemAgenda) {
-  const duration = item.terminaEm ? (Date.parse(item.terminaEm) - Date.parse(item.iniciaEm)) / 60000 : 60;
-  return duration > 0 ? duration : 60;
-}
-
-export default function AgendaCalendar({
-  podeVerEventos,
-  podeAprovar,
-  aoCriarEvento,
-  atualizacao = 0,
-  headingContent,
-}: {
-  headingContent?: React.ReactNode;
-  podeVerEventos: boolean;
-  podeAprovar: boolean;
-  // Quem hospeda o calendário decide o que "criar evento" faz; aqui só existe
-  // o lugar certo para essa ação morar — junto da navegação de período.
-  aoCriarEvento?: (dia?: string) => void;
-  atualizacao?: number;
-}) {
-  const formId = useId();
-  const [referencia, setReferencia] = useState(() => inicioDoDia(new Date()));
-  const [visao, setVisao] = useState<Visao>("mes");
-  const [itens, setItens] = useState<ItemAgenda[]>([]);
-  const [camadasAtivas, setCamadasAtivas] = useState<Camada[]>(["EVENTO", "ESCALA", "PESSOAL"]);
-  const [carregando, setCarregando] = useState(true);
-  const [erro, setErro] = useState("");
-  const [erroCarregamento, setErroCarregamento] = useState("");
-  const [sucesso, setSucesso] = useState("");
-  const [diaAberto, setDiaAberto] = useState<string | null>(null);
-  const [formAberto, setFormAberto] = useState(false);
-  const [formDia, setFormDia] = useState("");
-  const [salvando, setSalvando] = useState(false);
-
-  const dias = useMemo(() => {
-    if (visao === "mes") return gradeDoMes(referencia);
-    if (visao === "semana") return gradeDaSemana(referencia);
-    return [referencia];
-  }, [referencia, visao]);
-
-  const requestRef = useRef<AbortController | null>(null);
-  const loadedRangeRef = useRef("");
-  const [loadedRange, setLoadedRange] = useState("");
-  const rangeKey = `${dias[0].toISOString()}/${dias[dias.length - 1].toISOString()}`;
-  const hasCurrentData = loadedRange === rangeKey;
-  const blockingLoadError = Boolean(erroCarregamento) && !hasCurrentData;
-  const carregar = useCallback(async () => {
+export default function AgendaCalendar({podeVerEventos,podeAprovar,aoCriarEvento,atualizacao=0,headingContent}:{podeVerEventos:boolean;podeAprovar:boolean;aoCriarEvento?:(day?:string)=>void;atualizacao?:number;headingContent?:ReactNode}){
+  const [reference,setReference]=useState(()=>dayStart(new Date()));
+  const [mode,setMode]=useState<Mode>('mes');
+  const [items,setItems]=useState<CalendarItem[]>([]);
+  const [owners,setOwners]=useState<Owner[]>([]);
+  const [userId,setUserId]=useState(0);
+  const [loading,setLoading]=useState(true),[loaded,setLoaded]=useState('');
+  const [error,setError]=useState(''),[feedback,setFeedback]=useState('');
+  const [limited,setLimited]=useState(false);
+  const [search,setSearch]=useState(''),[owner,setOwner]=useState(''),[status,setStatus]=useState(''),[priority,setPriority]=useState(false),[source,setSource]=useState('');
+  const [side,setSide]=useState(true),[selected,setSelected]=useState<CalendarItem|null>(null),[creating,setCreating]=useState(false);
+  const [draft,setDraft]=useState<Draft>(()=>blank(0)),[busy,setBusy]=useState(false),[conflict,setConflict]=useState(false),[accept,setAccept]=useState(false);
+  const [undo,setUndo]=useState<{item:CalendarItem;version:number}|null>(null);
+  const [dragOver,setDragOver]=useState('');
+  const [today,setToday]=useState(''),[zone,setZone]=useState(''),[now,setNow]=useState(0);
+  const editor=useRef<HTMLHeadingElement>(null);
+  const timeScroll=useRef<HTMLDivElement>(null);
+  const requestRef=useRef<AbortController|null>(null);
+  const dates=useMemo(()=>period(reference,mode),[reference,mode]);
+  const from=dates[0].toISOString(),until=new Date(nextDay(dates.at(-1)!).getTime()-1).toISOString(),range=from+'/'+until;
+  const fetchItems=useCallback(async()=>{
     requestRef.current?.abort();
-    const request = new AbortController();
-    requestRef.current = request;
-    // Refresh the current period without unmounting the selected day or
-    // replacing existing content with loading UI on every polling cycle.
-    let preserveData = loadedRangeRef.current === rangeKey;
-    setCarregando(!preserveData);
-    if (!preserveData) {
-      loadedRangeRef.current = "";
-      setLoadedRange("");
-      setItens([]);
-      setErroCarregamento("");
-    }
-    try {
-      const de = inicioDoDia(dias[0]);
-      const ate = new Date(dias[dias.length - 1]);
-      ate.setHours(23, 59, 59, 999);
-      const dados = await readAgendaJson<{ itens?: ItemAgenda[] }>(
-        `/api/pilot/agenda?de=${encodeURIComponent(de.toISOString())}&ate=${encodeURIComponent(ate.toISOString())}`, request.signal,
-      );
-      if (!request.signal.aborted) {
-        loadedRangeRef.current = rangeKey;
-        setLoadedRange(rangeKey);
-        setItens(dados.itens || []);
-        setErroCarregamento("");
-      }
-    } catch (motivo) {
-      if (request.signal.aborted) return;
-      if (motivo instanceof AgendaRequestError && motivo.status >= 400 && motivo.status < 500) preserveData = false;
-      setErroCarregamento(agendaErrorMessage(motivo));
-      if (!preserveData) {
-        loadedRangeRef.current = "";
-        setLoadedRange("");
-        setItens([]);
-      }
-    } finally {
-      if (!request.signal.aborted) setCarregando(false);
-    }
-  }, [dias, rangeKey]);
-  useEffect(() => () => requestRef.current?.abort(), []);
-
-  useEffect(() => {
-    // Adiar a busca tira o setState do corpo síncrono do efeito, que dispara
-    // renderizações em cascata. É o mesmo padrão do resto do painel.
-    const timer = window.setTimeout(() => void carregar(), 0);
-    return () => window.clearTimeout(timer);
-  }, [carregar, atualizacao]);
-
-  useEffect(() => {
-    const resume = () => { if (document.visibilityState === "visible") void carregar(); };
-    window.addEventListener("online", resume); document.addEventListener("visibilitychange", resume);
-    return () => { window.removeEventListener("online", resume); document.removeEventListener("visibilitychange", resume); };
-  }, [carregar]);
-  const visiveis = useMemo(
-    () => itens.filter((item) => camadasAtivas.includes(item.camada)),
-    [itens, camadasAtivas],
-  );
-
-  const porDia = useMemo(() => {
-    const mapa = new Map<string, ItemAgenda[]>();
-    for (const item of visiveis) {
-      const chave = chaveDia(new Date(item.iniciaEm));
-      const lista = mapa.get(chave) || [];
-      lista.push(item);
-      mapa.set(chave, lista);
-    }
-    return mapa;
-  }, [visiveis]);
-
-  function alternarCamada(camada: Camada) {
-    setCamadasAtivas((atuais) =>
-      atuais.includes(camada) ? atuais.filter((c) => c !== camada) : [...atuais, camada],
-    );
+    const request=new AbortController();requestRef.current=request;
+    setLoading(true);setError('');
+    try{
+      const query='?de='+encodeURIComponent(from)+'&ate='+encodeURIComponent(until);
+      const [agenda,tasks]=await Promise.all([
+        readAgendaJson<{itens:CalendarItem[]}>('/api/pilot/agenda'+query,request.signal),
+        readAgendaJson<{itens:CalendarItem[];responsaveis:Owner[];usuarioId:number;limitado:boolean}>('/api/pilot/agenda/tarefas'+query,request.signal)
+      ]);
+      if(request.signal.aborted)return;
+      setItems([...agenda.itens,...tasks.itens]);setOwners(tasks.responsaveis);setUserId(tasks.usuarioId);setLimited(tasks.limitado);setLoaded(range);
+    }catch(cause){
+      if(request.signal.aborted)return;
+      if(cause instanceof AgendaRequestError&&cause.status>=400&&cause.status<500){setItems([]);setLoaded('');setSelected(null);setCreating(false);setUndo(null);}
+      setError(agendaErrorMessage(cause));
+    }finally{if(!request.signal.aborted)setLoading(false);}
+  },[from,until,range]);
+  useEffect(()=>{const timer=window.setTimeout(()=>void fetchItems(),0);return()=>{window.clearTimeout(timer);requestRef.current?.abort();};},[fetchItems,atualizacao]);
+  useEffect(()=>{
+    const resume=()=>{if(document.visibilityState==='visible')void fetchItems();};
+    window.addEventListener('online',resume);document.addEventListener('visibilitychange',resume);
+    return()=>{window.removeEventListener('online',resume);document.removeEventListener('visibilitychange',resume);};
+  },[fetchItems]);
+  useEffect(()=>{
+    const init=window.setTimeout(()=>{setNow(Date.now());setToday(calendarDay(new Date()));setZone(Intl.DateTimeFormat().resolvedOptions().timeZone);if(window.matchMedia('(max-width:700px)').matches)setMode('agenda');},0);
+    return()=>window.clearTimeout(init);
+  },[]);
+  useEffect(()=>{if(creating||selected)editor.current?.focus({preventScroll:true});},[creating,selected]);
+  const conflicts=useMemo(()=>calendarConflicts(items),[items]);
+  const filtered=useMemo(()=>items.filter(item=>(podeVerEventos||item.camada!=='EVENTO')&&(!source||item.camada===source)&&(!owner||String(item.responsavelId)===owner)&&(!status||item.status===status)&&(!priority||item.prioridade==='P1')&&calendarNormalize([item.titulo,item.responsavel,item.local,item.descricao].join(' ')).includes(calendarNormalize(search.trim()))),[items,podeVerEventos,source,owner,status,priority,search]);
+  const scheduled=filtered.filter(item=>item.iniciaEm);
+  const backlog=filtered.filter(item=>!item.iniciaEm&&(status==='CONCLUIDO'||item.status!=='CONCLUIDO'));
+  const ready=loaded===range;
+  useEffect(()=>{if(ready && (mode==='semana'||mode==='dia') && timeScroll.current)timeScroll.current.scrollTop=8*48;},[mode,ready,from]);
+  const editing=creating||!!selected;
+  const editable=creating||!!selected?.podeEditar;
+  const periodText=mode==='dia'?formatDay(reference):mode==='semana'?dates[0].toLocaleDateString('pt-BR',{day:'numeric',month:'short'})+' – '+dates.at(-1)!.toLocaleDateString('pt-BR',{day:'numeric',month:'short',year:'numeric'}):reference.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+  const open=(item:CalendarItem)=>{setSelected(item);setCreating(false);setDraft(toDraft(item,userId));setSide(true);setConflict(false);setAccept(false);setError('');};
+  const create=(start='')=>{setSelected(null);setCreating(true);setDraft(blank(userId,start));setSide(true);setConflict(false);setAccept(false);setError('');};
+  const close=()=>{setSelected(null);setCreating(false);setConflict(false);setAccept(false);};
+  const change=(key:keyof Draft,value:string)=>{setDraft(previous=>({...previous,[key]:value}));setAccept(false);};
+  function navigate(delta:number){setReference(date=>mode==='mes'||mode==='agenda'?new Date(date.getFullYear(),date.getMonth()+delta,1):nextDay(date,delta*(mode==='semana'?7:1)));setUndo(null);}
+  async function mutate(item:CalendarItem|null,value:Draft,allowConflict=false){
+    const endpoint=(item?.camada||value.kind)==='TAREFA'?'/api/pilot/agenda/tarefas':'/api/pilot/agenda';
+    const response=await fetch(endpoint,{method:item?'PATCH':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payload(value),id:item?.origemId,versao:item?.versao,acao:item?'EDITAR':undefined,aceitarConflito:allowConflict}),signal:AbortSignal.timeout(20000)});
+    const result=await response.json() as {error?:string;conflito?:boolean;versao?:number;message?:string};
+    if(!response.ok){if(result.conflito)setConflict(true);throw Object.assign(new Error(result.error||'Não foi possível salvar.'),{conflito:result.conflito});}
+    return result;
   }
-
-  function mover(passo: number) {
-    setDiaAberto(null);
-    setReferencia((atual) => {
-      const proximo = new Date(atual);
-      if (visao === "mes") {
-        proximo.setDate(1);
-        proximo.setMonth(atual.getMonth() + passo);
-      }
-      else if (visao === "semana") proximo.setDate(atual.getDate() + passo * 7);
-      else proximo.setDate(atual.getDate() + passo);
-      return proximo;
-    });
+  async function save(event:FormEvent<HTMLFormElement>){
+    event.preventDefault();if(busy||!editable)return;
+    if(draft.kind==='PESSOAL'&&!draft.iniciaEm){setError('Informe a data e hora do compromisso.');return;}
+    if(creating&&draft.visibilidade==='PUBLICO'&&!window.confirm('Publicar este compromisso? A comunidade verá o título, horário e local. As observações continuam privadas.'))return;
+    setBusy(true);setError('');
+    try{await mutate(selected,draft,accept);setFeedback('Registro salvo.');setUndo(null);close();await fetchItems();}
+    catch(cause){setError(agendaErrorMessage(cause,true));}
+    finally{setBusy(false);}
   }
-
-  function abrirCompromisso(dia = chaveDia(referencia)) {
-    setErro(""); setSucesso(""); setDiaAberto(dia);
-    setFormDia(dia);
-    setFormAberto(true);
-    window.setTimeout(() => {
-      const form = document.querySelector<HTMLFormElement>(".agenda-form");
-      form?.querySelector<HTMLInputElement>('[name="titulo"]')?.focus({ preventScroll: true });
-    }, 0);
+  async function reschedule(item:CalendarItem,start:string|null,restoring=false,version?:number){
+    if(busy||!item.podeEditar)return;
+    const value=toDraft(item,userId);
+    const duration=item.iniciaEm?Math.max(60000,calendarEnd(item)-Date.parse(item.iniciaEm)):3600000;
+    value.iniciaEm=start?calendarLocalInput(start):'';
+    value.terminaEm=start?calendarLocalInput(new Date(Date.parse(start)+duration).toISOString()):'';
+    let allow=false;
+    if(start){const changed={...item,iniciaEm:start,terminaEm:new Date(Date.parse(start)+duration).toISOString()};if(calendarConflicts([...items.filter(other=>other.id!==item.id),changed]).has(item.id)){allow=window.confirm('Há sobreposição de horário para este responsável. Deseja reagendar mesmo assim?');if(!allow)return;}}
+    setBusy(true);setError('');
+    try{const result=await mutate({...item,versao:version??item.versao},value,allow);setUndo(restoring?null:{item,version:result.versao!});setFeedback(restoring?'Reagendamento desfeito.':'Horário atualizado.');close();await fetchItems();}
+    catch(cause){open(item);setDraft(value);setConflict(Boolean((cause as {conflito?:boolean}).conflito));setError(agendaErrorMessage(cause,true));}
+    finally{setBusy(false);}
   }
-
-  async function criarCompromisso(evento: React.FormEvent<HTMLFormElement>) {
-    evento.preventDefault();
-    const form = new FormData(evento.currentTarget);
-    // Publicar expõe o compromisso para a comunidade inteira. Confirmar antes
-    // evita que um clique em "Salvar" vire uma publicação sem querer.
-    if (form.get("visibilidade") === "PUBLICO") {
-      const titulo = String(form.get("titulo") || "").trim();
-      const segue = window.confirm(
-        `Publicar "${titulo}" na agenda da comunidade?
-
-Todos os membros vão ver o título, o horário e o local. As observações continuam só suas.`,
-      );
-      if (!segue) return;
-    }
-    setSalvando(true);
-    setErro("");
-    setSucesso("");
-    try {
-      const resposta = await fetch("/api/pilot/agenda", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          titulo: form.get("titulo"),
-          descricao: form.get("descricao"),
-          categoria: form.get("categoria"),
-          iniciaEm: new Date(String(form.get("iniciaEm"))).toISOString(),
-          terminaEm: form.get("terminaEm") ? new Date(String(form.get("terminaEm"))).toISOString() : null,
-          local: form.get("local"),
-          visibilidade: form.get("visibilidade"),
-        }),
-      });
-      const dados = (await resposta.json()) as { error?: string; message?: string };
-      if (!resposta.ok) throw new Error(dados.error || "Não foi possível salvar.");
-      setSucesso(dados.message || "Compromisso salvo.");
-      setFormAberto(false);
-      await carregar();
-    } catch (motivo) {
-      setErro(agendaErrorMessage(motivo, true));
-    } finally {
-      setSalvando(false);
-    }
+  function drop(event:React.DragEvent,day:Date,hour=9){
+    event.preventDefault();setDragOver('');const item=items.find(value=>value.id===event.dataTransfer.getData('text/calendar-item'));
+    if(!item?.podeEditar||!ready)return;
+    const date=new Date(day.getFullYear(),day.getMonth(),day.getDate(),hour);
+    void reschedule(item,date.toISOString());
   }
-
-  async function removerCompromisso(origemId: number) {
-    setErro("");
-    setSucesso("");
-    try {
-      const resposta = await fetch(`/api/pilot/agenda?id=${origemId}`, { method: "DELETE" });
-      if (!resposta.ok) {
-        const dados = (await resposta.json()) as { error?: string };
-        throw new Error(dados.error || "Não foi possível remover.");
-      }
-      setSucesso("Compromisso removido.");
-      await carregar();
-    } catch (motivo) {
-      setErro(motivo instanceof Error ? motivo.message : "Não foi possível remover.");
-    }
+  async function approve(item:CalendarItem){
+    setBusy(true);setError('');
+    try{const response=await fetch('/api/pilot/agenda',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:item.origemId,acao:'APROVAR'}),signal:AbortSignal.timeout(20000)});const result=await response.json();if(!response.ok)throw new Error(result.error||'Não foi possível aprovar.');setFeedback('Compromisso aprovado.');close();await fetchItems();}catch(cause){setError(agendaErrorMessage(cause,true));}finally{setBusy(false);}
   }
-
-  async function aprovarCompromisso(origemId: number) {
-    setErro("");
-    setSucesso("");
-    try {
-      const resposta = await fetch("/api/pilot/agenda", { method:"PATCH", headers:{"content-type":"application/json"}, body:JSON.stringify({ id:origemId, acao:"APROVAR" }) });
-      const dados = await resposta.json() as { error?:string };
-      if (!resposta.ok) throw new Error(dados.error || "Não foi possível aprovar.");
-      setSucesso("Publicação aprovada.");
-      await carregar();
-    } catch (motivo) {
-      setErro(motivo instanceof Error ? motivo.message : "Não foi possível aprovar.");
-    }
+  async function remove(item:CalendarItem){
+    if(!window.confirm('Excluir este compromisso?'))return;
+    setBusy(true);setError('');
+    try{const response=await fetch('/api/pilot/agenda?id='+item.origemId,{method:'DELETE',signal:AbortSignal.timeout(20000)});const result=await response.json();if(!response.ok)throw new Error(result.error||'Não foi possível excluir.');close();setUndo(null);setFeedback('Compromisso excluído.');await fetchItems();}catch(cause){setError(agendaErrorMessage(cause,true));}finally{setBusy(false);}
   }
-
-  const camadasVisiveis = CAMADAS.filter((c) => c.id !== "EVENTO" || podeVerEventos);
-  // "Hoje" precisa vir de estado, nunca de `new Date()` durante a renderização:
-  // servidor e cliente calculariam valores diferentes na virada do dia e a
-  // hidratação quebraria. Mesmo padrão já adotado em DayThreadWorkspace.
-  // Começa vazio, então nenhum dia é marcado até o cliente acertar o relógio.
-  const [hojeChave, setHojeChave] = useState("");
-  useEffect(() => {
-    const acertar = () => setHojeChave(chaveDia(new Date()));
-    // Agendado em vez de chamado direto: escrever estado no corpo do efeito
-    // dispara renderização em cascata.
-    const primeiro = window.setTimeout(acertar, 0);
-    const relogio = window.setInterval(acertar, 60000);
-    return () => {
-      window.clearTimeout(primeiro);
-      window.clearInterval(relogio);
-    };
-  }, []);
-  const itensDoDiaAberto = diaAberto ? porDia.get(diaAberto) || [] : [];
-  const diaSelecionado = diaAberto;
-
-  const rotuloPeriodo =
-    visao === "dia"
-      ? referencia.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })
-      : visao === "semana"
-        ? `${dias[0].toLocaleDateString("pt-BR", { day: "numeric", month: "short" })} – ${dias[6].toLocaleDateString("pt-BR", { day: "numeric", month: "short", year: "numeric" })}`
-        : referencia.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
-
-  return (
-    <section className={`agenda-calendario agenda-studio ${styles.calendar}`} aria-label="Calendário da agenda">
-      <header className="agenda-calendario-topo">
-        {headingContent}
-        <div className="agenda-calendario-periodo">
-          <button type="button" onClick={() => mover(-1)} aria-label="Período anterior">‹</button>
-          <button type="button" onClick={() => mover(1)} aria-label="Próximo período">›</button>
-          <button type="button" className={styles.periodTitle} aria-label={`Planejar ${rotuloPeriodo}`} aria-haspopup="dialog" onClick={() => setDiaAberto(chaveDia(referencia))}>{rotuloPeriodo}</button>
-          <button
-            type="button"
-            className="agenda-hoje"
-            onClick={() => { setDiaAberto(null); setReferencia(inicioDoDia(new Date())); }}
-          >
-            Hoje
-          </button>
-        </div>
-        <div className="agenda-calendario-acoes">
-        <div className="agenda-calendario-visoes" role="group" aria-label="Formato do calendário">
-          {(["dia", "semana", "mes"] as Visao[]).map((modo) => (
-            <button
-              key={modo}
-              type="button"
-              className={visao === modo ? "active" : ""}
-              aria-pressed={visao === modo}
-              onClick={() => { setDiaAberto(null); setVisao(modo); }}
-            >
-              {modo === "dia" ? "Dia" : modo === "semana" ? "Semana" : "Mês"}
-            </button>
-          ))}
-        </div>
-        </div>
-      <div className="agenda-camadas">
-        <div className={styles.layers} role="group" aria-label="Camadas do calendário">
-        {camadasVisiveis.map((camada) => (
-          <button
-            key={camada.id}
-            type="button"
-            className={`agenda-camada camada-${camada.id.toLowerCase()}${
-              camadasAtivas.includes(camada.id) ? " active" : ""
-            }`}
-            aria-pressed={camadasAtivas.includes(camada.id)}
-            aria-label={camada.rotulo}
-            title={camada.ajuda}
-            onClick={() => alternarCamada(camada.id)}
-          >
-            <span aria-hidden="true" />
-            <span className={styles.layerLabel}>{camada.rotulo}</span><span className={styles.layerShort}>{camada.id === "EVENTO" ? "Eventos" : camada.id === "ESCALA" ? "Escalas" : "Pessoais"}</span>
-          </button>
-        ))}
-        </div>
-
+  function eventButton(item:CalendarItem,style?:CSSProperties){
+    return <button key={item.id} type="button" className="vp-calendar-event" style={style} data-priority={item.prioridade} data-status={statusText(item)} data-conflict={conflicts.has(item.id)} draggable={!!item.podeEditar&&!busy&&ready} onDragStart={event=>{event.dataTransfer.setData('text/calendar-item',item.id);event.dataTransfer.effectAllowed='move';}} onClick={()=>open(item)} title={`${item.titulo} · ${item.iniciaEm?time(item.iniciaEm):'Sem data'} · ${item.responsavel||SOURCE_LABELS[item.camada]} · ${statusText(item)}${conflicts.has(item.id)?' · Conflito de horário':''}`}>
+      <span className="vp-event-title">{item.iniciaEm&&!item.diaInteiro&&<>{time(item.iniciaEm)} </>}{item.titulo}</span><span className="vp-event-meta">{item.responsavel||SOURCE_LABELS[item.camada]} · {statusText(item)}</span>
+    </button>;
+  }
+  function timeColumn(day:Date){
+    const dayItems=scheduled.filter(item=>!item.diaInteiro&&overlapsDay(item,day)).sort((a,b)=>Date.parse(a.iniciaEm!)-Date.parse(b.iniciaEm!));
+    const lanes:number[]=[];
+    const positions=dayItems.map(item=>{const start=Math.max(day.getTime(),Date.parse(item.iniciaEm!)),end=Math.min(nextDay(day).getTime(),calendarEnd(item));let lane=lanes.findIndex(value=>value<=start);if(lane<0)lane=lanes.length;lanes[lane]=end;return {item,start,end,lane};});
+    return <div key={calendarDay(day)} className={'vp-time-column'+(dragOver===calendarDay(day)?' vp-drop-target':'')} onDragOver={event=>{if(!busy&&ready){event.preventDefault();setDragOver(calendarDay(day));}}} onDragLeave={()=>setDragOver('')} onDrop={event=>{const rect=event.currentTarget.getBoundingClientRect();drop(event,day,Math.max(0,Math.min(23.5,Math.floor((event.clientY-rect.top)/24)/2)));}}>
+      {positions.map(({item,start,end,lane})=>{const date=new Date(start),endDate=new Date(end);const minutes=date.getHours()*60+date.getMinutes();const finish=end===nextDay(day).getTime()?1440:endDate.getHours()*60+endDate.getMinutes();return eventButton(item,{top:minutes*.8,height:Math.max(44,(finish-minutes)*.8),left:`calc(${lane*100/lanes.length}% + 2px)`,width:`calc(${100/lanes.length}% - 4px)`});})}
+    </div>;
+  }
+  return <section className="management-calendar" aria-label="Calendário de gestão">
+    {headingContent&&<header className="vp-section-heading">{headingContent}</header>}
+    <div className="vp-toolbar"><strong className="vp-period">{periodText}</strong><div className="vp-period-nav"><button type="button" className="vp-button vp-icon-button vp-quiet" aria-label="Período anterior" disabled={busy} onClick={()=>navigate(-1)}>‹</button><button type="button" className="vp-button vp-quiet" disabled={busy} onClick={()=>setReference(dayStart(new Date()))}>Hoje</button><button type="button" className="vp-button vp-icon-button vp-quiet" aria-label="Próximo período" disabled={busy} onClick={()=>navigate(1)}>›</button></div><div className="vp-modes" role="group" aria-label="Visualização do calendário">{([['mes','Mês'],['semana','Semana'],['dia','Dia'],['agenda','Agenda']] as const).map(([value,label])=><button type="button" key={value} aria-pressed={mode===value} disabled={busy} onClick={()=>setMode(value)}>{label}</button>)}</div><button type="button" className="vp-button vp-primary vp-new" disabled={busy||!userId||!ready} onClick={()=>create()}>＋ Novo item</button></div>
+    <div className="vp-filters"><label className="vp-search"><input type="search" aria-label="Buscar no calendário" placeholder="Buscar título, pessoa ou local…" value={search} onChange={event=>setSearch(event.target.value)}/></label><select aria-label="Filtrar responsável" value={owner} onChange={event=>setOwner(event.target.value)}><option value="">Todos os responsáveis</option>{Array.from(new Map([...owners,...items.filter(item=>item.responsavelId&&item.responsavel).map(item=>({id:item.responsavelId!,nome:item.responsavel!}))].map(value=>[value.id,value])).values()).map(value=><option value={value.id} key={value.id}>{value.nome}</option>)}</select><select aria-label="Filtrar status" value={status} onChange={event=>setStatus(event.target.value)}><option value="">Todos os status</option>{Array.from(new Set(items.map(item=>item.status))).sort().map(value=><option value={value} key={value}>{statusText(items.find(item=>item.status===value)!)}</option>)}</select><select aria-label="Filtrar origem" value={source} onChange={event=>setSource(event.target.value)}><option value="">Todas as origens</option>{Object.entries(SOURCE_LABELS).filter(([value])=>podeVerEventos||value!=='EVENTO').map(([value,label])=><option value={value} key={value}>{label}</option>)}</select><button className="vp-chip" type="button" aria-pressed={priority} onClick={()=>setPriority(value=>!value)}>⚑ Prioridade alta</button><button className="vp-chip" type="button" aria-pressed={side} onClick={()=>{close();setSide(value=>!value);}}>☷ Sem data</button>{(search||owner||status||priority||source)&&<button type="button" className="vp-button vp-quiet" onClick={()=>{setSearch('');setOwner('');setStatus('');setPriority(false);setSource('');}}>Limpar filtros</button>}</div>
+    <div className="vp-metrics" aria-live="polite"><span><strong>{ready?scheduled.length:'–'}</strong> no período</span><span><strong>{ready?backlog.length:'–'}</strong> sem data</span><span className="vp-conflict-count"><strong>{ready?conflicts.size:'–'}</strong> itens com conflito</span>{loading&&<span>Atualizando…</span>}</div>
+    {error&&<div className="vp-feedback vp-error" role="alert"><span>{error}{loaded&&' Última consulta preservada.'}</span><button type="button" disabled={busy||loading} onClick={()=>void fetchItems()}>Atualizar</button></div>}
+    {limited&&<p className="vp-form-error">Limite de 400 tarefas atingido. Reduza o período para consultar os itens agendados.</p>}
+    <div className={'vp-workspace'+(!side?' no-side':'')+(editing?' side-open':'')}>
+      <div className="vp-calendar-main" aria-busy={loading&&!ready}>
+        {!ready?<p className="vp-empty">{loading?'Carregando calendário…':'Atualize para consultar este período.'}</p>:mode==='mes'?<div className="vp-month-scroll"><div className="vp-month-head">{days.map(value=><span key={value}>{value}</span>)}</div><div className="vp-month-grid">{dates.map(day=>{const key=calendarDay(day),entries=scheduled.filter(item=>overlapsDay(item,day));return <div key={key} className={'vp-day-cell'+(day.getMonth()!==reference.getMonth()?' vp-outside':'')+(dragOver===key?' vp-drop-target':'')} onDragOver={event=>{if(!busy){event.preventDefault();setDragOver(key);}}} onDragLeave={()=>setDragOver('')} onDrop={event=>drop(event,day)}>
+          <button className="vp-date-number" type="button" aria-label={formatDay(day)+(entries.length?`, ${entries.length} itens`:'')} aria-current={key===today?'date':undefined} onClick={()=>{setReference(day);setMode('dia');}}>{day.getDate()}</button>{entries.slice(0,3).map(item=>eventButton(item))}{entries.length>3&&<button className="vp-more" type="button" onClick={()=>{setReference(day);setMode('dia');}}>＋{entries.length-3} itens</button>}<span className="vp-mobile-count">{entries.length||''}</span></div>;})}</div></div>:mode==='agenda'?<div className="vp-agenda">{scheduled.length?dates.map(day=>{const entries=scheduled.filter(item=>overlapsDay(item,day)).sort((a,b)=>Date.parse(a.iniciaEm!)-Date.parse(b.iniciaEm!));return entries.length?<div key={calendarDay(day)}><h2 className="vp-agenda-day">{formatDay(day)}</h2>{entries.map(item=><button type="button" className="vp-agenda-row" key={item.id} onClick={()=>open(item)}><span className="vp-agenda-time">{item.diaInteiro?'Dia inteiro':calendarDay(item.iniciaEm!)!==calendarDay(day)?'Continua':time(item.iniciaEm!)}</span><span className="vp-agenda-title">{item.titulo}<span className="vp-agenda-sub">{SOURCE_LABELS[item.camada]}{item.local&&' · '+item.local}{item.prazoEm&&' · Prazo '+new Date(item.prazoEm).toLocaleDateString('pt-BR')}{conflicts.has(item.id)&&' · ! Conflito'}</span></span><span className="vp-agenda-owner">{item.responsavel||'Comunidade'}</span><span className="vp-status" data-status={statusText(item)}>{statusText(item)}</span></button>)}</div>:null;}):<p className="vp-empty">Nenhum item neste período com os filtros atuais.</p>}</div>:<><p className="vp-swipe-note">Deslize a grade para consultar os dias e horários.</p><div className="vp-time-scroll" ref={timeScroll}><div className={'vp-time-days'+(mode==='dia'?' vp-day-view':'')}><div className="vp-time-heading">Hora</div>{dates.map(day=><div className="vp-time-heading" key={calendarDay(day)}><button type="button" onClick={()=>{setReference(day);setMode('dia');}}>{days[day.getDay()]}<b>{day.getDate()}</b></button>{scheduled.filter(item=>item.diaInteiro&&overlapsDay(item,day)).map(item=>eventButton(item))}</div>)}<div className="vp-time-axis">{Array.from({length:24},(_,hour)=><span key={hour} className="vp-time-label" style={{'--hour':hour} as CSSProperties}>{String(hour).padStart(2,'0')}:00</span>)}</div>{dates.map(timeColumn)}</div></div></>}
       </div>
-
-      </header>
-
-      {!camadasVisiveis.some((camada) => camadasAtivas.includes(camada.id)) && <div className={styles.layerNotice} role="status"><span>Nenhuma categoria selecionada. Os compromissos estão ocultos.</span><button type="button" onClick={() => setCamadasAtivas(camadasVisiveis.map((camada) => camada.id))}>Mostrar todas as categorias</button></div>}
-
-      {erro && <TransientFeedback className="agenda-erro" role="alert">{erro}</TransientFeedback>}
-      {sucesso && <TransientFeedback className="operations-feedback" role="status" tone="success">{sucesso}</TransientFeedback>}
-      {erroCarregamento && <div className={styles.syncNotice} role="status">
-        <span>{erroCarregamento}</span>
-        <button type="button" onClick={() => void carregar()}>Atualizar</button>
-      </div>}
-
-      <div className="agenda-studio-layout"><div className="agenda-studio-planner">
-      {diaSelecionado && <AgendaDialog title={new Date(`${diaSelecionado}T12:00:00`).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })} busy={salvando} onClose={() => { setDiaAberto(null); setFormAberto(false); setErro(""); }}>
-        <section className={styles.dayPlan} aria-label="Planejar dia selecionado">
-          <strong>{new Date(`${diaSelecionado}T12:00:00`).toLocaleDateString("pt-BR", { day: "numeric", month: "long" })}</strong>
-          <p>{carregando ? "Carregando compromissos…" : erroCarregamento ? (hasCurrentData ? "Última consulta exibida; não foi possível atualizar." : "Compromissos indisponíveis no momento.") : itensDoDiaAberto.length ? `${itensDoDiaAberto.length} compromisso(s) neste dia` : "O que você quer marcar neste dia?"}</p>
-          {!formAberto && <div className={styles.dayChoices}>
-            {aoCriarEvento && <button type="button" onClick={() => { const day = diaSelecionado; setDiaAberto(null); aoCriarEvento(day); }}><b>＋ Criar evento</b><small>Programação da comunidade</small></button>}
-            <button type="button" onClick={() => abrirCompromisso(diaSelecionado)}><b>＋ Novo compromisso</b><small>Pessoal, visita ou reunião</small></button>
-          </div>}
-          {sucesso && <p role="status">{sucesso}</p>}
-          {erro && !formAberto && <p role="alert">{erro}</p>}
-        </section>
-      {formAberto && (
-        <form id={formId} className="agenda-form" key={formDia} onSubmit={criarCompromisso}>
-          <header className="agenda-form-larga"><strong>Novo compromisso</strong><button type="button" onClick={() => setFormAberto(false)} aria-label="Fechar formulário de compromisso">×</button></header>
-          <label>
-            Título
-            <input name="titulo" required maxLength={140} placeholder="Visita à família Silva" />
-          </label>
-          <label>
-            Categoria
-            <select name="categoria" defaultValue="PESSOAL">
-              {CATEGORIAS_PESSOAIS.map((c) => (
-                <option key={c.valor} value={c.valor}>{c.rotulo}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Início
-            <input name="iniciaEm" type="datetime-local" required defaultValue={formDia ? `${formDia}T09:00` : ""} />
-          </label>
-          <label>
-            Término
-            <input name="terminaEm" type="datetime-local" defaultValue={formDia ? `${formDia}T10:00` : ""} />
-          </label>
-          <label>
-            Quem vê
-            <select name="visibilidade" defaultValue="PRIVADO">
-              <option value="PRIVADO">Só eu</option>
-              <option value="PUBLICO">Toda a comunidade</option>
-            </select>
-          </label>
-          <label className="agenda-form-larga">
-            Local
-            <input name="local" maxLength={180} placeholder="Onde vai acontecer" />
-          </label>
-          <label className="agenda-form-larga">
-            Observações
-            <textarea name="descricao" rows={2} maxLength={1000} />
-          </label>
-          {erro && <p className={styles.formError} role="alert">{erro}</p>}
-          <button type="submit" disabled={salvando}>
-            {salvando ? "Salvando…" : "Salvar compromisso"}
-          </button>
-        </form>
-      )}
-        {!formAberto && itensDoDiaAberto.length > 0 && <ul className={styles.dayItems}>{itensDoDiaAberto.map(item => <li key={item.id}>
-          <span className={styles.itemTime}>{item.diaInteiro ? "Dia inteiro" : hora(item.iniciaEm)}</span><div><strong>{item.titulo}</strong><small>{item.local || CAMADAS.find(layer => layer.id === item.camada)?.rotulo}</small>{item.descricao && <p>{item.descricao}</p>}</div>
-          {item.camada === "PESSOAL" && item.meu !== false && <button type="button" onClick={() => void removerCompromisso(item.origemId)}>Remover</button>}
-          {item.camada === "PESSOAL" && item.aprovacaoStatus === "PENDENTE" && podeAprovar && <button type="button" onClick={() => void aprovarCompromisso(item.origemId)}>Aprovar publicação</button>}
-        </li>)}</ul>}
-      </AgendaDialog>}
-      <div className="agenda-corpo">
-
-      {/* DIA — linha do tempo vertical: a hora à esquerda, um marcador por
-          camada e o cartão com os detalhes à direita. */}
-      {blockingLoadError && <div className="agenda-studio-empty">
-        <strong>Agenda indisponível no momento</strong>
-        <p>Não foi possível consultar os compromissos deste período.</p>
-        <button type="button" disabled={carregando} onClick={() => void carregar()}>{carregando ? "Tentando novamente…" : "Tentar novamente"}</button>
-      </div>}
-      {!blockingLoadError && visao === "dia" && (
-        <div className="agenda-linha-tempo" aria-busy={carregando}>
-          {(porDia.get(chaveDia(referencia)) || []).length === 0 ? (
-            <p className="agenda-vazio">{carregando ? "Carregando compromissos…" : "Nada marcado neste dia."}</p>
-          ) : (
-            (porDia.get(chaveDia(referencia)) || []).map((item) => (
-              <article key={item.id} className={`agenda-tempo-item camada-${item.camada.toLowerCase()}`}>
-                <span className="agenda-tempo-hora">{hora(item.iniciaEm)}</span>
-                <span className="agenda-tempo-marca" aria-hidden="true" />
-                <div className="agenda-tempo-cartao">
-                  <strong>{item.titulo}</strong>
-                  {item.descricao && <small>{item.descricao}</small>}
-                  <span className="agenda-tempo-meta">
-                    {item.terminaEm && <em>{duracaoMin(item)} min</em>}
-                    {item.local && <em>{item.local}</em>}
-                    <em className="agenda-tempo-camada">
-                      {item.camada === "EVENTO" ? "Evento" : item.camada === "ESCALA" ? "Escala" : "Pessoal"}
-                    </em>
-                  </span>
-                  {item.camada === "PESSOAL" && item.meu !== false && (
-                    <button
-                      type="button"
-                      className="agenda-remover"
-                      onClick={() => void removerCompromisso(item.origemId)}
-                    >
-                      Remover
-                    </button>
-                  )}
-                  {item.camada === "PESSOAL" && item.aprovacaoStatus === "PENDENTE" && podeAprovar && (
-                    <button type="button" className="agenda-aprovar" onClick={() => void aprovarCompromisso(item.origemId)}>Aprovar publicação</button>
-                  )}
-                </div>
-              </article>
-            ))
-          )}
-        </div>
-      )}
-
-      {/* SEMANA — grade de horas: cada compromisso ocupa a altura da sua
-          duração, e os que se cruzam dividem a largura. */}
-      {!blockingLoadError && visao === "semana" && (
-        <div className="agenda-week-list" aria-busy={carregando}>
-          {dias.map((dia) => { const items = porDia.get(chaveDia(dia)) || []; return <section key={chaveDia(dia)} className={chaveDia(dia) === hojeChave ? "today" : ""}>
-            <button type="button" className="agenda-week-date" aria-haspopup="dialog" onClick={() => setDiaAberto(chaveDia(dia))}><small>{DIAS_CURTOS[dia.getDay()]}</small><strong>{dia.getDate()}</strong></button>
-            <div>{items.length ? items.map((item) => <button type="button" key={item.id} className={"agenda-week-entry camada-" + item.camada.toLowerCase()} aria-haspopup="dialog" onClick={() => setDiaAberto(chaveDia(dia))}><time>{item.diaInteiro ? "Dia inteiro" : hora(item.iniciaEm)}</time><strong>{item.titulo}</strong><span>{item.local || CAMADAS.find(layer => layer.id === item.camada)?.rotulo}</span></button>) : <p>{carregando ? "Carregando…" : "Dia livre"}</p>}</div>
-          </section>; })}
-        </div>
-      )}
-
-      {/* MÊS — visão de planejamento: chips compactos e "+N" quando não cabe. */}
-      {!blockingLoadError && visao === "mes" && (
-        <div className="agenda-grade" aria-busy={carregando}>
-          {DIAS_CURTOS.map((dia) => (
-            <span className="agenda-grade-cabecalho" key={dia}>{dia}</span>
-          ))}
-          {dias.map((dia) => {
-            const chave = chaveDia(dia);
-            const doPeriodo = dia.getMonth() === referencia.getMonth();
-            const doDia = porDia.get(chave) || [];
-            return (
-              <button
-                type="button"
-                key={chave}
-                className={`agenda-dia${doPeriodo ? "" : " fora"}${chave === hojeChave ? " hoje" : ""}${chave === diaAberto ? " selected" : ""}`}
-                onClick={() => { setErro(""); setSucesso(""); setDiaAberto(chave); }}
-                aria-haspopup="dialog"
-                aria-label={`${dia.toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" })} — ${carregando ? "Carregando compromissos" : `${doDia.length} compromisso(s)`}`}
-                aria-current={chave === hojeChave ? "date" : undefined}
-                aria-pressed={chave === diaAberto}
-              >
-                <span className="agenda-dia-numero">{dia.getDate()}</span>
-                <span className="agenda-dia-itens">
-                  {doDia.slice(0, 3).map((item) => (
-                    <span key={item.id} className={`agenda-marca camada-${item.camada.toLowerCase()}`}>
-                      <b>{hora(item.iniciaEm)}</b> {item.titulo}
-                    </span>
-                  ))}
-                  {doDia.length > 3 && (
-                    <span className="agenda-marca mais">+{doDia.length - 3} mais</span>
-                  )}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      </div>
-      </div><details className="agenda-studio-upcoming"><summary><span>Compromissos deste período</span><small>{carregando ? "Carregando…" : erroCarregamento ? "Indisponível" : `${visiveis.length} compromisso(s)`}</small><span aria-hidden="true">⌄</span></summary>
-      {carregando ? <p role="status">Carregando compromissos…</p> : erroCarregamento ? <p>Não foi possível consultar os compromissos deste período.</p> : !visiveis.length ? <div className="agenda-studio-empty"><span aria-hidden="true">♡</span><strong>Tempo para novos encontros</strong><p>Não há compromissos nas categorias selecionadas. Adicione um ou navegue para outro período.</p></div> : <ol>{[...visiveis].sort((a,b) => Date.parse(a.iniciaEm)-Date.parse(b.iniciaEm)).map(item => <li key={item.id}><button type="button" onClick={() => { setReferencia(inicioDoDia(new Date(item.iniciaEm))); setVisao("dia"); }}><time dateTime={item.iniciaEm}><b>{new Date(item.iniciaEm).getDate()}</b><span>{new Date(item.iniciaEm).toLocaleDateString("pt-BR",{month:"short"})}</span></time><div><small>{CAMADAS.find(layer => layer.id === item.camada)?.rotulo}</small><strong>{item.titulo}</strong><span>{item.diaInteiro ? "Dia inteiro" : hora(item.iniciaEm)}{item.local ? ` · ${item.local}` : ""}</span></div><span aria-hidden="true">→</span></button></li>)}</ol>}
-      <a href="/painel?view=fio">Acompanhar o Fio do dia →</a></details></div>
-    </section>
-  );
+      {side&&<aside className="vp-side" aria-label="Apoio ao planejamento"><div className="vp-side-heading"><h2 ref={editor} tabIndex={-1}>{creating?'Novo item':selected?'Detalhes do item':'Sem data'}{!editing&&` · ${backlog.length}`}</h2>{editing&&<button className="vp-button vp-icon-button vp-quiet" type="button" disabled={busy} aria-label="Fechar detalhes" onClick={close}>×</button>}</div>
+        {!editing?<><p className="vp-side-description">Arraste uma tarefa para a grade ou use Agendar.</p>{backlog.length?backlog.map(item=><div className="vp-backlog-row" key={item.id} draggable={!!item.podeEditar&&!busy} onDragStart={event=>{event.dataTransfer.setData('text/calendar-item',item.id);event.dataTransfer.effectAllowed='move';}}><button className="vp-backlog-title" type="button" onClick={()=>open(item)}>{item.titulo}</button><p className="vp-backlog-meta">{item.responsavel} · {statusText(item)}</p>{item.prazoEm&&<p className={'vp-backlog-meta'+(Date.parse(item.prazoEm)<now?' vp-overdue':'')}>Prazo {new Date(item.prazoEm).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}</p>}<div className="vp-backlog-footer"><span className="vp-priority" data-level={item.prioridade}>{item.prioridade}</span>{item.podeEditar&&<button type="button" disabled={busy||!ready} onClick={()=>{open(item);setDraft({...toDraft(item,userId),iniciaEm:calendarDay(reference)+'T09:00'});}}>Agendar →</button>}</div></div>):<p className="vp-side-description">Nenhuma pendência sem data.</p>}</>:<>
+        {selected&&<p className="vp-side-description">{SOURCE_LABELS[selected.camada]} · {statusText(selected)}{selected.aprovacaoStatus==='PENDENTE'?' · Aguardando aprovação':''}</p>}
+        {!editable&&selected?<div className="vp-readonly"><h3>{selected.titulo}</h3><p>{selected.iniciaEm&&new Date(selected.iniciaEm).toLocaleString('pt-BR')}</p>{selected.local&&<p>{selected.local}</p>}<p>{selected.descricao||'Sem observações.'}</p><p>{selected.camada==='ESCALA'?'A escala é administrada pelo ministério.':'Este item é administrado em sua área de origem.'}</p>{selected.camada==='EVENTO'&&<a href={'#event-'+selected.origemId} className="vp-button" onClick={close}>Ver evento ↓</a>}{selected.camada==='ESCALA'&&<a href="/painel?view=ministerios" className="vp-button">Abrir ministérios →</a>}{podeAprovar&&selected.camada==='PESSOAL'&&selected.aprovacaoStatus==='PENDENTE'&&<button type="button" className="vp-button vp-primary" disabled={busy} onClick={()=>void approve(selected)}>Aprovar publicação</button>}</div>:
+        <form className="vp-side-form" onSubmit={save}>
+          {creating&&<><label>Tipo<select value={draft.kind} onChange={event=>{const kind=event.target.value as Draft['kind'];setDraft(previous=>({...previous,kind,status:kind==='TAREFA'?'PLANEJADO':'ABERTO',visibilidade:'PRIVADO',responsavelId:String(userId)}));}}><option value="TAREFA">Tarefa de gestão</option><option value="PESSOAL">Compromisso pessoal</option></select></label>{aoCriarEvento&&<button type="button" className="vp-button vp-quiet" onClick={()=>{close();aoCriarEvento(calendarDay(reference));}}>Criar evento da comunidade ↗</button>}</>}
+          <label>Título*<input name="titulo" required maxLength={140} value={draft.titulo} onChange={event=>change('titulo',event.target.value)}/></label>
+          {draft.kind==='TAREFA'&&<label>Responsável<select value={draft.responsavelId} disabled={!podeAprovar&&!creating} onChange={event=>change('responsavelId',event.target.value)}>{owners.map(value=><option value={value.id} key={value.id}>{value.nome}</option>)}{selected?.responsavelId&&!owners.some(value=>value.id===selected.responsavelId)&&<option value={selected.responsavelId}>{selected.responsavel}</option>}</select></label>}
+          <label>Data agendada{draft.kind==='PESSOAL'?'*':' (opcional)'}<input type="datetime-local" name="iniciaEm" required={draft.kind==='PESSOAL'} value={draft.iniciaEm} onChange={event=>{change('iniciaEm',event.target.value);if(!event.target.value)change('terminaEm','');}}/></label>
+          <label>Término (opcional)<input type="datetime-local" name="terminaEm" disabled={!draft.iniciaEm} min={draft.iniciaEm||undefined} value={draft.terminaEm} onChange={event=>change('terminaEm',event.target.value)}/></label>
+          {draft.kind==='TAREFA'&&<><label>Prazo final (opcional)<input type="datetime-local" name="prazoEm" value={draft.prazoEm} onChange={event=>change('prazoEm',event.target.value)}/></label><label>Prioridade<select value={draft.prioridade} onChange={event=>change('prioridade',event.target.value)}><option value="P1">P1 · Alta</option><option value="P2">P2 · Normal</option><option value="P3">P3 · Baixa</option></select></label></>}
+          <label>Status<select value={draft.status} onChange={event=>change('status',event.target.value)}>{Object.entries(draft.kind==='TAREFA'?TASK_STATUSES:{ABERTO:'Planejado',CONCLUIDO:'Concluído'}).map(([value,label])=><option value={value} key={value}>{label}</option>)}</select></label>
+          {draft.status==='BLOQUEADO'&&<label>Motivo do bloqueio*<textarea required maxLength={500} value={draft.motivoBloqueio} onChange={event=>change('motivoBloqueio',event.target.value)}/></label>}
+          {draft.kind==='PESSOAL'&&<label>Local<input maxLength={180} value={draft.local} onChange={event=>change('local',event.target.value)}/></label>}
+          {creating&&<label>Visibilidade<select value={draft.visibilidade} onChange={event=>change('visibilidade',event.target.value)}><option value="PRIVADO">Só para mim</option>{(draft.kind==='PESSOAL'||podeAprovar)&&<option value={draft.kind==='PESSOAL'?'PUBLICO':'COMUNIDADE'}>Comunidade{draft.kind==='PESSOAL'&&!podeAprovar?' (sujeito à aprovação)':''}</option>}</select></label>}
+          <label>Observações<textarea maxLength={draft.kind==='TAREFA'?2000:1000} value={draft.descricao} onChange={event=>change('descricao',event.target.value)}/></label>
+          {conflict&&<label className="vp-conflict-accept"><input type="checkbox" checked={accept} onChange={event=>setAccept(event.target.checked)}/>Confirmo a sobreposição de horário.</label>}
+          <div className="vp-side-actions"><button type="button" className="vp-button" disabled={busy} onClick={close}>Cancelar</button><button type="submit" className="vp-button vp-primary" disabled={busy||!ready||(conflict&&!accept)}>{busy?'Salvando…':'Salvar'}</button></div>
+          {selected?.camada==='PESSOAL'&&selected.meu&&<button className="vp-button vp-quiet" type="button" disabled={busy} onClick={()=>void remove(selected)}>Excluir compromisso</button>}
+          {selected?.camada==='TAREFA'&&selected.iniciaEm&&<button className="vp-button vp-quiet" type="button" disabled={busy||!ready} onClick={()=>void reschedule(selected,null)}>Mover para sem data</button>}
+          {selected?.camada==='PESSOAL'&&podeAprovar&&selected.aprovacaoStatus==='PENDENTE'&&<button type="button" className="vp-button" disabled={busy} onClick={()=>void approve(selected)}>Aprovar publicação</button>}
+        </form>}</>}
+      </aside>}
+    </div>
+    <div className="vp-bottomline"><span>P1 Alta · P2 Normal · P3 Baixa · ! Conflito · <a href="/painel?view=fio">Fio do dia ↗</a></span><span>Fuso deste dispositivo{zone?' · '+zone:''}</span></div>
+    {feedback&&<div className="vp-feedback" role="status"><span>{feedback}</span><div>{undo&&<button type="button" disabled={busy||!ready} onClick={()=>void reschedule(undo.item,undo.item.iniciaEm,true,undo.version)}>Desfazer</button>}<button type="button" aria-label="Fechar confirmação" onClick={()=>{setFeedback('');setUndo(null);}}>×</button></div></div>}
+  </section>;
 }

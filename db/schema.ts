@@ -3334,3 +3334,17 @@ export const estacionamentoCenasHistorico = sqliteTable('estacionamento_cenas_hi
  id:integer('id').primaryKey({autoIncrement:true}), comunidadeId:integer('comunidade_id').notNull().references(()=>comunidades.id,{onDelete:'cascade'}),
  revisao:integer('revisao').notNull(), cena:text('cena').notNull(), criadoPor:integer('criado_por').references(()=>usuarios.id,{onDelete:'set null'}), criadoEm:text('criado_em').notNull().default(sql`CURRENT_TIMESTAMP`),
 },t=>[index('estacionamento_cenas_historico_comunidade').on(t.comunidadeId,t.id)]);
+
+// Calendar management: nullable scheduled dates keep the backlog independent of deadlines.
+export const agendaTarefas = sqliteTable('agenda_tarefas', {
+  id: integer('id').primaryKey({autoIncrement:true}),
+  comunidadeId: integer('comunidade_id').notNull().references(()=>comunidades.id,{onDelete:'cascade'}),
+  criadoPor: integer('criado_por').notNull().references(()=>usuarios.id,{onDelete:'cascade'}),
+  responsavelId: integer('responsavel_id').notNull().references(()=>usuarios.id,{onDelete:'cascade'}),
+  titulo:text('titulo').notNull(), descricao:text('descricao').notNull().default(''),
+  iniciaEm:text('inicia_em'), terminaEm:text('termina_em'), prazoEm:text('prazo_em'),
+  prioridade:text('prioridade').notNull().default('P2'), status:text('status').notNull().default('PLANEJADO'),
+  visibilidade:text('visibilidade').notNull().default('PRIVADO'), motivoBloqueio:text('motivo_bloqueio').notNull().default(''),
+  versao:integer('versao').notNull().default(1), concluidoEm:text('concluido_em'),
+  criadoEm:text('criado_em').notNull().default(sql`CURRENT_TIMESTAMP`), atualizadoEm:text('atualizado_em').notNull().default(sql`CURRENT_TIMESTAMP`),
+},t=>[index('agenda_tarefas_periodo_idx').on(t.comunidadeId,t.iniciaEm),index('agenda_tarefas_responsavel_idx').on(t.comunidadeId,t.responsavelId,t.iniciaEm),check('agenda_tarefas_priority',sql`${t.prioridade} IN ('P1','P2','P3')`),check('agenda_tarefas_status',sql`${t.status} IN ('PLANEJADO','EM_ANDAMENTO','BLOQUEADO','CONCLUIDO')`),check('agenda_tarefas_visibility',sql`${t.visibilidade} IN ('PRIVADO','COMUNIDADE')`)]);

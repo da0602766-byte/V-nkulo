@@ -12,7 +12,6 @@ import {
   FormEvent,
   useCallback,
   useEffect,
-  useId,
   useMemo,
   useRef,
   useState,
@@ -149,9 +148,17 @@ export default function CommunityHome({
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerIntent, setComposerIntent] = useState<ComposerIntent>("text");
   const [composerOptionsOpen, setComposerOptionsOpen] = useState(false);
-  const introId = useId();
+  const introId = "community-mural-intro";
   const [introState, setIntroState] = useState<"auto" | "open" | "closed">("auto");
   const introOpen = introState !== "closed";
+  useEffect(() => {
+    const toggle = () => setIntroState(value => value === "closed" ? "open" : "closed");
+    window.addEventListener("vinkulo:toggle-mural-intro", toggle);
+    return () => window.removeEventListener("vinkulo:toggle-mural-intro", toggle);
+  }, []);
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("vinkulo:mural-intro-state", {detail: {open: introOpen}}));
+  }, [introOpen]);
   useEffect(() => {
     if (introState !== "auto") return;
     const timer = window.setTimeout(() => setIntroState("closed"), 5_200);
@@ -665,12 +672,6 @@ export default function CommunityHome({
 
   return (
     <section className={`worship-feed community-feed-redesign ${introStyles.workspace}`} aria-busy={loading}>
-      <div className={introStyles.titlebar}>
-        <h1>Mural</h1>
-        <button type="button" className={introStyles.introToggle} aria-expanded={introOpen} aria-controls={introId} onClick={() => setIntroState(introOpen ? "closed" : "open")}>
-          {introOpen ? "Recolher apresentação" : "Sobre a comunidade"}<span aria-hidden="true">{introOpen ? "−" : "+"}</span>
-        </button>
-      </div>
       <FeedDriveStorageNotice key={`${currentUserId}:${communityId}`} currentUserId={currentUserId} communityId={communityId}/>
       <div id={introId} className={introStyles.intro} data-open={introOpen} aria-hidden={!introOpen} inert={!introOpen}>
       <div className={introStyles.introClip}>
