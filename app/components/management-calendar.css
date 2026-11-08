@@ -1,4 +1,32 @@
-.management-calendar.management-calendar{color-scheme:light dark;--v-bg:light-dark(#f4f7fb,#151c28);--v-surface:light-dark(#fff,#1d2735);--v-soft:light-dark(#edf3fb,#25354a);--v-text:light-dark(#20334d,#e8effb);--v-muted:light-dark(#63778d,#a5b7ce);--v-line:light-dark(#dce5ef,#354459);--v-accent:light-dark(#0865cf,#8ebcff);--v-on:light-dark(#fff,#14283f);--v-red:light-dark(#b23b4f,#ff9aa9);--v-red-soft:light-dark(#fff0f2,#482a36);--v-green:light-dark(#287d60,#87d6b6);--v-amber:light-dark(#8f651d,#e6c27e);font:14px/1.45 Inter,"Segoe UI",Arial,sans-serif;color:var(--v-text);width:100%;}
+/* Follow the application's resolved theme; OS-only light-dark() fallbacks can
+   disagree with a manual theme switch after CSS compilation. */
+.management-calendar.management-calendar {
+  --v-bg:var(--pilot-bg,#f4f7fb);
+  --v-surface:var(--pilot-surface,#fff);
+  --v-soft:var(--pilot-surface-2,#edf3fb);
+  --v-text:var(--pilot-text,#20334d);
+  --v-muted:var(--pilot-muted,#63778d);
+  --v-line:var(--pilot-line,#dce5ef);
+  --v-accent:var(--pilot-primary,#0865cf);
+  --v-on:var(--pilot-on-primary,#fff);
+  --v-red:#b23b4f;--v-red-soft:#fff0f2;
+  --v-green:#287d60;--v-amber:#8f651d;
+  color-scheme:inherit;
+  font:14px/1.45 Inter,"Segoe UI",Arial,sans-serif;
+  color:var(--v-text);width:100%;
+}
+:is(html[data-theme="dark"],html:not([data-theme])[data-pilot-theme="escuro"]) .management-calendar.management-calendar {
+  --v-bg:var(--pilot-bg,#151c28);
+  --v-surface:var(--pilot-surface,#1d2735);
+  --v-soft:var(--pilot-surface-2,#25354a);
+  --v-text:var(--pilot-text,#e8effb);
+  --v-muted:var(--pilot-muted,#a5b7ce);
+  --v-line:var(--pilot-line,#354459);
+  --v-accent:var(--pilot-primary,#8ebcff);
+  --v-on:var(--pilot-on-primary,#14283f);
+  --v-red:#ff9aa9;--v-red-soft:#482a36;
+  --v-green:#87d6b6;--v-amber:#e6c27e;
+}
     .management-calendar.management-calendar *{box-sizing:border-box;min-width:0}
     .management-calendar.management-calendar [hidden]{display:none!important}
     .management-calendar.management-calendar button,.management-calendar.management-calendar input,.management-calendar.management-calendar select,.management-calendar.management-calendar textarea{font:inherit}
@@ -109,7 +137,6 @@
     @media(max-width:700px){.management-calendar.management-calendar .vp-month-head,.management-calendar.management-calendar .vp-month-grid{min-width:336px}.management-calendar.management-calendar .vp-day-cell{padding:2px;min-height:78px}.management-calendar.management-calendar .vp-date-number{width:100%;height:44px;min-height:44px;border-radius:8px}.management-calendar.management-calendar .vp-modes button{min-height:44px}}
     @media(max-width:700px){.management-calendar.management-calendar .vp-toolbar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}.management-calendar.management-calendar .vp-period{grid-column:1/-1;min-width:0;margin:0}.management-calendar.management-calendar .vp-period-nav{grid-column:1;grid-row:2}.management-calendar.management-calendar .vp-modes{grid-column:1/-1;grid-row:3;margin:0;justify-content:space-around}.management-calendar.management-calendar .vp-new{grid-column:2;grid-row:2;justify-self:end}.management-calendar.management-calendar .vp-agenda-owner{grid-row:2;justify-self:start}.management-calendar.management-calendar .vp-agenda-row>.vp-status{grid-row:2;justify-self:end}}
     @media(pointer:coarse){.management-calendar.management-calendar .vp-button,.management-calendar.management-calendar .vp-icon-button,.management-calendar.management-calendar .vp-chip,.management-calendar.management-calendar .vp-modes button,.management-calendar.management-calendar .vp-backlog-footer button,.management-calendar.management-calendar .vp-date-number,.management-calendar.management-calendar input:not([type="checkbox"]),.management-calendar.management-calendar select{min-height:44px}}
-  .management-calendar.management-calendar{--v-bg:var(--pilot-bg,#f4f7fb);--v-surface:var(--pilot-surface,#fff);--v-soft:var(--pilot-soft,#edf3fb);--v-text:var(--pilot-text,#20334d);--v-muted:var(--pilot-muted,#63778d);--v-line:var(--pilot-line,#dce5ef);--v-accent:var(--pilot-primary,#0865cf);--v-on:var(--pilot-on-primary,#fff);color-scheme:inherit}
 .management-calendar.management-calendar .vp-section-heading{margin:8px 0 18px}
 .management-calendar.management-calendar .vp-time-scroll{max-height:640px;overflow:auto}
 .management-calendar.management-calendar .vp-time-column,.management-calendar.management-calendar .vp-time-axis{height:1152px}
