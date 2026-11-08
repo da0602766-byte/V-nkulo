@@ -322,3 +322,11 @@
   .calendar:global(.agenda-studio) :global(.agenda-calendario-acoes) { margin-left:0; }
   .calendar:global(.agenda-studio) :global(.agenda-camadas) { flex-basis:auto; }
 }
+
+.workspace .directoryDisclosure{margin-top:16px;border-top:1px solid var(--pilot-line);color:var(--pilot-text)}
+.workspace .directoryDisclosure>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:10px 0;list-style:none;cursor:pointer;color:var(--pilot-muted);font-size:12px}
+.workspace .directoryDisclosure>summary::-webkit-details-marker{display:none}
+.workspace .directoryDisclosure>summary:focus-visible{outline:2px solid var(--pilot-primary);outline-offset:3px}
+.workspace .directoryDisclosure>summary>span:last-child{font-size:18px}
+.workspace .directoryDisclosure[open]>summary>span:last-child{transform:rotate(180deg)}
+.workspace .directoryDisclosure>div{padding-top:10px}

@@ -32,7 +32,7 @@ export default function WorkspaceOrientation({ area, community }: { area: string
     return () => window.removeEventListener("vinkulo:mural-intro-state", sync);
   }, []);
   const info = AREAS[area];
-  if (!info) return null;
+  if (!info || area === "eventos") return null;
   return <div className="workspace-orientation">
     <div className="workspace-breadcrumb" aria-label="Localização atual"><span title={community}>{community}</span><span aria-hidden="true">/</span><span>{info[0]}</span><span aria-hidden="true">/</span><strong>{info[1]}</strong></div>
     <div style={{display:"flex",alignItems:"center",gap:4,marginLeft:"auto"}}><button type="button" aria-expanded={help} aria-controls={`workspace-guide-${area}`} onClick={() => setHelp(!help)}>Sobre esta área <span aria-hidden="true">{help ? "−" : "+"}</span></button>

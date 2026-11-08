@@ -31,7 +31,7 @@
     .management-calendar.management-calendar [hidden]{display:none!important}
     .management-calendar.management-calendar button,.management-calendar.management-calendar input,.management-calendar.management-calendar select,.management-calendar.management-calendar textarea{font:inherit}
     .management-calendar.management-calendar button{cursor:pointer}
-    .management-calendar.management-calendar :is(button,input,select,textarea,a):focus-visible{outline:3px solid var(--v-accent);outline-offset:3px}
+    .management-calendar.management-calendar :is(button,input,select,textarea,a,summary):focus-visible{outline:3px solid var(--v-accent);outline-offset:3px}
     .management-calendar.management-calendar button:disabled{opacity:.5;cursor:wait}
     .management-calendar.management-calendar svg{width:17px;height:17px;flex:0 0 17px;vertical-align:middle;stroke-width:1.7}
     .management-calendar.management-calendar h1,.management-calendar.management-calendar h2,.management-calendar.management-calendar h3,.management-calendar.management-calendar p{margin:0}
@@ -39,25 +39,12 @@
     .management-calendar.management-calendar .vp-button.is-active,.management-calendar.management-calendar .vp-primary{background:var(--v-accent);color:var(--v-on);border-color:var(--v-accent)}
     .management-calendar.management-calendar .vp-quiet{background:transparent;border-color:transparent;color:var(--v-muted)}
     .management-calendar.management-calendar .vp-icon-button{padding:8px;width:40px;min-width:40px}
-    .management-calendar.management-calendar .vp-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
-    .management-calendar.management-calendar .vp-period{font-size:17px;font-weight:650;letter-spacing:-.4px;margin-right:5px;min-width:170px}
-    .management-calendar.management-calendar .vp-period-nav{display:flex;gap:2px;align-items:center}
-    .management-calendar.management-calendar .vp-modes{display:flex;gap:2px;padding:3px;border:1px solid var(--v-line);border-radius:9px;background:var(--v-surface);margin-left:auto}
-    .management-calendar.management-calendar .vp-modes button{border:0;min-height:32px;padding:5px 10px;font-size:12px;border-radius:6px;background:transparent;color:var(--v-muted)}
-    .management-calendar.management-calendar .vp-modes button[aria-pressed="true"]{background:var(--v-soft);color:var(--v-accent);font-weight:600}
-    .management-calendar.management-calendar .vp-filters{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
-    .management-calendar.management-calendar .vp-search{position:relative;flex:1;min-width:180px}
-    .management-calendar.management-calendar .vp-search>i,.management-calendar.management-calendar .vp-search>svg{position:absolute;left:11px;top:12px;color:var(--v-muted)}
-    .management-calendar.management-calendar .vp-search input{padding-left:36px;width:100%}
     .management-calendar.management-calendar input,.management-calendar.management-calendar select,.management-calendar.management-calendar textarea{color:var(--v-text);background:var(--v-surface);border:1px solid var(--v-line);border-radius:8px;min-height:40px;padding:9px 10px;max-width:100%}
-    .management-calendar.management-calendar .vp-filters select{max-width:190px;font-size:12px}
     .management-calendar.management-calendar .vp-chip{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--v-line);background:transparent;color:var(--v-muted);padding:6px 10px;border-radius:20px;min-height:34px;font-size:12px}
     .management-calendar.management-calendar .vp-chip[aria-pressed="true"]{border-color:var(--v-accent);color:var(--v-accent);background:var(--v-soft)}
     .management-calendar.management-calendar .vp-metrics{display:flex;align-items:center;gap:20px;flex-wrap:wrap;border-bottom:1px solid var(--v-line);padding:0 0 12px;margin-bottom:14px;color:var(--v-muted);font-size:12px}
     .management-calendar.management-calendar .vp-metrics strong{font-size:16px;font-weight:650;color:var(--v-text);margin-right:4px;font-variant-numeric:tabular-nums}
     .management-calendar.management-calendar .vp-metrics .vp-conflict-count strong{color:var(--v-red)}
-    .management-calendar.management-calendar .vp-workspace{display:grid;grid-template-columns:minmax(0,1fr) 236px;gap:20px;align-items:start}
-    .management-calendar.management-calendar .vp-workspace.no-side{grid-template-columns:minmax(0,1fr)}
     .management-calendar.management-calendar .vp-calendar-main{border:1px solid var(--v-line);background:var(--v-surface);border-radius:10px;overflow:hidden}
     .management-calendar.management-calendar .vp-month-scroll{overflow-x:auto}
     .management-calendar.management-calendar .vp-month-head{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:var(--v-bg);border-bottom:1px solid var(--v-line)}
@@ -95,7 +82,7 @@
     .management-calendar.management-calendar .vp-swipe-note{display:none;padding:7px 10px;color:var(--v-muted);font-size:11px;background:var(--v-bg)}
     .management-calendar.management-calendar .vp-side{border-left:1px solid var(--v-line);padding-left:18px}
     .management-calendar.management-calendar .vp-side-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
-    .management-calendar.management-calendar .vp-side-heading h2{font-size:14px;font-weight:650}
+    .management-calendar.management-calendar .vp-side-heading h2{font-size:14px;font-weight:650;overflow-wrap:anywhere}
     .management-calendar.management-calendar .vp-side-description{font-size:11px;color:var(--v-muted);margin-bottom:12px}
     .management-calendar.management-calendar .vp-backlog-row{padding:12px 0;border-bottom:1px solid var(--v-line)}
     .management-calendar.management-calendar .vp-backlog-title{font-size:12px;line-height:1.45;font-weight:600;display:block;color:var(--v-text);border:0;padding:0;background:transparent;text-align:left}
@@ -132,11 +119,11 @@
     .management-calendar.management-calendar .vp-feedback button{background:transparent;border:0;color:var(--v-accent);font:inherit;padding:5px;min-height:32px}
     @keyframes vp-appear{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
     @media(prefers-reduced-motion:reduce){.management-calendar.management-calendar *,.management-calendar.management-calendar *::before,.management-calendar.management-calendar *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
-    @media(max-width:1050px){.management-calendar.management-calendar .vp-workspace{grid-template-columns:minmax(0,1fr) 218px;gap:14px}.management-calendar.management-calendar .vp-side{padding-left:14px}.management-calendar.management-calendar .vp-toolbar{gap:6px}.management-calendar.management-calendar .vp-modes{margin-left:0}.management-calendar.management-calendar .vp-period{flex-basis:calc(100% - 160px)}.management-calendar.management-calendar .vp-filters select{max-width:160px}}
-    @media(max-width:700px){.management-calendar.management-calendar .vp-toolbar{gap:8px}.management-calendar.management-calendar .vp-period{min-width:0;flex-basis:calc(100% - 150px);font-size:16px}.management-calendar.management-calendar .vp-modes{flex:1;justify-content:space-around}.management-calendar.management-calendar .vp-modes button{min-height:36px;padding:6px 8px}.management-calendar.management-calendar .vp-filters{gap:6px}.management-calendar.management-calendar .vp-search{flex-basis:100%}.management-calendar.management-calendar .vp-filters select{width:calc(50% - 3px);max-width:none;font-size:16px}.management-calendar.management-calendar input,.management-calendar.management-calendar select,.management-calendar.management-calendar textarea{font-size:16px}.management-calendar.management-calendar .vp-metrics{gap:10px;font-size:11px}.management-calendar.management-calendar .vp-metrics strong{font-size:15px}.management-calendar.management-calendar .vp-workspace{display:block}.management-calendar.management-calendar .vp-side{border:0;padding:0;margin-top:16px}.management-calendar.management-calendar .vp-workspace.side-open .vp-calendar-main{display:none}.management-calendar.management-calendar .vp-workspace.side-open .vp-side{margin:0}.management-calendar.management-calendar .vp-day-cell{min-height:66px;padding:4px}.management-calendar.management-calendar .vp-month-head>span{font-size:11px;padding:10px 0}.management-calendar.management-calendar .vp-date-number{width:27px;height:27px;margin:0 auto 6px;font-size:11px}.management-calendar.management-calendar .vp-day-cell .vp-calendar-event,.management-calendar.management-calendar .vp-day-cell .vp-more{display:none}.management-calendar.management-calendar .vp-mobile-count{display:block;text-align:center;color:var(--v-accent);font-size:11px}.management-calendar.management-calendar .vp-agenda-row{grid-template-columns:56px minmax(0,1fr);gap:8px;padding:12px 9px}.management-calendar.management-calendar .vp-agenda-owner{grid-column:2;font-size:11px}.management-calendar.management-calendar .vp-agenda-row>.vp-status{grid-column:2}.management-calendar.management-calendar .vp-agenda-time{align-self:start}.management-calendar.management-calendar .vp-swipe-note{display:block}.management-calendar.management-calendar .vp-side-form input,.management-calendar.management-calendar .vp-side-form select,.management-calendar.management-calendar .vp-side-form textarea{font-size:16px}.management-calendar.management-calendar .vp-side-actions .vp-button,.management-calendar.management-calendar .vp-backlog-footer button,.management-calendar.management-calendar .vp-icon-button,.management-calendar.management-calendar .vp-button,.management-calendar.management-calendar .vp-chip,.management-calendar.management-calendar .vp-date-number{min-height:44px}.management-calendar.management-calendar .vp-date-number{width:32px;height:32px;min-height:32px}.management-calendar.management-calendar .vp-month-head>span{font-size:11px}}
-    @media(max-width:700px){.management-calendar.management-calendar .vp-month-head,.management-calendar.management-calendar .vp-month-grid{min-width:336px}.management-calendar.management-calendar .vp-day-cell{padding:2px;min-height:78px}.management-calendar.management-calendar .vp-date-number{width:100%;height:44px;min-height:44px;border-radius:8px}.management-calendar.management-calendar .vp-modes button{min-height:44px}}
-    @media(max-width:700px){.management-calendar.management-calendar .vp-toolbar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}.management-calendar.management-calendar .vp-period{grid-column:1/-1;min-width:0;margin:0}.management-calendar.management-calendar .vp-period-nav{grid-column:1;grid-row:2}.management-calendar.management-calendar .vp-modes{grid-column:1/-1;grid-row:3;margin:0;justify-content:space-around}.management-calendar.management-calendar .vp-new{grid-column:2;grid-row:2;justify-self:end}.management-calendar.management-calendar .vp-agenda-owner{grid-row:2;justify-self:start}.management-calendar.management-calendar .vp-agenda-row>.vp-status{grid-row:2;justify-self:end}}
-    @media(pointer:coarse){.management-calendar.management-calendar .vp-button,.management-calendar.management-calendar .vp-icon-button,.management-calendar.management-calendar .vp-chip,.management-calendar.management-calendar .vp-modes button,.management-calendar.management-calendar .vp-backlog-footer button,.management-calendar.management-calendar .vp-date-number,.management-calendar.management-calendar input:not([type="checkbox"]),.management-calendar.management-calendar select{min-height:44px}}
+    @media(max-width:1050px){.management-calendar.management-calendar .vp-side{padding-left:14px}}
+    @media(max-width:700px){.management-calendar.management-calendar input,.management-calendar.management-calendar select,.management-calendar.management-calendar textarea{font-size:16px}.management-calendar.management-calendar .vp-metrics{gap:10px;font-size:11px}.management-calendar.management-calendar .vp-metrics strong{font-size:15px}.management-calendar.management-calendar .vp-side{border:0;padding:0;margin-top:16px}.management-calendar.management-calendar .vp-workspace.side-open .vp-calendar-main{display:none}.management-calendar.management-calendar .vp-workspace.side-open .vp-side{margin:0}.management-calendar.management-calendar .vp-day-cell{min-height:66px;padding:4px}.management-calendar.management-calendar .vp-month-head>span{font-size:11px;padding:10px 0}.management-calendar.management-calendar .vp-date-number{width:27px;height:27px;margin:0 auto 6px;font-size:11px}.management-calendar.management-calendar .vp-day-cell .vp-calendar-event,.management-calendar.management-calendar .vp-day-cell .vp-more{display:none}.management-calendar.management-calendar .vp-mobile-count{display:block;text-align:center;color:var(--v-accent);font-size:11px}.management-calendar.management-calendar .vp-agenda-row{grid-template-columns:56px minmax(0,1fr);gap:8px;padding:12px 9px}.management-calendar.management-calendar .vp-agenda-owner{grid-column:2;font-size:11px}.management-calendar.management-calendar .vp-agenda-row>.vp-status{grid-column:2}.management-calendar.management-calendar .vp-agenda-time{align-self:start}.management-calendar.management-calendar .vp-swipe-note{display:block}.management-calendar.management-calendar .vp-side-form input,.management-calendar.management-calendar .vp-side-form select,.management-calendar.management-calendar .vp-side-form textarea{font-size:16px}.management-calendar.management-calendar .vp-side-actions .vp-button,.management-calendar.management-calendar .vp-backlog-footer button,.management-calendar.management-calendar .vp-icon-button,.management-calendar.management-calendar .vp-button,.management-calendar.management-calendar .vp-chip,.management-calendar.management-calendar .vp-date-number{min-height:44px}.management-calendar.management-calendar .vp-date-number{width:32px;height:32px;min-height:32px}.management-calendar.management-calendar .vp-month-head>span{font-size:11px}}
+    @media(max-width:700px){.management-calendar.management-calendar .vp-month-head,.management-calendar.management-calendar .vp-month-grid{min-width:336px}.management-calendar.management-calendar .vp-day-cell{padding:2px;min-height:64px}.management-calendar.management-calendar .vp-date-number{width:100%;height:44px;min-height:44px;border-radius:8px}}
+    @media(max-width:700px){.management-calendar.management-calendar .vp-agenda-owner{grid-row:2;justify-self:start}.management-calendar.management-calendar .vp-agenda-row>.vp-status{grid-row:2;justify-self:end}}
+    @media(pointer:coarse){.management-calendar.management-calendar .vp-button,.management-calendar.management-calendar .vp-icon-button,.management-calendar.management-calendar .vp-chip,.management-calendar.management-calendar .vp-backlog-footer button,.management-calendar.management-calendar .vp-date-number,.management-calendar.management-calendar input:not([type="checkbox"]),.management-calendar.management-calendar select{min-height:44px}}
 .management-calendar.management-calendar .vp-section-heading{margin:8px 0 18px}
 .management-calendar.management-calendar .vp-time-scroll{max-height:640px;overflow:auto}
 .management-calendar.management-calendar .vp-time-column,.management-calendar.management-calendar .vp-time-axis{height:1152px}
@@ -146,7 +133,6 @@
 .management-calendar.management-calendar .vp-time-label{top:calc(var(--hour) * 48px)}
 .management-calendar.management-calendar .vp-calendar-event:hover{filter:brightness(.96);outline:1px solid var(--v-accent)}
 .management-calendar.management-calendar .vp-calendar-event:focus-visible{z-index:3}
-.management-calendar.management-calendar .vp-search input{padding-left:12px}
 .management-calendar.management-calendar .vp-feedback{margin:10px 0 14px}
 .management-calendar.management-calendar .vp-error{border-left:3px solid var(--v-red)}
 .management-calendar.management-calendar .vp-readonly{font-size:12px;line-height:1.7;overflow-wrap:anywhere}
@@ -156,6 +142,77 @@
 .management-calendar.management-calendar .vp-conflict-accept{display:flex}
 .management-calendar.management-calendar .vp-conflict-accept input{width:18px;min-height:18px;flex-shrink:0}
 .management-calendar.management-calendar .vp-side-form{animation:vp-appear .15s ease-out}
-.management-calendar.management-calendar .vp-filters select{min-width:0}
-@media(max-width:700px){.management-calendar.management-calendar .vp-new{grid-column:2;grid-row:2;justify-self:end}.management-calendar.management-calendar .vp-filters select{flex:1 1 calc(50% - 6px);width:calc(50% - 6px)}.management-calendar.management-calendar .vp-side-form input,.management-calendar.management-calendar .vp-side-form select,.management-calendar.management-calendar .vp-side-form textarea{font-size:16px}.management-calendar.management-calendar .vp-calendar-event{min-height:32px}.management-calendar.management-calendar .vp-side{max-width:100%}.management-calendar.management-calendar .vp-side-heading h2{font-size:16px}}
+@media(max-width:700px){.management-calendar.management-calendar .vp-side-form input,.management-calendar.management-calendar .vp-side-form select,.management-calendar.management-calendar .vp-side-form textarea{font-size:16px}.management-calendar.management-calendar .vp-calendar-event{min-height:32px}.management-calendar.management-calendar .vp-side{max-width:100%}.management-calendar.management-calendar .vp-side-heading h2{font-size:16px}}
 @media(prefers-reduced-motion:reduce){.management-calendar.management-calendar .vp-side-form{animation:none}}
+
+/* Calendar first: a compact command bar, with tools revealed on demand. */
+.management-calendar.management-calendar .vp-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 12px;flex-wrap:wrap}
+.management-calendar.management-calendar .vp-period-group{display:flex;align-items:center;gap:16px;flex:1;min-width:min(100%,290px)}
+.management-calendar.management-calendar .vp-period{margin:0;min-width:0;font-size:18px;line-height:1.25;font-weight:650;letter-spacing:-.35px;overflow-wrap:anywhere}
+.management-calendar.management-calendar .vp-period-nav{display:flex;align-items:center;gap:2px;flex-shrink:0}
+.management-calendar.management-calendar .vp-period-nav .vp-button{padding:8px;min-height:40px;font-size:12px}
+.management-calendar.management-calendar .vp-calendar-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.management-calendar.management-calendar .vp-view-select{width:108px;font-size:13px;min-height:40px;padding:8px 26px 8px 10px}
+.management-calendar.management-calendar .vp-filter-trigger{font-size:12px;gap:6px;white-space:nowrap}
+.management-calendar.management-calendar .vp-filter-trigger[data-active="true"]{border-color:var(--v-accent);color:var(--v-accent)}
+.management-calendar.management-calendar .vp-tool-icon{width:16px;height:16px;flex:0 0 16px}
+.management-calendar.management-calendar .vp-filter-count{font-size:11px;font-weight:650}
+.management-calendar.management-calendar .vp-new{font-size:13px;white-space:nowrap;padding:9px 12px}
+.management-calendar.management-calendar .vp-tools-menu{position:relative}
+.management-calendar.management-calendar .vp-tools-menu>summary{list-style:none;cursor:pointer;position:relative;font-size:20px;line-height:1;user-select:none}
+.management-calendar.management-calendar .vp-tools-menu>summary::-webkit-details-marker{display:none}
+.management-calendar.management-calendar .vp-menu-count{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;display:grid;place-items:center;border-radius:8px;background:var(--v-accent);color:var(--v-on);font-size:10px;font-weight:650;outline:2px solid var(--v-bg)}
+.management-calendar.management-calendar .vp-tools-content{position:absolute;right:0;top:calc(100% + 6px);z-index:12;display:grid;width:min(250px,calc(100vw - 36px));padding:5px;background:var(--v-surface);border:1px solid var(--v-line);border-radius:10px;box-shadow:0 10px 24px #0002}
+.management-calendar.management-calendar .vp-tools-content>button{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:10px;border:0;border-radius:6px;background:transparent;color:var(--v-text);min-height:40px;text-align:left;font-size:12px}
+.management-calendar.management-calendar .vp-tools-content>button:hover{background:var(--v-soft)}
+.management-calendar.management-calendar .vp-tools-content>button>span{color:var(--v-muted);font-variant-numeric:tabular-nums}
+.management-calendar.management-calendar .vp-filters{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 0;margin-bottom:12px;border-top:1px solid var(--v-line);border-bottom:1px solid var(--v-line)}
+.management-calendar.management-calendar .vp-search{display:block;flex:1;min-width:200px}
+.management-calendar.management-calendar .vp-search input{width:100%;padding-left:12px}
+.management-calendar.management-calendar .vp-filters select{max-width:190px;font-size:12px}
+.management-calendar.management-calendar .vp-active-filters{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--v-muted);margin:-2px 0 10px}
+.management-calendar.management-calendar .vp-active-filters button{border:0;background:none;color:var(--v-accent);font:inherit;min-height:32px;padding:4px}
+.management-calendar.management-calendar .vp-attention{font-size:12px;color:var(--v-red);margin:0 0 10px}
+.management-calendar.management-calendar .vp-calendar-help{display:flex;align-items:start;gap:12px;font-size:12px;line-height:1.6;color:var(--v-muted);padding:10px 0 14px}
+.management-calendar.management-calendar .vp-calendar-help>p{flex:1}
+.management-calendar.management-calendar .vp-calendar-help>button{flex-shrink:0}
+.management-calendar.management-calendar .vp-workspace{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;align-items:start}
+.management-calendar.management-calendar .vp-workspace.no-side{grid-template-columns:minmax(0,1fr)}
+.management-calendar.management-calendar .vp-metrics>.vp-button{margin-left:auto}
+@media(max-width:700px){
+ .management-calendar.management-calendar .vp-toolbar{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;margin-bottom:10px}
+ .management-calendar.management-calendar .vp-period-group{gap:4px;min-width:0;justify-content:space-between}
+ .management-calendar.management-calendar .vp-period{font-size:17px;flex:1}
+ .management-calendar.management-calendar .vp-period-nav .vp-button{min-height:44px;min-width:40px;padding:6px;font-size:13px}
+ .management-calendar.management-calendar .vp-calendar-actions{position:relative;display:grid;grid-template-columns:minmax(80px,1fr) auto 40px auto;gap:6px}
+ .management-calendar.management-calendar .vp-view-select{width:100%;font-size:16px;min-height:44px;padding:8px}
+ .management-calendar.management-calendar .vp-calendar-actions .vp-button{min-height:44px}
+ .management-calendar.management-calendar .vp-filter-trigger{font-size:13px;padding:8px;gap:4px}
+ .management-calendar.management-calendar .vp-filter-trigger svg{width:15px;flex-basis:15px}
+ .management-calendar.management-calendar .vp-new{font-size:14px;padding:8px 10px}
+ .management-calendar.management-calendar .vp-tools-menu{position:static}.management-calendar.management-calendar .vp-tools-content{right:0}.management-calendar.management-calendar .vp-tools-content>button{min-height:44px;font-size:14px}
+ .management-calendar.management-calendar .vp-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:10px 0}
+ .management-calendar.management-calendar .vp-search{grid-column:1/-1;min-width:0}
+ .management-calendar.management-calendar .vp-filters input,.management-calendar.management-calendar .vp-filters select{font-size:16px;max-width:100%;width:100%;min-height:44px}
+ .management-calendar.management-calendar .vp-filters>.vp-button:last-child{grid-column:2;justify-self:end}
+ .management-calendar.management-calendar .vp-workspace{display:block}
+ .management-calendar.management-calendar .vp-side-heading h2{font-size:16px}
+ .management-calendar.management-calendar .vp-date-number[aria-current="date"]{background:radial-gradient(circle,var(--v-accent) 0 16px,transparent 17px);border-radius:0}
+ .management-calendar.management-calendar .vp-mobile-count{font-size:15px;line-height:12px;letter-spacing:2px}
+ .management-calendar.management-calendar[data-editing="true"] .vp-toolbar{display:none}
+ .management-calendar.management-calendar .vp-agenda-owner{display:none}
+ .management-calendar.management-calendar .vp-agenda-row>.vp-status{justify-self:start;font-size:11px}
+ .management-calendar.management-calendar .vp-agenda-row>.vp-status:is([data-status="Publicado"],[data-status="Planejado"],[data-status="Confirmada"]){display:none}
+}
+
+.management-calendar.management-calendar .vp-item-options{border-top:1px solid var(--v-line);padding-top:3px}
+.management-calendar.management-calendar .vp-item-options>summary{cursor:pointer;color:var(--v-accent);font-size:12px;min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:8px;list-style:none}
+.management-calendar.management-calendar .vp-item-options>summary::after{content:'+';font-size:18px}
+.management-calendar.management-calendar .vp-item-options[open]>summary::after{content:'−'}
+.management-calendar.management-calendar .vp-item-options>summary::-webkit-details-marker{display:none}
+.management-calendar.management-calendar .vp-item-options>div{display:grid;gap:11px;padding:6px 0 10px}
+@media(max-width:360px){
+ .management-calendar.management-calendar .vp-calendar-actions{grid-template-columns:minmax(90px,1fr) auto 40px 44px}
+ .management-calendar.management-calendar .vp-new{width:44px;padding:8px}
+ .management-calendar.management-calendar .vp-new-label,.management-calendar.management-calendar .vp-filter-trigger .vp-tool-icon{display:none}
+}

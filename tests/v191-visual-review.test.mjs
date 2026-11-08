@@ -27,8 +27,8 @@ test("Agenda mantém ações juntas e editor sem faixa duplicada", async () => {
   assert.match(agenda, /aria-label="Visualização do calendário"/);
   assert.match(agenda, /aria-label="Filtrar origem"/);
   assert.match(agenda, /className="vp-side-form"/);
-  assert.match(agenda, /aoCriarEvento&&<button/);
-  assert.match(agenda, /close\(\);aoCriarEvento\(calendarDay\(reference\)\)/);
+  assert.match(agenda, /aoCriarEvento&&<option value="EVENTO"/);
+  assert.match(agenda, /aoCriarEvento\?\.\(calendarDay\(reference\)\)/);
   assert.match(events, /className="event-form-actions"/);
   assert.match(events, />\s*Fechar\s*<\/button>/);
 });

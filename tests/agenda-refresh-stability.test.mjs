@@ -53,14 +53,14 @@ async function respond(f,status=200){
 }
 const click=(tree,label)=>nodes(tree).find(n=>n.props?.['aria-label']===label).props.onClick();
 test('calendar refresh keeps an unsaved editor and its data mounted across background requests',async()=>{
- const f=harness();f.render();f.flush();await respond(f);let tree=f.render();
+ const f=harness();f.render();f.flush();await respond(f);let tree=f.render();click(tree,'Mostrar pendências sem data');tree=f.render();
  nodes(tree).find(n=>n.props?.className==='vp-backlog-title').props.onClick();tree=f.render();
  const title=nodes(panel(tree)).find(n=>n.props?.name==='titulo');title.props.onChange({target:{value:'Edição não salva'}});
  for(let revision=1;revision<=4;revision++){f.render(revision);f.flush();tree=f.render(revision);assert.ok(panel(tree));assert.equal(grid(tree).props['aria-busy'],false);assert.equal(nodes(panel(tree)).find(n=>n.props?.name==='titulo').props.value,'Edição não salva');await respond(f);}
  click(f.render(4),'Fechar detalhes');assert.equal(panel(f.render(4)),undefined);
 });
 test('calendar temporary refresh errors preserve data; revoked access clears private items and editor',async()=>{
- const f=harness();f.render();f.flush();await respond(f);let tree=f.render();nodes(tree).find(n=>n.props?.className==='vp-backlog-title').props.onClick();
+ const f=harness();f.render();f.flush();await respond(f);let tree=f.render();click(tree,'Mostrar pendências sem data');tree=f.render();nodes(tree).find(n=>n.props?.className==='vp-backlog-title').props.onClick();
  f.render(1);f.flush();await respond(f,503);tree=f.render(1);assert.ok(panel(tree));assert.ok(nodes(tree).some(n=>n.props?.role==='alert'));assert.equal(grid(tree).props['aria-busy'],false);
  f.render(2);f.flush();await respond(f,401);tree=f.render(2);assert.equal(panel(tree),undefined);assert.equal(nodes(tree).some(n=>n.props?.className==='vp-backlog-title'),false);
 });
@@ -72,8 +72,20 @@ test('calendar range changes abort previous requests and ignore their late respo
 });
 test('calendar offers four modes, keyboard scheduling and a real unscheduled task form',async()=>{
  const f=harness();f.render();f.flush();await respond(f);let tree=f.render();
- assert.deepEqual(nodes(tree).filter(n=>n.type==='button'&&['Mês','Semana','Dia','Agenda'].includes(n.props.children)).map(n=>n.props.children),['Mês','Semana','Dia','Agenda']);
+ assert.deepEqual(nodes(nodes(tree).find(n=>n.props?.['aria-label']==='Visualização do calendário')).filter(n=>n.type==='option').map(n=>n.props.children),['Mês','Semana','Dia','Agenda']);
  nodes(tree).find(n=>n.props?.className==='vp-button vp-primary vp-new').props.onClick();tree=f.render();assert.ok(panel(tree));assert.equal(nodes(tree).find(n=>n.props?.name==='iniciaEm').props.value,'');assert.equal(nodes(tree).find(n=>n.props?.name==='iniciaEm').props.required,false);
  assert.equal(nodes(tree).some(n=>n.props?.children==='Criar evento da comunidade ↗'),false);
- click(tree,'Fechar detalhes');tree=f.render();nodes(tree).find(n=>n.props?.children==='Agendar →').props.onClick();tree=f.render();assert.match(nodes(tree).find(n=>n.props?.name==='iniciaEm').props.value,/T09:00$/);
+ click(tree,'Fechar detalhes');tree=f.render();click(tree,'Mostrar pendências sem data');tree=f.render();nodes(tree).find(n=>n.props?.children==='Agendar →').props.onClick();tree=f.render();assert.match(nodes(tree).find(n=>n.props?.name==='iniciaEm').props.value,/T09:00$/);
+});
+
+test('calendar starts with tools collapsed and retains active filters when the panel is closed',async()=>{
+ const f=harness();f.render();f.flush();await respond(f);let tree=f.render();
+ assert.equal(nodes(tree).find(n=>n.props?.className==='vp-filters').props.hidden,true);
+ assert.equal(nodes(tree).some(n=>n.props?.className==='vp-side'||n.props?.className==='vp-metrics'),false);
+ click(tree,'Buscar e filtrar');tree=f.render();assert.equal(nodes(tree).find(n=>n.props?.className==='vp-filters').props.hidden,false);
+ nodes(tree).find(n=>n.props?.['aria-label']==='Buscar no calendário').props.onChange({target:{value:'oração'}});
+ tree=f.render();click(tree,'Buscar e filtrar');tree=f.render();assert.equal(nodes(tree).find(n=>n.props?.className==='vp-filters').props.hidden,true);
+ assert.ok(nodes(tree).some(n=>n.props?.className==='vp-active-filters'));
+ click(tree,'Buscar e filtrar');tree=f.render();assert.equal(nodes(tree).find(n=>n.props?.['aria-label']==='Buscar no calendário').props.value,'oração');
+ nodes(tree).find(n=>n.props?.children==='Limpar filtros').props.onClick();tree=f.render();assert.equal(nodes(tree).find(n=>n.props?.['aria-label']==='Buscar no calendário').props.value,'');
 });

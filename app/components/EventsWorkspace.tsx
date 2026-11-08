@@ -4,7 +4,6 @@ import {
   FormEvent,
   useCallback,
   useEffect,
-  useId,
   useMemo,
   useRef,
   useState,
@@ -79,8 +78,6 @@ export default function EventsWorkspace({
   communityName: string;
   communitySlug: string;
 }) {
-  const introId = useId();
-  const [introOpen, setIntroOpen] = useState(false);
 
   const [eventSearch, setEventSearch] = useState("");
   const [eventStatus, setEventStatus] = useState("TODOS");
@@ -103,12 +100,12 @@ export default function EventsWorkspace({
   const [registrantSearch, setRegistrantSearch] = useState("");
   const [actionMenuId, setActionMenuId] = useState<number | null>(null);
   const [eventFormOpen, setEventFormOpen] = useState(false);
+  const eventDirectoryRef = useRef<HTMLDetailsElement>(null);
   const eventsRequestRef = useRef<AbortController | null>(null);
   const eventsSignatureRef = useRef("");
   const canManage = permissions.includes("events.manage");
   const canRsvp = permissions.includes("events.rsvp");
   const displayedEvents = useMemo(() => filterEventDirectory(events, eventSearch, eventStatus, eventPeriod, now), [events, eventSearch, eventStatus, eventPeriod, now]);
-  const nextEvent = events.filter(item => item.status === "PUBLICADO" && Date.parse(item.inicia_em) >= now).sort((a,b) => Date.parse(a.inicia_em)-Date.parse(b.inicia_em))[0];
   const hasDirectoryFilters = Boolean(eventSearch.trim()) || eventStatus !== "TODOS" || eventPeriod !== "TODOS";
   const requestedEventRef = useRef<number | null>(null);
   const scrolledEventRef = useRef<number | null>(null);
@@ -192,6 +189,7 @@ export default function EventsWorkspace({
       setEventSearch("");
       setEventStatus("TODOS");
     }
+    if(eventDirectoryRef.current)eventDirectoryRef.current.open=true;
     const target = document.getElementById(`event-${requestedId}`);
     if (!target) return;
     const timer = window.setTimeout(() => {
@@ -427,39 +425,15 @@ export default function EventsWorkspace({
 
   return (
     <section className={`events-workspace events-studio ${styles.workspace}`}>
-      <div id={introId} className={styles.intro} data-open={introOpen} aria-hidden={!introOpen} inert={!introOpen}>
-        <div className={styles.introClip}>
-          <div className={styles.introContent}>
-            <div>
-              <p className="pilot-kicker">ENCONTROS QUE APROXIMAM</p>
-              <h2>Vamos nos encontrar.</h2>
-              <p>
-                A programação de {communityName}, suas escalas e seus compromissos em um só lugar.
-              </p>
-            </div>
-            <div className="events-studio-count"><strong>{events.filter(item => item.status === "PUBLICADO" && Date.parse(item.inicia_em) >= now).length}</strong><span>próximos eventos</span></div>
-          </div>
-        </div>
-      </div>
-
-      {/* O calendário reúne, em camadas, o que já existe espalhado: eventos da
-          comunidade, as escalas desta pessoa e os compromissos que ela mesma
-          marcou. A lista de gestão de eventos continua abaixo. */}
-      {nextEvent && <div className="workspace-next-step"><div><small>PRÓXIMO ENCONTRO</small><strong>{nextEvent.titulo}</strong><p>{new Date(nextEvent.inicia_em).toLocaleString("pt-BR", {dateStyle:"short",timeStyle:"short"})}{nextEvent.local && ` · ${nextEvent.local}`}</p></div><button type="button" onClick={() => { setEventSearch(""); setEventStatus("TODOS"); setEventPeriod("PROXIMOS"); requestAnimationFrame(() => document.getElementById(`event-${nextEvent.id}`)?.scrollIntoView({block:"center",behavior:"smooth"})); }}>Ver detalhes do encontro →</button></div>}
       <AgendaCalendar
-        headingContent={<div className={styles.titlebar}>
-        <h1>Agenda</h1>
-        <button
-          type="button"
-          className={styles.introToggle}
-          aria-expanded={introOpen}
-          aria-controls={introId}
-          onClick={() => setIntroOpen((value) => !value)}
-        >
-          {introOpen ? "Fechar resumo" : "Sobre"}
-          <span aria-hidden="true">{introOpen ? "−" : "+"}</span>
-        </button>
-      </div>}
+        aoVerEvento={(id)=>{
+          if(eventDirectoryRef.current)eventDirectoryRef.current.open=true;
+          if(id){setEventSearch("");setEventStatus("TODOS");setEventPeriod("TODOS");}
+          requestAnimationFrame(()=>{
+            const target=id?document.getElementById('event-'+id):null;
+            (target||eventDirectoryRef.current)?.scrollIntoView({block:id?"center":"start",behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"instant":"smooth"});
+          });
+        }}
         atualizacao={agendaRevision}
         podeVerEventos={permissions.includes("events.view")}
         podeAprovar={canManage}
@@ -482,7 +456,7 @@ export default function EventsWorkspace({
 
 
       {canManage && eventFormOpen && (
-        <AgendaDialog title={editing ? `Editar: ${editing.titulo}` : "Novo evento"} wide busy={workingId === "form"} onClose={() => setEventFormOpen(false)} key={editing?.id || `new-${newEventDraft}`}>
+        <AgendaDialog title={editing ? `Editar: ${editing.titulo}` : "Novo evento"} closeLabel="Fechar formulário de evento" wide busy={workingId === "form"} onClose={() => setEventFormOpen(false)} key={editing?.id || `new-${newEventDraft}`}>
         <div className={styles.eventDialogForm}>
           <form className="pilot-form event-form" onSubmit={saveEvent} onInvalidCapture={event=>{const parent=(event.target as HTMLElement).closest("details");if(parent)parent.open=true;}}>
             <div className="event-form-section-title"><span>01</span><div><h3>Sobre o encontro</h3><p>Nome e categoria do evento.</p></div></div>
@@ -547,7 +521,7 @@ export default function EventsWorkspace({
                 defaultValue={editing?.capacidade || ""}
               />
             </label>
-            <details className="event-advanced event-wide-field" open={Boolean(editing?.escalas_abrem_em || editing?.reservas_abrem_em)}><summary>Liberação de escalas e estacionamento <small>Opcional</small></summary><div>
+            <details data-keep-open-on-outside className="event-advanced event-wide-field" open={Boolean(editing?.escalas_abrem_em || editing?.reservas_abrem_em)}><summary>Liberação de escalas e estacionamento <small>Opcional</small></summary><div>
             <label>
               Escalas disponíveis em
               <input
@@ -583,7 +557,7 @@ export default function EventsWorkspace({
               />
               Exibir na página pública
             </label>
-            <details className="event-advanced event-wide-field" open={pollEnabled}><summary>Votação do evento <small>Opcional</small></summary><fieldset className={`event-poll-field event-wide-field ${pollEnabled ? "is-enabled" : ""}`}>
+            <details data-keep-open-on-outside className="event-advanced event-wide-field" open={pollEnabled}><summary>Votação do evento <small>Opcional</small></summary><fieldset className={`event-poll-field event-wide-field ${pollEnabled ? "is-enabled" : ""}`}>
               <legend>Votação</legend>
               <button
                 type="button"
@@ -721,6 +695,9 @@ export default function EventsWorkspace({
         </div>
       )}
 
+      <details data-keep-open-on-outside ref={eventDirectoryRef} className={styles.directoryDisclosure} id="calendar-community-events">
+        <summary><span>Eventos da comunidade</span><span aria-hidden="true">⌄</span></summary>
+        <div aria-label={'Programação de '+communityName}>
       {loading ? (
         <div className="event-skeleton-grid" aria-label="Carregando eventos">
           <span />
@@ -779,7 +756,7 @@ export default function EventsWorkspace({
                   </div>
                   <h2>{item.titulo}</h2>
                   <div className={styles.eventSummary}><time dateTime={item.inicia_em}>{formatDateTimeRange(item.inicia_em, item.termina_em)}</time><span>{item.local || "Local a definir"}</span></div>
-                  <details className="event-card-details">
+                  <details data-keep-open-on-outside className="event-card-details">
                     <summary>
                       <span>
                         {item.enquete && isPublished
@@ -874,7 +851,7 @@ export default function EventsWorkspace({
                     </section>
                   )}
                   {Boolean(item.can_view_registrants) && (
-                    <details className="event-registrants">
+                    <details data-keep-open-on-outside className="event-registrants">
                       <summary>
                         Ver inscritos confirmados <span>{item.inscritos.length}</span>
                       </summary>
@@ -919,6 +896,9 @@ export default function EventsWorkspace({
           </p>
         </div>
       )}
+        </div>
+      </details>
+
       {actionMenuEvent && typeof document !== "undefined" && createPortal(
         <div className="event-action-overlay" role="presentation" onMouseDown={(event) => {
           if (event.target === event.currentTarget) setActionMenuId(null);
