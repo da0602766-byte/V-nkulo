@@ -188,6 +188,9 @@ export function Pessoas({
   const [stagesCollapsed,setStagesCollapsed]=useVisitorPreference('stages');
   const {tableRef, ...columns}=useColumnWidths();
   const [q, setQ] = useState('')
+  const [showSummary, setShowSummary] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+  const filterToggleRef = useRef<HTMLButtonElement>(null)
   const filtersRef = useRef<HTMLDivElement>(null);
   useEffect(()=>{
     const filters=filtersRef.current;
@@ -332,19 +335,19 @@ export function Pessoas({
     <div className="vp-people-page">
       <Header
         title={cat ? (cat === '__sem' ? 'Sem categoria' : cat) : 'Pessoas'}
-        sub={`${pessoas.filter((p) => !p.arquivado && (!cat || (cat === '__sem' ? !p.categoria : p.categoria === cat))).length} visitantes e membros${cat ? ' nesta categoria' : ' cadastrados'}`}
+        sub={`${pessoas.filter((p) => !p.arquivado && (!cat || (cat === '__sem' ? !p.categoria : p.categoria === cat))).length} cadastros`}
       >
-        {onShare&&<button className={`${btnSec} vp-share-entry`} onClick={onShare}><Icon d={I.users}/><span>Compartilhar lista</span></button>}
+        <button className={`${btnSec} vp-summary-toggle`} aria-expanded={showSummary} aria-controls="vp-people-summary" onClick={()=>setShowSummary(!showSummary)}>Resumo<Icon d={I.chevronDown}/></button>
         {perfil.podeCriarPessoa && (
-          <button className={btnPri} onClick={onNew}>
+          <button className={btnPri} aria-label="Novo cadastro" onClick={onNew}>
             <Icon d={I.plus} />
-            <span>Novo cadastro</span>
+            <span>Novo</span>
           </button>
         )}
       </Header>
 
       {/* Metric Cards: 2 cols on mobile, 4 on desktop */}
-      <div className="vp-people-metrics px-4 sm:px-8 py-3 sm:pb-6 grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 bg-white shrink-0">
+      <div id="vp-people-summary" hidden={!showSummary} className="vp-people-metrics px-4 sm:px-8 py-3 sm:pb-6 grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 bg-white shrink-0">
         {[
           [
             'Visitantes ativos',
@@ -460,8 +463,8 @@ export function Pessoas({
         {/* Content Area */}
         <section className="flex-1 min-w-0 flex flex-col bg-white">
           {/* Filter Bar */}
-          <div ref={filtersRef} className="vp-people-filters p-3 sm:px-6 sm:py-3.5 border-b border-stone-100 space-y-2 shrink-0">
-            <button type="button" className="vp-status-trigger" aria-label={`Filtrar status e acompanhamento: ${recortes.find(r=>r.id===rec)?.label}`} aria-haspopup="dialog" aria-expanded={statusPicker} onClick={()=>setStatusPicker(true)}>
+          <div ref={filtersRef} className="vp-people-filters p-3 sm:px-6 sm:py-3.5 border-b border-stone-100 space-y-2 shrink-0" onKeyDown={e=>{if(e.key==='Escape'&&showFilters){setShowFilters(false);filterToggleRef.current?.focus();}}}>
+            <button type="button" hidden={!showFilters} className="vp-status-trigger" aria-label={`Filtrar status e acompanhamento: ${recortes.find(r=>r.id===rec)?.label}`} aria-haspopup="dialog" aria-expanded={statusPicker} onClick={()=>setStatusPicker(true)}>
               <Icon d={I.filter}/><span>{recortes.find(r=>r.id===rec)?.label}</span><strong>{count(rec)}</strong><Icon d={I.chevronDown}/>
             </button>
             <div className="vp-workspace-controls">{menuToggle}<button className="vp-stage-toggle" aria-controls="vp-stage-panel" aria-expanded={!stagesCollapsed} onClick={()=>setStagesCollapsed(!stagesCollapsed)}><Icon d={I.filter}/>{stagesCollapsed?'Mostrar etapas':'Recolher etapas'}</button><button className="vp-width-reset" onClick={columns.reset} title="Restaurar as larguras originais das colunas">Restaurar colunas</button></div>
@@ -481,7 +484,8 @@ export function Pessoas({
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
+              <button ref={filterToggleRef} type="button" className={`${btnSec} vp-filters-toggle`} aria-expanded={showFilters} aria-controls="vp-people-filter-options" onClick={()=>setShowFilters(!showFilters)}><Icon d={I.filter}/>Filtros{(filtrosAtivosTotal-(q?1:0))>0&&<b>{filtrosAtivosTotal-(q?1:0)}</b>}</button>
+              <div id="vp-people-filter-options" hidden={!showFilters} className="vp-filter-options flex items-center gap-2">
                 <button type="button" className="vp-choice-trigger" aria-label={`Filtrar categoria: ${categoryOptions.find(o=>o.value===cat)?.label || cat}`} aria-haspopup="dialog" aria-expanded={filterPicker==='categoria'} onClick={()=>setFilterPicker('categoria')}><span>{categoryOptions.find(o=>o.value===cat)?.label || cat}</span><Icon d={I.chevronDown}/></button>
                 <select
                   className={`vp-choice-native ${input} w-36 sm:w-44 text-[13px]`}
@@ -516,10 +520,10 @@ export function Pessoas({
                       ? 'bg-brand-50 border-brand-300 text-brand-700 font-semibold'
                       : ''
                   }`}
-                  title="Filtros operacionais avançados"
+                  title="Filtros operacionais avançados" aria-expanded={showFiltrosAvancados} aria-controls="vp-advanced-options"
                 >
                   <Icon d={I.filter} className="size-4" />
-                  <span className="hidden sm:inline">Filtros</span>
+                  <span>Avançados</span>
                   {countFiltrosAvancados > 0 && (
                     <span className="size-5 rounded-full bg-brand-600 text-white text-[10px] grid place-items-center">
                       {countFiltrosAvancados}
@@ -530,8 +534,8 @@ export function Pessoas({
             </div>
 
             {/* Expandable Advanced Operational Filters */}
-            {showFiltrosAvancados && (
-              <div className="vp-advanced-filters p-4 rounded-2xl bg-stone-50 ring-1 ring-stone-200 mt-2 space-y-3 [animation:rise_.2s_ease]">
+            {showFilters && showFiltrosAvancados && (
+              <div id="vp-advanced-options" className="vp-advanced-filters p-4 rounded-2xl bg-stone-50 ring-1 ring-stone-200 mt-2 space-y-3 [animation:rise_.2s_ease]">
                 <div className="flex items-center justify-between">
                   <span className="text-[12px] uppercase font-bold tracking-wider text-stone-500 flex items-center gap-1.5">
                     <Icon d={I.sliders} className="size-3.5" />
