@@ -257,4 +257,4 @@ ser instaladas como atualização normal.
 
 ## Endereço conectado
 
-`https://adote-gestao.da0602766.chatgpt.site`
+`https://vinkulo.da0602766.chatgpt.site`

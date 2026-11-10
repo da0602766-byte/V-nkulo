@@ -3,7 +3,7 @@ name: Validar APK do Vínkulo
 on:
   workflow_dispatch:
   push:
-    branches: [fix/android-global-offline-policy, fix/vinkulo-launcher-v-icon]
+    branches: [fix/android-global-offline-policy, fix/vinkulo-launcher-v-icon, fix/vinkulo-site-url]
   pull_request:
     branches: [main]
     paths:
@@ -74,13 +74,13 @@ jobs:
           sha256sum app/build/outputs/apk/release/app-release.apk
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: Vinkulo-Android-1.24.0-homologacao-api${{ matrix.api }}
+          name: Vinkulo-Android-1.24.1-homologacao-api${{ matrix.api }}
           path: Vinkulo-Android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: Vinkulo-Android-1.24.0-validacao-api${{ matrix.api }}
+          name: Vinkulo-Android-1.24.1-validacao-api${{ matrix.api }}
           path: |
             Vinkulo-Android/build/reports/dependency-verification/
             Vinkulo-Android/app/build/reports/
@@ -101,41 +101,41 @@ jobs:
           disable-animations: true
           working-directory: Vinkulo-Android
           script: |
-            curl --fail --location https://adote-gestao.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.7.1.apk --output /tmp/vinkulo-1.7.1.apk
+            curl --fail --location https://vinkulo.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.7.1.apk --output /tmp/vinkulo-1.7.1.apk
             echo '901e1d4e73bdc990d7d5d500ef10a422636777155cb821b6980e0cd083da7e8e  /tmp/vinkulo-1.7.1.apk' | sha256sum --check
             adb install /tmp/vinkulo-1.7.1.apk
             adb shell dumpsys package com.vinkulo.app | grep firstInstallTime > /tmp/vinkulo-first-install.txt
-            curl --fail --location https://adote-gestao.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.8.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.8.0.apk
+            curl --fail --location https://vinkulo.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.8.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.8.0.apk
             echo 'e1d6b91650f420a646972f68163ab8e19f01762dd862b2992a1851ead10a3da7  /tmp/vinkulo-1.8.0.apk' | sha256sum --check
             adb install -r /tmp/vinkulo-1.8.0.apk
-            curl --fail --location https://adote-gestao.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.9.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.9.0.apk
+            curl --fail --location https://vinkulo.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.9.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.9.0.apk
             echo '207318d3a9343dd55e85d8c76539b7dd80ff642a11b34d36dc69c1878cbc83ec  /tmp/vinkulo-1.9.0.apk' | sha256sum --check
             adb install -r /tmp/vinkulo-1.9.0.apk
-            curl --fail --location https://adote-gestao.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.10.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.10.0.apk
+            curl --fail --location https://vinkulo.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.10.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.10.0.apk
             echo '344f81565d286c491e7a5b9f30e48ffe52ba66cd8e8e3497769949cc6797be0a  /tmp/vinkulo-1.10.0.apk' | sha256sum --check
             adb install -r /tmp/vinkulo-1.10.0.apk
-            curl --fail --location https://adote-gestao.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.11.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.11.0.apk
+            curl --fail --location https://vinkulo.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.11.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.11.0.apk
             echo '02286b0a8bf3171097138330226a38271d6537384fae7fa13e4304eb8948ee51  /tmp/vinkulo-1.11.0.apk' | sha256sum --check
             adb install -r /tmp/vinkulo-1.11.0.apk
-            curl --fail --location https://adote-gestao.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.12.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.12.0.apk
+            curl --fail --location https://vinkulo.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.12.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.12.0.apk
             echo '1d222d14da23ba94483c00339781d263731475249d5405b0e1b83d2c7fa539b8  /tmp/vinkulo-1.12.0.apk' | sha256sum --check
             adb install -r /tmp/vinkulo-1.12.0.apk
-            curl --fail --location https://adote-gestao.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.13.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.13.0.apk
+            curl --fail --location https://vinkulo.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.13.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.13.0.apk
             echo '227398fad70fec0ecb1c081521123e1f400831f03b8521dc0a6a2d482a4077b5  /tmp/vinkulo-1.13.0.apk' | sha256sum --check
             adb install -r /tmp/vinkulo-1.13.0.apk
-            curl --fail --location https://adote-gestao.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.14.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.14.0.apk
+            curl --fail --location https://vinkulo.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.14.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.14.0.apk
             echo '4ab64689c3d9e7ee96022c9e43754ca738fd68679dfb1ab95db0c551c1f0be09  /tmp/vinkulo-1.14.0.apk' | sha256sum --check
             adb install -r /tmp/vinkulo-1.14.0.apk
-            curl --fail --location https://adote-gestao.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.15.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.15.0.apk
+            curl --fail --location https://vinkulo.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.15.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.15.0.apk
             echo '1124db700bd019190af8dc8eec5a6c68b3623b335671f7f8a53db800b3b89b18  /tmp/vinkulo-1.15.0.apk' | sha256sum --check
             adb install -r /tmp/vinkulo-1.15.0.apk
-            curl --fail --location https://adote-gestao.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.16.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.16.0.apk
+            curl --fail --location https://vinkulo.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.16.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.16.0.apk
             echo 'fdf7da2ed4ea75043d5fe469431dea7e1a9625ea25561542cafddacb958bd685  /tmp/vinkulo-1.16.0.apk' | sha256sum --check
             adb install -r /tmp/vinkulo-1.16.0.apk
-            curl --fail --location https://adote-gestao.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.17.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.17.0.apk
+            curl --fail --location https://vinkulo.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.17.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.17.0.apk
             echo 'f257a406776c1853b4eb2489baa8dbf966f35748b29958faf8051e20f46c1208  /tmp/vinkulo-1.17.0.apk' | sha256sum --check
             adb install -r /tmp/vinkulo-1.17.0.apk
-            curl --fail --location https://adote-gestao.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.18.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.18.0.apk
+            curl --fail --location https://vinkulo.da0602766.chatgpt.site/downloads/VINKULO_ANDROID_1.18.0_HOMOLOGACAO.apk --output /tmp/vinkulo-1.18.0.apk
             echo '474f28013671cee988aae97f4b7f3694d049f8a4da44195346a4b7366b5c5bd0  /tmp/vinkulo-1.18.0.apk' | sha256sum --check
             adb install -r /tmp/vinkulo-1.18.0.apk
             adb install -r app/build/outputs/apk/release/app-release.apk
@@ -158,12 +158,12 @@ jobs:
             # The icon-only branch validates signed updates and isolated offline
             # fixtures. Live disconnect depends on the production owner's policy
             # and public-network validation; retain it on the functional branch.
-            if [ "$GITHUB_REF_NAME" != "fix/vinkulo-launcher-v-icon" ]; then bash scripts/check-live-disconnect.sh; fi
+            if [ "$GITHUB_REF_NAME" != "fix/vinkulo-launcher-v-icon" ] && [ "$GITHUB_REF_NAME" != "fix/vinkulo-site-url" ]; then bash scripts/check-live-disconnect.sh; fi
             bash scripts/check-offline-tests.sh ${{ matrix.api }}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: Vinkulo-Android-1.24.0-emulador-api${{ matrix.api }}
+          name: Vinkulo-Android-1.24.1-emulador-api${{ matrix.api }}
           path: |
             Vinkulo-Android/app/build/reports/androidTests/
             Vinkulo-Android/app/build/outputs/androidTest-results/

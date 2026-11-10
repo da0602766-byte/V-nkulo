@@ -15,7 +15,7 @@ public class NativePolicyTest {
     @Test public void onlyOfficialHttpsOriginCanReachNativeFeatures() {
         assertTrue(NativePolicy.trusted(NativePolicy.ORIGIN + "/painel?view=conta"));
         assertTrue(NativePolicy.trusted(NativePolicy.ORIGIN + ":443/painel"));
-        for (String value : new String[]{"http://adote-gestao.da0602766.chatgpt.site", NativePolicy.ORIGIN + ".evil.test", NativePolicy.ORIGIN + ":8443", "https://user@adote-gestao.da0602766.chatgpt.site", "javascript:alert(1)", "file:///sdcard/data", "invalid", "https://evil.test"}) {
+        for (String value : new String[]{"http://vinkulo.da0602766.chatgpt.site", NativePolicy.ORIGIN + ".evil.test", NativePolicy.ORIGIN + ":8443", "https://user@vinkulo.da0602766.chatgpt.site", "javascript:alert(1)", "file:///sdcard/data", "invalid", "https://evil.test"}) {
             assertFalse(value, NativePolicy.trusted(value));
         }
     }

@@ -52,7 +52,7 @@ import java.util.Arrays;
 import java.util.List;
 
 public class MainActivity extends Activity {
-    private static final String APP_URL = "https://adote-gestao.da0602766.chatgpt.site";
+    private static final String APP_URL = NativePolicy.ORIGIN;
     private static final String GOOGLE_AUTH_HOST = "accounts.google.com";
     private static final String GOOGLE_RETURN_SCHEME = "vinkulo";
     private static final String GOOGLE_RETURN_HOST = "google-login-complete";
@@ -256,6 +256,7 @@ public class MainActivity extends Activity {
             // data. Recreate the stateless local document and its native bridge
             // explicitly; identity is always read again from protected storage.
             if (state.getBoolean("vinkulo.legacyOffline", false) || restored == null || restored.getCurrentItem() == null
+                    || !NativePolicy.trusted(restored.getCurrentItem().getUrl())
                     || OfflinePolicy.localPage(restored.getCurrentItem().getUrl())
                     || OfflinePolicy.errorPage(restored.getCurrentItem().getUrl())) {
                 if (hasNetwork()) webView.loadUrl(APP_URL + "/painel"); else showOfflineEntry();

@@ -4,7 +4,7 @@ import java.net.URI;
 
 /** Pure policy shared by navigation, native messages, camera and downloads. */
 final class NativePolicy {
-    static final String ORIGIN = "https://adote-gestao.da0602766.chatgpt.site";
+    static final String ORIGIN = "https://vinkulo.da0602766.chatgpt.site";
     private NativePolicy() {}
     static boolean validBinding(String value) { return value != null && value.matches("[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}"); }
     static boolean bindingMatches(String current, String received) { return validBinding(current) && current.equals(received); }
@@ -13,7 +13,7 @@ final class NativePolicy {
         try {
             URI uri = new URI(value);
             return "https".equalsIgnoreCase(uri.getScheme())
-                    && "adote-gestao.da0602766.chatgpt.site".equalsIgnoreCase(uri.getHost())
+                    && URI.create(ORIGIN).getHost().equalsIgnoreCase(uri.getHost())
                     && uri.getRawUserInfo() == null && (uri.getPort() == -1 || uri.getPort() == 443);
         } catch (Exception ignored) { return false; }
     }
