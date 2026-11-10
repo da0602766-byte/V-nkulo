@@ -13,7 +13,7 @@ try {
   const releaseResponse = await downloads.request.get(base + '/downloads/android-release.json');
   assert.equal(releaseResponse.status(), 200);
   const release = (await releaseResponse.json()).homologation;
-  assert.equal(release.versionName, '1.24.0');
+  assert.equal(release.versionName, '1.24.1');
   const apk = await downloads.request.get(base + '/downloads/' + release.file);
   assert.equal(apk.status(), 200);
   const bytes = await apk.body();
@@ -21,7 +21,7 @@ try {
   assert.equal(createHash('sha256').update(bytes).digest('hex'), release.sha256);
   results.push('APK download matches the signed release artifact size and SHA-256');
   await downloads.close();
-  for (const version of ['1.23.0', '1.24.0']) {
+  for (const version of ['1.23.0', '1.24.1']) {
     const context = await browser.newContext({viewport: {width: 390, height: 844}});
     await context.addInitScript(version => { window.VinkuloAndroid = {version}; }, version);
     const page = await context.newPage();
@@ -51,7 +51,7 @@ try {
     const notice = page.getByRole('complementary', { name: 'Atualização do aplicativo Android' });
     if (version === '1.23.0') {
       await notice.waitFor();
-      assert.equal(await notice.getByRole('link', {name: 'Baixar atualização'}).getAttribute('href'), '/downloads/VINKULO_ANDROID_1.24.0_HOMOLOGACAO.apk');
+      assert.equal(await notice.getByRole('link', {name: 'Baixar atualização'}).getAttribute('href'), '/downloads/VINKULO_ANDROID_1.24.1_HOMOLOGACAO.apk');
       for (const width of [390, 768, 1864]) {
         await page.setViewportSize({width, height: 1000});
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));

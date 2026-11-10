@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { needsAndroidPolicyUpdate, needsAndroidIconUpdate } from "../lib/android-version";
+import { needsAndroidPolicyUpdate, needsAndroidUrlUpdate } from "../lib/android-version";
 import "./android-update-notice.css";
 
 type InstallPromptEvent = Event & {
@@ -37,7 +37,7 @@ export default function MobileAppInstall() {
 
   useEffect(() => {
     const refreshVisibility = () => {
-      if (window.VinkuloAndroid && (needsAndroidPolicyUpdate(window.VinkuloAndroid.version) || needsAndroidIconUpdate(window.VinkuloAndroid.version))) {
+      if (window.VinkuloAndroid && (needsAndroidPolicyUpdate(window.VinkuloAndroid.version) || needsAndroidUrlUpdate(window.VinkuloAndroid.version))) {
         setUpdateRequired(true); setVisible(true); return false;
       }
       if (isStandalone()) {
@@ -87,8 +87,8 @@ export default function MobileAppInstall() {
 
   if (!visible) return null;
   if (updateRequired) return <aside className="android-update-notice" aria-label="Atualização do aplicativo Android">
-    <div><strong>Atualize o aplicativo Vínkulo</strong><p>A versão 1.24.0 atualiza o ícone do aplicativo para o V do Vínkulo. Instale por cima da versão atual.</p></div>
-    <a href="/downloads/VINKULO_ANDROID_1.24.0_HOMOLOGACAO.apk" download>Baixar atualização</a>
+    <div><strong>Atualize o aplicativo Vínkulo</strong><p>A versão 1.24.1 corrige o acesso ao novo endereço do Vínkulo. Instale por cima da versão atual, sem desinstalar. Pode ser necessário entrar novamente.</p></div>
+    <a href="/downloads/VINKULO_ANDROID_1.24.1_HOMOLOGACAO.apk" download>Baixar atualização</a>
     <button type="button" aria-label="Fechar aviso de atualização" onClick={() => setVisible(false)}>×</button>
   </aside>;
   if (pathname !== "/") return null;
@@ -130,7 +130,7 @@ export default function MobileAppInstall() {
             : <>No Android, abra o menu do navegador e escolha <strong>Instalar aplicativo</strong> ou <strong>Adicionar à tela inicial</strong>.</>}
           {androidDevice && (
             <p>
-              <a href="/downloads/VINKULO_ANDROID_1.24.0_HOMOLOGACAO.apk" download>Baixar APK Android 1.24.0</a>
+              <a href="/downloads/VINKULO_ANDROID_1.24.1_HOMOLOGACAO.apk" download>Baixar APK Android 1.24.1</a>
               {" — Permita notificações ao abrir. Os avisos com o aplicativo fechado dependem da ativação do Firebase pelo proprietário."}
             </p>
           )}

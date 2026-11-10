@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { getD1 } from "../../../../db";
 import PublicHeader from "../../../components/PublicHeader";
 
-const PRODUCTION_ORIGIN = "https://adote-gestao.da0602766.chatgpt.site";
+const PRODUCTION_ORIGIN = "https://vinkulo.da0602766.chatgpt.site";
 
 type SharedPost = {
   id: number;

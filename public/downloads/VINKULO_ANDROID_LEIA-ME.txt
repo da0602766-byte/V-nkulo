@@ -1,3 +1,10 @@
+1.24.1: correção do acesso após a mudança de URL
+
+Abra https://vinkulo.da0602766.chatgpt.site no navegador e baixe o APK 1.24.1.
+Instale por cima da versão atual, sem desinstalar, para preservar os dados locais.
+O aplicativo usa agora o novo endereço. Pode ser necessário entrar novamente.
+Atalhos instalados pelo navegador no domínio antigo devem ser recriados pelo novo site.
+
 VÍNKULO — ATUALIZAÇÃO ANDROID
 
 1.24.0: ícone V no Android e na instalação PWA

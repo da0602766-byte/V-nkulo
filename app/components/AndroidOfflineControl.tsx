@@ -47,7 +47,7 @@ export default function AndroidOfflineControl() {
     <p>Controle se o aplicativo pode abrir as funções offline. Quando desativado, a falta de internet mostra somente um aviso animado, com opção de tentar novamente.</p>
     <button type="button" className="primary" disabled={busy || enabled === null} onClick={() => void toggle()}>{busy ? "Salvando…" : enabled ? "Desativar para todos" : "Ativar para todos"}</button>
     <small>Requer APK 1.23.0 ou superior. O app consulta este controle a cada 30 segundos enquanto está aberto e conectado. Aparelhos sem internet recebem a mudança ao reconectar. Rascunhos já salvos são preservados.</small>
-    <a href="/downloads/VINKULO_ANDROID_1.24.0_HOMOLOGACAO.apk" download>Baixar APK atualizado</a>
+    <a href="/downloads/VINKULO_ANDROID_1.24.1_HOMOLOGACAO.apk" download>Baixar APK atualizado</a>
     {message && <p role="status">{message}</p>}
     {error && <div role="alert"><p>{error}</p>{enabled === null && <button type="button" onClick={() => void load()}>Tentar novamente</button>}</div>}
   </section>;

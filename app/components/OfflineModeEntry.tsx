@@ -34,10 +34,10 @@ export default function OfflineModeEntry() {
     <div className="offline-mode-entry__actions">
       {policy.enabled === null ? <p role="status">{policy.status === "checking" ? "Consultando disponibilidade…" : "Não foi possível confirmar a disponibilidade. Reconecte e tente novamente. Seus rascunhos não foram apagados."}</p>
         : ready ? <a className="primary" href="/mobile-app/index.html?mode=manual">Abrir modo offline</a>
-        : <a className="primary" href="/downloads/VINKULO_ANDROID_1.24.0_HOMOLOGACAO.apk" download>{native ? "Atualizar para usar offline" : "Instalar app com modo offline"}</a>}
+        : <a className="primary" href="/downloads/VINKULO_ANDROID_1.24.1_HOMOLOGACAO.apk" download>{native ? "Atualizar para usar offline" : "Instalar app com modo offline"}</a>}
       {policy.status === "unavailable" && policy.enabled === true && <p role="status">Sem confirmação atual da conexão. A disponibilidade anterior não garante acesso válido; o aplicativo confere a autorização local ao abrir.</p>}
       {policy.status === "unavailable" && <button type="button" onClick={policy.refresh}>Verificar disponibilidade</button>}
-      <small>{ready ? "Guardar rascunho não envia. Relatórios de células permanecem como rascunhos locais. Não desinstale o app para tentar corrigir uma pendência." : "Disponível no aplicativo Android 1.24.0. Atualize por cima da instalação existente para preservar os rascunhos; depois entre na comunidade."}</small>
+      <small>{ready ? "Guardar rascunho não envia. Relatórios de células permanecem como rascunhos locais. Não desinstale o app para tentar corrigir uma pendência." : "Disponível no aplicativo Android 1.24.1. Atualize por cima da instalação existente para preservar os rascunhos; depois entre na comunidade."}</small>
     </div>
   </section>;
 }

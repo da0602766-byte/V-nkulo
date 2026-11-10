@@ -12,7 +12,7 @@ if (args.some(arg => arg !== '--online') || args.length > 1) {
   console.error('Uso: node scripts/apk-baseline.mjs [--online]');
   process.exit(2);
 }
-const origin = 'https://adote-gestao.da0602766.chatgpt.site';
+const origin = 'https://vinkulo.da0602766.chatgpt.site';
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const rounded = value => Math.round(value * 10) / 10;
 const median = values => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
