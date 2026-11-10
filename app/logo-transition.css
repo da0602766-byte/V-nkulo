@@ -42,16 +42,22 @@ html body img.vinkulo-platform-mark {
   mask-position: center;
 }
 .platform-loading-transition[data-phase="waiting"] .vinkulo-animated-mark,
+html[data-logo-transition="waiting"] .platform-loading-transition .vinkulo-animated-mark,
 .vinkulo-loading .vinkulo-animated-mark { animation: vinkulo-mark-float 2.4s ease-in-out infinite; }
 .platform-loading-transition[data-phase="waiting"] .vinkulo-mark-draw,
+html[data-logo-transition="waiting"] .platform-loading-transition .vinkulo-mark-draw,
 .vinkulo-loading .vinkulo-mark-draw { animation: vinkulo-mark-draw 2.4s linear infinite; }
 .platform-loading-transition[data-phase="waiting"] .vinkulo-mark-shine,
+html[data-logo-transition="waiting"] .platform-loading-transition .vinkulo-mark-shine,
 .vinkulo-loading .vinkulo-mark-shine { animation: vinkulo-mark-shine 2.4s ease-in-out infinite; }
 .platform-loading-label { position: absolute; top: calc(50% + clamp(100px, 18vw, 190px)); left: 16px; right: 16px; margin: 20px 0 0; text-align: center; font: 500 16px/1.5 var(--font-body), sans-serif; color: #f7f3ff; }
 .platform-loading-transition[data-phase="revealing"] .platform-loading-backdrop,
 .platform-loading-transition[data-phase="revealing"] .platform-loading-label { opacity: 0; transition: opacity 2s ease; }
 .platform-loading-transition[data-no-destination="true"] .platform-loading-symbol { opacity: 0; transition: opacity 2s ease; }
 .platform-loading-transition[data-phase="idle"] { display: none; }
+html[data-logo-transition="waiting"] .platform-loading-transition { display: block; }
+html[data-logo-transition="waiting"] { background: #171126; }
+html[data-logo-transition="waiting"] .platform-loading-transition :is(.vinkulo-animated-mark,.vinkulo-mark-draw,.vinkulo-mark-shine) { animation-delay: var(--vinkulo-loading-offset,0ms); }
 html[data-logo-unavailable] .platform-loading-transition { display: none; }
 html[data-logo-transition="waiting"] #main-content { opacity: 0; }
 html[data-logo-transition="revealing"] #main-content { opacity: 1; transition: opacity 2s ease; }

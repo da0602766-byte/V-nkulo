@@ -47,7 +47,11 @@ export async function startLogoPreview(port = 4186) {
   }
   runInNewContext(ts.transpileModule(component, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, { exports, require: requirePreview });
   const overlay = renderToStaticMarkup(exports.default());
-  const controller = ts.transpileModule(await fs.readFile("app/lib/logo-transition.ts", "utf8"), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 } }).outputText;
+  const stateSource = await fs.readFile("app/lib/logo-loading-state.ts", "utf8");
+  const stateModule = ts.transpileModule(stateSource, {compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
+  const stateExports = {};
+  runInNewContext(ts.transpileModule(stateSource,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText,{exports:stateExports,URLSearchParams});
+  const controller = ts.transpileModule(await fs.readFile("app/lib/logo-transition.ts", "utf8"), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 } }).outputText.replace('"./logo-loading-state"','"/qa-loading-state.js"');
   const css = await fs.readFile("app/logo-transition.css", "utf8");
 
   const server = http.createServer(async (req, res) => {
@@ -55,8 +59,9 @@ export async function startLogoPreview(port = 4186) {
       const url = new URL(req.url, base);
       let response;
       if (url.pathname === "/qa-controller.js") response = new Response(controller, { headers: { "content-type": "text/javascript" } });
+      else if (url.pathname === "/qa-loading-state.js") response = new Response(stateModule, {headers:{"content-type":"text/javascript"}});
       else if (url.pathname === "/qa-logo.css") response = new Response(css, { headers: { "content-type": "text/css; charset=utf-8" } });
-      else if (url.pathname === "/qa-fixture") response = new Response(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/qa-logo.css"></head><body style="margin:0;background:#f7f5fb;font-family:system-ui"><div id="main-content" style="padding:24px"><header><img data-vinkulo-logo src="/vinkulo-symbol-v2.png" width="40" height="40" alt=""></header><h1>Teste local de carregamento</h1><button id="focus">Continuar</button><a href="#section" id="hash">Seção</a><a href="/login" id="native">Entrar</a><section id="section">Conteúdo</section>${url.searchParams.has("pending") ? '<div data-vinkulo-loading="Aguardando dados…"></div>' : ""}</div>${overlay}<script type="module">import {mountLogoTransition} from '/qa-controller.js';window.cleanupLogo=mountLogoTransition(document.querySelector('.platform-loading-transition'));</script></body></html>`, { headers: { "content-type": "text/html; charset=utf-8" } });
+      else if (url.pathname === "/qa-fixture") response = new Response(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script>${stateExports.LOGO_LOADING_BOOTSTRAP}</script><link rel="stylesheet" href="/qa-logo.css"></head><body style="margin:0;background:#f7f5fb;font-family:system-ui"><div id="main-content" style="padding:24px"><header><img data-vinkulo-logo src="/vinkulo-symbol-v2.png" width="40" height="40" alt=""></header><h1>Teste local de carregamento</h1><button id="focus">Continuar</button><a href="#section" id="hash">Seção</a><a href="/login" id="native">Entrar</a><section id="section">Conteúdo</section>${url.searchParams.has("pending") ? '<div data-vinkulo-loading="Aguardando dados…"></div>' : ""}</div>${overlay}<script type="module">import {mountLogoTransition} from '/qa-controller.js';window.cleanupLogo=mountLogoTransition(document.querySelector('.platform-loading-transition'));</script></body></html>`, { headers: { "content-type": "text/html; charset=utf-8" } });
       else if (/^\/qa-login\/(member|owner)$/.test(url.pathname)) {
         const owner = url.pathname.endsWith("owner");
         const login = await cpfLoginRequest(env, new Request(base + "/api/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: owner ? env.SYSTEM_OWNER_EMAIL : "member@logo.invalid", senha: "LocalLogo123!" }) }));

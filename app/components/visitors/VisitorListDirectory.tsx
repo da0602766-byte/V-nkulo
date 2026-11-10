@@ -8,11 +8,12 @@ import './visitor-list-directory.css';
 export default function VisitorListDirectory(){
   const [lists,setLists]=useState<VisitorListEntry[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState(''),[opening,setOpening]=useState(''),[search,setSearch]=useState('');
   const generation=useRef(0),working=useRef(false);
+  const [initialReady,setInitialReady]=useState(false);
   const refresh=useCallback(async()=>{
     const id=++generation.current;setLoading(true);setError('');
     try{const result=await api<{lists:VisitorListEntry[]}>('/api/pilot/visitantes/listas');if(id===generation.current)setLists(result.lists);}
     catch(e){if(id===generation.current){setLists([]);setError((e as Error).message);}}
-    finally{if(id===generation.current)setLoading(false);}
+    finally{if(id===generation.current){setLoading(false);setInitialReady(true);}}
   },[]);
   useEffect(()=>{const initial=setTimeout(()=>void refresh(),0);const focus=()=>{if(!working.current)void refresh();};window.addEventListener('focus',focus);const timer=setInterval(()=>{if(document.visibilityState==='visible')focus();},60000);return()=>{clearTimeout(initial);generation.current += 1;window.removeEventListener('focus',focus);clearInterval(timer);};},[refresh]);
   async function open(e:MouseEvent<HTMLAnchorElement>,entry:VisitorListEntry){
@@ -29,7 +30,7 @@ export default function VisitorListDirectory(){
   }
   const normalize=(value:string)=>value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR');
   const filtered=lists.filter(list=>normalize([list.title,list.ownerName,list.sharedByName,list.communityName].join(' ')).includes(normalize(search.trim())));
-  return <section className="vp-list-directory" aria-labelledby="visitor-lists-title">
+  return <section className="vp-list-directory" data-vinkulo-content-loading={!initialReady||undefined} aria-labelledby="visitor-lists-title">
     <header><div><p className="vp-list-eyebrow">PESSOAS</p><h1 id="visitor-lists-title">Listas disponíveis</h1><p>Listas que outros usuários compartilharam com você nesta comunidade.</p></div><button className={btnSec} disabled={loading||!!opening} onClick={()=>void refresh()}><Icon d={I.refresh}/>{loading?'Atualizando…':'Atualizar acessos'}</button></header>
     {error&&<p className="vp-error" role="alert">{error}</p>}
     <p className="vp-sr-only" role="status">{opening?'Abrindo lista…':loading?'Conferindo seus acessos…':lists.length+' lista(s) disponível(is).'}</p>

@@ -32,6 +32,7 @@ import { TransientFeedbackViewport } from "./components/TransientFeedback";
 import MediaConnectionFeedback from "./components/MediaConnectionFeedback";
 import { THEME_BOOTSTRAP_SCRIPT } from "./lib/theme-preference";
 import { VINKULO_LOGO } from "./lib/brand-identity";
+import { LOGO_LOADING_BOOTSTRAP } from "./lib/logo-loading-state";
 import PlatformLoadingTransition from "./components/PlatformLoadingTransition";
 import "./logo-transition.css";
 import "./brand-feedback.css";
@@ -95,6 +96,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: LOGO_LOADING_BOOTSTRAP }} />
         <link rel="preload" as="image" href={VINKULO_LOGO} />
         <noscript><style>{`.platform-loading-transition{display:none!important}`}</style></noscript>
         <script dangerouslySetInnerHTML={{ __html: "setTimeout(function(){if(!document.documentElement.dataset.logoController)document.documentElement.dataset.logoUnavailable='true'},25000)" }} />

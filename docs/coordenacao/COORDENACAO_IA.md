@@ -17,6 +17,8 @@ Antes de alterar o código, leia este documento e atualize a seção **Trabalho 
 
 ## Trabalho em andamento
 
+Carregamento único — Codex, 10/11/2026, base Sites 475. Reserva: logo-transition.ts e bootstrap/layout/CSS de transição, marcadores de prontidão de Visitantes, testes/QA e documentação. Manter uma única transição entre documentos e aguardar consultas iniciais antes de revelar. Preservar escopo da versão 475: nenhuma tela grande nova nas abas comuns, feedback de ações e ícones mantidos. Checkout isolado da fonte publicada; publicação autorizada na conversa.
+
 Escopo do carregamento V — Codex, 10/11/2026, correção solicitada após Sites 474. Reserva: app/lib/logo-transition.ts, PlatformLoadingTransition.tsx, testes/QA de carregamento e documentação. Retirar captura automática de indicadores locais e de qualquer link/formulário; manter carregamentos explícitos anteriores, Visitantes e entrada/troca de comunidade. Preservar ícones PWA/APK e feedback local de ações. Usar fonte publicada em checkout isolado; publicação autorizada na conversa.
 
 Compatibilidade de ícones: reservar também public/vinkulo-app-icon-{192,512}.png para servir o mesmo V nas URLs de instalações antigas.

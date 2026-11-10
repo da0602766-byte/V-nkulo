@@ -41,7 +41,7 @@ export default function VisitorDriveSettings({onChanged}:{onChanged:(state:strin
     setBusy('Conferindo o arquivo no dispositivo…');
     try{const value=JSON.parse(await file.text());validateVisitorArchive(value,value.communityId);setBackup(value);}catch{setError('Arquivo inválido. Escolha um backup JSON completo do Vínkulo. Excel e CSV são importados em Importar / Exportar.');}finally{setBusy('');}
   }
-  return <div className="vp-scroll vp-drive" aria-busy={!!busy}>
+  return <div className="vp-scroll vp-drive" data-vinkulo-content-loading={!data&&busy==='Carregando configuração…'||undefined} aria-busy={!!busy}>
     {busy&&<p className="vp-drive-progress" role="status"><span className="vp-spinner" aria-hidden="true"/>{busy}</p>}
     {error&&<p className="vp-error" role="alert">{error}</p>}{message&&<p className="vp-drive-message" role="status">{message}</p>}
     {!data&&!busy&&<button className={btnSec} onClick={()=>{setBusy('Carregando configuração…');void refresh().catch(e=>setError(e.message)).finally(()=>setBusy(''));}}>Tentar novamente</button>}

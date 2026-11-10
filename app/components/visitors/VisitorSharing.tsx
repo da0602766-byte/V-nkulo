@@ -50,7 +50,7 @@ export default function VisitorSharing({onNavigate}:{onNavigate:(section:'pessoa
     }catch{setHistoryError('Não foi possível carregar as alterações anteriores. Tente novamente.');}finally{historyWorking.current=false;setHistoryBusy(false);}
   }
   const disabled=loading||busy||!!data?.locked,selected=data?.members.find(m=>String(m.id)===user),existing=data?.grants.find(g=>String(g.usuario_id)===user),same=existing?.papel===role;
-  return <div className="vp-scroll vp-sharing" aria-busy={loading||busy}>
+  return <div className="vp-scroll vp-sharing" data-vinkulo-content-loading={loading&&!data||undefined} aria-busy={loading||busy}>
     <div ref={feedback} tabIndex={-1} className="vp-sharing-feedback" hidden={!error&&!message&&!busy}>
       {busy&&<p role="status">Salvando acesso…</p>}
       {message&&<div className="vp-sharing-success" role="status"><Icon d={I.checkCircle}/><p>{message}</p><button type="button" aria-label="Fechar confirmação" onClick={()=>setMessage('')}><Icon d={I.x}/></button></div>}

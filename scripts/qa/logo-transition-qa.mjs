@@ -35,7 +35,7 @@ try {
   results.push('v-arms-draw-progressively-with-shine-masked-to-the-artwork');
   await fixture.screenshot({path:'outputs/logo-transition/loading-desktop.png'});
   await fixture.evaluate(() => document.querySelector('[data-vinkulo-loading]').remove());
-  await fixture.clock.fastForward(125);
+  await fixture.clock.fastForward(305);
   assert.equal(await fixture.locator('.platform-loading-transition').getAttribute('data-phase'), 'revealing');
   await fixture.clock.fastForward(1990);
   assert.equal(await fixture.locator('.platform-loading-transition').getAttribute('data-phase'), 'revealing');
