@@ -1,5 +1,14 @@
 VÍNKULO — ATUALIZAÇÃO ANDROID
 
+1.24.0: ícone V no Android e na instalação PWA
+O APK usa o mesmo V colorido e transparente da plataforma, sem quadrado
+incorporado à imagem. Instale por cima da versão atual, sem desinstalar.
+O PWA usa ícones de instalação 192/512 e ícone Apple 180. Se um atalho
+antigo continuar com a cruz, remova somente o atalho da tela inicial e
+adicione o site novamente; não limpe os dados do aplicativo.
+A forma externa e a atualização de ícones dependem do navegador/launcher.
+Mantido o canal de homologação existente; validação física pendente.
+
 1.23.0: controle global do modo offline
 No Console do proprietário, abra Controles & módulos > Aplicativo Android.
 Use "Desativar para todos" para bloquear o modo offline em todas as comunidades.

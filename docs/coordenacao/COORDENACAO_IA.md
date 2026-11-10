@@ -17,6 +17,12 @@ Antes de alterar o código, leia este documento e atualize a seção **Trabalho 
 
 ## Trabalho em andamento
 
+Compatibilidade de ícones: reservar também public/vinkulo-app-icon-{192,512}.png para servir o mesmo V nas URLs de instalações antigas.
+
+Extensão da reserva de ícones: corrigir links de APK antigo em app/components/{AndroidOfflineControl,FirebaseIntegrationForm,OfflineModeEntry}.tsx. Apenas destino/versão do download; preservar política, permissões e operação offline.
+
+Ícones de instalação V — Codex, 10/11/2026. Base publicada Sites 473 (7e46ed5). Reserva: public/icons/vinkulo-*-v3.png, public/manifest.webmanifest, public/sw.js, metadata de ícones em app/layout.tsx, aviso/link em MobileAppInstall.tsx e android-version.ts, distribuição Android em public/downloads, tests/install-brand-icons.test.mjs, scripts/qa/install-icons-qa.mjs e relatório. Fonte nativa isolada em fix/vinkulo-launcher-v-icon: PNG transparente do mesmo V, versão 1.24.0/code 27, assinatura existente, CI Android 10/15 e continuidade da atualização. Preservar demais funcionalidades, canal estável, dados e autorizações. Publicação autorizada na conversa; validação física não realizada.
+
 Marca V — Codex, 10/11/2026, publicação autorizada pelo proprietário. Base remota Sites 472 (8b97f50). Reserva: marca/carregamentos compartilhados, feedback de ações, trechos de envio no chat/feed, confirmações e sinalizadores de carregamento. Integração em checkout isolado; preservar chat com emojis, temas, sons e janela minimizável, Momentos, prévia de publicação e atalhos de Visitantes. Sem migrações ou alteração de audiência. Verificações do pacote e de produção em andamento.
 
 Chat minimizado — Codex, 29/10/2026, base 453. Reserva: app/private-chat.css. Restringir seletores de dimensões da lista ao estado expandido para impedir que sobrescrevam a barra minimizada. Validados: build Sites, 25/25 testes; minimizar pela lista e pela conversa, restaurar mantendo as duas mensagens fictícias e fechar. Prévia em 390/768/1864 px sem overflow. Barra com altura do cabeçalho, sem painel vazio; posição elevada no tablet para preservar navegação inferior. Publicação em preparação.

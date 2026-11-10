@@ -62,9 +62,9 @@ export const metadata: Metadata = {
     follow: false,
   },
   icons: {
-    icon: VINKULO_LOGO,
-    shortcut: VINKULO_LOGO,
-    apple: VINKULO_LOGO,
+    icon: [{ url: "/icons/vinkulo-favicon-32-v3.png", sizes: "32x32", type: "image/png" }, { url: "/icons/vinkulo-192-v3.png", sizes: "192x192", type: "image/png" }],
+    shortcut: "/icons/vinkulo-192-v3.png",
+    apple: { url: "/icons/vinkulo-apple-180-v3.png", sizes: "180x180", type: "image/png" },
   },
   manifest: "/manifest.webmanifest",
   appleWebApp: {
