@@ -3,7 +3,7 @@ name: Validar APK do Vínkulo
 on:
   workflow_dispatch:
   push:
-    branches: [fix/android-global-offline-policy]
+    branches: [fix/android-global-offline-policy, fix/vinkulo-launcher-v-icon]
   pull_request:
     branches: [main]
     paths:
@@ -52,7 +52,7 @@ jobs:
           VINKULO_SIGNING_STORE_FILE: ${{ runner.temp }}/vinkulo-release.p12
           VINKULO_SIGNING_PASSWORD: ${{ secrets.ANDROID_SIGNING_PASSWORD }}
         run: |
-          node --test scripts/offline-shell.test.cjs scripts/visitor-shell.test.cjs scripts/module-shell.test.cjs scripts/usability-shell.test.cjs scripts/navigation-shell.test.cjs scripts/pending-shell.test.cjs scripts/workflows-shell.test.cjs
+          node --test scripts/launcher-icon.test.cjs scripts/offline-shell.test.cjs scripts/visitor-shell.test.cjs scripts/module-shell.test.cjs scripts/usability-shell.test.cjs scripts/navigation-shell.test.cjs scripts/pending-shell.test.cjs scripts/workflows-shell.test.cjs
           echo '2db75c40782f5e8ba1fc278a5574bab070adccb2d21ca5a6e5ed840888448046  gradle/wrapper/gradle-wrapper.jar' | sha256sum --check
           chmod +x gradlew
           ./gradlew --dependency-verification strict testDebugUnitTest lintRelease assembleRelease assembleDebug assembleDebugAndroidTest
@@ -74,13 +74,13 @@ jobs:
           sha256sum app/build/outputs/apk/release/app-release.apk
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: Vinkulo-Android-1.23.0-homologacao-api${{ matrix.api }}
+          name: Vinkulo-Android-1.24.0-homologacao-api${{ matrix.api }}
           path: Vinkulo-Android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: Vinkulo-Android-1.23.0-validacao-api${{ matrix.api }}
+          name: Vinkulo-Android-1.24.0-validacao-api${{ matrix.api }}
           path: |
             Vinkulo-Android/build/reports/dependency-verification/
             Vinkulo-Android/app/build/reports/
@@ -139,6 +139,10 @@ jobs:
             echo '474f28013671cee988aae97f4b7f3694d049f8a4da44195346a4b7366b5c5bd0  /tmp/vinkulo-1.18.0.apk' | sha256sum --check
             adb install -r /tmp/vinkulo-1.18.0.apk
             adb install -r app/build/outputs/apk/release/app-release.apk
+            mkdir -p app/build/reports/vinkulo-release-icons
+            adb shell input keyevent KEYCODE_HOME
+            adb shell input swipe 540 1600 540 300 350
+            adb exec-out screencap -p > app/build/reports/vinkulo-release-icons/launcher.png
             adb shell dumpsys package com.vinkulo.app | grep firstInstallTime > /tmp/vinkulo-after-update.txt
             diff /tmp/vinkulo-first-install.txt /tmp/vinkulo-after-update.txt
             adb shell svc wifi disable
@@ -152,7 +156,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: Vinkulo-Android-1.23.0-emulador-api${{ matrix.api }}
+          name: Vinkulo-Android-1.24.0-emulador-api${{ matrix.api }}
           path: |
             Vinkulo-Android/app/build/reports/androidTests/
             Vinkulo-Android/app/build/outputs/androidTest-results/
