@@ -1,5 +1,6 @@
 "use client";
 import { authorizeGoogle } from '../lib/google-authorization-client';
+import { openDialogAfterLoading } from '../lib/dialog-after-loading';
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -38,9 +39,9 @@ function StorageChoice({ status, onComplete }: { status: StorageStatus; onComple
     const dialog = dialogRef.current!;
     const previous = document.activeElement as HTMLElement | null;
     const overflow = document.body.style.overflow;
-    dialog.showModal();
-    document.body.style.overflow = "hidden";
+    const cancelOpen = openDialogAfterLoading(dialog, () => { document.body.style.overflow = "hidden"; });
     return () => {
+      cancelOpen();
       dialog.close();
       document.body.style.overflow = overflow;
       if (previous?.isConnected) previous.focus({ preventScroll: true });

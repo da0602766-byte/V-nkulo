@@ -21,7 +21,7 @@ test("o comentário usa campo que cresce com o texto e envio compacto", () => {
   const source = read("app/components/CommunityPostInteractions.tsx");
   assert.match(source, /<textarea/);
   assert.match(source, /name="texto"/);
-  assert.match(source, /community-comment-send-icon/);
+  assert.match(source, /vinkulo-brand-action/);
   assert.doesNotMatch(source, /<input name="texto"/);
 });
 

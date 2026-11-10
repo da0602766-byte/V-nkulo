@@ -31,6 +31,10 @@ import GoogleNativeAuth from "./components/GoogleNativeAuth";
 import { TransientFeedbackViewport } from "./components/TransientFeedback";
 import MediaConnectionFeedback from "./components/MediaConnectionFeedback";
 import { THEME_BOOTSTRAP_SCRIPT } from "./lib/theme-preference";
+import { VINKULO_LOGO } from "./lib/brand-identity";
+import PlatformLoadingTransition from "./components/PlatformLoadingTransition";
+import "./logo-transition.css";
+import "./brand-feedback.css";
 
 const instrumentSans = Instrument_Sans({
   variable: "--font-body",
@@ -58,9 +62,9 @@ export const metadata: Metadata = {
     follow: false,
   },
   icons: {
-    icon: "/vinkulo-logo.png",
-    shortcut: "/vinkulo-logo.png",
-    apple: "/vinkulo-logo.png",
+    icon: VINKULO_LOGO,
+    shortcut: VINKULO_LOGO,
+    apple: VINKULO_LOGO,
   },
   manifest: "/manifest.webmanifest",
   appleWebApp: {
@@ -91,6 +95,9 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <head>
+        <link rel="preload" as="image" href={VINKULO_LOGO} />
+        <noscript><style>{`.platform-loading-transition{display:none!important}`}</style></noscript>
+        <script dangerouslySetInnerHTML={{ __html: "setTimeout(function(){if(!document.documentElement.dataset.logoController)document.documentElement.dataset.logoUnavailable='true'},25000)" }} />
         <meta name="google-site-verification" content="u8fLno7h4JnKtsGZ8_9SKZfMKNjfU5ikqf_CRcnU230" />
         <script
           dangerouslySetInnerHTML={{
@@ -105,6 +112,7 @@ export default function RootLayout({
         <a className="skip-to-content" href="#main-content">Pular para o conteúdo principal</a>
         <SmartScrollHeader />
         <div id="main-content" tabIndex={-1}>{children}</div>
+        <PlatformLoadingTransition />
         <SystemExperienceController />
         <NativeNotificationSync />
         <GoogleNativeAuth />

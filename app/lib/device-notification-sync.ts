@@ -49,8 +49,8 @@ export async function showUnreadDeviceNotifications(items: DeviceNotificationRec
     if (!shownNatively && registration) {
       await registration.showNotification(content.title, {
         body: content.body,
-        icon: "/vinkulo-logo.png",
-        badge: "/vinkulo-logo.png",
+        icon: "/vinkulo-symbol-v2.png",
+        badge: "/vinkulo-symbol-v2.png",
         tag,
         renotify: true,
         data: { notificationId: item.id, url: destination },

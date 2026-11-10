@@ -45,10 +45,14 @@ export default function StableLink({
       event.ctrlKey ||
       event.shiftKey ||
       event.altKey ||
-      props.target === "_blank"
+      props.download !== undefined ||
+      (props.target && props.target !== "_self")
     ) {
       return;
     }
+    const destination = new URL(href, window.location.href);
+    if (destination.origin !== window.location.origin || !/^https?:$/.test(destination.protocol) ||
+      (destination.pathname === window.location.pathname && destination.search === window.location.search && destination.hash)) return;
     event.preventDefault();
     setPending(true);
     document.documentElement.dataset.navigationLoading = "true";

@@ -194,7 +194,7 @@ export default function LoginCustomizationWorkspace() {
   });
 
   return (
-    <section className="login-config-workspace">
+    <section className="login-config-workspace" data-page-loading={loading || undefined}>
       <header>
         <div>
           <p className="pilot-kicker">IDENTIDADE E CADASTRO</p>

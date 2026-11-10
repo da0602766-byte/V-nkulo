@@ -68,7 +68,7 @@ export default function PlatformBrandingWorkspace() {
     }
   }
 
-  if (loading) return <p className="platform-post-empty">Carregando identidade…</p>;
+  if (loading) return <p className="platform-post-empty" data-page-loading="true">Carregando identidade…</p>;
   return (
     <section className="platform-branding-workspace">
       <header>

@@ -2,8 +2,9 @@
 import SafeImage from "./SafeImage";
 
 
-import { FormEvent, KeyboardEvent, useCallback, useRef, useState } from "react";
+import { FormEvent, KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 import VerifiedOwnerName from "./VerifiedOwnerName";
+import VinkuloActionMark from "./VinkuloActionMark";
 
 type Comment = {
   id: number;
@@ -40,6 +41,13 @@ export default function CommunityPostInteractions({
   const [enabled, setEnabled] = useState(true);
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const sendingRef = useRef(false);
+  useEffect(() => {
+    if (!sent) return;
+    const timer = window.setTimeout(() => setSent(false), 1400);
+    return () => window.clearTimeout(timer);
+  }, [sent]);
   const [error, setError] = useState("");
   const [text, setText] = useState("");
   const [showAll, setShowAll] = useState(false);
@@ -88,7 +96,9 @@ export default function CommunityPostInteractions({
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const texto = text.trim();
-    if (sending || texto.length < 2) return;
+    if (sendingRef.current || texto.length < 2) return;
+    sendingRef.current = true;
+    setSent(false);
     // Mostra o comentário na hora e reconcilia com o servidor depois, para que
     // ele não desapareça durante a ida e volta da rede.
     const draft: FeedComment = {
@@ -115,12 +125,16 @@ export default function CommunityPostInteractions({
       });
       const payload = await response.json() as { error?: string };
       if (!response.ok) throw new Error(payload.error || "Não foi possível comentar.");
+      // A failed follow-up read must not leave an acknowledged comment spinning.
+      setComments(current => current.map(item => item.id === draft.id ? { ...item, pending: false } : item));
       await load(true);
+      setSent(true);
     } catch (cause) {
       setComments((current) => current.filter((item) => item.id !== draft.id));
       setText(texto);
       setError((cause as Error).message);
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
   }
@@ -168,7 +182,7 @@ export default function CommunityPostInteractions({
                           </span>
                         )}
                         <span className="community-comment-time" title={fullDate(comment.criadoEm)}>
-                          {comment.pending ? "enviando…" : relativeDate(comment.criadoEm)}
+                          {comment.pending ? <><VinkuloActionMark state="pending" size={20}/> enviando…</> : relativeDate(comment.criadoEm)}
                         </span>
                       </header>
                       <p>{comment.texto}</p>
@@ -199,12 +213,15 @@ export default function CommunityPostInteractions({
               </label>
               <button
                 type="submit"
+                className="vinkulo-brand-action"
                 disabled={!canSend}
+                aria-busy={sending}
                 aria-label={sending ? "Enviando comentário" : "Enviar comentário"}
                 title={sending ? "Enviando comentário" : "Enviar comentário"}
               >
-                <span aria-hidden="true" className="community-comment-send-icon">↑</span>
+                <VinkuloActionMark state={sending ? "pending" : error ? "error" : sent ? "success" : "idle"} size={30}/>
               </button>
+              <span className="sr-only" role="status">{sent ? "Comentário enviado." : ""}</span>
             </form>
           ) : <p className="community-comments-empty">Comentários desativados pelo autor.</p>}
           {text.length >= COUNTER_FROM && (

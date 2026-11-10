@@ -66,7 +66,7 @@ test('personal repertoire cancels deferred loading when unmounted',()=>{
 
 test('document navigation preserves local paths, query and fragment on the current origin',()=>{
   const exports={},visited=[],origin='https://vinkulo.test';
-  runInNewContext(compile('lib/document-navigation.ts'),{exports,URL,window:{location:{origin,assign:url=>visited.push(url)}}});
+  runInNewContext(compile('lib/document-navigation.ts'),{exports,URL,Event,window:{dispatchEvent(){},location:{origin,assign:url=>visited.push(url)}}});
   for(const route of ['/painel/visitantes?novo=1','/painel?view=inicio#publicacao-7','/proprietario?tab=editorial','/api/auth/google/start?purpose=drive&returnTo=%2Fpainel']){
     exports.navigateDocument(route);assert.equal(visited.at(-1),origin+route);
   }

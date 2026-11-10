@@ -151,7 +151,7 @@ export default function OwnerAppearanceWorkspace() {
   if (loading) {
     return (
       <section className="community-theme-editor owner-appearance-workspace">
-        <p>Carregando a Central de Aparência…</p>
+        <p data-page-loading="true">Carregando a Central de Aparência…</p>
       </section>
     );
   }

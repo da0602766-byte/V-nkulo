@@ -163,7 +163,6 @@ export function Pessoas({
   perfil,
   onOpen,
   onNew,
-  onShare,
   onBulk,
   celulas,
   notify,
@@ -1103,13 +1102,26 @@ export function Confirm({
   onCancel: () => void
   onConfirm: () => void | Promise<void>
 }) {
+  const [pending, setPending] = useState(false);
+  const [failure, setFailure] = useState("");
+  const pendingRef = useRef(false);
+  async function confirm() {
+    if (pendingRef.current) return;
+    pendingRef.current = true;
+    setPending(true);
+    setFailure("");
+    try { await onConfirm(); }
+    catch (cause) { setFailure(cause instanceof Error ? cause.message : "Não foi possível confirmar. Tente novamente."); }
+    finally { pendingRef.current = false; setPending(false); }
+  }
   return (
-    <Dialog title={title} onClose={onCancel}>
+    <Dialog title={title} busy={pending} failed={Boolean(failure)} onClose={() => { if (!pendingRef.current) onCancel(); }}>
       <div className="space-y-3">
         <div className="font-bold text-stone-900 text-base sm:text-lg">{title}</div>
         <p className="text-stone-600 text-[13px] leading-relaxed">{body}</p>
-        <div className="pt-3 flex justify-end gap-2">
-          <button className={btnSec} onClick={onCancel}>
+        {failure && <p role="alert">{failure}</p>}
+        <div className="vinkulo-confirm-actions pt-3 flex flex-wrap justify-end gap-2">
+          <button className={btnSec} disabled={pending} onClick={onCancel}>
             Cancelar
           </button>
           <button
@@ -1118,9 +1130,10 @@ export function Confirm({
                 ? `${btn} bg-red-600 text-white hover:bg-red-700 shadow-sm shadow-red-600/30`
                 : btnPri
             }
-            onClick={onConfirm}
+            disabled={pending}
+            onClick={confirm}
           >
-            {action}
+            {pending ? "Aguarde…" : action}
           </button>
         </div>
       </div>

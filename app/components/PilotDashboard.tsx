@@ -941,19 +941,21 @@ export default function PilotDashboard({
   }
 
   async function switchCommunity(comunidadeId: number) {
+    if (switching || comunidadeId === active.comunidadeId) return;
     setSwitching(true);
     try {
       const response = await fetch("/api/pilot/comunidade-ativa", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ comunidadeId }),
+        signal: AbortSignal.timeout(20000),
       });
       const result = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(result.error || "Não foi possível trocar de comunidade.");
       navigateDocument("/painel?view=inicio");
       return;
     } catch (error) {
-      window.alert((error as Error).message);
+      window.alert((error as Error).name === "TimeoutError" ? "A troca de comunidade demorou. Verifique sua conexão e tente novamente." : (error as Error).message);
     }
     setSwitching(false);
   }
@@ -1162,12 +1164,7 @@ export default function PilotDashboard({
           </section>
         </div>
       )}
-      {switching && (
-        <div className="pilot-community-switching-v3" role="status" aria-live="polite">
-          <span className="pilot-loading-spinner" aria-hidden="true" />
-          <div><strong>Entrando na comunidade</strong><small>Preparando informações, permissões e módulos…</small></div>
-        </div>
-      )}
+      {switching && <VinkuloLoading label="Entrando na comunidade…" />}
       {active.temporaryAccess && (
         <TemporaryAccessWatcher
           resourceLabel={active.temporaryAccess.resource === "ESTACIONAMENTO" ? "Estacionamento" : "Escala em modo leitura"}

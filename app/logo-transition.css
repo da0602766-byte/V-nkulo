@@ -1,0 +1,93 @@
+/* The artwork itself is transparent, with no tile, frame or rounded crop. */
+html body img.vinkulo-platform-mark {
+  display: block;
+  aspect-ratio: 1;
+  object-fit: contain;
+  background: transparent !important;
+  border: 0;
+  border-radius: 0 !important;
+  box-shadow: none;
+  padding: 0;
+}
+.platform-loading-transition {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483001;
+  isolation: isolate;
+  color: #f7f3ff;
+}
+.platform-loading-backdrop { position: absolute; inset: 0; background: #171126; }
+.platform-loading-symbol {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: clamp(200px, 36vw, 380px);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  transform-origin: center;
+}
+.vinkulo-animated-mark { position: relative; display: block; width: var(--vinkulo-mark-size, 320px); aspect-ratio: 1; }
+.platform-loading-symbol > .vinkulo-animated-mark,
+.vinkulo-loading-mark > .vinkulo-animated-mark { width: 100%; height: 100%; }
+.vinkulo-animated-mark img { display: block; width: 100%; height: 100%; object-fit: contain; background: transparent; border: 0; border-radius: 0; padding: 0; box-shadow: none; }
+.vinkulo-mark-guide { opacity: .17; }
+.vinkulo-mark-draw, .vinkulo-mark-shine { position: absolute; inset: 0; }
+.vinkulo-mark-shine {
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(115deg, transparent 34%, #ffffffd9 49%, transparent 64%);
+  background-size: 260% 100%;
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+}
+.platform-loading-transition[data-phase="waiting"] .vinkulo-animated-mark,
+.vinkulo-loading .vinkulo-animated-mark { animation: vinkulo-mark-float 2.4s ease-in-out infinite; }
+.platform-loading-transition[data-phase="waiting"] .vinkulo-mark-draw,
+.vinkulo-loading .vinkulo-mark-draw { animation: vinkulo-mark-draw 2.4s linear infinite; }
+.platform-loading-transition[data-phase="waiting"] .vinkulo-mark-shine,
+.vinkulo-loading .vinkulo-mark-shine { animation: vinkulo-mark-shine 2.4s ease-in-out infinite; }
+.platform-loading-label { position: absolute; top: calc(50% + clamp(100px, 18vw, 190px)); left: 16px; right: 16px; margin: 20px 0 0; text-align: center; font: 500 16px/1.5 var(--font-body), sans-serif; color: #f7f3ff; }
+.platform-loading-transition[data-phase="revealing"] .platform-loading-backdrop,
+.platform-loading-transition[data-phase="revealing"] .platform-loading-label { opacity: 0; transition: opacity 2s ease; }
+.platform-loading-transition[data-no-destination="true"] .platform-loading-symbol { opacity: 0; transition: opacity 2s ease; }
+.platform-loading-transition[data-phase="idle"] { display: none; }
+html[data-logo-unavailable] .platform-loading-transition { display: none; }
+html[data-logo-transition="waiting"] #main-content { opacity: 0; }
+html[data-logo-transition="revealing"] #main-content { opacity: 1; transition: opacity 2s ease; }
+html[data-logo-transition] { overflow: hidden; }
+html[data-logo-transition] .global-feedback-launcher { visibility: hidden; }
+[data-vinkulo-destination] { opacity: 0 !important; }
+html[data-logo-controller="ready"] [data-vinkulo-loading] { display: none; }
+.platform-loading-recovery { position: absolute; inset: auto 16px max(24px, env(safe-area-inset-bottom)); text-align: center; }
+.platform-loading-recovery[hidden] { display: none; }
+.platform-loading-recovery p { color: #f7f3ff; font: 16px/1.5 var(--font-body), sans-serif; }
+.platform-loading-recovery button { min-height: 44px; padding: 10px 16px; margin: 4px; border: 1px solid #b4a1d2; border-radius: 10px; background: #302341; color: #fff; font: inherit; cursor: pointer; }
+.platform-loading-recovery button:focus-visible { outline: 3px solid #35dbef; outline-offset: 3px; }
+.owner-console .oc-mobile-brand { display: none; }
+@media (max-width: 900px) { .owner-console .oc-mobile-brand { display: block; flex: none; } }
+/* Fallback for a Suspense boundary before the shared controller hydrates. */
+.vinkulo-loading { position: fixed; inset: 0; z-index: 2147483000; display: grid; place-content: center; justify-items: center; gap: 12px; background: #171126; color: #f7f3ff; }
+.vinkulo-loading-mark { width: clamp(200px,36vw,380px); aspect-ratio: 1; }
+.vinkulo-loading-mark img { width: 100%; height: 100%; }
+/* Follow the left arm down into the fold, then draw the right arm upwards. */
+@keyframes vinkulo-mark-draw {
+  0%, 4% { clip-path: polygon(0 0, 51% 0, 51% 0, 100% 0, 100% 0, 51% 0, 51% 0, 0 0); opacity: 1; }
+  36% { clip-path: polygon(0 0, 51% 0, 51% 100%, 100% 100%, 100% 100%, 51% 100%, 51% 100%, 0 100%); opacity: 1; }
+  68%, 90% { clip-path: polygon(0 0, 51% 0, 51% 0, 100% 0, 100% 100%, 51% 100%, 51% 100%, 0 100%); opacity: 1; }
+  100% { clip-path: polygon(0 0, 51% 0, 51% 0, 100% 0, 100% 100%, 51% 100%, 51% 100%, 0 100%); opacity: 0; }
+}
+@keyframes vinkulo-mark-shine {
+  0%, 45% { background-position: 150% 0; opacity: 0; }
+  58% { opacity: .65; }
+  86%, 100% { background-position: -50% 0; opacity: 0; }
+}
+@keyframes vinkulo-mark-float {
+  0%, 100% { transform: translateY(3px) rotate(-2deg); }
+  50% { transform: translateY(-4px) rotate(2deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vinkulo-animated-mark, .vinkulo-mark-draw, .vinkulo-mark-shine { animation: none !important; }
+  .vinkulo-mark-shine { display: none; }
+  .platform-loading-transition[data-phase="revealing"] .platform-loading-symbol { opacity: 0; transition: opacity 2s ease; }
+}

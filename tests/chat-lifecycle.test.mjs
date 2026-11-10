@@ -29,7 +29,7 @@ function harness() {
     exports, window, URL, document: {visibilityState:'visible',addEventListener(){},removeEventListener(){}},
     FormData: class {constructor(form) {this.form=form;} get() {return this.form.message;}},
     fetch: (url,options) => new Promise((resolve,reject) => requests.push({url,options,resolve,reject})),
-    require(name) {if(name==='react')return hooks;if(name==='react/jsx-runtime')return jsx;if(name==='./SafeImage')return {default:'SafeImage'};if(name==='./ChatEmoji')return {default:'ChatEmoji',EmojiText:'EmojiText'};if(name==='../lib/chat-sounds')return {playChatSound(...args){sounds.push(args);}};if(name==='../lib/chat-emojis')return {CHAT_EMOJIS:[]};throw Error(name);},
+    require(name) {if(name==='react')return hooks;if(name==='react/jsx-runtime')return jsx;if(name==='./SafeImage')return {default:'SafeImage'};if(name==='./VinkuloActionMark')return {default:'VinkuloActionMark'};if(name==='./ChatEmoji')return {default:'ChatEmoji',EmojiText:'EmojiText'};if(name==='../lib/chat-sounds')return {playChatSound(...args){sounds.push(args);}};if(name==='../lib/chat-emojis')return {CHAT_EMOJIS:[]};throw Error(name);},
   });
   return {
     requests, sounds,
@@ -170,3 +170,28 @@ test('sons: abrir histórico é silencioso e somente mensagem nova recebida toca
   await reply(poll,workspace([{...message(20,'Histórico'),remetente_id:8},{...message(21,'Nova'),remetente_id:8}]));f.render();f.flush();
   assert.deepEqual(f.sounds,[['received',21]]);f.close();
 });
+
+test('marca do chat só confirma depois do servidor e impede envio duplicado antes do render',async()=>{
+  const f=await initialized();await ready(f,11);
+  const sending=send(f,'Mensagem com marca');
+  await send(f,'Mensagem com marca');
+  assert.equal(f.requests.filter(r=>r.options?.method==='POST').length,1);
+  let button=nodes(f.render()).find(n=>n.type==='button'&&n.props['aria-label']==='Enviando mensagem');
+  assert.equal(button.props.children.props.state,'pending');
+  assert.doesNotMatch(text(f.render()),/Mensagem enviada\./);
+  await reply(f.requests.find(r=>r.options?.method==='POST'),{message:message(55,'Mensagem com marca')});
+  await sending;
+  button=nodes(f.render()).find(n=>n.type==='button'&&n.props['aria-label']==='Enviar mensagem');
+  assert.equal(button.props.children.props.state,'success');
+  assert.match(text(f.render()),/Mensagem enviada\./);
+  f.close();
+});
+
+test('falha no envio não recebe a confirmação positiva da marca',async()=>{
+  const f=await initialized();await ready(f,11);const sending=send(f,'Ainda não enviada');
+  await reply(f.requests.find(r=>r.options?.method==='POST'),{error:'Rede indisponível'},503);await sending;
+  const button=nodes(f.render()).find(n=>n.type==='button'&&n.props['aria-label']==='Enviar mensagem');
+  assert.equal(button.props.children.props.state,'error');
+  assert.doesNotMatch(text(f.render()),/Mensagem enviada\./);f.close();
+});
+

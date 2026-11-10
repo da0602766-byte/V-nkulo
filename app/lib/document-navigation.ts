@@ -9,5 +9,6 @@ export function navigateDocument(destination: string): void {
   if (url.origin !== window.location.origin || url.username || url.password) {
     throw new Error('Destino de navegação inválido.');
   }
+  window.dispatchEvent(new Event("vinkulo:document-navigation"));
   window.location.assign(url.href);
 }

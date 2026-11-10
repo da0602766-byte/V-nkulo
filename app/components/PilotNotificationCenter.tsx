@@ -322,8 +322,8 @@ export default function PilotNotificationCenter({
       setPushDelivery(null);
       await registration.showNotification("Notificações ativadas", {
         body: "Agora o Vínkulo poderá avisar você mesmo quando estiver fechado.",
-        icon: "/vinkulo-logo.png",
-        badge: "/vinkulo-logo.png",
+        icon: "/vinkulo-symbol-v2.png",
+        badge: "/vinkulo-symbol-v2.png",
         tag: "vinkulo-notifications-enabled",
         data: { url: "/painel" },
       });

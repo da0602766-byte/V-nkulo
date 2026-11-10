@@ -55,7 +55,7 @@ export default function SavedFilesWorkspace({ userId, profile, connected }: { us
       setError(`${completed} de ${local.length} concluídos. ${(cause as Error).message} Você pode tentar novamente sem duplicar os arquivos já enviados.`);
     } finally { syncing.current = false; setIsSyncing(false); window.dispatchEvent(new Event("vinkulo:files-changed")); }
   }
-  return <section className="saved-files-workspace" aria-labelledby="saved-files-title">
+  return <section className="saved-files-workspace" data-page-loading={loading && !local.length && !drive.length || undefined} aria-labelledby="saved-files-title">
     <header><div><h3 id="saved-files-title">Fotos e arquivos</h3><p>Baixe no celular sem precisar do Drive ou salve uma cópia na sua Conta Google.</p></div>
       <button type="button" disabled={loading || isSyncing} onClick={() => window.dispatchEvent(new Event("vinkulo:files-changed"))}>Atualizar lista</button></header>
     <p>Nas fotos do mural e nos PDFs, use as opções de salvar. Guardar no navegador permite recuperar a cópia neste aparelho; baixar permite guardar na pasta Arquivos ou Downloads.</p>

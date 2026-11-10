@@ -30,6 +30,8 @@ import FeedIcon from "./feed/FeedIcon";
 import useFeedDialog from "./feed/useFeedDialog";
 import FeedChannelChoices from "./feed/FeedChannelChoices";
 import TransientFeedback from "./TransientFeedback";
+import VinkuloActionMark, { VinkuloActionStatus } from "./VinkuloActionMark";
+import ActionDialog from "./ActionDialog";
 import introStyles from "./EventsAgenda.module.css";
 
 type FeedItem = {
@@ -170,6 +172,7 @@ export default function CommunityHome({
   const [composerImageUrl, setComposerImageUrl] = useState("");
   const [editingImageUrl, setEditingImageUrl] = useState("");
   const [feedback, setFeedback] = useState("");
+  const [postConfirmation, setPostConfirmation] = useState<{ id: number; action: "archive" | "delete" } | null>(null);
   const [error, setError] = useState("");
   const [feedCursor, setFeedCursor] = useState<string | null>(null);
   const [feedHasMore, setFeedHasMore] = useState(false);
@@ -178,6 +181,7 @@ export default function CommunityHome({
   const [feedFilter, setFeedFilter] = useState<"TODOS" | "COMUNICADOS" | "EVENTOS" | "MINISTERIOS">("TODOS");
   const [scheduleWorkingId, setScheduleWorkingId] = useState<number | null>(null);
   const [scheduleFeedback, setScheduleFeedback] = useState("");
+  const [scheduleFailed, setScheduleFailed] = useState(false);
   const [replacementScheduleId, setReplacementScheduleId] = useState<number | null>(null);
   const [replacementVolunteerId, setReplacementVolunteerId] = useState(0);
   const [renderedAt] = useState(() => Date.now());
@@ -469,6 +473,7 @@ export default function CommunityHome({
   ) {
     setScheduleWorkingId(scheduleId);
     setScheduleFeedback("");
+    setScheduleFailed(false);
     try {
       const response = await fetch(`/api/pilot/escalas/${scheduleId}`, {
         method: "PATCH",
@@ -501,6 +506,7 @@ export default function CommunityHome({
             : "Indisponibilidade registrada. A liderança responsável foi avisada.",
       );
     } catch (cause) {
+      setScheduleFailed(true);
       setScheduleFeedback((cause as Error).message);
     } finally {
       setScheduleWorkingId(null);
@@ -510,6 +516,8 @@ export default function CommunityHome({
   async function createPost(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formElement = event.currentTarget;
+    if (busyRef.current) return;
+    busyRef.current = true;
     setWorking(true);
     setFeedback("");
     setError("");
@@ -551,11 +559,14 @@ export default function CommunityHome({
     } catch (saveError) {
       setError((saveError as Error).message);
     } finally {
+      busyRef.current = false;
       setWorking(false);
     }
   }
 
   async function approvePost(id: number) {
+    if (busyRef.current) return;
+    busyRef.current = true;
     setWorking(true);
     setError("");
     try {
@@ -571,6 +582,7 @@ export default function CommunityHome({
     } catch (cause) {
       setError((cause as Error).message);
     } finally {
+      busyRef.current = false;
       setWorking(false);
     }
   }
@@ -580,6 +592,8 @@ export default function CommunityHome({
     post: FeedItem,
   ) {
     event.preventDefault();
+    if (busyRef.current) return;
+    busyRef.current = true;
     setWorking(true);
     setFeedback("");
     setError("");
@@ -612,14 +626,19 @@ export default function CommunityHome({
     } catch (saveError) {
       setError((saveError as Error).message);
     } finally {
+      busyRef.current = false;
       setWorking(false);
     }
   }
 
-  async function archivePost(id: number) {
-    if (!window.confirm("Arquivar esta publicação sem apagar o histórico?")) {
+  async function archivePost(id: number, confirmed = false) {
+    if (!confirmed) {
+      setError("");
+      setPostConfirmation({ id, action: "archive" });
       return;
     }
+    if (busyRef.current) return;
+    busyRef.current = true;
     setWorking(true);
     setFeedback("");
     setError("");
@@ -635,21 +654,23 @@ export default function CommunityHome({
       }
       setFeedback("Publicação arquivada.");
       await refreshFeed();
+      setPostConfirmation(null);
     } catch (archiveError) {
       setError((archiveError as Error).message);
     } finally {
+      busyRef.current = false;
       setWorking(false);
     }
   }
 
-  async function deletePost(id: number) {
-    if (
-      !window.confirm(
-        "Excluir definitivamente esta publicação, comentários e interações vinculadas?",
-      )
-    ) {
+  async function deletePost(id: number, confirmed = false) {
+    if (!confirmed) {
+      setError("");
+      setPostConfirmation({ id, action: "delete" });
       return;
     }
+    if (busyRef.current) return;
+    busyRef.current = true;
     setWorking(true);
     setFeedback("");
     setError("");
@@ -663,15 +684,22 @@ export default function CommunityHome({
       }
       setFeedback("Publicação excluída.");
       await refreshFeed();
+      setPostConfirmation(null);
     } catch (deleteError) {
       setError((deleteError as Error).message);
     } finally {
+      busyRef.current = false;
       setWorking(false);
     }
   }
 
   return (
-    <section className={`worship-feed community-feed-redesign ${introStyles.workspace}`} aria-busy={loading}>
+    <section className={`worship-feed community-feed-redesign ${introStyles.workspace}`} aria-busy={loading} data-page-loading={loading && posts.length === 0 || undefined}>
+      {postConfirmation && <ActionDialog title={postConfirmation.action === "delete" ? "Excluir publicação?" : "Ocultar publicação?"} busy={working} failed={Boolean(error)} onClose={() => { if (!working) setPostConfirmation(null); }}>
+        <p>{postConfirmation.action === "delete" ? "Excluir definitivamente esta publicação, comentários e interações vinculadas? Esta ação não pode ser desfeita." : "Arquivar esta publicação sem apagar o histórico? Ela deixará de aparecer no feed."}</p>
+        {error && <p role="alert">{error}</p>}
+        <footer><button type="button" disabled={working} onClick={() => setPostConfirmation(null)}>Cancelar</button><button type="button" className={postConfirmation.action === "delete" ? "danger vinkulo-brand-action" : "vinkulo-brand-action"} disabled={working} onClick={() => { if (!working) void (postConfirmation.action === "delete" ? deletePost(postConfirmation.id, true) : archivePost(postConfirmation.id, true)); }}>{working ? "Aguarde…" : postConfirmation.action === "delete" ? "Excluir definitivamente" : "Ocultar publicação"}</button></footer>
+      </ActionDialog>}
       <FeedDriveStorageNotice key={`${currentUserId}:${communityId}`} currentUserId={currentUserId} communityId={communityId}/>
       <div id={introId} className={introStyles.intro} data-open={introOpen} aria-hidden={!introOpen} inert={!introOpen}>
       <div className={introStyles.introClip}>
@@ -704,7 +732,7 @@ export default function CommunityHome({
       )}
 
       {(feedback || error) && (
-        <TransientFeedback className={`operations-feedback ${error ? "error" : ""}`} role="status">
+        <TransientFeedback className={`operations-feedback ${error ? "error" : ""}`} tone={error ? "error" : "success"} role="status">
           {error || feedback}
         </TransientFeedback>
       )}
@@ -822,7 +850,8 @@ export default function CommunityHome({
             <label className="composer-share composer-moment-option"><input type="checkbox" name="mostrarMomento" /><span><strong>Mostrar nos Momentos por 24 horas</strong><small>Opcional · começa após a publicação ser aprovada; o post continua no feed.</small></span></label>
             {error && <TransientFeedback className="operations-feedback error composer-wide" role="alert">{error}</TransientFeedback>}
             <PublicationPreview image={composerImageUrl} audience={audienceType === "PUBLICO" ? "Toda a comunidade" : ministries.filter(item => selectedMinistries.includes(item.id)).map(item => item.nome).join(", ") || "Nenhum ministério selecionado"} />
-            <button disabled={working}>
+            <button disabled={working} aria-busy={working} className="vinkulo-brand-action">
+              <VinkuloActionMark state={working ? "pending" : "idle"} size={30}/>
               {working ? "Salvando…" : "Salvar publicação"}
             </button>
           </form>
@@ -1057,7 +1086,7 @@ export default function CommunityHome({
                       </label>
                       {error && <TransientFeedback className="operations-feedback error composer-wide" role="alert">{error}</TransientFeedback>}
                       <div className="community-post-edit-actions">
-                        <button disabled={working}>Salvar alterações</button>
+                        <button disabled={working} aria-busy={working} className="vinkulo-brand-action"><VinkuloActionMark state={working ? "pending" : "idle"} size={30}/>{working ? "Salvando…" : "Salvar alterações"}</button>
                         <button
                           type="button"
                           className="secondary-button"
@@ -1171,7 +1200,7 @@ export default function CommunityHome({
                 </div>
                 <span>{myUpcomingSchedules.length} próximas</span>
               </header>
-              {scheduleFeedback && <p className="community-schedule-feedback" role="status">{scheduleFeedback}</p>}
+              {scheduleFeedback && <div className="community-schedule-feedback"><VinkuloActionStatus state={scheduleFailed ? "error" : "success"}>{scheduleFeedback}</VinkuloActionStatus></div>}
               {myUpcomingSchedules.length ? (
                 <div className="community-schedule-list">
                   {myUpcomingSchedules.slice(0, 1).map((schedule) => {
@@ -1195,9 +1224,10 @@ export default function CommunityHome({
                             <button
                               type="button"
                               disabled={scheduleWorkingId === schedule.id}
+                              className="vinkulo-brand-action"
                               onClick={() => void respondToSchedule(schedule.id, "CONFIRMADA")}
                               aria-label="Confirmar minha presença"
-                            >Confirmar presença</button>
+                            ><VinkuloActionMark state={scheduleWorkingId === schedule.id ? "pending" : "idle"} size={28}/>Confirmar presença</button>
                             <button
                               type="button"
                               className="secondary"

@@ -1,4 +1,5 @@
 "use client";
+import VinkuloActionMark from "./VinkuloActionMark";
 import { playChatSound } from "../lib/chat-sounds";
 
 import SafeImage from "./SafeImage";
@@ -210,6 +211,13 @@ export default function PrivateChatWorkspace({
   const [loading, setLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [sendComplete, setSendComplete] = useState(false);
+  const sendingScopeRef = useRef<{ id: number } | null>(null);
+  useEffect(() => {
+    if (!sendComplete) return;
+    const timer = window.setTimeout(() => setSendComplete(false), 1400);
+    return () => window.clearTimeout(timer);
+  }, [sendComplete, activeId]);
   const [hasDraft, setHasDraft] = useState(false);
   const [draftLength, setDraftLength] = useState(0);
   const [error, setError] = useState("");
@@ -367,6 +375,8 @@ export default function PrivateChatWorkspace({
     setConfirmed([]);
     setPending([]);
     setSending(false);
+    sendingScopeRef.current = null;
+    setSendComplete(false);
     setError("");
     setEmojiOpen(false);
     setAppearanceOpen(false);
@@ -482,6 +492,7 @@ export default function PrivateChatWorkspace({
     setError("");
     setConfirmed((current) => mergeMessages(current, [result.message!]));
     setPending((current) => current.filter((item) => item.tempId !== tempId));
+    setSendComplete(true);
     void refreshList();
   }
 
@@ -493,6 +504,9 @@ export default function PrivateChatWorkspace({
     if (!text || !conversation) return;
     const scope = activeScopeRef.current;
     if (scope.id !== conversation.id) return;
+    if (sendingScopeRef.current === scope) return;
+    sendingScopeRef.current = scope;
+    setSendComplete(false);
     const tempId = --pendingIdRef.current;
     setPending((current) => [...current, { tempId, mensagem: text, criadoEm: new Date(), status: "sending" }]);
     resetComposer(form);
@@ -504,6 +518,7 @@ export default function PrivateChatWorkspace({
       setPending((current) => current.map((item) => (item.tempId === tempId ? { ...item, status: "failed" } : item)));
       setError((sendError as Error).message);
     } finally {
+      if (sendingScopeRef.current === scope) sendingScopeRef.current = null;
       if (isCurrentScope(scope)) setSending(false);
     }
   }
@@ -778,7 +793,10 @@ export default function PrivateChatWorkspace({
                   onKeyDown={handleComposerKeyDown}
                 />
                 {draftLength > 1800 && <span className="private-chat-char-count">{draftLength}/2000</span>}
-                <button type="submit" className={hasDraft ? "ready" : ""} disabled={sending || !hasDraft} aria-label="Enviar mensagem"><ChatIcon name="send" /></button>
+                <button type="submit" className={`vinkulo-brand-action${hasDraft ? " ready" : ""}`} disabled={sending || !hasDraft} aria-busy={sending} aria-label={sending ? "Enviando mensagem" : "Enviar mensagem"}>
+                  <VinkuloActionMark state={sending ? "pending" : sendComplete ? "success" : pending.some(item => item.status === "failed") ? "error" : "idle"} size={32}/>
+                </button>
+                <span className="sr-only" role="status">{sending ? "Enviando mensagem…" : sendComplete ? "Mensagem enviada." : ""}</span>
               </form>
             </>
           )}
@@ -813,7 +831,7 @@ function Tick({ status, pulse = false }: { status?: TickStatus; pulse?: boolean 
   if (!status) return null;
   const labels = { sending: "Enviando", failed: "Falhou", sent: "Enviado", delivered: "Entregue", read: "Visto" };
   return <span className={`private-chat-tick ${status}${pulse ? " is-updated" : ""}`} aria-label={status === "read" ? "Visualizada" : labels[status]} title={status === "read" ? "Mensagem visualizada" : labels[status]}>
-    <span className="chat-status-symbol" aria-hidden="true">{status === "sending" ? <i /> : status === "failed" ? "!" : <svg viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path pathLength="1" d="m2 8 4 4L16 2" />{(status === "delivered" || status === "read") && <path pathLength="1" d="m11 10 2 2L23 2" />}</svg>}</span>
+    <span className="chat-status-symbol" aria-hidden="true">{status === "sending" ? <VinkuloActionMark state="pending" size={20}/> : status === "failed" ? "!" : <svg viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path pathLength="1" d="m2 8 4 4L16 2" />{(status === "delivered" || status === "read") && <path pathLength="1" d="m11 10 2 2L23 2" />}</svg>}</span>
     <span>{labels[status]}</span>
   </span>;
 }

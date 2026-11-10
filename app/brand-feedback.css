@@ -1,0 +1,60 @@
+/* Brand signatures belong to the V; community surfaces keep their own palette. */
+:root {
+  --vinkulo-brand-violet: #a41cff;
+  --vinkulo-brand-indigo: #4520e8;
+  --vinkulo-brand-cyan: #00cce9;
+  --vinkulo-brand-gradient: linear-gradient(115deg, var(--vinkulo-brand-violet), var(--vinkulo-brand-indigo) 55%, var(--vinkulo-brand-cyan));
+  --vinkulo-brand-ease: cubic-bezier(.22,.68,.18,1);
+}
+.vinkulo-action-mark { position: relative; display: inline-flex; align-items: center; justify-content: center; flex: none; vertical-align: middle; line-height: 1; }
+.vinkulo-action-mark > .vinkulo-animated-mark { width: calc(var(--vinkulo-mark-size,30px) * var(--vinkulo-ui-scale-inverse,1)); }
+.vinkulo-action-mark .vinkulo-mark-guide { opacity: .1; }
+.vinkulo-action-mark[data-state="pending"] .vinkulo-mark-draw { animation: vinkulo-mark-draw 1.35s linear infinite; }
+.vinkulo-action-mark[data-state="pending"] .vinkulo-mark-shine { animation: vinkulo-mark-shine 1.35s ease-in-out infinite; }
+.vinkulo-action-mark[data-state="pending"] > .vinkulo-animated-mark { animation: vinkulo-mark-float 1.35s ease-in-out infinite; }
+.vinkulo-action-mark[data-state="idle"] .vinkulo-mark-shine { animation: vinkulo-mark-shine 1.2s ease-out 1; }
+.vinkulo-action-mark[data-state="success"] > .vinkulo-animated-mark { animation: vinkulo-action-complete .6s var(--vinkulo-brand-ease) both; }
+.vinkulo-action-mark[data-state="success"] .vinkulo-mark-shine { animation: vinkulo-mark-shine .9s ease-out 1; }
+.vinkulo-action-badge { position: absolute; right: -3px; bottom: 0; display: grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; background: #126143; color: #fff; font: 800 10px/1 system-ui,sans-serif; box-shadow: 0 0 0 2px var(--pilot-surface,var(--toast-surface,#fff)); }
+.vinkulo-action-mark[data-state="error"] .vinkulo-action-badge { background: #ad2544; }
+.vinkulo-action-status { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; font-size: 13px; line-height: 1.5; }
+.vinkulo-action-status > span:last-child { min-width: 0; overflow-wrap: anywhere; }
+.vinkulo-brand-action { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.vinkulo-brand-action > .vinkulo-action-mark { margin-block: -3px; }
+/* The colored V stays readable on the compact send controls in either theme. */
+html body :is(.private-chat-thread > form, .community-comment-form, .community-composer-inline, .community-post-edit-actions, .feed-prayer-form, .community-schedule-actions, dialog.v-action-dialog footer) button.vinkulo-brand-action:not(.danger),
+html body .pilot-dashboard[data-ui-version="v2"] :is(.private-chat-thread > form, .community-comment-form, .community-composer-inline, .community-post-edit-actions, .feed-prayer-form, .community-schedule-actions) button.vinkulo-brand-action:not(.danger) {
+  --vinkulo-action-surface: var(--pilot-surface-opaque,var(--pilot-surface,var(--surface,#fff)));
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: calc(44px * var(--vinkulo-ui-scale-inverse,1)) !important;
+  min-width: calc(44px * var(--vinkulo-ui-scale-inverse,1)) !important;
+  background: linear-gradient(var(--vinkulo-action-surface),var(--vinkulo-action-surface)) padding-box, var(--vinkulo-brand-gradient) border-box !important;
+  border: 1px solid transparent !important;
+  color: var(--pilot-text,var(--ink,#243047)) !important;
+}
+html body button.vinkulo-brand-action:has(.vinkulo-action-mark:is([data-state="pending"],[data-state="success"],[data-state="error"])) { opacity: 1 !important; }
+.vinkulo-dialog-title { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.vinkulo-dialog-title > :last-child { min-width: 0; overflow-wrap: anywhere; }
+dialog header:has(> .vinkulo-dialog-title) > button,
+dialog.v-action-dialog > footer > button,
+.vinkulo-confirm-actions > button {
+  min-height: calc(44px * var(--vinkulo-ui-scale-inverse,1));
+  min-width: calc(44px * var(--vinkulo-ui-scale-inverse,1));
+}
+.app-toast-card { position: relative; }
+.app-toast-card::before { content: ""; position: absolute; top: 0; left: 18px; right: 18px; height: 2px; background: var(--vinkulo-brand-gradient); border-radius: 0 0 8px 8px; opacity: .8; }
+.app-toast-viewport .app-toast-card:is(.is-info,.is-success,.is-error) .app-toast-symbol { flex: 0 0 calc(36px * var(--vinkulo-ui-scale-inverse,1)); height: calc(36px * var(--vinkulo-ui-scale-inverse,1)); background: transparent; border-radius: 0; }
+.app-toast-card.is-error::before { background: #ad2544; }
+.private-chat-tick .vinkulo-action-mark { margin-right: 3px; }
+.chat-status-symbol:has(> .vinkulo-action-mark) { width: auto; height: auto; flex: none; }
+.private-chat-bubble footer:has(.vinkulo-action-mark) { align-items: center; }
+@keyframes vinkulo-action-complete {
+  0% { transform: scale(.8) rotate(-6deg); }
+  55% { transform: scale(1.12) rotate(2deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vinkulo-action-mark *, .vinkulo-action-mark { animation: none !important; }
+}
+.vinkulo-action-mark[data-motion="off"] *, .vinkulo-action-mark[data-motion="off"] { animation: none !important; }
+.vinkulo-action-mark[data-motion="off"] .vinkulo-mark-shine { display: none; }

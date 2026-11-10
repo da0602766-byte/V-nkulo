@@ -254,7 +254,7 @@ export default function LeadershipWorkspace({
 
   const pastoral = leaders.filter((item) => item.papel === "PASTOR");
   return (
-    <section className="leadership-workspace">
+    <section className="leadership-workspace" data-page-loading={loading && !loaded || undefined}>
       <header className="leadership-hero">
         <div>
           <p className="pilot-kicker">

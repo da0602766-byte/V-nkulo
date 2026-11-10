@@ -17,6 +17,8 @@ Antes de alterar o código, leia este documento e atualize a seção **Trabalho 
 
 ## Trabalho em andamento
 
+Marca V — Codex, 10/11/2026, publicação autorizada pelo proprietário. Base remota Sites 472 (8b97f50). Reserva: marca/carregamentos compartilhados, feedback de ações, trechos de envio no chat/feed, confirmações e sinalizadores de carregamento. Integração em checkout isolado; preservar chat com emojis, temas, sons e janela minimizável, Momentos, prévia de publicação e atalhos de Visitantes. Sem migrações ou alteração de audiência. Verificações do pacote e de produção em andamento.
+
 Chat minimizado — Codex, 29/10/2026, base 453. Reserva: app/private-chat.css. Restringir seletores de dimensões da lista ao estado expandido para impedir que sobrescrevam a barra minimizada. Validados: build Sites, 25/25 testes; minimizar pela lista e pela conversa, restaurar mantendo as duas mensagens fictícias e fechar. Prévia em 390/768/1864 px sem overflow. Barra com altura do cabeçalho, sem painel vazio; posição elevada no tablet para preservar navegação inferior. Publicação em preparação.
 
 Contraste do chat — Codex, 28/10/2026, base publicada 452. Reserva: app/private-chat.css. Ajustar fundos, balões, metadados e controles nos modos claro/escuro e nas 12 paletas, preservando preferências e dimensões. Validado: build Sites, 25/25 testes do chat e prévia com mensagens fictícias em 390/768/1864 px, sem overflow nem erros de console. Nas 12 paletas escuras, contraste mínimo medido de 7,68:1 no texto e 5,30:1 nos horários. Modo claro preservado; publicação desta correção em preparação.

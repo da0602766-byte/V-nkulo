@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { createFeedbackStore, type FeedbackEntry, type FeedbackTone } from "../lib/transient-feedback-store";
 import "../transient-feedback.css";
 import useFeedbackPosition from "./useFeedbackPosition";
+import VinkuloActionMark from "./VinkuloActionMark";
 
 const store = createFeedbackStore<ReactNode>();
 const empty: FeedbackEntry<ReactNode>[] = [];
@@ -29,7 +30,7 @@ export default function TransientFeedback({ children, className = "", role, tone
   useEffect(() => {
     const description = describe(children);
     if (!description.text) { store.remove(id); return; }
-    const kind = tone ?? (/error|erro|danger/.test(className) || role === "alert" ? "error" : "info");
+    const kind = tone ?? (/error|erro|danger/.test(className) || role === "alert" ? "error" : /success/.test(className) ? "success" : "info");
     store.publish({ id, content: children, tone: kind, actions: description.actions, onDismiss, durationMs,
       fingerprint: `${kind}:${noticeKey}:${description.text}` });
   }, [children, className, id, role, tone, onDismiss, durationMs, noticeKey]);
@@ -58,7 +59,7 @@ function ToastCard({ entry, history = false }: { entry: FeedbackEntry<ReactNode>
     role={history ? undefined : entry.tone === "error" ? "alert" : "status"}
     onPointerEnter={event => { if (event.pointerType === "mouse") setHovered(true); }} onPointerLeave={() => setHovered(false)}
     onFocusCapture={() => setFocused(true)} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false); }}>
-    <span className="app-toast-symbol" aria-hidden="true">{entry.tone === "error" ? "!" : entry.tone === "success" ? "✓" : "i"}</span>
+    <span className="app-toast-symbol" aria-hidden="true"><VinkuloActionMark state={entry.tone === "info" ? "idle" : entry.tone} size={36} animate={!history} /></span>
     <div className="app-toast-content" onClick={event => { if ((event.target as HTMLElement).closest("button,a")) store.acknowledge(entry.fingerprint); }}>{entry.content}</div>
     <button type="button" className="app-toast-close" aria-label={history ? "Excluir aviso" : "Fechar aviso"} onClick={() => store.acknowledge(entry.fingerprint)}><span aria-hidden="true">×</span> {history ? "Excluir" : "Fechar"}</button>
   </div>;

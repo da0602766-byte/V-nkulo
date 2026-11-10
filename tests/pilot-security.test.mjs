@@ -520,7 +520,7 @@ test("conversas ficam no perfil, isolam comunidade e respeitam membro versus ofi
   assert.match(chatApi, /communicationGroup/);
   assert.match(chatApi, /Membros conversam somente com membros/);
   assert.match(chatUi, /aria-label="Mensagem"/);
-  assert.match(chatUi, /aria-label="Enviar mensagem"/);
+  assert.match(chatUi, /aria-label=\{sending \? "Enviando mensagem" : "Enviar mensagem"\}/);
   assert.match(chatUi, /<form onSubmit=\{send\}/);
   assert.match(presenceUi, /Mensagem/);
   assert.match(presenceUi, /Biografia/);
