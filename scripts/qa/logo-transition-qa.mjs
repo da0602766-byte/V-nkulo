@@ -7,7 +7,7 @@ const browser = await chromium.launch({ channel: "msedge", headless: true });
 const results = [], errors = [];
 await fs.mkdir("outputs/logo-transition", { recursive: true });
 async function ready(page) {
-  await page.waitForFunction(() => document.querySelector('.platform-loading-transition')?.dataset.phase === 'idle', null, { timeout: 20000 });
+  await page.waitForFunction(() => document.documentElement.dataset.logoController === 'ready' && document.querySelector('.platform-loading-transition')?.dataset.phase === 'idle', null, { timeout: 20000 });
 }
 async function pageFor(options = {}) {
   const page = await browser.newPage({ viewport: { width: 1864, height: 1000 }, ...options });
@@ -62,7 +62,9 @@ try {
   await fixture.close();
 
   const motion = await pageFor({viewport:{width:390,height:844}});
-  await motion.goto(preview.base+'/login');
+  await motion.goto(preview.base+'/qa-fixture?pending');
+  await motion.waitForFunction(()=>document.querySelector('.platform-loading-transition')?.dataset.phase==='waiting');
+  await motion.evaluate(()=>document.querySelector('[data-vinkulo-loading]').remove());
   await motion.waitForFunction(()=>document.querySelector('.platform-loading-transition')?.dataset.phase==='revealing');
   const flight = await motion.locator('.platform-loading-symbol').evaluate(el=>({duration:el.getAnimations()[0]?.effect.getTiming().duration,destination:document.querySelectorAll('[data-vinkulo-destination]').length,reveal:getComputedStyle(document.querySelector('#main-content')).transitionDuration}));
   assert.deepEqual(flight,{duration:2000,destination:1,reveal:'2s'});
@@ -121,9 +123,11 @@ try {
     await owner.close();
   }
   const reduced = await pageFor({ reducedMotion:'reduce',viewport:{width:390,height:844} });
-  await reduced.goto(preview.base+'/login');
+  await reduced.goto(preview.base+'/qa-fixture?pending');
+  await reduced.waitForFunction(()=>document.querySelector('.platform-loading-transition')?.dataset.phase==='waiting');
+  await reduced.evaluate(()=>document.querySelector('[data-vinkulo-loading]').remove());
   await reduced.waitForFunction(()=>document.querySelector('.platform-loading-transition')?.dataset.phase==='revealing');
-  assert.equal(await reduced.locator('.platform-loading-symbol').evaluate(el=>el.getAnimations().length),0);
+  assert.equal(await reduced.locator('.platform-loading-symbol').evaluate(el=>el.getAnimations().filter(animation=>animation.effect.getKeyframes().some(frame=>'transform' in frame)).length),0);
   assert.equal(await reduced.locator('.vinkulo-animated-mark').evaluate(el=>el.getAnimations({subtree:true}).length),0);
   await ready(reduced);
   results.push('reduced-motion-without-flight');

@@ -17,6 +17,8 @@ Antes de alterar o código, leia este documento e atualize a seção **Trabalho 
 
 ## Trabalho em andamento
 
+Escopo do carregamento V — Codex, 10/11/2026, correção solicitada após Sites 474. Reserva: app/lib/logo-transition.ts, PlatformLoadingTransition.tsx, testes/QA de carregamento e documentação. Retirar captura automática de indicadores locais e de qualquer link/formulário; manter carregamentos explícitos anteriores, Visitantes e entrada/troca de comunidade. Preservar ícones PWA/APK e feedback local de ações. Usar fonte publicada em checkout isolado; publicação autorizada na conversa.
+
 Compatibilidade de ícones: reservar também public/vinkulo-app-icon-{192,512}.png para servir o mesmo V nas URLs de instalações antigas.
 
 Extensão da reserva de ícones: corrigir links de APK antigo em app/components/{AndroidOfflineControl,FirebaseIntegrationForm,OfflineModeEntry}.tsx. Apenas destino/versão do download; preservar política, permissões e operação offline.

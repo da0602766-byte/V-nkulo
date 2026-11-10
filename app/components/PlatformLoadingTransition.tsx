@@ -4,14 +4,14 @@ import { useEffect, useRef } from "react";
 import AnimatedVinkuloMark from "./AnimatedVinkuloMark";
 import { mountLogoTransition } from "../lib/logo-transition";
 
-/** One overlay per document, also present in the initial server HTML. */
+/** Dormant until an existing full-page loader or Visitantes requests it. */
 export default function PlatformLoadingTransition() {
   const overlay = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (overlay.current) return mountLogoTransition(overlay.current);
   }, []);
 
-  return <div ref={overlay} className="platform-loading-transition" data-phase="waiting">
+  return <div ref={overlay} className="platform-loading-transition" data-phase="idle">
     <div className="platform-loading-backdrop" />
     <div className="platform-loading-symbol" aria-hidden="true">
       <AnimatedVinkuloMark />
