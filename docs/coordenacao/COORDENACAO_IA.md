@@ -17,6 +17,8 @@ Antes de alterar o código, leia este documento e atualize a seção **Trabalho 
 
 ## Trabalho em andamento
 
+Auditoria AppSec — concluída e publicada em 20/11/2026. Sites 478, fonte `3f6fa40cdba05c2effebca25c54d259310be908e`, deployment `appgdep_6b003bbe9f54819195ba0f07f911ec55` (`succeeded`). Foram aprovados TypeScript, ESLint, build, `validate-artifact` e 1.003 testes. A validação prosseguiu por etapas após o script de pré-publicação encerrar ao procurar o resumo de um lint sem avisos. Audiência pública preservada e `drizzle/` inalterado desde a versão 477. [Vínkulo no Sites](https://vinkulo.da0602766.chatgpt.site)
+
 Carregamento único — Codex, 10/11/2026, base Sites 475. Reserva: logo-transition.ts e bootstrap/layout/CSS de transição, marcadores de prontidão de Visitantes, testes/QA e documentação. Manter uma única transição entre documentos e aguardar consultas iniciais antes de revelar. Preservar escopo da versão 475: nenhuma tela grande nova nas abas comuns, feedback de ações e ícones mantidos. Checkout isolado da fonte publicada; publicação autorizada na conversa.
 
 Escopo do carregamento V — Codex, 10/11/2026, correção solicitada após Sites 474. Reserva: app/lib/logo-transition.ts, PlatformLoadingTransition.tsx, testes/QA de carregamento e documentação. Retirar captura automática de indicadores locais e de qualquer link/formulário; manter carregamentos explícitos anteriores, Visitantes e entrada/troca de comunidade. Preservar ícones PWA/APK e feedback local de ações. Usar fonte publicada em checkout isolado; publicação autorizada na conversa.
