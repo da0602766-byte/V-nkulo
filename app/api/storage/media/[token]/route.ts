@@ -12,12 +12,14 @@ export async function GET(
   try {
     const accessToken = await getDriveAccessToken(reference.ownerId);
     const file = await readDriveFile(accessToken, reference.fileId);
+    const rawType = (file.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+    const safeType = ["image/jpeg", "image/png", "image/webp"].includes(rawType) ? rawType : "application/octet-stream";
     const headers = new Headers();
-    headers.set("Content-Type", file.headers.get("content-type") || "application/octet-stream");
+    headers.set("Content-Type", safeType);
     headers.set("Cache-Control", reference.scope === "public" ? "public, max-age=3600" : "private, max-age=300");
     headers.set("X-Content-Type-Options", "nosniff");
     headers.set("Referrer-Policy", "no-referrer");
-    if (new URL(request.url).searchParams.get("download") === "1") {
+    if (safeType === "application/octet-stream" || new URL(request.url).searchParams.get("download") === "1") {
       headers.set("Content-Disposition", "attachment");
     }
     return new Response(file.body, { headers });

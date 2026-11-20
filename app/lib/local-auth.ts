@@ -19,6 +19,8 @@ export function normalizeEmail(value: unknown) {
 export function validatePassword(password: string) {
   if (password.length < 8)
     return "A senha precisa ter pelo menos 8 caracteres.";
+  if (password.length > 256)
+    return "A senha pode ter no máximo 256 caracteres.";
   if (!/[A-Za-z]/.test(password) || !/\d/.test(password))
     return "Use letras e pelo menos um número na senha.";
   return null;
@@ -363,6 +365,9 @@ export async function consumeFirstAccessToken(input: {
   temporaryPassword: string;
   newPassword: string;
 }) {
+  if (input.temporaryPassword.length > 256 || input.newPassword.length > 256) {
+    return { ok: false, reason: "INVALID" } as const;
+  }
   const db = getD1();
   const email = normalizeEmail(input.email);
   const row = await db

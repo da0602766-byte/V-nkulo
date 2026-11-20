@@ -15,11 +15,18 @@ export async function GET(request: Request) {
   if (type === "cep") {
     const cep = onlyDigits(value, 8);
     if (cep.length !== 8) return Response.json({ error: "CEP inválido." }, { status: 400 });
-    const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`, { headers: { Accept: "application/json" } });
-    if (!response.ok) return Response.json({ error: "CEP não encontrado." }, { status: 404 });
-    const address = await response.json() as Record<string, unknown>;
-    if (address.erro) return Response.json({ error: "CEP não encontrado." }, { status: 404 });
-    return Response.json({ valido: true, endereco: { cep, logradouro: address.logradouro, bairro: address.bairro, cidade: address.localidade, estado: address.uf } });
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`, {
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!response.ok) return Response.json({ error: "CEP não encontrado." }, { status: 404 });
+      const address = (await response.json()) as Record<string, unknown>;
+      if (address.erro) return Response.json({ error: "CEP não encontrado." }, { status: 404 });
+      return Response.json({ valido: true, endereco: { cep, logradouro: address.logradouro, bairro: address.bairro, cidade: address.localidade, estado: address.uf } });
+    } catch {
+      return Response.json({ error: "Consulta de CEP temporariamente indisponível." }, { status: 503 });
+    }
   }
   return Response.json({ error: "Tipo de validação não suportado." }, { status: 400 });
 }

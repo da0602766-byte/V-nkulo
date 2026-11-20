@@ -31,13 +31,14 @@ function WorkspacePosition({ children }: { children: ReactNode }) {
   const position = useRef<number | null>(null);
   const root = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
+    const element = root.current;
     const frame = requestAnimationFrame(() => {
       window.scrollTo({ top: position.current ?? 0, behavior: "instant" });
     });
     return () => {
       position.current = window.scrollY; cancelAnimationFrame(frame);
-      root.current?.querySelectorAll<HTMLMediaElement>("video,audio").forEach(media => media.pause());
-      root.current?.querySelectorAll<HTMLInputElement>('input[type="password"]').forEach(field => { field.value = ""; });
+      element?.querySelectorAll<HTMLMediaElement>("video,audio").forEach(media => media.pause());
+      element?.querySelectorAll<HTMLInputElement>('input[type="password"]').forEach(field => { field.value = ""; });
     };
   }, []);
   return <div ref={root}>{children}</div>;

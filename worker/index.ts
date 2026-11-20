@@ -149,6 +149,9 @@ const worker = {
       }
       return withSecurityHeaders(response, url.pathname);
     } catch (error) {
+      if (url.pathname.startsWith("/api/") && error instanceof SyntaxError) {
+        return withSecurityHeaders(Response.json({ error: "Corpo da solicitação inválido." }, { status: 400 }), url.pathname);
+      }
       if (url.pathname.startsWith("/api/") && /PLAN_([A-Z_]*LIMIT|INACTIVE)/.test(String(error))) {
         return withSecurityHeaders(Response.json({error:"O plano da comunidade está inativo ou atingiu o limite deste recurso. Consulte o responsável."},{status:409}),url.pathname);
       }

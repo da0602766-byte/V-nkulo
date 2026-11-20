@@ -5,6 +5,7 @@ import {
   normalizeEmail,
   validatePassword,
 } from "../../../lib/local-auth";
+import { rateLimit } from "../../../lib/access-security";
 import { syncAuthAfterPasswordChange } from "../../../lib/supabase-auth-link";
 
 type FirstAccessPayload = {
@@ -18,7 +19,7 @@ type FirstAccessPayload = {
 export async function POST(request: Request) {
   let body: FirstAccessPayload;
   try {
-    body = await request.json() as FirstAccessPayload;
+    body = ((await request.json()) || {}) as FirstAccessPayload;
   } catch {
     return Response.json({ error: "Não foi possível ler os dados de acesso." }, { status: 400 });
   }
@@ -28,7 +29,10 @@ export async function POST(request: Request) {
   const temporaryPassword = String(body.temporaryPassword || "");
   const password = String(body.password || "");
   const confirmPassword = String(body.confirmPassword || "");
-  if (!token || !email || !temporaryPassword) {
+  if (!(await rateLimit(request, "first-access", email || "invalid", 8))) {
+    return Response.json({ error: "Muitas tentativas. Aguarde 15 minutos e tente novamente." }, { status: 429 });
+  }
+  if (!token || !email || !temporaryPassword || temporaryPassword.length > 256) {
     return Response.json({ error: "Informe o login e a senha temporária recebidos." }, { status: 400 });
   }
   const passwordError = validatePassword(password);

@@ -12,5 +12,7 @@ export async function GET(_request:Request,{params}:{params:Promise<{id:string;a
  if(!user.system_owner){const {context}=await getActiveTenantContext(user);if(!context||labModule.archived||!labModule.published||!canUseModule(labModule.published.definition,context)||!layoutHasAsset(labModule.published.definition,assetId))return new Response('Imagem indisponível.',{status:403});}
  const object=await getRuntimeEnv().BUCKET?.get(`lab-images/${assetId}`);
  if(!object)return new Response('Imagem não encontrada.',{status:404});
- return new Response(object.body,{headers:{'Content-Type':object.httpMetadata?.contentType||'image/png','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
+ const rawType=(object.httpMetadata?.contentType||'').split(';')[0].trim().toLowerCase();
+ const safeType=['image/jpeg','image/png','image/webp'].includes(rawType)?rawType:'image/png';
+ return new Response(object.body,{headers:{'Content-Type':safeType,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
 }

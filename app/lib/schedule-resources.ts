@@ -19,6 +19,7 @@ export function groupScheduleResources(
   const unmatched: ScheduleResourceLink[] = [];
 
   for (const link of links) {
+    if (!isSafeResourceUrl(link.url)) continue;
     const linkTitle = normalizeResourceTitle(link.titulo);
     const exactIndex = groups.findIndex(
       (group) => normalizeResourceTitle(group.title) === linkTitle,
@@ -49,12 +50,17 @@ export function mergeScheduleResourceLinks(
   const seen = new Set<string>();
   const merged: ScheduleResourceLink[] = [];
   for (const link of collections.flat()) {
+    if (!isSafeResourceUrl(link.url)) continue;
     const key = link.url.trim().toLocaleLowerCase("pt-BR");
     if (!key || seen.has(key)) continue;
     seen.add(key);
     merged.push(link);
   }
   return merged;
+}
+
+function isSafeResourceUrl(value: string) {
+  return /^https?:\/\//i.test(String(value || "").trim());
 }
 
 function normalizeResourceTitle(value: string) {

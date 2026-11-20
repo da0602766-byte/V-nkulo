@@ -27,9 +27,12 @@ export async function GET(
   if (!accessToken) return new Response("Google Drive desconectado.", { status: 409 });
   const object = await readDriveFile(accessToken, reference.fileId).catch(() => null);
   if (!object) return new Response("Foto não encontrada.", { status: 404 });
+  const rawType = (object.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+  const safeType = ["image/jpeg", "image/png", "image/webp"].includes(rawType) ? rawType : "application/octet-stream";
   return new Response(object.body, {
     headers: {
-      "Content-Type": object.headers.get("content-type") || "application/octet-stream",
+      "Content-Type": safeType,
+      ...(safeType === "application/octet-stream" ? { "Content-Disposition": "attachment" } : {}),
       "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff",
     },

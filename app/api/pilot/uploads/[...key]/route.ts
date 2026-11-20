@@ -46,11 +46,13 @@ export async function GET(
   if (!object && !copied) return new Response("Imagem não encontrada.", { status: 404 });
   const download = new URL(request.url).searchParams.get("download") === "1";
   const fileName = key.split("/").at(-1) || "imagem.jpg";
+  const rawType = (object?.httpMetadata?.contentType || copied?.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+  const safeType = ["image/jpeg", "image/png", "image/webp"].includes(rawType) ? rawType : "application/octet-stream";
   return new Response(object?.body || copied?.body, {
     headers: {
-      "Content-Type": object?.httpMetadata?.contentType || copied?.headers.get("content-type") || "application/octet-stream",
+      "Content-Type": safeType,
       "Cache-Control": download ? "private, no-store" : "public, max-age=31536000, immutable",
-      ...(download
+      ...(download || safeType === "application/octet-stream"
         ? { "Content-Disposition": `attachment; filename="${fileName}"` }
         : {}),
       "X-Content-Type-Options": "nosniff",
