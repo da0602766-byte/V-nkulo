@@ -29,7 +29,7 @@ export async function PATCH(request: Request) {
   const access = await requireTenantPermission("community.theme.manage");
   if ("error" in access) return access.error;
   const canEditWallpaper = true;
-  const requested = (await request.json()) as Partial<CommunityTheme>;
+  const requested = (((await request.json().catch(() => null)) ?? {})) as Partial<CommunityTheme>;
   const currentTheme = await getCommunityTheme(access.context.comunidadeId);
   const requestedWallpaper = Object.prototype.hasOwnProperty.call(
     requested,

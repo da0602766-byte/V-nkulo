@@ -692,7 +692,7 @@ export default function PilotDashboard({
       if (syncing || cancelled) return;
       syncing = true;
       try {
-        const response = await fetch("/api/pilot/chat", { cache: "no-store" });
+        const response = await fetch("/api/pilot/chat?summary=1", { cache: "no-store" });
         if (!response.ok) return;
         const payload = (await response.json()) as { conversations?: ChatArrivalConversation[]; messageNotificationsEnabled?: boolean; };
         if (cancelled) return;

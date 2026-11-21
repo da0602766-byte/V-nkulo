@@ -33,18 +33,29 @@ export default function EditorialSidebarSchedule({ onOpen }: { onOpen: () => voi
       setNow(Date.now());
     }, 0);
     let active = true;
-    async function load() {
+    let syncedFromCenter = false;
+    const onNotificationsLoaded = (event: Event) => {
+      const detail = (event as CustomEvent<SidebarNotification[]>).detail;
+      if (active && Array.isArray(detail)) {
+        syncedFromCenter = true;
+        setNotifications(detail);
+      }
+    };
+    window.addEventListener("vinkulo:notifications-loaded", onNotificationsLoaded);
+    async function load(includeNotifications = true) {
       try {
-        const [scheduleResponse, notificationResponse, postResponse] = await Promise.all([
+        const [scheduleResponse, postResponse, notificationResponse] = await Promise.all([
           fetch("/api/pilot/editorial/programacoes", { cache: "no-store" }),
-          fetch("/api/pilot/notificacoes", { cache: "no-store" }),
           fetch("/api/pilot/publicacoes?placement=sidebar&limit=4", { cache: "no-store" }),
+          includeNotifications && !syncedFromCenter
+            ? fetch("/api/pilot/notificacoes", { cache: "no-store" })
+            : Promise.resolve(null),
         ]);
         if (scheduleResponse.ok) {
           const result = (await scheduleResponse.json()) as { queue?: QueueItem[] };
           if (active) setQueue(result.queue || []);
         }
-        if (notificationResponse.ok) {
+        if (notificationResponse?.ok) {
           const result = (await notificationResponse.json()) as { notifications?: SidebarNotification[] };
           if (active) setNotifications(result.notifications || []);
         }
@@ -56,23 +67,32 @@ export default function EditorialSidebarSchedule({ onOpen }: { onOpen: () => voi
         // O painel é informativo; uma falha de rede não interrompe a navegação.
       }
     }
-    void load();
-    const refresh = window.setInterval(() => void load(), 30_000);
-    const clock = window.setInterval(() => setNow(Date.now()), 1_000);
+    void load(true);
+    const refresh = window.setInterval(() => {
+      if (document.visibilityState === "visible") void load(false);
+    }, 30_000);
     return () => {
       active = false;
+      window.removeEventListener("vinkulo:notifications-loaded", onNotificationsLoaded);
       window.clearTimeout(restorePreference);
       window.clearInterval(refresh);
-      window.clearInterval(clock);
     };
   }, []);
 
-  function changeVisibility(next: boolean) {
-    setVisible(next);
-    try { window.localStorage.setItem(STORAGE_KEY, String(next)); } catch { /* preferência opcional */ }
+  const next = queue.find((item) => item.status === "AGENDADA");
+  useEffect(() => {
+    if (!visible || !next) return;
+    const clock = window.setInterval(() => {
+      if (document.visibilityState === "visible") setNow(Date.now());
+    }, 1_000);
+    return () => window.clearInterval(clock);
+  }, [visible, next]);
+
+  function changeVisibility(nextValue: boolean) {
+    setVisible(nextValue);
+    try { window.localStorage.setItem(STORAGE_KEY, String(nextValue)); } catch { /* preferência opcional */ }
   }
 
-  const next = queue.find((item) => item.status === "AGENDADA");
   const latest = notifications.find((item) => !item.read) || notifications[0];
   if (!visible) {
     return (

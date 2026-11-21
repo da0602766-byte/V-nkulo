@@ -108,18 +108,26 @@ export default function TemporaryAccessFlow({
       }
     };
     void refresh();
-    const interval = window.setInterval(() => void refresh(), 5_000);
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") void refresh();
+    }, 5_000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
       window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [token]);
 
   useEffect(() => {
-    const interval = window.setInterval(
-      () => setNow((current) => current + 1_000),
-      1_000,
-    );
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        setNow((current) => current + 1_000);
+      }
+    }, 1_000);
     return () => window.clearInterval(interval);
   }, []);
 

@@ -37,7 +37,7 @@ export async function GET() {
 export async function PUT(request: Request) {
   const access = await requireTenantPermission("cells.manage");
   if ("error" in access) return access.error;
-  const payload = await request.json() as Record<string, unknown>;
+  const payload = ((await request.json().catch(() => null)) ?? {}) as Record<string, unknown>;
   const titulo = String(payload.titulo || "").trim().slice(0, 80);
   const mensagem = String(payload.mensagem || "").trim().slice(0, 400);
   if (titulo.length < 2 || mensagem.length < 2) {

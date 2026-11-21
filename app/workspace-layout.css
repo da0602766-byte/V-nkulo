@@ -163,12 +163,12 @@ html body .people-directory .people-card-contact { display:grid; gap:4px; font-s
 .people-directory-ministry>span { font-size:14px; line-height:1.5; }
 .people-directory-schedules>span { display:inline-grid; place-items:center; min-width:32px; height:32px; background:var(--community-soft); color:var(--community-primary); border-radius:9px; font-weight:650; }
 html body .people-directory .people-card-actions { display:flex; align-items:center; flex-wrap:nowrap; gap:8px; }
-html body .people-directory .people-open-record { min-height:40px; padding:8px 12px; font-size:14px; border:1px solid var(--pilot-line); border-radius:10px; background:var(--pilot-surface-2); color:var(--community-primary); cursor:pointer; white-space:nowrap; }
+html body .people-directory .people-open-record { min-height:44px; padding:8px 12px; font-size:14px; border:1px solid var(--pilot-line); border-radius:10px; background:var(--pilot-surface-2); color:var(--community-primary); cursor:pointer; white-space:nowrap; }
 .people-row-menu { position:relative; }
-.people-row-menu>summary { cursor:pointer; list-style:none; display:grid; place-items:center; width:30px; min-height:40px; font-size:22px; }
+.people-row-menu>summary { cursor:pointer; list-style:none; display:grid; place-items:center; min-width:44px; width:44px; min-height:44px; font-size:22px; }
 .people-row-menu>summary::-webkit-details-marker { display:none; }
 .people-row-menu>div { position:absolute; right:0; top:100%; z-index:5; display:grid; gap:6px; width:180px; padding:8px; border:1px solid var(--pilot-line); border-radius:12px; background:var(--pilot-surface); box-shadow:0 4px 20px #0002; }
-.people-row-menu button { text-align:left; font-size:14px; min-height:40px; }
+.people-row-menu button { text-align:left; font-size:14px; min-height:44px; }
 .people-mobile-label { display:none; }
 @container (max-width:1000px) {
   html body .people-directory :is(.people-directory-columns,.people-directory-row) { grid-template-columns:minmax(200px,1.5fr) minmax(120px,1fr) minmax(140px,1.1fr) 126px !important; }

@@ -29,7 +29,7 @@ export async function PATCH(request: Request) {
   const access = await requireTenantPermission("parking.configure");
   if ("error" in access) return access.error;
   const parsed = parseParkingConfig(
-    (await request.json()) as Record<string, unknown>,
+    (((await request.json().catch(() => null)) ?? {})) as Record<string, unknown>,
   );
   if ("error" in parsed) {
     return Response.json({ error: parsed.error }, { status: 400 });

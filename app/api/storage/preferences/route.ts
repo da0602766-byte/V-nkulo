@@ -58,7 +58,15 @@ export async function GET() {
 export async function PATCH(request: Request) {
   const user = await getSessionUser();
   if (!user) return Response.json({ error: "Sessão necessária." }, { status: 401 });
-  const payload = await request.json() as Record<string, unknown>;
+  let payload: Record<string, unknown>;
+  try {
+    payload = (await request.json()) as Record<string, unknown>;
+  } catch {
+    return Response.json({ error: "Preferências inválidas." }, { status: 400 });
+  }
+  if (!payload || typeof payload !== "object") {
+    return Response.json({ error: "Preferências inválidas." }, { status: 400 });
+  }
   const provider = payload.provider === "GOOGLE_DRIVE" ? "GOOGLE_DRIVE" : "LOCAL";
   if (provider === "GOOGLE_DRIVE") {
     const connection = await getGoogleConnection(user.id);

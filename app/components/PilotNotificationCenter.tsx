@@ -157,6 +157,9 @@ export default function PilotNotificationCenter({
       const nextItems = result.notifications || [];
       void showUnreadOnDevice(nextItems);
       setItems(nextItems);
+      if (typeof window !== "undefined" && typeof window.dispatchEvent === "function" && typeof CustomEvent === "function") {
+        window.dispatchEvent(new CustomEvent("vinkulo:notifications-loaded", { detail: nextItems }));
+      }
       setCanConfigure(Boolean(result.canConfigure));
       setConfig(result.config || DEFAULT_CONFIG);
       setMessage("");

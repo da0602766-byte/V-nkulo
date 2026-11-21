@@ -51,7 +51,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const access = await requireTenantPermission("parking.reserve");
   if ("error" in access) return access.error;
-  const payload = await request.json() as Record<string, unknown>;
+  const payload = ((await request.json().catch(() => null)) ?? {}) as Record<string, unknown>;
   const vagaId = Number(payload.vagaId);
   const nome = String(payload.nomeCompleto || "").trim().slice(0, 140);
   const email = String(payload.email || "").trim().toLowerCase().slice(0, 180);
@@ -125,7 +125,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const payload = await request.json() as Record<string, unknown>;
+  const payload = ((await request.json().catch(() => null)) ?? {}) as Record<string, unknown>;
   const id = Number(payload.id);
   const action = String(payload.acao || "").toUpperCase();
   const access = await requireTenantPermission(action === "CANCELAR_PROPRIA" ? "parking.reserve" : action === "CHECKIN" ? "parking.entry" : "parking.edit");

@@ -89,7 +89,7 @@ export async function PATCH(request: Request) {
     );
   }
 
-  const payload = (await request.json()) as Record<string, unknown>;
+  const payload = (((await request.json().catch(() => null)) ?? {})) as Record<string, unknown>;
   const enabled = payload.enabled === true;
   const affiliateCreationEnabled =
     enabled && payload.affiliateCreationEnabled === true;

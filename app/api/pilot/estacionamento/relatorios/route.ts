@@ -20,7 +20,7 @@ export async function GET() {
 export async function PATCH(request: Request) {
   const access = await requireTenantPermission("parking.view");
   if ("error" in access) return access.error;
-  const payload=await request.json() as Record<string,unknown>; const id=Number(payload.id); const action=String(payload.acao||"").toUpperCase(); const db=getD1();
+  const payload=((await request.json().catch(() => null)) ?? {}) as Record<string,unknown>; const id=Number(payload.id); const action=String(payload.acao||"").toUpperCase(); const db=getD1();
   const row=await db.prepare(`SELECT r.*,e.inicia_em,e.termina_em,m.responsavel_usuario_id FROM estacionamento_relatorios_escala r JOIN escalas_ministerio e ON e.id=r.escala_id AND e.comunidade_id=r.comunidade_id JOIN ministerios_comunidade m ON m.id=e.ministerio_id AND m.comunidade_id=e.comunidade_id WHERE r.id=? AND r.comunidade_id=?`).bind(id,access.context.comunidadeId).first<Record<string,unknown>>();
   if(!row) return Response.json({error:"Relatório não encontrado."},{status:404});
   const canReview=access.context.permissions.includes("parking.configure")||Number(row.responsavel_usuario_id)===access.user.id;

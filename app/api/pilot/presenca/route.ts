@@ -146,8 +146,16 @@ export async function POST() {
 export async function PATCH(request: Request) {
   const access = await requirePresenceAccess();
   if ("error" in access) return access.error;
-  const body = (await request.json()) as { shareLastSeen?: unknown };
-  if (typeof body.shareLastSeen !== "boolean") {
+  let body: { shareLastSeen?: unknown };
+  try {
+    body = (await request.json()) as { shareLastSeen?: unknown };
+  } catch {
+    return Response.json(
+      { error: "Escolha se deseja compartilhar a última atividade." },
+      { status: 400 },
+    );
+  }
+  if (typeof body?.shareLastSeen !== "boolean") {
     return Response.json(
       { error: "Escolha se deseja compartilhar a última atividade." },
       { status: 400 },

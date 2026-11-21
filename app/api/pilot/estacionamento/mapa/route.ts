@@ -9,7 +9,7 @@ import { requireTenantPermission } from "../../../../lib/tenant";
 export async function POST(request: Request) {
   const access = await requireTenantPermission("parking.configure");
   if ("error" in access) return access.error;
-  const payload = (await request.json()) as Record<string, unknown>;
+  const payload = (((await request.json().catch(() => null)) ?? {})) as Record<string, unknown>;
   const action = String(payload.action || "").toUpperCase();
   const db = getD1();
   const scene = await db.prepare('SELECT revisao FROM estacionamento_cenas WHERE comunidade_id=?').bind(access.context.comunidadeId).first<{revisao:number}>();
@@ -117,7 +117,7 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   const access = await requireTenantPermission("parking.configure");
   if ("error" in access) return access.error;
-  const payload = (await request.json()) as Record<string, unknown>;
+  const payload = (((await request.json().catch(() => null)) ?? {})) as Record<string, unknown>;
   const action = String(payload.action || "").toUpperCase();
   const db = getD1();
   const scene = await db.prepare('SELECT revisao FROM estacionamento_cenas WHERE comunidade_id=?').bind(access.context.comunidadeId).first<{revisao:number}>();

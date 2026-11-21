@@ -141,7 +141,9 @@ export default function EditorialAutomationWorkspace() {
 
   useEffect(() => {
     const firstTick = window.setTimeout(() => setNow(Date.now()), 0);
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") setNow(Date.now());
+    }, 1000);
     return () => {
       window.clearTimeout(firstTick);
       window.clearInterval(timer);

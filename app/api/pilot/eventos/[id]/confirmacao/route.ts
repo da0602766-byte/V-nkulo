@@ -8,8 +8,13 @@ export async function POST(request: Request, context: Context) {
   const access = await requireTenantPermission("events.rsvp");
   if ("error" in access) return access.error;
   const id = Number((await context.params).id);
-  const payload = (await request.json()) as { status?: string };
-  const status = String(payload.status || "").toUpperCase();
+  let payload: { status?: string };
+  try {
+    payload = (await request.json()) as { status?: string };
+  } catch {
+    return Response.json({ error: "Confirmação inválida." }, { status: 400 });
+  }
+  const status = String(payload?.status || "").toUpperCase();
   if (
     !Number.isInteger(id) ||
     id <= 0 ||

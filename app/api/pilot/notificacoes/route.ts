@@ -174,7 +174,15 @@ export async function PATCH(request: Request) {
   if (!user || !user.ativo) {
     return Response.json({ error: "Faça login para continuar." }, { status: 401 });
   }
-  const payload = (await request.json()) as { id?: unknown; todas?: unknown; config?: unknown };
+  let payload: { id?: unknown; todas?: unknown; config?: unknown };
+  try {
+    payload = (await request.json()) as { id?: unknown; todas?: unknown; config?: unknown };
+  } catch {
+    return Response.json({ error: "Notificação inválida." }, { status: 400 });
+  }
+  if (!payload || typeof payload !== "object") {
+    return Response.json({ error: "Notificação inválida." }, { status: 400 });
+  }
   const db = getD1();
   if (payload.config && typeof payload.config === "object") {
     const owner = await db.prepare("SELECT id FROM comunidades WHERE proprietario_usuario_id = ? AND status = 'ATIVA' LIMIT 1").bind(user.id).first<{ id: number }>();
@@ -225,7 +233,15 @@ export async function DELETE(request: Request) {
   if (!user || !user.ativo) {
     return Response.json({ error: "Faça login para continuar." }, { status: 401 });
   }
-  const payload = (await request.json()) as { id?: unknown; lidas?: unknown };
+  let payload: { id?: unknown; lidas?: unknown };
+  try {
+    payload = (await request.json()) as { id?: unknown; lidas?: unknown };
+  } catch {
+    return Response.json({ error: "Notificação inválida." }, { status: 400 });
+  }
+  if (!payload || typeof payload !== "object") {
+    return Response.json({ error: "Notificação inválida." }, { status: 400 });
+  }
   const db = getD1();
   if (payload.lidas === true) {
     await db.prepare(`DELETE FROM notificacoes_sistema

@@ -158,12 +158,18 @@ export default function EventsWorkspace({
     return () => window.clearTimeout(timer);
   }, [loadEvents]);
 
+  const hasActivePolls = useMemo(
+    () => events.some((item) => Boolean(item.enquete)),
+    [events],
+  );
   useEffect(() => {
+    if (eventFormOpen || editing || workingId !== null) return;
+    const intervalMs = hasActivePolls ? 3_000 : 30_000;
     const timer = window.setInterval(() => {
       if (document.visibilityState === "visible") void loadEvents(true);
-    }, 3_000);
+    }, intervalMs);
     return () => window.clearInterval(timer);
-  }, [loadEvents]);
+  }, [editing, eventFormOpen, hasActivePolls, loadEvents, workingId]);
 
   useEffect(() => {
     if (!actionMenuId) return;

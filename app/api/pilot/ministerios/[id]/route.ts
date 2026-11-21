@@ -23,7 +23,7 @@ export async function PATCH(request: Request, context: Context) {
   if (!Number.isInteger(id) || id <= 0) {
     return Response.json({ error: "Ministério inválido." }, { status: 400 });
   }
-  const payload = (await request.json()) as Record<string, unknown>;
+  const payload = (((await request.json().catch(() => null)) ?? {})) as Record<string, unknown>;
   const action = cleanAction(payload.acao);
   const db = getD1();
   const ministry = await db

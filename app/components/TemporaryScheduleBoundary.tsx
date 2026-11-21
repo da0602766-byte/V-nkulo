@@ -30,10 +30,17 @@ export default function TemporaryScheduleBoundary({
         // Mantém o conteúdo; ele continua somente leitura e será revalidado.
       }
     };
-    const interval = window.setInterval(() => void validate(), 5_000);
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") void validate();
+    }, 5_000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void validate();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
       window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [token]);
 

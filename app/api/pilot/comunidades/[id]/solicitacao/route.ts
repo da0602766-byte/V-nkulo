@@ -20,7 +20,7 @@ export async function POST(request: Request, context: Context) {
   if (!Number.isInteger(comunidadeId) || comunidadeId <= 0) {
     return Response.json({ error: "Comunidade inválida." }, { status: 400 });
   }
-  const payload = (await request.json()) as { mensagem?: unknown };
+  const payload = (((await request.json().catch(() => null)) ?? {})) as { mensagem?: unknown };
   const mensagem = parseJoinRequestMessage(payload.mensagem);
   const db = getD1();
   const community = await db

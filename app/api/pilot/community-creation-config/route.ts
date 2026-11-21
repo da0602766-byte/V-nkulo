@@ -51,7 +51,7 @@ export async function PATCH(request: Request) {
       { status: 403 },
     );
   }
-  const payload = (await request.json()) as Record<string, unknown>;
+  const payload = (((await request.json().catch(() => null)) ?? {})) as Record<string, unknown>;
   const fields = parseCommunityCreationFields(payload.fields);
   if (!fields.length) {
     return Response.json(

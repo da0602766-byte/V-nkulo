@@ -10,7 +10,7 @@ export async function PATCH(request: Request, context: Context) {
   const access = await requireTenantPermission("cells.view");
   if ("error" in access) return access.error;
   const id = Number((await context.params).id);
-  const payload = await request.json() as Record<string, unknown>;
+  const payload = ((await request.json().catch(() => null)) ?? {}) as Record<string, unknown>;
   const db = getD1();
   const existing = await db.prepare(
     `SELECT id, nome, membros, lider_usuario_id, vice_lider_usuario_id, ativo, criado_por

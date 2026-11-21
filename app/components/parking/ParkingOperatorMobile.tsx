@@ -23,9 +23,12 @@ export default function ParkingOperatorMobile({
   const autoSentRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
+    if (!escala) return;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") setNow(Date.now());
+    }, 1_000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [escala]);
 
   const startsAt = escala ? new Date(escala.inicia_em).getTime() : 0;
   const endsAt = escala ? new Date(escala.termina_em).getTime() : 0;

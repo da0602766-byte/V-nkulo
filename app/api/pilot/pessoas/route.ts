@@ -304,7 +304,7 @@ export async function DELETE(request: Request) {
       { status: 403 },
     );
   }
-  const payload = (await request.json()) as Record<string, unknown>;
+  const payload = (((await request.json().catch(() => null)) ?? {})) as Record<string, unknown>;
   const membershipId = Number(payload.membershipId);
   const action = String(payload.action || "").trim().toUpperCase();
   if (
@@ -484,7 +484,7 @@ export async function DELETE(request: Request) {
 export async function PATCH(request: Request) {
   const access = await requireTenantPermission("officials.manage");
   if ("error" in access) return access.error;
-  const parsed = parseOfficialUpdate(await request.json());
+  const parsed = parseOfficialUpdate(((await request.json().catch(() => null)) ?? {}));
   if ("error" in parsed) {
     return Response.json({ error: parsed.error }, { status: 400 });
   }

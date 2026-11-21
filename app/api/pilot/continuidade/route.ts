@@ -104,7 +104,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const access = await requireTenantPermission("community.lifecycle.request");
   if ("error" in access) return access.error;
-  const payload = (await request.json()) as Record<string, unknown>;
+  const payload = (((await request.json().catch(() => null)) ?? {})) as Record<string, unknown>;
   const action = String(payload.action || "CRIAR_SOLICITACAO").toUpperCase();
   if (action === "CRIAR_SOLICITACAO") {
     return createRequest(payload, access);

@@ -8,7 +8,7 @@ export async function POST(request: Request) {
   const access = await requireTenantPermission("parking.edit");
   if ("error" in access) return access.error;
   const parsed = parseParkingOccurrence(
-    (await request.json()) as Record<string, unknown>,
+    (((await request.json().catch(() => null)) ?? {})) as Record<string, unknown>,
   );
   if ("error" in parsed) {
     return Response.json({ error: parsed.error }, { status: 400 });

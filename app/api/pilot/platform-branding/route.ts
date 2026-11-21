@@ -24,7 +24,7 @@ export async function PATCH(request: Request) {
       { status: 403 },
     );
   }
-  const branding = parsePlatformBranding(await request.json());
+  const branding = parsePlatformBranding(((await request.json().catch(() => null)) ?? {}));
   const db = getD1();
   await db
     .prepare(

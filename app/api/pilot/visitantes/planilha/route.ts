@@ -25,7 +25,7 @@ export async function POST(request: Request) {
   const access = await accessForSheets();
   if ("error" in access) return access.error;
   if(await visitorDriveConfig(access.context.comunidadeId))return Response.json({error:'Os cadastros agora usam o armazenamento Drive. A antiga cópia em Planilhas está desativada.'},{status:409});
-  const body = await request.json() as { action?: string; url?: string; channel?: string; pairing?: string };
+  const body = ((await request.json().catch(() => null)) ?? {}) as { action?: string; url?: string; channel?: string; pairing?: string };
   const db = getD1();
   const communityId = access.context.comunidadeId;
   const current = await db.prepare("SELECT * FROM visitante_planilha WHERE comunidade_id = ?").bind(communityId).first<VisitorSheetConfig>();

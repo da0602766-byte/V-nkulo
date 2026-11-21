@@ -209,7 +209,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const access = await requireTenantPermission("ministries.view");
   if ("error" in access) return access.error;
-  const payload = (await request.json()) as Record<string, unknown>;
+  const payload = (((await request.json().catch(() => null)) ?? {})) as Record<string, unknown>;
   const action = cleanAction(payload.acao);
   const db = getD1();
 
@@ -541,7 +541,7 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   const access = await requireTenantPermission("schedules.view");
   if ("error" in access) return access.error;
-  const payload = (await request.json()) as Record<string, unknown>;
+  const payload = (((await request.json().catch(() => null)) ?? {})) as Record<string, unknown>;
   const action = cleanAction(payload.acao);
   const db = getD1();
 

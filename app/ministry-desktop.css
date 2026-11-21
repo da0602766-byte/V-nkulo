@@ -213,7 +213,7 @@
   .ministry-meeting-review article { display: grid; gap: 5px; border-bottom: 1px solid var(--mp-line); padding: 14px 0; font-size: 14px; }
   .ministry-meeting-review p, .ministry-meeting-review span { font-size: 13px; color: var(--mp-muted); }
   .ministry-wizard-confirm-backdrop { position: absolute; inset: 0; display: grid; place-items: center; background: #16162c66; padding: 24px; z-index: 5; }
-  .ministry-wizard-confirm { width: 440px; max-width: 100%; padding: 32px; border-radius: 20px; background: var(--mp-card); box-shadow: 0 20px 100px #1113; }
+  .ministry-wizard-confirm { width: min(440px, calc(100vw - 32px)); max-width: 100%; padding: 32px; border-radius: 20px; background: var(--mp-card); box-shadow: 0 20px 100px #1113; }
   .ministry-wizard-confirm-icon { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 14px; background: var(--mp-soft); color: var(--mp-accent); font-size: 26px; margin-bottom: 20px; }
   .ministry-wizard-confirm p { color: var(--mp-muted); font-size: 14px; line-height: 1.7; }
   .ministry-wizard-confirm > div { display: flex; gap: 12px; margin-top: 22px; justify-content: flex-end; }

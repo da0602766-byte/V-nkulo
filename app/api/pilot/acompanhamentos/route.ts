@@ -64,7 +64,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const access = await requireTenantPermission("followups.manage");
   if ("error" in access) return access.error;
-  const payload = (await request.json()) as Record<string, string | number | null>;
+  const payload = (((await request.json().catch(() => null)) ?? {})) as Record<string, string | number | null>;
   const visitorId = Number(payload.visitanteId || 0);
   const tipo = String(payload.tipo || "WHATSAPP").trim().toUpperCase();
   const resultado = String(payload.resultado || "").trim().slice(0, 160);

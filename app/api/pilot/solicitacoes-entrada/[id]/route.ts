@@ -12,7 +12,7 @@ export async function PATCH(request: Request, context: Context) {
   if (!Number.isInteger(id) || id <= 0) {
     return Response.json({ error: "Solicitação inválida." }, { status: 400 });
   }
-  const payload = (await request.json()) as { acao?: unknown };
+  const payload = (((await request.json().catch(() => null)) ?? {})) as { acao?: unknown };
   const acao = String(payload.acao || "").toUpperCase();
   if (!["APROVAR", "RECUSAR"].includes(acao)) {
     return Response.json({ error: "Ação inválida." }, { status: 400 });

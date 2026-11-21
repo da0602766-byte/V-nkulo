@@ -173,7 +173,7 @@ export async function GET() {
 export async function PATCH(request: Request) {
   const access = await requireTenantPermission("diaconia.view");
   if ("error" in access) return access.error;
-  const payload = (await request.json()) as Record<string, unknown>;
+  const payload = (((await request.json().catch(() => null)) ?? {})) as Record<string, unknown>;
   const action = cleanDiaconiaAction(payload.acao);
   const db = getD1();
   await closeExpiredDiaconiaSchedules(db, access.context.comunidadeId);

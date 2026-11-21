@@ -6,7 +6,13 @@ import { requireTenantPermission } from "../../../../lib/tenant";
 export async function PATCH(request: Request) {
   const access = await requireTenantPermission("profile.self.update");
   if ("error" in access) return access.error;
-  const parsed = parseSelfProfileUpdate(await request.json());
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "Dados inválidos." }, { status: 400 });
+  }
+  const parsed = parseSelfProfileUpdate(body);
   if ("error" in parsed) {
     return Response.json({ error: parsed.error }, { status: 400 });
   }

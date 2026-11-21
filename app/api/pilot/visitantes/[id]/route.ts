@@ -22,7 +22,7 @@ export async function PATCH(request: Request, context: Context) {
   if (!Number.isInteger(id) || id <= 0) {
     return Response.json({ error: "Visitante inválido." }, { status: 400 });
   }
-  const submitted = (await request.json()) as Record<
+  const submitted = (((await request.json().catch(() => null)) ?? {})) as Record<
     string,
     string | number | boolean | null
   >;

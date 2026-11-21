@@ -489,25 +489,27 @@ export async function POST(request: Request) {
     );
     for (const recipient of careRecipients) resolved.userIds.add(recipient);
   }
-  for (const target of audience.value) {
-    await db
+  const audienceStatements = audience.value.map((target) =>
+    db
       .prepare(
         `INSERT INTO solicitacao_publicos
          (solicitacao_id, comunidade_id, tipo, referencia_id, referencia_texto)
          VALUES (?, ?, ?, ?, ?)`,
       )
-      .bind(id, access.context.comunidadeId, target.type, target.id, target.value)
-      .run();
-  }
-  for (const userId of resolved.userIds) {
-    await db
+      .bind(id, access.context.comunidadeId, target.type, target.id, target.value),
+  );
+  const recipientStatements = [...resolved.userIds].map((userId) =>
+    db
       .prepare(
         `INSERT OR IGNORE INTO solicitacao_destinatarios
          (solicitacao_id, comunidade_id, usuario_id)
          VALUES (?, ?, ?)`,
       )
-      .bind(id, access.context.comunidadeId, userId)
-      .run();
+      .bind(id, access.context.comunidadeId, userId),
+  );
+  const allInserts = [...audienceStatements, ...recipientStatements];
+  for (let i = 0; i < allInserts.length; i += 50) {
+    await db.batch(allInserts.slice(i, i + 50));
   }
   if (repositoryId) {
     const repositoryItem = await db.prepare(

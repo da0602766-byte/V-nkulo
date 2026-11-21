@@ -56,7 +56,9 @@ export function ParkingReservationQr({
   useEffect(() => {
     const initial = window.setTimeout(() => setRemaining(remainingMs(expiresAt)), 0);
     if (!expiresAt) return () => window.clearTimeout(initial);
-    const timer = window.setInterval(() => setRemaining(remainingMs(expiresAt)), 1_000);
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") setRemaining(remainingMs(expiresAt));
+    }, 1_000);
     return () => {
       window.clearTimeout(initial);
       window.clearInterval(timer);

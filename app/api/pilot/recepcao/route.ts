@@ -46,7 +46,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const access = await requireMember();
   if ("error" in access) return access.error;
-  const payload = (await request.json()) as Record<string, unknown>;
+  const payload = (((await request.json().catch(() => null)) ?? {})) as Record<string, unknown>;
   const action = String(payload.acao || "").toUpperCase();
   const db = getD1();
 

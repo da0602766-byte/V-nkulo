@@ -231,39 +231,41 @@ export async function GET(request: Request) {
   for (let inicio = 0; inicio < loadedScheduleIds.length; inicio += ASSIGNMENT_ID_CHUNK) {
     const bloco = loadedScheduleIds.slice(inicio, inicio + ASSIGNMENT_ID_CHUNK);
     const marcadores = bloco.map(() => "?").join(", ");
-    const parcial = await db
-      .prepare(
-        `SELECT d.id, d.escala_id, d.voluntario_id, d.usuario_id, d.equipe_id,
-          u.nome, u.telefone, u.foto_perfil, u.email AS owner_email,
-          (SELECT official.titulo FROM oficiais_comunidade official JOIN usuario_comunidades membership ON membership.id=official.usuario_comunidade_id WHERE membership.usuario_id=d.usuario_id AND membership.comunidade_id=d.comunidade_id AND membership.status='ATIVO' LIMIT 1) AS titulo_oficial,
-          u.criado_em AS owner_criado_em, d.funcao, d.status,
-          equipe.nome AS equipe_nome, equipe.cor AS equipe_cor,
-          CASE WHEN d.usuario_id = ? THEN 1 ELSE 0 END AS is_mine
-        FROM escala_designacoes d
-        JOIN usuarios u ON u.id = d.usuario_id
-        LEFT JOIN ministerio_equipes equipe
-          ON equipe.id = d.equipe_id
-         AND equipe.comunidade_id = d.comunidade_id
-        WHERE d.comunidade_id = ? AND d.ativo = 1
-          AND d.escala_id IN (${marcadores})
-        ORDER BY u.nome ASC`,
-      )
-      .bind(access.user.id, access.context.comunidadeId, ...bloco)
-      .all<AssignmentRow>();
+    const [parcial, teamsPartial] = await Promise.all([
+      db
+        .prepare(
+          `SELECT d.id, d.escala_id, d.voluntario_id, d.usuario_id, d.equipe_id,
+            u.nome, u.telefone, u.foto_perfil, u.email AS owner_email,
+            (SELECT official.titulo FROM oficiais_comunidade official JOIN usuario_comunidades membership ON membership.id=official.usuario_comunidade_id WHERE membership.usuario_id=d.usuario_id AND membership.comunidade_id=d.comunidade_id AND membership.status='ATIVO' LIMIT 1) AS titulo_oficial,
+            u.criado_em AS owner_criado_em, d.funcao, d.status,
+            equipe.nome AS equipe_nome, equipe.cor AS equipe_cor,
+            CASE WHEN d.usuario_id = ? THEN 1 ELSE 0 END AS is_mine
+          FROM escala_designacoes d
+          JOIN usuarios u ON u.id = d.usuario_id
+          LEFT JOIN ministerio_equipes equipe
+            ON equipe.id = d.equipe_id
+           AND equipe.comunidade_id = d.comunidade_id
+          WHERE d.comunidade_id = ? AND d.ativo = 1
+            AND d.escala_id IN (${marcadores})
+          ORDER BY u.nome ASC`,
+        )
+        .bind(access.user.id, access.context.comunidadeId, ...bloco)
+        .all<AssignmentRow>(),
+      db
+        .prepare(
+          `SELECT se.escala_id, se.equipe_id, se.funcao, se.ponto_encontro, se.horario_encontro,
+            equipe.nome AS equipe_nome, equipe.cor AS equipe_cor, equipe.ordem AS equipe_ordem
+           FROM escala_equipes se
+           JOIN ministerio_equipes equipe
+             ON equipe.id = se.equipe_id
+            AND equipe.comunidade_id = se.comunidade_id
+           WHERE se.comunidade_id = ? AND se.escala_id IN (${marcadores})
+           ORDER BY se.escala_id ASC, equipe.ordem ASC, equipe.nome ASC`,
+        )
+        .bind(access.context.comunidadeId, ...bloco)
+        .all<ScheduleTeamRow>(),
+    ]);
     assignmentRows.push(...parcial.results);
-    const teamsPartial = await db
-      .prepare(
-        `SELECT se.escala_id, se.equipe_id, se.funcao, se.ponto_encontro, se.horario_encontro,
-          equipe.nome AS equipe_nome, equipe.cor AS equipe_cor, equipe.ordem AS equipe_ordem
-         FROM escala_equipes se
-         JOIN ministerio_equipes equipe
-           ON equipe.id = se.equipe_id
-          AND equipe.comunidade_id = se.comunidade_id
-         WHERE se.comunidade_id = ? AND se.escala_id IN (${marcadores})
-         ORDER BY se.escala_id ASC, equipe.ordem ASC, equipe.nome ASC`,
-      )
-      .bind(access.context.comunidadeId, ...bloco)
-      .all<ScheduleTeamRow>();
     scheduleTeamRows.push(...teamsPartial.results);
   }
   const assignmentsResult = { results: assignmentRows };
@@ -432,7 +434,12 @@ export async function POST(request: Request) {
 async function createSchedule(request: Request) {
   const access = await requireTenantPermission("schedules.view");
   if ("error" in access) return access.error;
-  const payload = (await request.json()) as Record<string, unknown>;
+  let payload: Record<string, unknown>;
+  try {
+    payload = (await request.json()) as Record<string, unknown>;
+  } catch {
+    return Response.json({ error: "Solicitação inválida." }, { status: 400 });
+  }
   const parsed = parseSchedulePayload(payload);
   if ("error" in parsed) {
     return Response.json({ error: parsed.error }, { status: 400 });
@@ -451,19 +458,18 @@ async function createSchedule(request: Request) {
       { status: 403 },
     );
   }
-  for (const selectedTeam of parsed.equipes) {
-    const team = await db
+  if (parsed.equipes.length > 0) {
+    const teamIds = [...new Set(parsed.equipes.map((team) => Number(team.equipeId)))];
+    const placeholders = teamIds.map(() => "?").join(", ");
+    const activeTeams = await db
       .prepare(
         `SELECT id FROM ministerio_equipes
-         WHERE id = ? AND ministerio_id = ? AND comunidade_id = ? AND ativa = 1`,
+         WHERE ministerio_id = ? AND comunidade_id = ? AND ativa = 1
+           AND id IN (${placeholders})`,
       )
-      .bind(
-        selectedTeam.equipeId,
-        parsed.ministerioId,
-        access.context.comunidadeId,
-      )
-      .first<{ id: number }>();
-    if (!team) {
+      .bind(parsed.ministerioId, access.context.comunidadeId, ...teamIds)
+      .all<{ id: number }>();
+    if (activeTeams.results.length !== teamIds.length) {
       return Response.json(
         {
           error: parsed.equipes.length === 1
@@ -521,6 +527,20 @@ async function createSchedule(request: Request) {
       volunteersById.set(Number(volunteer.id), volunteer);
     }
   }
+  const validTeamMembers =
+    parsed.equipes.length > 0 && parsed.designacoes.length > 0
+      ? new Set(
+          (
+            await db
+              .prepare(
+                `SELECT equipe_id, voluntario_id FROM ministerio_equipe_membros
+                 WHERE ministerio_id = ? AND comunidade_id = ?`,
+              )
+              .bind(parsed.ministerioId, access.context.comunidadeId)
+              .all<{ equipe_id: number; voluntario_id: number }>()
+          ).results.map((m) => `${Number(m.equipe_id)}:${Number(m.voluntario_id)}`),
+        )
+      : null;
   for (const assignment of parsed.designacoes) {
     const volunteer = volunteersById.get(assignment.voluntarioId);
     if (!volunteer) {
@@ -544,26 +564,14 @@ async function createSchedule(request: Request) {
         { status: 400 },
       );
     }
-    if (assignmentTeamId) {
-      const teamMember = await db
-        .prepare(
-          `SELECT id FROM ministerio_equipe_membros
-           WHERE equipe_id = ? AND ministerio_id = ? AND comunidade_id = ?
-             AND voluntario_id = ?`,
-        )
-        .bind(
-          assignmentTeamId,
-          parsed.ministerioId,
-          access.context.comunidadeId,
-          volunteer.id,
-        )
-        .first<{ id: number }>();
-      if (!teamMember) {
-        return Response.json(
-          { error: "Cada integrante precisa pertencer à equipe escolhida para ele." },
-          { status: 400 },
-        );
-      }
+    if (
+      assignmentTeamId &&
+      !validTeamMembers?.has(`${Number(assignmentTeamId)}:${Number(volunteer.id)}`)
+    ) {
+      return Response.json(
+        { error: "Cada integrante precisa pertencer à equipe escolhida para ele." },
+        { status: 400 },
+      );
     }
     const capacity = await db
       .prepare(

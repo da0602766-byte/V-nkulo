@@ -188,7 +188,7 @@ export async function PATCH(request: Request) {
       { status: 403 },
     );
   }
-  const payload = (await request.json()) as Record<string, unknown>;
+  const payload = (((await request.json().catch(() => null)) ?? {})) as Record<string, unknown>;
   const nome = clean(payload.nome, 120);
   const descricao = clean(payload.descricao, 600);
   const cidade = clean(payload.cidade, 120);

@@ -183,7 +183,7 @@ export async function POST(request: Request) {
   if ("error" in access) return access.error;
   const accessContext = access.context;
   const accessUser = access.user;
-  const payload = (await request.json()) as Record<string, unknown>;
+  const payload = (((await request.json().catch(() => null)) ?? {})) as Record<string, unknown>;
   const action = String(payload.action || "").toUpperCase();
   const db = getD1();
 

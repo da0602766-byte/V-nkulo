@@ -22,8 +22,13 @@ export async function POST(request: Request) {
     return Response.json({ error: "Faça login para continuar." }, { status: 401 });
   if (!user.ativo)
     return Response.json({ error: "Usuário inativo." }, { status: 403 });
-  const payload = (await request.json()) as { comunidadeId?: number };
-  const requestedId = Number(payload.comunidadeId);
+  let payload: { comunidadeId?: number };
+  try {
+    payload = (await request.json()) as { comunidadeId?: number };
+  } catch {
+    return Response.json({ error: "Solicitação inválida." }, { status: 400 });
+  }
+  const requestedId = Number(payload?.comunidadeId);
   const memberships = await listTenantMemberships(user);
   const selected = memberships.find(
     (membership) =>

@@ -247,7 +247,7 @@ export async function POST(request: Request) {
       { status: 403 },
     );
   }
-  const parsed = parseMinistryPayload(await request.json());
+  const parsed = parseMinistryPayload(((await request.json().catch(() => null)) ?? {}));
   if ("error" in parsed) {
     return Response.json({ error: parsed.error }, { status: 400 });
   }

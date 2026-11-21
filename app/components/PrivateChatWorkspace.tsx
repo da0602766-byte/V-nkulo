@@ -135,11 +135,13 @@ export default function PrivateChatWorkspace({
   const [preferenceUser, setPreferenceUser] = useState(0);
 
   useEffect(() => {
-    if (!visible) return;
+    if (!visible || activeId > 0) return;
     const initial = window.setTimeout(() => setNow(Date.now()), 0);
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") setNow(Date.now());
+    }, 1000);
     return () => { window.clearTimeout(initial); window.clearInterval(timer); };
-  }, [visible]);
+  }, [activeId, visible]);
 
   useEffect(() => {
     const id = workspace?.currentUserId;
@@ -339,14 +341,14 @@ export default function PrivateChatWorkspace({
 
   useEffect(() => {
     const tick = () => {
-      if (document.visibilityState !== "visible") return;
+      if (document.visibilityState !== "visible" || !visibleRef.current) return;
       void refreshList();
     };
     const timer = window.setInterval(tick, LIST_POLL_MS);
     const onVisible = () => {
-      if (document.visibilityState !== "visible") return;
+      if (document.visibilityState !== "visible" || !visibleRef.current) return;
       void refreshList();
-      if (activeId > 0 && visibleRef.current) {
+      if (activeId > 0) {
         void refreshMessages(activeId);
         void markRead(activeId);
       }

@@ -82,7 +82,15 @@ export async function GET() {
 export async function PATCH(request: Request) {
   const user = await getSessionUser();
   if (!user) return Response.json({ error: "Sessão necessária." }, { status: 401 });
-  const payload = (await request.json()) as Record<string, unknown>;
+  let payload: Record<string, unknown>;
+  try {
+    payload = (await request.json()) as Record<string, unknown>;
+  } catch {
+    return Response.json({ error: "Dados inválidos." }, { status: 400 });
+  }
+  if (!payload || typeof payload !== "object") {
+    return Response.json({ error: "Dados inválidos." }, { status: 400 });
+  }
   const config = await getPilotLoginConfig();
   const fieldsPayload =
     payload.fields && typeof payload.fields === "object"

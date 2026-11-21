@@ -29,7 +29,15 @@ export async function PATCH(request: Request, context: Context) {
   if (!Number.isInteger(id) || id <= 0) {
     return Response.json({ error: "Escala inválida." }, { status: 400 });
   }
-  const payload = (await request.json()) as Record<string, unknown>;
+  let payload: Record<string, unknown>;
+  try {
+    payload = (await request.json()) as Record<string, unknown>;
+  } catch {
+    return Response.json({ error: "Solicitação inválida." }, { status: 400 });
+  }
+  if (!payload || typeof payload !== "object") {
+    return Response.json({ error: "Solicitação inválida." }, { status: 400 });
+  }
   const action = cleanAction(payload.acao);
   const db = getD1();
   const schedule = await db
@@ -591,19 +599,18 @@ export async function PATCH(request: Request, context: Context) {
         );
       }
     }
-    for (const selectedTeam of parsed.equipes) {
-      const team = await db
+    if (parsed.equipes.length > 0) {
+      const teamIds = [...new Set(parsed.equipes.map((team) => Number(team.equipeId)))];
+      const placeholders = teamIds.map(() => "?").join(", ");
+      const activeTeams = await db
         .prepare(
           `SELECT id FROM ministerio_equipes
-           WHERE id = ? AND ministerio_id = ? AND comunidade_id = ? AND ativa = 1`,
+           WHERE ministerio_id = ? AND comunidade_id = ? AND ativa = 1
+             AND id IN (${placeholders})`,
         )
-        .bind(
-          selectedTeam.equipeId,
-          schedule.ministerio_id,
-          access.context.comunidadeId,
-        )
-        .first<{ id: number }>();
-      if (!team) {
+        .bind(schedule.ministerio_id, access.context.comunidadeId, ...teamIds)
+        .all<{ id: number }>();
+      if (activeTeams.results.length !== teamIds.length) {
         return Response.json(
           { error: "Uma das equipes selecionadas não pertence a este ministério." },
           { status: 400 },
@@ -630,33 +637,35 @@ export async function PATCH(request: Request, context: Context) {
       )
       .bind(id, access.context.comunidadeId)
       .all<{ usuario_id: number; voluntario_id: number; equipe_id: number | null }>();
+    const selectedTeamSet = new Set(parsed.equipes.map((team) => Number(team.equipeId)));
+    const validTeamMemberPairs = assignments.results.some((a) => Boolean(a.equipe_id))
+      ? new Set(
+          (
+            await db
+              .prepare(
+                `SELECT equipe_id, voluntario_id FROM ministerio_equipe_membros
+                 WHERE ministerio_id = ? AND comunidade_id = ?`,
+              )
+              .bind(schedule.ministerio_id, access.context.comunidadeId)
+              .all<{ equipe_id: number; voluntario_id: number }>()
+          ).results.map((m) => `${Number(m.equipe_id)}:${Number(m.voluntario_id)}`),
+        )
+      : null;
     for (const assignment of assignments.results) {
-      if (assignment.equipe_id && !parsed.equipes.some((team) => team.equipeId === Number(assignment.equipe_id))) {
+      if (assignment.equipe_id && !selectedTeamSet.has(Number(assignment.equipe_id))) {
         return Response.json(
           { error: "Remova ou mova as pessoas da equipe antes de retirar esta equipe da escala." },
           { status: 409 },
         );
       }
-      if (assignment.equipe_id) {
-        const teamMember = await db
-          .prepare(
-            `SELECT id FROM ministerio_equipe_membros
-             WHERE equipe_id = ? AND ministerio_id = ? AND comunidade_id = ?
-               AND voluntario_id = ?`,
-          )
-          .bind(
-            assignment.equipe_id,
-            schedule.ministerio_id,
-            access.context.comunidadeId,
-            assignment.voluntario_id,
-          )
-          .first<{ id: number }>();
-        if (!teamMember) {
-          return Response.json(
-            { error: "Uma pessoa já designada não pertence à equipe registrada para ela." },
-            { status: 409 },
-          );
-        }
+      if (
+        assignment.equipe_id &&
+        !validTeamMemberPairs?.has(`${Number(assignment.equipe_id)}:${Number(assignment.voluntario_id)}`)
+      ) {
+        return Response.json(
+          { error: "Uma pessoa já designada não pertence à equipe registrada para ela." },
+          { status: 409 },
+        );
       }
       if (
         await hasScheduleConflict(db, {

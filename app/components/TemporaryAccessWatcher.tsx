@@ -40,7 +40,13 @@ export default function TemporaryAccessWatcher({
       }
     };
     void validate();
-    const interval = window.setInterval(() => void validate(), 5_000);
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") void validate();
+    }, 5_000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void validate();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     const expiryDelay = Math.max(0, Date.parse(endsAt) - Date.now());
     const expiryTimer = window.setTimeout(
       () => void validate(),
@@ -50,6 +56,7 @@ export default function TemporaryAccessWatcher({
       cancelled = true;
       window.clearInterval(interval);
       window.clearTimeout(expiryTimer);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [endsAt]);
 

@@ -92,7 +92,7 @@ export async function GET() {
 export async function PUT(request: Request) {
   const access = await editorialAccess();
   if (access instanceof Response) return access;
-  const payload = (await request.json()) as Record<string, unknown>;
+  const payload = (((await request.json().catch(() => null)) ?? {})) as Record<string, unknown>;
   const mode = String(payload.mode || "COM_REVISAO").toUpperCase();
   const enabled = payload.enabled !== false;
   if (!["COM_REVISAO", "AUTOMATICO", "HIBRIDO", "PAUSADO"].includes(mode))
@@ -253,7 +253,7 @@ export async function PUT(request: Request) {
 export async function PATCH(request: Request) {
   const access = await editorialAccess();
   if (access instanceof Response) return access;
-  const payload = (await request.json()) as Record<string, unknown>;
+  const payload = (((await request.json().catch(() => null)) ?? {})) as Record<string, unknown>;
   const draftId = Number(payload.draftId || 0);
   const action = String(payload.action || "").toUpperCase();
   const reason = String(payload.reason || "").trim().slice(0, 500);

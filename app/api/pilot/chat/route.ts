@@ -45,6 +45,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const conversationId = Number(url.searchParams.get("conversation") || 0);
   const messagesOnly = url.searchParams.get("messagesOnly") === "1";
+  const summaryOnly = url.searchParams.get("summary") === "1";
 
   if (messagesOnly && Number.isInteger(conversationId) && conversationId > 0) {
     const owned = await ownedConversation(access, conversationId);
@@ -57,6 +58,38 @@ export async function GET(request: Request) {
   }
 
   const communicationGroup = await communicationClass(access.user.id, access.context.comunidadeId);
+  if (summaryOnly) {
+    const [conversations, notificationPreference] = await Promise.all([
+      getD1().prepare(
+        `SELECT c.id, c.atualizado_em,
+          u.id AS participante_id, u.nome AS participante_nome,
+          u.foto_perfil AS participante_foto,
+          (SELECT mp.id FROM mensagens_privadas mp
+            WHERE mp.conversa_id = c.id AND mp.remetente_id <> ? AND mp.lida_em IS NULL ORDER BY mp.id DESC LIMIT 1) AS ultima_recebida_id,
+          (SELECT mp.mensagem FROM mensagens_privadas mp
+            WHERE mp.conversa_id = c.id AND mp.remetente_id <> ? AND mp.lida_em IS NULL ORDER BY mp.id DESC LIMIT 1) AS ultima_recebida,
+          (SELECT COUNT(*) FROM mensagens_privadas mp
+            WHERE mp.conversa_id = c.id AND mp.remetente_id <> ? AND mp.lida_em IS NULL) AS nao_lidas
+         FROM conversas_privadas c
+         JOIN usuarios u ON u.id = CASE WHEN c.usuario_menor_id = ?
+           THEN c.usuario_maior_id ELSE c.usuario_menor_id END
+         JOIN usuario_comunidades uc ON uc.usuario_id = u.id
+           AND uc.comunidade_id = c.comunidade_id AND uc.status = 'ATIVO'
+         WHERE c.comunidade_id = ? AND c.ciclo_semana = strftime('%Y-%W','now')
+           AND (? IN (c.usuario_menor_id, c.usuario_maior_id))
+           AND (${COMMUNICATION_GROUP_CASE}) = ?
+         ORDER BY c.atualizado_em DESC LIMIT 100`,
+      ).bind(access.user.id, access.user.id, access.user.id, access.user.id, access.context.comunidadeId, access.user.id, communicationGroup).all<Record<string, unknown>>(),
+      getD1().prepare("SELECT valor FROM configuracoes WHERE chave = ? LIMIT 1")
+        .bind(`notification_preferences:${access.user.id}`).first<{ valor: string }>(),
+    ]);
+    let messageNotificationsEnabled = true;
+    try { messageNotificationsEnabled = JSON.parse(notificationPreference?.valor || "{}").mensagens !== false; } catch { /* Same default as notification settings. */ }
+    return Response.json(
+      { conversations: conversations.results, messageNotificationsEnabled },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  }
   const [people, conversations, notificationPreference] = await Promise.all([
     getD1().prepare(
       `SELECT u.id, u.nome, u.foto_perfil,

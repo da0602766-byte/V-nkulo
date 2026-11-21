@@ -240,7 +240,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const access = await requireTenantPermission("visitors.create");
   if ("error" in access) return access.error;
-  const payload = (await request.json()) as Record<
+  const payload = (((await request.json().catch(() => null)) ?? {})) as Record<
     string,
     string | number | boolean | null
   >;
