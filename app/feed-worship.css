@@ -91,8 +91,6 @@
 .worship-composer-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; margin-top: 10px; border-top: 1px solid var(--w-line); padding-top: 5px; }
 .worship-composer-tools button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 6px 9px; border: 0; border-radius: 8px; background: none; color: var(--w-violet); font-size: 11px; }
 .worship-composer-tools button:hover { background: var(--w-soft); }
-.worship-composer-tools .worship-publish { margin-left: auto; background: #6530c8; color: #fff; padding-inline: 15px; }
-.worship-composer-tools .worship-publish:hover { background: #4c22a2; }
 .worship-feed-heading { display: flex; align-items: center; justify-content: space-between; margin: 5px 2px -5px; }
 .worship-feed-heading h2 { font-size: 13px; font-weight: 650; color: var(--w-ink); }
 .worship-feed-heading > span { color: var(--w-muted); font-size: 11px; }
@@ -133,12 +131,10 @@
 .worship-photo-pending { width: 100%; aspect-ratio: var(--photo-ratio); max-height: 620px; background: var(--w-soft); }
 .worship-photo .feed-image-placeholder { position: absolute; inset: 0; background: var(--w-soft); }
 .worship-photo.is-loaded .feed-image-placeholder { display: none; }
-.worship-feed .worship-photo .feed-image-attachment-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--w-surface); padding: 2px 0; }
 .worship-photo .feed-image-attachment-actions :is(button, a) { min-height: 36px; display: inline-flex; align-items: center; border: 0; background: transparent; padding: 5px 8px; font-size: 11px; color: var(--w-muted); }
 .worship-photo .feed-image-attachment-summary { min-height: 130px; padding: 20px; }
 .pilot-dashboard[data-ui-version="v2"] .worship-feed .feed-responsive-image.worship-photo { padding: 0 !important; border: 0 !important; border-radius: 10px !important; max-height: none !important; background: var(--w-bg) !important; }
 .pilot-dashboard[data-ui-version="v2"] .worship-feed .worship-photo > img { width: 100% !important; height: auto !important; max-height: 620px !important; object-fit: contain !important; border-radius: 0 !important; }
-.pilot-dashboard[data-ui-version="v2"] .worship-feed .worship-photo .feed-image-attachment-actions { background: var(--w-surface) !important; padding: 2px 0 !important; }
 .worship-empty { padding: 36px 22px; border: 1px dashed var(--w-line); border-radius: 14px; text-align: center; color: var(--w-muted); }
 .worship-empty > svg { width: 32px; height: 32px; margin: 0 auto 14px; color: var(--w-violet); }
 .worship-empty h3 { font-size: 17px; color: var(--w-ink); margin-bottom: 8px; }
@@ -245,8 +241,6 @@ html[data-theme="dark"] [data-feed-dialog] :is(input, textarea, select) { backgr
   .worship-composer-tools { gap: 0; }
   .worship-composer-tools button { font-size: 10px; padding-inline: 6px; gap: 4px; }
   .worship-composer-tools button svg { width: 17px; height: 17px; flex-basis: 17px; }
-  .worship-composer-tools .worship-publish { padding-inline: 9px; }
-  .worship-publish svg { display: none; }
   .worship-tabs { gap: 18px; }
   .worship-tabs button { font-size: 11px; }
   .worship-post { padding: 13px 11px 4px; border-radius: 12px; }

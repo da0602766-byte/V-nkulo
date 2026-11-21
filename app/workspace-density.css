@@ -80,15 +80,6 @@
 .pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-dashboard-grid,.pilot-dashboard[data-ui-version="v2"] .ministry-project .secretary-panel:has(>.secretary-dashboard-grid) { padding:0!important; border:0!important; background:transparent!important; box-shadow:none!important; align-items:start; }
 .pilot-dashboard[data-ui-version="v2"] .secretary-workspace.secretary-catalog.ministry-project .secretary-ministry-catalog { grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),360px))!important; align-items:start; justify-content:start; gap:16px; }
 .pilot-dashboard[data-ui-version="v2"] .secretary-workspace.secretary-catalog.ministry-project .secretary-ministry-tile-wrap { border:0; }
-.pilot-dashboard[data-ui-version="v2"] .secretary-workspace.secretary-catalog.ministry-project .secretary-ministry-tile.ministry-directory-card { display:flex!important; flex-direction:column!important; position:relative; isolation:isolate; min-height:0!important; height:auto!important; padding:0!important; gap:0!important; width:100%; text-align:left; border:1px solid var(--pilot-line)!important; border-radius:14px!important; overflow:hidden; background:var(--pilot-surface)!important; color:var(--pilot-text)!important; }
-.pilot-dashboard[data-ui-version="v2"] .secretary-workspace.secretary-catalog.ministry-project .secretary-ministry-tile.ministry-directory-card .secretary-ministry-tile-media { position:relative!important; inset:auto!important; width:100%!important; height:112px!important; min-height:0!important; margin:0!important; padding:0!important; opacity:1!important; mask-image:none!important; z-index:auto!important; display:grid!important; place-items:center; background:var(--pilot-surface-2)!important; }
-.pilot-dashboard[data-ui-version="v2"] .secretary-workspace.secretary-catalog.ministry-project .secretary-ministry-tile.ministry-directory-card .secretary-ministry-tile-media img { width:100%!important; height:100%!important; object-fit:cover!important; opacity:1!important; mask-image:none!important; filter:none!important; }
-.pilot-dashboard[data-ui-version="v2"] .secretary-workspace.secretary-catalog.ministry-project .ministry-directory-card .secretary-ministry-tile-media>span { font-size:48px; opacity:.35; color:var(--pilot-primary); }
-.pilot-dashboard[data-ui-version="v2"] .secretary-workspace.secretary-catalog.ministry-project .ministry-directory-card .secretary-ministry-copy { padding:14px 16px 10px!important; display:grid; gap:6px; }
-.pilot-dashboard[data-ui-version="v2"] .secretary-workspace.secretary-catalog.ministry-project .ministry-directory-card .secretary-ministry-copy>strong { font-size:18px; }
-.pilot-dashboard[data-ui-version="v2"] .secretary-workspace.secretary-catalog.ministry-project .ministry-directory-card .secretary-ministry-copy>span { font-size:13px; line-height:1.5; min-height:0; }
-.pilot-dashboard[data-ui-version="v2"] .secretary-workspace.secretary-catalog.ministry-project .ministry-directory-card .secretary-ministry-meta { display:flex!important; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin:0 16px; padding:12px 0!important; width:auto!important; border-top:1px solid var(--pilot-line); }
-.pilot-dashboard[data-ui-version="v2"] .secretary-workspace.secretary-catalog.ministry-project .ministry-directory-card .secretary-ministry-meta>strong { font-size:12px; color:var(--pilot-muted); }
 .pilot-dashboard[data-ui-version="v2"] .secretary-workspace.secretary-catalog.ministry-project .ministry-directory-card .ministry-card-action { display:inline-flex; gap:12px; align-items:center; padding:8px 10px; border-radius:8px; border:1px solid var(--pilot-line); background:var(--pilot-surface-2); color:var(--pilot-primary); font-size:12px; }
 @media(max-width:760px) {
   .pilot-dashboard .care-note-composer { grid-template-columns:minmax(0,1fr); }
@@ -101,11 +92,6 @@
   .pilot-dashboard .event-card-expanded dl>div { grid-template-columns:100px minmax(0,1fr); }
   .pilot-dashboard .member-account-action { box-sizing:border-box; width:100%; padding:14px; }
 }
-
-.pilot-dashboard[data-ui-version="v2"] .secretary-catalog.ministry-project .ministry-directory-card .secretary-ministry-copy { max-width:none!important; }
-.pilot-dashboard[data-ui-version="v2"] .secretary-catalog.ministry-project .ministry-directory-card .secretary-ministry-meta>strong { max-width:none!important; }
-
-.pilot-dashboard[data-ui-version="v2"] .secretary-workspace.secretary-catalog.ministry-project .ministry-directory-card .secretary-ministry-meta { margin:0 16px!important; align-self:stretch; }
 .pilot-dashboard .parking-space-card:has(.parking-space-reservations) .parking-space-current { min-height:0; }
 @media(max-width:760px) { .pilot-dashboard .garage-actions button { min-height:44px; } }
 

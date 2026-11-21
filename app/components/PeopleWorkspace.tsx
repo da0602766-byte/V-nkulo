@@ -194,6 +194,7 @@ export default function PeopleWorkspace({
   const [officialTitle, setOfficialTitle] = useState("LÍDER");
   const [isOfficial, setIsOfficial] = useState(false);
   const [removing, setRemoving] = useState<Person | null>(null);
+  const [optionsMemberId, setOptionsMemberId] = useState<number | null>(null);
   const [removeConfirmation, setRemoveConfirmation] = useState("");
   const [removalIssue, setRemovalIssue] = useState<{ message: string; blockers: RemovalBlocker[] } | null>(null);
   const queryKey = JSON.stringify([tab, search.trim(), participation]);
@@ -538,23 +539,41 @@ export default function PeopleWorkspace({
             <div className="people-directory-schedules"><small className="people-mobile-label">Próximas escalas</small><span>{person.proximas_escalas || 0}</span></div>
             <div className="people-card-actions">
               <button type="button" className="people-open-record" onClick={() => setRecord(person)} aria-label={`Ver ficha de ${person.nome}`}>Ver ficha</button>
-              {(person.canEditHierarchy || person.canRemove) && <details className="people-row-menu"><summary aria-label={`Mais ações para ${person.nome}`}>⋯</summary><div>
-              {person.canEditHierarchy && (
-                <button type="button" onClick={() => { const title = person.titulo_oficial || "LÍDER"; setEditing(person); setModelApplied(false); setPermissionDraft(person.permissoes.split(",").filter(Boolean)); setPresetTitle(title); setOfficialTitle(title); setIsOfficial(Boolean(person.oficial)); }}>
-                  Editar função
-                </button>
-              )}
-              {person.canRemove && (
+              {(person.canEditHierarchy || person.canRemove) && (
                 <button
                   type="button"
-                  className="danger"
-                  onClick={() => { setRemoveConfirmation(""); setRemovalIssue(null); setRemoving(person); }}
+                  className="people-options-toggle"
+                  aria-label={`Opções de ${person.nome}`}
+                  aria-expanded={optionsMemberId === person.membership_id}
+                  aria-controls={`people-options-${person.membership_id}`}
+                  onClick={() => setOptionsMemberId(optionsMemberId === person.membership_id ? null : person.membership_id)}
                 >
-                  Remover pessoa
+                  Opções
                 </button>
               )}
-              </div></details>}
             </div>
+            {(person.canEditHierarchy || person.canRemove) && (
+              <div
+                id={`people-options-${person.membership_id}`}
+                className="people-row-inline-options"
+                hidden={optionsMemberId !== person.membership_id}
+              >
+                {person.canEditHierarchy && (
+                  <button type="button" onClick={() => { const title = person.titulo_oficial || "LÍDER"; setEditing(person); setModelApplied(false); setPermissionDraft(person.permissoes.split(",").filter(Boolean)); setPresetTitle(title); setOfficialTitle(title); setIsOfficial(Boolean(person.oficial)); }}>
+                    Editar função
+                  </button>
+                )}
+                {person.canRemove && (
+                  <button
+                    type="button"
+                    className="danger"
+                    onClick={() => { setRemoveConfirmation(""); setRemovalIssue(null); setRemoving(person); }}
+                  >
+                    Remover pessoa
+                  </button>
+                )}
+              </div>
+            )}
           </article>
         ))}
         {!filtered.length && (
