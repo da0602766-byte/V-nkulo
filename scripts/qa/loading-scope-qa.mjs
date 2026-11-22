@@ -9,11 +9,45 @@ const results=[],errors=[];
 const record=message=>{results.push(message);console.log(message);};
 page.setDefaultTimeout(12000);page.setDefaultNavigationTimeout(12000);
 page.on('pageerror',error=>errors.push(error.message));
+await page.addInitScript(() => {
+  window.logoArrivalSeen = false;
+  const observer = new MutationObserver(records => {
+    if (document.documentElement.dataset.logoTransition === 'waiting' || records.some(record => record.oldValue === 'waiting')) {
+      window.logoArrivalSeen = true;
+      observer.disconnect();
+    }
+  });
+  observer.observe(document, {subtree:true,attributes:true,attributeFilter:['data-logo-transition'],attributeOldValue:true});
+});
 const idle=()=>page.waitForFunction(()=>document.documentElement.dataset.logoController==='ready'&&document.querySelector('.platform-loading-transition')?.dataset.phase==='idle');
 const state=()=>page.evaluate(()=>({phase:document.querySelector('.platform-loading-transition')?.dataset.phase,inert:document.querySelector('#main-content').inert,blocked:document.documentElement.hasAttribute('data-logo-transition')}));
 const expectedIdle={phase:'idle',inert:false,blocked:false};
 await fs.mkdir('outputs/loading-scope',{recursive:true});
 try {
+ await page.goto(preview.base+'/qa-v2');await idle();
+ assert.equal(new URL(page.url()).pathname,'/');
+ assert.equal(await page.locator('.vinkulo-landing .lp-hero h1').isVisible(),true);
+ assert.equal(await page.evaluate(()=>window.logoArrivalSeen),false);
+ await page.locator('.lp-hero-actions a[href="#fio-do-dia"]').click();
+ await page.waitForURL('**/#fio-do-dia');
+ assert.deepEqual(await state(),expectedIdle);
+ assert.equal(await page.evaluate(()=>window.logoArrivalSeen),false);
+
+ const loginUrl=preview.base+'/login';
+ let releaseLogin;
+ const loginGate=new Promise(resolve=>{releaseLogin=resolve;});
+ await page.route(loginUrl,async route=>{await loginGate;await route.continue();});
+ try {
+  await page.locator('.lp-nav-actions a[href="/login"]').click({noWaitAfter:true});
+  await page.waitForFunction(()=>document.querySelector('.platform-loading-transition')?.dataset.phase==='waiting');
+  assert.equal(await page.evaluate(()=>window.logoArrivalSeen),true);
+ } finally {releaseLogin();}
+ await page.waitForURL(loginUrl);await idle();await page.unroute(loginUrl);
+ await page.goBack();await idle();
+ assert.equal(await page.locator('.vinkulo-landing .lp-hero h1').isVisible(),true);
+ assert.deepEqual(await state(),expectedIdle);
+ record('The preview opens the real landing page and uses the transition only on the eligible link to login');
+
  await page.goto(preview.base+'/qa-fixture');await idle();
  assert.deepEqual(await state(),expectedIdle);
  record('A ready document does not force an initial loading screen');
@@ -39,9 +73,8 @@ try {
  await page.evaluate(()=>document.querySelector('#visitors-loading').remove());await idle();
  record('Visitantes still waits for its data and reveals the page');
  await page.goto(preview.base+'/qa-login/member');
- await page.waitForFunction(()=>document.documentElement.dataset.logoController==='ready');
- assert.equal(await page.locator('.platform-loading-transition').getAttribute('data-phase'),'waiting');
  await idle();
+ assert.equal(await page.evaluate(()=>window.logoArrivalSeen),true);
  record('Community entry still starts its arrival animation');
  await page.getByRole('button',{name:'Manter no celular',exact:true}).click();
  await page.locator('dialog.storage-onboarding').waitFor({state:'detached'});
@@ -62,9 +95,8 @@ try {
  record(`${checked} real community tab clicks do not activate the full-page overlay`);
  await page.locator('.pilot-sidebar button[data-editor-key="menu-principal-visitantes"]').click();
  await page.waitForURL('**/painel/visitantes');
- await page.waitForFunction(()=>document.documentElement.dataset.logoController==='ready');
- assert.equal(await page.locator('.platform-loading-transition').getAttribute('data-phase'),'waiting');
  await idle();
+ assert.equal(await page.evaluate(()=>window.logoArrivalSeen),true);
  record('Real Visitantes navigation retains its arrival animation');
  for(const width of [1864,768,390]){await page.setViewportSize({width,height:1000});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:`outputs/loading-scope/tabs-${width}.png`});}
  assert.deepEqual(errors,[]);

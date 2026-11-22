@@ -16,7 +16,10 @@ export default function PlatformLoadingTransition() {
     <div className="platform-loading-symbol" aria-hidden="true">
       <AnimatedVinkuloMark />
     </div>
-    <p className="platform-loading-label" role="status" aria-live="polite">Carregando o Vínkulo…</p>
+    <div className="platform-loading-label">
+      <strong aria-hidden="true">V Í N K U L O</strong>
+      <p className="platform-loading-message" role="status" aria-live="polite">Preparando sua experiência</p>
+    </div>
     <div className="platform-loading-recovery" hidden>
       <p>Está demorando mais que o esperado.</p>
       <button type="button" data-loading-retry>Tentar novamente</button>
