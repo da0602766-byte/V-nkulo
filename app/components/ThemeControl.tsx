@@ -8,10 +8,12 @@ export default function ThemeControl({
   compact = false,
   cycle = false,
   storageId = "",
+  onManualChange,
 }: {
   compact?: boolean;
   cycle?: boolean;
   storageId?: string;
+  onManualChange?: () => void;
 }) {
   const { theme, resolvedDark, updateTheme } = useThemePreference(storageId);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -21,6 +23,7 @@ export default function ThemeControl({
     if (transitionInProgress.current) return;
     transitionInProgress.current = true;
     setIsTransitioning(true);
+    onManualChange?.();
     updateTheme(next);
     animateThemeChange(next).finally(() => {
       transitionInProgress.current = false;

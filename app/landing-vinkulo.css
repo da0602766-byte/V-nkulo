@@ -1,4 +1,16 @@
 /* Landing pública do Vínkulo. Toda a composição usa os tokens locais da página. */
+@property --lp-bg { syntax:"<color>"; inherits:true; initial-value:#fbfaf7; }
+@property --lp-surface { syntax:"<color>"; inherits:true; initial-value:#fff; }
+@property --lp-soft { syntax:"<color>"; inherits:true; initial-value:#eef2ff; }
+@property --lp-line { syntax:"<color>"; inherits:true; initial-value:#dbe1ef; }
+@property --lp-text { syntax:"<color>"; inherits:true; initial-value:#111b34; }
+@property --lp-subtle { syntax:"<color>"; inherits:true; initial-value:#43516c; }
+@property --lp-muted { syntax:"<color>"; inherits:true; initial-value:#54617a; }
+@property --lp-blue { syntax:"<color>"; inherits:true; initial-value:#2149bf; }
+@property --lp-orange { syntax:"<color>"; inherits:true; initial-value:#a4400c; }
+@property --lp-hero-wash { syntax:"<color>"; inherits:true; initial-value:#e5ebff; }
+@property --lp-hero-warm { syntax:"<color>"; inherits:true; initial-value:#fff0d7; }
+
 .vinkulo-landing {
   --lp-bg:#fbfaf7;
   --lp-surface:#ffffff;
@@ -140,7 +152,7 @@ html[data-pilot-theme="escuro"] .vinkulo-landing {
 .lp-hero h1 em { color:var(--lp-orange); }
 .lp-hero-description { max-width:43ch; margin:22px 0 0; color:var(--lp-subtle); font-size:clamp(1rem,1.6vw,1.18rem); line-height:1.66; }
 .lp-hero-actions { display:flex; flex-wrap:wrap; gap:11px; margin-top:27px; }
-.lp-hero-actions .lp-button:first-child { position:relative; overflow:hidden; }
+.lp-hero-actions .lp-button:first-child { position:relative; isolation:isolate; overflow:hidden; }
 .lp-hero-visual {
   position:relative;
   isolation:isolate;
@@ -412,7 +424,9 @@ html:is([data-theme="dark"],[data-pilot-theme="escuro"]) .vinkulo-landing .lp-to
 
 .lp-final { background:radial-gradient(ellipse at 86% 0%,#4069d6,transparent 66%),#17368f; color:#fff; padding-block:clamp(52px,7vw,85px); }
 .lp-final .lp-shell { display:flex; flex-direction:column; align-items:center; text-align:center; }
-.lp-final h2 { max-width:18ch; margin:15px 0 10px; color:#fff; }
+.lp-final-art { width:clamp(128px,15vw,168px); aspect-ratio:1; margin:-20px 0 -9px; background:url("/landing-convite.webp") center/contain no-repeat; }
+.lp-final h2 { max-width:18ch; margin:7px 0 10px; color:#fff; }
+.lp-final-name { color:#d1f1ff; }
 .lp-final p { margin:0 0 20px; color:#f2f5ff; font-size:1.07rem; line-height:1.5; }
 .lp-final :focus-visible { outline-color:#fff; }
 .lp-button-white { background:#fff; color:#17368f!important; }
@@ -425,6 +439,12 @@ html:is([data-theme="dark"],[data-pilot-theme="escuro"]) .vinkulo-landing .lp-to
 
 @media (prefers-reduced-motion:no-preference) {
   html:has(.vinkulo-landing) { scroll-behavior:smooth; }
+  .vinkulo-landing.lp-theme-changing {
+    transition-property:--lp-bg,--lp-surface,--lp-soft,--lp-line,--lp-text,--lp-subtle,--lp-muted,--lp-blue,--lp-orange,--lp-hero-wash,--lp-hero-warm;
+    transition-duration:.44s;
+    transition-timing-function:var(--lp-ease);
+  }
+  .vinkulo-landing.lp-theme-changing .theme-control-glyph { animation:lp-theme-turn .44s var(--lp-ease) both; }
   .lp-hero-copy>*,.lp-hero-preview,.lp-reveal.is-visible { animation:lp-rise .64s var(--lp-ease) both; }
   .lp-hero::before { animation:lp-light-bloom 1.8s var(--lp-ease) both; }
   .lp-hero h1 { animation-delay:75ms; }
@@ -432,14 +452,22 @@ html:is([data-theme="dark"],[data-pilot-theme="escuro"]) .vinkulo-landing .lp-to
   .lp-hero-actions { animation-delay:200ms; }
   .lp-hero-visual img { animation:lp-photo 1.12s var(--lp-ease) both; }
   .lp-hero-preview { animation-delay:230ms; }
+  .lp-hero-actions .lp-button:first-child::before,
   .lp-hero-actions .lp-button:first-child::after {
     content:"";
     position:absolute;
+    z-index:-1;
     inset:0;
-    background:linear-gradient(105deg,transparent 30%,#ffffff3d 49%,transparent 66%);
+    transform:translateX(-110%);
+    background:
+      linear-gradient(105deg,transparent 31%,#fff9 50%,transparent 69%) center top/100% 3px no-repeat,
+      linear-gradient(105deg,transparent 28%,#a6e9ff33 44%,#fff3 50%,#a9bdff33 56%,transparent 72%);
     pointer-events:none;
-    animation:lp-shine .9s .72s var(--lp-ease) both;
   }
+  .lp-hero-actions .lp-button:first-child::after { animation:lp-shine 2.8s .45s ease-in-out both; }
+  .lp-hero-actions .lp-button:first-child:is(:hover,:focus-visible)::before { transform:translateX(110%); transition:transform .85s var(--lp-ease); }
+  .lp-final .is-visible .lp-final-art { background-image:url("/landing-convite.gif"); }
+  .lp-final .is-visible .lp-final-name { animation:lp-final-color 3.5s .12s ease-in-out both; }
   .lp-reveal.is-visible { animation-delay:var(--lp-enter-delay,0ms); }
   .lp-reveal:focus-within,.lp-hero-actions:focus-within { animation:none; }
   .lp-reveal.is-visible .now .lp-timeline-marker { animation:lp-pulse 1.3s .45s ease-out 2; }
@@ -479,7 +507,20 @@ html:is([data-theme="dark"],[data-pilot-theme="escuro"]) .vinkulo-landing .lp-to
 @keyframes lp-rise { from { opacity:0; transform:translateY(15px); } to { opacity:1; transform:none; } }
 @keyframes lp-photo { from { transform:scale(1.045); } to { transform:scale(1); } }
 @keyframes lp-light-bloom { from { opacity:0; transform:translate(-7%,-4%) scale(.9); } to { opacity:.6; transform:none; } }
-@keyframes lp-shine { from { transform:translateX(-100%); } to { transform:translateX(100%); } }
+@keyframes lp-shine {
+  0%,12%,51% { transform:translateX(-110%); }
+  43%,50%,82%,100% { transform:translateX(110%); }
+}
+@keyframes lp-theme-turn {
+  from { opacity:.4; transform:rotate(-35deg) scale(.75); }
+  to { opacity:1; transform:none; }
+}
+@keyframes lp-final-color {
+  0%,100% { color:#d1f1ff; }
+  31% { color:#9ef7ff; }
+  63% { color:#f4cdff; }
+  82% { color:#ffdfae; }
+}
 @keyframes lp-progress { from { transform:scaleX(0); } to { transform:scaleX(1); } }
 @keyframes lp-notice-in { from { opacity:0; transform:translateY(9px) scale(.98); } to { opacity:1; transform:none; } }
 @keyframes lp-pulse {

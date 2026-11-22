@@ -76,6 +76,7 @@ const FAQS = [
 
 export default function LandingPageExperience({ signedIn, panelHref, canEdit, plans, siteName = "Vínkulo", logoUrl = "" }: LandingPageExperienceProps) {
   const root = useRef<HTMLElement>(null);
+  const themeTransition = useRef(0);
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
   const [demoView, setDemoView] = useState<DemoView>("timeline");
   const signupHref = signedIn ? panelHref : "/log1";
@@ -90,6 +91,17 @@ export default function LandingPageExperience({ signedIn, panelHref, canEdit, pl
     });
     return () => cancelAnimationFrame(frame);
   }, []);
+
+  useEffect(() => () => window.clearTimeout(themeTransition.current), []);
+
+  function animateManualThemeChange() {
+    const landing = root.current;
+    if (!landing || !window.matchMedia("(prefers-reduced-motion: no-preference)").matches) return;
+
+    window.clearTimeout(themeTransition.current);
+    landing.classList.add("lp-theme-changing");
+    themeTransition.current = window.setTimeout(() => landing.classList.remove("lp-theme-changing"), 500);
+  }
 
   useEffect(() => {
     const landing = root.current;
@@ -116,7 +128,7 @@ export default function LandingPageExperience({ signedIn, panelHref, canEdit, pl
             <a href="#recursos">Recursos</a><a href="#fio-do-dia">Fio do dia</a>{canEdit ? <a href="#planos">Planos</a> : <Link href="/planos">Planos</Link>}<a href="#duvidas">Dúvidas</a>
           </div>
           <div className="lp-nav-actions">
-            <ThemeControl compact cycle />
+            <ThemeControl compact cycle onManualChange={animateManualThemeChange} />
             {canEdit && <span id="global-editor-toolbar-slot" className="global-editor-toolbar-slot" aria-label="Aparência" />}
             <Link className="lp-button lp-button-small" href={signedIn ? "/painel" : "/login"} showLoading>{signedIn ? "Abrir painel" : "Entrar"}</Link>
           </div>
@@ -191,7 +203,16 @@ export default function LandingPageExperience({ signedIn, panelHref, canEdit, pl
         <div className="lp-faq-list">{FAQS.map(([question, answer], index) => <article key={question}><button type="button" aria-expanded={activeFaq === index} aria-controls={`faq-${index}`} onClick={() => setActiveFaq(activeFaq === index ? null : index)}><span>{question}</span><i aria-hidden="true">+</i></button><div id={`faq-${index}`} hidden={activeFaq !== index}><p>{answer}</p></div></article>)}</div>
       </section>
 
-      <section className="lp-final"><Reveal className="lp-shell"><VinkuloMark light size={52} /><h2>Traga sua comunidade para o Vínkulo</h2><p>Conheça os planos e envie sua solicitação.</p><Link className="lp-button lp-button-white" href={signupHref} showLoading>{signedIn ? "Abrir meu painel" : "Solicitar minha comunidade"}</Link></Reveal></section>
+      <section className="lp-final">
+        <Reveal className="lp-shell">
+          <span className="lp-final-art" aria-hidden="true" />
+          <h2>Traga sua comunidade para o <span className="lp-final-name">Vínkulo</span></h2>
+          <p>Conheça os planos e envie sua solicitação.</p>
+          <Link className="lp-button lp-button-white" href={signupHref} showLoading>
+            {signedIn ? "Abrir meu painel" : "Solicitar minha comunidade"}
+          </Link>
+        </Reveal>
+      </section>
 
       <footer className="lp-footer"><div className="lp-shell"><div className="lp-footer-main"><div><Link className="lp-brand" href="/" aria-label={`${siteName} — início`}><VinkuloMark logoUrl={logoUrl} size={40} /><span>{siteName}</span></Link><p>Plataforma de gestão para igrejas e comunidades em português do Brasil.</p></div><nav aria-label="Links institucionais"><Link href="/planos">Planos</Link><Link href="/termos">Termos de uso</Link><Link href="/privacidade">Privacidade</Link><Link href="/contato">Suporte</Link><Link href="/comunidades">Comunidades</Link></nav></div><div className="lp-footer-bottom"><span>© 2026 Vínkulo</span><span>Feito com cuidado para igrejas brasileiras</span></div></div></footer>
     </main>
