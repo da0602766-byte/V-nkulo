@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
+import { type CSSProperties, type PointerEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import Link from "./StableLink";
 import ThemeControl from "./ThemeControl";
 import VinkuloMark from "./VinkuloMark";
@@ -43,6 +43,27 @@ const TIMELINE_EVENTS = [
   { time: "Sáb · 10h", title: "Treinamento de líderes", status: "6 confirmados", state: "future" },
 ] as const;
 
+const NOTIFICATION_EXAMPLES = [
+  {
+    id: "escalas", label: "Escalas", icon: "ministry", tone: "yellow",
+    title: "Você foi escalado para a recepção",
+    message: "Domingo, às 9h. Abra a escala para confirmar sua disponibilidade.",
+  },
+  {
+    id: "visitantes", label: "Visitantes", icon: "visitor", tone: "rose",
+    title: "Novo visitante para acompanhar",
+    message: "Uma visita foi registrada. A equipe de acolhimento pode dar continuidade ao contato.",
+  },
+  {
+    id: "agenda", label: "Agenda", icon: "calendar", tone: "blue",
+    title: "Lembrete de reunião",
+    message: "A reunião de liderança começa às 19h30.",
+  },
+] as const;
+
+type DemoView = "timeline" | "notifications";
+type NotificationExample = (typeof NOTIFICATION_EXAMPLES)[number];
+
 export { DEFAULT_LANDING_PLANS };
 
 const FAQS = [
@@ -56,6 +77,7 @@ const FAQS = [
 export default function LandingPageExperience({ signedIn, panelHref, canEdit, plans, siteName = "Vínkulo", logoUrl = "" }: LandingPageExperienceProps) {
   const root = useRef<HTMLElement>(null);
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
+  const [demoView, setDemoView] = useState<DemoView>("timeline");
   const signupHref = signedIn ? panelHref : "/log1";
 
   useEffect(() => {
@@ -109,10 +131,10 @@ export default function LandingPageExperience({ signedIn, panelHref, canEdit, pl
             <p className="lp-hero-description">Células, ministérios, escalas, visitantes e pedidos de oração em uma plataforma feita para igrejas brasileiras.</p>
             <div className="lp-hero-actions">
               <Link className="lp-button" href={signupHref} showLoading>{signedIn ? "Abrir meu painel" : "Solicitar comunidade"}</Link>
-              <a className="lp-button lp-button-secondary" href="#fio-do-dia">Ver demonstração</a>
+              <a className="lp-button lp-button-secondary" href="#fio-do-dia" onClick={() => setDemoView("timeline")}>Ver demonstração</a>
             </div>
           </div>
-          <figure className="lp-hero-visual">
+          <figure className="lp-hero-visual" onPointerMove={moveHeroLight}>
             <Image
               src="/landing-comunidade.webp"
               alt="Pessoas de diferentes gerações conversam em uma igreja"
@@ -123,9 +145,10 @@ export default function LandingPageExperience({ signedIn, panelHref, canEdit, pl
               unoptimized
             />
             <figcaption className="lp-hero-preview">
-              <span className="lp-hero-preview-icon"><FeatureIcon name="thread" /></span>
-              <div><span>Exemplo do Fio do dia</span><strong>{CURRENT_EVENT.title}</strong></div>
-              <span className="lp-hero-preview-status">{CURRENT_EVENT.time}</span>
+              <a href="#fio-do-dia" onClick={() => setDemoView("notifications")}>
+                <span className="lp-hero-preview-icon"><FeatureIcon name="bell" /></span>
+                <span className="lp-hero-preview-copy"><span>Demonstração interativa</span><strong>Simular notificações</strong></span>
+              </a>
             </figcaption>
           </figure>
         </div>
@@ -147,8 +170,8 @@ export default function LandingPageExperience({ signedIn, panelHref, canEdit, pl
 
       <section className="lp-section lp-thread-section" id="fio-do-dia">
         <div className="lp-shell lp-thread-layout">
-          <Reveal className="lp-thread-copy"><SectionLabel>O Fio do dia</SectionLabel><h2>A linha do tempo da <em>sua comunidade</em></h2><p>Acompanhe os compromissos da igreja em sequência. A linha sólida mostra o que passou, o ponto marca o agora e o tracejado indica o que vem depois.</p></Reveal>
-          <Reveal delay={90}><TimelineDemo /></Reveal>
+          <Reveal className="lp-thread-copy"><SectionLabel>O Fio do dia</SectionLabel><h2>A linha do tempo da <em>sua comunidade</em></h2><p>Veja o que já aconteceu, o que está em andamento e o que vem a seguir. Experimente também os avisos de escalas, visitantes e agenda.</p></Reveal>
+          <Reveal delay={90}><LandingDemo view={demoView} onViewChange={setDemoView} /></Reveal>
         </div>
       </section>
 
@@ -179,6 +202,14 @@ function Reveal({ children, className = "", delay = 0 }: { children: ReactNode; 
   return <div className={`lp-reveal ${className}`} style={{ "--lp-enter-delay": `${delay}ms` } as CSSProperties}>{children}</div>;
 }
 
+function moveHeroLight(event: PointerEvent<HTMLElement>) {
+  if (event.pointerType !== "mouse") return;
+  const { currentTarget, clientX, clientY } = event;
+  const rect = currentTarget.getBoundingClientRect();
+  currentTarget.style.setProperty("--lp-light-x", `${clientX - rect.left}px`);
+  currentTarget.style.setProperty("--lp-light-y", `${clientY - rect.top}px`);
+}
+
 function SectionLabel({ children }: { children: ReactNode }) { return <p className="lp-section-label">{children}</p>; }
 
 function FeatureIcon({ name }: { name: string }) {
@@ -189,6 +220,7 @@ function FeatureIcon({ name }: { name: string }) {
     ministry: <><rect x="4" y="9" width="16" height="11" rx="2" /><path d="M8 9V6a4 4 0 0 1 8 0v3M12 13v3" /></>,
     visitor: <><circle cx="11" cy="8" r="3" /><path d="M4 21c.5-4 2.8-6 7-6s6.5 2 7 6M18 4l2 2-2 2" /></>,
     prayer: <><path d="M12 3S6 7 6 12a6 6 0 0 0 12 0c0-5-6-9-6-9Z" /><path d="M12 8v8M9 12h6" /></>,
+    bell: <><path d="M5 17h14l-2-3V9a5 5 0 0 0-10 0v5l-2 3Z" /><path d="M10 21h4" /></>,
     calendar: <><rect x="4" y="6" width="16" height="14" rx="2" /><path d="M8 3v5M16 3v5M4 11h16M8 15h.01M12 15h.01M16 15h.01" /></>,
     leadership: <><path d="m12 3 2.4 4.8 5.3.8-3.8 3.7.9 5.3-4.8-2.5-4.8 2.5.9-5.3-3.8-3.7 5.3-.8L12 3Z" /></>,
     member: <><circle cx="12" cy="8" r="4" /><path d="M4 21c.7-4.5 3.3-7 8-7s7.3 2.5 8 7" /></>,
@@ -198,9 +230,27 @@ function FeatureIcon({ name }: { name: string }) {
 
 function CheckIcon() { return <svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="8" /><path d="m5.5 9 2.4 2.5 4.7-5" /></svg>; }
 
+function LandingDemo({ view, onViewChange }: { view: DemoView; onViewChange: (view: DemoView) => void }) {
+  return (
+    <div className="lp-timeline lp-demo">
+      <div className="lp-demo-tabs" role="group" aria-label="Demonstração do Vínkulo">
+        <button type="button" aria-pressed={view === "timeline"} aria-controls="lp-demo-content" onClick={() => onViewChange("timeline")}>
+          <FeatureIcon name="thread" /> Fio do dia
+        </button>
+        <button type="button" aria-pressed={view === "notifications"} aria-controls="lp-demo-content" onClick={() => onViewChange("notifications")}>
+          <FeatureIcon name="bell" /> Notificações
+        </button>
+      </div>
+      <div id="lp-demo-content" className="lp-demo-content" key={view}>
+        {view === "timeline" ? <TimelineDemo /> : <NotificationDemo />}
+      </div>
+    </div>
+  );
+}
+
 function TimelineDemo() {
   return (
-    <div className="lp-timeline">
+    <>
       <div className="lp-timeline-heading"><FeatureIcon name="thread" /><strong>Exemplo de agenda</strong></div>
       <ol className="lp-timeline-events">
         {TIMELINE_EVENTS.map(({ time, title, status, state }) => (
@@ -211,6 +261,60 @@ function TimelineDemo() {
           </li>
         ))}
       </ol>
+    </>
+  );
+}
+
+function NotificationDemo() {
+  const [selected, setSelected] = useState<NotificationExample>(NOTIFICATION_EXAMPLES[0]);
+  const [notice, setNotice] = useState<{ example: NotificationExample; sequence: number } | null>(null);
+  const sendButton = useRef<HTMLButtonElement>(null);
+
+  return (
+    <div className="lp-notification-demo">
+      <p>Escolha um tipo de aviso e veja como ele aparece no painel. Os dados são fictícios.</p>
+      <div className="lp-demo-choices" role="group" aria-label="Tipo de aviso">
+        {NOTIFICATION_EXAMPLES.map((example) => (
+          <button
+            key={example.id}
+            type="button"
+            aria-pressed={selected.id === example.id}
+            onClick={() => setSelected(example)}
+          >
+            {example.label}
+          </button>
+        ))}
+      </div>
+      <button
+        ref={sendButton}
+        className="lp-button lp-demo-send"
+        type="button"
+        onClick={() => setNotice(previous => ({ example: selected, sequence: (previous?.sequence ?? 0) + 1 }))}
+      >
+        <FeatureIcon name="bell" /> Simular aviso
+      </button>
+      <div className="lp-demo-notice-region" role="status" aria-atomic="true">
+        {notice && (
+          <article className={`lp-demo-notice lp-tone-${notice.example.tone}`} key={notice.sequence}>
+            <span className="lp-demo-notice-icon"><FeatureIcon name={notice.example.icon} /></span>
+            <div>
+              <span className="lp-demo-notice-label">Aviso simulado</span>
+              <strong>{notice.example.title}</strong>
+              <p>{notice.example.message}</p>
+            </div>
+            <button
+              type="button"
+              aria-label="Fechar aviso simulado"
+              onClick={() => {
+                setNotice(null);
+                sendButton.current?.focus();
+              }}
+            >
+              Fechar
+            </button>
+          </article>
+        )}
+      </div>
     </div>
   );
 }
