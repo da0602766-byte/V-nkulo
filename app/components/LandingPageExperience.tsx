@@ -74,11 +74,17 @@ const FAQS = [
   ["Posso cancelar quando quiser?", "As condições de duração e encerramento constam na proposta apresentada antes da contratação."],
 ] as const;
 
+const HERO_HIGHLIGHT_PATH = "M2 8.5C38 3 118 2.5 198 6.5";
+
+const NAV_SECTIONS = ["recursos", "fio-do-dia", "planos", "duvidas"] as const;
+
 export default function LandingPageExperience({ signedIn, panelHref, canEdit, plans, siteName = "Vínkulo", logoUrl = "" }: LandingPageExperienceProps) {
   const root = useRef<HTMLElement>(null);
   const themeTransition = useRef(0);
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
   const [demoView, setDemoView] = useState<DemoView>("timeline");
+  const [navScrolled, setNavScrolled] = useState(false);
+  const [activeSection, setActiveSection] = useState<string>("");
   const signupHref = signedIn ? panelHref : "/log1";
 
   useEffect(() => {
@@ -105,7 +111,80 @@ export default function LandingPageExperience({ signedIn, panelHref, canEdit, pl
 
   useEffect(() => {
     const landing = root.current;
+    if (!landing) return;
+
+    let frame = 0;
+    const syncScrollState = () => {
+      frame = 0;
+      const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+      setNavScrolled((previous) => {
+        const next = scrollY > 24;
+        return previous === next ? previous : next;
+      });
+      const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+      const progress = Math.min(1, Math.max(0, scrollY / maxScroll));
+      landing.style.setProperty("--lp-scroll-progress", progress.toFixed(4));
+    };
+
+    const handleScroll = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(syncScrollState);
+    };
+
+    syncScrollState();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleScroll, { passive: true });
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
+    };
+  }, []);
+
+  useEffect(() => {
+    const landing = root.current;
+    if (!landing || typeof IntersectionObserver === "undefined") return;
+
+    const sections = NAV_SECTIONS
+      .map((id) => document.getElementById(id))
+      .filter((element): element is HTMLElement => Boolean(element));
+    if (!sections.length) return;
+
+    const visibleRatios = new Map<string, number>();
+    const sectionObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          visibleRatios.set(entry.target.id, entry.isIntersecting ? entry.intersectionRatio : 0);
+        }
+        let bestId = "";
+        let bestRatio = 0;
+        for (const [id, ratio] of visibleRatios) {
+          if (ratio > bestRatio) {
+            bestRatio = ratio;
+            bestId = id;
+          }
+        }
+        setActiveSection(bestId);
+      },
+      { rootMargin: "-22% 0px -48% 0px", threshold: [0, 0.15, 0.35, 0.6] },
+    );
+
+    for (const section of sections) sectionObserver.observe(section);
+    return () => sectionObserver.disconnect();
+  }, [canEdit]);
+
+  useEffect(() => {
+    const landing = root.current;
     if (!landing || typeof IntersectionObserver === "undefined" || !window.matchMedia("(prefers-reduced-motion: no-preference)").matches) return;
+
+    const items = Array.from(landing.querySelectorAll<HTMLElement>(".lp-reveal"));
+    const viewportThreshold = window.innerHeight * 0.94;
+    for (const item of items) {
+      if (item.getBoundingClientRect().top <= viewportThreshold) {
+        item.classList.add("is-visible");
+      }
+    }
+    landing.classList.add("lp-motion-ready");
 
     const observer = new IntersectionObserver((entries) => {
       for (const entry of entries) {
@@ -113,19 +192,27 @@ export default function LandingPageExperience({ signedIn, panelHref, canEdit, pl
         entry.target.classList.add("is-visible");
         observer.unobserve(entry.target);
       }
-    }, { threshold: 0.12 });
+    }, { threshold: 0.12, rootMargin: "0px 0px -6% 0px" });
 
-    for (const item of landing.querySelectorAll(".lp-reveal")) observer.observe(item);
-    return () => observer.disconnect();
+    for (const item of items) {
+      if (!item.classList.contains("is-visible")) observer.observe(item);
+    }
+    return () => {
+      observer.disconnect();
+      landing.classList.remove("lp-motion-ready");
+    };
   }, []);
 
   return (
     <main ref={root} className="vinkulo-site vinkulo-reception vinkulo-landing" data-visual-editor-root data-editor-key="landing-page" aria-label="VÍNKULO — gestão para igrejas e comunidades">
-      <nav className="lp-nav" aria-label="Navegação principal">
+      <nav className="lp-nav" data-scrolled={navScrolled ? "true" : "false"} aria-label="Navegação principal">
         <div className="lp-shell lp-nav-inner">
           <Link className="lp-brand" href="/" aria-label={`${siteName} — início`}><VinkuloMark logoUrl={logoUrl} size={40} /><span>{siteName}</span></Link>
           <div className="lp-nav-links">
-            <a href="#recursos">Recursos</a><a href="#fio-do-dia">Fio do dia</a>{canEdit ? <a href="#planos">Planos</a> : <Link href="/planos">Planos</Link>}<a href="#duvidas">Dúvidas</a>
+            <a href="#recursos" data-active={activeSection === "recursos" ? "true" : undefined}>Recursos</a>
+            <a href="#fio-do-dia" data-active={activeSection === "fio-do-dia" ? "true" : undefined}>Fio do dia</a>
+            {canEdit ? <a href="#planos" data-active={activeSection === "planos" ? "true" : undefined}>Planos</a> : <Link href="/planos">Planos</Link>}
+            <a href="#duvidas" data-active={activeSection === "duvidas" ? "true" : undefined}>Dúvidas</a>
           </div>
           <div className="lp-nav-actions">
             <ThemeControl compact cycle onManualChange={animateManualThemeChange} />
@@ -136,17 +223,34 @@ export default function LandingPageExperience({ signedIn, panelHref, canEdit, pl
       </nav>
 
       <section className="lp-hero">
+        <div className="lp-hero-ambient" aria-hidden="true">
+          <span className="lp-hero-orb lp-hero-orb-a" />
+          <span className="lp-hero-orb lp-hero-orb-b" />
+          <span className="lp-hero-grid" />
+        </div>
         <div className="lp-shell lp-hero-content">
           <div className="lp-hero-copy">
             <p className="lp-section-label">Gestão para igrejas</p>
-            <h1>Tudo que sua <em>comunidade</em> precisa, conectado.</h1>
+            <h1>
+              Tudo que sua{" "}
+              <em className="lp-hero-highlight">
+                comunidade
+                <svg className="lp-hero-underline" viewBox="0 0 200 12" preserveAspectRatio="none" aria-hidden="true">
+                  <path d={HERO_HIGHLIGHT_PATH} pathLength={1} />
+                </svg>
+              </em>{" "}
+              precisa, conectado.
+            </h1>
             <p className="lp-hero-description">Células, ministérios, escalas, visitantes e pedidos de oração em uma plataforma feita para igrejas brasileiras.</p>
             <div className="lp-hero-actions">
-              <Link className="lp-button" href={signupHref} showLoading>{signedIn ? "Abrir meu painel" : "Solicitar comunidade"}</Link>
+              <Link className="lp-button lp-button-arrow" href={signupHref} showLoading>
+                <span>{signedIn ? "Abrir meu painel" : "Solicitar comunidade"}</span>
+                <ArrowRightIcon />
+              </Link>
               <a className="lp-button lp-button-secondary" href="#fio-do-dia" onClick={() => setDemoView("timeline")}>Ver demonstração</a>
             </div>
           </div>
-          <figure className="lp-hero-visual" onPointerMove={moveHeroLight}>
+          <figure className="lp-hero-visual" onPointerMove={moveHeroLight} onPointerLeave={resetHeroLight}>
             <Image
               src="/landing-comunidade.webp"
               alt="Pessoas de diferentes gerações conversam em uma igreja"
@@ -159,7 +263,11 @@ export default function LandingPageExperience({ signedIn, panelHref, canEdit, pl
             <figcaption className="lp-hero-preview">
               <a href="#fio-do-dia" onClick={() => setDemoView("notifications")}>
                 <span className="lp-hero-preview-icon"><FeatureIcon name="bell" /></span>
-                <span className="lp-hero-preview-copy"><span>Demonstração interativa</span><strong>Simular notificações</strong></span>
+                <span className="lp-hero-preview-copy">
+                  <span className="lp-hero-preview-kicker"><i className="lp-live-dot" aria-hidden="true" />Demonstração interativa</span>
+                  <strong>Simular notificações</strong>
+                </span>
+                <span className="lp-hero-preview-arrow" aria-hidden="true"><ArrowRightIcon /></span>
               </a>
             </figcaption>
           </figure>
@@ -168,48 +276,97 @@ export default function LandingPageExperience({ signedIn, panelHref, canEdit, pl
 
       <section className="lp-section lp-shell" id="recursos">
         <Reveal className="lp-section-heading"><SectionLabel>Recursos</SectionLabel><h2>Cada área da sua igreja, <em>organizada</em></h2><p>Pastores, líderes e membros encontram as ferramentas do dia a dia em um só lugar.</p></Reveal>
-        <div className="lp-module-grid">{MODULES.map((module, index) => <Reveal key={module.label} delay={(index % 3) * 65}><article className={`lp-module lp-tone-${module.tone}`}><span><FeatureIcon name={module.icon} /></span><h3>{module.label}</h3><p>{module.desc}</p></article></Reveal>)}</div>
+        <div className="lp-module-grid">
+          {MODULES.map((module, index) => (
+            <Reveal key={module.label} delay={(index % 3) * 75 + Math.floor(index / 3) * 55}>
+              <article className={`lp-module lp-tone-${module.tone}`} onPointerMove={moveCardSpotlight}>
+                <span className="lp-card-icon"><FeatureIcon name={module.icon} /></span>
+                <h3>{module.label}</h3>
+                <p>{module.desc}</p>
+              </article>
+            </Reveal>
+          ))}
+        </div>
       </section>
 
       <section className="lp-section lp-shell" id="como-funciona" aria-labelledby="como-funciona-titulo">
-        <div className="lp-section-heading"><SectionLabel>Como funciona</SectionLabel><h2 id="como-funciona-titulo">Seu lugar na comunidade, <em>passo a passo</em></h2><p>Conheça a comunidade, solicite seu vínculo e acompanhe o que acontece por lá.</p></div>
-        <ol className="lp-joining-steps">
-          <li><span aria-hidden="true">1</span><h3>Encontre sua comunidade</h3><p>Busque pelo nome ou pela cidade e conheça a página da comunidade.</p><Link href="/comunidades">Explorar comunidades</Link></li>
-          <li><span aria-hidden="true">2</span><h3>Solicite sua entrada</h3><p>Entre na sua conta e envie a solicitação na página da comunidade. A equipe responsável analisa seu vínculo.</p><Link href={signedIn ? "/comunidades" : "/login"}>{signedIn ? "Encontrar minha comunidade" : "Entrar na minha conta"}</Link></li>
-          <li><span aria-hidden="true">3</span><h3>Participe do dia a dia</h3><p>Após a aprovação, acompanhe o mural, a agenda e as áreas disponíveis para o seu perfil.</p><Link href={panelHref}>Abrir meu painel</Link></li>
-        </ol>
+        <Reveal className="lp-section-heading"><SectionLabel>Como funciona</SectionLabel><h2 id="como-funciona-titulo">Seu lugar na comunidade, <em>passo a passo</em></h2><p>Conheça a comunidade, solicite seu vínculo e acompanhe o que acontece por lá.</p></Reveal>
+        <Reveal className="lp-steps-reveal">
+          <ol className="lp-joining-steps">
+            <li style={{ "--lp-step-delay": "0ms" } as CSSProperties}><span aria-hidden="true">1</span><h3>Encontre sua comunidade</h3><p>Busque pelo nome ou pela cidade e conheça a página da comunidade.</p><Link className="lp-step-link" href="/comunidades"><span>Explorar comunidades</span><ArrowRightIcon /></Link></li>
+            <li style={{ "--lp-step-delay": "120ms" } as CSSProperties}><span aria-hidden="true">2</span><h3>Solicite sua entrada</h3><p>Entre na sua conta e envie a solicitação na página da comunidade. A equipe responsável analisa seu vínculo.</p><Link className="lp-step-link" href={signedIn ? "/comunidades" : "/login"}><span>{signedIn ? "Encontrar minha comunidade" : "Entrar na minha conta"}</span><ArrowRightIcon /></Link></li>
+            <li style={{ "--lp-step-delay": "240ms" } as CSSProperties}><span aria-hidden="true">3</span><h3>Participe do dia a dia</h3><p>Após a aprovação, acompanhe o mural, a agenda e as áreas disponíveis para o seu perfil.</p><Link className="lp-step-link" href={panelHref}><span>Abrir meu painel</span><ArrowRightIcon /></Link></li>
+          </ol>
+        </Reveal>
       </section>
 
       <section className="lp-section lp-thread-section" id="fio-do-dia">
         <div className="lp-shell lp-thread-layout">
-          <Reveal className="lp-thread-copy"><SectionLabel>O Fio do dia</SectionLabel><h2>A linha do tempo da <em>sua comunidade</em></h2><p>Veja o que já aconteceu, o que está em andamento e o que vem a seguir. Experimente também os avisos de escalas, visitantes e agenda.</p></Reveal>
-          <Reveal delay={90}><LandingDemo view={demoView} onViewChange={setDemoView} /></Reveal>
+          <Reveal className="lp-thread-copy" variant="left"><SectionLabel>O Fio do dia</SectionLabel><h2>A linha do tempo da <em>sua comunidade</em></h2><p>Veja o que já aconteceu, o que está em andamento e o que vem a seguir. Experimente também os avisos de escalas, visitantes e agenda.</p></Reveal>
+          <Reveal delay={100} variant="scale"><LandingDemo view={demoView} onViewChange={setDemoView} /></Reveal>
         </div>
       </section>
 
       <section className="lp-section lp-shell">
         <Reveal className="lp-section-heading lp-centered"><SectionLabel>Para quem é</SectionLabel><h2>A visão certa para <em>cada papel</em></h2></Reveal>
-        <div className="lp-role-grid">{ROLES.map((role, index) => <Reveal key={role.role} delay={index * 65}><article className={`lp-role lp-tone-${role.tone}`}><header><span><FeatureIcon name={role.icon} /></span><h3>{role.role}</h3></header><ul>{role.items.map((item) => <li key={item}>{item}</li>)}</ul></article></Reveal>)}</div>
+        <div className="lp-role-grid">
+          {ROLES.map((role, index) => (
+            <Reveal key={role.role} delay={index * 85}>
+              <article className={`lp-role lp-tone-${role.tone}`} onPointerMove={moveCardSpotlight}>
+                <header><span className="lp-card-icon"><FeatureIcon name={role.icon} /></span><h3>{role.role}</h3></header>
+                <ul>
+                  {role.items.map((item, itemIndex) => (
+                    <li key={item} style={{ "--lp-item-delay": `${140 + itemIndex * 55}ms` } as CSSProperties}>{item}</li>
+                  ))}
+                </ul>
+              </article>
+            </Reveal>
+          ))}
+        </div>
       </section>
 
       {canEdit && <section className="lp-section lp-shell" id="planos" data-editor-key="landing-governanca">
         <Reveal className="lp-section-heading lp-centered"><SectionLabel>Planos</SectionLabel><h2>Simples e <em>transparente</em></h2><p>Planos configurados para as necessidades da sua comunidade.</p></Reveal>
-        <div className="lp-plan-grid">{plans.map((plan, index) => <Reveal key={plan.name} delay={(index % 3) * 65}><article className={plan.featured ? "featured" : ""}>{plan.featured && <span className="lp-popular">Destaque</span>}<h3>{plan.name}</h3><div className="lp-price"><strong>{plan.price}</strong>{plan.period && <span>{plan.period}</span>}</div><p>{plan.description}</p><ul>{plan.items.map((item) => <li key={item}><CheckIcon />{item}</li>)}</ul><Link className={`lp-button ${plan.featured ? "" : "lp-button-secondary"}`} href="/log1" showLoading>{plan.cta}</Link></article></Reveal>)}</div>
+        <div className="lp-plan-grid">{plans.map((plan, index) => <Reveal key={plan.name} delay={(index % 3) * 80}><article className={plan.featured ? "featured" : ""} onPointerMove={moveCardSpotlight}>{plan.featured && <span className="lp-popular">Destaque</span>}<h3>{plan.name}</h3><div className="lp-price"><strong>{plan.price}</strong>{plan.period && <span>{plan.period}</span>}</div><p>{plan.description}</p><ul>{plan.items.map((item) => <li key={item}><CheckIcon />{item}</li>)}</ul><Link className={`lp-button ${plan.featured ? "" : "lp-button-secondary"}`} href="/log1" showLoading>{plan.cta}</Link></article></Reveal>)}</div>
         <p className="lp-owner-plan-note">Esta prévia é exclusiva do proprietário. <Link href="/proprietario?tab=plans">Configurar planos e chamadas</Link></p>
       </section>}
 
       <section className="lp-section lp-faq lp-shell" id="duvidas">
         <Reveal className="lp-section-heading lp-centered"><SectionLabel>Dúvidas</SectionLabel><h2>Perguntas frequentes</h2></Reveal>
-        <div className="lp-faq-list">{FAQS.map(([question, answer], index) => <article key={question}><button type="button" aria-expanded={activeFaq === index} aria-controls={`faq-${index}`} onClick={() => setActiveFaq(activeFaq === index ? null : index)}><span>{question}</span><i aria-hidden="true">+</i></button><div id={`faq-${index}`} hidden={activeFaq !== index}><p>{answer}</p></div></article>)}</div>
+        <Reveal delay={70}>
+          <div className="lp-faq-list">
+            {FAQS.map(([question, answer], index) => {
+              const isOpen = activeFaq === index;
+              return (
+                <article key={question} data-open={isOpen ? "true" : "false"}>
+                  <button type="button" aria-expanded={activeFaq === index} aria-controls={`faq-${index}`} onClick={() => setActiveFaq(isOpen ? null : index)}>
+                    <span>{question}</span>
+                    <i aria-hidden="true"><span>+</span></i>
+                  </button>
+                  <div id={`faq-${index}`} className="lp-faq-panel" data-open={isOpen ? "true" : "false"} aria-hidden={!isOpen}>
+                    <div className="lp-faq-panel-inner">
+                      <p>{answer}</p>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </Reveal>
       </section>
 
       <section className="lp-final">
-        <Reveal className="lp-shell">
+        <div className="lp-final-ambient" aria-hidden="true">
+          <span className="lp-final-glow lp-final-glow-a" />
+          <span className="lp-final-glow lp-final-glow-b" />
+        </div>
+        <Reveal className="lp-shell lp-final-content" variant="scale">
           <span className="lp-final-art" aria-hidden="true" />
           <h2>Traga sua comunidade para o <span className="lp-final-name">Vínkulo</span></h2>
           <p>Conheça os planos e envie sua solicitação.</p>
-          <Link className="lp-button lp-button-white" href={signupHref} showLoading>
-            {signedIn ? "Abrir meu painel" : "Solicitar minha comunidade"}
+          <Link className="lp-button lp-button-white lp-button-arrow" href={signupHref} showLoading>
+            <span>{signedIn ? "Abrir meu painel" : "Solicitar minha comunidade"}</span>
+            <ArrowRightIcon />
           </Link>
         </Reveal>
       </section>
@@ -219,19 +376,65 @@ export default function LandingPageExperience({ signedIn, panelHref, canEdit, pl
   );
 }
 
-function Reveal({ children, className = "", delay = 0 }: { children: ReactNode; className?: string; delay?: number }) {
-  return <div className={`lp-reveal ${className}`} style={{ "--lp-enter-delay": `${delay}ms` } as CSSProperties}>{children}</div>;
+function Reveal({
+  children,
+  className = "",
+  delay = 0,
+  variant = "rise",
+}: {
+  children: ReactNode;
+  className?: string;
+  delay?: number;
+  variant?: "rise" | "left" | "scale";
+}) {
+  return (
+    <div
+      className={`lp-reveal ${className}`}
+      data-reveal={variant}
+      style={{ "--lp-enter-delay": `${delay}ms` } as CSSProperties}
+    >
+      {children}
+    </div>
+  );
 }
 
 function moveHeroLight(event: PointerEvent<HTMLElement>) {
   if (event.pointerType !== "mouse") return;
   const { currentTarget, clientX, clientY } = event;
   const rect = currentTarget.getBoundingClientRect();
-  currentTarget.style.setProperty("--lp-light-x", `${clientX - rect.left}px`);
-  currentTarget.style.setProperty("--lp-light-y", `${clientY - rect.top}px`);
+  const x = clientX - rect.left;
+  const y = clientY - rect.top;
+  const ratioX = rect.width ? (x / rect.width - 0.5) * 2 : 0;
+  const ratioY = rect.height ? (y / rect.height - 0.5) * 2 : 0;
+  currentTarget.style.setProperty("--lp-light-x", `${x}px`);
+  currentTarget.style.setProperty("--lp-light-y", `${y}px`);
+  currentTarget.style.setProperty("--lp-tilt-y", `${(ratioX * 2.1).toFixed(2)}deg`);
+  currentTarget.style.setProperty("--lp-tilt-x", `${(-ratioY * 2.1).toFixed(2)}deg`);
+}
+
+function resetHeroLight(event: PointerEvent<HTMLElement>) {
+  const { currentTarget } = event;
+  currentTarget.style.setProperty("--lp-tilt-x", "0deg");
+  currentTarget.style.setProperty("--lp-tilt-y", "0deg");
+}
+
+function moveCardSpotlight(event: PointerEvent<HTMLElement>) {
+  if (event.pointerType !== "mouse") return;
+  const { currentTarget, clientX, clientY } = event;
+  const rect = currentTarget.getBoundingClientRect();
+  currentTarget.style.setProperty("--lp-card-x", `${clientX - rect.left}px`);
+  currentTarget.style.setProperty("--lp-card-y", `${clientY - rect.top}px`);
 }
 
 function SectionLabel({ children }: { children: ReactNode }) { return <p className="lp-section-label">{children}</p>; }
+
+function ArrowRightIcon() {
+  return (
+    <svg className="lp-arrow-icon" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3.75 9h10.5M9.75 4.5 14.25 9l-4.5 4.5" />
+    </svg>
+  );
+}
 
 function FeatureIcon({ name }: { name: string }) {
   const common = { fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
@@ -254,7 +457,8 @@ function CheckIcon() { return <svg viewBox="0 0 18 18" aria-hidden="true"><circl
 function LandingDemo({ view, onViewChange }: { view: DemoView; onViewChange: (view: DemoView) => void }) {
   return (
     <div className="lp-timeline lp-demo">
-      <div className="lp-demo-tabs" role="group" aria-label="Demonstração do Vínkulo">
+      <div className="lp-demo-tabs" data-active-tab={view} role="group" aria-label="Demonstração do Vínkulo">
+        <span className="lp-demo-tab-indicator" aria-hidden="true" />
         <button type="button" aria-pressed={view === "timeline"} aria-controls="lp-demo-content" onClick={() => onViewChange("timeline")}>
           <FeatureIcon name="thread" /> Fio do dia
         </button>
@@ -270,15 +474,31 @@ function LandingDemo({ view, onViewChange }: { view: DemoView; onViewChange: (vi
 }
 
 function TimelineDemo() {
+  const [selectedTitle, setSelectedTitle] = useState<string>(CURRENT_EVENT.title);
   return (
     <>
-      <div className="lp-timeline-heading"><FeatureIcon name="thread" /><strong>Exemplo de agenda</strong></div>
+      <div className="lp-timeline-heading">
+        <FeatureIcon name="thread" />
+        <strong>Exemplo de agenda</strong>
+        <span className="lp-timeline-live-badge"><i className="lp-live-dot" aria-hidden="true" />Em andamento</span>
+      </div>
       <ol className="lp-timeline-events">
-        {TIMELINE_EVENTS.map(({ time, title, status, state }) => (
-          <li key={title} className={state}>
+        {TIMELINE_EVENTS.map(({ time, title, status, state }, index) => (
+          <li
+            key={title}
+            className={`${state}${selectedTitle === title ? " is-selected" : ""}`}
+            style={{ "--lp-item-delay": `${index * 70}ms` } as CSSProperties}
+          >
             <span className="lp-timeline-marker" aria-hidden="true" />
-            <span className="lp-timeline-time">{time}</span>
-            <div><strong>{title}</strong><span>{status}</span></div>
+            <button
+              type="button"
+              className="lp-timeline-item-btn"
+              aria-pressed={selectedTitle === title}
+              onClick={() => setSelectedTitle(title)}
+            >
+              <span className="lp-timeline-time">{time}</span>
+              <span><strong>{title}</strong><small>{status}</small></span>
+            </button>
           </li>
         ))}
       </ol>
@@ -289,7 +509,21 @@ function TimelineDemo() {
 function NotificationDemo() {
   const [selected, setSelected] = useState<NotificationExample>(NOTIFICATION_EXAMPLES[0]);
   const [notice, setNotice] = useState<{ example: NotificationExample; sequence: number } | null>(null);
+  const [ringing, setRinging] = useState(false);
+  const ringTimer = useRef(0);
   const sendButton = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => () => window.clearTimeout(ringTimer.current), []);
+
+  function triggerSimulatedNotice() {
+    setNotice((previous) => ({ example: selected, sequence: (previous?.sequence ?? 0) + 1 }));
+    window.clearTimeout(ringTimer.current);
+    setRinging(false);
+    requestAnimationFrame(() => {
+      setRinging(true);
+      ringTimer.current = window.setTimeout(() => setRinging(false), 620);
+    });
+  }
 
   return (
     <div className="lp-notification-demo">
@@ -308,9 +542,9 @@ function NotificationDemo() {
       </div>
       <button
         ref={sendButton}
-        className="lp-button lp-demo-send"
+        className={`lp-button lp-demo-send${ringing ? " is-ringing" : ""}`}
         type="button"
-        onClick={() => setNotice(previous => ({ example: selected, sequence: (previous?.sequence ?? 0) + 1 }))}
+        onClick={triggerSimulatedNotice}
       >
         <FeatureIcon name="bell" /> Simular aviso
       </button>
