@@ -1,6 +1,7 @@
 "use client";
 
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import Image from "next/image";
+import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
 import Link from "./StableLink";
 import ThemeControl from "./ThemeControl";
 import VinkuloMark from "./VinkuloMark";
@@ -17,7 +18,7 @@ type LandingPageExperienceProps = {
 
 
 const MODULES = [
-  { icon: "thread", label: "Fio do dia", desc: "A linha do tempo da comunidade. Passado sólido, futuro tracejado e o momento certo entre os dois.", tone: "blue" },
+  { icon: "thread", label: "Fio do dia", desc: "Veja o que já aconteceu, o que está em andamento e os próximos compromissos.", tone: "blue" },
   { icon: "cells", label: "Células", desc: "Gerencie grupos, acompanhe saúde, relatórios semanais e solicitações de entrada.", tone: "green" },
   { icon: "ministry", label: "Ministérios e escalas", desc: "Monte escalas, notifique voluntários e registre quem participa de cada ministério.", tone: "yellow" },
   { icon: "visitor", label: "Visitantes", desc: "Acolha quem chegou pela primeira vez e acompanhe a jornada de integração.", tone: "rose" },
@@ -27,8 +28,19 @@ const MODULES = [
 
 const ROLES = [
   { icon: "leadership", role: "Pastor e liderança", tone: "blue", items: ["Painel executivo da comunidade", "Acompanhamento de células", "Relatórios de crescimento", "Gestão de pessoas e papéis"] },
-  { icon: "cells", role: "Líder de célula", tone: "green", items: ["Relatório semanal em 2 min", "Lista de membros e visitantes", "Aprovações de entrada", "Agenda do grupo"] },
+  { icon: "cells", role: "Líder de célula", tone: "green", items: ["Relatório semanal da célula", "Lista de membros e visitantes", "Aprovações de entrada", "Agenda do grupo"] },
   { icon: "member", role: "Membro", tone: "purple", items: ["Mural e fio do dia", "Ministérios e escalas", "Pedidos de oração", "Reserva de eventos"] },
+] as const;
+
+const CURRENT_EVENT = {
+  time: "Agora", title: "Reunião de liderança", status: "Em andamento", state: "now",
+} as const;
+
+const TIMELINE_EVENTS = [
+  { time: "08:30", title: "Culto de oração", status: "Realizado", state: "past" },
+  CURRENT_EVENT,
+  { time: "19h30", title: "Culto de quarta", status: "Confirmado", state: "future" },
+  { time: "Sáb · 10h", title: "Treinamento de líderes", status: "6 confirmados", state: "future" },
 ] as const;
 
 export { DEFAULT_LANDING_PLANS };
@@ -42,6 +54,7 @@ const FAQS = [
 ] as const;
 
 export default function LandingPageExperience({ signedIn, panelHref, canEdit, plans, siteName = "Vínkulo", logoUrl = "" }: LandingPageExperienceProps) {
+  const root = useRef<HTMLElement>(null);
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
   const signupHref = signedIn ? panelHref : "/log1";
 
@@ -56,8 +69,24 @@ export default function LandingPageExperience({ signedIn, panelHref, canEdit, pl
     return () => cancelAnimationFrame(frame);
   }, []);
 
+  useEffect(() => {
+    const landing = root.current;
+    if (!landing || typeof IntersectionObserver === "undefined" || !window.matchMedia("(prefers-reduced-motion: no-preference)").matches) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        entry.target.classList.add("is-visible");
+        observer.unobserve(entry.target);
+      }
+    }, { threshold: 0.12 });
+
+    for (const item of landing.querySelectorAll(".lp-reveal")) observer.observe(item);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <main className="vinkulo-site vinkulo-reception vinkulo-landing" data-visual-editor-root data-editor-key="landing-page" aria-label="VÍNKULO — gestão para igrejas e comunidades">
+    <main ref={root} className="vinkulo-site vinkulo-reception vinkulo-landing" data-visual-editor-root data-editor-key="landing-page" aria-label="VÍNKULO — gestão para igrejas e comunidades">
       <nav className="lp-nav" aria-label="Navegação principal">
         <div className="lp-shell lp-nav-inner">
           <Link className="lp-brand" href="/" aria-label={`${siteName} — início`}><VinkuloMark logoUrl={logoUrl} size={40} /><span>{siteName}</span></Link>
@@ -67,84 +96,87 @@ export default function LandingPageExperience({ signedIn, panelHref, canEdit, pl
           <div className="lp-nav-actions">
             <ThemeControl compact cycle />
             {canEdit && <span id="global-editor-toolbar-slot" className="global-editor-toolbar-slot" aria-label="Aparência" />}
-            <Link className="lp-button lp-button-small" href={signedIn ? "/painel" : "/login"} showLoading>{signedIn ? "Abrir painel" : "Entrar"} <span aria-hidden="true">→</span></Link>
+            <Link className="lp-button lp-button-small" href={signedIn ? "/painel" : "/login"} showLoading>{signedIn ? "Abrir painel" : "Entrar"}</Link>
           </div>
         </div>
       </nav>
 
       <section className="lp-hero">
-        <div className="lp-thread lp-thread-hero" aria-hidden="true"><i /><b /><span /></div>
         <div className="lp-shell lp-hero-content">
-          <div className="lp-pill"><span />Gestão para igrejas</div>
-          <h1>Tudo que sua <em>comunidade</em> precisa, conectado.</h1>
-          <p>Células, ministérios, escalas, visitantes, pedidos de oração e muito mais — em uma plataforma feita para igrejas brasileiras.</p>
-          <div className="lp-hero-actions">
-            <Link className="lp-button" href={signupHref} showLoading>{signedIn ? "Abrir meu painel" : "Solicitar comunidade"}</Link>
-            <a className="lp-button lp-button-secondary" href="#fio-do-dia">Ver demonstração</a>
+          <div className="lp-hero-copy">
+            <p className="lp-section-label">Gestão para igrejas</p>
+            <h1>Tudo que sua <em>comunidade</em> precisa, conectado.</h1>
+            <p className="lp-hero-description">Células, ministérios, escalas, visitantes e pedidos de oração em uma plataforma feita para igrejas brasileiras.</p>
+            <div className="lp-hero-actions">
+              <Link className="lp-button" href={signupHref} showLoading>{signedIn ? "Abrir meu painel" : "Solicitar comunidade"}</Link>
+              <a className="lp-button lp-button-secondary" href="#fio-do-dia">Ver demonstração</a>
+            </div>
           </div>
-
+          <figure className="lp-hero-visual">
+            <Image
+              src="/landing-comunidade.webp"
+              alt="Pessoas de diferentes gerações conversam em uma igreja"
+              width={1120}
+              height={1400}
+              loading="eager"
+              fetchPriority="high"
+              unoptimized
+            />
+            <figcaption className="lp-hero-preview">
+              <span className="lp-hero-preview-icon"><FeatureIcon name="thread" /></span>
+              <div><span>Exemplo do Fio do dia</span><strong>{CURRENT_EVENT.title}</strong></div>
+              <span className="lp-hero-preview-status">{CURRENT_EVENT.time}</span>
+            </figcaption>
+          </figure>
         </div>
       </section>
 
-<section className="lp-section lp-shell" id="recursos">
-        <Reveal className="lp-section-heading"><SectionLabel>O que o vínkulo faz</SectionLabel><h2>Cada área da sua igreja, <em>organizada</em></h2><p>Módulos conectados entre si para que pastores, líderes e membros tenham sempre a informação certa.</p></Reveal>
-        <div className="lp-module-grid">{MODULES.map((module, index) => <Reveal key={module.label} delay={index * 100}><article className={`lp-module lp-tone-${module.tone}`}><span><FeatureIcon name={module.icon} /></span><h3>{module.label}</h3><p>{module.desc}</p></article></Reveal>)}</div>
+      <section className="lp-section lp-shell" id="recursos">
+        <Reveal className="lp-section-heading"><SectionLabel>Recursos</SectionLabel><h2>Cada área da sua igreja, <em>organizada</em></h2><p>Pastores, líderes e membros encontram as ferramentas do dia a dia em um só lugar.</p></Reveal>
+        <div className="lp-module-grid">{MODULES.map((module, index) => <Reveal key={module.label} delay={(index % 3) * 65}><article className={`lp-module lp-tone-${module.tone}`}><span><FeatureIcon name={module.icon} /></span><h3>{module.label}</h3><p>{module.desc}</p></article></Reveal>)}</div>
       </section>
 
       <section className="lp-section lp-shell" id="como-funciona" aria-labelledby="como-funciona-titulo">
         <div className="lp-section-heading"><SectionLabel>Como funciona</SectionLabel><h2 id="como-funciona-titulo">Seu lugar na comunidade, <em>passo a passo</em></h2><p>Conheça a comunidade, solicite seu vínculo e acompanhe o que acontece por lá.</p></div>
         <ol className="lp-joining-steps">
-          <li><span aria-hidden="true">01</span><h3>Encontre sua comunidade</h3><p>Busque pelo nome ou pela cidade e conheça a página da comunidade.</p><Link href="/comunidades">Explorar comunidades →</Link></li>
-          <li><span aria-hidden="true">02</span><h3>Solicite sua entrada</h3><p>Entre na sua conta e envie a solicitação na página da comunidade. A equipe responsável analisa seu vínculo.</p><Link href={signedIn ? "/comunidades" : "/login"}>{signedIn ? "Encontrar minha comunidade →" : "Entrar na minha conta →"}</Link></li>
-          <li><span aria-hidden="true">03</span><h3>Participe do dia a dia</h3><p>Após a aprovação, acompanhe o mural, a agenda e as áreas disponíveis para o seu perfil.</p><Link href={panelHref}>Abrir meu painel →</Link></li>
+          <li><span aria-hidden="true">1</span><h3>Encontre sua comunidade</h3><p>Busque pelo nome ou pela cidade e conheça a página da comunidade.</p><Link href="/comunidades">Explorar comunidades</Link></li>
+          <li><span aria-hidden="true">2</span><h3>Solicite sua entrada</h3><p>Entre na sua conta e envie a solicitação na página da comunidade. A equipe responsável analisa seu vínculo.</p><Link href={signedIn ? "/comunidades" : "/login"}>{signedIn ? "Encontrar minha comunidade" : "Entrar na minha conta"}</Link></li>
+          <li><span aria-hidden="true">3</span><h3>Participe do dia a dia</h3><p>Após a aprovação, acompanhe o mural, a agenda e as áreas disponíveis para o seu perfil.</p><Link href={panelHref}>Abrir meu painel</Link></li>
         </ol>
       </section>
 
       <section className="lp-section lp-thread-section" id="fio-do-dia">
         <div className="lp-shell lp-thread-layout">
-          <Reveal direction="right"><SectionLabel>O fio do dia</SectionLabel><h2>A linha do tempo da <em>sua comunidade</em></h2><p>Passado sólido, futuro tracejado, o momento presente marcado entre os dois. O fio não é enfeite — ele mostra a direção do tempo da sua igreja.</p><ul className="lp-thread-benefits"><li><i className="blue" />Uma fonte única de verdade</li><li><i className="green" />Atualizações em tempo real</li><li><i className="yellow" />Visão clara do que importa</li></ul></Reveal>
-          <Reveal direction="left" delay={200}><TimelineDemo /></Reveal>
+          <Reveal className="lp-thread-copy"><SectionLabel>O Fio do dia</SectionLabel><h2>A linha do tempo da <em>sua comunidade</em></h2><p>Acompanhe os compromissos da igreja em sequência. A linha sólida mostra o que passou, o ponto marca o agora e o tracejado indica o que vem depois.</p></Reveal>
+          <Reveal delay={90}><TimelineDemo /></Reveal>
         </div>
       </section>
 
       <section className="lp-section lp-shell">
         <Reveal className="lp-section-heading lp-centered"><SectionLabel>Para quem é</SectionLabel><h2>A visão certa para <em>cada papel</em></h2></Reveal>
-        <div className="lp-role-grid">{ROLES.map((role, index) => <Reveal key={role.role} delay={index * 150}><article className={`lp-role lp-tone-${role.tone}`}><header><span><FeatureIcon name={role.icon} /></span><h3>{role.role}</h3></header><ul>{role.items.map((item) => <li key={item}>{item}</li>)}</ul></article></Reveal>)}</div>
+        <div className="lp-role-grid">{ROLES.map((role, index) => <Reveal key={role.role} delay={index * 65}><article className={`lp-role lp-tone-${role.tone}`}><header><span><FeatureIcon name={role.icon} /></span><h3>{role.role}</h3></header><ul>{role.items.map((item) => <li key={item}>{item}</li>)}</ul></article></Reveal>)}</div>
       </section>
 
-{canEdit && <section className="lp-section lp-shell" id="planos" data-editor-key="landing-governanca">
+      {canEdit && <section className="lp-section lp-shell" id="planos" data-editor-key="landing-governanca">
         <Reveal className="lp-section-heading lp-centered"><SectionLabel>Planos</SectionLabel><h2>Simples e <em>transparente</em></h2><p>Planos configurados para as necessidades da sua comunidade.</p></Reveal>
-        <div className="lp-plan-grid">{plans.map((plan, index) => <Reveal key={plan.name} delay={index * 150}><article className={plan.featured ? "featured" : ""}>{plan.featured && <span className="lp-popular">Destaque</span>}<h3>{plan.name}</h3><div className="lp-price"><strong>{plan.price}</strong>{plan.period && <span>{plan.period}</span>}</div><p>{plan.description}</p><ul>{plan.items.map((item) => <li key={item}><CheckIcon />{item}</li>)}</ul><Link className={`lp-button ${plan.featured ? "" : "lp-button-secondary"}`} href="/log1" showLoading>{plan.cta}</Link></article></Reveal>)}</div>
-        <p className="lp-owner-plan-note">Esta prévia é exclusiva do proprietário. <Link href="/proprietario?tab=plans">Configurar planos e chamadas →</Link></p>
+        <div className="lp-plan-grid">{plans.map((plan, index) => <Reveal key={plan.name} delay={(index % 3) * 65}><article className={plan.featured ? "featured" : ""}>{plan.featured && <span className="lp-popular">Destaque</span>}<h3>{plan.name}</h3><div className="lp-price"><strong>{plan.price}</strong>{plan.period && <span>{plan.period}</span>}</div><p>{plan.description}</p><ul>{plan.items.map((item) => <li key={item}><CheckIcon />{item}</li>)}</ul><Link className={`lp-button ${plan.featured ? "" : "lp-button-secondary"}`} href="/log1" showLoading>{plan.cta}</Link></article></Reveal>)}</div>
+        <p className="lp-owner-plan-note">Esta prévia é exclusiva do proprietário. <Link href="/proprietario?tab=plans">Configurar planos e chamadas</Link></p>
       </section>}
 
       <section className="lp-section lp-faq lp-shell" id="duvidas">
         <Reveal className="lp-section-heading lp-centered"><SectionLabel>Dúvidas</SectionLabel><h2>Perguntas frequentes</h2></Reveal>
-        <div>{FAQS.map(([question, answer], index) => <Reveal key={question} delay={index * 100}><article><button type="button" aria-expanded={activeFaq === index} aria-controls={`faq-${index}`} onClick={() => setActiveFaq(activeFaq === index ? null : index)}><span>{question}</span><i aria-hidden="true">+</i></button><div id={`faq-${index}`} hidden={activeFaq !== index}><p>{answer}</p></div></article></Reveal>)}</div>
+        <div className="lp-faq-list">{FAQS.map(([question, answer], index) => <article key={question}><button type="button" aria-expanded={activeFaq === index} aria-controls={`faq-${index}`} onClick={() => setActiveFaq(activeFaq === index ? null : index)}><span>{question}</span><i aria-hidden="true">+</i></button><div id={`faq-${index}`} hidden={activeFaq !== index}><p>{answer}</p></div></article>)}</div>
       </section>
 
-      <section className="lp-final"><Reveal className="lp-shell"><VinkuloMark light size={62} /><h2>Sua comunidade merece o melhor</h2><p>Encontre o plano adequado e solicite sua comunidade.</p><Link className="lp-button lp-button-white" href={signupHref} showLoading>{signedIn ? "Abrir meu painel →" : "Solicitar minha comunidade →"}</Link></Reveal></section>
+      <section className="lp-final"><Reveal className="lp-shell"><VinkuloMark light size={52} /><h2>Traga sua comunidade para o Vínkulo</h2><p>Conheça os planos e envie sua solicitação.</p><Link className="lp-button lp-button-white" href={signupHref} showLoading>{signedIn ? "Abrir meu painel" : "Solicitar minha comunidade"}</Link></Reveal></section>
 
       <footer className="lp-footer"><div className="lp-shell"><div className="lp-footer-main"><div><Link className="lp-brand" href="/" aria-label={`${siteName} — início`}><VinkuloMark logoUrl={logoUrl} size={40} /><span>{siteName}</span></Link><p>Plataforma de gestão para igrejas e comunidades em português do Brasil.</p></div><nav aria-label="Links institucionais"><Link href="/planos">Planos</Link><Link href="/termos">Termos de uso</Link><Link href="/privacidade">Privacidade</Link><Link href="/contato">Suporte</Link><Link href="/comunidades">Comunidades</Link></nav></div><div className="lp-footer-bottom"><span>© 2026 Vínkulo</span><span>Feito com cuidado para igrejas brasileiras</span></div></div></footer>
     </main>
   );
 }
 
-function Reveal({ children, className = "", delay = 0, direction = "up" }: { children: ReactNode; className?: string; delay?: number; direction?: "up" | "left" | "right" }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
-  useEffect(() => {
-    const node = ref.current;
-    if (!node) return;
-    if (typeof IntersectionObserver === "undefined" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      const frame = window.requestAnimationFrame(() => setVisible(true));
-      return () => window.cancelAnimationFrame(frame);
-    }
-    const observer = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) { setVisible(true); observer.unobserve(entry.target); } }, { threshold: 0.1 });
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
-  return <div ref={ref} className={`lp-reveal lp-from-${direction}${visible ? " is-visible" : ""} ${className}`} style={{ transitionDelay: `${delay}ms` }}>{children}</div>;
+function Reveal({ children, className = "", delay = 0 }: { children: ReactNode; className?: string; delay?: number }) {
+  return <div className={`lp-reveal ${className}`} style={{ "--lp-enter-delay": `${delay}ms` } as CSSProperties}>{children}</div>;
 }
 
 function SectionLabel({ children }: { children: ReactNode }) { return <p className="lp-section-label">{children}</p>; }
@@ -167,11 +199,18 @@ function FeatureIcon({ name }: { name: string }) {
 function CheckIcon() { return <svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="8" /><path d="m5.5 9 2.4 2.5 4.7-5" /></svg>; }
 
 function TimelineDemo() {
-  const events = [
-    ["08:30", "Culto de oração", "Realizado", "past"],
-    ["Agora", "Reunião de liderança", "Em andamento", "now"],
-    ["19h30", "Culto de quarta", "Confirmado", "future"],
-    ["Sáb · 10h", "Treinamento de líderes", "6 confirmados", "future"],
-  ];
-  return <div className="lp-timeline"><div className="lp-timeline-thread" aria-hidden="true"><i /><b /><span /></div><div className="lp-timeline-events">{events.map(([time, title, status, state]) => <article key={title} className={state}><time>{time}</time><div><strong>{title}</strong><span>{status}</span></div></article>)}</div></div>;
+  return (
+    <div className="lp-timeline">
+      <div className="lp-timeline-heading"><FeatureIcon name="thread" /><strong>Exemplo de agenda</strong></div>
+      <ol className="lp-timeline-events">
+        {TIMELINE_EVENTS.map(({ time, title, status, state }) => (
+          <li key={title} className={state}>
+            <span className="lp-timeline-marker" aria-hidden="true" />
+            <span className="lp-timeline-time">{time}</span>
+            <div><strong>{title}</strong><span>{status}</span></div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
 }
