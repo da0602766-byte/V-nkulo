@@ -626,7 +626,6 @@ html[data-theme="dark"] .owner-area-v4 .owner-topbar, html[data-pilot-theme="esc
 .owner-area.owner-area-v4 .owner-density-control button { color: var(--owner-muted); min-height: 36px; }
 .owner-area.owner-area-v4 .owner-density-control button.active { background: var(--owner-surface); color: var(--owner-ink); }
 .owner-area.owner-area-v4 :is(.owner-v3-source,.owner-v3-community-table small,.owner-v3-community-table .owner-v3-table-head,.owner-metric-grid article p) { color: var(--owner-muted); }
-.owner-area.owner-area-v4 .owner-v3-metrics .owner-metric-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
 .owner-area.owner-area-v4 .owner-v3-main-grid { grid-template-columns: minmax(0,1fr); }
 .owner-area.owner-area-v4 .owner-v3-activity { border-left: 0; padding-left: 0; }
 .owner-area.owner-area-v4 .owner-v3-community-table > div { grid-template-columns: minmax(160px,1.5fr) minmax(120px,1fr) 80px 80px 55px; }

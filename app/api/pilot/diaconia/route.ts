@@ -92,61 +92,63 @@ export async function GET() {
     .all<Row>();
   const ids = schedules.results.map((item) => Number(item.id));
   const placeholders = ids.map(() => "?").join(",");
-  const checklist = ids.length
-    ? await db
-        .prepare(
-          `SELECT ci.id, ci.escala_id, ci.designacao_id, ci.tarefa,
-            ci.status, ci.substituto_usuario_id,
-            ci.substituto_externo_nome, ci.observacao,
-            ci.atualizado_em, su.nome AS substituto_nome,
-            du.nome AS responsavel_nome
-           FROM ministerio_checklist_itens ci
-           LEFT JOIN usuarios su ON su.id = ci.substituto_usuario_id
-           LEFT JOIN escala_designacoes d ON d.id = ci.designacao_id
-           LEFT JOIN usuarios du ON du.id = d.usuario_id
-           WHERE ci.comunidade_id = ?
-             AND ci.escala_id IN (${placeholders})
-           ORDER BY ci.id ASC`,
-        )
-        .bind(access.context.comunidadeId, ...ids)
-        .all<Row>()
-    : { results: [] as Row[] };
-  const assignments = ids.length
-    ? await db
-        .prepare(
-          `SELECT d.id, d.escala_id, d.usuario_id, u.nome, d.funcao
-           FROM escala_designacoes d
-           JOIN usuarios u ON u.id = d.usuario_id
-           WHERE d.comunidade_id = ? AND d.ativo = 1
-             AND d.escala_id IN (${placeholders})
-           ORDER BY u.nome ASC`,
-        )
-        .bind(access.context.comunidadeId, ...ids)
-        .all<Row>()
-    : { results: [] as Row[] };
-  const reports = ids.length
-    ? await db
-        .prepare(
-          `SELECT id, escala_id, resumo, status,
-            destinatarios_notificados, encerrado_em
-           FROM diaconia_relatorios
-           WHERE comunidade_id = ? AND escala_id IN (${placeholders})`,
-        )
-        .bind(access.context.comunidadeId, ...ids)
-        .all<Row>()
-    : { results: [] as Row[] };
-  const substitutes = await db
-    .prepare(
-      `SELECT DISTINCT u.id, u.nome
-       FROM usuarios u
-       JOIN usuario_comunidades uc ON uc.usuario_id = u.id
-       WHERE uc.comunidade_id = ? AND uc.status = 'ATIVO'
-         AND u.ativo = 1
-       ORDER BY u.nome ASC
-       LIMIT 300`,
-    )
-    .bind(access.context.comunidadeId)
-    .all<Row>();
+  const [checklist, assignments, reports, substitutes] = await Promise.all([
+    ids.length
+      ? db
+          .prepare(
+            `SELECT ci.id, ci.escala_id, ci.designacao_id, ci.tarefa,
+              ci.status, ci.substituto_usuario_id,
+              ci.substituto_externo_nome, ci.observacao,
+              ci.atualizado_em, su.nome AS substituto_nome,
+              du.nome AS responsavel_nome
+             FROM ministerio_checklist_itens ci
+             LEFT JOIN usuarios su ON su.id = ci.substituto_usuario_id
+             LEFT JOIN escala_designacoes d ON d.id = ci.designacao_id
+             LEFT JOIN usuarios du ON du.id = d.usuario_id
+             WHERE ci.comunidade_id = ?
+               AND ci.escala_id IN (${placeholders})
+             ORDER BY ci.id ASC`,
+          )
+          .bind(access.context.comunidadeId, ...ids)
+          .all<Row>()
+      : Promise.resolve({ results: [] as Row[] }),
+    ids.length
+      ? db
+          .prepare(
+            `SELECT d.id, d.escala_id, d.usuario_id, u.nome, d.funcao
+             FROM escala_designacoes d
+             JOIN usuarios u ON u.id = d.usuario_id
+             WHERE d.comunidade_id = ? AND d.ativo = 1
+               AND d.escala_id IN (${placeholders})
+             ORDER BY u.nome ASC`,
+          )
+          .bind(access.context.comunidadeId, ...ids)
+          .all<Row>()
+      : Promise.resolve({ results: [] as Row[] }),
+    ids.length
+      ? db
+          .prepare(
+            `SELECT id, escala_id, resumo, status,
+              destinatarios_notificados, encerrado_em
+             FROM diaconia_relatorios
+             WHERE comunidade_id = ? AND escala_id IN (${placeholders})`,
+          )
+          .bind(access.context.comunidadeId, ...ids)
+          .all<Row>()
+      : Promise.resolve({ results: [] as Row[] }),
+    db
+      .prepare(
+        `SELECT DISTINCT u.id, u.nome
+         FROM usuarios u
+         JOIN usuario_comunidades uc ON uc.usuario_id = u.id
+         WHERE uc.comunidade_id = ? AND uc.status = 'ATIVO'
+           AND u.ativo = 1
+         ORDER BY u.nome ASC
+         LIMIT 300`,
+      )
+      .bind(access.context.comunidadeId)
+      .all<Row>(),
+  ]);
 
   const checklistBySchedule = groupBySchedule(checklist.results);
   const assignmentsBySchedule = groupBySchedule(assignments.results);

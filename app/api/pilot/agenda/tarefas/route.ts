@@ -17,11 +17,15 @@ export async function GET(request:Request) {
   const url=new URL(request.url), de=url.searchParams.get('de') || '', ate=url.searchParams.get('ate') || '';
   if (!Number.isFinite(Date.parse(de)) || !Number.isFinite(Date.parse(ate)) || Date.parse(ate)<Date.parse(de) || Date.parse(ate)-Date.parse(de)>62*86400000) return Response.json({error:'Período inválido.'},{status:400});
   const db=getD1();
-  const rows=await db.prepare(`SELECT t.*, u.nome AS responsavel FROM agenda_tarefas t JOIN usuarios u ON u.id=t.responsavel_id
-    WHERE t.comunidade_id=? AND (t.visibilidade='COMUNIDADE' OR t.criado_por=? OR t.responsavel_id=?)
-    AND (t.inicia_em IS NULL OR datetime(t.inicia_em) BETWEEN datetime(?) AND datetime(?) OR (datetime(t.inicia_em)<datetime(?) AND datetime(t.termina_em)>datetime(?)))
-    ORDER BY t.inicia_em, t.id LIMIT 401`).bind(comunidadeId,userId,userId,de,ate,de,de).all<Row>();
-  const owners=canManage ? await db.prepare(`SELECT u.id,u.nome FROM usuarios u JOIN usuario_comunidades uc ON uc.usuario_id=u.id WHERE uc.comunidade_id=? AND uc.status='ATIVO' AND u.ativo=1 ORDER BY u.nome LIMIT 1000`).bind(comunidadeId).all<{id:number;nome:string}>() : {results:[{id:userId,nome:access.user.nome}]};
+  const [rows, owners] = await Promise.all([
+    db.prepare(`SELECT t.*, u.nome AS responsavel FROM agenda_tarefas t JOIN usuarios u ON u.id=t.responsavel_id
+      WHERE t.comunidade_id=? AND (t.visibilidade='COMUNIDADE' OR t.criado_por=? OR t.responsavel_id=?)
+      AND (t.inicia_em IS NULL OR datetime(t.inicia_em) BETWEEN datetime(?) AND datetime(?) OR (datetime(t.inicia_em)<datetime(?) AND datetime(t.termina_em)>datetime(?)))
+      ORDER BY t.inicia_em, t.id LIMIT 401`).bind(comunidadeId,userId,userId,de,ate,de,de).all<Row>(),
+    canManage
+      ? db.prepare(`SELECT u.id,u.nome FROM usuarios u JOIN usuario_comunidades uc ON uc.usuario_id=u.id WHERE uc.comunidade_id=? AND uc.status='ATIVO' AND u.ativo=1 ORDER BY u.nome LIMIT 1000`).bind(comunidadeId).all<{id:number;nome:string}>()
+      : Promise.resolve({results:[{id:userId,nome:access.user.nome}]}),
+  ]);
   return Response.json({itens:rows.results.slice(0,400).map(row=>output(row,userId,canManage)),responsaveis:owners.results,usuarioId:userId,limitado:rows.results.length>400});
 }
 async function write(request:Request, editing:boolean) {

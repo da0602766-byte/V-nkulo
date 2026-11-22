@@ -97,7 +97,7 @@ html[data-theme] .gestao-scan-hub button :is(strong,span,small){color:inherit!im
   .worship-welcome{padding-left:max(0px,calc((100% - 858px)/2))}
 }
 /* Desktop reflow and mobile drawer behavior are owned by workspace-layout.css. */
-.pilot-dashboard[data-ui-version="v2"] .secretary-capacity-form{display:flex!important;align-items:center!important;gap:8px!important;width:auto!important}
+.pilot-dashboard[data-ui-version="v2"] .secretary-capacity-form{display:flex!important;align-items:center!important;gap:8px!important}
 .pilot-dashboard[data-ui-version="v2"] .secretary-capacity-form label{display:flex!important;align-items:center;gap:8px;margin:0!important;font-size:11px}
 .pilot-dashboard[data-ui-version="v2"] .secretary-capacity-form input{width:58px!important;min-height:32px!important;padding:6px!important}
 .pilot-dashboard[data-ui-version="v2"] .secretary-capacity-form button{min-height:32px!important;margin:0!important;white-space:nowrap}

@@ -200,6 +200,7 @@ export async function GET(request: Request) {
 
   // Visitantes recebidos no dia, agrupados: quatorze linhas iguais não são
   // catorze acontecimentos, são um só.
+  let totalVisitantesDia = 0;
   if (permissions.includes("visitors.view")) {
     const visitantes = await db
       .prepare(
@@ -213,6 +214,7 @@ export async function GET(request: Request) {
       .bind(comunidadeId, inicio, fim)
       .first<{ total: number; primeiro: string | null }>();
     const total = Number(visitantes?.total || 0);
+    totalVisitantesDia = total;
     if (total > 0 && visitantes?.primeiro) {
       itens.push({
         id: "visitantes-do-dia",
@@ -229,15 +231,77 @@ export async function GET(request: Request) {
 
   // Pedidos abertos no dia — só a contagem, nunca o corpo. O que é
   // confidencial não vaza para o fio de quem não pode abrir o pedido.
-  const pedidos = await db
-    .prepare(
-      `SELECT COUNT(*) AS total, MIN(criado_em) AS primeiro
-       FROM solicitacoes_comunidade
-       WHERE comunidade_id = ?
-         AND datetime(criado_em) BETWEEN datetime(?) AND datetime(?)`,
-    )
-    .bind(comunidadeId, inicio, fim)
-    .first<{ total: number; primeiro: string | null }>();
+  const visiveis = visibilidadesVisiveis(permissions);
+  const marcadores = visiveis.map(() => "?").join(",");
+  const [pedidos, publicacoes, registros, visitantesPorCategoria, escalasDoDia] = await Promise.all([
+    db
+      .prepare(
+        `SELECT COUNT(*) AS total, MIN(criado_em) AS primeiro
+         FROM solicitacoes_comunidade
+         WHERE comunidade_id = ?
+           AND datetime(criado_em) BETWEEN datetime(?) AND datetime(?)`,
+      )
+      .bind(comunidadeId, inicio, fim)
+      .first<{ total: number; primeiro: string | null }>(),
+    db
+      .prepare(
+        `SELECT id, titulo, criado_em
+         FROM publicacoes_piloto
+         WHERE comunidade_id = ?
+           AND status = 'PUBLICADA'
+           AND datetime(criado_em) BETWEEN datetime(?) AND datetime(?)
+         ORDER BY datetime(criado_em) ASC
+         LIMIT 20`,
+      )
+      .bind(comunidadeId, inicio, fim)
+      .all<{ id: number; titulo: string; criado_em: string }>(),
+    db
+      .prepare(
+        `SELECT f.id, f.camada, f.titulo, f.detalhe, f.ocorre_em, u.nome AS autor
+         FROM fio_registros f
+         LEFT JOIN usuarios u ON u.id = f.autor_usuario_id
+         WHERE f.comunidade_id = ?
+           AND f.ativo = 1
+           AND f.visibilidade IN (${marcadores})
+           AND datetime(f.ocorre_em) BETWEEN datetime(?) AND datetime(?)
+         ORDER BY datetime(f.ocorre_em) ASC
+         LIMIT ?`,
+      )
+      .bind(comunidadeId, ...visiveis, inicio, fim, MAX_ITENS)
+      .all<{
+        id: number; camada: string; titulo: string; detalhe: string;
+        ocorre_em: string; autor: string | null;
+      }>(),
+    permissions.includes("visitors.view")
+      ? db
+          .prepare(
+            `SELECT COALESCE(vc.nome, 'Sem categoria') AS nome, COUNT(*) AS total
+             FROM visitantes v
+             LEFT JOIN visitante_categorias vc ON vc.id = v.categoria_id
+             WHERE v.comunidade_id = ?
+               AND v.ativo = 1
+               AND v.escopo_confirmado = 1
+               AND datetime(v.criado_em) BETWEEN datetime(?) AND datetime(?)
+             GROUP BY vc.id, vc.nome
+             ORDER BY total DESC
+             LIMIT 6`,
+          )
+          .bind(comunidadeId, inicio, fim)
+          .all<{ nome: string; total: number }>()
+      : Promise.resolve({ results: [] as { nome: string; total: number }[] }),
+    db
+      .prepare(
+        `SELECT COUNT(*) AS total,
+          SUM(CASE WHEN d.status = 'CONFIRMADA' THEN 1 ELSE 0 END) AS confirmadas
+         FROM escala_designacoes d
+         JOIN escalas_ministerio e ON e.id = d.escala_id
+         WHERE d.comunidade_id = ?
+           AND d.ativo = 1
+           AND datetime(e.inicia_em) BETWEEN datetime(?) AND datetime(?)`,
+      )
+      .bind(comunidadeId, inicio, fim)
+      .first<{ total: number; confirmadas: number }>(),
+  ]);
   const totalPedidos = Number(pedidos?.total || 0);
   if (totalPedidos > 0 && pedidos?.primeiro) {
     itens.push({
@@ -251,20 +315,6 @@ export async function GET(request: Request) {
       manual: false,
     });
   }
-
-  // Publicações do mural.
-  const publicacoes = await db
-    .prepare(
-      `SELECT id, titulo, criado_em
-       FROM publicacoes_piloto
-       WHERE comunidade_id = ?
-         AND status = 'PUBLICADA'
-         AND datetime(criado_em) BETWEEN datetime(?) AND datetime(?)
-       ORDER BY datetime(criado_em) ASC
-       LIMIT 20`,
-    )
-    .bind(comunidadeId, inicio, fim)
-    .all<{ id: number; titulo: string; criado_em: string }>();
   for (const linha of publicacoes.results || []) {
     itens.push({
       id: `publicacao-${linha.id}`,
@@ -277,27 +327,6 @@ export async function GET(request: Request) {
       manual: false,
     });
   }
-
-  // Registros manuais, respeitando a visibilidade de cada um.
-  const visiveis = visibilidadesVisiveis(permissions);
-  const marcadores = visiveis.map(() => "?").join(",");
-  const registros = await db
-    .prepare(
-      `SELECT f.id, f.camada, f.titulo, f.detalhe, f.ocorre_em, u.nome AS autor
-       FROM fio_registros f
-       LEFT JOIN usuarios u ON u.id = f.autor_usuario_id
-       WHERE f.comunidade_id = ?
-         AND f.ativo = 1
-         AND f.visibilidade IN (${marcadores})
-         AND datetime(f.ocorre_em) BETWEEN datetime(?) AND datetime(?)
-       ORDER BY datetime(f.ocorre_em) ASC
-       LIMIT ?`,
-    )
-    .bind(comunidadeId, ...visiveis, inicio, fim, MAX_ITENS)
-    .all<{
-      id: number; camada: string; titulo: string; detalhe: string;
-      ocorre_em: string; autor: string | null;
-    }>();
   for (const linha of registros.results || []) {
     itens.push({
       id: `fio-${linha.id}`,
@@ -317,54 +346,9 @@ export async function GET(request: Request) {
       Date.parse(esquerda.ocorreEm) - Date.parse(direita.ocorreEm),
   );
 
-  // Resumo do dia. Os números saem das mesmas consultas já feitas acima, exceto
-  // as escalas da comunidade inteira e os visitantes por categoria, que pedem
-  // duas leituras a mais — ambas presas ao mesmo dia.
-  const visitantesPorCategoria = permissions.includes("visitors.view")
-    ? await db
-        .prepare(
-          `SELECT COALESCE(vc.nome, 'Sem categoria') AS nome, COUNT(*) AS total
-           FROM visitantes v
-           LEFT JOIN visitante_categorias vc ON vc.id = v.categoria_id
-           WHERE v.comunidade_id = ?
-             AND v.ativo = 1
-             AND v.escopo_confirmado = 1
-             AND datetime(v.criado_em) BETWEEN datetime(?) AND datetime(?)
-           GROUP BY vc.id, vc.nome
-           ORDER BY total DESC
-           LIMIT 6`,
-        )
-        .bind(comunidadeId, inicio, fim)
-        .all<{ nome: string; total: number }>()
-    : { results: [] as { nome: string; total: number }[] };
-
-  const escalasDoDia = await db
-    .prepare(
-      `SELECT COUNT(*) AS total,
-        SUM(CASE WHEN d.status = 'CONFIRMADA' THEN 1 ELSE 0 END) AS confirmadas
-       FROM escala_designacoes d
-       JOIN escalas_ministerio e ON e.id = d.escala_id
-       WHERE d.comunidade_id = ?
-         AND d.ativo = 1
-         AND datetime(e.inicia_em) BETWEEN datetime(?) AND datetime(?)`,
-    )
-    .bind(comunidadeId, inicio, fim)
-    .first<{ total: number; confirmadas: number }>();
-
   const resumo = {
     visitantes: permissions.includes("visitors.view")
-      ? Number(
-          (
-            await db
-              .prepare(
-                `SELECT COUNT(*) AS total FROM visitantes
-                 WHERE comunidade_id = ? AND ativo = 1 AND escopo_confirmado = 1
-                   AND datetime(criado_em) BETWEEN datetime(?) AND datetime(?)`,
-              )
-              .bind(comunidadeId, inicio, fim)
-              .first<{ total: number }>()
-          )?.total || 0,
-        )
+      ? totalVisitantesDia
       : null,
     pedidos: totalPedidos,
     registros: itens.length,

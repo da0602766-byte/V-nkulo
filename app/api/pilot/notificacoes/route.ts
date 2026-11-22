@@ -60,39 +60,44 @@ export async function GET(request: Request) {
     Number.isInteger(requestedSize) && requestedSize > 0
       ? Math.min(requestedSize, NOTIFICATION_MAX_PAGE_SIZE)
       : NOTIFICATION_PAGE_SIZE;
-  const result = await db
-    .prepare(
-      `WITH page AS MATERIALIZED (
-        SELECT n.id FROM notificacoes_sistema n
-      WHERE n.usuario_id = ? AND n.area <> 'CHAT' AND ${notificationVisibilitySql(Boolean(user.system_owner))}
-        AND (
-          ? = 0
-          OR n.criado_em < ?
-          OR (n.criado_em = ? AND n.id < ?)
+  const configKey = `notification_preferences:${user.id}`;
+  const [result, owner, stored] = await Promise.all([
+    db
+      .prepare(
+        `WITH page AS MATERIALIZED (
+          SELECT n.id FROM notificacoes_sistema n
+        WHERE n.usuario_id = ? AND n.area <> 'CHAT' AND ${notificationVisibilitySql(Boolean(user.system_owner))}
+          AND (
+            ? = 0
+            OR n.criado_em < ?
+            OR (n.criado_em = ? AND n.id < ?)
+          )
+        ORDER BY n.criado_em DESC, n.id DESC
+        LIMIT ?
         )
-      ORDER BY n.criado_em DESC, n.id DESC
-      LIMIT ?
+        SELECT n.id, n.tipo, n.titulo, n.mensagem, n.area, n.entidade_id,
+          n.destino_rota, n.hierarquia, n.ministerio,
+          remetente.nome AS remetente_nome,
+          n.criado_em, CASE WHEN nl.id IS NULL THEN 0 ELSE 1 END AS lida
+        FROM page JOIN notificacoes_sistema n ON n.id = page.id
+        LEFT JOIN usuarios remetente ON remetente.id = n.remetente_usuario_id
+        LEFT JOIN notificacoes_lidas nl
+          ON nl.notificacao_id = n.id AND nl.usuario_id = ?
+        ORDER BY n.criado_em DESC, n.id DESC`,
       )
-      SELECT n.id, n.tipo, n.titulo, n.mensagem, n.area, n.entidade_id,
-        n.destino_rota, n.hierarquia, n.ministerio,
-        remetente.nome AS remetente_nome,
-        n.criado_em, CASE WHEN nl.id IS NULL THEN 0 ELSE 1 END AS lida
-      FROM page JOIN notificacoes_sistema n ON n.id = page.id
-      LEFT JOIN usuarios remetente ON remetente.id = n.remetente_usuario_id
-      LEFT JOIN notificacoes_lidas nl
-        ON nl.notificacao_id = n.id AND nl.usuario_id = ?
-      ORDER BY n.criado_em DESC, n.id DESC`,
-    )
-    .bind(
-      user.id,
-      cursor ? 1 : 0,
-      cursor?.criadoEm ?? "",
-      cursor?.criadoEm ?? "",
-      cursor?.id ?? 0,
-      pageSize + 1,
-      user.id,
-    )
-    .all<NotificationRow>();
+      .bind(
+        user.id,
+        cursor ? 1 : 0,
+        cursor?.criadoEm ?? "",
+        cursor?.criadoEm ?? "",
+        cursor?.id ?? 0,
+        pageSize + 1,
+        user.id,
+      )
+      .all<NotificationRow>(),
+    db.prepare("SELECT id FROM comunidades WHERE proprietario_usuario_id = ? AND status = 'ATIVA' LIMIT 1").bind(user.id).first<{ id: number }>(),
+    db.prepare("SELECT valor FROM configuracoes WHERE chave = ? LIMIT 1").bind(configKey).first<{ valor: string }>(),
+  ]);
 
   const hasMore = result.results.length > pageSize;
   if (hasMore) result.results.length = pageSize;
@@ -105,9 +110,6 @@ export async function GET(request: Request) {
         })
       : null;
 
-  const owner = await db.prepare("SELECT id FROM comunidades WHERE proprietario_usuario_id = ? AND status = 'ATIVA' LIMIT 1").bind(user.id).first<{ id: number }>();
-  const configKey = `notification_preferences:${user.id}`;
-  const stored = await db.prepare("SELECT valor FROM configuracoes WHERE chave = ? LIMIT 1").bind(configKey).first<{ valor: string }>();
   const config = parseNotificationConfig(stored?.valor);
   const countCategory = (Object.keys(DEFAULT_NOTIFICATION_CONFIG) as NotificationCategory[])
     .every(category => config[category]) ? "'sistema'" : NOTIFICATION_CATEGORY_SQL;

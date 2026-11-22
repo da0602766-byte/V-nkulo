@@ -16,175 +16,177 @@ export async function GET() {
   const systemOwner = access.user.system_owner === true;
   const globalManager =
     systemOwner || hasGlobalMinistryManagement(access.context);
-  const ministriesResult = await db
-    .prepare(
-      `SELECT m.id, m.nome, m.descricao, m.categoria, m.status,
-        m.youtube_url, m.spotify_url, m.banner_url,
-        (SELECT COUNT(*) FROM ministerio_voluntarios members
-         JOIN usuarios member_user ON member_user.id=members.usuario_id AND member_user.ativo=1
-         JOIN usuario_comunidades member_link ON member_link.usuario_id=members.usuario_id AND member_link.comunidade_id=members.comunidade_id AND member_link.status='ATIVO'
-         WHERE members.ministerio_id=m.id AND members.comunidade_id=m.comunidade_id AND members.ativo=1) AS total_integrantes,
-        (SELECT COUNT(*) FROM escala_designacoes pending
-         JOIN escalas_ministerio future ON future.id=pending.escala_id AND future.comunidade_id=pending.comunidade_id
-         WHERE future.ministerio_id=m.id AND future.comunidade_id=m.comunidade_id AND future.status='PUBLICADA'
-           AND datetime(future.termina_em)>=datetime('now') AND pending.ativo=1 AND pending.status='PENDENTE'
-           AND (?=1 OR m.responsavel_usuario_id=? OR EXISTS(SELECT 1 FROM ministerio_voluntarios lead WHERE lead.ministerio_id=m.id AND lead.comunidade_id=m.comunidade_id AND lead.usuario_id=? AND lead.ativo=1 AND lead.papel='LIDER') OR pending.usuario_id=?)) AS confirmacoes_pendentes,
-        (SELECT official.titulo FROM oficiais_comunidade official JOIN usuario_comunidades membership ON membership.id=official.usuario_comunidade_id WHERE membership.usuario_id=m.responsavel_usuario_id AND membership.comunidade_id=m.comunidade_id AND membership.status='ATIVO' LIMIT 1) AS responsavel_titulo_oficial,
-        m.fio_habilitado, m.fio_etapas,
-        m.responsavel_usuario_id, responsavel.nome AS responsavel_nome,
-        m.criado_em, m.atualizado_em,
-        CASE WHEN ${ministryMemberRemovalCondition} THEN 1 ELSE 0 END AS can_remove_members,
-        ? AS can_remove_leaders,
-        CASE WHEN m.status = 'ATIVO' AND (
-          ? = 1
-          OR m.responsavel_usuario_id = ?
-          OR EXISTS (
-          SELECT 1 FROM ministerio_voluntarios own_leadership
-          WHERE own_leadership.ministerio_id = m.id
-            AND own_leadership.comunidade_id = m.comunidade_id
-            AND own_leadership.usuario_id = ?
-            AND own_leadership.papel = 'LIDER'
-            AND own_leadership.ativo = 1
-          )
-        ) THEN 1 ELSE 0 END AS can_manage,
-        CASE WHEN m.categoria = 'DIACONIA' AND (
-          ? = 1 OR ? = 1
-        ) THEN 1 ELSE 0 END AS can_archive,
-        CASE WHEN ? = 1 OR (
-          m.status = 'ATIVO' AND (
+  const [ministriesResult, volunteersResult, visitorCategoriesResult] = await Promise.all([
+    db
+      .prepare(
+        `SELECT m.id, m.nome, m.descricao, m.categoria, m.status,
+          m.youtube_url, m.spotify_url, m.banner_url,
+          (SELECT COUNT(*) FROM ministerio_voluntarios members
+           JOIN usuarios member_user ON member_user.id=members.usuario_id AND member_user.ativo=1
+           JOIN usuario_comunidades member_link ON member_link.usuario_id=members.usuario_id AND member_link.comunidade_id=members.comunidade_id AND member_link.status='ATIVO'
+           WHERE members.ministerio_id=m.id AND members.comunidade_id=m.comunidade_id AND members.ativo=1) AS total_integrantes,
+          (SELECT COUNT(*) FROM escala_designacoes pending
+           JOIN escalas_ministerio future ON future.id=pending.escala_id AND future.comunidade_id=pending.comunidade_id
+           WHERE future.ministerio_id=m.id AND future.comunidade_id=m.comunidade_id AND future.status='PUBLICADA'
+             AND datetime(future.termina_em)>=datetime('now') AND pending.ativo=1 AND pending.status='PENDENTE'
+             AND (?=1 OR m.responsavel_usuario_id=? OR EXISTS(SELECT 1 FROM ministerio_voluntarios lead WHERE lead.ministerio_id=m.id AND lead.comunidade_id=m.comunidade_id AND lead.usuario_id=? AND lead.ativo=1 AND lead.papel='LIDER') OR pending.usuario_id=?)) AS confirmacoes_pendentes,
+          (SELECT official.titulo FROM oficiais_comunidade official JOIN usuario_comunidades membership ON membership.id=official.usuario_comunidade_id WHERE membership.usuario_id=m.responsavel_usuario_id AND membership.comunidade_id=m.comunidade_id AND membership.status='ATIVO' LIMIT 1) AS responsavel_titulo_oficial,
+          m.fio_habilitado, m.fio_etapas,
+          m.responsavel_usuario_id, responsavel.nome AS responsavel_nome,
+          m.criado_em, m.atualizado_em,
+          CASE WHEN ${ministryMemberRemovalCondition} THEN 1 ELSE 0 END AS can_remove_members,
+          ? AS can_remove_leaders,
+          CASE WHEN m.status = 'ATIVO' AND (
             ? = 1
             OR m.responsavel_usuario_id = ?
             OR EXISTS (
-              SELECT 1 FROM ministerio_voluntarios delete_leadership
-              WHERE delete_leadership.ministerio_id = m.id
-                AND delete_leadership.comunidade_id = m.comunidade_id
-                AND delete_leadership.usuario_id = ?
-                AND delete_leadership.papel = 'LIDER'
-                AND delete_leadership.ativo = 1
-            )
-          )
-        ) THEN 1 ELSE 0 END AS can_delete
-      FROM ministerios_comunidade m
-      LEFT JOIN usuarios responsavel ON responsavel.id = m.responsavel_usuario_id
-      WHERE m.comunidade_id = ?
-        AND m.status != 'ARQUIVADO'
-        AND (m.status = 'ATIVO' OR ? = 1)
-        AND (
-          ? = 1
-          OR m.responsavel_usuario_id = ?
-          OR EXISTS (
-            SELECT 1 FROM ministerio_voluntarios own_membership
-            WHERE own_membership.ministerio_id = m.id
-              AND own_membership.comunidade_id = m.comunidade_id
-              AND own_membership.usuario_id = ?
-              AND own_membership.ativo = 1
-          )
-          OR EXISTS (
-            SELECT 1
-            FROM escala_designacoes own_assignment
-            JOIN escalas_ministerio own_schedule
-              ON own_schedule.id = own_assignment.escala_id
-             AND own_schedule.comunidade_id = own_assignment.comunidade_id
-            WHERE own_schedule.ministerio_id = m.id
-              AND own_assignment.comunidade_id = m.comunidade_id
-              AND own_assignment.usuario_id = ?
-              AND own_assignment.ativo = 1
-              AND own_schedule.status = 'PUBLICADA'
-          )
-        )
-      ORDER BY m.status ASC, m.nome ASC
-      LIMIT 100`,
-    )
-    .bind(
-      globalManager ? 1 : 0, access.user.id, access.user.id, access.user.id,
-      access.context.isCommunityOwner ? 1 : 0,
-      access.user.id,
-      access.user.id,
-      access.context.isCommunityOwner ? 1 : 0,
-      globalManager ? 1 : 0,
-      access.user.id,
-      access.user.id,
-      globalManager ? 1 : 0,
-      access.user.system_owner ? 1 : 0,
-      systemOwner ? 1 : 0,
-      globalManager ? 1 : 0,
-      access.user.id,
-      access.user.id,
-      access.context.comunidadeId,
-      globalManager ? 1 : 0,
-      globalManager ? 1 : 0,
-      access.user.id,
-      access.user.id,
-      access.user.id,
-    )
-    .all<MinistryRow>();
-  const volunteersResult = await db
-    .prepare(
-      `SELECT mv.id, mv.ministerio_id, mv.usuario_id, u.nome, u.foto_perfil,
-        (SELECT official.titulo FROM oficiais_comunidade official WHERE official.usuario_comunidade_id=uc.id LIMIT 1) AS titulo_oficial,
-        mv.funcao, mv.papel, mv.dias_disponiveis,
-        mv.periodo_preferido, mv.limite_escalas, mv.ativo,
-        (
-          SELECT COUNT(*)
-          FROM escala_designacoes capacity_assignment
-          JOIN escalas_ministerio capacity_schedule
-            ON capacity_schedule.id = capacity_assignment.escala_id
-           AND capacity_schedule.comunidade_id = capacity_assignment.comunidade_id
-          WHERE capacity_assignment.voluntario_id = mv.id
-            AND capacity_assignment.comunidade_id = mv.comunidade_id
-            AND capacity_assignment.ativo = 1
-            AND capacity_schedule.status IN ('PUBLICADA', 'AGUARDANDO_CHECKLIST')
-            AND datetime(capacity_schedule.termina_em) >= datetime('now')
-        ) AS escalas_ativas,
-        CASE WHEN mv.usuario_id = ? THEN 1 ELSE 0 END AS is_mine
-      FROM ministerio_voluntarios mv
-      JOIN usuarios u ON u.id = mv.usuario_id
-      JOIN usuario_comunidades uc
-        ON uc.usuario_id = mv.usuario_id
-       AND uc.comunidade_id = mv.comunidade_id
-       AND uc.status = 'ATIVO'
-      JOIN ministerios_comunidade m
-        ON m.id = mv.ministerio_id
-       AND m.comunidade_id = mv.comunidade_id
-      WHERE mv.comunidade_id = ? AND mv.ativo = 1
-        AND (
-          ? = 1
-          OR m.responsavel_usuario_id = ?
-          OR EXISTS (
             SELECT 1 FROM ministerio_voluntarios own_leadership
-            WHERE own_leadership.ministerio_id = mv.ministerio_id
-              AND own_leadership.comunidade_id = mv.comunidade_id
+            WHERE own_leadership.ministerio_id = m.id
+              AND own_leadership.comunidade_id = m.comunidade_id
               AND own_leadership.usuario_id = ?
               AND own_leadership.papel = 'LIDER'
               AND own_leadership.ativo = 1
+            )
+          ) THEN 1 ELSE 0 END AS can_manage,
+          CASE WHEN m.categoria = 'DIACONIA' AND (
+            ? = 1 OR ? = 1
+          ) THEN 1 ELSE 0 END AS can_archive,
+          CASE WHEN ? = 1 OR (
+            m.status = 'ATIVO' AND (
+              ? = 1
+              OR m.responsavel_usuario_id = ?
+              OR EXISTS (
+                SELECT 1 FROM ministerio_voluntarios delete_leadership
+                WHERE delete_leadership.ministerio_id = m.id
+                  AND delete_leadership.comunidade_id = m.comunidade_id
+                  AND delete_leadership.usuario_id = ?
+                  AND delete_leadership.papel = 'LIDER'
+                  AND delete_leadership.ativo = 1
+              )
+            )
+          ) THEN 1 ELSE 0 END AS can_delete
+        FROM ministerios_comunidade m
+        LEFT JOIN usuarios responsavel ON responsavel.id = m.responsavel_usuario_id
+        WHERE m.comunidade_id = ?
+          AND m.status != 'ARQUIVADO'
+          AND (m.status = 'ATIVO' OR ? = 1)
+          AND (
+            ? = 1
+            OR m.responsavel_usuario_id = ?
+            OR EXISTS (
+              SELECT 1 FROM ministerio_voluntarios own_membership
+              WHERE own_membership.ministerio_id = m.id
+                AND own_membership.comunidade_id = m.comunidade_id
+                AND own_membership.usuario_id = ?
+                AND own_membership.ativo = 1
+            )
+            OR EXISTS (
+              SELECT 1
+              FROM escala_designacoes own_assignment
+              JOIN escalas_ministerio own_schedule
+                ON own_schedule.id = own_assignment.escala_id
+               AND own_schedule.comunidade_id = own_assignment.comunidade_id
+              WHERE own_schedule.ministerio_id = m.id
+                AND own_assignment.comunidade_id = m.comunidade_id
+                AND own_assignment.usuario_id = ?
+                AND own_assignment.ativo = 1
+                AND own_schedule.status = 'PUBLICADA'
+            )
           )
-        )
-      ORDER BY mv.papel DESC, u.nome ASC`,
-    )
-    .bind(
-      access.user.id,
-      access.context.comunidadeId,
-      globalManager ? 1 : 0,
-      access.user.id,
-      access.user.id,
-    )
-    .all<VolunteerRow>();
-  const visitorCategoriesResult = await db
-    .prepare(
-      `SELECT vc.id, vc.ministerio_id, vc.nome, vc.icone, vc.cor,
-        COUNT(v.id) AS total_visitantes
-       FROM visitante_categorias vc
-       LEFT JOIN visitantes v
-         ON v.categoria_id = vc.id
-        AND v.comunidade_id = vc.comunidade_id
-        AND v.ativo = 1 AND v.escopo_confirmado = 1
-       WHERE vc.comunidade_id = ? AND vc.ativa = 1
-         AND vc.ministerio_id IS NOT NULL
-       GROUP BY vc.id
-       ORDER BY vc.ordem ASC, vc.nome ASC`,
-    )
-    .bind(access.context.comunidadeId)
-    .all<VisitorCategoryRow>();
+        ORDER BY m.status ASC, m.nome ASC
+        LIMIT 100`,
+      )
+      .bind(
+        globalManager ? 1 : 0, access.user.id, access.user.id, access.user.id,
+        access.context.isCommunityOwner ? 1 : 0,
+        access.user.id,
+        access.user.id,
+        access.context.isCommunityOwner ? 1 : 0,
+        globalManager ? 1 : 0,
+        access.user.id,
+        access.user.id,
+        globalManager ? 1 : 0,
+        access.user.system_owner ? 1 : 0,
+        systemOwner ? 1 : 0,
+        globalManager ? 1 : 0,
+        access.user.id,
+        access.user.id,
+        access.context.comunidadeId,
+        globalManager ? 1 : 0,
+        globalManager ? 1 : 0,
+        access.user.id,
+        access.user.id,
+        access.user.id,
+      )
+      .all<MinistryRow>(),
+    db
+      .prepare(
+        `SELECT mv.id, mv.ministerio_id, mv.usuario_id, u.nome, u.foto_perfil,
+          (SELECT official.titulo FROM oficiais_comunidade official WHERE official.usuario_comunidade_id=uc.id LIMIT 1) AS titulo_oficial,
+          mv.funcao, mv.papel, mv.dias_disponiveis,
+          mv.periodo_preferido, mv.limite_escalas, mv.ativo,
+          (
+            SELECT COUNT(*)
+            FROM escala_designacoes capacity_assignment
+            JOIN escalas_ministerio capacity_schedule
+              ON capacity_schedule.id = capacity_assignment.escala_id
+             AND capacity_schedule.comunidade_id = capacity_assignment.comunidade_id
+            WHERE capacity_assignment.voluntario_id = mv.id
+              AND capacity_assignment.comunidade_id = mv.comunidade_id
+              AND capacity_assignment.ativo = 1
+              AND capacity_schedule.status IN ('PUBLICADA', 'AGUARDANDO_CHECKLIST')
+              AND datetime(capacity_schedule.termina_em) >= datetime('now')
+          ) AS escalas_ativas,
+          CASE WHEN mv.usuario_id = ? THEN 1 ELSE 0 END AS is_mine
+        FROM ministerio_voluntarios mv
+        JOIN usuarios u ON u.id = mv.usuario_id
+        JOIN usuario_comunidades uc
+          ON uc.usuario_id = mv.usuario_id
+         AND uc.comunidade_id = mv.comunidade_id
+         AND uc.status = 'ATIVO'
+        JOIN ministerios_comunidade m
+          ON m.id = mv.ministerio_id
+         AND m.comunidade_id = mv.comunidade_id
+        WHERE mv.comunidade_id = ? AND mv.ativo = 1
+          AND (
+            ? = 1
+            OR m.responsavel_usuario_id = ?
+            OR EXISTS (
+              SELECT 1 FROM ministerio_voluntarios own_leadership
+              WHERE own_leadership.ministerio_id = mv.ministerio_id
+                AND own_leadership.comunidade_id = mv.comunidade_id
+                AND own_leadership.usuario_id = ?
+                AND own_leadership.papel = 'LIDER'
+                AND own_leadership.ativo = 1
+            )
+          )
+        ORDER BY mv.papel DESC, u.nome ASC`,
+      )
+      .bind(
+        access.user.id,
+        access.context.comunidadeId,
+        globalManager ? 1 : 0,
+        access.user.id,
+        access.user.id,
+      )
+      .all<VolunteerRow>(),
+    db
+      .prepare(
+        `SELECT vc.id, vc.ministerio_id, vc.nome, vc.icone, vc.cor,
+          COUNT(v.id) AS total_visitantes
+         FROM visitante_categorias vc
+         LEFT JOIN visitantes v
+           ON v.categoria_id = vc.id
+          AND v.comunidade_id = vc.comunidade_id
+          AND v.ativo = 1 AND v.escopo_confirmado = 1
+         WHERE vc.comunidade_id = ? AND vc.ativa = 1
+           AND vc.ministerio_id IS NOT NULL
+         GROUP BY vc.id
+         ORDER BY vc.ordem ASC, vc.nome ASC`,
+      )
+      .bind(access.context.comunidadeId)
+      .all<VisitorCategoryRow>(),
+  ]);
   const volunteersByMinistry = new Map<number, VolunteerRow[]>();
   for (const volunteer of volunteersResult.results) {
     const ministryId = Number(volunteer.ministerio_id);

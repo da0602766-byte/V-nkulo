@@ -152,7 +152,7 @@ html[data-theme="dark"] .owner-area.owner-console, html[data-pilot-theme="escuro
 .owner-console kbd { font: 10px ui-monospace,monospace; padding: 2px 5px; border: 1px solid var(--owner-line); border-radius: 5px; white-space: nowrap; }
 .owner-console .oc-top-spacer { flex: 1; }
 .owner-console .oc-env { font-size: 10px; color: var(--owner-muted); white-space: nowrap; }
-.owner-console .oc-icon-button { position: relative; display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 38px; border: 1px solid var(--owner-line); border-radius: 11px; background: var(--owner-surface); color: var(--owner-ink); padding: 0; }
+.owner-console .oc-icon-button { position: relative; display: grid; place-items: center; flex: 0 0 38px; border: 1px solid var(--owner-line); border-radius: 11px; background: var(--owner-surface); color: var(--owner-ink); padding: 0; }
 .owner-console .oc-menu-button { display: none; }
 .owner-console .oc-notification-dot { position: absolute; top: 5px; right: 6px; width: 6px; height: 6px; border-radius: 50%; background: var(--owner-danger); }
 .owner-console .oc-topbar .theme-control { margin: 0; padding: 0; background: transparent; border: 0; box-shadow: none; }

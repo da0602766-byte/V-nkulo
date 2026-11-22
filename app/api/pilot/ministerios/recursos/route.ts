@@ -21,162 +21,164 @@ export async function GET() {
   if ("error" in access) return access.error;
   const db = getD1();
   const globalManager = hasGlobalMinistryManagement(access.context);
-  const functions = await db
-    .prepare(
-      `SELECT f.id, f.ministerio_id, f.nome, f.descricao
-       FROM ministerio_funcoes f
-       JOIN ministerios_comunidade m
-         ON m.id = f.ministerio_id
-        AND m.comunidade_id = f.comunidade_id
-       WHERE f.comunidade_id = ? AND f.ativa = 1
-         AND (
-           ? = 1
-           OR m.responsavel_usuario_id = ?
-           OR EXISTS (
-             SELECT 1 FROM ministerio_voluntarios own_leadership
-             WHERE own_leadership.ministerio_id = f.ministerio_id
-               AND own_leadership.comunidade_id = f.comunidade_id
-               AND own_leadership.usuario_id = ?
-               AND own_leadership.papel = 'LIDER'
-               AND own_leadership.ativo = 1
+  const [functions, templates, checklist, reusableLinks, libraryItems] = await Promise.all([
+    db
+      .prepare(
+        `SELECT f.id, f.ministerio_id, f.nome, f.descricao
+         FROM ministerio_funcoes f
+         JOIN ministerios_comunidade m
+           ON m.id = f.ministerio_id
+          AND m.comunidade_id = f.comunidade_id
+         WHERE f.comunidade_id = ? AND f.ativa = 1
+           AND (
+             ? = 1
+             OR m.responsavel_usuario_id = ?
+             OR EXISTS (
+               SELECT 1 FROM ministerio_voluntarios own_leadership
+               WHERE own_leadership.ministerio_id = f.ministerio_id
+                 AND own_leadership.comunidade_id = f.comunidade_id
+                 AND own_leadership.usuario_id = ?
+                 AND own_leadership.papel = 'LIDER'
+                 AND own_leadership.ativo = 1
+             )
            )
-         )
-       ORDER BY f.nome ASC`,
-    )
-    .bind(
-      access.context.comunidadeId,
-      globalManager ? 1 : 0,
-      access.user.id,
-      access.user.id,
-    )
-    .all<Row>();
-  const templates = await db
-    .prepare(
-      `SELECT t.id, t.ministerio_id, t.nome, t.titulo, t.duracao_minutos,
-        t.local, t.observacoes, t.checklist_modelo,
-        t.campos_personalizados, t.versao
-       FROM ministerio_modelos_escala t
-       JOIN ministerios_comunidade m
-         ON m.id = t.ministerio_id
-        AND m.comunidade_id = t.comunidade_id
-       WHERE t.comunidade_id = ? AND t.ativo = 1
-         AND (
-           ? = 1
-           OR m.responsavel_usuario_id = ?
-           OR EXISTS (
-             SELECT 1 FROM ministerio_voluntarios own_leadership
-             WHERE own_leadership.ministerio_id = t.ministerio_id
-               AND own_leadership.comunidade_id = t.comunidade_id
-               AND own_leadership.usuario_id = ?
-               AND own_leadership.papel = 'LIDER'
-               AND own_leadership.ativo = 1
+         ORDER BY f.nome ASC`,
+      )
+      .bind(
+        access.context.comunidadeId,
+        globalManager ? 1 : 0,
+        access.user.id,
+        access.user.id,
+      )
+      .all<Row>(),
+    db
+      .prepare(
+        `SELECT t.id, t.ministerio_id, t.nome, t.titulo, t.duracao_minutos,
+          t.local, t.observacoes, t.checklist_modelo,
+          t.campos_personalizados, t.versao
+         FROM ministerio_modelos_escala t
+         JOIN ministerios_comunidade m
+           ON m.id = t.ministerio_id
+          AND m.comunidade_id = t.comunidade_id
+         WHERE t.comunidade_id = ? AND t.ativo = 1
+           AND (
+             ? = 1
+             OR m.responsavel_usuario_id = ?
+             OR EXISTS (
+               SELECT 1 FROM ministerio_voluntarios own_leadership
+               WHERE own_leadership.ministerio_id = t.ministerio_id
+                 AND own_leadership.comunidade_id = t.comunidade_id
+                 AND own_leadership.usuario_id = ?
+                 AND own_leadership.papel = 'LIDER'
+                 AND own_leadership.ativo = 1
+             )
            )
-         )
-       ORDER BY t.nome ASC`,
-    )
-    .bind(
-      access.context.comunidadeId,
-      globalManager ? 1 : 0,
-      access.user.id,
-      access.user.id,
-    )
-    .all<Row>();
-  const checklist = await db
-    .prepare(
-      `SELECT ci.id, ci.escala_id, ci.designacao_id, ci.tarefa,
-        ci.status, ci.observacao, d.usuario_id,
-        CASE WHEN d.usuario_id = ? THEN 1 ELSE 0 END AS is_mine
-       FROM ministerio_checklist_itens ci
-       JOIN escalas_ministerio s
-         ON s.id = ci.escala_id
-        AND s.comunidade_id = ci.comunidade_id
-       JOIN ministerios_comunidade m
-         ON m.id = s.ministerio_id
-        AND m.comunidade_id = s.comunidade_id
-       LEFT JOIN escala_designacoes d
-         ON d.id = ci.designacao_id
-        AND d.comunidade_id = ci.comunidade_id
-       WHERE ci.comunidade_id = ?
-         AND s.status != 'CANCELADA'
-         AND (
-           ? = 1
-           OR m.responsavel_usuario_id = ?
-           OR EXISTS (
-             SELECT 1 FROM ministerio_voluntarios lead
-             WHERE lead.ministerio_id = s.ministerio_id
-               AND lead.comunidade_id = s.comunidade_id
-               AND lead.usuario_id = ?
-               AND lead.papel = 'LIDER' AND lead.ativo = 1
+         ORDER BY t.nome ASC`,
+      )
+      .bind(
+        access.context.comunidadeId,
+        globalManager ? 1 : 0,
+        access.user.id,
+        access.user.id,
+      )
+      .all<Row>(),
+    db
+      .prepare(
+        `SELECT ci.id, ci.escala_id, ci.designacao_id, ci.tarefa,
+          ci.status, ci.observacao, d.usuario_id,
+          CASE WHEN d.usuario_id = ? THEN 1 ELSE 0 END AS is_mine
+         FROM ministerio_checklist_itens ci
+         JOIN escalas_ministerio s
+           ON s.id = ci.escala_id
+          AND s.comunidade_id = ci.comunidade_id
+         JOIN ministerios_comunidade m
+           ON m.id = s.ministerio_id
+          AND m.comunidade_id = s.comunidade_id
+         LEFT JOIN escala_designacoes d
+           ON d.id = ci.designacao_id
+          AND d.comunidade_id = ci.comunidade_id
+         WHERE ci.comunidade_id = ?
+           AND s.status != 'CANCELADA'
+           AND (
+             ? = 1
+             OR m.responsavel_usuario_id = ?
+             OR EXISTS (
+               SELECT 1 FROM ministerio_voluntarios lead
+               WHERE lead.ministerio_id = s.ministerio_id
+                 AND lead.comunidade_id = s.comunidade_id
+                 AND lead.usuario_id = ?
+                 AND lead.papel = 'LIDER' AND lead.ativo = 1
+             )
+             OR d.usuario_id = ?
            )
-           OR d.usuario_id = ?
-         )
-       ORDER BY ci.escala_id DESC, ci.id ASC`,
-    )
-    .bind(
-      access.user.id,
-      access.context.comunidadeId,
-      globalManager ? 1 : 0,
-      access.user.id,
-      access.user.id,
-      access.user.id,
-    )
-    .all<Row>();
-  const reusableLinks = await db
-    .prepare(
-      `SELECT l.id, l.ministerio_id, l.item_id, l.tipo, l.titulo, l.url
-       FROM ministerio_links_reutilizaveis l
-       JOIN ministerios_comunidade m
-         ON m.id = l.ministerio_id
-        AND m.comunidade_id = l.comunidade_id
-       WHERE l.comunidade_id = ? AND l.ativo = 1
-         AND (
-           ? = 1
-           OR m.responsavel_usuario_id = ?
-           OR EXISTS (
-             SELECT 1 FROM ministerio_voluntarios lead
-             WHERE lead.ministerio_id = l.ministerio_id
-               AND lead.comunidade_id = l.comunidade_id
-               AND lead.usuario_id = ?
-               AND lead.papel = 'LIDER' AND lead.ativo = 1
+         ORDER BY ci.escala_id DESC, ci.id ASC`,
+      )
+      .bind(
+        access.user.id,
+        access.context.comunidadeId,
+        globalManager ? 1 : 0,
+        access.user.id,
+        access.user.id,
+        access.user.id,
+      )
+      .all<Row>(),
+    db
+      .prepare(
+        `SELECT l.id, l.ministerio_id, l.item_id, l.tipo, l.titulo, l.url
+         FROM ministerio_links_reutilizaveis l
+         JOIN ministerios_comunidade m
+           ON m.id = l.ministerio_id
+          AND m.comunidade_id = l.comunidade_id
+         WHERE l.comunidade_id = ? AND l.ativo = 1
+           AND (
+             ? = 1
+             OR m.responsavel_usuario_id = ?
+             OR EXISTS (
+               SELECT 1 FROM ministerio_voluntarios lead
+               WHERE lead.ministerio_id = l.ministerio_id
+                 AND lead.comunidade_id = l.comunidade_id
+                 AND lead.usuario_id = ?
+                 AND lead.papel = 'LIDER' AND lead.ativo = 1
+             )
            )
-         )
-       ORDER BY l.atualizado_em DESC, l.id DESC`,
-    )
-    .bind(
-      access.context.comunidadeId,
-      globalManager ? 1 : 0,
-      access.user.id,
-      access.user.id,
-    )
-    .all<Row>();
-  const libraryItems = await db
-    .prepare(
-      `SELECT b.id, b.ministerio_id, b.titulo, b.atualizado_em
-       FROM ministerio_biblioteca_itens b
-       JOIN ministerios_comunidade m
-         ON m.id = b.ministerio_id
-        AND m.comunidade_id = b.comunidade_id
-       WHERE b.comunidade_id = ? AND b.ativo = 1
-         AND (
-           ? = 1
-           OR m.responsavel_usuario_id = ?
-           OR EXISTS (
-             SELECT 1 FROM ministerio_voluntarios lead
-             WHERE lead.ministerio_id = b.ministerio_id
-               AND lead.comunidade_id = b.comunidade_id
-               AND lead.usuario_id = ?
-               AND lead.papel = 'LIDER' AND lead.ativo = 1
+         ORDER BY l.atualizado_em DESC, l.id DESC`,
+      )
+      .bind(
+        access.context.comunidadeId,
+        globalManager ? 1 : 0,
+        access.user.id,
+        access.user.id,
+      )
+      .all<Row>(),
+    db
+      .prepare(
+        `SELECT b.id, b.ministerio_id, b.titulo, b.atualizado_em
+         FROM ministerio_biblioteca_itens b
+         JOIN ministerios_comunidade m
+           ON m.id = b.ministerio_id
+          AND m.comunidade_id = b.comunidade_id
+         WHERE b.comunidade_id = ? AND b.ativo = 1
+           AND (
+             ? = 1
+             OR m.responsavel_usuario_id = ?
+             OR EXISTS (
+               SELECT 1 FROM ministerio_voluntarios lead
+               WHERE lead.ministerio_id = b.ministerio_id
+                 AND lead.comunidade_id = b.comunidade_id
+                 AND lead.usuario_id = ?
+                 AND lead.papel = 'LIDER' AND lead.ativo = 1
+             )
            )
-         )
-       ORDER BY b.titulo COLLATE NOCASE ASC`,
-    )
-    .bind(
-      access.context.comunidadeId,
-      globalManager ? 1 : 0,
-      access.user.id,
-      access.user.id,
-    )
-    .all<Row>();
+         ORDER BY b.titulo COLLATE NOCASE ASC`,
+      )
+      .bind(
+        access.context.comunidadeId,
+        globalManager ? 1 : 0,
+        access.user.id,
+        access.user.id,
+      )
+      .all<Row>(),
+  ]);
   // Cada item da biblioteca reúne os links da mesma música ou material, para
   // que a lista mostre apenas o nome e os ícones das plataformas.
   const linksByItem = new Map<number, Row[]>();
