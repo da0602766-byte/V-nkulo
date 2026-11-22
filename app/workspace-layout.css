@@ -133,7 +133,7 @@ html body .worship-composer-prompt[hidden], html body .composer-inline-title[hid
 
 /* Directory: compact rows, with one focused record on demand. */
 html body .pilot-dashboard[data-ui-version="v2"] .pilot-workspace:has(>.people-directory) { width:100% !important; max-width:none !important; padding:26px clamp(16px,2.4vw,40px) 48px; }
-.people-directory { container-type:inline-size; }
+.people-directory { container-type:inline-size; --people-actions-column:168px; }
 .people-directory .people-heading { margin-bottom:0; padding-bottom:16px; border-bottom:1px solid var(--pilot-line); }
 .people-directory .people-heading h1 { font-size:clamp(28px,3vw,40px); }
 .people-directory .people-heading p:last-child { font-size:14px; color:var(--pilot-muted); }
@@ -148,7 +148,7 @@ html body .people-directory .people-toolbar { display:flex; flex-wrap:wrap; min-
 html body .people-directory .people-toolbar>label { flex:1 1 240px; min-width:0; max-width:100%; }
 html body .people-directory .people-toolbar input[type="search"] { min-width:0; width:100%; box-sizing:border-box; }
 html body .people-directory .people-directory-list { display:block; border:1px solid var(--pilot-line); border-radius:14px; background:var(--pilot-surface); }
-html body .people-directory :is(.people-directory-columns,.people-directory-row) { display:grid !important; grid-template-columns:minmax(210px,1.5fr) minmax(120px,1fr) minmax(170px,1.1fr) 100px auto !important; gap:16px; align-items:center; }
+html body .people-directory :is(.people-directory-columns,.people-directory-row) { display:grid !important; grid-template-columns:minmax(210px,1.5fr) minmax(120px,1fr) minmax(170px,1.1fr) 100px var(--people-actions-column) !important; gap:16px; align-items:center; }
 .people-directory-columns { padding:14px 18px; background:var(--pilot-surface-2); border-radius:14px 14px 0 0; color:var(--pilot-muted); font-size:12px; font-weight:650; }
 html body .people-directory .people-directory-row { padding:14px 18px !important; border:0 !important; border-bottom:1px solid var(--pilot-line) !important; border-radius:0 !important; background:transparent !important; box-shadow:none !important; margin:0 !important; min-height:82px; }
 html body .people-directory .people-directory-row:last-child { border-bottom:0 !important; }
@@ -162,7 +162,7 @@ html body .people-directory .people-avatar { width:40px; height:40px; flex:0 0 4
 html body .people-directory .people-card-contact { display:grid; gap:4px; font-size:14px; }
 .people-directory-ministry>span { font-size:14px; line-height:1.5; }
 .people-directory-schedules>span { display:inline-grid; place-items:center; min-width:32px; height:32px; background:var(--community-soft); color:var(--community-primary); border-radius:9px; font-weight:650; }
-html body .people-directory .people-card-actions { display:flex; align-items:center; flex-wrap:nowrap; gap:8px; }
+html body .people-directory .people-card-actions { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
 html body .people-directory :is(.people-open-record,.people-options-toggle) { min-height:44px; padding:8px 12px; font-size:14px; border:1px solid var(--pilot-line); border-radius:10px; background:var(--pilot-surface-2); color:var(--community-primary); cursor:pointer; white-space:nowrap; }
 html body .people-directory .people-options-toggle { color:var(--pilot-text); }
 html body .people-directory .people-options-toggle[aria-expanded="true"] { border-color:var(--community-primary); background:var(--community-soft); color:var(--community-primary); }
@@ -171,7 +171,7 @@ html body .people-directory .people-options-toggle[aria-expanded="true"] { borde
 .people-row-inline-options button.danger { color:var(--rose,#b42338); border-color:color-mix(in srgb,var(--rose,#b42338) 35%,var(--pilot-line)); }
 .people-mobile-label { display:none; }
 @container (max-width:1000px) {
-  html body .people-directory :is(.people-directory-columns,.people-directory-row) { grid-template-columns:minmax(200px,1.5fr) minmax(120px,1fr) minmax(140px,1.1fr) auto !important; }
+  html body .people-directory :is(.people-directory-columns,.people-directory-row) { grid-template-columns:minmax(200px,1.5fr) minmax(120px,1fr) minmax(140px,1.1fr) var(--people-actions-column) !important; }
   .people-directory-schedules,.people-directory-columns>span:nth-child(4) { display:none; }
 }
 @container (max-width:720px) {
