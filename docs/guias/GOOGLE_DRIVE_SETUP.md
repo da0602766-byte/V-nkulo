@@ -27,7 +27,7 @@ Crie uma credencial **OAuth Client ID** do tipo **Web application** e use:
 Copie o Client ID e o Client Secret. O Client Secret deve ser informado somente
 no gerenciador seguro de variáveis do Site.
 
-## 2.1 Liberar o acesso enquanto o app não é verificado
+## 2.1 Publicação, escopos e verificação da marca
 
 A tela de consentimento nasce com o status **Em teste**. Nesse status o Google
 responde `Erro 403: access_denied` para qualquer conta que não esteja na lista
@@ -39,10 +39,23 @@ do projeto" e "testador autorizado" são cadastros separados.
 2. Em **Usuários de teste**, adicione os e-mails que vão entrar (limite de 100).
 3. O acesso vale imediatamente, sem verificação do Google.
 
-Para abrir o app a qualquer pessoa é preciso publicar em produção e passar pela
-verificação do Google, porque `drive.file` é um escopo sensível. A verificação
-exige a Política de Privacidade e os Termos publicados, além da propriedade do
-domínio confirmada no Search Console:
+`drive.file` é um escopo não sensível. Publicação em produção, verificação da
+marca e verificação de acesso a dados são etapas distintas. O Google pode exigir
+verificação da marca para exibir nome/logo de um app externo em produção, mesmo
+sem escopos sensíveis. Confira o estado na Central de verificação.
+
+Em 30/10/2026, capturas fornecidas pelo proprietário confirmaram: Drive API
+ativada, aplicativo externo em produção, marca pendente e acesso aos dados sem
+verificação exigida para os escopos configurados naquele momento. Isso não
+comprova a lista exata de escopos nem a aprovação de fluxos opcionais.
+
+O código também contém um fluxo opcional de Planilhas (`visitorSheets`) que
+solicita `spreadsheets` e `drive.metadata.readonly`. Revise esse fluxo e suas
+permissões separadamente; não amplie os escopos apenas para verificar a marca.
+
+Para a verificação da marca, confira as páginas públicas e a propriedade do
+domínio exigido pelo Console. Cadastrar um domínio não comprova sua propriedade.
+Não tente verificar o domínio raiz do provedor sem controle sobre ele:
 
 - Página inicial: `https://<dominio>/`
 - Política de Privacidade: `https://<dominio>/privacidade`
@@ -72,5 +85,7 @@ domínio confirmada no Search Console:
 - Entrar com Google não autoriza o Drive automaticamente.
 - Uma Conta Google não cria uma conta Vínkulo nem um vínculo comunitário.
 - Novas fotos e arquivos não são gravados no bucket da plataforma.
-- Novas mensagens são criptografadas antes de serem salvas no Drive.
+- Mensagens privadas seguem a política específica do chat. A política atual
+  (`app/privacidade/page.tsx`) informa armazenamento no banco do Vínkulo e
+  exclusão semanal; não prometa armazenamento dessas mensagens no Drive.
 - O download automático começa desligado e depende da escolha do usuário.

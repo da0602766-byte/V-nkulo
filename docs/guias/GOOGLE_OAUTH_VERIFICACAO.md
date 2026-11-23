@@ -5,6 +5,21 @@ feito manualmente no Google Cloud Console. Nada aqui foi inventado — onde
 um dado real é necessário (endereço, CNPJ, e-mail de suporte), está
 marcado como `[a definir]`.
 
+## Estado observado em 30/10/2026
+
+Capturas fornecidas pelo proprietário mostram:
+
+- Google Drive API ativada.
+- Cliente OAuth Web existente, chamado Vinkulo.
+- Público externo e status **Em produção**.
+- Nome, e-mail de suporte e logo preenchidos em Branding.
+- Central de verificação: marca não verificada; revisão de acesso aos dados não
+  necessária para os escopos configurados naquele momento.
+
+**Em produção não significa marca aprovada.** A lista exata de escopos no Console,
+o domínio verificado e as URLs completas salvas ainda precisam ser conferidos.
+A logo exibida no formulário não comprova aprovação nem sua exibição aos usuários.
+
 ## 1. Nome do aplicativo
 
 **VÍNKULO** — gestão para igrejas e comunidades.
@@ -66,10 +81,10 @@ Para desenvolvimento local (opcional, só se for testar OAuth localmente):
 http://localhost:5188/api/auth/google/callback
 ```
 
-Não existe redirect URI dinâmica nem gerada por usuário — o código sempre
-usa `origin + "/api/auth/google/callback"`, e agora rejeita origem que não
-seja HTTPS (exceto localhost), então uma URL fora dessas duas não
-completa o fluxo mesmo que alguém tente forçar.
+O código monta o retorno com `origin + "/api/auth/google/callback"` e exige
+HTTPS, exceto localhost. Isso não limita o retorno aos dois exemplos acima:
+o cliente OAuth no Google deve autorizar exatamente as origens de produção
+utilizadas. Confira esses valores antes de alterá-los.
 
 ## 8. Scopes solicitados
 
@@ -78,7 +93,17 @@ completa o fluxo mesmo que alguém tente forçar.
 | `openid` | Sempre (login) | Não sensível |
 | `email` | Sempre (login) | Não sensível |
 | `profile` | Sempre (login) | Não sensível |
-| `https://www.googleapis.com/auth/drive.file` | Só quando o usuário clica em "Conectar Google Drive" | Sensível (não é restrito — `drive.file` fica de fora da lista de escopos restritos do Google) |
+| `https://www.googleapis.com/auth/drive.file` | Só quando o usuário clica em "Conectar Google Drive" | Não sensível — acesso por arquivo |
+
+### Fluxo opcional de Planilhas
+
+`app/lib/google-integration.ts` acrescenta `spreadsheets` e
+`drive.metadata.readonly` quando `visitorSheets=true`. Esse fluxo é iniciado
+em `app/api/pilot/visitantes/planilha/route.ts`, ação `authorize`.
+A tabela acima descreve login/Drive básico e não todo o código. Revise a
+necessidade dessas permissões e o processo de verificação antes de liberar o
+fluxo de Planilhas. Não adicione essas permissões para resolver uma pendência de
+marca.
 
 ## 9. Justificativa de cada escopo
 
@@ -87,7 +112,7 @@ completa o fluxo mesmo que alguém tente forçar.
   eles não há como saber quem é o usuário.
 - **`drive.file`** — permitir que o usuário guarde, no próprio Google
   Drive dele, os arquivos que cria dentro do VÍNKULO (fotos de perfil,
-  anexos de conversa, mídia de publicação), em vez do VÍNKULO guardar uma
+  arquivos autorizados, mídia de publicação), em vez do VÍNKULO guardar uma
   cópia própria. O escopo é limitado aos arquivos que o próprio app cria
   ou que o usuário abre explicitamente pelo seletor do Google — nunca ao
   Drive inteiro. Por isso não usamos `drive` (acesso total), que exigiria
@@ -97,8 +122,8 @@ completa o fluxo mesmo que alguém tente forçar.
 
 - **Google Drive API** — para criar pastas, enviar, ler e apagar os
   arquivos que o próprio VÍNKULO gerencia dentro do Drive do usuário.
-- Nenhuma outra API Google é usada. A validação de identidade do login usa
-  o endpoint público `oauth2.googleapis.com/tokeninfo`, que não exige
+- O fluxo opcional de Planilhas também exige conferir a Google Sheets API e
+  os escopos adicionais. A validação de identidade do login usa o endpoint público `oauth2.googleapis.com/tokeninfo`, que não exige
   habilitação separada.
 
 ## 11. Configurações necessárias no Google Auth Platform
@@ -108,12 +133,15 @@ OAuth"):
 
 1. **Tipo de usuário**: Externo (qualquer Conta Google pode entrar).
 2. **Nome do app**: VÍNKULO.
-3. **Logo**: usar o ícone já publicado em `/vinkulo-app-icon-192.png`.
-4. **E-mail de suporte ao usuário**: `[a definir]`.
-5. **E-mail de contato do desenvolvedor**: `[a definir]`.
-6. **Domínios autorizados**: `chatgpt.site` (ou o domínio próprio, se
-   houver) — precisa passar pela verificação de propriedade do domínio no
-   Google Search Console antes de publicar.
+3. **Logo**: usar a arte oficial em `/vinkulo-logo.png`, definida em
+   `app/lib/brand-identity.ts`. Ajuste apenas formato/tamanho se o Console exigir.
+4. **E-mail de suporte ao usuário**: `da0602766@gmail.com` (confirmado na captura).
+5. **E-mail de contato do desenvolvedor**: `da0602766@gmail.com` (confirmado na captura).
+6. **Domínios autorizados**: a captura mostra `da0602766.chatgpt.site`.
+   A aceitação desse campo não comprova propriedade. Confira a exigência exibida
+   pelo Google; não cadastre nem tente verificar o domínio raiz do provedor
+   (`chatgpt.site`) sem controle sobre ele. Se não for possível comprovar o
+   endereço hospedado, será necessário um domínio sob controle do responsável.
 
 ## 12. Configurações em Branding
 
@@ -155,14 +183,14 @@ OAuth"):
    de exclusão/contato estão publicadas e acessíveis sem login (itens 3-6
    já cobrem isso).
 2. Preencher Branding, Audience e Data Access (itens 12-14).
-3. Verificar a propriedade do domínio `chatgpt.site` (ou domínio próprio)
-   no [Google Search Console](https://search.google.com/search-console),
-   com a mesma conta usada no Google Cloud.
-4. No Google Auth Platform, clicar em **Publish App** (ou "Publicar
-   aplicativo"). Como o único escopo sensível é `drive.file` (não é
-   restrito), o Google normalmente **não exige verificação de segurança
-   de terceiros (CASA)** — só a revisão padrão do próprio Google, que pode
-   levar alguns dias.
+3. Conferir a propriedade dos domínios exigidos para a marca no
+   [Google Search Console](https://search.google.com/search-console), com uma
+   conta vinculada ao projeto e controle comprovável sobre o endereço.
+4. A publicação em produção já foi confirmada nas capturas de 30/10/2026.
+   Concluir a revisão da marca em Branding e usar a opção de envio para análise
+   que o Console disponibilizar. `drive.file` não exige revisão de escopo
+   sensível por si só. Se houver rascunho de marca, conferir também a etapa de
+   publicação da marca após aprovação.
 5. Se o Google pedir o vídeo de demonstração, use o roteiro em
    `docs/guias/GOOGLE_OAUTH_VIDEO_VERIFICACAO.md`.
 
@@ -191,11 +219,8 @@ OAuth"):
       tornaria ilegíveis os refresh tokens já salvos de quem já conectou o
       Drive.
 - [ ] Verificar a propriedade do domínio no Google Search Console (item 16.3).
-- [ ] Confirmar se o app já está em Testing ou Production hoje — você não
-      soube informar, e eu não tenho acesso ao Console para checar. O
-      login funcionar não decide isso sozinho: tanto Testing (com seu
-      e-mail na lista de test users) quanto Production explicam o que você
-      viu.
+- [x] Status **Em produção** e público **Externo** confirmados por captura
+      fornecida pelo proprietário em 30/10/2026.
 - [ ] Localizar (ou decidir que ainda não existe) o código-fonte do app
       Android, para eu confirmar que o `AndroidManifest.xml` registra
       `scheme=vinkulo` e `package=com.vinkulo.app`, usados em
@@ -214,10 +239,24 @@ OAuth"):
 - [x] Política de Privacidade e Termos existem e mencionam Google/Drive.
 - [x] Página de exclusão de conta/dados existe.
 - [x] Página de contato/suporte existe.
-- [ ] E-mails reais de suporte/privacidade preenchidos (placeholders hoje).
+- [x] E-mail real de suporte preenchido, confirmado nas capturas e no código.
 - [ ] Branding, Audience, Data Access e Clients configurados no Console.
 - [ ] Propriedade do domínio verificada no Search Console.
-- [ ] App publicado (Testing → Production) no Console.
+- [x] App publicado (Testing → Production) no Console, conforme captura de 30/10/2026.
+- [ ] Marca enviada e aprovada; confirmar também a publicação da marca.
+- [ ] Escopos reais do Console comparados com login/Drive e fluxo opcional de Planilhas.
 
 Com os `[a definir]` preenchidos e os itens do Console configurados, o
 VÍNKULO está tecnicamente pronto para solicitar a publicação/verificação.
+
+
+## Fontes e limites
+
+- Google Drive: https://developers.google.com/workspace/drive/api/guides/api-specific-auth
+- Marca OAuth: https://developers.google.com/identity/protocols/oauth2/production-readiness/brand-verification
+- Capturas do proprietário em 30/10/2026; leitura do código da branch principal.
+- O prazo de exclusão e o responsável legal ainda aparecem como placeholders
+  nas páginas de exclusão e contato. Devem ser definidos pelo responsável, sem
+  inventar nome empresarial, endereço ou compromisso de atendimento.
+- Esta atualização corrige documentação. Não publica o site, não altera o Console,
+  não comprova funcionamento multiusuário e não concede aprovação do Google.
