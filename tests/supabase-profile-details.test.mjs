@@ -13,8 +13,11 @@ test("dados cadastrais são copiados ao serviço e a API devolve apenas contagen
     senha: "Owner123", memberships: [{ comunidadeId: 1, papel: "ADMIN_COMUNIDADE" }] });
   await createPilotUser(database, { nome: "Sensitive Member", email: "member.details@example.test",
     senha: "Member123", memberships: [{ comunidadeId: 1, papel: "MEMBRO" }] });
+  const signupMarker = "ab".repeat(32);
+  const registration = { origem: "LINK_CADASTRO_MEMBROS", operacao: signupMarker, campo: "dado sensível" };
+  const updateRegistration = database.prepare("UPDATE usuarios SET cadastro_dados=? WHERE id=?");
   database.prepare("UPDATE usuarios SET telefone=?,endereco=?,observacoes=?,cadastro_dados=? WHERE id=?")
-    .run("11999990000", "Rua Confidencial 123", "Observação privada", JSON.stringify({ campo: "dado sensível" }), ownerId);
+    .run("11999990000", "Rua Confidencial 123", "Observação privada", JSON.stringify(registration), ownerId);
   const tasks = [];
   const context = { waitUntil(promise) { tasks.push(promise); }, passThroughOnException() {} };
   const worker = (await import(new URL(`../dist/server/index.js?profile-details-${Date.now()}`, import.meta.url))).default;
@@ -104,7 +107,10 @@ test("dados cadastrais são copiados ao serviço e a API devolve apenas contagen
     assert.equal(privatePayload.payload.length, preview.sourceCount);
     const ownerDetails = privatePayload.payload.find(item => item.legacy_d1_id === ownerId).details;
     assert.equal(ownerDetails.phone, "11999990000");
-    assert.equal(ownerDetails.registration_data.campo, "dado sensível");
+    assert.deepEqual(ownerDetails.registration_data, { origem: registration.origem, campo: registration.campo });
+    assert.equal(JSON.stringify(privatePayload).includes(signupMarker), false);
+    assert.equal(database.prepare("SELECT cadastro_dados FROM usuarios WHERE id=?").get(ownerId).cadastro_dados,
+      JSON.stringify(registration));
     assert.equal(JSON.stringify(privatePayload).includes("senha_hash"), false);
     assert.equal(JSON.stringify(privatePayload).includes("senha_salt"), false);
     for (const secret of ["11999990000", "Rua Confidencial 123", "Observação privada", "dado sensível"]) {
@@ -120,6 +126,10 @@ test("dados cadastrais são copiados ao serviço e a API devolve apenas contagen
     const marker = await call(ownerCookie);
     assert.equal(marker.status, 409);
     assert.match((await marker.json()).error, /marcador ou credencial/);
+    updateRegistration.run(JSON.stringify({ ...registration, perfil: { senha: "ficticia" } }), ownerId);
+    assert.equal((await call(ownerCookie)).status, 409);
+    updateRegistration.run(JSON.stringify({ origem: "OUTRA", operacao: signupMarker }), ownerId);
+    assert.equal((await call(ownerCookie)).status, 409);
     assert.equal((await call(ownerCookie, "DELETE", { confirm: "REMOVER_COPIA_DADOS_CADASTRAIS", destinationCount: remoteDetails.length + 1 })).status, 409);
     assert.equal(remoteDetails.length, preview.sourceCount);
     database.prepare("UPDATE usuarios SET cadastro_dados=? WHERE id=?").run("{}", ownerId);

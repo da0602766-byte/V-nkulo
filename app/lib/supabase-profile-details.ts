@@ -69,7 +69,14 @@ export async function loadSourceProfileDetails(): Promise<ProfileDetailsItem[]> 
       || JSON.stringify(registrationData).length > 16_000) {
       throw new ProfileDetailsError("Há dados de cadastro incompatíveis no D1.", 422);
     }
-    assertNoCredentialFields(registrationData);
+    const registration = registrationData as Record<string, unknown>;
+    // The public signup route stores this nonce to correlate writes in its D1 batch.
+    // Keep it in D1 and omit only the recognized top-level marker from the copy.
+    if (registration.origem === "LINK_CADASTRO_MEMBROS" &&
+      typeof registration.operacao === "string" && /^[a-f0-9]{64}$/.test(registration.operacao)) {
+      delete registration.operacao;
+    }
+    assertNoCredentialFields(registration);
     const profilePhoto = bounded(row.foto_perfil, 2048);
     if (profilePhoto?.startsWith("data:")) {
       throw new ProfileDetailsError("Há foto incorporada ao cadastro. Migre o arquivo antes de copiar os detalhes.", 409);
@@ -79,7 +86,7 @@ export async function loadSourceProfileDetails(): Promise<ProfileDetailsItem[]> 
       permissions: bounded(row.permissoes, 4096) || "",
       profile_photo: profilePhoto,
       phone: bounded(row.telefone, 80),
-      registration_data: registrationData as Record<string, unknown>,
+      registration_data: registration,
       birth_date: bounded(row.data_nascimento, 40),
       address: bounded(row.endereco, 2000),
       cell: bounded(row.celula, 180),

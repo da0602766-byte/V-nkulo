@@ -148,12 +148,15 @@ test("conciliação automática é exclusiva do proprietário, ordenada, pausáv
     assert.equal((await detailsCall("POST", { confirm: "SINCRONIZAR_DADOS_CADASTRAIS", sourceCount: detailsBefore.sourceCount })).status, 200);
     assert.equal((await (await detailsCall("PATCH", { action: "ENABLE" })).json()).autoSyncEnabled, true);
     const memberId = profiles.find(profile => profile.email === "member.auto@example.test").legacy_d1_id;
-    database.prepare("UPDATE usuarios SET telefone = ?, atualizado_em = ? WHERE id = ?")
-      .run("11987654321", "2026-09-29 15:00:00", memberId);
+    database.prepare("UPDATE usuarios SET telefone = ?, cadastro_dados = ?, atualizado_em = ? WHERE id = ?")
+      .run("11987654321", JSON.stringify({ origem: "LINK_CADASTRO_MEMBROS", operacao: "ab".repeat(32) }),
+        "2026-09-29 15:00:00", memberId);
     const detailsUpdated = (await (await call("RECONCILE")).json()).status;
     assert.equal(detailsUpdated.lastError, null);
     assert.equal(detailsUpdated.lastResult.profileDetails.changed, 1);
     assert.equal(destination.profileDetails.find(item => item.legacy_d1_id === memberId).details.phone, "11987654321");
+    assert.deepEqual(destination.profileDetails.find(item => item.legacy_d1_id === memberId).details.registration_data,
+      { origem: "LINK_CADASTRO_MEMBROS" });
     assert.equal((await (await detailsCall("PATCH", { action: "DISABLE" })).json()).autoSyncEnabled, false);
     database.prepare("UPDATE usuarios SET telefone = ?, atualizado_em = ? WHERE id = ?")
       .run("11876543210", "2026-09-29 15:01:00", memberId);
