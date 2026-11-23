@@ -1,6 +1,7 @@
 import { cpfLoginRequest } from './helpers/cpf-login.mjs';
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { createPilotD1, createPilotUser } from "./helpers/sqlite-d1.mjs";
 
@@ -20,7 +21,7 @@ async function login(worker, runtime, context, email, password) {
   return values.map(value => value.match(/__Host-adote_session=[^;]+/)?.[0]).find(Boolean);
 }
 
-test("conciliação automática é exclusiva do proprietário, ordenada, pausável e não envia credenciais", async () => {
+test("conciliação automática é exclusiva do proprietário, ordenada, pausável e não envia credenciais", async t => {
   const { database, d1 } = await createPilotD1();
   await createPilotUser(database, { nome: "Proprietário", email: "owner.auto@example.test", senha: "Owner123",
     memberships: [{ comunidadeId: 1, papel: "ADMIN_COMUNIDADE" }] });
@@ -59,8 +60,12 @@ test("conciliação automática é exclusiva do proprietário, ordenada, pausáv
   const destination = { tenants: [], profiles: [], memberships: [], profileDetails: [] };
   const writes = [];
   const nativeFetch = globalThis.fetch;
+  let membershipUnavailable = false;
   globalThis.fetch = async (request, init = {}) => {
     const url = String(request);
+    if (membershipUnavailable && url.endsWith("/rpc/vinkulo_membership_snapshot")) {
+      return Response.json({ message: "Indisponível" }, { status: 503 });
+    }
     if (url.includes('/rest/v1/vinkulo_profiles?') && init.method === 'DELETE') {
       const id = Number(new URL(url).searchParams.get('legacy_d1_id').slice(3));
       assert.equal(new URL(url).searchParams.get('auth_user_id'), 'is.null');
@@ -96,6 +101,42 @@ test("conciliação automática é exclusiva do proprietário, ordenada, pausáv
     assert.deepEqual(Object.keys(writes[1].body.payload[0]).sort(), ["active", "created_at", "display_name", "email", "legacy_d1_id"]);
     assert.equal(JSON.stringify(writes).includes("Owner123"), false);
     assert.equal(JSON.stringify(enabled).includes("@example.test"), false);
+
+    // Preserve the installed v1 token derivation while calling the canonical origin.
+    const token = createHash("sha256")
+      .update(`vinkulo:supabase-schedule:v1:https://adote-gestao.da0602766.chatgpt.site:${runtime.AUTH_SECRET}`)
+      .digest("hex");
+    const scheduled = async () => {
+      await Promise.all(tasks.splice(0));
+      const response = await worker.fetch(new Request(
+        "https://vinkulo.da0602766.chatgpt.site/api/system/supabase-sync",
+        { method: "POST", headers: { authorization: `Bearer ${token}` } },
+      ), runtime, context);
+      await Promise.all(tasks.splice(0));
+      return response;
+    };
+    t.mock.timers.enable({ apis: ["Date"], now: Date.now() });
+    t.mock.timers.tick(5 * 60_000);
+    assert.equal((await scheduled()).status, 200);
+    assert.equal(writes.length, 3);
+
+    destination.profiles = [];
+    destination.memberships = [];
+    membershipUnavailable = true;
+    t.mock.timers.tick(5 * 60_000);
+    const failedSchedule = await scheduled();
+    const failedStatus = await failedSchedule.json();
+    assert.equal(failedSchedule.status, 503, JSON.stringify({ failedStatus, writes: writes.map(item => item.key) }));
+    assert.ok(failedStatus.lastError);
+    assert.deepEqual(writes.slice(3).map(item => item.key), ["profiles"]);
+    membershipUnavailable = false;
+    t.mock.timers.tick(5 * 60_000);
+    assert.equal((await scheduled()).status, 200);
+    assert.deepEqual(writes.slice(3).map(item => item.key), ["profiles", "memberships"]);
+    assert.deepEqual(destination.profiles, profiles);
+    assert.deepEqual(destination.memberships, memberships);
+    t.mock.timers.reset();
+
     const detailsEndpoint = "http://localhost/api/proprietario/integracoes/supabase/profile-details";
     const detailsCall = (method, body, cookie = ownerCookie) => worker.fetch(new Request(detailsEndpoint, {
       method, headers: { cookie, "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined,
