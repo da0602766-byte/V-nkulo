@@ -4,7 +4,7 @@ import { startLogoPreview } from "./logo-transition-preview.mjs";
 const { chromium } = await import(process.env.VINKULO_PLAYWRIGHT_MODULE || "playwright");
 const preview = await startLogoPreview();
 const browser = await chromium.launch({ channel: "msedge", headless: true });
-const results = [], errors = [], previewWarnings = new Set();
+const results = [], errors = [];
 await fs.mkdir("outputs/logo-transition", { recursive: true });
 async function ready(page) {
   await page.waitForFunction(() => document.documentElement.dataset.logoController === 'ready' && document.querySelector('.platform-loading-transition')?.dataset.phase === 'idle', null, { timeout: 20000 });
@@ -16,9 +16,7 @@ async function pageFor(options = {}) {
     if (message.type() !== 'error') return;
     const expectedFailure = /\/api\/(pilot\/comunidade-ativa|auth\/login)$/.test(message.location().url)
       && /\b(401|503)\b/.test(message.text());
-    const absentPreload = /\/assets\/community-central-[\w-]+\.js$/.test(message.location().url) && /\b404\b/.test(message.text());
-    if (absentPreload) previewWarnings.add(`${message.location().url} ${message.text()}`);
-    else if (!expectedFailure) errors.push(`${message.location().url} ${message.text()}`);
+    if (!expectedFailure) errors.push(`${message.location().url} ${message.text()}`);
   });
   return page;
 }
@@ -219,8 +217,8 @@ try {
   await noJs.close();
   assert.deepEqual(errors,[]);
 } finally {
-  await fs.writeFile('outputs/logo-transition/results.json',JSON.stringify({results,errors,previewWarnings:[...previewWarnings]},null,2));
+  await fs.writeFile('outputs/logo-transition/results.json',JSON.stringify({results,errors},null,2));
   await browser.close();
   await preview.close();
 }
-console.log(JSON.stringify({results,errors,previewWarnings:[...previewWarnings]},null,2));
+console.log(JSON.stringify({results,errors},null,2));

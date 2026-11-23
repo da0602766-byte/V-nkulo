@@ -23,6 +23,14 @@ export function sites(): Plugin {
     apply: "build",
     configResolved(config) {
       root = config.root;
+      // Vite removes pure-CSS JavaScript placeholders during generateBundle.
+      // Collect RSC preloads after that pass so SSR sees the published files.
+      const assetsManifest = config.plugins.find(
+        plugin => plugin.name === "rsc:virtual:vite-rsc/assets-manifest",
+      );
+      if (typeof assetsManifest?.generateBundle === "function") {
+        assetsManifest.generateBundle = { order: "post", handler: assetsManifest.generateBundle };
+      }
     },
     async closeBundle() {
       const outputDirectory = resolve(root, "dist", ".openai");
