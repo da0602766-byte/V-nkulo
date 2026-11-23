@@ -302,6 +302,10 @@ export async function getActiveTenantContext(
       permissions.push("community.theme.manage");
     }
   }
+  if (fullAccess && isCommunityOwner && !permissions.includes("pastoral.panel.view")) {
+    permissions.push("pastoral.panel.view");
+  }
+  if (fullAccess && permissions.includes("dashboard.view")) permissions.push("reports.view");
   if (user.system_owner) {
     permissions.push("community.lifecycle.review");
   }

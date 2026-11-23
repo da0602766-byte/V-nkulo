@@ -6,11 +6,36 @@ import { requireTenantPermission } from "../../../../lib/tenant";
 type Context = { params: Promise<{ id: string }> };
 type StoredCellMember = { id: string; kind: "COMMUNITY" | "EXTERNAL"; userId?: number; name: string; note?: string; role?: "LEADER" | "VICE_LEADER" | "MEMBER" };
 
+export async function GET(request: Request, context: Context) {
+  const access = await requireTenantPermission("cells.view");
+  if ("error" in access) return access.error;
+  const id = Number((await context.params).id);
+  const query = new URL(request.url).searchParams;
+  const reportId = Number(query.get("relatorio") || 0);
+  const page = Number(query.get("pagina") || 1);
+  if (![id,page].every(value => Number.isSafeInteger(value) && value > 0) || !Number.isSafeInteger(reportId) || reportId < 0 || page > 10_000) {
+    return Response.json({ error: "Informe uma célula e uma página válidas." }, { status: 400 });
+  }
+  const db = getD1();
+  const cid = access.context.comunidadeId;
+  const scope = await db.prepare(`SELECT id FROM celulas WHERE id=? AND comunidade_id=? AND escopo_confirmado=1
+    AND (?=1 OR lider_usuario_id=? OR vice_lider_usuario_id=? OR lower(trim(criado_por))=lower(trim(?)))`)
+    .bind(id,cid,+access.context.permissions.includes("cells.manage"),access.user.id,access.user.id,access.user.email).first();
+  if (!scope) return Response.json({ error: "Histórico da célula indisponível para este acesso." }, { status: 404 });
+  const size = 12;
+  const reports = await db.prepare(`SELECT r.id,r.data_reuniao,r.aconteceu,r.presentes,r.visitantes,r.observacoes,r.versao,u.nome AS enviado_por_nome
+    FROM celula_relatorios r LEFT JOIN usuarios u ON u.id=r.enviado_por_usuario_id
+    WHERE r.comunidade_id=? AND r.celula_id=? AND (?=0 OR r.id=?)
+    ORDER BY r.data_reuniao DESC,r.id DESC LIMIT ? OFFSET ?`)
+    .bind(cid,id,reportId,reportId,size+1,(page-1)*size).all();
+  return Response.json({ relatorios: reports.results.slice(0,size), hasMore: reports.results.length > size }, { headers: { "Cache-Control": "private, no-store" } });
+}
+
 export async function PATCH(request: Request, context: Context) {
   const access = await requireTenantPermission("cells.view");
   if ("error" in access) return access.error;
   const id = Number((await context.params).id);
-  const payload = ((await request.json().catch(() => null)) ?? {}) as Record<string, unknown>;
+  const payload = await request.json() as Record<string, unknown>;
   const db = getD1();
   const existing = await db.prepare(
     `SELECT id, nome, membros, lider_usuario_id, vice_lider_usuario_id, ativo, criado_por
@@ -122,21 +147,45 @@ export async function PATCH(request: Request, context: Context) {
     return audited(db, access.context, access.user.id, id, "AGENDA_DA_CELULA_CRIADA");
   }
 
-  if (action === "RELATORIO_CRIAR") {
+  if (action === "RELATORIO_CRIAR" || action === "RELATORIO_CORRIGIR") {
     const date = String(payload.dataReuniao || "").slice(0, 10);
+    const parsedDate = new Date(`${date}T00:00:00.000Z`);
     const happened = payload.aconteceu !== false && payload.aconteceu !== "false";
-    const present = Math.max(0, Math.min(999, Number(payload.presentes) || 0));
-    const visitors = Math.max(0, Math.min(999, Number(payload.visitantes) || 0));
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return Response.json({ error: "Informe a data da reunião." }, { status: 400 });
-    await db.batch([
-      db.prepare(
-        `INSERT INTO celula_relatorios (comunidade_id, celula_id, data_reuniao, aconteceu, presentes, visitantes, observacoes, enviado_por_usuario_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(celula_id, data_reuniao) DO UPDATE SET aconteceu=excluded.aconteceu, presentes=excluded.presentes, visitantes=excluded.visitantes, observacoes=excluded.observacoes, enviado_por_usuario_id=excluded.enviado_por_usuario_id`,
-      ).bind(access.context.comunidadeId, id, date, happened ? 1 : 0, happened ? present : 0, happened ? visitors : 0, String(payload.observacoes || "").trim().slice(0, 1000), access.user.id),
-      db.prepare(`UPDATE celulas SET ultimo_relatorio_em = CURRENT_TIMESTAMP, ativo = 1, arquivada_em = NULL, atualizado_em = CURRENT_TIMESTAMP WHERE id = ? AND comunidade_id = ?`).bind(id, access.context.comunidadeId),
+    const present = happened ? Number(payload.presentes ?? 0) : 0;
+    const visitors = happened ? Number(payload.visitantes ?? 0) : 0;
+    if (!Number.isFinite(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== date) {
+      return Response.json({ error: "Informe uma data válida para a reunião." }, { status: 400 });
+    }
+    if (![present, visitors].every(count => Number.isInteger(count) && count >= 0 && count <= 999)) {
+      return Response.json({ error: "Informe números inteiros de 0 a 999 para presentes e visitantes." }, { status: 400 });
+    }
+    const cid = access.context.comunidadeId;
+    const notes = String(payload.observacoes || "").trim().slice(0, 1000);
+    const reportAudit = (event: string) => db.prepare(`INSERT INTO auditoria_piloto (comunidade_id,usuario_id,evento,resultado,metadados)
+      SELECT ?,?,?,'SUCESSO',? WHERE changes()=1`).bind(cid,access.user.id,event,JSON.stringify({ celulaId:id }));
+    if (action === "RELATORIO_CORRIGIR") {
+      const version = Number(payload.versao);
+      const reportId = Number(payload.relatorioId);
+      if (![version, reportId].every(value => Number.isSafeInteger(value) && value > 0)) {
+        return Response.json({ error: "Abra um relatório do histórico antes de corrigir." }, { status: 400 });
+      }
+      const [result] = await db.batch([db.prepare(`UPDATE celula_relatorios
+        SET aconteceu=?,presentes=?,visitantes=?,observacoes=?,enviado_por_usuario_id=?,versao=versao+1,atualizado_em=CURRENT_TIMESTAMP
+        WHERE id=? AND comunidade_id=? AND celula_id=? AND data_reuniao=? AND versao=?`)
+        .bind(+happened,present,visitors,notes,access.user.id,reportId,cid,id,date,version),reportAudit("RELATORIO_SEMANAL_CORRIGIDO")]);
+      if (!result.meta.changes) return Response.json({ error: "O relatório mudou. Atualize o histórico antes de corrigir." }, { status: 409 });
+      return Response.json({ ok: true });
+    }
+    const [result] = await db.batch([
+      db.prepare(`INSERT INTO celula_relatorios (comunidade_id,celula_id,data_reuniao,aconteceu,presentes,visitantes,observacoes,enviado_por_usuario_id)
+        VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(celula_id,data_reuniao) DO NOTHING`)
+        .bind(cid,id,date,+happened,present,visitors,notes,access.user.id),
+      db.prepare(`UPDATE celulas SET ultimo_relatorio_em=CURRENT_TIMESTAMP,ativo=1,arquivada_em=NULL,atualizado_em=CURRENT_TIMESTAMP
+        WHERE id=? AND comunidade_id=? AND changes()=1`).bind(id,cid),
+      reportAudit("RELATORIO_SEMANAL_ENVIADO"),
     ]);
-    return audited(db, access.context, access.user.id, id, "RELATORIO_SEMANAL_ENVIADO");
+    if (!result.meta.changes) return Response.json({ error: "Já existe um relatório para esta data. Abra o histórico e escolha Corrigir relatório." }, { status: 409 });
+    return Response.json({ ok: true });
   }
 
   if (action === "SOLICITACAO_DECIDIR") {

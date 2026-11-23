@@ -15,7 +15,7 @@ export async function GET() {
   const isCreator = Number(community?.proprietario_usuario_id) === Number(access.user.id);
   const grant = isCreator
     ? { ativo: 1 }
-    : await db
+    : access.context.papel !== "PASTOR" ? null : await db
         .prepare("SELECT ativo FROM acessos_painel_pastoral WHERE comunidade_id = ? AND usuario_id = ? LIMIT 1")
         .bind(communityId, access.user.id)
         .first<{ ativo: number }>();
@@ -59,9 +59,9 @@ export async function GET() {
       `SELECT r.id, r.data_reuniao, r.aconteceu, r.presentes, r.visitantes,
         r.observacoes, r.criado_em, c.nome AS celula_nome,
         COALESCE(u.nome, 'Liderança da célula') AS enviado_por_nome
-       FROM celula_relatorios r JOIN celulas c ON c.id = r.celula_id
+       FROM celula_relatorios r JOIN celulas c ON c.id = r.celula_id AND c.comunidade_id = r.comunidade_id
        LEFT JOIN usuarios u ON u.id = r.enviado_por_usuario_id
-       WHERE r.comunidade_id = ? ORDER BY r.data_reuniao DESC, r.id DESC LIMIT 30`,
+       WHERE r.comunidade_id = ? AND c.escopo_confirmado = 1 ORDER BY r.data_reuniao DESC, r.id DESC LIMIT 30`,
     ).bind(communityId).all(),
   ]);
 

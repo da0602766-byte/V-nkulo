@@ -109,7 +109,7 @@ const MENU: { id: View; label: string; permission: string }[] = [
   { id: "lider", label: "Painel de liderança", permission: "leadership.panel.view" },
   { id: "pessoas", label: "Pessoas", permission: "people.view" },
   { id: "comunidade", label: "Central da Comunidade", permission: "dashboard.view" },
-  { id: "relatorios", label: "Relatórios", permission: "dashboard.view" },
+  { id: "relatorios", label: "Relatórios", permission: "reports.view" },
   { id: "avisos", label: "Avisos", permission: "dashboard.view" },
   { id: "configuracoes", label: "Configurações", permission: "dashboard.view" },
   { id: "continuidade", label: "Continuidade", permission: "community.lifecycle.request" },
@@ -1351,6 +1351,9 @@ export default function PilotDashboard({
           {["comunidade", "relatorios", "avisos"].includes(visibleView) && !accessDeniedView && <CommunityCentral
             key={`${active.comunidadeId}:${visibleView}`} communityId={active.comunidadeId}
             mode={visibleView === "relatorios" ? "reports" : visibleView === "avisos" ? "notices" : "overview"}
+            reportsEnabled={active.permissions.includes("reports.view")}
+            reportPreferenceKey={`${active.comunidadeId}:${active.userId}`}
+            canScheduleReports={active.isCommunityOwner}
             onNotifications={() => window.dispatchEvent(new CustomEvent("vinkulo:open-notifications"))} />}
           {visibleView === "inicio" && !accessDeniedView && (
             <CommunityHome
@@ -1398,13 +1401,13 @@ export default function PilotDashboard({
             />
           )}
           {visibleView === "estacionamento" && (
-            <ParkingWorkspace key={active.comunidadeId} communityName={active.comunidadeNome} memberMode={!active.permissions.includes("parking.view")} />
+            <ParkingWorkspace key={active.comunidadeId} communityName={active.comunidadeNome} memberMode={!active.permissions.includes("parking.view")} reportsEnabled={active.permissions.includes("reports.view")} />
           )}
           {visibleView === "redes" && features.networkModuleEnabled && (
             <NetworkWorkspace />
           )}
           {visibleView === "membro" && <>
-            <CommunityCentral key={`member:${active.comunidadeId}`} communityId={active.comunidadeId} mode="member" />
+            <CommunityCentral key={`member:${active.comunidadeId}`} communityId={active.comunidadeId} mode="member" reportsEnabled={active.permissions.includes("reports.view")} />
             <details className="central-disclosure"><summary>Meus dados e vínculos</summary><p>Consulte seus vínculos e mantenha seus contatos atualizados.</p>
               <PeopleWorkspace communityName={active.comunidadeNome} mode="self"
                 selfLinks={allowedMenu.filter(item => ["eventos", "ministerios", "celulas"].includes(item.id)).map(item => ({ label: item.label, href: `/painel?view=${item.id}` }))} />
@@ -1412,7 +1415,7 @@ export default function PilotDashboard({
             <a className="member-account-action" href="/painel?view=conta"><span aria-hidden="true">⚙</span><span><strong>Meu perfil e conta</strong><small>Foto, dados pessoais e privacidade</small></span><b aria-hidden="true">→</b></a>
           </>}
           {visibleView === "lider" && <>
-            <CommunityCentral key={`leadership:${active.comunidadeId}`} communityId={active.comunidadeId} mode="leadership" />
+            <CommunityCentral key={`leadership:${active.comunidadeId}`} communityId={active.comunidadeId} mode="leadership" reportsEnabled={active.permissions.includes("reports.view")} />
             <details className="central-disclosure"><summary>Equipe, funções e acesso pastoral</summary><p>Consulte os responsáveis, o histórico e as opções de gestão disponíveis para você.</p>
               <LeadershipWorkspace mode={active.permissions.includes("pastoral.panel.view") ? "pastoral" : "leader"} communityName={active.comunidadeNome} />
             </details>

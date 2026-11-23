@@ -57,6 +57,9 @@ export type ParkingReport = {
   inicia_em: string;
   termina_em: string;
   resumo: string;
+  motivo_correcao: string;
+  pode_revisar: number;
+  proprio: number;
   entradas: number;
   saidas: number;
   ocorrencias: number;

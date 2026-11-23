@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ParkingQrCheckin, type ParkingQrValidationResult } from "../ParkingReservationQr";
 import { formatClock, formatCountdown, formatTime, parkingLabel } from "./format";
 import { ParkingEmpty, ParkingHeading, ParkingMetric, ParkingMovementCard } from "./ParkingUi";
@@ -16,11 +16,10 @@ export default function ParkingOperatorMobile({
   communityName: string;
   parking: ParkingController;
 }) {
-  const { data, reservations, reports, working, feedback, error, registerExit, reservationAction, reportAction } = parking;
+  const { data, reservations, reports, working, feedback, error, registerExit, reservationAction } = parking;
   const escala = data?.operator.escala || null;
   const [now, setNow] = useState(() => Date.now());
   const [search, setSearch] = useState("");
-  const autoSentRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!escala) return;
@@ -62,21 +61,6 @@ export default function ParkingOperatorMobile({
     [reports, escala],
   );
 
-  useEffect(() => {
-    if (!shiftEnded || !escala || !myReport) return;
-    if (myReport.status !== "AGUARDANDO_MEMBRO") return;
-    if (autoSentRef.current === myReport.id) return;
-    autoSentRef.current = myReport.id;
-    void reportAction({
-      id: myReport.id,
-      acao: "ENVIAR",
-      resumo: `Relatório enviado automaticamente ao final da escala “${escala.titulo}”.`,
-      entradas: shiftStats.entradas,
-      saidas: shiftStats.saidas,
-      ocorrencias: shiftStats.ocorrencias,
-    });
-  }, [shiftEnded, escala, myReport, reportAction, shiftStats]);
-
   if (!escala) {
     return (
       <section className="gestao-operator gestao-operator-closed">
@@ -115,6 +99,7 @@ export default function ParkingOperatorMobile({
           <span aria-hidden="true">✓</span>
           <h2>Escala encerrada</h2>
           <p>{myReport && ["AGUARDANDO_LIDER","ENVIADO_PASTOR"].includes(myReport.status) ? "Relatório registrado para a liderança." : "Consulte o estado do relatório após a sincronização. O encerramento do plantão não registra a saída dos veículos."}</p><p>{onSite.length} veículo(s) ainda no local.</p>
+          {myReport && <a href={`/painel?view=estacionamento&relatorio=${myReport.id}`}>Abrir relatório do plantão</a>}
           <div className="gestao-shift-summary-grid">
             <div><strong>{shiftStats.entradas}</strong><small>Entradas</small></div>
             <div><strong>{shiftStats.saidas}</strong><small>Saídas</small></div>

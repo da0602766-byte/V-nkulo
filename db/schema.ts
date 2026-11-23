@@ -413,6 +413,8 @@ export const celulaRelatorios = sqliteTable(
       .notNull()
       .references(() => celulas.id, { onDelete: "cascade" }),
     dataReuniao: text("data_reuniao").notNull(),
+    versao: integer("versao").notNull().default(1),
+    atualizadoEm: text("atualizado_em"),
     aconteceu: integer("aconteceu", { mode: "boolean" }).notNull().default(true),
     presentes: integer("presentes").notNull().default(0),
     visitantes: integer("visitantes").notNull().default(0),
@@ -434,6 +436,33 @@ export const celulaRelatorios = sqliteTable(
     ),
   ],
 );
+
+export const celulaRelatorioRevisoes = sqliteTable("celula_relatorio_revisoes", {
+  relatorioId: integer("relatorio_id").notNull().references(() => celulaRelatorios.id, { onDelete: "cascade" }),
+  versao: integer("versao").notNull(),
+  aconteceu: integer("aconteceu").notNull(),
+  presentes: integer("presentes").notNull(),
+  visitantes: integer("visitantes").notNull(),
+  observacoes: text("observacoes").notNull(),
+  registradoPor: integer("registrado_por").references(() => usuarios.id, { onDelete: "set null" }),
+  registradoEm: text("registrado_em").notNull(),
+}, table => [primaryKey({ columns: [table.relatorioId, table.versao] })]);
+
+export const relatoriosAgendamentos = sqliteTable("relatorios_agendamentos", {
+  comunidadeId: integer("comunidade_id").notNull().references(() => comunidades.id, { onDelete: "cascade" }),
+  usuarioId: integer("usuario_id").notNull().references(() => usuarios.id, { onDelete: "cascade" }),
+  frequencia: text("frequencia").notNull(),
+  dias: integer("dias").notNull(),
+  area: text("area").notNull().default(""),
+  grupo: text("grupo").notNull().default(""),
+  situacao: text("situacao").notNull().default(""),
+  proximaExecucao: text("proxima_execucao").notNull(),
+  versao: integer("versao").notNull().default(1),
+}, table => [primaryKey({ columns: [table.comunidadeId, table.usuarioId] }),
+  index("relatorios_agendamentos_proxima_idx").on(table.proximaExecucao),
+  check("relatorios_agendamentos_frequencia_check", sql`${table.frequencia} IN ('SEMANAL','MENSAL')`),
+  check("relatorios_agendamentos_dias_check", sql`${table.dias} BETWEEN 1 AND 366`),
+]);
 
 export const celulaSolicitacoes = sqliteTable(
   "celula_solicitacoes",
@@ -2959,6 +2988,7 @@ export const estacionamentoRelatoriosEscala = sqliteTable(
     saidas: integer("saidas").notNull().default(0),
     ocorrencias: integer("ocorrencias").notNull().default(0),
     status: text("status").notNull().default("AGUARDANDO_MEMBRO"),
+    motivoCorrecao: text("motivo_correcao").notNull().default(""),
     revisadoPor: integer("revisado_por").references(() => usuarios.id, { onDelete: "set null" }),
     enviadoPastorEm: text("enviado_pastor_em"),
     criadoEm: text("criado_em").notNull().default(sql`CURRENT_TIMESTAMP`),

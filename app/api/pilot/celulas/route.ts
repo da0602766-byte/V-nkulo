@@ -87,7 +87,7 @@ export async function GET(request: Request) {
     // pessoas pelo tamanho da comunidade. Por isso é o que ganha cursor.
     db.prepare(
       `SELECT r.id, r.celula_id, r.data_reuniao, r.aconteceu, r.presentes,
-        r.visitantes, r.observacoes, r.criado_em, u.nome AS enviado_por_nome
+        r.visitantes, r.observacoes, r.criado_em, r.versao, u.nome AS enviado_por_nome
        FROM celula_relatorios r LEFT JOIN usuarios u ON u.id = r.enviado_por_usuario_id
        WHERE r.comunidade_id = ?
          AND (? = 0 OR r.data_reuniao < ? OR (r.data_reuniao = ? AND r.id < ?))

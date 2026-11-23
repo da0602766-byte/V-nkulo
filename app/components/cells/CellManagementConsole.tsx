@@ -9,6 +9,7 @@ import TransientFeedback from "../TransientFeedback";
 import { type FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import NativeImageUpload from "../NativeImageUpload";
+import CellReports from "./CellReports";
 import { cellHealth, initialsOf, whatsappHref } from "./format";
 import type { CellsData } from "./useCellsData";
 import { DAY_LABELS, DAY_ORDER, type Cell, type CellHealthId, type CellMember } from "./types";
@@ -268,7 +269,8 @@ type DetailTab = "visao" | "integrantes" | "agenda" | "relatorio" | "solicitacoe
 function CellDetailPage({ cell, cells, onBack }: { cell: Cell; cells: CellsData; onBack: () => void }) {
   const search=useBrowserSearch();
   const [selectedTab,setTab]=useState<DetailTab|null>(null);
-  const tab=selectedTab??(new URLSearchParams(search).get("aba")==="solicitacoes"?"solicitacoes":"visao");
+  const requestedTab = new URLSearchParams(search).get("aba");
+  const tab = selectedTab ?? (requestedTab === "relatorio" || requestedTab === "solicitacoes" ? requestedTab : "visao");
   const [memberProfile, setMemberProfile] = useState<CellMember | null>(null);
   const health = cellHealth(cell, cells.agora);
 
@@ -345,7 +347,7 @@ function CellDetailPage({ cell, cells, onBack }: { cell: Cell; cells: CellsData;
             <IntegrantesTab cell={cell} cells={cells} onOpenProfile={setMemberProfile} />
           )}
           {tab === "agenda" && <AgendaTab cell={cell} cells={cells} />}
-          {tab === "relatorio" && cell.can_operate && <RelatorioTab cell={cell} cells={cells} />}
+          {tab === "relatorio" && cell.can_operate && <CellReports cell={cell} cells={cells} />}
           {tab === "solicitacoes" && cell.can_operate && <SolicitacoesTab cell={cell} cells={cells} />}
           {tab === "config" && cell.can_operate && <ConfiguracoesTab cell={cell} cells={cells} />}
           {tab === "entrar" && !cell.can_operate && <EntrarTab cell={cell} cells={cells} onSent={() => setTab("visao")} />}
@@ -521,40 +523,6 @@ function AgendaTab({ cell, cells }: { cell: Cell; cells: CellsData }) {
           <button disabled={cells.saving}>Verificar horários e salvar</button>
         </form>
       )}
-    </div>
-  );
-}
-
-function RelatorioTab({ cell, cells }: { cell: Cell; cells: CellsData }) {
-  return (
-    <div className="cgestao-reports">
-      <form
-        className="cgestao-form"
-        onSubmit={(event) => {
-          event.preventDefault();
-          const form = event.currentTarget;
-          const data = Object.fromEntries(new FormData(form));
-          void cells.cellAction(cell.id, { acao: "RELATORIO_CRIAR", ...data, aconteceu: data.aconteceu === "true" }, "Relatório enviado ao acompanhamento pastoral.").then((ok) => { if (ok) form.reset(); });
-        }}
-      >
-        <h3>Formulário do encontro</h3>
-        <label>Data<input name="dataReuniao" type="date" required /></label>
-        <label>Aconteceu?<select name="aconteceu"><option value="true">Sim</option><option value="false">Não</option></select></label>
-        <label>Presentes<input name="presentes" type="number" min="0" defaultValue="0" /></label>
-        <label>Visitantes<input name="visitantes" type="number" min="0" defaultValue="0" /></label>
-        <label className="cgestao-wide">Observações<textarea name="observacoes" rows={2} /></label>
-        <button disabled={cells.saving}>Enviar ao pastor</button>
-      </form>
-      <div className="cgestao-report-history">
-        {cell.relatorios.map((report) => (
-          <article key={report.id}>
-            <time>{new Date(`${report.data_reuniao}T12:00:00`).toLocaleDateString("pt-BR")}</time>
-            <strong>{report.aconteceu ? `${report.presentes} pessoas · ${report.visitantes} visitantes` : "Encontro não realizado"}</strong>
-            <small>{report.enviado_por_nome ? `Enviado por ${report.enviado_por_nome}` : "Relatório registrado"}</small>
-          </article>
-        ))}
-        {!cell.relatorios.length && <p className="cgestao-empty">Nenhum relatório enviado ainda.</p>}
-      </div>
     </div>
   );
 }

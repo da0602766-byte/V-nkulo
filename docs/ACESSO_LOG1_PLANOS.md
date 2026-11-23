@@ -43,6 +43,8 @@ O acesso combina papel, permissões, configuração de módulos da comunidade e 
 
 São configuráveis os módulos reais do catálogo `community-modules`, Feed, Pedidos e Relatórios. As cotas controlam usuários ativos, administradores ativos, visitantes cadastrados ativos, células ativas e ministérios ativos. `null` significa ausência de limite definido. Os nomes exibidos informam o que é contado; cadastros de membros também consomem a cota de usuários.
 
+O recurso **Relatórios** habilita a consulta consolidada, as exportações da Central, os indicadores pastorais, a aba de relatórios ministeriais e o fechamento de plantões do Estacionamento. Cada consulta também respeita o módulo ativo e o papel da pessoa. Lançar um encontro em Células, consultar seus registros operacionais e usar as escalas são funções dos respectivos módulos. Comunidades criadas antes da assinatura conservam o acesso conforme seus papéis.
+
 Triggers SQLite aplicam cotas nas inserções e reativações/alterações pertinentes, inclusive nas APIs administrativas existentes. Uma falha de cota durante um convite reverte a conta, a identidade e o consumo do token. Reduzir uma cota não apaga registros existentes; bloqueia novas operações que aumentariam o excedente.
 
 Comunidades anteriores à migração, sem assinatura nessa nova tabela, mantêm suas permissões e módulos existentes. Não recebem um plano comercial arbitrário. O Proprietário pode vinculá-las em **Planos → Vincular uma comunidade existente**, com revisão das condições, fundamento e justificativa. Assinaturas suspensas, encerradas ou vencidas restringem o acesso operacional. A duração controla o vencimento; a periodicidade comercial não simula renovação ou cobrança automática. Alterar apenas o status não renova o vencimento.

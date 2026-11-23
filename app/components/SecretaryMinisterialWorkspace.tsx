@@ -260,7 +260,7 @@ const DAYS = [
 function parseFavorites(raw:string|null):number[]{try{const saved=JSON.parse(raw||'[]');return Array.isArray(saved)?saved.filter(n=>Number.isSafeInteger(n)&&n>0):[];}catch{return [];}}
 
 export default function SecretaryMinisterialWorkspace({
-
+  permissions,
   communityName,
   preferenceKey,
 }: {
@@ -1881,6 +1881,7 @@ export default function SecretaryMinisterialWorkspace({
             ] as [Tab, string][])
           : ([["escalas", "Minhas escalas"]] as [Tab, string][]))
           .concat(selectedMinistry?.categoria === "LOUVOR" ? [["repertorio", "Repertórios"] as [Tab, string]] : [])
+          .filter(([id]) => id !== "relatorios" || permissions.includes("reports.view"))
           .map(([id, label]) => (
           <button type="button" aria-pressed={tab === id} className={tab === id ? "active" : ""} onClick={() => setTab(id)} key={id}>{label}</button>
         ))}
@@ -2580,7 +2581,7 @@ export default function SecretaryMinisterialWorkspace({
             />
           )}
 
-          {tab === "relatorios" && (
+          {tab === "relatorios" && permissions.includes("reports.view") && (
             <div className="secretary-reports">
               <div className="secretary-summary-grid">
                 <SummaryCard label="Escalas publicadas" value={ministrySchedules.filter((item) => item.status === "PUBLICADA").length} detail="Visíveis à equipe" icon="▣" tone="purple" />

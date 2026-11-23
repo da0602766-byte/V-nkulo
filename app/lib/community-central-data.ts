@@ -89,7 +89,7 @@ export async function loadCommunityCentral(db: ReturnType<typeof getD1>, context
   }));
 
   if (!options.personal && can("pastoral.panel.view")) tasks.push(attempt("pastoral", "Não foi possível consultar os relatórios pastorais.", async () => {
-    const grant = await db.prepare(`SELECT c.id FROM comunidades c WHERE c.id=? AND c.status='ATIVA' AND (c.proprietario_usuario_id=? OR EXISTS (SELECT 1 FROM acessos_painel_pastoral a WHERE a.comunidade_id=c.id AND a.usuario_id=? AND a.ativo=1))`).bind(cid, uid, uid).first();
+    const grant = await db.prepare(`SELECT c.id FROM comunidades c WHERE c.id=? AND c.status='ATIVA' AND (c.proprietario_usuario_id=? OR (?='PASTOR' AND EXISTS (SELECT 1 FROM acessos_painel_pastoral a WHERE a.comunidade_id=c.id AND a.usuario_id=? AND a.ativo=1)))`).bind(cid, uid, context.papel, uid).first();
     if (!grant) { data.pastoralLocked = true; return; }
     if (can("cells.view", "cells")) {
       data.capabilities.cellReports = true;

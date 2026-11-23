@@ -23,10 +23,6 @@ const raiz = new URL("../", import.meta.url);
 // adicionar uma linha aqui precisa dizer por que é segura.
 const EXCECOES = new Map([
   [
-    "app/api/pilot/estacionamento/relatorios/route.ts",
-    "A posse é verificada logo antes, no SELECT com r.id = ? AND r.comunidade_id = ?, que devolve 404 quando o relatório é de outra comunidade.",
-  ],
-  [
     "app/api/pilot/editorial/route.ts",
     "Endpoint de escopo global: exige platform.admin.view, e o proprietário administra os rascunhos de todas as comunidades.",
   ],

@@ -6,8 +6,14 @@ migração nova, leia isto.
 
 ## Próximo número livre
 
-**`0096`**. Use o próximo inteiro disponível a partir daí — não reaproveite
+**`0099`**. Use o próximo inteiro disponível a partir daí — não reaproveite
 um número já usado, mesmo que o arquivo tenha sido escrito à mão.
+
+`0096_parking_report_closure.sql` guarda o motivo da devolução e distingue devoluções existentes de fechamentos aguardando o primeiro envio.
+
+`0097_cell_report_revisions.sql` acrescenta versão aos relatórios de célula e preserva o conteúdo anterior em cada correção.
+
+`0098_report_schedules.sql` guarda agendamentos escolhidos pelo proprietário. A execução usa o evento agendado do Worker e verifica pendências no tráfego de API. A migração não cria agendamentos.
 
 `0094_parking_scene.sql`: cenários 3D com rascunho/publicação, histórico e vínculo estável com vagas e setores. Aditiva; não altera reservas nem publica desenhos automaticamente.
 

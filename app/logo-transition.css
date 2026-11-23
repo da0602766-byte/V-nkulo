@@ -13,18 +13,40 @@ html body img.vinkulo-platform-mark {
   position: fixed;
   inset: 0;
   z-index: 2147483001;
-  isolation: isolate;
-  color: #f7f3ff;
 }
-.platform-loading-backdrop { position: absolute; inset: 0; background: #171126; }
-.platform-loading-symbol {
+.platform-loading-transition, .vinkulo-loading {
+  --vinkulo-load-ease: cubic-bezier(.22, 1, .36, 1);
+  --vinkulo-dissolve-ease: cubic-bezier(.28, .72, .23, 1);
+  --vinkulo-ambient-delay: calc(110ms + var(--vinkulo-loading-offset, 0ms));
+  --vinkulo-loading-background: radial-gradient(circle at center, rgba(145, 99, 247, .09), transparent 30%),
+    radial-gradient(ellipse 50% 50% at 50% 44%, #251637 0%, #161023 47%, #0f0e1b 100%);
+  isolation: isolate;
+  overflow: clip;
+  color: #fff;
+}
+.platform-loading-backdrop { position: absolute; inset: 0; background: var(--vinkulo-loading-background); }
+:is(.platform-loading-transition, .vinkulo-loading)::before {
+  content: "";
   position: absolute;
   left: 50%;
   top: 50%;
-  width: clamp(200px, 36vw, 380px);
+  translate: -50% -50%;
+  width: min(70vw, 530px);
   aspect-ratio: 1;
-  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 1px solid rgba(154, 117, 228, .12);
+  box-shadow: 0 0 0 58px rgba(170, 114, 255, .019), 0 0 0 115px rgba(170, 114, 255, .011);
+  z-index: 1;
+}
+.platform-loading-symbol, .vinkulo-loading-mark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: clamp(156px, 24vw, 250px);
+  aspect-ratio: 1;
+  translate: -50% -50%;
   transform-origin: center;
+  z-index: 2;
 }
 .vinkulo-animated-mark { position: relative; display: block; width: var(--vinkulo-mark-size, 320px); aspect-ratio: 1; }
 .platform-loading-symbol > .vinkulo-animated-mark,
@@ -41,31 +63,116 @@ html body img.vinkulo-platform-mark {
   mask-repeat: no-repeat;
   mask-position: center;
 }
-.platform-loading-transition[data-phase="waiting"] .vinkulo-animated-mark,
-html[data-logo-transition="waiting"] .platform-loading-transition .vinkulo-animated-mark,
-.vinkulo-loading .vinkulo-animated-mark { animation: vinkulo-mark-float 2.4s ease-in-out infinite; }
-.platform-loading-transition[data-phase="waiting"] .vinkulo-mark-draw,
-html[data-logo-transition="waiting"] .platform-loading-transition .vinkulo-mark-draw,
-.vinkulo-loading .vinkulo-mark-draw { animation: vinkulo-mark-draw 2.4s linear infinite; }
-.platform-loading-transition[data-phase="waiting"] .vinkulo-mark-shine,
-html[data-logo-transition="waiting"] .platform-loading-transition .vinkulo-mark-shine,
-.vinkulo-loading .vinkulo-mark-shine { animation: vinkulo-mark-shine 2.4s ease-in-out infinite; }
-.platform-loading-label { position: absolute; top: calc(50% + clamp(100px, 18vw, 190px)); left: 16px; right: 16px; margin: 20px 0 0; text-align: center; font: 500 16px/1.5 var(--font-body), sans-serif; color: #f7f3ff; }
-.platform-loading-transition[data-phase="revealing"] .platform-loading-backdrop,
-.platform-loading-transition[data-phase="revealing"] .platform-loading-label { opacity: 0; transition: opacity 2s ease; }
-.platform-loading-transition[data-no-destination="true"] .platform-loading-symbol { opacity: 0; transition: opacity 2s ease; }
+:is(.platform-loading-transition, .vinkulo-loading) .vinkulo-animated-mark { isolation: isolate; }
+:is(.platform-loading-transition, .vinkulo-loading) .vinkulo-animated-mark::after {
+  content: "";
+  position: absolute;
+  inset: -30px;
+  border-radius: 50%;
+  z-index: -1;
+  background: radial-gradient(circle, rgba(140, 91, 234, .12), transparent 70%);
+}
+:is(.platform-loading-transition, .vinkulo-loading) .vinkulo-mark-guide {
+  position: absolute;
+  inset: 0;
+  opacity: .25;
+  filter: blur(18px);
+  transform: scale(1.07);
+}
+:is(.platform-loading-transition, .vinkulo-loading) .vinkulo-mark-draw {
+  filter: drop-shadow(0 0 24px rgba(135, 108, 248, .23));
+}
+html[data-logo-transition="waiting"] .platform-loading-transition::before,
+.vinkulo-loading::before {
+  animation: vinkulo-halo-in 750ms var(--vinkulo-load-ease) var(--vinkulo-loading-offset, 0ms) both,
+    vinkulo-opacity-in 500ms ease var(--vinkulo-loading-offset, 0ms) both;
+}
+html[data-logo-transition="waiting"] .platform-loading-symbol,
+.vinkulo-loading-mark {
+  animation: vinkulo-logo-in 440ms var(--vinkulo-load-ease) var(--vinkulo-loading-offset, 0ms) both,
+    vinkulo-opacity-in 360ms ease var(--vinkulo-loading-offset, 0ms) both;
+}
+:is(html[data-logo-transition] .platform-loading-transition, .vinkulo-loading) .vinkulo-animated-mark {
+  animation: vinkulo-logo-breathe 2300ms ease-in-out var(--vinkulo-ambient-delay) infinite both;
+}
+:is(html[data-logo-transition] .platform-loading-transition, .vinkulo-loading) .vinkulo-animated-mark::after {
+  animation: vinkulo-halo-breathe 2300ms ease-in-out var(--vinkulo-ambient-delay) infinite both;
+}
+:is(html[data-logo-transition] .platform-loading-transition, .vinkulo-loading) .vinkulo-mark-shine {
+  background: none;
+  animation: vinkulo-logo-glint 2300ms ease-in-out var(--vinkulo-ambient-delay) infinite both;
+}
+:is(html[data-logo-transition] .platform-loading-transition, .vinkulo-loading) .vinkulo-mark-shine::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, .48) 50%, transparent 70%);
+  animation: vinkulo-logo-sweep 2300ms ease-in-out var(--vinkulo-ambient-delay) infinite both;
+}
+.platform-loading-label {
+  position: absolute;
+  top: calc(50% + clamp(95px, 15vw, 155px));
+  left: 20px;
+  right: 20px;
+  z-index: 2;
+  text-align: center;
+  pointer-events: none;
+  font: 400 16px/normal var(--font-body, system-ui), sans-serif;
+}
+.platform-loading-label strong { font: 700 12px var(--font-display, system-ui), sans-serif; letter-spacing: .25em; }
+.platform-loading-message { margin: 12px 0 0; color: #c6bdda; font-size: 12px; letter-spacing: .03em; }
+html[data-logo-transition="waiting"] .platform-loading-transition .platform-loading-label,
+.vinkulo-loading .platform-loading-label {
+  animation: vinkulo-label-in 500ms var(--vinkulo-load-ease) var(--vinkulo-ambient-delay) both,
+    vinkulo-opacity-in 400ms ease var(--vinkulo-ambient-delay) both;
+}
+html[data-logo-transition="revealing"] .platform-loading-transition .vinkulo-animated-mark {
+  animation: vinkulo-pulse-settle 180ms var(--vinkulo-load-ease) both;
+}
+html[data-logo-transition="revealing"] .platform-loading-transition .vinkulo-animated-mark::after,
+html[data-logo-transition="revealing"] .platform-loading-transition .vinkulo-mark-shine,
+html[data-logo-transition="revealing"] .platform-loading-transition .vinkulo-mark-shine::before {
+  animation-play-state: paused;
+}
+.platform-loading-transition[data-phase="revealing"],
+.platform-loading-transition[data-phase="revealing"] .platform-loading-backdrop {
+  animation: vinkulo-backdrop-out 620ms var(--vinkulo-dissolve-ease) both;
+}
+.platform-loading-transition[data-phase="revealing"] {
+  will-change: opacity;
+}
+.platform-loading-transition[data-phase="revealing"]::before {
+  animation: vinkulo-halo-out 580ms var(--vinkulo-load-ease) both,
+    vinkulo-halo-fade 400ms ease both;
+}
+.platform-loading-transition[data-phase="revealing"] .platform-loading-label {
+  animation: vinkulo-label-out 400ms var(--vinkulo-load-ease) both,
+    vinkulo-label-fade 300ms ease both;
+}
+.platform-loading-transition[data-phase="revealing"] .platform-loading-symbol {
+  animation: vinkulo-logo-out 560ms var(--vinkulo-load-ease) both,
+    vinkulo-logo-fade 420ms ease both;
+  will-change: transform, opacity;
+}
+.platform-loading-transition[data-logo-flight] .platform-loading-symbol {
+  animation: vinkulo-logo-flight 560ms var(--vinkulo-load-ease) both,
+    vinkulo-flight-fade 520ms ease both;
+}
 .platform-loading-transition[data-phase="idle"] { display: none; }
 html[data-logo-transition="waiting"] .platform-loading-transition { display: block; }
-html[data-logo-transition="waiting"] { background: #171126; }
-html[data-logo-transition="waiting"] .platform-loading-transition :is(.vinkulo-animated-mark,.vinkulo-mark-draw,.vinkulo-mark-shine) { animation-delay: var(--vinkulo-loading-offset,0ms); }
 html[data-logo-unavailable] .platform-loading-transition { display: none; }
-html[data-logo-transition="waiting"] #main-content { opacity: 0; }
-html[data-logo-transition="revealing"] #main-content { opacity: 1; transition: opacity 2s ease; }
-html[data-logo-transition] { overflow: hidden; }
-html[data-logo-transition] .global-feedback-launcher { visibility: hidden; }
-[data-vinkulo-destination] { opacity: 0 !important; }
-html[data-logo-controller="ready"] [data-vinkulo-loading] { display: none; }
-.platform-loading-recovery { position: absolute; inset: auto 16px max(24px, env(safe-area-inset-bottom)); text-align: center; }
+html[data-logo-transition="waiting"]:not([data-logo-unavailable]) { background: #0f0e1b; }
+html[data-logo-transition="waiting"]:not([data-logo-unavailable]) #main-content { opacity: 0; }
+html[data-logo-transition="revealing"] #main-content {
+  animation: vinkulo-page-in var(--vinkulo-reveal-duration) cubic-bezier(.22, 1, .36, 1) both;
+  transform-origin: center top;
+}
+html[data-logo-transition]:not([data-logo-unavailable]) { overflow: hidden; }
+html[data-logo-transition]:not([data-logo-unavailable]) .global-feedback-launcher { visibility: hidden; }
+html[data-logo-transition="revealing"] [data-vinkulo-destination] { animation: vinkulo-flight-arrival var(--vinkulo-reveal-duration) linear both; }
+html[data-logo-controller="ready"] [data-vinkulo-loading],
+html[data-logo-transition="waiting"]:not([data-logo-unavailable]) body:has(> .platform-loading-transition) .vinkulo-loading { display: none; }
+.platform-loading-recovery { position: absolute; inset: auto 16px max(24px, env(safe-area-inset-bottom)); z-index: 3; text-align: center; }
 .platform-loading-recovery[hidden] { display: none; }
 .platform-loading-recovery p { color: #f7f3ff; font: 16px/1.5 var(--font-body), sans-serif; }
 .platform-loading-recovery button { min-height: 44px; padding: 10px 16px; margin: 4px; border: 1px solid #b4a1d2; border-radius: 10px; background: #302341; color: #fff; font: inherit; cursor: pointer; }
@@ -73,9 +180,64 @@ html[data-logo-controller="ready"] [data-vinkulo-loading] { display: none; }
 .owner-console .oc-mobile-brand { display: none; }
 @media (max-width: 900px) { .owner-console .oc-mobile-brand { display: block; flex: none; } }
 /* Fallback for a Suspense boundary before the shared controller hydrates. */
-.vinkulo-loading { position: fixed; inset: 0; z-index: 2147483000; display: grid; place-content: center; justify-items: center; gap: 12px; background: #171126; color: #f7f3ff; }
-.vinkulo-loading-mark { width: clamp(200px,36vw,380px); aspect-ratio: 1; }
+.vinkulo-loading { position: fixed; inset: 0; z-index: 2147483000; background: var(--vinkulo-loading-background); }
 .vinkulo-loading-mark img { width: 100%; height: 100%; }
+@keyframes vinkulo-logo-in {
+  from { transform: translateY(17px) scale(.87); }
+  to { transform: none; }
+}
+@keyframes vinkulo-opacity-in { from { opacity: 0; } }
+@keyframes vinkulo-label-in { from { transform: translateY(8px); } }
+@keyframes vinkulo-halo-in { from { transform: scale(.82); } }
+@keyframes vinkulo-logo-breathe {
+  50% { transform: translateY(-5px) scale(1.045); }
+}
+@keyframes vinkulo-halo-breathe { 50% { opacity: .3; transform: scale(1.16); } }
+@keyframes vinkulo-logo-glint { 50% { opacity: .64; } 70% { opacity: 0; } }
+@keyframes vinkulo-logo-sweep {
+  from, 24% { transform: translateX(-110%); }
+  70%, to { transform: translateX(110%); }
+}
+@keyframes vinkulo-pulse-settle {
+  from { transform: var(--vinkulo-pulse-from-transform); }
+  to { transform: none; }
+}
+@keyframes vinkulo-logo-out {
+  from { transform: var(--vinkulo-logo-from-transform); }
+  to { transform: translateY(-4px) scale(1.20); }
+}
+@keyframes vinkulo-logo-fade {
+  from { opacity: var(--vinkulo-logo-from-opacity); }
+  17% { opacity: .76; }
+  to { opacity: 0; }
+}
+@keyframes vinkulo-halo-out {
+  from { transform: var(--vinkulo-halo-from-transform); }
+  to { transform: scale(1.27); }
+}
+@keyframes vinkulo-halo-fade { from { opacity: var(--vinkulo-halo-from-opacity); } to { opacity: 0; } }
+@keyframes vinkulo-label-out {
+  from { transform: var(--vinkulo-label-from-transform); }
+  to { transform: translateY(5px); }
+}
+@keyframes vinkulo-label-fade { from { opacity: var(--vinkulo-label-from-opacity); } to { opacity: 0; } }
+@keyframes vinkulo-logo-flight {
+  from { transform: var(--vinkulo-logo-from-transform); }
+  32% { transform: translateY(-4px) scale(1.15); }
+  to { transform: var(--vinkulo-logo-flight-transform); }
+}
+@keyframes vinkulo-flight-fade {
+  from { opacity: var(--vinkulo-logo-from-opacity); }
+  14% { opacity: .76; }
+  38% { opacity: .26; }
+  to { opacity: 0; }
+}
+@keyframes vinkulo-flight-arrival { from, 65% { opacity: 0; } to { opacity: 1; } }
+@keyframes vinkulo-backdrop-out { to { opacity: 0; } }
+@keyframes vinkulo-page-in {
+  from { opacity: .78; transform: var(--vinkulo-page-entry-transform, translateY(8px) scale(.997)); }
+  to { opacity: 1; transform: none; }
+}
 /* Follow the left arm down into the fold, then draw the right arm upwards. */
 @keyframes vinkulo-mark-draw {
   0%, 4% { clip-path: polygon(0 0, 51% 0, 51% 0, 100% 0, 100% 0, 51% 0, 51% 0, 0 0); opacity: 1; }
@@ -95,5 +257,10 @@ html[data-logo-controller="ready"] [data-vinkulo-loading] { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .vinkulo-animated-mark, .vinkulo-mark-draw, .vinkulo-mark-shine { animation: none !important; }
   .vinkulo-mark-shine { display: none; }
-  .platform-loading-transition[data-phase="revealing"] .platform-loading-symbol { opacity: 0; transition: opacity 2s ease; }
+  html[data-logo-transition="waiting"] .platform-loading-transition :is(.platform-loading-symbol, .platform-loading-label),
+  html[data-logo-transition="waiting"] .platform-loading-transition .vinkulo-animated-mark::after,
+  html[data-logo-transition="waiting"] .platform-loading-transition::before,
+  .vinkulo-loading :is(.vinkulo-loading-mark, .platform-loading-label),
+  .vinkulo-loading .vinkulo-animated-mark::after,
+  .vinkulo-loading::before { animation: none !important; }
 }
