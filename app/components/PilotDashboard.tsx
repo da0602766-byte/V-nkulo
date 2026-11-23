@@ -33,6 +33,7 @@ import ThemeControl from "./ThemeControl";
 import OfflineModeEntry from "./OfflineModeEntry";
 import WorkspaceErrorBoundary from "./WorkspaceErrorBoundary";
 import WorkspaceDeck from "./WorkspaceDeck";
+import { useWorkspaceDraftNavigation, WorkspaceDrafts } from "./WorkspaceDrafts";
 import WorkspaceOrientation from "./WorkspaceOrientation";
 import VerifiedOwnerName from "./VerifiedOwnerName";
 import TemporaryAccessWatcher from "./TemporaryAccessWatcher";
@@ -211,19 +212,7 @@ function PersonalizationControls({
   );
 }
 
-export default function PilotDashboard({
-  active,
-  memberships,
-  feed,
-  features,
-  parkingEnabled,
-  userName,
-  userEmail,
-  userPhotoUrl,
-  systemOwner,
-  initialView,
-  communityTheme,
-}: {
+type PilotDashboardProps = {
   active: TenantContext;
   memberships: TenantMembership[];
   feed: FeedItem[];
@@ -235,9 +224,35 @@ export default function PilotDashboard({
   systemOwner: boolean;
   initialView: string;
   communityTheme: CommunityTheme;
-}) {
+};
+
+export default function PilotDashboard(props: PilotDashboardProps) {
+  const { active } = props;
+  return (
+    <WorkspaceDrafts key={`${active.comunidadeId}:${active.userId}:${active.permissions.join(",")}`}>
+      <PilotDashboardContent {...props} />
+    </WorkspaceDrafts>
+  );
+}
+
+function PilotDashboardContent({
+  active,
+  memberships,
+  feed,
+  features,
+  parkingEnabled,
+  userName,
+  userEmail,
+  userPhotoUrl,
+  systemOwner,
+  initialView,
+  communityTheme,
+}: PilotDashboardProps) {
+  const draftNavigation = useWorkspaceDraftNavigation();
+  const allowDeparture = draftNavigation?.allowDeparture;
   const communityPalette = getCommunityPalette(communityTheme.paletteId);
   const [view, setView] = useState<View>(initialView as View);
+  const lastMinistryId = useRef<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const dashboardRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -264,6 +279,55 @@ export default function PilotDashboard({
   const [navigationSearchOpen, setNavigationSearchOpen] = useState(false);
   const [quickActionSearch, setQuickActionSearch] = useState("");
   const [switching, setSwitching] = useState(false);
+  const [accessInvalidated, setAccessInvalidated] = useState(false);
+  const permissionScope = active.permissions.join(",");
+  useEffect(() => {
+    if (switching || accessInvalidated) return;
+    const controller = new AbortController();
+    let checking = false;
+    const refreshAccess = async () => {
+      if (checking || document.visibilityState !== "visible") return;
+      checking = true;
+      try {
+        const response = await fetch("/api/pilot/comunidade-ativa", {
+          cache: "no-store",
+          signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]),
+        });
+        let destination: string;
+        if (response.status === 401) destination = "/login?motivo=sessao_expirada";
+        else if (response.status === 403) destination = "/acesso-negado";
+        else if (response.ok) {
+          const { context } = await response.json() as { context: TenantContext | null };
+          if (
+            context?.userId === active.userId &&
+            context.comunidadeId === active.comunidadeId &&
+            context.permissions.join(",") === permissionScope
+          ) return;
+          destination = "/painel?view=inicio";
+        } else return;
+        if (controller.signal.aborted) return;
+        allowDeparture?.();
+        setAccessInvalidated(true);
+        window.location.replace(destination);
+      } catch {
+        // A network failure leaves the last verified scope available.
+      } finally {
+        checking = false;
+      }
+    };
+    const revalidate = () => { void refreshAccess(); };
+    const timer = window.setInterval(revalidate, 60_000);
+    document.addEventListener("visibilitychange", revalidate);
+    window.addEventListener("pageshow", revalidate);
+    window.addEventListener("online", revalidate);
+    return () => {
+      controller.abort();
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", revalidate);
+      window.removeEventListener("pageshow", revalidate);
+      window.removeEventListener("online", revalidate);
+    };
+  }, [accessInvalidated, active.comunidadeId, active.userId, allowDeparture, permissionScope, switching]);
   const [openingVisitors, setOpeningVisitors] = useState(false);
   useEffect(() => {
     const reset = () => setOpeningVisitors(false);
@@ -839,9 +903,14 @@ export default function PilotDashboard({
     rememberRecentView(nextView);
     const address = new URL(window.location.href);
     address.searchParams.set("view", nextView);
-    if (new URL(window.location.href).searchParams.get("view") !== nextView) {
+    const currentView = new URL(window.location.href).searchParams.get("view");
+    if (currentView !== nextView) {
+      if (currentView === "ministerios") lastMinistryId.current = address.searchParams.get("ministry");
       address.hash = "";
       for (const key of ["anotacao", "celula", "aba", "ministry"]) address.searchParams.delete(key);
+      if (nextView === "ministerios" && lastMinistryId.current) {
+        address.searchParams.set("ministry", lastMinistryId.current);
+      }
       window.history.pushState(
         { ...window.history.state, view: nextView },
         "",
@@ -942,6 +1011,7 @@ export default function PilotDashboard({
 
   async function switchCommunity(comunidadeId: number) {
     if (switching || comunidadeId === active.comunidadeId) return;
+    if (draftNavigation?.hasDrafts && !window.confirm("Você tem alterações não salvas. Descartar o rascunho e trocar de comunidade?")) return;
     setSwitching(true);
     try {
       const response = await fetch("/api/pilot/comunidade-ativa", {
@@ -952,6 +1022,7 @@ export default function PilotDashboard({
       });
       const result = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(result.error || "Não foi possível trocar de comunidade.");
+      allowDeparture?.();
       navigateDocument("/painel?view=inicio");
       return;
     } catch (error) {
@@ -984,6 +1055,8 @@ export default function PilotDashboard({
       setInviteLoading(false);
     }
   }
+
+  if (accessInvalidated) return <p role="status">Atualizando seu acesso…</p>;
 
   return (
     <main
@@ -1330,7 +1403,7 @@ export default function PilotDashboard({
           }`}
           data-editor-key="conteudo-principal"
         >
-          <WorkspaceDeck<View> key={`${active.comunidadeId}:${active.userId}:${active.permissions.join(",")}`} active={visibleView} onNavigate={openView} allowed={[...allowedMenu.map(item => item.id), "conta", "inicio"]}>
+          <WorkspaceDeck<View> active={visibleView} onNavigate={openView} allowed={[...allowedMenu.map(item => item.id), "conta", "inicio"]}>
           {(visibleView) => <WorkspaceErrorBoundary resetKey={`${active.comunidadeId}:${visibleView}`}>
           {!accessDeniedView && <WorkspaceOrientation area={visibleView} community={active.comunidadeNome} />}
           {accessDeniedView && (

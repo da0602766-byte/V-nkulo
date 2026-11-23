@@ -1,9 +1,10 @@
 "use client";
 
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useId, useMemo, useState } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from "react";
 
 type DraftRegistry = { update: (id: string, label: string, dirty: boolean) => void };
 const DraftContext = createContext<DraftRegistry | null>(null);
+const DraftNavigationContext = createContext<{ hasDrafts: boolean; allowDeparture: () => void } | null>(null);
 
 /** Lives outside Activity so drafts in hidden tabs still protect document navigation. */
 export function WorkspaceDrafts({ children }: { children: ReactNode }) {
@@ -18,13 +19,28 @@ export function WorkspaceDrafts({ children }: { children: ReactNode }) {
   }, []);
   const registry = useMemo(() => ({ update }), [update]);
   const hasDrafts = Object.keys(drafts).length > 0;
+  const departureAllowed = useRef(false);
+  const allowDeparture = useCallback(() => { departureAllowed.current = true; }, []);
+  const navigation = useMemo(() => ({ hasDrafts, allowDeparture }), [hasDrafts, allowDeparture]);
   useEffect(() => {
     if (!hasDrafts) return;
-    const protect = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    const protect = (event: BeforeUnloadEvent) => {
+      if (departureAllowed.current) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
     window.addEventListener("beforeunload", protect);
     return () => window.removeEventListener("beforeunload", protect);
   }, [hasDrafts]);
-  return <DraftContext.Provider value={registry}>{children}</DraftContext.Provider>;
+  return (
+    <DraftContext.Provider value={registry}>
+      <DraftNavigationContext.Provider value={navigation}>{children}</DraftNavigationContext.Provider>
+    </DraftContext.Provider>
+  );
+}
+
+export function useWorkspaceDraftNavigation() {
+  return useContext(DraftNavigationContext);
 }
 
 export function useWorkspaceDraft(dirty: boolean, label: string) {
