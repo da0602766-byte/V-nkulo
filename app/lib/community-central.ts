@@ -25,18 +25,18 @@ export function centralCsv(rows: Array<Array<string | number>>) {
   }).join(";")).join("\r\n");
 }
 
-export function centralReportRows(data: CentralData, ministries: CentralMinistry[] = data.ministries) {
+export function centralReportRows(data: CentralData, ministries: CentralMinistry[] = data.ministries, ministryOnly = false) {
   const rows: Array<Array<string | number>> = [
     ["Comunidade", data.community.name], ["Escopo", data.scopeLabel],
+    ...(ministryOnly ? [["Consulta", ministries.length === 1 ? ministries[0].name : "Ministérios do recorte"]] : []),
     ["Período das escalas", data.period.from, data.period.to], ["Atualizado em", data.generatedAt],
     ["Observação", "Confirmação não comprova presença. Pendências referem-se a escalas futuras."],
-    [], ["Indicador atual do escopo", "Valor", "Referência"],
-    ...data.metrics.map(m => [m.label, m.value, m.detail]),
+    ...(ministryOnly ? [] : [[], ["Indicador atual do escopo", "Valor", "Referência"], ...data.metrics.map(m => [m.label, m.value, m.detail])]),
     [], ["Ministério", "Responsável", "Integrantes ativos", "Escalas no período", "Confirmações", "Ausências registradas", "Confirmações pendentes futuras", "Substituições solicitadas futuras"],
   ];
   ministries.forEach(m => rows.push([m.name, m.leader, m.volunteers ?? "Não disponível", ...[m.schedules, m.confirmed, m.absent, m.pending, m.replacements].map(value => data.capabilities.schedules ? value : "Não disponível")]));
-  if (data.limits.ministries) rows.push(["Limite", "Primeiros 200 ministérios; consulte a área de ministérios para continuar."]);
-  if (data.cellReports.length) {
+  if (!ministryOnly && data.limits.ministries) rows.push(["Limite", "Primeiros 200 ministérios; consulte a área de ministérios para continuar."]);
+  if (!ministryOnly && data.cellReports.length) {
     rows.push([], ["Célula", "Data", "Encontro realizado", "Presentes", "Visitantes", "Observações"]);
     data.cellReports.forEach(r => rows.push([r.name, r.date, r.happened ? "Sim" : "Não", r.attendees, r.visitors, r.notes]));
     if (data.limits.cellReports) rows.push(["Limite", "50 relatórios de células mais recentes no período."]);

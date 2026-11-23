@@ -6,7 +6,9 @@ import "./parking/parking.css";
 import ParkingManagementConsole from "./parking/ParkingManagementConsole";
 import ParkingMemberPortal from "./parking/ParkingMemberPortal";
 import ParkingOperatorMobile from "./parking/ParkingOperatorMobile";
+import ParkingReportDetail from "./parking/ParkingReportDetail";
 import { useParkingData } from "./parking/useParkingData";
+import { useBrowserSearch } from "./useBrowserSearch";
 
 const MOBILE_QUERY = "(max-width: 900px)";
 
@@ -23,23 +25,28 @@ const MOBILE_QUERY = "(max-width: 900px)";
 export default function ParkingWorkspace({
   communityName,
   memberMode = false,
+  reportsEnabled = true,
 }: {
   communityName: string;
   memberMode?: boolean;
+  reportsEnabled?: boolean;
 }) {
   const [viewAsMember, setViewAsMember] = useState(false);
+  const search = useBrowserSearch();
+  const reportId = Number(new URLSearchParams(search).get("relatorio"));
+  if (reportsEnabled && Number.isSafeInteger(reportId) && reportId > 0) return <ParkingReportDetail key={reportId} id={reportId} />;
   const effectiveMemberMode = memberMode || viewAsMember;
   return <div className="parking-experience">
     {!memberMode && <nav className="parking-experience-switch" aria-label="Visão do estacionamento">
       <button type="button" aria-pressed={!viewAsMember} onClick={() => setViewAsMember(false)}><PublicIcon name="layers" size={18}/>Gestão</button>
       <button type="button" aria-pressed={viewAsMember} onClick={() => setViewAsMember(true)}><PublicIcon name="user" size={18}/>Visão do membro · Reservar vaga</button>
     </nav>}
-    <ParkingExperience key={effectiveMemberMode ? "member" : "management"} communityName={communityName} memberMode={effectiveMemberMode} />
+    <ParkingExperience key={effectiveMemberMode ? "member" : "management"} communityName={communityName} memberMode={effectiveMemberMode} reportsEnabled={reportsEnabled} />
   </div>;
 }
 
-function ParkingExperience({ communityName, memberMode }: { communityName: string; memberMode: boolean }) {
-  const parking = useParkingData(memberMode);
+function ParkingExperience({ communityName, memberMode, reportsEnabled }: { communityName: string; memberMode: boolean; reportsEnabled: boolean }) {
+  const parking = useParkingData(memberMode, reportsEnabled);
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {

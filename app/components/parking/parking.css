@@ -518,3 +518,9 @@
 .parking-redesign .parking-qr-dialog, .parking-redesign .parking-qr-welcome { border-radius: 18px; background: var(--parking-surface); color: var(--pilot-text); }
 .parking-redesign .parking-qr-dialog .parking-qr-alternatives { background: var(--parking-soft); border-radius: 12px; padding: 14px; }
 .parking-redesign .parking-qr-dialog .parking-camera-permission { border-radius: 12px; }
+.parking-report-detail .gestao-report-form { width: min(100%, 34rem); }
+.gestao-report-form :is(h3, dd, summary) { overflow-wrap: anywhere; }
+.gestao-report-form form { display: grid; gap: .75rem; margin-block-start: .6rem; }
+.gestao-report-form form label { display: grid; gap: .375rem; }
+.gestao-report-form textarea { max-width: 100%; font-size: 1rem; }
+.gestao-report-form summary, .gestao-report-form form button { min-height: 44px; }

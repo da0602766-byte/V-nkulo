@@ -1,4 +1,6 @@
 "use client";
+
+import CellReports from "./CellReports";
 import {useBrowserSearch} from "../useBrowserSearch";
 
 import TransientFeedback from "../TransientFeedback";
@@ -528,20 +530,7 @@ function MobileLeaderEssentials({ cell, cells }: { cell: Cell; cells: CellsData 
       <p className="cpart-kicker">O essencial no celular</p>
       <div className="cpart-mobile-card">
         <p className="cpart-mobile-card-title">Relatório do encontro</p>
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            const form = event.currentTarget;
-            const data = Object.fromEntries(new FormData(form));
-            void cells.cellAction(cell.id, { acao: "RELATORIO_CRIAR", ...data, aconteceu: data.aconteceu === "true" }, "Relatório enviado ao acompanhamento pastoral.").then((ok) => { if (ok) form.reset(); });
-          }}
-        >
-          <label>Data<input name="dataReuniao" type="date" required /></label>
-          <label>Aconteceu?<select name="aconteceu"><option value="true">Sim</option><option value="false">Não</option></select></label>
-          <label>Presentes<input name="presentes" type="number" min="0" defaultValue="0" /></label>
-          <label>Visitantes<input name="visitantes" type="number" min="0" defaultValue="0" /></label>
-          <button disabled={cells.saving}>Enviar relatório</button>
-        </form>
+        <CellReports cell={cell} cells={cells} />
       </div>
       {cell.solicitacoes.length > 0 && (
         <div className="cpart-mobile-card">

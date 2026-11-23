@@ -26,6 +26,7 @@ export type CellAgendaItem = {
 
 export type CellReport = {
   id: number;
+  versao: number;
   data_reuniao: string;
   aconteceu: number;
   presentes: number;

@@ -7,6 +7,8 @@ import PublicIcon, { type PublicIconName } from "../PublicIcon";
 import { ParkingEmpty, ParkingHeading, ParkingMetric, ParkingMovementCard } from "./ParkingUi";
 import ParkingReservationTable from "./ParkingReservationTable";
 import ParkingMovementHistory from "./ParkingMovementHistory";
+import ParkingReportCard from "./ParkingReportCard";
+import { useBrowserSearch } from "../useBrowserSearch";
 import { spaceState } from "./ParkingSpaceMap";
 import { ParkingQrCheckin, type ParkingQrValidationResult } from "../ParkingReservationQr";
 import {
@@ -31,7 +33,6 @@ export default function ParkingManagementConsole({
     working,
     feedback,
     error,
-    canReviewReports,
     registerEntry,
     registerExit,
     registerOccurrence,
@@ -41,7 +42,9 @@ export default function ParkingManagementConsole({
     reportAction,
     } = parking;
 
-  const [tab, updateTab] = useState<Tab>("visao");
+  const search = useBrowserSearch();
+  const [selectedTab, updateTab] = useState<Tab | null>(null);
+  const tab = selectedTab ?? (parking.reportsEnabled && new URLSearchParams(search).get("aba") === "relatorios" ? "relatorios" : "visao");
   const [sceneDirty, setSceneDirty] = useState(false);
   const setTab = (next: Tab) => { if (tab === "mapa" && sceneDirty && next !== tab && !window.confirm("Sair sem salvar o rascunho?")) return; setSceneDirty(false); if (next !== tab) parking.setReservationFilters(f => ({...f,status:"",page:1})); updateTab(next); };
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -69,7 +72,7 @@ export default function ParkingManagementConsole({
     {id:"reservas",label:"Reservas",show:true,description:"Aprove as solicitações pendentes e acompanhe as entradas. Uma solicitação ainda não é uma aprovação."},
     {id:"historico",label:"Histórico",show:canEntry||canExit||canEdit,description:"Consulte as movimentações de todas as atividades, inclusive veículos que já saíram."},
     {id:"ocorrencias",label:"Ocorrências",show:canEdit,description:"Registre o que aconteceu e o nível de atenção necessário. A lista mostra os 20 registros mais recentes."},
-    {id:"relatorios",label:"Relatórios",show:true,description:"Acompanhe o envio e a revisão dos relatórios de plantão. São exibidos os 60 relatórios mais recentes."},
+    {id:"relatorios",label:"Relatórios",show:parking.reportsEnabled,description:"Acompanhe o envio e a revisão dos relatórios de plantão."},
     {id:"mapa",label:"Mapa e vagas",show:true,description:"Organize os setores e as posições. As cores mostram a situação física atual; consulte Vagas para disponibilidade por atividade."},
     {id:"equipe",label:"Equipe e configuração",show:canConfigure||canManageHelpers,description:"Defina o responsável e as orientações. Auxiliares são convidados durante um plantão confirmado."},
   ];
@@ -118,7 +121,7 @@ export default function ParkingManagementConsole({
         <TabButton id="reservas" tab={tab} setTab={setTab}>Reservas</TabButton>
         {(canEntry || canExit || canEdit) && <TabButton id="historico" tab={tab} setTab={setTab}>Histórico</TabButton>}
         {canEdit && <TabButton id="ocorrencias" tab={tab} setTab={setTab}>Ocorrências</TabButton>}
-        <TabButton id="relatorios" tab={tab} setTab={setTab}>Relatórios</TabButton>
+        {parking.reportsEnabled && <TabButton id="relatorios" tab={tab} setTab={setTab}>Relatórios</TabButton>}
         <TabButton id="mapa" tab={tab} setTab={setTab}>Mapa e vagas</TabButton>
         {(canConfigure || canManageHelpers) && <TabButton id="equipe" tab={tab} setTab={setTab}>Equipe e configuração</TabButton>}
       </nav>
@@ -220,26 +223,7 @@ export default function ParkingManagementConsole({
         <section className="gestao-card">
           <ParkingHeading icon="layers" eyebrow="FECHAMENTO DE ESCALA" title="Envio e revisão dos plantões">Confira os números e o resumo antes de encaminhar à liderança.</ParkingHeading>
           <div className="gestao-report-grid">
-            {reports.length ? reports.map((report) => (
-              <article key={report.id} className="gestao-report-form">
-                <header>
-                  <span className={`gestao-badge status-${report.status.toLowerCase()}`}>{parkingLabel(report.status)}</span>
-                  <h3>{report.titulo}</h3>
-                </header>
-                <div className="parking-workspace-metrics parking-report-metrics"><ParkingMetric label="Entradas" value={report.entradas} tone="green" icon="arrow"/><ParkingMetric label="Saídas" value={report.saidas} icon="logout"/><ParkingMetric label="Ocorrências" value={report.ocorrencias} tone="amber" icon="shield"/></div><dl>
-                  <div><dt>Responsável</dt><dd>{report.membro_nome}</dd></div>
-                  <div><dt>Período</dt><dd>{formatTime(report.inicia_em)} até {formatTime(report.termina_em)}</dd></div>
-                  <div className="gestao-wide"><dt>Resumo</dt><dd>{report.resumo || "Nenhum resumo informado neste relatório."}</dd></div>
-                </dl>
-                <p className="parking-report-next">{report.status === "AGUARDANDO_LIDER" ? "Próximo passo: revisar o relatório e confirmar o envio ou solicitar correção." : report.status === "AGUARDANDO_MEMBRO" ? "Aguardando o responsável enviar o fechamento do plantão." : report.status === "ENVIADO_PASTOR" ? "Relatório encaminhado ao pastor." : "Confira o estado do relatório antes de continuar."}</p>
-                {canReviewReports && report.status === "AGUARDANDO_LIDER" && (
-                  <div className="gestao-row-actions">
-                    <button type="button" className="gestao-primary" disabled={working} onClick={() => void reportAction({ id: report.id, acao: "CONFIRMAR" })}>Confirmar e enviar ao pastor</button>
-                    <button type="button" className="gestao-ghost" disabled={working} onClick={() => void reportAction({ id: report.id, acao: "CORRIGIR", resumo: report.resumo })}>Solicitar correção</button>
-                  </div>
-                )}
-              </article>
-            )) : <ParkingEmpty icon="layers" title="Nenhum relatório disponível">Os relatórios aparecem a partir dos plantões do ministério. Aqui você acompanha o envio e a revisão de cada fechamento.</ParkingEmpty>}
+            {reports.length ? reports.map(report => <ParkingReportCard key={report.id} report={report} working={working} onAction={reportAction} />) : <ParkingEmpty icon="layers" title="Nenhum relatório disponível">Os relatórios aparecem a partir dos plantões do ministério. Aqui você acompanha o envio e a revisão de cada fechamento.</ParkingEmpty>}
           </div>
         </section>
       )}

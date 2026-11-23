@@ -10,7 +10,7 @@ import type {
   Reservation,
 } from "./types";
 
-export function useParkingData(memberMode: boolean) {
+export function useParkingData(memberMode: boolean, reportsEnabled = true) {
   const [data, setData] = useState<ParkingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
@@ -53,7 +53,7 @@ export function useParkingData(memberMode: boolean) {
       const [response,reservationResponse,reportResponse] = await Promise.all([
         fetch((memberMode ? "/api/pilot/estacionamento/disponibilidade" : "/api/pilot/estacionamento") + "?" + params,options),
         fetch("/api/pilot/estacionamento/reservas?"+filters,options),
-        memberMode ? Promise.resolve(null) : fetch("/api/pilot/estacionamento/relatorios",options),
+        memberMode || !reportsEnabled ? Promise.resolve(null) : fetch("/api/pilot/estacionamento/relatorios",options),
       ]);
       if ([response,reservationResponse,reportResponse].some(item=>item && [401,403,423].includes(item.status)) && sequence===sequenceRef.current) {
         setData(null);setReservations([]);setReports([]);setEventOptions([]);setCanManageReservations(false);setCanReviewReports(false);
@@ -82,7 +82,7 @@ export function useParkingData(memberMode: boolean) {
     } finally {
       if (sequence === sequenceRef.current) { setLoading(false); requestRef.current=null; }
     }
-  }, [memberMode,context,reservationFilters]);
+  }, [memberMode,reportsEnabled,context,reservationFilters]);
 
   const refreshReservations = useCallback(() => load(true),[load]);
   useEffect(() => {
@@ -409,6 +409,7 @@ export function useParkingData(memberMode: boolean) {
     reservations,
     eventOptions,
     reports,
+    reportsEnabled,
     canManageReservations,
     canReviewReports,
     sectors,

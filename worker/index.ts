@@ -12,6 +12,8 @@ import { syncPendingVisitorSheets } from "../app/lib/visitor-sheets";
 import { purgeVisitorSharingHistory } from '../app/lib/visitor-sharing-history';
 import { getRuntimeEnv } from '../db/runtime-env';
 import { VisitorDriveError } from '../app/lib/visitor-drive-store';
+import { closeParkingReports } from "../app/lib/parking-report-closure";
+import { deliverScheduledReports } from "../app/lib/report-schedules";
 
 interface Env {
   ASSETS: Fetcher;
@@ -46,6 +48,7 @@ let nextAutoSyncCheckAt = 0;
 let nextPushQueueCheckAt = 0;
 let nextAccessCleanupAt = 0;
 let nextVisitorSheetCheckAt = 0;
+let nextParkingClosureCheckAt = 0;
 const AUTO_SYNC_CHECK_MS = 60_000;
 const AUTO_SYNC_MUTATION_PATHS = [
   "/api/auth/cadastro", "/api/conta/perfil", "/api/pilot/pessoas",
@@ -67,6 +70,9 @@ function relevantCatalogMutation(pathname: string, method: string) {
 // const imageConfig: ImageConfig = { dangerouslyAllowSVG: true };
 
 const worker = {
+  scheduled(_controller: unknown, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(closeParkingReports(env.DB).then(() => deliverScheduledReports(env.DB)));
+  },
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const resetRequest = url.pathname === '/api/proprietario/reset';
@@ -125,6 +131,10 @@ const worker = {
       });
       if (resetRequest) return withSecurityHeaders(response, url.pathname);
       const now = Date.now();
+      if (env.DB && now >= nextParkingClosureCheckAt && url.pathname.startsWith("/api/")) {
+        nextParkingClosureCheckAt = now + 60_000;
+        ctx.waitUntil(closeParkingReports(env.DB).then(() => deliverScheduledReports(env.DB)).catch(() => undefined));
+      }
       const visitorMutation = UNSAFE_METHODS.has(request.method) && /^\/api\/(pilot\/(visitantes|acompanhamentos|celulas|visitante-categorias)|mobile\/visitors)(\/|$)/.test(url.pathname);
       if (response.status < 400 && (visitorMutation || now >= nextVisitorSheetCheckAt) && url.pathname.startsWith("/api/") && !url.pathname.includes("/planilha")) {
         nextVisitorSheetCheckAt = now + 60000;
@@ -149,11 +159,11 @@ const worker = {
       }
       return withSecurityHeaders(response, url.pathname);
     } catch (error) {
-      if (url.pathname.startsWith("/api/") && error instanceof SyntaxError) {
-        return withSecurityHeaders(Response.json({ error: "Corpo da solicitação inválido." }, { status: 400 }), url.pathname);
-      }
       if (url.pathname.startsWith("/api/") && /PLAN_([A-Z_]*LIMIT|INACTIVE)/.test(String(error))) {
         return withSecurityHeaders(Response.json({error:"O plano da comunidade está inativo ou atingiu o limite deste recurso. Consulte o responsável."},{status:409}),url.pathname);
+      }
+      if (url.pathname.startsWith("/api/") && error instanceof SyntaxError) {
+        return withSecurityHeaders(Response.json({ error: "Corpo da solicitação inválido." }, { status: 400 }), url.pathname);
       }
       const fallback = url.pathname.startsWith("/api/")
         ? Response.json(

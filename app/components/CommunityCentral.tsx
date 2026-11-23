@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { centralCsv, centralReportRows, safeCentralDestination, type CentralData } from "../lib/community-central";
 import { matchesDirectorySearch } from "../lib/directory-search";
 import "./community-central.css";
+import ManagementReportArchive from "./ManagementReportArchive";
 
 export const CENTRAL_VIEWS = ["comunidade", "membro", "lider", "pessoas", "relatorios", "avisos", "conta", "continuidade", "configuracoes"];
 const TITLES: Record<string, string> = { comunidade: "Visão geral", membro: "Minha participação", lider: "Liderança", pessoas: "Pessoas", relatorios: "Relatórios", avisos: "Avisos", conta: "Perfil e conta", continuidade: "Continuidade", configuracoes: "Configurações" };
@@ -34,7 +35,7 @@ export function CentralNavigation({ communityName, roleLabel, current, allowed, 
   </div>;
 }
 
-export default function CommunityCentral({ mode = "overview", communityId, onNotifications }: { mode?: "overview" | "member" | "leadership" | "reports" | "notices"; communityId: number; onNotifications?: () => void }) {
+export default function CommunityCentral({ mode = "overview", communityId, onNotifications, reportsEnabled = true, reportPreferenceKey, canScheduleReports }: { mode?: "overview" | "member" | "leadership" | "reports" | "notices"; communityId: number; onNotifications?: () => void; reportsEnabled?: boolean; reportPreferenceKey?: string; canScheduleReports?: boolean }) {
   const [days, setDays] = useState(30);
   const [data, setData] = useState<CentralData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -45,14 +46,15 @@ export default function CommunityCentral({ mode = "overview", communityId, onNot
   const [exportMessage, setExportMessage] = useState("");
   const requestRef = useRef<AbortController | null>(null);
   const personal = mode === "member";
+  const reportMode = mode === "reports";
   const fetchData = useCallback(async () => {
     requestRef.current?.abort(); const controller = new AbortController(); requestRef.current = controller;
-    return fetch(`/api/pilot/central?days=${days}${personal ? "&scope=me" : ""}`, { cache: "no-store", signal: controller.signal }).then(async response=>{
+    return fetch(`/api/pilot/central?days=${days}${personal ? "&scope=me" : ""}${reportMode ? "&view=reports" : ""}`, { cache: "no-store", signal: controller.signal }).then(async response=>{
       const result = await response.json();
       if (!response.ok) { if ([401,403].includes(response.status) && !controller.signal.aborted) setData(null); throw new Error(result.error || "Não foi possível consultar a Central."); }
       if (result.community?.id !== communityId || !Array.isArray(result.ministries) || !Array.isArray(result.metrics) || !Array.isArray(result.errors) || !Array.isArray(result.notices) || !Array.isArray(result.schedules) || !result.capabilities || !Array.isArray(result.areas) || !Array.isArray(result.events) || !Array.isArray(result.cellReports)) throw new Error("A consulta retornou dados incompletos. Tente novamente.");
       if (!controller.signal.aborted) { setData(result); setMinistryId(current => result.ministries.some((m: { id: number }) => String(m.id) === current) ? current : ""); }
-    }).catch(cause=>{ if (!controller.signal.aborted) setError((cause as Error).message); }).finally(()=>{ if (!controller.signal.aborted) setLoading(false); });},[communityId, days, personal]);
+    }).catch(cause=>{ if (!controller.signal.aborted) setError((cause as Error).message); }).finally(()=>{ if (!controller.signal.aborted) setLoading(false); });},[communityId, days, personal, reportMode]);
   const load=useCallback(()=>{setLoading(true); setError("");return fetchData();},[fetchData]);
  useEffect(() => { void fetchData(); return () => requestRef.current?.abort(); }, [fetchData]);
 const queryKey=JSON.stringify([communityId,days,personal]);
@@ -60,7 +62,6 @@ const queryKey=JSON.stringify([communityId,days,personal]);
  if(previousQueryKey!==queryKey){setPreviousQueryKey(queryKey);setLoading(true); setError(""); setData(null);}
    const ministries = data?.ministries.filter(m => (!ministryId || String(m.id) === ministryId) && matchesDirectorySearch(query, m.name, m.leader)) || [];
   const notices = data?.notices.filter(n => (!onlyUnread || !n.read) && matchesDirectorySearch(query, n.title, n.message, n.ministry)) || [];
-  const reportMode = mode === "reports";
   const noticesMode = mode === "notices";
   const personalScope = personal || data?.scope === "personal";
   const title = noticesMode ? "Seus avisos" : reportMode ? "Relatórios" : personal ? "Minha participação" : mode === "leadership" ? "Ministérios e liderança" : personalScope ? "Meu resumo" : "Resumo da comunidade";
@@ -68,8 +69,8 @@ const queryKey=JSON.stringify([communityId,days,personal]);
   function downloadReport() {
     if (!data || loading || data.errors.some(e => ["ministries", "pastoral"].includes(e.section))) return;
     try {
-      const blob = new Blob([centralCsv(centralReportRows(data, ministries))], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `relatorio-comunidade-${communityId}-${days}dias.csv`; a.click();
+      const blob = new Blob([centralCsv(centralReportRows(data, ministries, true))], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `relatorio-ministerios-${communityId}-${ministryId || "todos"}-${days}dias.csv`; a.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000); setExportMessage("Relatório preparado para download. Confira os arquivos do seu dispositivo.");
     } catch { setExportMessage("Não foi possível baixar. Use Imprimir para salvar uma cópia em PDF."); }
   }
@@ -77,11 +78,12 @@ const queryKey=JSON.stringify([communityId,days,personal]);
   const reportControls = data && (data.capabilities.ministries || data.capabilities.cellReports) && <div className="central-report-controls">
           <div className="central-toolbar"><label>Período<select value={days} onChange={e => setDays(Number(e.target.value))}><option value={7}>Últimos 7 dias</option><option value={30}>Últimos 30 dias</option><option value={90}>Últimos 90 dias</option></select></label>{data.capabilities.ministries && <label>{reportMode ? "Ministério" : "Buscar ministério"}{reportMode ? <select value={ministryId} onChange={e => setMinistryId(e.target.value)}><option value="">Todos os disponíveis</option>{data.ministries.map(m => <option value={m.id} key={m.id}>{m.name}</option>)}</select> : <input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Nome ou responsável" />}</label>}{reportMode && <div className="central-export-actions"><button type="button" onClick={downloadReport} disabled={data.errors.some(e => ["ministries", "pastoral"].includes(e.section))}>Baixar CSV</button><button type="button" onClick={() => window.print()}>Imprimir / PDF</button></div>}</div>
           <p className="central-note">{date(data.period.from)} a {date(data.period.to)} · Confirmação de escala não comprova presença.</p>
+          {reportMode && <p className="central-note">{ministryId ? "O CSV contém o ministério selecionado." : "O CSV contém os ministérios deste recorte."}</p>}
           {exportMessage && <p role="status">{exportMessage}</p>}
         </div>;
 
   return <section className={`central-dashboard central-mode-${mode}`} aria-busy={loading}>
-    <header className="central-page-heading"><div><span className="central-eyebrow">{noticesMode ? "COMUNICAÇÃO" : reportMode ? "CONSULTAS E EXPORTAÇÃO" : personalScope ? "SEU DIA A DIA" : "ACOMPANHAMENTO"}</span><h2>{title}</h2><p>{data?.scopeLabel || (personal ? "Sua participação" : "Carregando seu contexto…")}{data && <> · Atualizado {dateTime(data.generatedAt)}</>}</p></div><div className="central-heading-actions">{!reportMode && !noticesMode && <a className="central-primary-action" href={personalScope ? "/painel?view=conta" : "/painel?view=relatorios"}>{personalScope ? "Meu perfil" : "Ver relatórios"}<CentralIcon name="arrow"/></a>}<button type="button" onClick={() => void load()} disabled={loading}>{loading ? "Atualizando…" : "Atualizar"}</button></div></header>
+    <header className="central-page-heading"><div><span className="central-eyebrow">{noticesMode ? "COMUNICAÇÃO" : reportMode ? "CONSULTAS E EXPORTAÇÃO" : personalScope ? "SEU DIA A DIA" : "ACOMPANHAMENTO"}</span><h2>{title}</h2><p>{data?.scopeLabel || (personal ? "Sua participação" : "Carregando seu contexto…")}{data && <> · Atualizado {dateTime(data.generatedAt)}</>}</p></div><div className="central-heading-actions">{!reportMode && !noticesMode && (personalScope || reportsEnabled) && <a className="central-primary-action" href={personalScope ? "/painel?view=conta" : "/painel?view=relatorios"}>{personalScope ? "Meu perfil" : "Ver relatórios"}<CentralIcon name="arrow"/></a>}<button type="button" onClick={() => void load()} disabled={loading}>{loading ? "Atualizando…" : "Atualizar"}</button></div></header>
     {error && <div className="central-error" role="alert"><p>{error}</p><button type="button" onClick={() => void load()}>Tentar novamente</button></div>}
     {loading && <p className="central-empty" role="status">{data ? "Atualizando informações…" : "Consultando as informações disponíveis para você…"}</p>}
     {data && <>
@@ -109,8 +111,9 @@ const queryKey=JSON.stringify([communityId,days,personal]);
 
 
 
-        {data.capabilities.ministries && <section className="central-section central-report-section">
-          <div className="central-section-heading"><div><h3><CentralIcon name="lider"/>{personalScope ? "Meus ministérios e participação" : "Ministérios em acompanhamento"}</h3><p>{personalScope ? "Sua participação no período. Os números abaixo se referem somente a você." : "Compare os ministérios no período. Integrantes e pendências mostram a situação atual."}</p></div>{!reportMode && <a href="/painel?view=relatorios">Todos os relatórios →</a>}</div>
+        {mode === "overview" && reportsEnabled && !personalScope && <ManagementReportArchive preview />}
+        {data.capabilities.ministries && (mode !== "overview" || data.scope !== "community") && <section className="central-section central-report-section">
+          <div className="central-section-heading"><div><h3><CentralIcon name="lider"/>{personalScope ? "Meus ministérios e participação" : "Ministérios em acompanhamento"}</h3><p>{personalScope ? "Sua participação no período. Os números abaixo se referem somente a você." : "Compare os ministérios no período. Integrantes e pendências mostram a situação atual."}</p></div>{!reportMode && reportsEnabled && <a href="/painel?view=relatorios">Todos os relatórios →</a>}</div>
           {reportControls}
           <div className={`central-ministry-table${personalScope ? " is-personal" : ""}`} role="table" aria-label="Relatório de ministérios"><div className="central-ministry-columns" role="row"><span role="columnheader">Ministério / responsável</span>{!personalScope && <span role="columnheader">Integrantes</span>}<span role="columnheader">Escalas</span><span role="columnheader">Confirmações</span><span role="columnheader">Ausências</span><span role="columnheader">Pendentes futuras</span></div>{ministries.map(m => <div className="central-ministry-row" role="row" key={m.id}><div role="cell"><a href={`/painel?view=ministerios&ministry=${m.id}`}>{m.name}<span aria-hidden="true"> ↗</span></a><small>{m.leader}</small></div>{[...(!personalScope ? [["Integrantes", m.volunteers ?? "Não disponível"]] : []), ["Escalas", data.capabilities.schedules ? m.schedules : "—"], ["Confirmações", data.capabilities.schedules ? m.confirmed : "—"], ["Ausências", data.capabilities.schedules ? m.absent : "—"], ["Pendentes futuras", data.capabilities.schedules ? m.pending : "—"]].map(([label, value]) => <div role="cell" key={label} className={label === "Pendentes futuras" && Number(value) > 0 ? "needs-attention" : undefined}><small className="central-mobile-label">{label}</small><strong>{value}</strong></div>)}</div>)}</div>
           {!ministries.length && !data.errors.some(e => e.section === "ministries") && <p className="central-empty">{query || ministryId ? "Nenhum ministério corresponde ao filtro." : data.scope === "leadership" ? "Você ainda não está vinculado como responsável ou líder de um ministério." : "Nenhum ministério disponível para este acesso."}</p>}
@@ -119,9 +122,9 @@ const queryKey=JSON.stringify([communityId,days,personal]);
 
         {!data.capabilities.ministries && data.capabilities.cellReports && reportControls}
         {!reportMode && data.capabilities.events && <section className="central-section"><div className="central-section-heading"><div><h3><CentralIcon name="agenda"/>Na agenda da comunidade</h3><p>Os cinco próximos eventos publicados.</p></div><a href="/painel?view=eventos">Ver agenda →</a></div>{data.events.map(e => <div className="central-schedule-row" key={e.id}><time dateTime={e.startsAt}><strong>{day(e.startsAt)}</strong><small>{month(e.startsAt)}</small></time><span><strong>{e.title}</strong><small>{time(e.startsAt)}{e.location && ` · ${e.location}`}{e.response === "CONFIRMADO" && " · Você confirmou"}</small></span></div>)}{!data.events.length && !data.errors.some(e => e.section === "events") && <p className="central-empty">Nenhum próximo evento publicado.</p>}</section>}
-        {reportMode && !data.capabilities.ministries && !data.capabilities.cellReports && <p className="central-empty">Nenhum relatório está disponível para as áreas autorizadas ao seu perfil.</p>}
+
         {data.pastoralLocked && <p className="central-note">Os indicadores pastorais precisam ser liberados pelo criador da comunidade. Os demais dados disponíveis continuam acessíveis.</p>}
-        {data.capabilities.cellReports && <section className="central-section"><div className="central-section-heading"><div><h3><CentralIcon name="relatorios"/>Relatórios recebidos das células</h3><p>Encontros registrados no período selecionado.</p></div><a href="/painel?view=celulas">Abrir células →</a></div>{data.cellReports.map(r => <details className="central-cell-report" key={r.id}><summary><span><strong>{r.name}</strong><small>{date(r.date)}</small></span><span>{r.happened ? `${r.attendees} presentes · ${r.visitors} visitantes` : "Encontro não realizado"}</span></summary><p>{r.notes || "Sem observações adicionais."}</p></details>)}{!data.cellReports.length && !data.errors.some(e => e.section === "pastoral") && <p className="central-empty">Nenhum relatório de célula disponível neste período.</p>}{data.limits.cellReports && <p className="central-note">50 relatórios mais recentes. Consulte os demais na área de células.</p>}</section>}
+        {reportMode && reportsEnabled && <ManagementReportArchive preferenceKey={reportPreferenceKey} canSchedule={canScheduleReports} />}
         {reportMode && data.areas.length > 0 && <section className="central-section"><div className="central-section-heading"><div><h3>Consultas por área</h3><p>Continue a análise nos módulos disponíveis para você.</p></div></div><div className="central-area-index">{data.areas.map(area => <a key={area.href} href={area.href}><strong>{area.label}</strong><small>{area.description}</small><span aria-hidden="true">→</span></a>)}</div></section>}
       </>}
     </>}

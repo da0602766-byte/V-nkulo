@@ -23,7 +23,7 @@ export function filterPlanPermissions(permissions:string[], plan:CommercialPlan|
   return permissions.filter(p=> {
     if((p.startsWith('feed.')||p==='community.feed.settings')&&!plan.recursos.includes('feed')) return false;
     if(p.startsWith('requests.')&&!plan.recursos.includes('requests')) return false;
-    if((p.endsWith('.report')||p.includes('stats.')||p.includes('reports.'))&&!plan.recursos.includes('reports')) return false;
+    if((p.endsWith('.report')||p.includes('stats.')||p.includes('reports.')||p==='pastoral.panel.view')&&!plan.recursos.includes('reports')) return false;
     return true;
   });
 }
