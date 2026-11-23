@@ -109,7 +109,7 @@ export const COMMUNITY_PALETTES: CommunityPalette[] = [
       surface: "#fafbfc",
       surface2: "#e8ebf2",
       text: "#1b2332",
-      muted: "#687284",
+      muted: "#5d677a",
       line: "#d6dae4",
       primary: "#6243d7",
       secondary: "#327fc4",

@@ -26,7 +26,7 @@
 .cgestao-directory .cgestao-kicker{overflow-wrap:anywhere}
 .cgestao-directory .cgestao-header-actions{flex-wrap:wrap;flex-shrink:1;gap:4px 8px}
 .cgestao-directory .cgestao-header-actions button{min-height:calc(44px * var(--vinkulo-ui-scale-inverse,1));padding:8px 12px;font-size:14px;white-space:normal}
-.cgestao-directory .cgestao-header-actions .cgestao-btn-solid{background:var(--acc);border-color:var(--acc)}
+.cgestao-directory .cgestao-header-actions .cgestao-btn-solid{background:var(--acc);border-color:var(--acc);color:var(--community-on-primary,#fff)!important}
 .cgestao-directory .cgestao-header-actions .cgestao-btn-outline{background:transparent;border-color:transparent;color:var(--acc)!important;padding-inline:0}
 .cgestao-directory .cgestao-filters{display:grid;grid-template-columns:minmax(220px,1fr) minmax(130px,160px) minmax(160px,220px);gap:10px 12px;align-items:end;margin-bottom:12px}
 .cgestao-directory .cgestao-search,.cgestao-filter-field{display:grid;gap:4px;min-width:0;color:var(--muted);font-size:13px;font-weight:650}

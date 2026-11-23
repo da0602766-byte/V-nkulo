@@ -14342,7 +14342,7 @@ html[data-pilot-theme="escuro"] {
   background:transparent!important;
 }
 .pilot-dashboard[data-ui-version="v2"] .pilot-workspace>section { min-width:0; max-width:100%; }
-.pilot-dashboard[data-ui-version="v2"] .pilot-kicker { margin:0; color:var(--v2-teal)!important; font-size:var(--fs-xs)!important; font-weight:850!important; letter-spacing:.13em!important; }
+.pilot-dashboard[data-ui-version="v2"] .pilot-kicker { margin:0; color:var(--community-link,var(--v2-teal))!important; font-size:var(--fs-xs)!important; font-weight:850!important; letter-spacing:.13em!important; }
 
 /* Visão geral e feed */
 .pilot-dashboard[data-ui-version="v2"] .community-home {
@@ -16779,7 +16779,7 @@ body {
 .pilot-dashboard[data-ui-version="v2"] .pilot-sidebar nav { gap: 8px !important; }
 .pilot-dashboard[data-ui-version="v2"] .pilot-sidebar-group { display: grid; gap: 2px; }
 .pilot-dashboard[data-ui-version="v2"] .pilot-sidebar-group + .pilot-sidebar-group { margin-top: 6px; }
-.pilot-dashboard[data-ui-version="v2"] .pilot-sidebar-group > h2 { margin: 0; color: var(--faint); padding: 7px 10px 4px; font-family: var(--font-body), Arial, sans-serif; font-size: var(--fs-xs); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.pilot-dashboard[data-ui-version="v2"] .pilot-sidebar-group > h2 { margin: 0; color: var(--pilot-muted); padding: 7px 10px 4px; font-family: var(--font-body), Arial, sans-serif; font-size: var(--fs-xs); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
 .pilot-dashboard[data-ui-version="v2"] .pilot-sidebar nav :is(button, a) { min-height: 42px; color: var(--muted) !important; }
 .pilot-dashboard[data-ui-version="v2"] .pilot-sidebar nav :is(button, a):hover { background: var(--bg) !important; color: var(--ink) !important; }
 .pilot-dashboard[data-ui-version="v2"] .pilot-sidebar nav button.active { background: var(--violet-soft) !important; color: var(--violet) !important; }
