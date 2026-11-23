@@ -20,9 +20,9 @@ o usuário autoriza, sem conceder acesso geral ao Drive.
 Crie uma credencial **OAuth Client ID** do tipo **Web application** e use:
 
 - Origem JavaScript autorizada:
-  `https://adote-gestao.da0602766.chatgpt.site`
+  `https://vinkulo.da0602766.chatgpt.site`
 - URI de redirecionamento autorizada:
-  `https://adote-gestao.da0602766.chatgpt.site/api/auth/google/callback`
+  `https://vinkulo.da0602766.chatgpt.site/api/auth/google/callback`
 
 Copie o Client ID e o Client Secret. O Client Secret deve ser informado somente
 no gerenciador seguro de variáveis do Site.
@@ -39,10 +39,13 @@ do projeto" e "testador autorizado" são cadastros separados.
 2. Em **Usuários de teste**, adicione os e-mails que vão entrar (limite de 100).
 3. O acesso vale imediatamente, sem verificação do Google.
 
-Para abrir o app a qualquer pessoa é preciso publicar em produção e passar pela
-verificação do Google, porque `drive.file` é um escopo sensível. A verificação
-exige a Política de Privacidade e os Termos publicados, além da propriedade do
-domínio confirmada no Search Console:
+O Google classifica `drive.file` como não sensível. Confira separadamente no
+Google Auth Platform o status de publicação, a verificação da marca e a
+revisão de acesso aos dados. O fluxo opcional de Planilhas solicita escopos
+adicionais e precisa da própria revisão.
+
+Use os links do domínio atual na configuração da marca. Confirme a propriedade
+do domínio exigido no Google Search Console quando o Console solicitar.
 
 - Página inicial: `https://<dominio>/`
 - Política de Privacidade: `https://<dominio>/privacidade`
@@ -72,5 +75,6 @@ domínio confirmada no Search Console:
 - Entrar com Google não autoriza o Drive automaticamente.
 - Uma Conta Google não cria uma conta Vínkulo nem um vínculo comunitário.
 - Novas fotos e arquivos não são gravados no bucket da plataforma.
-- Novas mensagens são criptografadas antes de serem salvas no Drive.
+- As mensagens privadas seguem a política de retenção do chat descrita em
+  [Privacidade](https://vinkulo.da0602766.chatgpt.site/privacidade).
 - O download automático começa desligado e depende da escolha do usuário.

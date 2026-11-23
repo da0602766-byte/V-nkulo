@@ -11,9 +11,9 @@ marcado como `[a definir]`.
 
 ## 2. Domínio utilizado
 
-`adote-gestao.da0602766.chatgpt.site` (origem única identificada no
-código-fonte, em `app/compartilhar/publicacao/[id]/page.tsx` e no
-`docs/guias/GOOGLE_DRIVE_SETUP.md` já existente no repositório).
+`vinkulo.da0602766.chatgpt.site` é a origem publicada. O domínio anterior
+redireciona para ela. O início do OAuth solicita o callback na origem atual.
+Confira a URI exata na credencial Web do Google Cloud Console.
 
 Se houver um domínio próprio (`vinkulo.com`, `vinkulo.app` ou similar)
 planejado além deste, ele precisa ser adicionado nas mesmas telas do
@@ -25,29 +25,29 @@ no Console.
 
 | URL | Uso |
 | --- | --- |
-| `https://adote-gestao.da0602766.chatgpt.site` | Homepage / Origem JavaScript autorizada |
-| `https://adote-gestao.da0602766.chatgpt.site/privacidade` | Política de Privacidade |
-| `https://adote-gestao.da0602766.chatgpt.site/termos` | Termos de Uso |
-| `https://adote-gestao.da0602766.chatgpt.site/exclusao-de-dados` | Instruções de exclusão de conta e dados |
-| `https://adote-gestao.da0602766.chatgpt.site/contato` | Contato/suporte |
-| `https://adote-gestao.da0602766.chatgpt.site/api/auth/google/callback` | Redirect URI (login e Drive usam o mesmo endpoint) |
+| `https://vinkulo.da0602766.chatgpt.site` | Homepage / Origem JavaScript autorizada |
+| `https://vinkulo.da0602766.chatgpt.site/privacidade` | Política de Privacidade |
+| `https://vinkulo.da0602766.chatgpt.site/termos` | Termos de Uso |
+| `https://vinkulo.da0602766.chatgpt.site/exclusao-de-dados` | Instruções de exclusão de conta e dados |
+| `https://vinkulo.da0602766.chatgpt.site/contato` | Contato/suporte |
+| `https://vinkulo.da0602766.chatgpt.site/api/auth/google/callback` | Redirect URI (login e Drive usam o mesmo endpoint) |
 
 ## 4. Homepage
 
-`https://adote-gestao.da0602766.chatgpt.site/` — página pública, sem
+`https://vinkulo.da0602766.chatgpt.site/` — página pública, sem
 login, com apresentação da plataforma e links de rodapé para Privacidade,
 Termos, Exclusão de dados e Contato.
 
 ## 5. Política de Privacidade
 
-`https://adote-gestao.da0602766.chatgpt.site/privacidade` — já existe e
+`https://vinkulo.da0602766.chatgpt.site/privacidade` — já existe e
 foi atualizada nesta rodada com: separação login vs. Drive, menção
 explícita aos escopos usados, referência à Google API Services User Data
 Policy, e link para a página de exclusão de dados.
 
 ## 6. Termos de Uso
 
-`https://adote-gestao.da0602766.chatgpt.site/termos` — já existe, agora
+`https://vinkulo.da0602766.chatgpt.site/termos` — já existe, agora
 com uma seção curta referenciando Conta Google/Drive e a página de
 exclusão.
 
@@ -57,7 +57,7 @@ Cadastrar no Google Cloud Console, em **APIs e serviços → Credenciais →
 [seu OAuth Client] → URIs de redirecionamento autorizados**:
 
 ```
-https://adote-gestao.da0602766.chatgpt.site/api/auth/google/callback
+https://vinkulo.da0602766.chatgpt.site/api/auth/google/callback
 ```
 
 Para desenvolvimento local (opcional, só se for testar OAuth localmente):
@@ -66,10 +66,9 @@ Para desenvolvimento local (opcional, só se for testar OAuth localmente):
 http://localhost:5188/api/auth/google/callback
 ```
 
-Não existe redirect URI dinâmica nem gerada por usuário — o código sempre
-usa `origin + "/api/auth/google/callback"`, e agora rejeita origem que não
-seja HTTPS (exceto localhost), então uma URL fora dessas duas não
-completa o fluxo mesmo que alguém tente forçar.
+O código monta a URI com a origem da requisição e o caminho fixo
+`/api/auth/google/callback`. O Google exige que a URI transmitida corresponda
+à configuração do cliente OAuth Web.
 
 ## 8. Scopes solicitados
 
@@ -78,7 +77,10 @@ completa o fluxo mesmo que alguém tente forçar.
 | `openid` | Sempre (login) | Não sensível |
 | `email` | Sempre (login) | Não sensível |
 | `profile` | Sempre (login) | Não sensível |
-| `https://www.googleapis.com/auth/drive.file` | Só quando o usuário clica em "Conectar Google Drive" | Sensível (não é restrito — `drive.file` fica de fora da lista de escopos restritos do Google) |
+| `https://www.googleapis.com/auth/drive.file` | Quando o usuário autoriza o Google Drive | Não sensível |
+
+O fluxo opcional de Planilhas também solicita `spreadsheets` e
+`drive.metadata.readonly`. Revise esses escopos no Console se usar esse fluxo.
 
 ## 9. Justificativa de cada escopo
 
@@ -111,9 +113,8 @@ OAuth"):
 3. **Logo**: usar o ícone já publicado em `/vinkulo-app-icon-192.png`.
 4. **E-mail de suporte ao usuário**: `[a definir]`.
 5. **E-mail de contato do desenvolvedor**: `[a definir]`.
-6. **Domínios autorizados**: `chatgpt.site` (ou o domínio próprio, se
-   houver) — precisa passar pela verificação de propriedade do domínio no
-   Google Search Console antes de publicar.
+6. **Domínios autorizados**: confira o domínio exigido pelo Console para
+   as URLs públicas e comprove propriedade onde a conta tiver controle.
 
 ## 12. Configurações em Branding
 
@@ -133,9 +134,8 @@ OAuth"):
 
 ## 14. Data Access
 
-- Listar os escopos da seção 8 (o Console já detecta os escopos
-  solicitados pelo código, mas confirme que aparecem exatamente esses
-  quatro, sem nenhum escopo extra herdado de um teste anterior).
+- Conferir os escopos da seção 8 e revisar separadamente os do fluxo opcional
+  de Planilhas.
 - Confirmar a resposta às perguntas de uso de dados do Drive: os dados são
   usados **somente dentro do próprio app**, não são vendidos, não
   alimentam publicidade, e não são usados para treinar modelos de IA
@@ -155,14 +155,12 @@ OAuth"):
    de exclusão/contato estão publicadas e acessíveis sem login (itens 3-6
    já cobrem isso).
 2. Preencher Branding, Audience e Data Access (itens 12-14).
-3. Verificar a propriedade do domínio `chatgpt.site` (ou domínio próprio)
-   no [Google Search Console](https://search.google.com/search-console),
-   com a mesma conta usada no Google Cloud.
+3. Se solicitado, comprovar no [Google Search Console](https://search.google.com/search-console)
+   a propriedade do domínio exigido. Se a verificação depender do domínio do
+   provedor, registre essa dependência antes de prosseguir.
 4. No Google Auth Platform, clicar em **Publish App** (ou "Publicar
-   aplicativo"). Como o único escopo sensível é `drive.file` (não é
-   restrito), o Google normalmente **não exige verificação de segurança
-   de terceiros (CASA)** — só a revisão padrão do próprio Google, que pode
-   levar alguns dias.
+   aplicativo"). Confira na Central de verificação o status da marca e os
+   requisitos de acesso aos dados conforme os escopos solicitados.
 5. Se o Google pedir o vídeo de demonstração, use o roteiro em
    `docs/guias/GOOGLE_OAUTH_VIDEO_VERIFICACAO.md`.
 
